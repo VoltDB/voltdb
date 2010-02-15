@@ -1,0 +1,554 @@
+% VoltDB Developer Guide
+
+CAUTION: The information in this file is out of date; however, 
+there is enough valid content - seems a shame to remove this file.
+
+
+Overview
+========
+
+A _site_ or _worker site_ is a single node in Horizontica.  A host can run
+multiple sites.  Each site manages a single partition.  A partition can be
+replicated onto multiple sites (preferably running on *at least* distinct
+hosts).
+
+Server
+======
+
+The main server class is `VoltDB`.  This initializes the system by loading
+the catalog jar file (which contains the transactions/stored procedures along
+with the actual serialized catalog data) and starting up the sites.
+
+The server is what the client talks to (specifically, the `ClientInterface`).
+Initially there will just be one server, but the long-term plan includes a
+server per host.
+
+Currently the system aims to run only a single site on a single host.
+
+Control Flow Outline/Notes
+
+- VoltDB.init
+  - read serialized catalog from jar file and execute it
+  - initialize hashinator
+  - HostMessenger.init: initialize the messaging system
+    - new HostMessenger
+      - new SocketJoiner().start()
+    - wait for group to join
+      - there is one "primary" server; all other hosts are secondary
+      - `SocketJoiner` class contains code for listening on the primary and for
+        connecting on the secondaries
+      - the primary waits for the expected number of secondaries to join
+      - the primary has host ID 0; the remaining host IDs are assigned by the
+        primary
+      - establish sockets/streams
+    - initialize localSites (int -> SiteManager), siteThreads (int -> Thread)
+    - for each site
+      - if site host ID is ours, then HostMessenger.createLocalSite
+        - sitesToHosts[siteId] = localHostId
+        - localSiteMap[siteId] = new MessengerSite
+        - if site is exec, then localSites[siteId] = new SiteManager, which
+          represents a *single node* in Horizontica, not a full partition
+          - execute the serialized catalog data
+          - create a local `ExecutionSite`; an execution unit is the main work
+            horse
+            - read some values from the catalog
+            - create a mailbox for the local site (site 1)
+            - create a `SimpleDtxnConnection` to the dtxn for the local site
+              (site 1)
+            - create a `StoredProcedureRunner`
+            - create an `ExecutionEngine` and load catalog into it as well
+              (also pass it guid of current cluster/site)
+      - else, HostMessenger.createForeignSite
+        - sitesToHosts[siteId] = hostId
+    - initialize siteThreads; details aren't important
+    - if host ID == 0, ClientInterface.create(messenger, hostCount)
+      - mqueue = ((HostMessenger)messenger).createMailbox(initiator site id = 0,
+                                         dtxn mailbox id = 0)
+        - if site id not in localSiteMap, return null (error)
+        - else, ((MessengerSite)site).createMailbox(mailbox id)
+          - mbox = this.getMailbox(mailbox id) = this.mailboxes[mailbox id]
+          - if mbox isn't null, return null (error: already exists)
+          - else, return mailboxes[mailbox id] = new SiteMailbox(this.hostMessenger, mailbox id)
+      - initiator = new SimpleDtxnInitiator(mqueue, hostCount, initiator site id,
+                                            dtxn mailbox id)
+      - this.listener = new NIOMessageListener(); this.listener.bind(21212)
+        - registers the single (ServerSocketChannel)server with the selector
+      - return new ClientInterface(listener, initiator)
+- `VoltDB.run()`: for each thread in siteThreads, `SiteManager.run()`, which
+  loops over:
+  - run `ClientInterface.run()` which talks with the client
+    - send responses for `SimpleDtxnInitiator.getCompletedTransaction()`
+    - while ((SequenceListener)this.listener).getNextEvent():
+      - while ((NIOMessageListener)this.listener).getNextEvent():
+        - pop next event off the eventQueue, or fill it with events from the
+          selector (which initially just has a single ServerSocketChannel
+          registered earlier during ClientInterface.create, but later can have
+          any number of SocketChannels that were accepted just here in
+          handleSelectedKeys())
+          - handleSelectedKeys()
+            - new NIOMessageConnection(channel=client)
+              - configure the channel, wrap in new NIOReadStream, allocate
+                writeBuffer
+      - convertMessageEvent
+        - if event is a conn add/remove, update
+          (MessageConnection)connectionInfo with new conn id
+        - else, event is a message; wrap it in an Event with conn id, seq no
+    - SimpleDtxnInitiator.createTransaction() for incoming (valid) proc calls
+      - if single-sited, sendWorkToPartition()
+        - ((SiteMailbox)this.mailbox).send(dst site = 1, mailbox id = 0, msg =
+          new SimpleDtxnUnion(new RemoteWorkRequest))
+          - ((HostMessenger)this.messenger).send(dst site, mailbox id, msg)
+            - presend(dst site, mailbox id, msg)
+              - hostId = this.sitesToHosts[site id]
+              - deliver msg directly to the specified local mailbox
+                - if hostId == localHostId
+                  - site = (MessengerSite)localSiteMap[site id]
+                  - mbox = site.getMailbox(mailbox id) = this.mailboxes[mailbox id]
+                  - mbox.deliver(msg)
+    - outstanding.add((conn id, seq no))
+  - run local `ExecutionSite.run()`
+    - `SimpleDtxnConnection.getNextWorkUnit()`
+      - findNextWork(): check to see if we currently have any work, in
+        following order:
+        - work to be undone
+        - xact currently being processed
+        - queued work units (to be executed later)
+          - createTxnStateWithWork(request)
+            - state = new TxnState(request)
+            - state.createWork(payload = request.getWork(), deps = request.getDependencyIds())
+              - w = new SimpleWorkUnit(payload, deps)
+              - if all deps satisfied, ((TxnState)this).readyWorkUnits.add(w)
+            - return state
+          - return state.getNextWorkUnit() = this.readyWorkUnits.pop()
+      - if no work, then repeatedly: read mailbox/handle new unions, then check
+        again for new work
+        - `SiteMailbox<SimpleDtxnUnion>.recv()`
+          - `HostMessenger.doWork()`
+            - for each foreign host, `ForeignHost.recv()`
+              - read from the socket; this socket is created by the
+                SocketJoiner (SocketJoiner sets up sockets among the nodes in
+                the system)
+              - eventually, put the message into the `SiteMailbox`'s `messages`
+                `ArrayList` via `SiteMailbox.deliver()`
+            - for single-host case (which is usually what we're working with at
+              the moment), there are no foreign hosts
+          - return `messages.poll()`, where `messages` is an `ArrayList` filled
+            up by `HostMessenger.doWork()` and by `ClientInterface.run()`
+            (SimpleDtxnInitiator.createTransaction/sendWorkToPartition, to be
+            precise)
+    - get the work unit's payload (an `ExecutionUnitTask`), and handle it; it
+      can be either a:
+      - stack frame drop
+        - clear `LSM.shouldContinue`
+        - call `SimpleDtxnConnection.completedWorkUnit()`
+      - `STORED_PROCEDURE`
+        - contains a `StoredProcedureInvocation`
+        - `StoredProcedureRunner.invokeProcedure()` looks up the SP by its name
+          (from the `StoredProcedureInvocation`)
+        - executes the SP (originally from the catalog jar) by calling
+          `StoredProcedureWrapper.call()`
+          - inside the actual stored procedure (e.g. `MilestoneOneInsert`),
+            there are calls to:
+            - `HZ.queueStatement()`: calls
+              `ProcedureWrapper.runStatement()`:
+              - `SimpleDtxnConnection.completedWorkUnit()`: this corresponds to the initial
+                RemoteWorkRequest
+              - for each plan frag in the stmt, `SimpleDtxnConnection.createWorkUnit(new
+                ExecutionUnitTask(...), ...)`
+              - `SimpleDtxnConnection.createWorkUnit()` a stack frame drop task
+              - `LSM.run()`: recursive call!  This is because we can't really
+                "yield" from middle of stored procedure
+                - hence, hope that the SP is of reasonable length
+            - `HZ.executeSQL()`: simply returns the results?  TODO
+        - call `SimpleDtxnConnection.completedWorkUnit()`
+      - `PLAN_FRAGMENT`
+        - `ExecutionEngine.executePlanFragment()`, down the rabbit hole
+        - call `SimpleDtxnConnection.completedWorkUnit()`
+        - call `SimpleDtxnConnection.completedWorkUnit()` at the end
+
+Execution Unit
+==============
+
+The user prepares a set of stored procedures which contain Java code
+interleaved with SQL statements.  A transaction is an execution of a stored
+procedure.
+
+When a transaction is started, the dtxn yields a `RemoteWorkRequest` work unit
+that is retrieved and handled in `ExecutionSite.run()`.  The payload will be an
+`ExecutionUnitTask` with `Type` `STORED_PROCEDURE`.  We step into the SP
+`run()` method by calling `StoredProcedureRunner.invokeProcedure()`.  The SP
+user code makes repeated calls to `HZ.queueStatement()` which calls
+`ProcedureWrapper.runStatement()`.  This then starts execution of the statement
+by first acknowledging the `STORED_PROCEDURE` initial work unit by calling
+`dtxn.completedWorkUnit()` and, for each statement in the work unit, creating a
+`PLAN_FRAGMENT` work unit.  It creates a final work unit which depends on all
+the work units created above, called the "stack frame drop" work unit; this is
+responsible for unwinding the stack.  The final `dtxn.completedWorkUnit()` call
+in the `ExecutionSite` corresponds to the work unit to return the statement
+result.  TODO: make sure about that last sentence; where exactly does this work
+unit get created?
+
+The stack unwinding is necessary due to the way SP execution works.  Because
+the SP is simply Java bytecode with calls into `HZ`, and Java has no
+continuations, coroutines, cooperative threads, etc., recursion is one way to
+suspend execution of the SP.  That is, `StoredProcedureWrapper.runStatement()`
+calls `LogicalSiteManager.run()` again to return control to HZ (so it may
+continue doing other things in its main loop, such as communicating with the
+client, and executing plan fragments or handling new work units in general).
+Recursion assumes the length/complexity of the SP is small so that stack
+explosion is not an issue, which is probably reasonable (TODO: however it could
+make concurrency trickier).  Hence, upon statement, termination, we must be
+able to unwind the stack back up to where we left off in the SP.  This is done
+using the "stack frame drop" work unit; `ExecutionSite.run()` handles this
+specially by returning right away (after marking the unit completed).  This
+runs at the end by depending on all the fragments.
+
+The plan fragments are how the query actually gets executed.  The handler
+for this in `ExecutionSite.run()` calls directly into the
+`ExecutionEngine.executePlanFragment()`.  Then the C++ side of things takes
+over.  The C++ does make callbacks back into Java via the
+`ExecutionEngine.sendDependency()` method.
+
+So in terms of what we see in the system catalog: each SP (`Procedure`) has a
+set of SQL statements (`Statement`).  Each `Statement` has, despite the catalog
+specification, a _single_ associated `Plan`.  And each `Plan` has a set of
+`PlanFragment`s, which correspond to the distribution of work.  For instance,
+if we had a statement that aggregated data from two partitions, then there
+would be 3 fragments: one per partition for the initial selection, and then a
+third one for aggregation, which has a _dependency_ on the first two.
+
+Client
+======
+
+The client uses the `HZClient` interface to communicate with the server.  An
+example of client interaction is in the `MilestoneOneExecutionTest`.
+
+Messaging System
+================
+
+The messaging system allows nodes to send messages to mailboxes that are
+addressed by high-level concepts like "site."  This requires the catalog to
+resolve addresses to hosts.
+
+The interface is in
+
+  GPL_VCR/gpl_java/gpl_src/com/horizontica/messaging/
+
+and the implementation is in
+
+  MIT_ACR/mit_java/mit_src/com/horizontica/messaging/impl/
+
+The mailbox is an abstraction that allows both sending and receiving.  One
+simple implementation of this is in `SimpleMsgRouter.Queue`, which is a
+shared-memory implementation of a mailbox (it's just backed by an `ArrayList`).
+
+The "real" implementation is in `SiteMailbox`, which itself is relatively bare
+but depends heavily on the `HostMessenger` class.  The `HostMessenger` is
+initialized by `VoltDB`.  `HostMessenger.createMailbox()` is called from
+`ExecutionSite`'s constructor (i.e. one mailbox per execution unit), and
+`.send()` method calls are forwarded via `SiteMailbox.send()`.
+
+The implementation doesn't actually perform serialization of messages between
+local sites; these messages are simply placed in the SiteMailbox.messages
+linked list.  Only messages between foreign hosts are serialized.
+
+TODO: what's the precise relationship among MessengerSite, ForeignHost,
+HostMessenger, SiteMailbox?
+
+`ExecutionSiteTask` is the transaction type, wrapped briefly in a `TxnState` by
+`SimpleDtxnInitiator.createTransaction()` before being shipped off in a
+`RemoteWorkRequest` (the `Remote*` message types are generic to the dtxn, not
+specific to H-Store).
+
+`ClientResponse` is the response type, wrapped briefly in a `TxnState` and in
+`TransactionInitiator.Response` by
+`SimpleDtxnInitiator.getCompletedTransaction()` after being received in a
+`RemoteWorkResponse`.
+
+(TODO) is the transaction fragment type.
+
+`NIOMessageListener` (a `MessageListener`) handles new connections and reading
+messages on raw channel sockets.  It has an `eventQueue` of
+`MessageListener.Event`s that it polls from/fills up in `getNextEvent()`.  It
+uses a selector for polling.  This is used by the `ClientInterface`.
+
+`SequenceListener` (really `SequenceListener.Implementation`) sits atop
+`NIOMessageListener` and tags messages with (connId, seqNo).
+
+The Java side of things is called the "frontend" to HZ.  It spins when there's
+nothing to do because it only ever polls sockets in the overarching
+`SiteManager` loop.  There are the `ClientInterface` sockets that communicate
+with clients (which uses NIO), and there are also the `ForeignHost` sockets
+that allow nodes within the HZ system to communicate with one another (which
+uses the blocking Socket interface; these sockets are set up by the
+`SocketJoiner` during initialization).  There's just a single `ClientInterface`
+per host that is "up for grabs" by all sites; the stored procedure/transaction
+requests from here are dispatched to the correct site thread via the
+SiteMailbox (inter-thread communication), and it's very unlikely that the site
+thread which happens to be reading client messages is the correct destination
+thread.  However, the messages that come off the `ForeignHost` sockets should
+be destined directly to the thread that is reading the socket.
+
+Because the `ClientInterface` uses a synchronized queue to communicate with
+sites, and because synchronized queues are not select-able, each site
+alternates between checking sockets and checking the synchronized queue, hence
+the polling loop design.  However, we should be able to do better (esp. since
+Java has a nice clean interface for waking a blocking select call).
+
+Distributed Transaction Manager
+===============================
+
+The dtxn begins mainly in the `TransactionInitiator` (`SimpleDtxnInitiator`),
+which resides on the server node and is the only way to initiate transactions.
+The initiator is currently only used from HTable, but must eventually be
+introduced into the main Horizontica system.  The most interesting two methods
+here are:
+
+- `createTransaction()`: the caller (Horizontica/HTable) must specify the
+  partitions that are involved in this transaction
+- `getCompletedTransaction()`
+
+The "central" class is `SimpleDtxnConnection`, which implements
+`SiteConnection` and is created/used by `ExecutionSite` and by `HTableHost`.
+This object is created by worker sites to interact with the dtxn system.  The
+name is a bit unfortunate, because the transaction management system itself is
+really what's implemented here.
+
+There are two main types of transactions, single-partition and multi-partition
+transactions.  All transactions involve a coordinator, which runs at one of the
+sites involved in the partition.  For single-partition transactions, the
+coordinator is on the one single site, but for multi-partition transactions,
+the system will try to place the coordinator on the site that minimizes the
+cost of the transaction (primarily, the amount of network communication).  This
+is usually the site where the most data is being touched.
+
+`SimpleDtxnConnection` decides what the next job is for the local site and also
+uses the messaging system to communicate with other sites.  The next job is
+retrieved via `getNextWorkUnit()`; each work unit must have a corresponding
+call to `completedWorkUnit()` to signal the completion of that work unit.
+TODO: understand why this is necessary (understand the code in
+`completedWorkUnit()`).
+
+There are three different types of messages exchanged:
+
+- Work requests: The initiator sends these to the coordinator partition.  The
+  worker site then (eventually) gets this by calling `getNextWorkUnit()`.  If
+  the work unit turns out to be a multi-partition transaction, then this
+  coordinator site can create and send work requests to the participant sites
+  via `createWorkUnit()`.  **Note**: The `RemoteWorkRequest` class
+  unfortunately calls coordinators "initiators" (`isInitiator()`).
+- Work dependencies: These contain the intermediate results of a transaction.
+  Participants send these to each other (these are sent along edges that
+  represent data flow dependencies).  The message ordering in the network may
+  cause some sites to receive dependencies before the site has received the
+  work request for the corresponding transaction or after the corresponding
+  transaction has terminated (aborted).
+- Work responses: The coordinator sends these to the initiator on transaction
+  completion.  Also, the non-coordinator participants can send these to the
+  coordinator on abort (so that the coordinator can prematurely stop processing
+  the transaction).  Again, message ordering trickiness may cause this message
+  to arrive before the corresponding work request has made the site aware of
+  this transaction.
+
+These three generic (non-HZ-specific) message types are non-`FastSerializable`
+and are all transmitted over the wire wrapped up in a `SimpleDtxnUnion`, which
+*is* `FastSerializable`.  These are types that are parameterized on the
+application-specific type (which are described at the end of the previous
+section).  They must be deserialized by passing the appropriate type to the
+`SimpleDtxnUnion.get*()` methods.
+
+The logic is primarily in the polling-style method `getNetxWorkUnit()` (and
+callees).  It yields work in the following order:
+
+- work to be undone
+- work for xact currently being processed
+- queued work units (to be executed later)
+
+This work is supplied via the work messages above, and the actual work
+processing is performed outside the dtxn.
+
+JNI
+===
+
+The execution engine is written in C++ whereas the rest of the system is
+written in Java.  The Java code uses the EE via JNI.  The relevant files are:
+
+  GPL_VCR/gpl_java/gpl_src/com/horizontica/jni/ExecutionEngine.java
+  MIT_ACR/EE/src/com_horizontica_jni_ExecutionEngine.h
+  MIT_ACR/EE/src/hstorejni.cpp
+
+Execution Engine
+================
+
+The top module in the EE is `engine` and the main class is called
+`HStoreEngine`.  The Java-side `executePlanFragment()` calls into
+`HStoreEngine::execute(planfragment_id)`.  Outline starting from there:
+
+- wait_cnt = map from node ID to count
+  - represents the number of children that a node is still waiting to execute
+    before the node itself can execute
+  - this is initialized to be the number of children a node has, but is
+    decremented as children complete execution
+- execute_queue = queue of nodes that are ready for immediate execution
+- initExecution(root_node = plannodes[planfragment_id]) (a terrible method
+  name)
+  - if node is leaf, then push onto execute_queue and return 1
+  - else, return wait_cnt[node.id] = sum(initExecution(child) for each child)
+- while execute_queue not empty (start executing from the leaves up)
+  - node = execute_queue.pop()
+  - ex = executors[node.type]
+    - types include: constraint, delete, indexscan, insert, nestloop,
+      projection, result, seqscan, union, update, ...
+    - e.g.: ConstraintExecutor, DeleteExecutor, ...
+  - ex.init(node)
+  - (there is room to do something before init/execute, but nothing there)
+  - ex.execute(node)
+  - for parent in node, decrement wait_cnt[parent], pushing onto execute_queue
+    if wait_cnt[parent] == 0
+    - TODO: nodes can have more than one parent? not a tree?
+- return send(last node.getOutputTable())
+
+Query Plans
+===========
+
+Query plans currently consist of
+
+These exist in both Java and C++, and there's a great deal of repetitive code
+being produced across all the plan nodes types, but alas these were manually
+written, rather than taking the code gen approach that's currently in use by
+the system catalog.
+
+Each plan node type has a corresponding Executor.
+
+Milestones
+==========
+
+M1: Single-partition transactions.  A single site will run in the same JVM as
+the initiator.
+
+M2: Multi-partition transactions.  Multiple sites (one per partition) will run
+in separate JVMs, with the initiator running in one of those.
+
+Notes from developer meeting
+============================
+
+jhugg: compiler
+---------------
+
+build:
+  expanded: where jar files are exploded (for manual inspection/debugging)
+    jar resides in build/trunk
+    made by m1test_pre
+    hz server actually loads the jar file, not expanded
+  nativelibs
+  prod: class files; these are files that get shipped
+    sources are from anywhere, not just gpl
+  test: class files; junit tests only
+  testoutput: test output
+doc/api: javadoc
+hzsqldb: using it for the parser/analyzer primarily
+  renamed h* to hz* make room for hsqldb in case we want latter for an alternative backend (alt to the EE)
+  org.hzsqldb.HZSQLInterface: added for hz
+    shutdown()
+    runDDL*(); getXMLFromCatalog: this is what we use to get the result from the DDL parser
+      Table.hzGetXML: added for hz
+    getXMLCompiledStatement(sql): compile a SQL statement (through parser and analyzer)
+      gets the XML "semi-plan"
+      tells us full table scan or index scan; which cols to scan; what kind of join to use
+        may not want to listen to these choices too carefully
+      CompiledStatement.hzGetXML: added for hz
+    all these *can* run at runtime but usually runs statically
+  org.hzsqldb.Types: modified
+    typeAliases: map, eg from "INTEGER" to Types.BIGINT
+com.horizontica.gui.CompilerPreview: a GUI for seeing the DTD and XML for DDL or SQL
+  Catalog Output: our custom syscat DDL
+org.horizontica.compiler.HZCompiler: compile a project XML file and some metadata into a jar file containing SPs and syscat DDL
+  project XML file: database, program, schema (paths to ddls), SPs
+    project can contain multiple DBs
+  compile(): parses the project file given in ctor
+    compileXMLRootNode(): fills in the `catalog` field
+      compileDatabaseNode(): ...
+        DDLCompiler()
+  feedback: lists that accumulate warnings, errors, etc.
+org.horizontica.compiler.DDLCompiler:
+  fillCatalogFromXML()
+org.horizontica.compiler.ProcedureCompiler:
+  StatementCompiler()
+
+apavlo: planning
+----------------
+
+planning:
+  take the raw SQL XML semi-plan
+com.horizontica.compiler.xmlparser.XMLPlanParser: parse the semi-plan XML
+com.horizontica.compiler.QueryPlanner:
+  reads but doesn't update the catalogs
+com.horizontica.plannodes.AbstractPlanNode:
+  output table
+  children
+  parents: probably don't need this
+com.horizontica.expressions.AbstractExpression:
+  asdf
+
+ejones: dtxn
+------------
+
+jhugg: runtime
+--------------
+
+VoltDB: the main class, called at startup (its main)
+  abstract class with all statics
+  ClientInterface: accepts conns from outside world and requests for SPs (the top ??? box in ejones' diagram)
+ThreadManager: runnable, thread
+  ExecutionSite()
+  run(): while (shouldContinue) { run client interface; run local site; if shouldDrop, return }
+ExecutionSite: the bottom ??? box in ejones' diagram
+  create a mailbox (msg queue) for dtxn
+  ExecutionEngine(); ee.loadCatalog
+  hzsql = new Backend()
+  for each SP, load that class, wrap it in a SPW, and put it in `procs`
+    SPW: finds the 'run' method
+  run(): interacts with dtxn, processes WUs
+  runSystemProcedure(): special system procedures, eg @sysperf
+
+eg
+  Java
+  SQL
+  Java
+  ->
+  WU for starting the SP
+  WU for the SQL
+  WU for the next Java bit (the shouldDrop)
+  ->
+  proc
+  execSQL
+  TM.run()
+  ee.exec...
+  sendDep...
+
+hideaki: storage & jni
+----------------------
+
+see his HzEE JNI document
+
+apavlo: execution
+-----------------
+
+insert into table values (?,?)
+  materialize -> insert -> result -> send
+  (result just returns sum of counts of children's output tables)
+expressions: getValue() and substitute()
+
+jhugg: directions
+-----------------
+
+goals for end of month:
+  multisite
+    m2a: m1 with 2 sites on same host: next tue
+    m2b: m1 with any thing on multiple hosts: 7/21
+  tpcc
+    m3: any tpcc proc
+    m3a: on hsql: next wed
+    m3b: on ee: 7/21
+  multisite tpcc: 7/31
+next mtg: 7/29

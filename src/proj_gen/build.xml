@@ -1,0 +1,98 @@
+<?xml version="1.0" ?>
+<project default="main" name="##project_name## build file">
+
+<!--
+***************************************
+PATHS AND PROPERTIES
+***************************************
+-->
+
+<!-- make environment var FOO available as env.FOO -->
+<property environment="env"/>
+
+<property name='build.dir'          location='obj/' />
+<property name='src.dir'            location='src/' />
+<property name='junit.haltonfailure'    value='true' />
+
+<path id='project.classpath'>
+    <pathelement location='${build.dir}' />
+    <fileset dir='##voltdb_lib_path##' >
+        <include name='voltdb*.jar' />
+    </fileset>
+    <pathelement path="${java.class.path}"/>
+</path>
+
+<!--
+***************************************
+PRIMARY ENTRY POINTS
+***************************************
+-->
+
+<target name="main" depends="srccompile, compile" description="default. Compile Java stored procedures and and then run the VoltDB compiler on the stored procedures and schema to generate a catalog" />
+
+
+<target name="client" depends="srccompile" description="Start the client who will connect to the server @ localhost and start calling procedures" >
+    <java fork="yes" classname="##package_prefix##.Client" >
+        <jvmarg value="-server" />
+        <jvmarg value="-Xmx512m" />
+        <jvmarg value="-XX:+AggressiveOpts" />
+        <classpath refid='project.classpath' />
+        <assertions><disable /></assertions>
+    </java>
+</target>
+
+
+<target name="server" depends="srccompile, compile" description="Start the server and load the catalog." >
+    <java fork="yes" classname="org.voltdb.VoltDB" >
+        <arg value="polite" /> <!-- polite level profiling (delete to disable profiling) -->
+        <jvmarg value="-Djava.library.path=##voltdb_lib_path##" />
+        <jvmarg value="-server" />
+        <jvmarg value="-Xmx512m" />
+        <jvmarg value="-XX:+AggressiveOpts" />
+        <classpath refid='project.classpath' />
+        <assertions><disable /></assertions>
+    </java>
+</target>
+
+
+<target name="compile" depends="srccompile" description="Compile the catalog using the schema and the DDL file" >
+    <java fork="yes" classname="org.voltdb.compiler.VoltCompiler" >
+        <arg value="project.xml"/> <!-- project file -->
+        <arg value="1"/>           <!-- hosts -->
+        <arg value="1"/>           <!-- sites -->
+        <arg value="localhost"/>   <!-- leader -->
+        <arg value="catalog.jar"/> <!-- output -->
+        <classpath refid='project.classpath' />
+        <assertions><disable /></assertions>
+    </java>
+</target>
+
+<!--
+***************************************
+CLEANING
+***************************************
+-->
+
+<target name='clean' description="remove all compiled files">
+    <delete includeemptydirs="true" failonerror='false'>
+        <fileset dir="${build.dir}" includes="**/*" />
+        <fileset dir="." defaultexcludes="yes" >
+            <include name="catalog.jar" />
+        </fileset>
+    </delete>
+</target>
+
+<!--
+***************************************
+JAVA COMPILATION
+***************************************
+-->
+
+<target name="srccompile">
+    <mkdir dir='${build.dir}' />
+    <javac target="1.6" srcdir="${src.dir}" destdir='${build.dir}' debug='true'>
+        <classpath refid="project.classpath" />
+    </javac>
+</target>
+
+</project>

@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<project>
+    <database name='database'>
+       <schemas>
+           <schema path='helloworld.sql' />
+       </schemas>
+       <procedures>
+           <procedure class='Insert' />
+           <procedure class='Select' />
+       </procedures>
+       <partitions>
+           <partition table='HELLOWORLD' column='DIALECT' />
+       </partitions>
+    </database>
+</project>

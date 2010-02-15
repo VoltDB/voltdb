@@ -1,0 +1,83 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2010 VoltDB L.L.C.
+ *
+ * VoltDB is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * VoltDB is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+package org.voltdb.client;
+
+import org.voltdb.VoltTable;
+
+/**
+ *  Interface implemented by the responses that are generated for procedure invocations
+ */
+public interface ClientResponse {
+
+    /**
+     * Status code indicating the store procedure executed successfully
+     */
+    public static final byte SUCCESS = 1;
+
+    /**
+     * Status code indicating the stored procedure executed successfully and was voluntarily aborted and rolled
+     * back by the stored procedure code
+     */
+    public static final byte USER_ABORT = -1;
+
+    /**
+     * Status code indicating the stored procedure failed and was rolled back. There are no negative server side
+     * side effects.
+     */
+    public static final byte GRACEFUL_FAILURE = -2;
+
+    /**
+     * Status code indicating the stored procedure failed (or may never have been successfully invoked)
+     * and that there may have been negative side effects on the server
+     */
+    public static final byte UNEXPECTED_FAILURE = -3;
+
+    /**
+     * Status code indicating the connection to the database that the invocation was queued at
+     * was lost before a response was received. It is possible that the invocation was sent, executed, and successfully
+     * committed before a response could be returned or the invocation may never have been sent.
+     */
+    public static final byte CONNECTION_LOST = -4;
+
+    /**
+     * Retrieve the status code returned by the server
+     * @return Status code
+     */
+    public byte getStatus();
+
+    /**
+     * Get the array of {@link org.voltdb.VoltTable} results returned by the stored procedure.
+     * @return An array of results. Will never be <code>null</code>, but may be length 0.
+     */
+    public VoltTable[] getResults();
+
+    /**
+     * Get a <code>String</code> representation of any additional information the server may have included in
+     * the response. This may be an stack trace, error message, etc.
+     * @return A message or <code>null</code> if there is none.
+     */
+    public String getExtra();
+
+    /**
+     * Get the <code>Exception</code> that caused the stored procedure to fail and roll back.
+     * There is no guarantee that an <code>Exception</code> will be provided.
+     * @return The <code>Exception</code> that caused the procedure to fail if it is available or <code>null</code>
+     *         if none was provided in the response.
+     */
+    public Exception getException();
+}

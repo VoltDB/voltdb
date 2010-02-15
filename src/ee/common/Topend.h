@@ -1,0 +1,49 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2010 VoltDB L.L.C.
+ *
+ * VoltDB is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * VoltDB is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#ifndef TOPEND_H_
+#define TOPEND_H_
+#include "common/ids.h"
+
+namespace voltdb {
+class Table;
+class Pool;
+
+/*
+ * Topend abstracts the EE's calling interface to Java to
+ * allow the engine to cleanly integrate both the JNI and
+ * the IPC communication paths.
+ */
+class Topend {
+  public:
+    virtual void handoffReadyELBuffer(
+        char* bufferPtr, int32_t bytesUsed, CatalogId tableId) = 0;
+
+    virtual char* claimManagedBuffer(int32_t desiredSizeInBytes) = 0;
+
+    virtual void releaseManagedBuffer(char* bufferPtr) = 0;
+
+    virtual int loadNextDependency(
+        int32_t dependencyId, voltdb::Pool *pool, Table* destination) = 0;
+
+    virtual ~Topend()
+    {
+    }
+};
+
+}
+#endif /* TOPEND_H_ */

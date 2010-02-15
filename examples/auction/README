@@ -1,0 +1,18 @@
+The auction example is a VERY simple on-line auction simulation.
+
+The auction-ddl.sql file describes the following tables:
+- Category (types of things that can be auctioned)
+- Item (actual things that are auctioned)
+- User (buyers and sellers)
+- Auction (one record per auction, including a start time equal to the creation time of the record and an end time 2 minutes later)
+- Bid (all of the bids for all of the auctions)
+
+A client is provided that runs various Java stored procedure files to:
+- Load categories, users, and items from the category,txt, user.txt, and item.txt datafiles into the appropriate tables.
+- Load 4 auctions from the auctions.txt file into the auction table and initiate the auctions.
+- Provide bids by various users for each auction, using an algorithm for creating a new bid price based on the previous bid for the item adjusted by an increase based on the starting price and a random Gaussian function. Each auction completes within 1 to 2 minutes after the auction starts. 
+- Provide periodic status on each auction.
+- Provide the results of each auction after close.
+
+This content is available at
+https://hzproject.com/svn/repos/build/newtrunk/examples/auction/README.

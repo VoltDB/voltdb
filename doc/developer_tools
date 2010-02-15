@@ -1,0 +1,175 @@
+Getting Started in Eclipse
+==========================
+
+0. Check out the project (outside of Eclipse; Eclipse's svn plugins
+   are dismal) The projectis arranged to align with an Eclipse project
+   layout.
+1. Create a new Java project.
+2. Delete the automatically created `src` directory.
+3. Go to the project's Properties > Java Build Path > Source.
+4. Link the following src dirs:
+   - `gpl_src`
+   - `hzsqldb_src`
+   - `hzsqldb_test_src`
+   - `mit_src`
+   - `mit_test_src`
+5. Under the Libraries tab, add the external jar junit-4.4.jar
+6. Filter out some noise warnings from the Problems display.
+   1. Click on the down-arrow on the Problems tab (sits along the bottom of the
+      main window by default) and choose Configure Contents.
+   2. Create a new configuration, and make sure it's checked.
+   3. Choose "Select" under "On working set".
+   4. Create a working set that includes just the `mit_src` and `gpl_src`
+      directories.  This is because the hzsql sources are largely unmodified
+      and contain legacy code (e.g. they don't use generics), and the test
+      sources are allowed to be sloppy.
+   5. Under Description, choose "doesn't contain" and enter "The resource is a
+      duplicate of".  This is to deal with the messages that describe files in
+      the `.svn` directories.
+7. To start the server, right-click on the `com.horizontica.VoltDB` class
+   and choose Debug As...
+   1. Specify `-ea` as a vm argument.
+   2. Spcify the `trunk/` directory as the working directory.
+   3. Specify `milestoneOneCatalog.jar` (or any catalog jar; make sure it's in
+      `trunk/`) as the application argument.
+
+Getting Started in KDevelop
+===========================
+
+1. Copy `hstore.kdevelop-sample` to `hstore.kdevelop` and edit it, filling out
+   the information denoted with asterisks `***`.
+   - The `HSTORE_ROOT` environment variable is actually no longer used.
+2. Open the project in KDevelop.  Done!
+
+Debugging JNI with GDB
+======================
+
+This approach mostly comes from ["Debugging integrated Java and C/C++
+code"](http://www.ibm.com/developerworks/java/library/j-jnidebug/index.html).
+
+1. Start the JVM in suspended debug mode, waiting for a debugger to attach.  In
+   this example, we're running a JUnit test that was causing JVM crashes (at
+   least on Ubuntu machines, both 32- and 64-bit).  This is as of svn revision
+   908.
+
+   $ LD_LIBRARY_PATH=.:$LD_LIBRARY_PATH java -Xdebug -Xnoagent
+     -Djava.compiler=none -Xrunjdwp:transport=dt_socket,server=y,suspend=y -cp
+     GPL_VCR/gpl_java/build/test:GPL_VCR/gpl_java/build/prod:GPL_VCR/gpl_java/Third-Party/junit-4.4.jar
+     org.junit.runner.JUnitCore com.horizontica.jni.TestExecutionEngine
+   Listening for transport dt_socket at address: 37294
+
+2. Attach JDB to the JVM and stop at the point of interest:
+
+   $ jdb -attach 37294
+   Set uncaught java.lang.Throwable
+   Set deferred uncaught java.lang.Throwable
+   Initializing jdb ...
+   >
+   VM Started: No frames on the current call stack
+
+   main[1] stop at com.horizontica.jni.TestExecutionEngine:16
+   Deferring breakpoint com.horizontica.jni.TestExecutionEngine:16.
+   It will be set after the class is loaded.
+   main[1] run
+   > Set deferred breakpoint com.horizontica.jni.TestExecutionEngine:16
+
+   Breakpoint hit: "thread=main", com.horizontica.jni.TestExecutionEngine.testLoadCatalogs(), line=16 bci=0
+
+3. Attach GDB to the JVM and stop at the point of interest:
+
+   $ gdb -nw -quiet
+   (gdb) attach 30700
+   Attaching to process 30700
+   Reading symbols from /usr/lib/jvm/java-6-sun-1.6.0.06/jre/bin/java...(no debugging symbols found)...done.
+   Reading symbols from /lib/tls/i686/cmov/libpthread.so.0...(no debugging symbols found)...done.
+   [Thread debugging using libthread_db enabled]
+   [New Thread 0xb7dedad0 (LWP 30700)]
+   [New Thread 0xad585b90 (LWP 30724)]
+   [New Thread 0xad5d6b90 (LWP 30723)]
+   [New Thread 0xad657b90 (LWP 30722)]
+   [New Thread 0xad6a8b90 (LWP 30718)]
+   [New Thread 0xad6f9b90 (LWP 30707)]
+   ...
+   Reading symbols from /lib/libgcc_s.so.1...done.
+   Loaded symbols for /lib/libgcc_s.so.1
+
+   0xb7f79410 in __kernel_vsyscall ()
+   (gdb) break hstorejni.cpp:137
+   Breakpoint 1 at 0xad34f7e8: file hstorejni.cpp, line 137.
+   (gdb) cont
+   Continuing.
+
+4. Continue from the JDB side as well:
+
+   main[1] cont
+   >
+
+5. Voila!  In GDB you will arrive at the code you're interested in.  You may
+   receive some spurious seg faults.  I don't know yet if these are actually
+   signs of problems, but it seems you can just ignore them.
+
+   Program received signal SIGSEGV, Segmentation fault.
+   [Switching to Thread 0xb7dc7b90 (LWP 30701)]
+   0x0626d0e2 in JVM_ArrayCopy () from /usr/lib/jvm/java-6-sun-1.6.0.06/jre/lib/i386/client/libjvm.so
+   (gdb) c
+   Continuing.
+   
+   Breakpoint 1, Java_com_horizontica_jni_ExecutionEngine_nativeLoadCatalog (env=0x805f8f4, obj=0xb7dc67f8, engine_ptr=578149344600260548,
+       serialized_catalog=0xb7dc67ec) at hstorejni.cpp:138
+   138         jlong engine_ptr, jstring serialized_catalog) {
+   Current language:  auto; currently c++
+   (gdb) l
+   133      * human-readable text strings separated by line feeds.
+   134      * @return error code
+   135     */
+   136     JNIEXPORT jint JNICALL Java_com_horizontica_jni_ExecutionEngine_nativeLoadCatalog(
+   137         JNIEnv *env, jobject obj,
+   138         jlong engine_ptr, jstring serialized_catalog) {
+   139         HStoreEngine *engine = castToEngine(engine_ptr);
+   140         if (engine == NULL) {
+   141             return com_horizontica_jni_ExecutionEngine_ERRORCODE_ERROR;
+   142         }
+
+Debugging TPCC
+--------------
+
+  LD_LIBRARY_PATH=.:$LD_LIBRARY_PATH java -Xdebug -Xnoagent -Djava.compiler=none -Xrunjdwp:transport=dt_socket,server=y,suspend=y -cp GPL_VCR/gpl_java/build/test:GPL_VCR/gpl_java/build/prod:GPL_VCR/gpl_java/Third-Party/junit-4.4.jar:GPL_VCR/gpl_java/Third-Party/log4j-1.2.15.jar org.junit.runner.JUnitCore com.horizontica.MilestoneThreeCTest
+  rlwrap jdb -attach 47747
+  gdb -nw -quiet -ex "attach `pgrep java`" -ex cont
+
+Profiling
+---------
+
+To profile the Java application, we recommend using our own custom Java
+sampling profiler, called JSampler.  You can start/stop the profiling at
+arbitrary time points either programmatically (allowing the profile application
+control over profiling) or by manually attaching to the JVM (using the
+`hz.bash` scripts `start-jsampler` and `stop-jsampler`).  The output is simply
+the entire accumulated list of stack traces; to process/analyze this, use the
+`jsampler.py` script.
+
+You may also choose to use hprof, which comes with Java 5+, but as far as we
+know, this does not provide facilities for starting/stopping profiling at
+arbitrary points, either programmatically or manually.  Other profilers we've
+looked at include:
+
+- NetBeans Profiler: this instruments the code at method call points to
+  maintain a stack that can instantly be recorded.  This makes the stack
+  snapshotting faster, since the stack snapshot is continually being
+  maintained, but overall it makes our application run slower.
+- VisualVM: this instruments the code at method call points to collect
+  profiling information, which makes the application run much slower than it
+  normally would.
+- JProfiler: this is a flexible profiler, but it is not free nor open-source.
+
+Compiling new VoltDB setups
+--------------------------------
+
+The VoltCompiler is used to package the system catalog, schema, stored
+procedures, etc. all into a single JAR, which can then be loaded by VoltDB to set
+up the system.
+
+You may programmatically use the `VoltCompilerUtil` class to compile what you
+want, or use the `TPCCCompiler` frontend to get a TPCC-ready setup.
+
+

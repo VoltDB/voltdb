@@ -1,0 +1,67 @@
+% VoltDB Users Guide
+
+Who this is for
+========
+People who want to write clients, stored procedures, and database schema for use with VoltDB. This does not include the software necessary to modify or extend VoltDB itself.
+
+License & Copyright
+========
+Copyright (C) 2009  VoltDB L.L.C.
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+Software Dependencies
+========
+VoltDB depends on the Java 1.6 runtime and ant 1.7.
+
+Additional documentation
+========
+Several word documents are attached and they have been updated for this release. If there are conflicts or differences between the word documents and the examples or javadocs you should assume that the word documents or javadocs are correct.
+
+Overview
+========
+
+A _site_ or _worker site_ is a single node in VoltDB.  A host can run
+multiple sites.  Each site manages a single partition.  A partition can be
+replicated onto multiple sites (preferably running on *at least* distinct
+hosts).
+
+Currently only stored procedures (SP) are supported and Java is the stored procedure language. Store procedures are written as a regular class that makes calls on org.voltdb.VoltProcedure which is the interface that SPs use to execute SQL statements. Stored procedures are discovered via the project file procedure elements at compilation (VoltDB compilation, not Java compilation) time. Reflection is used to read the SPs run method and its arguments and types as well as the SQL statements and annotations that provide VoltDB specific meta data about the procedure and statements.
+
+There are two types of annotations that are currently required (see a stored procedure in edu.mit.tpcc.procedures in the TPC-C example for context).
+@StmtAttributes(readOnly = false, singleSited = true)
+@ProcInfo(
+	accessibleBy = "program",
+	partitionInfo = "WAREHOUSE.W_ID: 0",
+	alwaysSingleSite = true
+)
+We don't support multisite transactions at this point so singleSited and alwaysSingleSite should always be set to true. The readOnly member of @StmtAttributes should reflect whether the statement is a SELECT (true) or UPDATE, INSERT, or DELETE (false). accessibleBy should always be set to to 'program' to match the program element in the project file (tpcc_project.xml). Currently this can't be modified. 
+
+The partitionInfo value is a way for the system to route single-site procedures to the right site in a multi-site environment. The form looks like "TABLE.COLUMN : PARAM_INDEX" and it tells the system which parameter maps to a partition column. This information allows the procedure to be directed to the right site given only it's input.
+
+For now, all single-sited stored procedures must have at least one parameter, even if it's not used. Generally, "TABLE.COLUMN : 0" will work as a value, where TABLE.COLUMN should be replaced by any table and column. Since there is only one site for this release, it will always map to the correct site.
+
+Compilation
+========
+
+Compilation is performed by invoking org.voltdb.compiler.VoltCompiler from VoltDB.jar. The compiler requires the project file as an argument as well as the name of the catalog that will be output and it also requires that all stored procedures and their dependencies are in the classpath of the JVM.
+
+Client
+======
+
+The client uses the `VoltClient` interface to communicate with the server.  An
+example of client interaction is in the TPC-C sample `org.voltdb.benchmark.tpcc.AsyncClient' class. The example client can be invoked using the client target.
+
+Server
+======
+
+The main server class is `VoltDB`.  This initializes the system by loading
+the catalog jar file output by VoltCompiler (which contains the transactions/stored procedures along with the serialized catalog data) and starting up the sites.
+
+The server is what the client talks to (specifically, the `ClientInterface`).
+Initially there will just be one server, but the long-term plan includes a
+server per host.

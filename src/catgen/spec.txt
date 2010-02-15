@@ -1,0 +1,197 @@
+begin CatalogInteger   "Wrapper for an integer so it can be in a list."
+  int value            "Integer Value"
+end
+
+begin Cluster           "A set of connected hosts running one or more database application contexts"
+  Database* databases   "The set of databases the cluster is running"
+  Host* hosts           "The set of host that belong to this cluster"
+  Site* sites           "The set of physical execution contexts executing on this cluster"
+  Partition* partitions "The set of logical partitions in this cluster"
+  string leaderaddress  "The ip or hostname of the cluster 'leader' - see docs for details"
+  int localepoch        "The number of seconds since the epoch that we're calling our local epoch"
+  bool securityEnabled   "Whether security and authentication should be enabled/disabled"
+end
+
+begin Host      "A single host participating in the cluster"
+  string ipaddr "The ip address or hostname of the host"
+end
+
+begin Partition       "A logical, replicate-able partition"
+end
+
+begin Site             "A physical execution context for the system"
+  bool  isexec         "Does the site execute workunits?"
+  Host? host           "Which host does the site belong to?"
+  Partition? partition "Which logical data partition does this host process?"
+  int initiatorid      "If the site is an initiator, this is its tightly packed id"
+end
+
+begin Database          "A set of schema, procedures and other metadata that together comprise an application"
+  string     schema     "Full SQL DDL for the database's schema"
+  User*      users      "The set of users"
+  Group*     groups     "The set of groups"
+  Table*     tables     "The set of Tables for the database"
+  Program*   programs   "The set of programs allowed to access this database"
+  Procedure* procedures "The set of stored procedures/transactions for this database"
+  Connector* connectors  "Export connector configuration"
+  SnapshotSchedule* snapshotSchedule "Schedule for automated snapshots"
+end
+
+begin ConnectorTableInfo      "Per-export connector table configuration"
+  Table? table                "Reference to the table being ammended"
+  bool appendOnly             "True if this table is an append-only table for export."
+end
+
+begin ConnectorDestinationInfo
+  string ipaddr                 "The IP address or hostname"
+  string username               "Authentication name"
+  string password
+end
+
+begin Connector                      "Export connector (ELT)"
+  string loaderclass                 "The class name of the connector"
+  bool enabled                       "Is the connector enabled"
+  ConnectorTableInfo* tableInfo      "Per table configuration"
+  ConnectorDestinationInfo* destInfo "Per destination configuration"
+end
+
+begin Group
+  UserRef* users
+  bool sysproc  "Can invoke system procedures"
+  bool adhoc    "Can invoke the adhoc system procedure
+end
+
+begin GroupRef
+  Group? group
+end
+
+begin UserRef
+  User? user
+end
+
+begin User
+  GroupRef* groups
+  bool sysproc  "Can invoke system procedures"
+  bool adhoc    "Can invoke the adhoc system procedure
+  string shadowPassword "SHA-1 double hashed hex encoded version of the password"
+end
+
+begin Program "The name of a program with access (effectively a username for an app server)"
+end
+
+begin Procedure             "A stored procedure (transaction) in the system"
+  string classname          "The full class name for the Java class for this procedure"
+  UserRef* authUsers        "Users authorized to invoke this procedure"
+  GroupRef* authGroups      "Groups authorized to invoke this procedure"
+  bool readonly             "Can the stored procedure modify data"
+  bool singlepartition      "Does the stored procedure need data on more than one partition?"
+  bool systemproc           "Is this procedure an internal system procedure?"
+  bool hasjava              "Is this a full java stored procedure or is it just a single stmt?"
+  Table? partitiontable     "Which table contains the partition column for this procedure?"
+  Column? partitioncolumn   "Which column in the partitioned table is this procedure mapped on?"
+  int partitionparameter    "Which parameter identifies the partition column?"
+  AuthProgram* authPrograms "The set of authorized programs for this procedure (users)"
+  Statement* statements     "The set of SQL statements this procedure may call"
+  ProcParameter* parameters "The set of parameters to this stored procedure"
+end
+
+begin Table                   "A table (relation) in the database"
+  Column* columns             "The set of columns in the table"
+  Index* indexes              "The set of indexes on the columns in the table"
+  Constraint* constraints     "The set of constraints on the table"
+  bool isreplicated           "Is the table replicated?"
+  Column? partitioncolumn     "On which column is the table partitioned"
+  int estimatedtuplecount     "A rough estimate of the number of tuples in the table; used for planning"
+  MaterializedViewInfo* views "Information about materialized views based on this table's content"
+  Table? materializer         "If this is a materialized view, this field stores the source table"
+end
+
+begin MaterializedViewInfo "Information used to build and update a materialized view"
+  Table? dest              "The table which will be updated when the source table is updated"
+  ColumnRef* groupbycols   "The columns involved in the group by of the aggregation"
+  string predicate         "A filtering predicate"
+end
+
+begin AuthProgram "The name of a program with access to a specific procedure. This is effectively a weak reference to a 'program'"
+end
+
+begin ProcParameter "Metadata for a parameter to a stored procedure"
+  int type          "The data type for the parameter (int/float/date/etc)"
+  bool isarray      "Is the parameter an array of value"
+  int index         "The index of the parameter within the list of parameters for the stored procedure"
+end
+
+begin Statement             "A parameterized SQL statement embedded in a stored procedure"
+  string sqltext            "The text of the sql statement"
+  int querytype             ""
+  bool readonly             "Can the statement modify any data?"
+  bool singlepartition      "Does the statement only use data on one partition?"
+  bool replicatedtabledml   "Should the result of this statememt be divided by partition count before returned"
+  bool batched              ""
+  int paramnum              ""
+  StmtParameter* parameters "The set of parameters to this SQL statement"
+  PlanFragment* fragments   "The set of plan fragments used to execute this statement"
+  Column* output_columns    "The set of columns in the output table"
+  string exptree            "A serialized representation of the original expression tree"
+  string fullplan           "A serialized representation of the un-fragmented plan"
+  int cost                  "The cost of this plan measured in arbitrary units"
+end
+
+begin StmtParameter            "A parameter for a parameterized SQL statement"
+  int sqltype                  "The SQL type of the parameter (int/float/date/etc)"
+  int javatype                 "The Java class of the parameter (int/float/date/etc)"
+  int index                    "The index of the parameter in the set of statement parameters"
+  ProcParameter? procparameter "Reference back to original input parameter"
+end
+
+begin PlanFragment               "Instructions to the executor to execute part of an execution plan"
+  bool hasdependencies           "Dependencies must be received before this plan fragment can execute"
+  bool multipartition            "Should this plan fragment be sent to all partitions"
+  string plannodetree            "A serialized representation of the plan-graph/plan-pipeline"
+  bool nontransactional          "True if this fragment doesn't read from or write to any persistent tables"
+end
+
+begin Index          "A index structure on a database table's columns"
+  bool unique        "May the index contain duplicate keys?"
+  int type           "What data structure is the index using and what kinds of keys does it support?"
+  ColumnRef* columns "Columns referenced by the index"
+end
+
+begin ColumnRef  "A reference to a table column"
+  int index      "The index within the set"
+  Column? column "The table column being referenced"
+end
+
+begin Constraint            "A constraint on a database table"
+  int type                  "The type of constraint"
+  string oncommit           "(currently unused)"
+  Index? index              "The index used by this constraint (if needed)"
+  Table? foreignkeytable    "The table referenced by the foreign key (if needed)"
+  ColumnRef* foreignkeycols "The columns in the foreign table referenced by the constraint (if needed)"
+end
+
+begin ConstraintRef      "A reference to a table constraint"
+  Constraint? constraint "The constraint that is referenced"
+end
+
+begin Column                    "A table column"
+  int index                     "The column's order in the table"
+  int type                      "The type of the column (int/double/date/etc)"
+  int size                      "(currently unused)"
+  bool nullable                 "Is the column nullable?"
+  string name                   "Name of column"
+  string defaultvalue           "Default value of the column"
+  int defaulttype               "Type of the default value of the column"
+  ConstraintRef* constraints    "Constraints that use this column"
+  MaterializedViewInfo? matview "If part of a materialized view, ref of view info"
+  int aggregatetype             "If part of a materialized view, represents aggregate type"
+  Column? matviewsource         "If part of a materialized view, represents source column"
+end
+
+begin SnapshotSchedule          "A schedule for the database to follow when creating automated snapshots"
+  string frequencyUnit          "Unit of time frequency is specified in"
+  int frequencyValue            "Frequency in some unit"
+  int retain                    "How many snapshots to retain"
+  string path                   "Path where snapshots should be stored"
+  string prefix                 "Prefix for snapshot filenames"
+end

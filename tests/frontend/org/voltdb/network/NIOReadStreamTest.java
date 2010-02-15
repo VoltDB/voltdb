@@ -1,0 +1,216 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2010 VoltDB L.L.C.
+ *
+ * This file contains original code and/or modifications of original code.
+ * Any modifications made by VoltDB L.L.C. are licensed under the following
+ * terms and conditions:
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+/* Copyright (C) 2008
+ * Evan Jones
+ * Massachusetts Institute of Technology
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+package org.voltdb.network;
+
+import java.nio.channels.ReadableByteChannel;
+import java.nio.ByteBuffer;
+import org.voltdb.network.NIOReadStream;
+import junit.framework.TestCase;
+import java.io.IOException;
+import org.voltdb.utils.DBBPool;
+
+public class NIOReadStreamTest extends TestCase {
+    MockReadableByteChannel channel;
+    NIOReadStream stream;
+    DBBPool pool;
+
+    private static class MockReadableByteChannel implements ReadableByteChannel {
+        public int read(ByteBuffer buffer) {
+            if (nextRead == null) {
+                if (end) return -1;
+                return 0;
+            }
+
+            byte[] target = nextRead;
+            nextRead = null;
+            int length = target.length;
+
+            // If we have too much data, split the nextRead array
+            if (length > buffer.remaining()) {
+                length = buffer.remaining();
+                nextRead = new byte[target.length-length];
+                for (int i = 0; i < nextRead.length; ++i) {
+                    nextRead[i] = target[i + length];
+                }
+            }
+
+            buffer.put(target, 0, length);
+            return length;
+        }
+
+        public boolean isOpen() { return !closed; }
+        public void close() {
+            assert !closed;
+            closed = true;
+            end = true;
+        }
+
+        public byte[] nextRead;
+        public boolean end = false;
+        private boolean closed = false;
+    }
+
+    @Override
+    public void setUp() {
+        channel = new MockReadableByteChannel();
+        stream = new NIOReadStream();
+        pool = new DBBPool();
+    }
+
+    @Override
+    public void tearDown() {
+        stream.shutdown();
+        pool.clear();
+    }
+
+    public void testZeroLength() {
+        assertEquals(0, stream.dataAvailable());
+        byte[] empty = new byte[0];
+        stream.getBytes(empty);
+    }
+
+    public void testEmpty() {
+        byte[] foo = new byte[1];
+        try {
+            stream.getBytes(foo);
+            fail("expected IllegalStateException");
+        } catch (IllegalStateException e) {}
+    }
+
+    public void testMultipleOneRead() throws IOException {
+        channel.nextRead = new byte[]{0, 1, 2, 3,};
+        assertEquals(4, stream.read(channel, 1, pool));
+        assertEquals(4, stream.dataAvailable());
+        byte[] single = new byte[1];
+        for (int i = 0; i < 4; ++i) {
+            stream.getBytes(single);
+            assertEquals(i, single[0]);
+        }
+    }
+
+    public void testSpanRead() throws IOException {
+        // Write a block that spans multiple buffers
+        final int SIZE = 4096*5;
+        channel.nextRead = new byte[SIZE];
+        channel.nextRead[0] = 42;
+        channel.nextRead[SIZE-1] = 79;
+
+        // Read a byte off the beginning
+        assertTrue(stream.read(channel, 1, pool) >= 1);
+        assertTrue(1 <= stream.dataAvailable() && stream.dataAvailable() < SIZE);
+        byte[] single = new byte[1];
+        stream.getBytes(single);
+        assertEquals(42, single[0]);
+
+        // Read most of the block
+        byte[] most = new byte[SIZE-2];
+        assertEquals(SIZE-1, stream.read(channel, most.length, pool));
+        assertEquals(SIZE-1, stream.dataAvailable());
+        stream.getBytes(most);
+
+        // Read the byte off the end
+        stream.getBytes(single);
+        assertEquals(79, single[0]);
+        assertStreamIsEmpty();
+    }
+
+    public void testMultipleReadsOneValue() throws IOException {
+        final int HUGE_SIZE = 4096*16;
+        byte[] huge = new byte[HUGE_SIZE];
+        channel.nextRead = huge;
+        assertEquals(HUGE_SIZE, stream.read(channel, HUGE_SIZE, pool));
+        assertEquals(HUGE_SIZE, stream.dataAvailable());
+        stream.getBytes(huge);
+        assertStreamIsEmpty();
+    }
+
+    public void testIncompleteReads() throws IOException {
+        channel.nextRead = new byte[1000];
+        assertEquals(1000, stream.read(channel, 1500, pool));
+        assertEquals(1000, stream.dataAvailable());
+        channel.nextRead = new byte[500];
+        assertEquals(1500, stream.read(channel, 1500, pool));
+        assertEquals(1500, stream.dataAvailable());
+    }
+
+    public void testReadInt() throws IOException {
+        channel.nextRead = new byte[]{1, 2, 3, 4};
+        assertEquals(4, stream.read( channel, 4, pool));
+        int value = stream.getInt();
+        assertEquals(0x01020304, value);
+
+        channel.nextRead = new byte[]{-1, -1, -1, -4};
+        assertEquals(4, stream.read( channel, 4, pool));
+        assertEquals(-4, stream.getInt());
+
+        channel.nextRead = new byte[]{0, 0, 0, -4};
+        assertEquals(4, stream.read( channel, 4, pool));
+        assertEquals(252, stream.getInt());
+    }
+
+    public void testEndReadComplete() throws IOException {
+        channel.nextRead = new byte[]{1, 2, 3,4 };
+        channel.end = true;
+        assertEquals(4, stream.read(channel, 1, pool));
+        assertEquals(-1, stream.read(channel, 42, pool));
+    }
+
+   /* public void testEndReadIncomplete() throws IOException {
+        channel.nextRead = new byte[]{1, 2, 3,4 };
+        channel.end = true;
+        assertEquals(-1, stream.fillFrom(channel, 42));
+    }*/
+
+    private void assertStreamIsEmpty() throws IOException {
+        assertEquals(0, stream.read(channel, Integer.MAX_VALUE, pool));
+        assertEquals(0, stream.dataAvailable());
+    }
+}

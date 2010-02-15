@@ -1,0 +1,6 @@
+1,"Books","Fiction, Biography, Paperback, Hardback"
+2,"Vehicles","Cars, Trucks, SUVs"
+3,"Art","Paintings, Sculpture"
+4,"Cameras","Digital, Film, Accesories, Supplies"
+5,"Computers","Apple, Dell, IBM, Accesories"
+6,"Movies","Recent DVDs"

@@ -1,0 +1,1402 @@
+<?xml version="1.0" ?>
+<project default="default" name="VoltDB">
+
+<!-- PATHS AND PROPERTIES -->
+
+<!-- make environment var foo available as env.foo -->
+<property environment="env"/>
+
+<!-- allow env.VOLTBUILD to override "build" property -->
+<condition property="build" value="${env.VOLTBUILD}" else='release'>
+    <isset property="env.VOLTBUILD"/>
+</condition>
+
+<!-- allow env.VOLTPRO to override "voltpro" property -->
+<condition property="voltpro" value="${env.VOLTPRO}">
+    <isset property="env.VOLTPRO"/>
+</condition>
+
+<!-- stub the voltpro classpath fileset so a fileset with this id always exists -->
+<fileset id="voltpro.classpath" file="build.xml">
+  <exclude name="build.xml"/>
+</fileset>
+
+<!-- import the pro build.xml if it exists and is requested -->
+<import file="${voltpro}/build.xml" optional="true"/>
+
+<property name='build.dir'                   location='obj/${build}' />
+<property name='build.prod.dir'              location='${build.dir}/prod' />
+<property name='build.test.dir'              location='${build.dir}/test' />
+<property name='dist.dir'                    location='${build.dir}/dist' />
+<property name='dist.examples.dir'           location='${dist.dir}/examples' />
+<property name='dist.examples.auction.dir'   location='${dist.examples.dir}/auction' />
+<property name='dist.examples.satellite.dir' location='${dist.examples.dir}/satellite' />
+<property name='doc.dir'                     location='doc' />
+<property name='src.gpl.dir'                 location='src/frontend' />
+<property name='src.hsqldb.dir'              location='src/hsqldb19b3' />
+<property name='src.test.dir'                location='tests/frontend' />
+<property name='src.hsqldb.test.dir'         location='tests/hsqldb' />
+<property name='build.testoutput.dir'        location='${build.dir}/testoutput' />
+<property name='build.testobjects.dir'       location='${build.dir}/testobjects' />
+<property name='vendor.lib.dir'              location='third_party/java/jars' />
+<property name='vendor.src.dir'              location='third_party/java/src'  />
+<property name='vendor.obj.dir'              location='third_party/java/obj'  />
+<property name='src.ee.parent.dir'           location='src/ee' />
+<property name='src.ee.dir'                  location='src/ee' />
+<property name='m1catalog'                   location='${src.test.dir}/org/voltdb/catalog/catalog.txt' />
+<property name='depcache'                    value='.depcache' />
+
+<!-- emma build instrumentation location -->
+<property name='build.instr.dir'             location='${build.dir}/instr' />
+
+<!-- Default heap size for Volt server (MB)  -->
+<condition property="volt.server.memory" value="2048">
+    <not><isset property="volt.server.memory"/></not>
+</condition>
+
+<!-- Default heap size for Volt clients+loaders (MB)  -->
+<condition property="volt.client.memory" value="1024">
+    <not><isset property="volt.client.memory"/></not>
+</condition>
+
+<!-- Overridden in the Hudson test script. -->
+<property name='junit.haltonfailure'    value='false' />
+<property name="j2se_api" value="http://java.sun.com/javase/6/docs/api/"/>
+
+<path id='project.classpath'>
+    <pathelement location='${build.instr.dir}' />
+    <pathelement location='${build.prod.dir}' />
+    <pathelement location='${build.test.dir}' />
+    <pathelement location='${vendor.obj.dir}' />
+    <fileset dir='${vendor.lib.dir}'>
+        <include name='*.jar' />
+        <exclude name='ant.jar' />
+    </fileset>
+    <pathelement path="${java.class.path}"/>
+    <fileset refid="voltpro.classpath"/>
+</path>
+
+<!-- select which set of regression suite configuration types to run -->
+<condition property="regressions" value="${regressions}" else="all">
+  <isset property="regressions"/>
+</condition>
+
+<!-- Workload Tracer Properties -->
+<condition property="workload.trace.class" value="">
+    <not><isset property="workload.trace.class"/></not>
+</condition>
+<condition property="workload.trace.path" value="">
+    <not><isset property="workload.trace.path"/></not>
+</condition>
+<condition property="workload.trace.ignore" value="">
+    <not><isset property="workload.trace.ignore"/></not>
+</condition>
+
+<!--
+***************************************
+PRIMARY ENTRY POINTS
+***************************************
+-->
+
+<target name="default"
+    depends="compile, ee"
+    description="Compile Java classes and C++ JNI library."
+/>
+<target name="check"
+    depends="compile, eecheck, junit, distcheck, licensecheck"
+    description="Run Java and C++ JNI testcases and test plan fragments."
+/>
+<target name="check_quick"
+    depends="compile, junit_quick, distcheck"
+    description="Run a subset of Java testcases and test fragments."
+/>
+<target name="all"
+    depends="compile, ee, junit, eecheck, doc, eedoc, jars"
+    description="Do all tasks."
+/>
+<target name="jars"
+    depends="voltdb.jar, voltdbfat.jar"
+    description="Create production JAR files."
+/>
+<target name="dist"
+    depends="dist_internal"
+    description="Create VoltDB release package with examples and documentation."
+/>
+
+<!--
+***************************************
+DISTRIBUTION
+***************************************
+-->
+
+<target name="voltbin" depends="compile, ee, jars">
+    <mkdir dir="${build.dir}/voltbin" />
+    <copy todir="${build.dir}/voltbin" flatten="true">
+        <fileset dir="${build.dir}" defaultexcludes="yes">
+            <include name="nativelibs/libvoltdb*" />
+            <include name="prod/voltdbfat.jar" />
+        </fileset>
+    </copy>
+    <!-- use cp to preserve permissions -->
+    <exec dir="tools" executable="cp" failonerror="true">
+        <arg line="getmac.py"/>
+        <arg line="killstragglers.sh"/>
+        <arg line="${build.dir}/voltbin"/>
+    </exec>
+    <!-- strip the voltbin shared library (~40x size reduction) -->
+    <exec dir='${build.dir}/voltbin' executable='/bin/sh'>
+        <arg line="-c '/usr/bin/strip -x libvoltdb*'"/>
+    </exec>
+</target>
+
+<target name="dist_internal" depends="compile, ee, voltdb.jar">
+    <!-- prepare release directory for new content -->
+    <delete includeemptydirs="true" failonerror='false'>
+        <fileset dir="${dist.dir}" includes="**/*" />
+    </delete>
+    <mkdir dir="${dist.dir}" />
+
+    <mkdir dir="${dist.dir}/doc" />
+    <mkdir dir="${dist.dir}/tools" />
+    <mkdir dir="${dist.dir}/voltdb" />
+
+    <!-- populate selected server/compiler javadoc documentation -->
+    <javadoc
+        destdir="${dist.dir}/doc/procedure-api"
+        Public="true"
+        version="true"
+        use="true"
+        nodeprecated="true"
+        Overview='${src.gpl.dir}/overview-public.html'
+        Windowtitle='VoltDB Server APIs'>
+        <link href="${j2se_api}"/>
+        <classpath refid='project.classpath' />
+        <fileset dir="." defaultexcludes="yes">
+            <include name="src/frontend/org/voltdb/VoltTable.java" />
+            <include name="src/frontend/org/voltdb/VoltTableRow.java" />
+            <include name="src/frontend/org/voltdb/VoltProcedure.java" />
+            <include name="src/frontend/org/voltdb/SQLStmt.java" />
+            <include name="src/frontend/org/voltdb/VoltType.java" />
+            <include name="src/frontend/org/voltdb/ProcInfo.java" />
+        </fileset>
+    </javadoc>
+
+    <!-- populate selected client javadoc documentation -->
+    <javadoc
+        destdir="${dist.dir}/doc/java-client-api"
+        access="protected"
+        version="true"
+        use="true"
+        nodeprecated="true"
+        Overview='${src.gpl.dir}/overview-public.html'
+        Windowtitle='VoltDB Client APIs'>
+        <link href="${j2se_api}"/>
+        <classpath refid='project.classpath' />
+        <fileset dir="." defaultexcludes="yes">
+            <include name="src/frontend/org/voltdb/VoltTable.java" />
+            <include name="src/frontend/org/voltdb/VoltTableRow.java" />
+            <include name="src/frontend/org/voltdb/VoltClient.java" />
+            <include name="src/frontend/org/voltdb/VoltType.java" />
+            <include name="src/frontend/org/voltdb/client/Client.java" />
+            <include name="src/frontend/org/voltdb/client/NoConnectionsException.java" />
+            <include name="src/frontend/org/voltdb/client/ProcedureCallback.java" />
+            <include name="src/frontend/org/voltdb/client/ClientFactory.java" />
+            <include name="src/frontend/org/voltdb/client/SyncCallback.java" />
+            <include name="src/frontend/org/voltdb/client/NullCallback.java" />
+            <include name="src/frontend/org/voltdb/client/ProcCallException.java" />
+            <include name="src/frontend/org/voltdb/client/ClientStatusListener.java" />
+            <include name="src/frontend/org/voltdb/client/ClientResponse.java" />
+        </fileset>
+    </javadoc>
+
+    <!-- populate java and native libraries -->
+    <copy todir="${dist.dir}/voltdb" flatten="true" >
+        <fileset dir="${build.dir}" defaultexcludes="yes">
+            <include name="prod/voltdb-${dist.version}.jar" />
+            <include name="nativelibs/libvoltdb*" />
+        </fileset>
+    </copy>
+
+    <!-- populate top level README by copying and renaming user_guide -->
+    <copy tofile="${dist.dir}/README" file="doc/user_guide"/>
+
+    <!-- populate examples top level README -->
+    <copy tofile="${dist.dir}/examples/README" file="examples/README"/>
+
+    <!-- populate the other examples -->
+    <copy todir="${dist.dir}/examples" >
+        <fileset dir="examples" defaultexcludes="yes">
+            <include name="**/*"/>
+        </fileset>
+    </copy>
+
+    <!-- populate the ad hoc tool -->
+    <copy todir="${dist.dir}/tools" >
+        <fileset dir="tools" defaultexcludes="yes">
+            <include name="browser_adhoc/**"/>
+        </fileset>
+    </copy>
+
+    <!-- copy fastserializer.py for python examples -->
+    <copy todir="${dist.dir}/tools/browser_adhoc" file="tests/scripts/fastserializer.py"/>
+
+    <!-- populate project generator -->
+    <exec dir="src/proj_gen/" executable="python">
+        <arg line="generator_compiler.py"/>
+    </exec>
+    <move tofile="${dist.dir}/tools/generate" file="src/proj_gen/generate" />
+    <chmod perm="ugo+rx">
+        <fileset dir="${dist.dir}/tools" defaultexcludes="yes">
+            <include name="generate"/>
+        </fileset>
+    </chmod>
+
+    <!-- copy licenses -->
+    <copy todir="${dist.dir}" file="COPYING"/>
+    <copy todir="${dist.dir}/voltdb" file="COPYING"/>
+
+    <!-- create an archive for distribution -->
+    <tar destfile="voltdb-temp.tar" >
+        <tarfileset
+            prefix="voltdb-${dist.version}"
+            dir="${dist.dir}"
+            includes="**/*"
+            excludes="**/*.py generate"
+        />
+        <tarfileset
+            prefix="voltdb-${dist.version}"
+            dir="${dist.dir}"
+            includes="**/*.py generate"
+        />
+    </tar>
+    <gzip src="voltdb-temp.tar" destfile="${build.dir}/voltdb-${dist.version}.tar.gz" />
+    <delete file="voltdb-temp.tar" />
+</target>
+
+<!--
+***************************************
+CLEANING
+***************************************
+-->
+
+<target name='clean' description="Remove all compiled files.">
+  <exec dir='.' executable='/bin/sh'>
+    <arg line="-c 'rm -rf obj/*'"/>
+  </exec>
+</target>
+
+<!--
+***************************************
+JAR BUILDING
+***************************************
+-->
+
+<target name="buildinfo">
+  <loadfile property='dist.version' srcFile='version.txt'>
+      <filterchain><striplinebreaks/></filterchain>
+  </loadfile>
+  <exec dir="." executable="tools/getsvninfo.sh">
+      <arg line='${dist.version}' />
+  </exec>
+</target>
+
+<target name="voltdb.jar" depends="compile, buildinfo">
+    <jar destfile="${build.prod.dir}/voltdb-${dist.version}.jar">
+        <fileset dir="${build.prod.dir}" defaultexcludes="yes" >
+            <include name="org/voltdb/**" />
+            <include name="org/hsqldb/**" />
+            <include name="org/json/**" />
+        </fileset>
+        <fileset dir="${build.test.dir}" defaultexcludes="yes" >
+            <include name="org/voltdb/ServerThread.class" />
+            <include name="org/voltdb/benchmark/*" />
+            <include name="org/voltdb/regressionsuites/Local*" />
+            <include name="org/voltdb/regressionsuites/MultiConfigSuiteBuilder.class" />
+            <include name="org/voltdb/regressionsuites/RegressionSuite.class" />
+            <include name="org/voltdb/regressionsuites/VoltServerConfig.class" />
+        </fileset>
+        <fileset dir="${vendor.obj.dir}" defaultexcludes="yes" >
+            <include name="**" />
+        </fileset>
+        <fileset dir="."><include name="buildstring.txt"/></fileset>
+        <manifest>
+            <section name="Credits">
+                <attribute name="Author" value="VoltDB LLC" />
+            </section>
+            <section name="Shared">
+                <attribute
+                    name="Title"
+                    value="VoltDB compiler, server, and client interface libraries"
+                />
+                <attribute name="Date" value="${TODAY}" />
+            </section>
+        </manifest>
+    </jar>
+</target>
+
+<target name="voltdbthin.jar" depends="compile"
+    description="used by testability-explorer">
+    <jar destfile="${build.prod.dir}/voltdbthin.jar">
+        <fileset dir="${build.prod.dir}" defaultexcludes="yes" >
+            <include name="org/voltdb/**" />
+        </fileset>
+    </jar>
+</target>
+
+<target name="voltdbfat.jar" depends="compile, buildinfo">
+    <jar destfile="${build.prod.dir}/voltdbfat.jar">
+        <fileset dir="${build.prod.dir}" defaultexcludes="yes" >
+            <include name="org/voltdb/**" />
+            <include name="org/hsqldb/**" />
+            <include name="org/json/**" />
+        </fileset>
+        <fileset dir="${build.test.dir}" defaultexcludes="no" >
+            <include name="org/voltdb/**" />
+        </fileset>
+        <fileset dir="${src.gpl.dir}" defaultexcludes="yes" >
+            <include name="org/voltdb/**" />
+        </fileset>
+        <fileset dir="${src.test.dir}" defaultexcludes="yes" >
+            <include name="org/voltdb/**" />
+        </fileset>
+        <fileset dir="${vendor.obj.dir}" defaultexcludes="yes" >
+            <include name="**" />
+        </fileset>
+        <fileset dir="."><include name="buildstring.txt"/></fileset>
+        <manifest>
+            <section name="Credits">
+                <attribute name="Author" value="VoltDB LLC" />
+            </section>
+            <section name="Shared">
+                <attribute
+                    name="Title"
+                    value="VoltDB compiler, server, client and test libraries"
+                />
+                <attribute name="Date" value="${TODAY}" />
+            </section>
+        </manifest>
+    </jar>
+</target>
+
+<!--
+***************************************
+JAVA COMPILATION
+***************************************
+-->
+
+<target name="compile" depends="compile_core, compile_pro"
+        description="Compile all Java source and test classes"/>
+
+<target name="compile_core">
+    <mkdir dir='${build.prod.dir}' />
+    <mkdir dir='${build.test.dir}' />
+    <exec
+        dir='${src.gpl.dir}/org/voltdb/utils'
+        executable='${src.gpl.dir}/org/voltdb/utils/generate_logkeys.py'
+        failonerror='true' />
+    <depend
+        srcdir="${src.hsqldb.dir}:${src.hsqldb.test.dir}:${src.gpl.dir}:${src.test.dir}:${vendor.src.dir}"
+        destdir="${build.prod.dir}:${build.test.dir}"
+        cache="${depcache}">
+        <classpath refid="project.classpath" />
+    </depend>
+
+    <!-- copy resources needed for logging messages -->
+    <copy todir="${build.prod.dir}">
+        <fileset dir="${src.hsqldb.dir}" includes="**/*.properties" />
+        <fileset dir="${src.gpl.dir}" includes="**/*.properties"/>
+        <fileset dir="${src.gpl.dir}" includes="**/*.xml" />
+    </copy>
+
+    <copy todir='${build.prod.dir}/org/hsqldb/resources'>
+        <fileset dir="${src.hsqldb.dir}/org/hsqldb/resources">
+            <include name="*"/>
+        </fileset>
+    </copy>
+
+    <!-- pick src//** schemas as package resources -->
+    <copy flatten='false' todir="${build.prod.dir}">
+        <fileset dir="${src.gpl.dir}">
+            <include name="**/*.xsd"/>
+        </fileset>
+    </copy>
+
+    <!-- the ddl files used by tests and benchmark clients are copied
+         relative to the client class and found with class.getResource() -->
+    <copy flatten='false' todir='${build.test.dir}'>
+        <fileset dir="${src.test.dir}">
+            <include name="**/*.sql"/>
+        </fileset>
+    </copy>
+
+    <copy todir='${build.test.dir}/org/hsqldb'>
+        <fileset dir="${src.hsqldb.test.dir}/org/hsqldb">
+            <include name="*.sql"/>
+        </fileset>
+    </copy>
+
+    <copy
+        file='${src.test.dir}/org/voltdb/catalog/catalog.txt'
+        todir='${build.test.dir}/org/voltdb/catalog'/>
+
+    <!-- compile the individual source directories -->
+    <javac
+        target="1.6"
+        srcdir="${src.hsqldb.dir}"
+        destdir='${build.prod.dir}'
+        debug='true'>
+        <classpath refid="project.classpath" />
+    </javac>
+
+    <javac
+        target="1.6"
+        srcdir="${vendor.src.dir}"
+        destdir='${build.prod.dir}'
+        debug='true'>
+        <classpath refid="project.classpath" />
+    </javac>
+
+    <javac
+        target="1.6"
+        srcdir="${src.gpl.dir}"
+        destdir='${build.prod.dir}'
+        debug='true'>
+        <classpath refid="project.classpath" />
+    </javac>
+
+    <!-- compile the individual test directories -->
+    <javac
+        target="1.6"
+        srcdir="${src.hsqldb.test.dir}"
+        destdir='${build.test.dir}'
+        debug='true'>
+        <classpath refid="project.classpath" />
+    </javac>
+
+    <javac
+        target="1.6"
+        srcdir="${src.test.dir}"
+        destdir='${build.test.dir}'
+        excludes="org/voltdb/benchmark/tpcc/JDBCClient.java,edu/mit/elt/ELTTester**"
+        debug='true'>
+        <classpath refid="project.classpath" />
+    </javac>
+</target>
+
+<!-- This task only executes if the voltpro.flavor property is set. -->
+<target name="compile_pro" if="voltpro.flavor">
+  <antcall target="voltpro.compile"/>
+</target>
+
+<!--
+***************************************
+DOCUMENTATION
+***************************************
+-->
+
+<target name="doc" description="Create Java doc files.">
+    <javadoc
+        destdir="${doc.dir}/java-api"
+        version="true"
+        use="true"
+        Overview='${src.gpl.dir}/overview.html'>
+        <classpath refid='project.classpath' />
+        <link href="${j2se_api}"/>
+        <fileset dir="." defaultexcludes="yes">
+            <include name="src/frontend/org/voltdb/**/*.java"/>
+        </fileset>
+    </javadoc>
+</target>
+
+<taskdef
+    name="doxygen"
+    classname="org.doxygen.tools.DoxygenTask"
+    classpath="${vendor.lib.dir}/ant_doxygen.jar"
+/>
+<target name="eedoc"
+    description="Generate doxygen C++ execution engine documentation.">
+    <doxygen configfilename="${doc.dir}/Doxyfile" />
+</target>
+
+<!--
+***************************************
+NATIVE EE STUFF
+***************************************
+-->
+
+<target name='jnicompile'
+    depends='compile, jnicompile_temp, uptodate_jni_h.check'
+    description="Build C++ JNI library."
+    unless='uptodate_jni_h'>
+    <delete file="${src.ee.dir}/org_voltdb_jni_ExecutionEngine.h" />
+    <delete file="${src.ee.dir}/org_voltdb_utils_DBBPool.h" />
+    <delete file="${src.ee.dir}/org_voltdb_utils_ThreadUtils.h" />
+    <move
+        file='${build.dir}/org_voltdb_jni_ExecutionEngine.h'
+        todir='${src.ee.dir}'
+    />
+    <move
+        file='${build.dir}/org_voltdb_utils_DBBPool.h'
+        todir='${src.ee.dir}'
+    />
+    <move
+        file='${build.dir}/org_voltdb_utils_ThreadUtils.h'
+        todir='${src.ee.dir}'
+    />
+</target>
+
+<target name='uptodate_jni_h.check' depends='jnicompile_temp'>
+    <condition property='uptodate_jni_h'>
+        <and>
+            <filesmatch
+                file1="${src.ee.dir}/org_voltdb_jni_ExecutionEngine.h"
+                file2="${build.dir}/org_voltdb_jni_ExecutionEngine.h"
+            />
+            <filesmatch
+                file1="${src.ee.dir}/org_voltdb_utils_DBBPool.h"
+                file2="${build.dir}/org_voltdb_utils_DBBPool.h"
+            />
+            <filesmatch
+                file1="${src.ee.dir}/org_voltdb_utils_ThreadUtils.h"
+                file2="${build.dir}/org_voltdb_utils_ThreadUtils.h"
+            />
+        </and>
+    </condition>
+</target>
+
+<target name='jnicompile_temp'>
+    <delete file="${build.dir}/org_voltdb_jni_ExecutionEngine.h"/>
+    <delete file="${build.dir}/org_voltdb_utils_DBBPool.h" />
+    <javah
+        classpathref="project.classpath"
+        force="yes"
+        verbose="yes"
+        class="org.voltdb.jni.ExecutionEngine"
+        destdir="${build.dir}"
+    />
+    <javah
+        classpathref="project.classpath"
+        force="yes"
+        verbose="yes"
+        class="org.voltdb.utils.DBBPool"
+        destdir="${build.dir}"
+    />
+    <javah
+        classpathref="project.classpath"
+        force="yes"
+        verbose="yes"
+        class="org.voltdb.utils.ThreadUtils"
+        destdir="${build.dir}"
+    />
+</target>
+
+<target name="eecheck" depends="ee"
+    description="Run testcases for C++ JNI library.">
+    <exec dir='.' executable='python' failonerror='true'>
+        <env key='M1CATALOG_PATH' value='${m1catalog}' />
+        <env key="TEST_DIR" value="${build.testobjects.dir}" />
+        <arg line="build.py ${build} test" />
+    </exec>
+</target>
+
+<target name='ee' depends="jnicompile"
+    description="Build C++ JNI library and copy it to production folder.">
+    <exec dir='.' executable='python' failonerror='true'>
+        <arg line="build.py ${build}" />
+    </exec>
+</target>
+
+<target name='execplanfrag' depends="ee"
+        description="Create test program that loads catalog and tables and executes a plan fragment.">
+    <exec dir='.' executable='python' failonerror='true'>
+        <arg line="build.py EXECPLANFRAG ${build}" />
+    </exec>
+</target>
+
+
+<!--
+***************************************
+LICENSING
+***************************************
+-->
+
+<target name='licensecheck' description="make sure all source files have approved licenses">
+    <exec dir='tools' executable='python' failonerror='true'>
+        <arg line="licensescheck.py" />
+        <arg line="${voltpro}"/>
+    </exec>
+</target>
+
+
+<!--
+***************************************
+TEST CASES
+***************************************
+-->
+
+<target name='pythonfser' description="run python fastserializer tests">
+    <exec dir='tests/scripts/' executable='python' failonerror='true'>
+        <arg line="Testfastserializer.py"/>
+    </exec>
+</target>
+
+<target name='with.emma' description="enable code coverage analysis" >
+    <!-- set up emma -->
+    <path id="emma.lib" >
+        <pathelement location="${vendor.lib.dir}/emma.jar" />
+        <pathelement location="${vendor.lib.dir}/emma_ant.jar" />
+    </path>
+    <taskdef resource="emma_ant.properties" classpathref="emma.lib" />
+    <!-- enable emma -->
+    <property name="emma.enabled" value="true" />
+    <!-- instrument the code -->
+    <property name="emma.dir" location="${build.dir}/emma" />
+    <mkdir dir="${emma.dir}" />
+    <emma>
+        <!-- don't instrument build.test.dir or any non-voltdb code -->
+        <instr
+            instrpath="${build.prod.dir}/org/voltdb"
+            destdir="${build.instr.dir}/org/voltdb"
+            metadatafile="${emma.dir}/metadata.emma"
+            merge="true"
+        />
+    </emma>
+</target>
+
+<!-- common junit parameters go here -->
+<macrodef name='run_junit'>
+    <attribute name='timeout' default='180000' />
+    <attribute name='printsummary' default='off' />
+    <attribute name='showoutput' default='false' />
+    <element name='tests'/>
+    <element name='formatters'/>
+    <sequential>
+        <mkdir dir='${build.testoutput.dir}' />
+        <junit
+            fork="yes"
+            haltonfailure="${junit.haltonfailure}"
+            failureproperty="junit.failures"
+            printsummary="@{printsummary}"
+            timeout="@{timeout}"
+            maxmemory='1024M'
+            showoutput="@{showoutput}"
+        >
+            <classpath refid='project.classpath' />
+            <jvmarg value="-Djava.library.path=${build.dir}/nativelibs" />
+            <jvmarg value="-server" />
+            <jvmarg value="-Xcheck:jni" />
+            <jvmarg value="-Xmx2048m"/>
+            <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError"/>
+            <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
+            <env key="TEST_DIR" value="${build.testobjects.dir}" />
+            <env key="VOLT_REGRESSIONS" value="${regressions}" />
+            <!-- Following two env vars are used by Java code
+                 when running ant check -Dbuild=memcheck
+                 The voltdbipc client is used in concert with valgrind
+                 for most tests (those that would normally run against
+                 the single process JNI backend. -->
+            <env key="BUILD" value="${build}" />
+            <env key="VOLTDBIPC_PATH" value="${build.prod.dir}/voltdbipc" />
+            <!-- code coverage output settings, harmless if not in use -->
+            <jvmarg value="-Demma.coverage.out.file=${emma.dir}/coverage.emma" />
+            <jvmarg value="-Demma.coverage.out.merge=true" />
+            <!-- -->
+            <formatters/>
+            <batchtest todir="${build.testoutput.dir}">
+                <tests/>
+            </batchtest>
+            <assertions><enable/></assertions>
+        </junit>
+    </sequential>
+</macrodef>
+
+<!-- A set of junit tests that only run on hudson and have an extended timeout -->
+<!-- Run this before junit to pick up these tests in the reporting -->
+<target name="junit-hudson">
+    <run_junit timeout="900000" printsummary="yes">
+        <formatters>
+            <formatter type="xml" />
+        </formatters>
+        <tests>
+            <fileset dir='${build.test.dir}'>
+                <!-- currently empty! -->
+            </fileset>
+        </tests>
+    </run_junit>
+</target>
+    
+<!-- Junit tests that run quickly -->
+<target
+    name="junit_quick"
+    description="Tests and suites that run in under 3 minutes under memcheck"
+>
+    <run_junit>
+        <formatters>
+            <formatter type="plain" unless="hudson"/>
+            <formatter
+                type='xml'
+                classname="org.voltdb.VoltJUnitFormatter"
+                usefile='false'
+                extension="none"
+            />
+            <formatter type="xml" />
+        </formatters>
+        <tests>
+            <fileset dir='${build.test.dir}'>
+                <include name='org/hsqldb/**/Test*.class'/>
+                <include name='org/voltdb/**/Test*.class'/>
+                <include name='org/voltdb/network/**/Test*.class'/>
+                <include name='org/voltdb/messaging/**/*Test.class'/>
+                <include name='org/voltdb/network/**/*Test.class'/>
+                <include name='org/voltdb/utils/**/*Test.class'/>
+                <exclude name="**/*$*.class"/>
+                <exclude name="**/TestMaliciousClientSuite.class" />
+                <exclude name="**/TestELTSuite" />
+                <exclude name="**/TestFailuresSuite" />
+                <exclude name="**/TestFixedSQLSuite" />
+                <exclude name="**/TestPlansGroupBySuite" />
+                <exclude name="**/TestRollbackSuite" />
+                <exclude name="**/TestSQLFeaturesSuite" />
+                <exclude name="**/TestSQLTypesSuite" />
+                <exclude name="**/TestSqlUpdateSuite" />
+                <exclude name="**/TestTPCCSuite" />     
+            </fileset>
+        </tests>
+    </run_junit>
+</target>
+    
+<target name="junit" description="Run testcases for Java classes.">
+    <!-- Run the unit tests -->
+    <condition property="timeoutLength" value="${timeoutLength}" else='180000'>
+        <isset property="timeoutLength"/>
+    </condition>
+
+    <run_junit timeout="${timeoutLength}" printsummary="no">
+        <formatters>
+            <formatter type="plain" unless="hudson"/>
+            <formatter
+                type='xml'
+                classname="org.voltdb.VoltJUnitFormatter"
+                usefile='false'
+                extension="none"
+            />
+            <formatter type="xml" />
+        </formatters>
+        <tests>
+            <fileset dir='${build.test.dir}'>
+                <include name='org/hsqldb/**/Test*.class'/>
+                <include name='org/voltdb/**/Test*.class'/>
+                <include name='org/voltdb/network/**/Test*.class'/>
+                <include name='org/voltdb/messaging/**/*Test.class'/>
+                <include name='org/voltdb/network/**/*Test.class'/>
+                <include name='org/voltdb/utils/**/*Test.class'/>
+                <exclude name="**/*$*.class"/>
+                <exclude name="**/TestMaliciousClientSuite.class" />
+            </fileset>
+        </tests>
+    </run_junit>
+    
+    <!-- Generate unit test reports. -->
+    <mkdir dir='${build.testoutput.dir}/report' />
+    <junitreport todir="${build.testoutput.dir}">
+        <fileset dir='${build.testoutput.dir}'>
+            <include name="*.xml" />
+            <exclude name='TESTS-TestSuites.xml' />
+        </fileset>
+        <report format="noframes" todir="${build.testoutput.dir}/report"/>
+        <report
+            styledir="tools"
+            format="noframes"
+            todir="${build.testoutput.dir}"
+        />
+    </junitreport>
+
+    <exec dir="${build.testoutput.dir}" executable='cat'>
+        <arg line="junit-noframes.html"/>
+    </exec>
+    <delete
+        dir='${build.testoutput.dir}'
+        includes='*.xml'
+        excludes='TESTS-TestSuites.xml'
+    />
+    <!-- Fail the build if there were any problems.
+        This runs all the tests before failing. -->
+    <fail
+        if="junit.failures"
+        unless="emma.enabled"
+        message="JUnit had failures"
+    />
+
+    <!-- Regenerate milestoneOneCatalog/ -->
+    <delete dir='${build.dir}/expanded/milestoneOneCatalog' />
+    <mkdir dir='${build.dir}/expanded/milestoneOneCatalog' />
+    <unjar
+        src='${build.testobjects.dir}/milestoneOneCatalog.jar'
+        dest='${build.dir}/expanded/milestoneOneCatalog'
+    />
+</target>
+
+<target
+    name='emma-report'
+    depends='with.emma, junit'
+    description="Generate code coverage reports, if appropriate.">
+    <emma>
+        <report
+            sourcepath="${src.gpl.dir}"
+            sort="+name"
+            metrics="method:70,block:80,line:80,class:100">
+            <fileset dir="${emma.dir}"><include name="*.emma"/></fileset>
+            <xml outfile="${emma.dir}/coverage.xml" depth="method" />
+            <html
+                outfile="${emma.dir}/coverage.html"
+                depth="method"
+                columns="name,class,method,block,line"
+                encoding="UTF-8"
+            />
+        </report>
+    </emma>
+</target>
+
+<!--
+    this target is intended to be called only with antcall!
+    set two properties beforehand or as part of the call:
+    lcov.dir is the directory in which to put the coverage report
+    lcov.target is the ant target to run under coverage
+-->
+<target name='with.lcov' description="Generate C++ code coverage reports.">
+  <property name="lcov.base.tracefile" value="lcov_base.info" />
+  <property name="lcov.test.tracefile" value="lcov_test.info" />
+  <property name="lcov.tracefile" value="lcov.info" />
+  <!-- Generate instrumented objects -->
+  <!-- Whether any work needs doing is left to the C++ makefile -->
+  <exec dir='.' executable='python' failonerror='true'>
+    <arg line="build.py ${build} coverage" />
+  </exec>
+  <mkdir dir="${lcov.dir}" />
+  <!-- Reset all counters -->
+  <exec dir="${lcov.dir}" executable='lcov' failonerror="true">
+    <arg line="--directory ${build.dir}-coverage/objects"/>
+    <arg line="--zerocounters"/>
+  </exec>
+  <!-- Get baseline coverage (zero coverage) -->
+  <exec dir="${lcov.dir}" executable='lcov' failonerror="true">
+    <arg line="--directory ${build.dir}-coverage/objects"/>
+    <arg line="-i --capture"/>
+    <arg line="--output-file ${lcov.base.tracefile}"/>
+    <arg line="-b ${src.ee.parent.dir}"/>
+  </exec>
+  <!-- Run the tests -->
+  <antcall target="${lcov.target}">
+    <param name="build.dir.suffix" value="-coverage" />
+  </antcall>
+  <!-- Get test coverage -->
+  <exec dir="${lcov.dir}" executable='lcov' failonerror="true">
+    <arg line="--directory ${build.dir}-coverage/objects"/>
+    <arg line="--capture"/>
+    <arg line="--output-file ${lcov.test.tracefile}"/>
+    <arg line="-b ${src.ee.parent.dir}"/>
+  </exec>
+  <!-- Combine the baseline coverage and the test coverage -->
+  <exec dir="${lcov.dir}" executable='lcov' failonerror="true">
+    <arg line="-a ${lcov.base.tracefile}"/>
+    <arg line="-a ${lcov.test.tracefile}"/>
+    <arg line="-o ${lcov.tracefile}"/>
+  </exec>
+  <!-- Remove standard library and third party coverages -->
+  <exec dir="${lcov.dir}" executable='lcov' failonerror="true">
+    <arg line="-r ${lcov.tracefile}"/>
+    <arg line='"/usr/include/*"'/>
+    <arg line='"*third_party*"'/>
+    <arg line="-o ${lcov.tracefile}"/>
+  </exec>
+  <!-- Generate HTML report -->
+  <exec dir="${lcov.dir}" executable='genhtml' failonerror="true">
+    <arg line="${lcov.tracefile}"/>
+  </exec>
+</target>
+
+<target name='lcov-report' description=''>
+    <property name="lcov.dir" location="${build.dir}-coverage/lcov" />
+    <property name="lcov.target" value="sqlcoverage" />
+    <antcall target="with.lcov" />
+</target>
+
+<target
+    name='lcov-unit-tests'
+    description="Run C++ unit tests from the coverage directory">
+    <exec dir='.' executable='python' failonerror='true'>
+        <env key='M1CATALOG_PATH' value='${m1catalog}' />
+        <env key="TEST_DIR" value="${build.dir}-coverage/testobjects" />
+        <arg line="build.py ${build} test coverage" />
+    </exec>
+</target>
+
+<target
+    name='lcov-unit-tests-report'
+    description="Generate C++ unit test coverage reports.">
+    <property
+        name="lcov.dir"
+        location="${build.dir}-coverage/lcov-unit-tests"
+    />
+    <property name="lcov.target" value="lcov-unit-tests" />
+    <antcall target="with.lcov" />
+</target>
+
+<target
+    name='testability-report'
+    depends="voltdbthin.jar"
+    description="produce Google Code testability-explorer report">
+    <path id="testability.lib">
+        <pathelement
+            location="${vendor.lib.dir}/ant-testability-explorer.jar"
+        />
+        <pathelement
+            location="${vendor.lib.dir}/testability-explorer.jar"
+        />
+    </path>
+    <taskdef
+        name="testability"
+        classname="com.google.ant.TestabilityTask"
+        classpathref="testability.lib"
+    />
+    <testability
+        resultfile="${build.dir}/testability.result.html" print="html"
+        errorfile="${build.dir}/testability.err.txt">
+        <classpath>
+            <fileset dir="${build.prod.dir}">
+                <include name="voltdbthin.jar" />
+            </fileset>
+        </classpath>
+    </testability>
+</target>
+
+<target name="cpd">
+    <taskdef
+        name="cpdtask"
+        classname="net.sourceforge.pmd.cpd.CPDTask"
+        classpath="${vendor.lib.dir}/pmd-4.2.5.jar"
+    />
+    <macrodef name="cpd">
+        <attribute name="language"/>
+        <attribute name="srcdir"/>
+        <attribute name="format"/>
+        <sequential>
+            <echo>@{language} @{srcdir} @{format}</echo>
+            <cpdtask
+                minimumTokenCount="100"
+                outputFile="${build.dir}/cpd-@{language}.@{format}"
+                language="@{language}"
+                format="@{format}">
+                <fileset dir="@{srcdir}">
+                    <include name="**/*.@{language}"/>
+                </fileset>
+            </cpdtask>
+        </sequential>
+    </macrodef>
+    <cpd language="java" srcdir="${src.gpl.dir}" format="text"/>
+    <cpd language="java" srcdir="${src.gpl.dir}" format="xml"/>
+    <cpd language="cpp" srcdir="${src.ee.dir}" format="text"/>
+    <cpd language="cpp" srcdir="${src.ee.dir}" format="xml"/>
+</target>
+
+<!-- This target will run a junit suite. It will also run a single
+     suite under valgrind with -Dbuild=memcheck.  NOTE: to use valgrind,
+     you must "cd obj/memcheck && make prod/voltdbipc" separately. -->
+<target name='junitclass'
+    description="Run one junit suite (i.e, -Djunitclass=TestSQLFeaturesSuite)">
+    
+    <condition property="timeoutLength" value="${timeoutLength}" else='180000'>
+        <isset property="timeoutLength"/>
+    </condition>
+    <run_junit timeout="${timeoutLength}" printsummary="yes" showoutput="yes">
+        <formatters>
+            <formatter usefile="false" type="plain"/>
+        </formatters>
+        <tests>
+            <include name="**/${junitclass}.class"/>
+        </tests>
+    </run_junit>
+    <fail if="junit.failures" message="JUnit had failures" />
+</target>
+
+<target name="distcheck" depends='dist'
+    description="Verify distribution sample applications compile and run.">
+
+    <!-- make sure auction example compiles -->
+    <ant
+        dir='${dist.examples.auction.dir}'
+        inheritAll='false'
+        inheritRefs='false'
+        target='main'
+    />
+
+    <!-- make sure satellite example compiles
+    <ant
+        dir='${dist.examples.satellite.dir}'
+        inheritAll='false'
+        inheritRefs='false'
+        target='main'
+    />
+    -->
+
+    <!-- test the generator -->
+    <exec dir="${dist.dir}" executable='${dist.dir}/tools/generate'>
+        <arg line="foo org.foo foo"/>
+    </exec>
+    <ant
+        dir='${dist.dir}/foo'
+        inheritAll='false'
+        inheritRefs='false'
+        target='main'
+    />
+    <delete dir='${dist.dir}/foo' />
+</target>
+
+<target name='m1test_pre' depends='ee, compile'>
+    <mkdir dir='${build.testoutput.dir}' />
+    <junit fork="yes" printsummary='yes' haltonfailure="yes" showoutput='true'>
+        <jvmarg value="-Djava.library.path=${build.dir}/nativelibs" />
+        <env key="TEST_DIR" value="${build.testobjects.dir}" />
+        <env key="PLANNER" value="${planner}" />
+        <classpath refid='project.classpath' />
+        <formatter type="plain" unless="hudson"/>
+        <formatter type="xml" if="hudson"/>
+        <batchtest todir="${build.testoutput.dir}">
+            <fileset dir='${build.test.dir}'>
+                <include name='org/voltdb/compiler/TestMilestoneOneCompile.class'/>
+                <exclude name="**/*$*.class"/>
+            </fileset>
+        </batchtest>
+        <assertions><enable/></assertions>
+    </junit>
+    <delete dir='${build.dir}/expanded/milestoneOneCatalog' />
+    <mkdir dir='${build.dir}/expanded/milestoneOneCatalog' />
+    <unjar
+        src='${build.testobjects.dir}/milestoneOneCatalog.jar'
+        dest='${build.dir}/expanded/milestoneOneCatalog'
+    />
+    <copy
+        file='${build.dir}/expanded/milestoneOneCatalog/catalog.txt'
+        todir='${build.test.dir}/org/voltdb/catalog'
+    />
+    <copy
+          file='${build.dir}/expanded/milestoneOneCatalog/catalog.txt'
+          todir='${build.test.dir}/org/voltdb/catalog'
+    />
+    <copy
+          file='${build.dir}/expanded/milestoneOneCatalog/catalog.txt'
+          todir='${src.test.dir}/org/voltdb/catalog/'
+    />
+</target>
+
+<target name='sqlcoverage' depends="ee,compile"
+    description="Run the SQL coverage tests.">
+    <property name="build.dir.suffix" value="" /> <!-- Default -->
+    <property name="test.example.dir"
+    location="tests/scripts/examples/sql_coverage" />
+    <property name="default_ddl" location="${test.example.dir}/DDL.sql" />
+    <property name="default_config" location="${test.example.dir}/config.py" />
+    <property name="sqlcov.dir" location="${build.dir}/sqlcoverage" />
+    <mkdir dir="${sqlcov.dir}" />
+    <condition property="" value="${env.VOLTBUILD}" else='release'>
+        <isset property="env.VOLTBUILD"/>
+    </condition>
+    <condition property="seed_arg" value="-s ${sql_coverage_seed}" else="">
+        <isset property="sql_coverage_seed"/>
+    </condition>
+    <condition property="config_arg" value="-c ${sql_coverage_config}" else="">
+        <isset property="sql_coverage_config"/>
+    </condition>
+    <condition property="config_verbose" value="-r" else="">
+        <isset property="sql_coverage_verbose"/>
+    </condition>
+    <condition property="debug_output" value="" else="quietadhoc">
+        <isset property="sql_coverage_verbose"/>
+    </condition>
+    <condition property="hosts" value="${sql_coverage_hosts}" else="1">
+        <isset property="sql_coverage_hosts"/>
+    </condition>
+    <condition property="sitesperhost" value="${sql_coverage_sites}" else="1">
+        <isset property="sql_coverage_sites"/>
+    </condition>
+    <condition property="replicas" value="${sql_coverage_replicas}" else="0">
+        <isset property="sql_coverage_replicas"/>
+    </condition>
+    <property name='classpath' refid='project.classpath' />
+    <property name='simpleserver.command' value='java
+    -Djava.library.path=${build.dir}${build.dir.suffix}/nativelibs -classpath
+    ${classpath} -server -Xmx512m -XX:+AggressiveOpts -ea
+    org.voltdb.sqlgenerator.SimpleServer hosts=${hosts}
+    sitesperhost=${sitesperhost} replicas=${replicas}
+    ${debug_output}' />
+    <copy todir="${build.test.dir}/org/voltdb/sqlgenerator">
+      <fileset dir="${test.example.dir}">
+        <include name="**/*.sql"/>
+      </fileset>
+    </copy>
+    <copy todir="tests/scripts">
+      <fileset dir=".">
+        <include name="buildstring.txt"/>
+        <include name="version.txt"/>
+      </fileset>
+    </copy>
+    <exec dir='tests/scripts' executable='python' failonerror='true'>
+        <env key="TEST_DIR" value="${build.testobjects.dir}" />
+        <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
+        <arg line='sql_coverage_test.py' />
+        <arg line="${seed_arg}" />
+        <arg line="${config_arg}" />
+        <arg line="${config_verbose}" />
+        <arg file="${default_config}" />
+        <arg file="${sqlcov.dir}" />
+        <arg line='"${simpleserver.command}"' />
+    </exec>
+</target>
+
+<!--
+***************************************
+BENCHMARKS
+***************************************
+-->
+
+<target name="benchmarkcluster"
+    description="Call the standard benchmark target configured to use test cluster.">
+    <antcall target="benchmark" inheritAll='true'>
+        <param name="hostcount" value="12"/>
+        <param name="sitesperhost" value="10"/>
+        <param name="clientcount" value="3"/>
+        <param name="processesperclient" value="4"/>
+        <param name="host1" value="volt3a"/>
+        <param name="host2" value="volt3b"/>
+        <param name="host3" value="volt3c"/>
+        <param name="host4" value="volt3d"/>
+        <param name="host5" value="volt3e"/>
+        <param name="host6" value="volt3f"/>
+        <param name="host7" value="volt3g"/>
+        <param name="host8" value="volt3h"/>
+        <param name="host9" value="volt3i"/>
+        <param name="host10" value="volt3j"/>
+        <param name="host11" value="volt3k"/>
+        <param name="host12" value="volt3l"/>
+        <param name="clienthost1" value="volt4a"/>
+        <param name="clienthost2" value="volt4b"/>
+        <param name="clienthost3" value="volt4c"/>
+        <param name="warehouses" value="120"/>
+    </antcall>
+</target>
+
+<target name="benchmarkone"
+    description="Call the standard benchmark target configured to use one node of the test cluster.">
+    <antcall target="benchmark" inheritAll='true'>
+        <param name="hostcount" value="1"/>
+        <param name="sitesperhost" value="12"/>
+        <param name="clientcount" value="1"/>
+        <param name="processesperclient" value="6"/>
+        <param name="host1" value="volt3a"/>
+        <param name="host2" value="volt3b"/>
+        <param name="host3" value="volt3c"/>
+        <param name="host4" value="volt3d"/>
+        <param name="host5" value="volt3e"/>
+        <param name="host6" value="volt3f"/>
+        <param name="clienthost1" value="volt4a"/>
+        <param name="clienthost2" value="volt4b"/>
+        <param name="clienthost3" value="volt4c"/>
+        <param name="warehouses" value="12"/>
+        <param name="volt.server.memory" value="5096"/>
+    </antcall>
+</target>
+
+<target name='benchmark'
+    description="Compile VoltDB and run a benchmark">
+    <java fork="true" failonerror="true"
+        classname="org.voltdb.benchmark.BenchmarkController" >
+        <classpath refid='project.classpath' />
+        <jvmarg value="-Xmx512m" />
+        <jvmarg value="-Djava.library.path=${build.dir}/nativelibs" />
+        <assertions><disable/></assertions>
+        <arg value="CLIENT=${client}" />
+        <arg value="BACKEND=${backend}" />
+        <arg value="HOSTCOUNT=${hostcount}" />
+        <arg value="SITESPERHOST=${sitesperhost}"/>
+        <arg value="CLIENTCOUNT=${clientcount}" />
+        <arg value="PROCESSESPERCLIENT=${processesperclient}" />
+        <arg value="INTERVAL=${interval}" />
+        <arg value="DURATION=${duration}" />
+        <arg value="REMOTEPATH=${remotepath}" />
+        <arg value="REMOTEUSER=${remoteuser}"/>
+        <arg value="HOST=${host1}" />
+        <arg value="HOST=${host2}" />
+        <arg value="HOST=${host3}" />
+        <arg value="HOST=${host4}" />
+        <arg value="HOST=${host5}" />
+        <arg value="HOST=${host6}" />
+        <arg value="HOST=${host7}" />
+        <arg value="HOST=${host8}" />
+        <arg value="HOST=${host9}" />
+        <arg value="HOST=${host10}" />
+        <arg value="HOST=${host11}" />
+        <arg value="HOST=${host12}" />
+        <arg value="CLIENTHOST=${clienthost1}" />
+        <arg value="CLIENTHOST=${clienthost2}" />
+        <arg value="CLIENTHOST=${clienthost3}" />
+        <arg value="LISTENFORDEBUGGER=${debug}" />
+        <arg value="USEPROFILE=${useprofile}" />
+        <arg value="CHECKTRANSACTION=${checktransaction}" />
+        <arg value="CLIENTHEAP=${volt.client.memory}" />
+        <arg value="SERVERHEAP=${volt.server.memory}" />
+        <arg value="LOCAL=${local}" />
+        <!-- Actual TXN rate sent to cluster will be:
+            TXNRATE * CLIENTCOUNT * PROCESSESPERCLIENT -->
+        <arg value="TXNRATE=${txnrate}" />
+        <!-- Actual number of connections opened to cluster will be:
+            NUMCONNECTIONS * CLIENTCOUNT * PROCESSESPERCLIENT * HOSTCOUNT -->
+        <arg value="NUMCONNECTIONS=${numconnections}" />
+
+        <!-- tpcc parameters -->
+        <arg value="warehouses=${warehouses}" />
+        <arg value="scalefactor=${sf}" />
+        <arg value="skewfactor=${skew}" />
+        <arg value="loadthreads=${loadthreads}" />
+
+        <!-- measureoverhead parameters -->
+        <arg value="transaction=${transaction}"/>
+
+        <!-- multisite parameters -->
+        <arg value="sf=${sf}"/>
+        <arg value="multipartition=${multipartition}"/>
+
+        <!-- automatic online snapshot parameters -->
+        <arg value="SNAPSHOTPATH=${snapshotPath}" />
+        <arg value="SNAPSHOTFREQUENCY=${snapshotFrequency}" />
+        <arg value="SNAPSHOTPREFIX=${snapshotPrefix}" />
+        <arg value="SNAPSHOTRETAIN=${snapshotRetain}" />
+    </java>
+</target>
+
+<target name='proccallmicrobench' depends='ee, compile'
+    description="Run client-server stored procedure call overhead microbenchmark. [-Dclients={# clients}]">
+    <java fork="true" failonerror="true"
+        classname="org.voltdb.ProcedureCallMicrobench" >
+        <arg value='${clients}' />
+        <jvmarg value="-Djava.library.path=${build.dir}/nativelibs" />
+        <jvmarg value="-server" />
+        <jvmarg value="-Xmx512m" />
+        <classpath refid='project.classpath' />
+        <assertions><disable /></assertions>
+    </java>
+</target>
+
+<target name='update_logging' depends='compile'
+    description="Invoke utility that connects to the specified VoltDB host and calls @UpdateLogging system procedure with the specified XML confiG file">
+    <java fork="true" failonerror="true"
+        classname="org.voltdb.UpdateLogging" >
+        <arg value='host=${host}' />
+        <arg value='config=${config}' />
+        <arg value='allHosts=${allHosts}' />
+        <arg value='user=${user}' />
+        <arg value='password=${password}' />
+        <classpath refid='project.classpath' />
+        <assertions><enable /></assertions>
+    </java>
+</target>
+
+<target name='tcp_throughput_sender' depends='compile'
+    description="Open a TCP connection and send fixed sized packets for a specified duration.">
+    <java fork="true" failonerror="true"
+        classname="org.voltdb.TCPThroughputSender" >
+        <jvmarg value="-server" />
+        <jvmarg value="-Xmx512m" />
+        <arg value='${address}' />
+        <arg value='${packetsize}' />
+        <arg value='${seconds}' />
+        <arg value='${numsockets}' />
+        <classpath refid='project.classpath' />
+        <assertions><enable /></assertions>
+    </java>
+</target>
+
+<target name='tcp_throughput_receiver' depends='compile'
+  description="Accept a TCP connection and log how many messages and bytes are received.">
+    <java fork="true" failonerror="true"
+        classname="org.voltdb.TCPThroughputReceiver" >
+        <jvmarg value="-server" />
+        <jvmarg value="-Xmx512m" />
+        <arg value="${respond}" />
+        <arg value="${responsesize}" />
+        <arg value="${packetsize}" />
+        <classpath refid='project.classpath' />
+        <assertions><enable /></assertions>
+    </java>
+</target>
+
+<!--
+***************************************
+JAPEX MICROBENCHMARKS
+***************************************
+-->
+
+<target name='microbenchmarks' description="Run all micro-benchmarks.">
+    <!-- don't fail on error: jpeg generator requires sun jdk -->
+    <java fork="true" classname="com.sun.japex.Japex">
+        <jvmarg value="-server"/>
+        <classpath refid="project.classpath"/>
+        <jvmarg value="-Djapex.numberOfThreads=1"/>
+        <arg line="microbenchmark-config.xml"/>
+    </java>
+</target>
+
+<!--
+***************************************
+HUDSON-SPECIFIC TARGETS
+***************************************
+-->
+
+<target name='copy-coverage-files'
+    description="Collect test results so that Hudson can display them even after an ant clean">
+    <copy todir=".." preservelastmodified="true">
+        <fileset dir="obj/release/emma" includes="coverage.html"/>
+        <fileset dir="obj/release/emma" includes="_files/"/>
+        <fileset dir="obj/release-coverage" includes="lcov-unit-tests"/>
+        <fileset dir="${build.dir}" includes="testability.result.html"/>
+    </copy>
+</target>
+
+<!--
+***************************************
+UTILITIES
+***************************************
+-->
+
+<target name='dumper' description="Ask a running voltdb to dump state.">
+    <java fork="true" classname="org.voltdb.utils.DumpManager">
+        <jvmarg value="-server"/>
+        <classpath refid="project.classpath"/>
+        <arg value='${hostname}' />
+    </java>
+</target>
+
+<target name='dumpcluster' description="Ask a running voltdb on the default cluster to dump state.">
+    <java fork="true" classname="org.voltdb.utils.DumpManager">
+        <jvmarg value="-server"/>
+        <classpath refid="project.classpath"/>
+        <arg value='volt3a' />
+        <arg value='volt3b' />
+        <arg value='volt3c' />
+        <arg value='volt3d' />
+        <arg value='volt3e' />
+        <arg value='volt3f' />
+    </java>
+</target>
+
+<target name='elsinkserver'
+    description="Run the EL sink test server.">
+    <java fork="true" failonerror="true"
+        classname="org.voltdb.elt.ELSinkServer">
+        <classpath refid='project.classpath' />
+        <assertions><enable/></assertions>
+    </java>
+</target>
+
+
+<!-- END PROJECT -->
+</project>

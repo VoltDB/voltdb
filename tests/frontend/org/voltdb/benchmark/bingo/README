@@ -1,0 +1,77 @@
+This benchmark client pretends to be a faux-bingo hall.
+
+-- tournaments
+CREATE TABLE T (
+  T_ID INTEGER NOT NULL,
+  DESC STRING,
+  PRIMARY KEY (T_ID)
+);
+
+-- a tournament has multiple boards
+-- each board stores the last round's value.
+CREATE TABLE B (
+ T_ID INTEGER NOT NULL,
+ B_ID INTEGER NOT NULL,
+ LAST_VALUE STRING,
+ PRIMARY KEY (T_ID, B_ID)
+);
+
+-- a tournament has multiple rounds
+-- maybe this table should be wider?
+CREATE TABLE R (
+ T_ID INTEGER NOT NULL,
+ R_ID INTEGER NOT NULL,
+ VALUE STRING NOT NULL,
+ PRIMARY KEY (T_ID, R_ID)
+);
+
+
+There are three single partition procedures:
+
+CreateTournament:
+  insert into T
+  insert boards into B
+
+PlayRound:
+   insert into R
+   update last value in B for each board in this T_ID
+
+DeleteTournament:
+   delete from T where T_ID=tid
+   delete from B where T_ID=tid
+   delete from R where T_ID=tid.
+
+(A transaction can be added to change rows in B where B_ID=x to
+create a multi-partition transaction when/if needed.)
+
+Client configurable parameters allow controlling the number of updates
+per procedure and the number of deletes in the cleanup.
+
+  1. Number of concurrent tournaments (default 1000)
+  2. Board per tournament (B per T) (default 10)
+  3. Rounds per tournament (R per T) (default 100)
+
+
+Workload characterization.
+
+Tournament creation:
+1 insert plus (B per T) inserts.
+
+Tournament round:
+1 insert plus (B per T) updates.
+
+Tournament cleanup:
+1 delete plus (B per T) deletes plus (R per T) deletes.
+
+
+The client code synchronizes on the tournament id. If you run with
+many clients and few tournaments, there is likely going to be lock
+contention in the client.  Currently, the client parameters are
+constants in BingoClient.java. These could be improved to be
+command line arguments from Benchmark, I suppose.
+
+*--Ryan.
+
+
+
+

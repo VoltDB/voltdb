@@ -1,0 +1,32 @@
+Prototype VoltDB Command Line Interface (CLI)
+
+To use the VoltDB CLI:
+
+1. Compile the cli:  
+
+   $ javac VoltdbCli
+
+2. Define the environment variable VOLTDBROOT to point to where VoltDB is installed. For example:
+
+   $ export VOLTDBROOT=$HOME/voltdb-0.5.02/
+
+3. Make sure classpath is defined to include Volt and the location of the CLI (in this case, the /tools/ subfolder):
+
+   $ export CLASSPATH=./:$VOLTDBROOT/voltdb/*:$VOLTDBROOT/tools/
+
+4. Define voltdb as an alias to invoke the CLI:
+
+   $ alias voltdb='java VoltDBCli'
+
+Once you have performed the preceding steps (you can put steps 2-4 into your .bashrc file so they are executed automatically when you login), you can start using the CLI. There are two ways to invoke the CLI:
+
+   $ voltdb
+   $ voltdb {command}
+
+If you start voltdb without an argument, it starts a command line parser. You can then issue VoltDB commands until you explicitly EXIT the CLI. 
+
+If you invoke voltdb with a command, it executes the command and then returns you to the shell.
+
+See voltdb HELP for information about the commands you can use.
+
+

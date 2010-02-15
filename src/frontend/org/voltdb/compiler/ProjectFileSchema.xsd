@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+
+    WORTH READING:
+
+    This schema describes the Volt project file,
+    project.xml. VoltCompiler processes project.xml file using
+    the jaxb XML to Java bindings.
+
+    If you modify this schema, you must regenerate the jaxb
+    bindings. It's easy to do:
+
+    cd src/frontend
+    xjc -p org.voltdb.compiler.projectfile org/voltdb/compiler/ProjectFileSchema.xsd
+
+    Binding objects are created in the org.voltdb.compiler.projectfile
+    package. These generated files are checked in to svn.
+
+    You can check that changes to this file produce a valid schema using
+    the public tool at http://www.w3.org/2001/03/webdata/xsv.
+
+    For more information about jaxb, see:
+    http://java.sun.com/developer/technicalArticles/WebServices/jaxb/
+
+  -->
+
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            elementFormDefault="unqualified">
+
+  <!--  <project> -->
+  <xsd:element name="project" type="projectType"/>
+  <xsd:complexType name="projectType">
+    <xsd:sequence>
+      <xsd:element name="security" minOccurs='0' maxOccurs='1' type="securityType"/>
+      <xsd:element name="database" minOccurs="1" maxOccurs="1" type="databaseType"/>
+    </xsd:sequence>
+  </xsd:complexType>
+
+  <!-- <security> -->
+  <xsd:complexType name="securityType">
+    <xsd:attribute name="enabled" type="xsd:boolean" default="false"/>
+  </xsd:complexType>
+
+  <!--  <database> -->
+  <xsd:complexType name="databaseType">
+    <xsd:all>
+      <!-- elements of an all group may appear in any order at most once. -->
+      <xsd:element name="users" type="usersType" minOccurs="0"/>
+      <xsd:element name="groups" type="groupsType" minOccurs="0"/>
+      <xsd:element name="schemas" type="schemasType"/>
+      <xsd:element name="procedures" type="proceduresType"/>
+      <xsd:element name="partitions" type="partitionsType" minOccurs="0"/>
+      <xsd:element name="classdependencies" type="classdependenciesType" minOccurs="0"/>
+      <xsd:element name="exports" type="exportsType" minOccurs="0"/>
+      <xsd:element name="snapshot" type="snapshotType" minOccurs="0" maxOccurs="1" />
+    </xsd:all>
+    <xsd:attribute name="name" type="xsd:string" use="required"/>
+  </xsd:complexType>
+
+  <!-- <snapshot> -->
+  <xsd:complexType name="snapshotType">
+    <xsd:attribute name="frequency" type="xsd:string" use="required"  />
+    <xsd:attribute name="retain" type="xsd:integer" use="required" />
+    <xsd:attribute name="path" type="xsd:string" use="required" />
+    <xsd:attribute name="prefix" type="xsd:string" use="required" />
+  </xsd:complexType>
+
+  <!-- <users> -->
+  <xsd:complexType name="usersType">
+    <xsd:sequence>
+      <xsd:element name="user" minOccurs="1" maxOccurs="unbounded">
+        <xsd:complexType>
+          <xsd:attribute name="name" type="xsd:string" use="required"/>
+          <xsd:attribute name="sysproc" type="xsd:boolean" default="false"/>
+          <xsd:attribute name="adhoc" type="xsd:boolean" default="false"/>
+          <xsd:attribute name="groups" type="xsd:string" />
+          <xsd:attribute name="password" type="xsd:string" use="required"/>
+        </xsd:complexType>
+      </xsd:element>
+    </xsd:sequence>
+  </xsd:complexType>
+
+  <!-- <groups> -->
+  <xsd:complexType name="groupsType">
+    <xsd:sequence>
+      <xsd:element name="group" minOccurs="1" maxOccurs="unbounded">
+        <xsd:complexType>
+          <xsd:attribute name="name" type="xsd:string" use="required"/>
+          <xsd:attribute name="sysproc" type="xsd:boolean" default="false"/>
+          <xsd:attribute name="adhoc" type="xsd:boolean" default="false"/>
+        </xsd:complexType>
+      </xsd:element>
+    </xsd:sequence>
+  </xsd:complexType>
+
+  <!-- <schemas> -->
+  <xsd:complexType name="schemasType">
+    <xsd:sequence>
+      <xsd:element name="schema" minOccurs="1" maxOccurs="unbounded">
+        <xsd:complexType>
+          <xsd:attribute name="path" type="xsd:string" use="required"/>
+        </xsd:complexType>
+      </xsd:element>
+    </xsd:sequence>
+  </xsd:complexType>
+
+  <!-- <procedures> -->
+  <xsd:complexType name="proceduresType">
+    <xsd:sequence>
+      <xsd:element name="procedure" minOccurs="0" maxOccurs="unbounded">
+        <xsd:complexType>
+          <!-- a "statement procedure" specifies a single sql statement -->
+          <xsd:sequence>
+            <xsd:element name="sql" type="xsd:string" minOccurs="0" maxOccurs="1"/>
+          </xsd:sequence>
+          <xsd:attribute name="class" type="xsd:string" use="required"/>
+          <xsd:attribute name="partitioninfo" type="xsd:string"/>
+          <xsd:attribute name="users" type="xsd:string"/>
+          <xsd:attribute name="groups" type="xsd:string"/>
+        </xsd:complexType>
+      </xsd:element>
+    </xsd:sequence>
+  </xsd:complexType>
+
+  <!-- <partitions> -->
+  <xsd:complexType name="partitionsType">
+    <xsd:sequence>
+      <xsd:element name="partition" minOccurs="1" maxOccurs="unbounded">
+        <xsd:complexType>
+          <xsd:attribute name="table" type="xsd:string" use="required"/>
+          <xsd:attribute name="column" type="xsd:string" use="required"/>
+        </xsd:complexType>
+      </xsd:element>
+    </xsd:sequence>
+  </xsd:complexType>
+
+  <!-- <classdependencies> -->
+  <xsd:complexType name="classdependenciesType">
+    <xsd:sequence>
+      <xsd:element name="classdependency" minOccurs="0" maxOccurs="unbounded">
+        <xsd:complexType>
+          <xsd:attribute name="class" type="xsd:string" use="required"/>
+        </xsd:complexType>
+      </xsd:element>
+    </xsd:sequence>
+  </xsd:complexType>
+
+  <!-- <exports> -->
+  <xsd:complexType name="exportsType">
+    <xsd:sequence>
+      <!-- <connector> -->
+      <xsd:element name="connector" minOccurs="0" maxOccurs="1">
+	<xsd:complexType>
+          <xsd:all>
+            <!-- <tables> -->
+            <xsd:element name="tables" minOccurs="0">
+              <xsd:complexType>
+		<xsd:sequence>
+		  <!-- <table> -->
+		  <xsd:element name="table" minOccurs="0" maxOccurs="unbounded">
+		    <xsd:complexType>
+                      <xsd:attribute name="name" type="xsd:string" use="required"/>
+                      <xsd:attribute name="exportonly" type="xsd:boolean" default="false"/>
+		    </xsd:complexType>
+		  </xsd:element>
+		</xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+            <!-- <destinations> -->
+            <xsd:element name="destinations" minOccurs="0">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <!-- <destination> -->
+                  <xsd:element name="destination" minOccurs="1" maxOccurs="1">
+                    <xsd:complexType>
+                      <xsd:attribute name="address" type="xsd:string" use="required"/>
+                      <xsd:attribute name="username" type="xsd:string" use="required"/>
+                      <xsd:attribute name="password" type="xsd:string"/>
+                    </xsd:complexType>
+                  </xsd:element>
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+	  </xsd:all>
+	  <!-- connector attributes -->
+          <xsd:attribute name="class" type="xsd:string" use="required"/>
+	  <xsd:attribute name="enabled" type="xsd:boolean" default="false"/>
+	</xsd:complexType>
+      </xsd:element>
+    </xsd:sequence>
+  </xsd:complexType>
+
+</xsd:schema>

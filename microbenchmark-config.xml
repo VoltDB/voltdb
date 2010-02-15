@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testSuite name="Serialization" xmlns="http://www.sun.com/japex/testSuite">\
+    <!-- specifying these as separate parameters is *so annoying* -->
+    <param name="japex.classPath" value="./obj/release/test"/>
+    <param name="japex.classPath" value="./obj/release/prod"/>
+    <param name="japex.classPath" value="./third_party/java/jars/*.jar"/>
+
+    <driver name="org.voltdb.messaging.SerializeIntegerBenchmark">
+    </driver>
+
+    <testCase/>
+    
+</testSuite>

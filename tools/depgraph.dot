@@ -1,0 +1,34 @@
+digraph name {
+  storage [label="storage"];
+  execution [label="execution"];
+  plannode [label="plannode"];
+  stats [label="stats"];
+  executors [label="executors"];
+
+  expressions [label="expressions"];
+  indexes [label="indexes"];
+
+  storage -> expressions;
+  storage -> indexes;	
+  storage -> stats;
+  
+  execution -> executors;
+  execution -> indexes;
+  execution -> plannode;
+  execution -> stats;
+  execution -> storage;
+
+  plannode -> executors
+  plannode -> expressions;
+  plannode -> storage;
+
+  stats -> storage;
+ 
+  executors -> execution;
+  executors -> expressions;
+  executors -> indexes;
+  executors -> plannode;
+  executors -> storage;
+}
+
+

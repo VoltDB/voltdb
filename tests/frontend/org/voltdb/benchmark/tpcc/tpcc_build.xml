@@ -1,0 +1,232 @@
+<?xml version="1.0" ?>
+<project default="main" name="VoltDB release and TPCC example app build and test system">
+
+<!--
+***************************************
+PATHS AND PROPERTIES
+***************************************
+-->
+
+<!-- make environment var FOO available as env.FOO -->
+<property environment="env"/>
+
+<!-- allow env.VOLTBUILD to override "build" property -->
+<condition property="build" value="${env.VOLTBUILD}" else='release'>
+  <isset property="env.VOLTBUILD"/>
+</condition>
+
+<condition property="address" value="${address}" else="localhost">
+  <isset property="address" />
+</condition>
+
+<condition property="sites" value="${sites}" else="1">
+  <isset property="sites" />
+</condition>
+
+<condition property="warehouses" value="${warehouses}" else="10">
+  <isset property="warehouses" />
+</condition>
+
+<condition property="clients" value="${clients}" else="50">
+  <isset property="clients"/>
+</condition>
+
+<condition property="sf" value="${sf}" else="50">
+  <isset property="sf"/>
+</condition>
+
+<property name='build.dir'          location='obj/${build}' />
+<property name='build.testoutput.dir' location="${build.dir}/testoutput" />
+<property name='build.testobjects.dir'      location='${build.dir}/testobjects' />
+
+<property name='src.dir'            location='src/' />
+
+<path id='project.classpath'>
+    <pathelement location='${build.dir}' />
+    <pathelement location="../../voltdb.jar" />
+    <pathelement location="../../log4j.jar" />
+    <fileset dir='../../' >
+        <include name='junit*.jar' />
+    </fileset>
+    <pathelement path="${java.class.path}"/>
+</path>
+
+<!--
+***************************************
+PRIMARY ENTRY POINTS
+***************************************
+-->
+
+<target name="main" depends="srccompile_tpcc" description="default. Compile Java stored procedures and jar them up and then run the VoltDB compiler on the stored procedure" />
+
+<target name="client" depends="srccompile_tpcc, tpccclient_internal" description="Example: ant tpccclient -Daddress=localhost -Dwarehouses=10 -Daddress=localhost Start a TPC-C client workload generator that will generate 50 clients unless otherwise specified (-Dclients=50). You must also specify the number of warehouses to match what the loader used (-Dwarehouses=10). The VoltDB server the client connects to defaults to localhost unless specifed (-Daddress=localhost). Alias for the tpccclient_internal target." />
+
+<target name="server" depends="srccompile_tpcc, tpccserver_internal" description="Example: ant tpccserver -Dsites=1   Starts an VoltDB server with the TPC-C catalog. Defaults to one site (-Dsites=1)." />
+
+<target name="benchmark" depends="benchmark_internal" description="Example: ant benchmark -Dsites=1 -Dwarehouses=10 -Dclients=50    Run a tpcc benchmark on the local machine. You can specify the number of sites, warehouses, and clients." />
+
+<!--
+***************************************
+CLEANING
+***************************************
+-->
+
+<target name='clean' description="remove all compiled files">
+    <delete includeemptydirs="true" failonerror='false'>
+        <fileset dir="${build.dir}" includes="**/*" />
+        <fileset dir="." defaultexcludes="yes" >
+            <include name="tpcc.jar" />
+        </fileset>
+    </delete>
+</target>
+
+<!--
+***************************************
+JAVA COMPILATION
+***************************************
+-->
+
+<target name="srccompile_tpcc">
+    <mkdir dir='${build.dir}' />
+    <javac target="1.6" srcdir="${src.dir}" destdir='${build.dir}' debug='true'>
+        <classpath refid="project.classpath" />
+    </javac>
+    <copy flatten='false' todir="${build.dir}/org/voltdb/benchmark/tpcc">
+        <fileset dir="${src.dir}/org/voltdb/benchmark/tpcc">
+            <include name="tpcc-ddl.sql"/>
+        </fileset>
+    </copy>
+</target>
+
+<target name="benchmark_internal" depends="srccompile_tpcc" >
+    <echo>Starting server </echo>
+    <java fork="yes" spawn="yes" classname="org.voltdb.TPCCServer">
+        <arg value="${sites}" />
+        <arg value="true" />
+        <arg value="${useprofile}" />
+        <jvmarg value="-Djava.library.path=../../" />
+        <jvmarg value="-server" />
+        <jvmarg value="-Xmx512m" />
+        <jvmarg value="-XX:+AggressiveOpts" />
+        <classpath refid='project.classpath' />
+        <assertions><disable /></assertions>
+    </java>
+
+    <sleep  seconds="10" />
+
+    <echo>Finished waiting for server to start, running loader </echo>
+
+    <java fork="yes" classname="org.voltdb.benchmark.tpcc.Loader">
+        <arg value='${address}' />
+        <arg value='${warehouses}' />
+        <arg value='${sf}' />
+        <jvmarg value="-Djava.library.path=../../" />
+        <jvmarg value="-server" />
+        <jvmarg value="-Xmx512m" />
+        <classpath refid='project.classpath' />
+        <assertions><disable /></assertions>
+    </java>
+
+    <echo>Finished running loader, starting AsyncClient</echo>
+
+    <java fork="yes" classname="org.voltdb.benchmark.tpcc.AsyncClient">
+        <arg value='${address}' />
+        <arg value='${warehouses}' />
+        <arg value='${sf}' />
+        <arg value='${clients}' />
+        <jvmarg value="-Djava.library.path=../../" />
+        <jvmarg value="-server" />
+        <jvmarg value="-Xmx512m" />
+        <jvmarg value="-XX:+AggressiveOpts" />
+        <classpath refid='project.classpath' />
+        <assertions><disable /></assertions>
+    </java>
+    <echo>Finished running AsyncClient, ignore the java.io.EOFException</echo>
+</target>
+
+<!--
+***************************************
+TPC-C BENCHMARKS
+***************************************
+-->
+
+<target name='tpccserver_internal' depends="srccompile_tpcc">
+    <java fork="yes" classname="org.voltdb.TPCCServer" >
+        <arg value="${sites}" />
+        <arg value="true" />
+        <arg value="${useprofile}" />
+        <jvmarg value="-Djava.library.path=../../" />
+        <jvmarg value="-server" />
+        <jvmarg value="-Xmx512m" />
+        <jvmarg value="-XX:+AggressiveOpts" />
+        <classpath refid='project.classpath' />
+        <assertions><disable /></assertions>
+    </java>
+</target>
+
+<target name='loader' depends='srccompile_tpcc'>
+    <java fork="yes" classname="org.voltdb.benchmark.tpcc.Loader" >
+        <arg value='${address}' />
+        <arg value='${warehouses}' />
+        <arg value='${sf}' />
+        <jvmarg value="-Djava.library.path=../../" />
+        <jvmarg value="-server" />
+        <jvmarg value="-Xmx512m" />
+        <classpath refid='project.classpath' />
+        <assertions><disable /></assertions>
+    </java>
+</target>
+
+<target name='tpccclient_internal' depends='srccompile_tpcc'>
+    <java fork="yes" classname="org.voltdb.benchmark.tpcc.AsyncClient" >
+        <arg value='${address}' />
+        <arg value='${warehouses}' />
+        <arg value='${sf}' />
+        <arg value='${clients}' />
+        <jvmarg value="-Djava.library.path=../../" />
+        <jvmarg value="-server" />
+        <jvmarg value="-Xmx512m" />
+        <jvmarg value="-XX:+AggressiveOpts" />
+        <classpath refid='project.classpath' />
+        <assertions><disable /></assertions>
+    </java>
+</target>
+
+<!--
+***************************************
+TESTS
+***************************************
+-->
+
+<target name="check" depends='srccompile_tpcc'>
+    <mkdir dir='${build.testoutput.dir}'/>
+    <mkdir dir='${build.dir}/prod'/>
+    <mkdir dir='${build.dir}/nativelibs'/>
+    <mkdir dir='${build.testobjects.dir}'/>
+    <copy todir='${build.dir}/nativelibs'>
+        <fileset dir='${basedir}/../../'>
+            <include name="*voltdb*" />
+        </fileset>
+    </copy>
+    <copy todir='${build.dir}/prod' file='${basedir}/../../voltdb.jar' />
+    <junit fork="yes" haltonfailure="false" failureproperty="junit.failures" printsummary='yes' timeout="120000" maxmemory='512M' dir='${basedir}' >
+        <!-- cluster tests must find the voltdb.jar beneath build.dir -->
+        <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
+        <env key="TEST_DIR" value="${build.testobjects.dir}" />
+        <jvmarg value='-Djava.library.path=${basedir}/../..' />
+        <jvmarg value='-Xcheck:jni' />
+        <classpath refid='project.classpath' />
+        <formatter type="plain" />
+        <batchtest todir='${build.testoutput.dir}'>
+            <fileset dir='${build.dir}'>
+                <include name='org/voltdb/regressionsuites/**/Test*.class' />
+            </fileset>
+        </batchtest>
+        <assertions><enable/></assertions>
+    </junit>
+    <delete dir='${build.dir}/nativelibs' />
+    <delete dir='${build.dir}/prod' />
+    <fail if="junit.failures" message="JUnit had failures" />
+</target>
+
+</project>

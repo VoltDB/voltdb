@@ -1,0 +1,110 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<html>
+<head>
+<!--
+This file is part of VoltDB.
+Copyright (C) 2008-2010 VoltDB L.L.C.
+
+VoltDB is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+VoltDB is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+-->
+</head>
+<body>
+<h2>Java Native Interfaces of C++ Execution Engine.</h2>
+
+<hr />
+<h3>Overview</h3>
+<p>
+VoltDB mainly consists of Java modules for easier development.
+However, the core EE and its underlying on-memory storage system is
+implemented in C++. Nowadays Java and C++ have almost same performance
+for many cases, but C++ still outperforms Java on low-level memory accesses.
+This is why we have EE and its storage system written in C++.
+
+The Java native interface works as a bridge between Java modules and C++ EE.
+</p>
+
+<hr />
+<h3>Files and Compilation</h3>
+<p>The JNI entry points are defined in:</p>
+<p><b>build/trunk/MIT_ACR/EE/src/hstorejni.cpp</b></p>
+<p>which includes the JNI skeleton header file:</p>
+<p><b>build/trunk/MIT_ACR/EE/src/org_voltdb_jni_ExecutionEngine.h</b></p>
+<p>output by JDK's <i>javah</i> command on:</p>
+<p><b>build/trunk/GPL_VCR/gpl_java/gpl_src/org/voltdb/jni/ExecutionEngine.java</b></p>
+<p></p>
+<p>The <b>org.voltdb.jni.ExecutionEngine</b> Java class also defines
+several public static final constant values exported to C++ side by javah
+command. The compilation does following:</p>
+<ol>
+  <li>
+    <p>Compile Java classes</p>
+  </li>
+  <li>
+    <p>Execute javah on the class files to refresh JNI skeleton header</p>
+  </li>
+  <li>
+    <p>Compile C++ files</p>
+  </li>
+  <li>
+    <p>Link object files to a native shared library</p>
+  </li>
+</ol>
+<p></p>
+<p>The name of JNI shared library is "<b>voltdb" </b>(VoltDB Execution Engine)
+and the actual library file compiled by GCC is named "<b>libvoltdb.so</b>"
+in Linux, "<b>libvoltdb.jnilib</b>" in MacOSX and so on, depending on the default
+ prefix and extension of shared library on the platform.
+  See <b>MIT_ACR/EE/platform/platform-XXX-defines.mk</b> and
+   <b>MIT_ACR/EE/src/makefile</b> for more details about compile/link options.</p>
+<p>In anyway, the library is loaded to JVM in ExecutionEngine Java class by the name "voltdb".</p>
+
+<hr />
+<h3>Basic Rules</h3>
+<p>An ExecutionEngine Java object corresponds to an HStoreEngine C++ object
+defined in MIT_ACR/EE/src/execution/hstoreengine.h, cpp. Each method
+in ExecutionEngine Java class has corresponding method in HStoreEngine C++
+class and its JNI interface in hstorejni.cpp.</p>
+<p></p>
+<p>To make JNI method calls simple and fast, all JNI methods should
+satisfy 3 rules.</p>
+<p></p>
+<p>1. First parameter should be the EE pointer.</p>
+<p>hstorejni.cpp is designed to be stateless. It uses no local or global
+ variables in it. Instead, <b>nativeCreate()</b> method creates
+ HStoreEngine C++ object and returns the pointer to Java as a
+ <i>jlong</i> value. ExecutionEngine Java object holds the pointer
+ value until the Java object is released and passes it to JNI methods
+ each time. By this way, multiple C++ EE instances in same shared
+ library space can simultaneously work without any conflict between them.</p>
+<p></p>
+<p>2. Return value should be an error code.</p>
+<p>For portability, the JNI methods don't throw exceptions. Instead,
+they return <i>jint</i> value as an error code defined in ExecutionEngine.
+ ExecutionEngine converts the error code to RuntimeException and appropriate
+ message and throws it in Java side.</p>
+<p></p>
+<p>3. Parameters and return values should be in primitive types</p>
+<p>They should be simple primitive values or arrays of primitive types.
+Java.lang.String is also used, but only in the case where the characters
+are guaranteed to be in US-ASCII charset.</p>
+<p></p>
+<p>The only exception of above rule is <b>nativeSerializeTable()</b>,
+which returns the whole content of a table stored in C++ EE.</p>
+<p></p>
+<p>Also, for type-safety, the public Java method receives objects, not
+primitive values. See the class comment of
+<a href="ExecutionEngine.html">ExecutionEngine</a> for more details.</p>
+
+</body>
+</html>
