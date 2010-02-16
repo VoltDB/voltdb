@@ -17,25 +17,31 @@
 
 package org.voltdb.messaging.impl;
 
-import java.net.*;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.Map.Entry;
 import java.util.concurrent.BlockingQueue;
-import org.voltdb.VoltDB;
-import org.voltdb.messaging.*;
-import org.voltdb.network.VoltNetwork;
-import org.voltdb.utils.DeferredSerialization;
-import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.utils.VoltLoggerFactory;
-import org.apache.log4j.Logger;
-
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.apache.log4j.Logger;
+import org.voltdb.VoltDB;
+import org.voltdb.messaging.Mailbox;
+import org.voltdb.messaging.MessagingException;
+import org.voltdb.messaging.Messenger;
+import org.voltdb.messaging.VoltMessage;
+import org.voltdb.network.VoltNetwork;
+import org.voltdb.utils.DBBPool;
+import org.voltdb.utils.DeferredSerialization;
+import org.voltdb.utils.VoltLoggerFactory;
+import org.voltdb.utils.DBBPool.BBContainer;
 
 public class HostMessenger implements Messenger {
 
@@ -45,6 +51,16 @@ public class HostMessenger implements Messenger {
         public byte[] buf;
         public int off;
         public int len;
+    }
+
+    static class ForeignHostBundle {
+        int count = 0;
+        final int[] siteIds = new int[VoltDB.MAX_SITES_PER_HOST];
+
+        public void add(int siteId) {
+            assert(count < (VoltDB.MAX_SITES_PER_HOST - 1));
+            siteIds[count++] = siteId;
+        }
     }
 
     int m_localHostId;
@@ -225,12 +241,17 @@ public class HostMessenger implements Messenger {
         assert(m_initialized);
         assert(message != null);
         assert(siteIds != null);
-        final HashSet<ForeignHost> foreignHosts = new HashSet<ForeignHost>(32);
+        final HashMap<ForeignHost, ForeignHostBundle> foreignHosts =
+            new HashMap<ForeignHost, ForeignHostBundle>(32);
         for (int siteId : siteIds) {
-            ForeignHost  host = presend(siteId, mailboxId, message);
-            if (host != null) {
-                foreignHosts.add(host);
+            ForeignHost host = presend(siteId, mailboxId, message);
+            if (host == null) continue;
+            ForeignHostBundle bundle = foreignHosts.get(host);
+            if (bundle == null) {
+                bundle = new ForeignHostBundle();
+                foreignHosts.put(host, bundle);
             }
+            bundle.add(siteId);
         }
 
         if (foreignHosts.size() == 0) return;
@@ -248,8 +269,8 @@ public class HostMessenger implements Messenger {
                     }
                 });
 
-        for (ForeignHost host : foreignHosts) {
-                host.send(mailboxId, siteIds, siteIds.length,
+        for (Entry<ForeignHost, ForeignHostBundle> e : foreignHosts.entrySet()) {
+                e.getKey().send(mailboxId, e.getValue().siteIds, e.getValue().count,
                         new DeferredSerialization() {
                     @Override
                     public final BBContainer serialize(DBBPool pool) throws IOException {
