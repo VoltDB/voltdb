@@ -21,6 +21,7 @@
 #include "storage/tableiterator.h"
 #include <algorithm>
 #include <cassert>
+#include <boost/crc.hpp>
 
 /**
  * Matches the allocations size in persistenttable.cpp. It's a terrible idea to cut and paste
@@ -75,15 +76,19 @@ CopyOnWriteContext::CopyOnWriteContext(Table *table, TupleSerializer *serializer
 }
 
 bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
+    boost::crc_32_type crc;
+    const std::size_t crcPosition = out->reserveBytes(4);//For CRC
     out->writeInt(m_partitionId);
-    const std::size_t rowCountPosition = out->reserveBytes(4);//To add a row count
+    crc.process_bytes(out->data() + crcPosition + 4, 4);//CRC the partition ID
     int rowsSerialized = 0;
 
     TableTuple tuple(m_table->schema());
     if (out->remaining() < m_maxTupleLength) {
-        out->writeIntAt( rowCountPosition, 0);
-        assert(false);
-        return false;
+        throw std::runtime_error("Serialize more should never be called "
+                "a 2nd time after return indicating there is no more data");
+//        out->writeInt(0);
+//        assert(false);
+//        return false;
     }
 
     while (out->remaining() >= m_maxTupleLength) {
@@ -95,7 +100,9 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
          */
         if (!hadMore) {
             if (m_finishedTableScan) {
-                out->writeIntAt( rowCountPosition, rowsSerialized);
+                out->writeInt(rowsSerialized);
+                crc.process_bytes(out->data() + out->position() - 4, 4);
+                out->writeIntAt(crcPosition, crc.checksum());
                 return false;
             } else {
                 m_finishedTableScan = true;
@@ -104,12 +111,16 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
             }
         }
 
+        const std::size_t tupleStartPosition = out->position();
         m_serializer->serializeTo( tuple, out);
+        const std::size_t tupleEndPosition = out->position();
+        crc.process_block(out->data() + tupleStartPosition, out->data() + tupleEndPosition);
         m_tuplesSerialized++;
         rowsSerialized++;
     }
-    out->writeIntAt( rowCountPosition, rowsSerialized);
-
+    out->writeInt(rowsSerialized);
+    crc.process_bytes(out->data() + out->position() - 4, 4);
+    out->writeIntAt(crcPosition, crc.checksum());
     return true;
 }
 

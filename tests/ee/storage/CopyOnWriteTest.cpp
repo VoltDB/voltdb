@@ -300,7 +300,7 @@ TEST_F(CopyOnWriteTest, BigTest) {
                 break;
             }
             int ii = 10;//skip partition id and row count and first tuple length
-            while (ii < serialized) {
+            while (ii < (serialized - 4)) {
                 int values[2];
                 values[0] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
                 values[1] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii + 4]));
@@ -385,7 +385,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
                 break;
             }
             int ii = 10;//skip partition id and row count and first tuple length
-            while (ii < serialized) {
+            while (ii < (serialized - 4)) {
                 int values[2];
                 values[0] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
                 values[1] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii + 4]));
@@ -474,7 +474,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
                 break;
             }
             int ii = 10;//skip partition id and row count and first tuple length
-            while (ii < serialized) {
+            while (ii < (serialized - 4)) {
                 int values[2];
                 values[0] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
                 values[1] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii + 4]));

@@ -230,7 +230,7 @@ public:
     virtual ~SerializeOutput() {};
 
     /** Returns a pointer to the beginning of the buffer, for reading the serialized data. */
-    const void* data() const { return buffer_; }
+    const char* data() const { return buffer_; }
 
     /** Returns the number of bytes written in to the buffer. */
     size_t size() const { return position_; }

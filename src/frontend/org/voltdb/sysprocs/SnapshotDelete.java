@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2010 VoltDB L.L.C.
+ * Copyright (C) 2008-2009 VoltDB L.L.C.
  *
  * VoltDB is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -41,6 +41,11 @@ import org.voltdb.utils.VoltLoggerFactory;
 
 @ProcInfo(singlePartition = false)
 public class SnapshotDelete extends VoltSystemProcedure {
+    
+    private static final Logger hostLog =
+        Logger.getLogger("HOST",
+                         VoltLoggerFactory.instance());
+    
     private static final Logger TRACE_LOG =
         Logger.getLogger(SnapshotStatus.class.getName(),
                          VoltLoggerFactory.instance());
@@ -78,7 +83,7 @@ public class SnapshotDelete extends VoltSystemProcedure {
             assert(params.toArray()[1] instanceof String[]);
             assert(((String[])params.toArray()[1]).length > 0);
             assert(((String[])params.toArray()[0]).length == ((String[])params.toArray()[1]).length);
-
+            
             final String paths[] = (String[])params.toArray()[0];
             final String nonces[] = (String[])params.toArray()[1];
             for (int ii = 0; ii < paths.length; ii++) {
@@ -150,6 +155,7 @@ public class SnapshotDelete extends VoltSystemProcedure {
 
     public VoltTable[] run(String paths[], String nonces[]) throws VoltAbortException
     {
+        final long startTime = System.currentTimeMillis();
         VoltTable results[] = new VoltTable[1];
         ColumnInfo[] result_columns = new ColumnInfo[1];
         int ii = 0;
@@ -179,13 +185,16 @@ public class SnapshotDelete extends VoltSystemProcedure {
                 return results;
             }
         }
-
+        
         if (paths.length != nonces.length) {
             results[0].addRow("A path must be provided for every nonce");
             return results;
         }
-
-        return performSnapshotDeleteWork( paths, nonces);
+        final long endTime = System.currentTimeMillis();
+        final long duration = endTime -startTime;
+        results = performSnapshotDeleteWork( paths, nonces);
+        hostLog.info("Finished deleting snapshots. Took " + duration + " milliseconds");
+        return results;
     }
 
     private final List<File> retrieveRelevantFiles(String filePath, String nonce) {

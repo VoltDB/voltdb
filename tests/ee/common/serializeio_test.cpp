@@ -106,7 +106,7 @@ TEST_F(SerializeIOTest, ReadWrite) {
     readTestSuite(&in);
 
     CopySerializeInput in2(out.data(), out.size());
-    memset(const_cast<void*>(out.data()), 0, out.size());
+    memset(const_cast<char*>(out.data()), 0, out.size());
     readTestSuite(&in2);
 }
 
@@ -135,7 +135,7 @@ TEST(SerializeOutput, ReserveBytes) {
 
     size_t nextOffset = out.writeBytesAt(1, &DATA, sizeof(DATA));
     EXPECT_EQ(1+sizeof(DATA), nextOffset);
-    EXPECT_EQ(0, memcmp(static_cast<const int8_t*>(out.data()) + 1, &DATA, sizeof(DATA)));
+    EXPECT_EQ(0, memcmp(static_cast<const char*>(out.data()) + 1, &DATA, sizeof(DATA)));
 }
 
 int main() {

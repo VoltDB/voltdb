@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.ArrayDeque;
 import java.util.HashSet;
 import java.util.concurrent.Semaphore;
+import java.util.zip.CRC32;
 
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.utils.DBBPool.BBContainer;
@@ -84,10 +85,12 @@ public class TableSaveFile
         m_chunkReads = new Semaphore(readAheadChunks);
         m_saveFile = dataIn;
 
+        final CRC32 crc = new CRC32();
+        
         /*
          * Get the header with the save restore specific information
          */
-        final ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
+        final ByteBuffer lengthBuffer = ByteBuffer.allocate(8);
         while (lengthBuffer.hasRemaining()) {
             final int read = m_saveFile.read(lengthBuffer);
             if (read == -1) {
@@ -95,7 +98,11 @@ public class TableSaveFile
             }
         }
         lengthBuffer.flip();
+        final int originalCRC = lengthBuffer.getInt();
         int length = lengthBuffer.getInt();
+        crc.update(lengthBuffer.array(), 4, 4);
+        
+
         final ByteBuffer saveRestoreHeader = ByteBuffer.allocate(length);
         while (saveRestoreHeader.hasRemaining()) {
             final int read = m_saveFile.read(saveRestoreHeader);
@@ -104,6 +111,7 @@ public class TableSaveFile
             }
         }
         saveRestoreHeader.flip();
+        crc.update(saveRestoreHeader.array());
 
         FastDeserializer fd = new FastDeserializer(saveRestoreHeader);
         m_completed = fd.readByte() == 1 ? true : false;
@@ -144,7 +152,7 @@ public class TableSaveFile
                 throw new EOFException();
             }
         }
-
+        crc.update(lengthBuffer.array(), 0, 2);
         lengthBuffer.flip();
         length = lengthBuffer.getShort();
         m_tableHeader = ByteBuffer.allocate(length);
@@ -154,6 +162,12 @@ public class TableSaveFile
             if (read == -1) {
                 throw new EOFException();
             }
+        }
+        crc.update(m_tableHeader.array(), 2, length - 2);
+        
+        final int actualCRC = (int)crc.getValue();
+        if (originalCRC != actualCRC) {
+            throw new IOException("Checksum mismatch");
         }
     }
 
@@ -318,9 +332,9 @@ public class TableSaveFile
                 try {
 
                     /*
-                     * Get the length of the next chunk and the partition id
+                     * Get the length of the next chunk, crc, and partition id
                      */
-                    ByteBuffer chunkLengthB = ByteBuffer.allocate(8);
+                    ByteBuffer chunkLengthB = ByteBuffer.allocate(12);
                     while (chunkLengthB.hasRemaining()) {
                         final int read = m_saveFile.read(chunkLengthB);
                         if (read == -1) {
@@ -328,15 +342,18 @@ public class TableSaveFile
                         }
                     }
                     chunkLengthB.flip();
-                    int nextChunkLength = chunkLengthB.getInt();
-                    int nextChunkPartitionId = chunkLengthB.getInt();
+                    final int nextChunkLength = chunkLengthB.getInt();
+                    final int nextChunkCRC = chunkLengthB.getInt();
+                    final int nextChunkPartitionId = chunkLengthB.getInt();
+                    final CRC32 crc = new CRC32();
+                    crc.update(chunkLengthB.array(), 8, 4);
 
                     /*
                      * Skip irrelevant chunks
                      */
                     if (m_relevantPartitionIds != null) {
                         if (!m_relevantPartitionIds.contains(nextChunkPartitionId)) {
-                            m_saveFile.position(m_saveFile.position() + (nextChunkLength - 4));
+                            m_saveFile.position(m_saveFile.position() + (nextChunkLength - 8));
                         }
                     }
 
@@ -357,13 +374,29 @@ public class TableSaveFile
                     c.b.limit((nextChunkLength - 4)  + m_tableHeader.capacity());
                     m_tableHeader.position(0);
                     c.b.put(m_tableHeader);
+                    c.b.position(c.b.position() + 4);//Leave space for row count to be moved
+                    final int checksumStartPosition = c.b.position();
                     while (c.b.hasRemaining()) {
                         final int read = m_saveFile.read(c.b);
                         if (read == -1) {
                             throw new EOFException();
                         }
                     }
-                    c.b.flip();
+                    c.b.position(c.b.position() - 4);
+                    final int rowCount = c.b.getInt();
+                    c.b.position(checksumStartPosition);
+                    while (c.b.hasRemaining()) {
+                        crc.update(c.b.get());
+                    }
+                    
+                    final int calculatedCRC = (int)crc.getValue();
+                    if (calculatedCRC != nextChunkCRC) {
+                        throw new IOException("CRC mismatch in saved table chunk");
+                    }
+                    
+                    c.b.limit(c.b.limit() - 4);
+                    c.b.position(checksumStartPosition - 4);
+                    c.b.putInt(rowCount);
                     c.b.position(0);
                     ++chunksRead;
                     synchronized (TableSaveFile.this) {

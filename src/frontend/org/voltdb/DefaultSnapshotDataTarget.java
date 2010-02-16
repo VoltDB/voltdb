@@ -29,9 +29,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.Future;
+import java.util.zip.CRC32;
 
 import org.apache.log4j.Logger;
 import org.voltdb.messaging.FastSerializer;
+import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.VoltLoggerFactory;
 import org.voltdb.utils.DBBPool.BBContainer;
 
@@ -106,8 +108,9 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             }
         });
         final FastSerializer fs = new FastSerializer();
+        fs.writeInt(0);//CRC
         fs.writeInt(0);//Header length placeholder
-        fs.writeByte(0);//Indicate the snapshot was not completed
+        fs.writeByte(1);//Indicate the snapshot was not completed, set to true for the CRC calculation, false later
         for (int ii = 0; ii < 4; ii++) {
             fs.writeInt(version[ii]);//version
         }
@@ -122,19 +125,32 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             fs.writeInt(numPartitions);
         }
         final BBContainer container = fs.getBBContainer();
-        write(container);
-
+        container.b.position(4);
+        container.b.putInt(container.b.remaining() - 4);
+        container.b.position(0);
+        
         FastSerializer schemaSerializer = new FastSerializer();
         schemaTable.writeExternal(schemaSerializer);
         final BBContainer schemaContainer = schemaSerializer.getBBContainer();
         schemaContainer.b.limit(schemaContainer.b.limit() - 4);//Don't want the row count
         schemaContainer.b.position(schemaContainer.b.position() + 4);//Don't want total table length
+        
+        final CRC32 crc = new CRC32();
+        ByteBuffer aggregateBuffer = ByteBuffer.allocate(container.b.remaining() + schemaContainer.b.remaining());
+        aggregateBuffer.put(container.b);
+        aggregateBuffer.put(schemaContainer.b);
+        aggregateBuffer.flip();
+        crc.update(aggregateBuffer.array(), 4, aggregateBuffer.capacity() - 4);
+        
+        final int crcValue = (int) crc.getValue();
+        aggregateBuffer.putInt(crcValue).position(8);
+        aggregateBuffer.put((byte)0).position(0);//Haven't actually finished writing file
 
         /*
          * Be completely sure the write succeeded. If it didn't
          * the disk is probably full or the path is bunk etc.
          */
-        Future<?> writeFuture = write(schemaContainer, false);
+        Future<?> writeFuture = write(DBBPool.wrapBB(aggregateBuffer), false);
         try {
             writeFuture.get();
         } catch (InterruptedException e) {
@@ -159,7 +175,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         m_es.awaitTermination( 1, TimeUnit.DAYS);
         m_channel.force(true);
         m_fos.getFD().sync();
-        m_channel.position(4);
+        m_channel.position(8);
         ByteBuffer completed = ByteBuffer.allocate(1);
         completed.put((byte)1).flip();
         m_channel.write(completed);
@@ -185,6 +201,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             tupleData.b.putInt(tupleData.b.remaining() - 4);
             tupleData.b.position(0);
         }
+        
         return m_es.submit(new Runnable() {
             @Override
             public void run() {
