@@ -34,6 +34,7 @@ import org.voltdb.messaging.FastSerializer;
 import org.voltdb.DefaultSnapshotDataTarget;
 import org.voltdb.utils.Pair;
 import org.voltdb.utils.DBBPool.BBContainer;
+import java.util.zip.CRC32;
 
 /**
  * This test also provides pretty good coverage of DefaultSnapshotTarget
@@ -62,11 +63,20 @@ public class TestTableSaveFile extends TestCase
         b.getInt();
         int headerLength = b.getShort();
         b.position(b.position() + (headerLength - 2));// at row count
-        ByteBuffer chunkBuffer = ByteBuffer.allocate(b.remaining() + 4 + target.getHeaderSize());
+        final int rowCount = b.getInt();
+        ByteBuffer chunkBuffer = ByteBuffer.allocate(b.remaining() + 12 + target.getHeaderSize());
+        final CRC32 crc = new CRC32();
         chunkBuffer.position(target.getHeaderSize());
+        final int crcPosition = chunkBuffer.position();
+        chunkBuffer.position(chunkBuffer.position() + 4);
         chunkBuffer.putInt(2);
         chunkBuffer.put(b);
-        chunkBuffer.flip();
+        chunkBuffer.putInt(rowCount);
+        chunkBuffer.position(crcPosition + 4);
+        crc.update(chunkBuffer.array(), chunkBuffer.position(), chunkBuffer.remaining());
+        chunkBuffer.position(crcPosition);
+        chunkBuffer.putInt((int)crc.getValue());
+        chunkBuffer.position(0);
         target.write(new BBContainer( chunkBuffer, 0) {
 
             @Override
