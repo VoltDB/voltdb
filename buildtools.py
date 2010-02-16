@@ -29,7 +29,7 @@ class BuildContext:
         for arg in [x.strip().upper() for x in args]:
             if arg in ["DEBUG", "RELEASE", "MEMCHECK", "MEMCHECK_NOFREELIST"]:
                 self.LEVEL = arg
-            if arg in ["BUILD", "CLEAN", "TEST", "VOLTRUN"]:
+            if arg in ["BUILD", "CLEAN", "TEST", "VOLTRUN", "VOLTDBIPC"]:
                 self.TARGET = arg
             if arg in ["COVERAGE"]:
                 self.COVERAGE = True
@@ -73,7 +73,7 @@ def startsWithFromTuple(strValue, prefixes):
 
 def getDependencies(filename, cppflags, sysprefixes):
     command = "g++ %s -MM %s" % (cppflags, filename)
-    
+
     pipe = Popen(args=command, shell=True, bufsize=-1, stdout=PIPE, stderr=PIPE)
     out = pipe.stdout.readlines()
     out_err = pipe.stderr.readlines()
@@ -107,7 +107,7 @@ def namesForTestCode(filename):
 
 def buildMakefile(CTX):
     global version
-    
+
     CPPFLAGS = " ".join(CTX.CPPFLAGS.split())
     MAKECPPFLAGS = CPPFLAGS
     for dir in CTX.SYSTEM_DIRS:
@@ -294,10 +294,12 @@ def buildMakefile(CTX):
             shutil.copy(pysourcename, targetpath)
 
     makefile.write("\n")
-
     makefile.close()
-
     return True
+
+def buildIPC(CTX):
+    retval = os.system("make --directory=%s prod/voltdbipc -j4" % (CTX.OUTPUT_PREFIX))
+    return retval
 
 def runTests(CTX):
     failedTests = []
@@ -341,7 +343,7 @@ def runTests(CTX):
                         allHeapBlocksFreed = True
                 if not allHeapBlocksFreed:
                     print "Not all heap blocks were freed"
-                    retval = -1 
+                    retval = -1
                 if retval == -1:
                     for str in out_err:
                         print str
@@ -364,8 +366,8 @@ def runTests(CTX):
     print "==============================================================================="
 
     return failures
-    
-def getGCCVersion(): 
+
+def getGCCVersion():
     vinfo = output = Popen(["gcc", "-v"], stderr=PIPE).communicate()[1]
     vinfo = vinfo.strip().split("\n")
     vinfo = vinfo[-1]

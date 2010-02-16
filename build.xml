@@ -103,7 +103,7 @@ PRIMARY ENTRY POINTS
     description="Compile Java classes and C++ JNI library."
 />
 <target name="check"
-    depends="compile, eecheck, junit, distcheck, licensecheck"
+    depends="compile, eecheck, junit, distcheck, voltdbipc, licensecheck"
     description="Run Java and C++ JNI testcases and test plan fragments."
 />
 <target name="check_quick"
@@ -599,6 +599,13 @@ NATIVE EE STUFF
     </exec>
 </target>
 
+<target name='voltdbipc' depends="ee"
+    description="Build the IPC client.">
+    <exec dir='.' executable='python' failonerror='true'>
+        <arg line="build.py ${build} voltdbipc" />
+    </exec>
+</target>
+
 <target name='ee' depends="jnicompile"
     description="Build C++ JNI library and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
@@ -724,7 +731,7 @@ TEST CASES
         </tests>
     </run_junit>
 </target>
-    
+
 <!-- Junit tests that run quickly -->
 <target
     name="junit_quick"
@@ -759,12 +766,12 @@ TEST CASES
                 <exclude name="**/TestSQLFeaturesSuite" />
                 <exclude name="**/TestSQLTypesSuite" />
                 <exclude name="**/TestSqlUpdateSuite" />
-                <exclude name="**/TestTPCCSuite" />     
+                <exclude name="**/TestTPCCSuite" />
             </fileset>
         </tests>
     </run_junit>
 </target>
-    
+
 <target name="junit" description="Run testcases for Java classes.">
     <!-- Run the unit tests -->
     <condition property="timeoutLength" value="${timeoutLength}" else='180000'>
@@ -795,7 +802,7 @@ TEST CASES
             </fileset>
         </tests>
     </run_junit>
-    
+
     <!-- Generate unit test reports. -->
     <mkdir dir='${build.testoutput.dir}/report' />
     <junitreport todir="${build.testoutput.dir}">
@@ -1004,7 +1011,7 @@ TEST CASES
      you must "cd obj/memcheck && make prod/voltdbipc" separately. -->
 <target name='junitclass'
     description="Run one junit suite (i.e, -Djunitclass=TestSQLFeaturesSuite)">
-    
+
     <condition property="timeoutLength" value="${timeoutLength}" else='180000'>
         <isset property="timeoutLength"/>
     </condition>

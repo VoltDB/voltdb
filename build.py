@@ -394,6 +394,8 @@ if retval != 0:
 retval = 0
 if CTX.TARGET == "TEST":
     retval = runTests(CTX)
+elif CTX.TARGET == "VOLTDBIPC":
+    retval = buildIPC(CTX)
 
 if retval != 0:
     sys.exit(-1)
