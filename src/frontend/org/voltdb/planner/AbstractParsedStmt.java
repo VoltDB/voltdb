@@ -329,6 +329,10 @@ public abstract class AbstractParsedStmt {
         String type = attrs.getNamedItem("type").getNodeValue();
         ExpressionType exprType = ExpressionType.get(type);
         AbstractExpression expr = null;
+
+        if (exprType == ExpressionType.INVALID) {
+            throw new PlanningErrorException("Unsupported operation type '" + type + "'");
+        }
         try {
             expr = exprType.getExpressionClass().newInstance();
         } catch (Exception e) {
