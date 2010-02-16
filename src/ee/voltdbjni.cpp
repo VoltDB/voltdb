@@ -88,6 +88,7 @@
 #include "execution/JNITopend.h"
 #include "json_spirit/json_spirit.h"
 #include "boost/pool/pool.hpp"
+#include "boost/crc.hpp"
 #include "logging/JNILogProxy.h"
 
 #include "logging/LogDefs.h"
@@ -545,6 +546,24 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_DBBPool_getBufferAddress
     }
     assert(address);
     return reinterpret_cast<jlong>(address);
+}
+
+/*
+ * Class:     org_voltdb_utils_DBBPool
+ * Method:    getBufferCRC32
+ * Signature: (Ljava/nio/ByteBuffer;II)I
+ */
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_utils_DBBPool_getBufferCRC32
+  (JNIEnv *env, jclass clazz, jobject buffer, jint offset, jint length) {
+    char *address = reinterpret_cast<char*>(env->GetDirectBufferAddress(buffer));
+    if (env->ExceptionCheck()) {
+        env->ExceptionDescribe();
+        return -1;
+    }
+    assert(address);
+    boost::crc_32_type crc;
+    crc.process_bytes(address + offset, length);
+    return static_cast<jint>(crc.checksum());
 }
 
 /*

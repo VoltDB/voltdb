@@ -28,6 +28,7 @@ import java.util.concurrent.Semaphore;
 import java.util.zip.CRC32;
 
 import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
 
 /**
@@ -345,8 +346,6 @@ public class TableSaveFile
                     final int nextChunkLength = chunkLengthB.getInt();
                     final int nextChunkCRC = chunkLengthB.getInt();
                     final int nextChunkPartitionId = chunkLengthB.getInt();
-                    final CRC32 crc = new CRC32();
-                    crc.update(chunkLengthB.array(), 8, 4);
 
                     /*
                      * Skip irrelevant chunks
@@ -374,8 +373,8 @@ public class TableSaveFile
                     c.b.limit((nextChunkLength - 4)  + m_tableHeader.capacity());
                     m_tableHeader.position(0);
                     c.b.put(m_tableHeader);
-                    c.b.position(c.b.position() + 4);//Leave space for row count to be moved
                     final int checksumStartPosition = c.b.position();
+                    c.b.position(c.b.position() + 4);//Leave space for row count to be moved
                     while (c.b.hasRemaining()) {
                         final int read = m_saveFile.read(c.b);
                         if (read == -1) {
@@ -385,17 +384,16 @@ public class TableSaveFile
                     c.b.position(c.b.position() - 4);
                     final int rowCount = c.b.getInt();
                     c.b.position(checksumStartPosition);
-                    while (c.b.hasRemaining()) {
-                        crc.update(c.b.get());
-                    }
-                    
-                    final int calculatedCRC = (int)crc.getValue();
+                    c.b.putInt(nextChunkPartitionId);
+                    c.b.position(c.b.position() - 4);
+                    final int calculatedCRC = DBBPool.getBufferCRC32(c.b, c.b.position(), c.b.remaining());
+
                     if (calculatedCRC != nextChunkCRC) {
                         throw new IOException("CRC mismatch in saved table chunk");
                     }
                     
                     c.b.limit(c.b.limit() - 4);
-                    c.b.position(checksumStartPosition - 4);
+                    c.b.position(checksumStartPosition);
                     c.b.putInt(rowCount);
                     c.b.position(0);
                     ++chunksRead;
