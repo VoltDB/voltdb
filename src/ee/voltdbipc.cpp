@@ -78,6 +78,8 @@ typedef struct {
     int64_t lastCommittedTxnId;
     int64_t undoToken;
     int64_t fragmentId;
+    int32_t outputDepId;
+    int32_t inputDepId;
     char data[0];
 }__attribute__((packed)) planfrag;
 
@@ -89,6 +91,8 @@ typedef struct {
     int64_t txnId;
     int64_t lastCommittedTxnId;
     int64_t undoToken;
+    int32_t outputDepId;
+    int32_t inputDepId;
     int16_t length;
     char data[0];
 }__attribute__((packed)) customplanfrag;
@@ -406,7 +410,7 @@ void VoltDBIPC::executeQueryPlanFragmentsAndGetResults(struct ipc_command *cmd) 
         Pool *pool = m_engine->getStringPool();
         deserializeParameterSetCommon(cnt, serialize_in, params, pool);
         m_engine->setUsedParamcnt(cnt);
-        if (m_engine->executeQuery(ntohll(fragmentId[i]),
+        if (m_engine->executeQuery(ntohll(fragmentId[i]), 1, -1,
                                    params, ntohll(queryCommand->txnId),
                                    ntohll(queryCommand->lastCommittedTxnId),
                                    i == 0 ? true : false, //first
@@ -444,8 +448,10 @@ void VoltDBIPC::executePlanFragmentAndGetResults(struct ipc_command *cmd) {
                   << " lastCommitted=" << ntohll(planfragCommand->lastCommittedTxnId)
                   << " fragmentId=" << ntohll(planfragCommand->fragmentId) << std::endl;
 
-    // data has binary packed fragmentIds first
+    // data has binary packed fragmentIds/deps first
     int64_t fragmentId = ntohll(planfragCommand->fragmentId);
+    int32_t outputDepId = ntohl(planfragCommand->outputDepId);
+    int32_t inputDepId = ntohl(planfragCommand->inputDepId);
 
     // ...and fast serialized parameter set last.
     void* offset = planfragCommand->data;
@@ -461,7 +467,7 @@ void VoltDBIPC::executePlanFragmentAndGetResults(struct ipc_command *cmd) {
     deserializeParameterSetCommon(cnt, serialize_in, params, pool);
     m_engine->setUsedParamcnt(cnt);
     m_engine->setUndoToken(ntohll(planfragCommand->undoToken));
-    if (m_engine->executeQuery(fragmentId, params,
+    if (m_engine->executeQuery(fragmentId, outputDepId, inputDepId, params,
                                ntohll(planfragCommand->txnId),
                                ntohll(planfragCommand->lastCommittedTxnId),
                                true, true)) {
@@ -527,8 +533,12 @@ void VoltDBIPC::executeCustomPlanFragmentAndGetResults(struct ipc_command *cmd) 
     int16_t len = ntohs(plan->length);
     string plan_str = string(plan->data, len);
 
+    // deps info
+    int32_t outputDepId = ntohl(plan->outputDepId);
+    int32_t inputDepId = ntohl(plan->inputDepId);
+
     // execute
-    if (m_engine->executePlanFragment(plan_str,
+    if (m_engine->executePlanFragment(plan_str, outputDepId, inputDepId,
                                       ntohll(plan->txnId),
                                       ntohll(plan->lastCommittedTxnId))) {
         ++errors;
@@ -594,7 +604,7 @@ void VoltDBIPC::terminate() {
 char *VoltDBIPC::retrieveDependency(int32_t dependencyId, size_t *dependencySz) {
     ssize_t bytes;
     char message[5];
-    *dependencySz = -1;
+    *dependencySz = 0;
 
     // tell java to send the dependency over the socket
     message[0] = static_cast<int8_t>(kErrorCode_RetrieveDependency);
@@ -701,7 +711,7 @@ void VoltDBIPC::getStats(struct ipc_command *cmd) {
 
 void
 VoltDBIPC::handoffReadyELBuffer(char* bufferPtr, int32_t bytesUsed, int32_t tableId) {
-    size_t bytes = -1;
+    size_t bytes = 0;
 
     // serialized in network order.
     // serialize as {int8_t indicator,

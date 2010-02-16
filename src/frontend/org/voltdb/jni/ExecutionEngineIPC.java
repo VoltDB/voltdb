@@ -774,6 +774,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putLong(lastCommittedTxnId);
         m_data.putLong(undoToken);
         m_data.putLong(planFragmentId);
+        m_data.putInt(outputDepId);
+        m_data.putInt(inputDepId);
         m_data.put(fser.getBuffer());
 
         try {
@@ -822,6 +824,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putLong(txnId);
         m_data.putLong(lastCommittedTxnId);
         m_data.putLong(undoQuantumToken);
+        m_data.putInt(outputDepId);
+        m_data.putInt(inputDepId);
         m_data.put(fser.getBuffer());
 
         try {
