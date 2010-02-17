@@ -131,7 +131,7 @@ public class paymentByCustomerName extends VoltProcedure {
 
     public final SQLStmt insertHistory = new SQLStmt("INSERT INTO HISTORY VALUES (?, ?, ?, ?, ?, ?, ?, ?);");
 
-    public VoltTable[] processPayment(byte w_id, byte d_id, byte c_w_id, byte c_d_id, int c_id, double h_amount, VoltTableRow customer, TimestampType timestamp) {
+    public VoltTable[] processPayment(short w_id, byte d_id, short c_w_id, byte c_d_id, int c_id, double h_amount, VoltTableRow customer, TimestampType timestamp) {
         voltQueueSQL(getWarehouse, w_id);
         voltQueueSQL(getDistrict, w_id, d_id);
         final VoltTable[] results = voltExecuteSQL();
@@ -218,7 +218,7 @@ public class paymentByCustomerName extends VoltProcedure {
         return new VoltTable[]{warehouse, district, misc};
     }
 
-    public VoltTable[] run(byte w_id, byte d_id, double h_amount, byte c_w_id, byte c_d_id, byte[] c_last, TimestampType timestamp) throws VoltAbortException {
+    public VoltTable[] run(short w_id, byte d_id, double h_amount, short c_w_id, byte c_d_id, byte[] c_last, TimestampType timestamp) throws VoltAbortException {
         voltQueueSQL(getCustomersByLastName, c_last, c_d_id, c_w_id);
         final VoltTable customers = voltExecuteSQL()[0];
         final int namecnt = customers.getRowCount();

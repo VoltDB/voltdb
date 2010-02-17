@@ -200,7 +200,7 @@ public class BulkTPCCClient extends BulkClient {
         }
 
         @Override
-        public void callDelivery(byte w_id, int carrier, TimestampType date)
+        public void callDelivery(short w_id, int carrier, TimestampType date)
                 throws IOException {
             invokeProcedure( c, new DeliveryCallback(),
                     Constants.DELIVERY, w_id, carrier, date);
@@ -219,8 +219,8 @@ public class BulkTPCCClient extends BulkClient {
                     proc, paramlist);
         }
         @Override
-        public void callPaymentById(byte w_id, byte d_id, double h_amount,
-                byte c_w_id, byte c_d_id, int c_id, TimestampType now) throws IOException {
+        public void callPaymentById(short w_id, byte d_id, double h_amount,
+                short c_w_id, byte c_d_id, int c_id, TimestampType now) throws IOException {
             if (m_scaleParams.warehouses > 1) {
                 invokeProcedure( c, new VerifyBasicCallback(),
                         Constants.PAYMENT_BY_ID_W,
@@ -236,8 +236,8 @@ public class BulkTPCCClient extends BulkClient {
             }
         }
         @Override
-        public void callPaymentByName(byte w_id, byte d_id, double h_amount,
-                byte c_w_id, byte c_d_id, byte[] c_last, TimestampType now) throws IOException {
+        public void callPaymentByName(short w_id, byte d_id, double h_amount,
+                short c_w_id, byte c_d_id, byte[] c_last, TimestampType now) throws IOException {
             if ((m_scaleParams.warehouses > 1) || (c_last != null)) {
                 invokeProcedure( c, new VerifyBasicCallback(),
                         Constants.PAYMENT_BY_NAME_W, w_id, d_id, h_amount,
@@ -261,7 +261,7 @@ public class BulkTPCCClient extends BulkClient {
                   customersPerDistrict, newOrdersPerDistrict);
         }
         @Override
-        public void callStockLevel(byte w_id, byte d_id, int threshold) throws IOException {
+        public void callStockLevel(short w_id, byte d_id, int threshold) throws IOException {
             invokeProcedure( c, new StockLevelCallback(), Constants.STOCK_LEVEL,
                      w_id, d_id, threshold);
         }

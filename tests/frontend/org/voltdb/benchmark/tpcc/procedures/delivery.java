@@ -95,7 +95,7 @@ public class delivery extends VoltProcedure {
     public final SQLStmt updateCustomer =
         new SQLStmt("UPDATE CUSTOMER SET C_BALANCE = C_BALANCE + ? WHERE C_ID = ? AND C_D_ID = ? AND C_W_ID = ?;"); //ol_total, c_id, d_id, w_id
 
-    public VoltTable run(byte w_id, int o_carrier_id, TimestampType timestamp) throws VoltAbortException {
+    public VoltTable run(short w_id, int o_carrier_id, TimestampType timestamp) throws VoltAbortException {
         for (long d_id  = 1; d_id <= Constants.DISTRICTS_PER_WAREHOUSE; ++d_id) {
             voltQueueSQL(getNewOrder, d_id, w_id);
         }
@@ -153,7 +153,7 @@ public class delivery extends VoltProcedure {
             }
             assert otherresults[resultoffset + 0].getRowCount() == 1;
             assert otherresults[resultoffset + 1].getRowCount() == 1;
-            final long c_id = (long) (otherresults[resultoffset + 0].asScalarLong());
+            final long c_id = (otherresults[resultoffset + 0].asScalarLong());
             final VoltTableRow row = otherresults[resultoffset + 1].fetchRow(0);
             final double ol_total = row.getDouble(0);
             final boolean ol_total_wasnull = row.wasNull();

@@ -117,7 +117,7 @@ public class paymentByCustomerIdC extends VoltProcedure {
 
     public final SQLStmt updateGCCustomer = new SQLStmt("UPDATE CUSTOMER SET C_BALANCE = ?, C_YTD_PAYMENT = ?, C_PAYMENT_CNT = ? WHERE C_W_ID = ? AND C_D_ID = ? AND C_ID = ?;"); //c_balance, c_ytd_payment, c_payment_cnt, c_w_id, c_d_id, c_id
 
-    public VoltTable[] processPayment(byte w_id, byte d_id, byte c_w_id, byte c_d_id, int c_id, double h_amount, VoltTableRow customer, TimestampType timestamp) {
+    public VoltTable[] processPayment(short w_id, byte d_id, short c_w_id, byte c_d_id, int c_id, double h_amount, VoltTableRow customer, TimestampType timestamp) {
         //customer info
         final byte[] c_first = customer.getStringAsBytes(C_FIRST_IDX);
         final byte[] c_middle = customer.getStringAsBytes(C_MIDDLE_IDX);
@@ -177,7 +177,7 @@ public class paymentByCustomerIdC extends VoltProcedure {
         return new VoltTable[]{misc};
     }
 
-    public VoltTable[] run(byte w_id, byte d_id, double h_amount, byte c_w_id, byte c_d_id, int c_id, TimestampType timestamp) {
+    public VoltTable[] run(short w_id, byte d_id, double h_amount, short c_w_id, byte c_d_id, int c_id, TimestampType timestamp) {
         // assert (w_id == c_w_id); cross partition should be supported (at least in future)
         voltQueueSQL(getCustomersByCustomerId, c_id, c_d_id, c_w_id);
         final VoltTableRow customer = voltExecuteSQL()[0].fetchRow(0);

@@ -144,7 +144,7 @@ public class neworder extends VoltProcedure {
         return -1;
     }
 
-    public VoltTable[] run(byte w_id, byte d_id, int c_id, TimestampType timestamp, int[] item_id, byte[] supware, int[] quantity) throws VoltAbortException {
+    public VoltTable[] run(short w_id, byte d_id, int c_id, TimestampType timestamp, int[] item_id, byte[] supware, int[] quantity) throws VoltAbortException {
         assert item_id.length > 0;
         assert item_id.length == supware.length;
         assert item_id.length == quantity.length;
@@ -201,7 +201,7 @@ public class neworder extends VoltProcedure {
             final long ol_i_id = item_id[i];
 
             // One getStockInfo SQL statement for each district
-            voltQueueSQL(getStockInfo[(int)d_id-1], ol_i_id, ol_supply_w_id);
+            voltQueueSQL(getStockInfo[d_id-1], ol_i_id, ol_supply_w_id);
         }
         final VoltTable[] stockresults = voltExecuteSQL();
         assert stockresults.length == item_id.length;

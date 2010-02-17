@@ -74,7 +74,7 @@ public class slev extends VoltProcedure {
         "S_I_ID = OL_I_ID AND " +
         "S_QUANTITY < ?;");
 
-    public VoltTable[] run(byte w_id, byte d_id, int threshold) {
+    public VoltTable[] run(short w_id, byte d_id, int threshold) {
 
         voltQueueSQL(GetOId, w_id, d_id);
         final VoltTable result = voltExecuteSQL()[0];

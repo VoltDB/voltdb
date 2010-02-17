@@ -74,13 +74,13 @@ public class TPCCSimulation
         public void callResetWarehouse(long w_id, long districtsPerWarehouse,
                 long customersPerDistrict, long newOrdersPerDistrict)
         throws IOException;
-        public void callStockLevel(byte w_id, byte d_id, int threshold) throws IOException;
+        public void callStockLevel(short w_id, byte d_id, int threshold) throws IOException;
         public void callOrderStatus(String proc, Object... paramlist) throws IOException;
-        public void callDelivery(byte w_id, int carrier, TimestampType date) throws IOException;
-        public void callPaymentByName(byte w_id, byte d_id, double h_amount,
-                byte c_w_id, byte c_d_id, byte[] c_last, TimestampType now) throws IOException;
-        public void callPaymentById(byte w_id, byte d_id, double h_amount,
-                byte c_w_id, byte c_d_id, int c_id, TimestampType now)
+        public void callDelivery(short w_id, int carrier, TimestampType date) throws IOException;
+        public void callPaymentByName(short w_id, byte d_id, double h_amount,
+                short c_w_id, byte c_d_id, byte[] c_last, TimestampType now) throws IOException;
+        public void callPaymentById(short w_id, byte d_id, double h_amount,
+                short c_w_id, byte c_d_id, int c_id, TimestampType now)
         throws IOException;
         public void callNewOrder(boolean rollback, Object... paramlist) throws IOException;
     }
@@ -141,7 +141,7 @@ public class TPCCSimulation
 
     /** Executes a stock level transaction. */
     public void doStockLevel() throws IOException {
-        int threshold = (int)generator.number(Constants.MIN_STOCK_LEVEL_THRESHOLD,
+        int threshold = generator.number(Constants.MIN_STOCK_LEVEL_THRESHOLD,
                                           Constants.MAX_STOCK_LEVEL_THRESHOLD);
 
         client.callStockLevel(generateWarehouseId(), generateDistrict(), threshold);
@@ -168,7 +168,7 @@ public class TPCCSimulation
 
     /** Executes a delivery transaction. */
     public void doDelivery()  throws IOException {
-        int carrier = (int)generator.number(Constants.MIN_CARRIER_ID,
+        int carrier = generator.number(Constants.MIN_CARRIER_ID,
                                         Constants.MAX_CARRIER_ID);
 
         client.callDelivery(generateWarehouseId(), carrier, clock.getDateTime());
@@ -192,9 +192,9 @@ public class TPCCSimulation
             // 15%: paying through another warehouse:
             // select in range [1, num_warehouses] excluding w_id
             c_w_id = (byte)generator.numberExcluding(1, parameters.warehouses,
-                    (int) w_id);
+                    w_id);
             assert c_w_id != w_id;
-            c_d_id = (byte)generateDistrict();
+            c_d_id = generateDistrict();
         }
         double h_amount = generator.fixedPoint(2, Constants.MIN_PAYMENT,
                 Constants.MAX_PAYMENT);
@@ -241,7 +241,7 @@ public class TPCCSimulation
             // fails. will revert soon.
             if (parameters.warehouses > 1 && remote) {
                 supply_w_id[i] = (byte)generator.numberExcluding(1,
-                        parameters.warehouses, (int) warehouse_id);
+                        parameters.warehouses, warehouse_id);
             } else {
                 supply_w_id[i] = warehouse_id;
             }

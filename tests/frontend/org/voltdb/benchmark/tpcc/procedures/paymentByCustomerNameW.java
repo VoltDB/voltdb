@@ -115,7 +115,7 @@ public class paymentByCustomerNameW extends VoltProcedure {
         return new VoltTable[]{warehouse, district};
     }
 
-    public VoltTable[] run(byte w_id, byte d_id, double h_amount, byte c_w_id, byte c_d_id, byte[] c_last, TimestampType timestamp) throws VoltAbortException {
+    public VoltTable[] run(short w_id, byte d_id, double h_amount, short c_w_id, byte c_d_id, byte[] c_last, TimestampType timestamp) throws VoltAbortException {
         // retrieve c_id from replicated CUSTOMER_NAME table
         voltQueueSQL(getCidByLastName, c_last, c_d_id, c_w_id);
         final VoltTable result = voltExecuteSQL()[0];

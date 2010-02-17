@@ -82,7 +82,7 @@ public class paymentByCustomerIdW extends VoltProcedure {
 
     public final SQLStmt insertHistory = new SQLStmt("INSERT INTO HISTORY VALUES (?, ?, ?, ?, ?, ?, ?, ?);");
 
-    public VoltTable[] processPayment(byte w_id, byte d_id, double h_amount, byte c_w_id, byte c_d_id, int c_id, TimestampType timestamp) {
+    public VoltTable[] processPayment(short w_id, byte d_id, double h_amount, short c_w_id, byte c_d_id, int c_id, TimestampType timestamp) {
 
         voltQueueSQL(getWarehouse, w_id);
         voltQueueSQL(getDistrict, w_id, d_id);
@@ -111,7 +111,7 @@ public class paymentByCustomerIdW extends VoltProcedure {
         return new VoltTable[]{warehouse, district};
     }
 
-    public VoltTable[] run(byte w_id, byte d_id, double h_amount, byte c_w_id, byte c_d_id, int c_id, TimestampType timestamp) {
+    public VoltTable[] run(short w_id, byte d_id, double h_amount, short c_w_id, byte c_d_id, int c_id, TimestampType timestamp) {
         return processPayment(w_id, d_id, h_amount, c_w_id, c_d_id, c_id, timestamp);
     }
 }

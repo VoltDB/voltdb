@@ -110,7 +110,7 @@ public class MultiLoader extends ClientMain {
         VoltTable customerNames = new VoltTable(
                 new VoltTable.ColumnInfo("C_ID", VoltType.INTEGER),
                 new VoltTable.ColumnInfo("C_D_ID", VoltType.TINYINT),
-                new VoltTable.ColumnInfo("C_W_ID", VoltType.TINYINT),
+                new VoltTable.ColumnInfo("C_W_ID", VoltType.SMALLINT),
                 new VoltTable.ColumnInfo("C_FIRST", VoltType.STRING),
                 new VoltTable.ColumnInfo("C_LAST", VoltType.STRING)
         );
@@ -164,6 +164,7 @@ public class MultiLoader extends ClientMain {
      * serialization
      * @return
      */
+    @Override
     protected int getExpectedOutgoingMessageSize() {
         return 10485760;
     }
@@ -222,6 +223,7 @@ public class MultiLoader extends ClientMain {
             this.customerNames = customer_names;
         }
 
+        @Override
         public void run() {
             Integer warehouseId = null;
             while ((warehouseId = availableWarehouseIds.poll()) != null) {
@@ -493,7 +495,7 @@ public class MultiLoader extends ClientMain {
             final int BATCH_SIZE = (m_parameters.items / BATCH);
             data_tables[IDX_STOCKS] = new VoltTable(
                     new VoltTable.ColumnInfo("S_I_ID", VoltType.INTEGER),
-                    new VoltTable.ColumnInfo("S_W_ID", VoltType.TINYINT),
+                    new VoltTable.ColumnInfo("S_W_ID", VoltType.SMALLINT),
                     new VoltTable.ColumnInfo("S_QUANTITY", VoltType.INTEGER),
                     new VoltTable.ColumnInfo("S_DIST_01", VoltType.STRING),
                     new VoltTable.ColumnInfo("S_DIST_02", VoltType.STRING),
@@ -646,7 +648,7 @@ public class MultiLoader extends ClientMain {
             //non replicated tables
             for (int i = 0; i < data_tables.length; ++i) data_tables[i] = null;
             data_tables[IDX_WAREHOUSES] = new VoltTable(
-                    new VoltTable.ColumnInfo("W_ID", VoltType.TINYINT),
+                    new VoltTable.ColumnInfo("W_ID", VoltType.SMALLINT),
                     new VoltTable.ColumnInfo("W_NAME", VoltType.STRING),
                     new VoltTable.ColumnInfo("W_STREET_1", VoltType.STRING),
                     new VoltTable.ColumnInfo("W_STREET_2", VoltType.STRING),
@@ -661,7 +663,7 @@ public class MultiLoader extends ClientMain {
 
             data_tables[IDX_DISTRICTS] = new VoltTable(
                     new VoltTable.ColumnInfo("D_ID", VoltType.TINYINT),
-                    new VoltTable.ColumnInfo("D_W_ID", VoltType.TINYINT),
+                    new VoltTable.ColumnInfo("D_W_ID", VoltType.SMALLINT),
                     new VoltTable.ColumnInfo("D_NAME", VoltType.STRING),
                     new VoltTable.ColumnInfo("D_STREET_1", VoltType.STRING),
                     new VoltTable.ColumnInfo("D_STREET_2", VoltType.STRING),
@@ -678,7 +680,7 @@ public class MultiLoader extends ClientMain {
             data_tables[IDX_CUSTOMERS] = new VoltTable(
                     new VoltTable.ColumnInfo("C_ID", VoltType.INTEGER),
                     new VoltTable.ColumnInfo("C_D_ID", VoltType.TINYINT),
-                    new VoltTable.ColumnInfo("C_W_ID", VoltType.TINYINT),
+                    new VoltTable.ColumnInfo("C_W_ID", VoltType.SMALLINT),
                     new VoltTable.ColumnInfo("C_FIRST", VoltType.STRING),
                     new VoltTable.ColumnInfo("C_MIDDLE", VoltType.STRING),
                     new VoltTable.ColumnInfo("C_LAST", VoltType.STRING),
@@ -704,7 +706,7 @@ public class MultiLoader extends ClientMain {
             data_tables[IDX_ORDERS] = new VoltTable(
                     new VoltTable.ColumnInfo("O_ID", VoltType.INTEGER),
                     new VoltTable.ColumnInfo("O_D_ID", VoltType.TINYINT),
-                    new VoltTable.ColumnInfo("O_W_ID", VoltType.TINYINT),
+                    new VoltTable.ColumnInfo("O_W_ID", VoltType.SMALLINT),
                     new VoltTable.ColumnInfo("O_C_ID", VoltType.INTEGER),
                     new VoltTable.ColumnInfo("O_ENTRY_D", VoltType.TIMESTAMP),
                     new VoltTable.ColumnInfo("O_CARRIER_ID", VoltType.INTEGER),
@@ -716,17 +718,17 @@ public class MultiLoader extends ClientMain {
             data_tables[IDX_NEWORDERS] = new VoltTable(
                     new VoltTable.ColumnInfo("NO_O_ID", VoltType.INTEGER),
                     new VoltTable.ColumnInfo("NO_D_ID", VoltType.TINYINT),
-                    new VoltTable.ColumnInfo("NO_W_ID", VoltType.TINYINT)
+                    new VoltTable.ColumnInfo("NO_W_ID", VoltType.SMALLINT)
             );
             //t.ensureRowCapacity(parameters.customersPerDistrict);
 
             data_tables[IDX_ORDERLINES] = new VoltTable(
                     new VoltTable.ColumnInfo("OL_O_ID", VoltType.INTEGER),
                     new VoltTable.ColumnInfo("OL_D_ID", VoltType.TINYINT),
-                    new VoltTable.ColumnInfo("OL_W_ID", VoltType.TINYINT),
+                    new VoltTable.ColumnInfo("OL_W_ID", VoltType.SMALLINT),
                     new VoltTable.ColumnInfo("OL_NUMBER", VoltType.INTEGER),
                     new VoltTable.ColumnInfo("OL_I_ID", VoltType.INTEGER),
-                    new VoltTable.ColumnInfo("OL_SUPPLY_W_ID", VoltType.TINYINT),
+                    new VoltTable.ColumnInfo("OL_SUPPLY_W_ID", VoltType.SMALLINT),
                     new VoltTable.ColumnInfo("OL_DELIVERY_D", VoltType.TIMESTAMP),
                     new VoltTable.ColumnInfo("OL_QUANTITY", VoltType.INTEGER),
                     new VoltTable.ColumnInfo("OL_AMOUNT", VoltType.FLOAT),
@@ -738,9 +740,9 @@ public class MultiLoader extends ClientMain {
             data_tables[IDX_HISTORIES] = new VoltTable(
                     new VoltTable.ColumnInfo("H_C_ID", VoltType.INTEGER),
                     new VoltTable.ColumnInfo("H_C_D_ID", VoltType.TINYINT),
-                    new VoltTable.ColumnInfo("H_C_W_ID", VoltType.TINYINT),
+                    new VoltTable.ColumnInfo("H_C_W_ID", VoltType.SMALLINT),
                     new VoltTable.ColumnInfo("H_D_ID", VoltType.TINYINT),
-                    new VoltTable.ColumnInfo("H_W_ID", VoltType.TINYINT),
+                    new VoltTable.ColumnInfo("H_W_ID", VoltType.SMALLINT),
                     new VoltTable.ColumnInfo("H_DATE", VoltType.TIMESTAMP),
                     new VoltTable.ColumnInfo("H_AMOUNT", VoltType.FLOAT),
                     new VoltTable.ColumnInfo("H_DATA", VoltType.STRING)

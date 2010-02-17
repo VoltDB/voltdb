@@ -73,7 +73,7 @@ public class ostatByCustomerId extends VoltProcedure {
     public final SQLStmt getOrderLines = new SQLStmt("SELECT OL_SUPPLY_W_ID, OL_I_ID, OL_QUANTITY, OL_AMOUNT, OL_DELIVERY_D FROM ORDER_LINE WHERE OL_W_ID = ? AND OL_O_ID = ? AND OL_D_ID = ?");
     //gets returned directly, as, since all data must be returned as VoltTables, this the most useful form the data can be presented in.
 
-    public VoltTable[] getOrderStatus(byte w_id, byte d_id, int c_id, VoltTable customer) {
+    public VoltTable[] getOrderStatus(short w_id, byte d_id, int c_id, VoltTable customer) {
         voltQueueSQL(getLastOrder, w_id, d_id, c_id);
         final VoltTable order = voltExecuteSQL()[0];
 
@@ -84,7 +84,7 @@ public class ostatByCustomerId extends VoltProcedure {
         return new VoltTable[]{customer, order, orderLines};
     }
 
-    public VoltTable[] run(byte w_id, byte d_id, int c_id) {
+    public VoltTable[] run(short w_id, byte d_id, int c_id) {
         voltQueueSQL(getCustomerByCustomerId, w_id, d_id, c_id);
         final VoltTable customer = voltExecuteSQL()[0];
         return getOrderStatus(w_id, d_id, c_id, customer);
