@@ -41,6 +41,7 @@ public class LoadWarehouseReplicated extends VoltProcedure {
 
     public VoltTable[] run(long w_id, VoltTable items, VoltTable customerNames)
     throws VoltAbortException {
+        int allowELT = 0;
         if (items != null) {
             // check if we've already set up this partition
             voltQueueSQL(checkItemExists);
