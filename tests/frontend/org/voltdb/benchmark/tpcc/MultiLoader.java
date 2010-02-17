@@ -57,14 +57,18 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.Iterator;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.benchmark.ClientMain;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcedureCallback;
 import java.util.concurrent.Semaphore;
+import org.voltdb.utils.Pair;
 
 /** TPC-C database loader. Note: The methods order id parameters from "top level" to "low level"
 parameters. However, the insert stored procedures use the defined TPC-C table order, which goes from
@@ -613,16 +617,92 @@ public class MultiLoader extends ClientMain {
 
             if (m_voltClient != null) {
                 // XXX
-                for (long w_id = 1; w_id <= m_parameters.warehouses; ++w_id) {
-                    boolean first = true;
-                    for (VoltTable t : customerNamesTables) {
-                        if (first) {
-                            rethrowExceptionLoad(Constants.LOAD_WAREHOUSE_REPLICATED, w_id, items, t);
-                            first = false;
-                        } else {
-                            rethrowExceptionLoad(Constants.LOAD_WAREHOUSE_REPLICATED, w_id, null, t);
+                final int numPermits = 24;
+                final Semaphore maxOutstandingInvocations = new Semaphore(numPermits);
+                final int totalInvocations = customerNamesTables.size() * m_parameters.warehouses;
+                final ProcedureCallback callback = new ProcedureCallback() {
+                    private int invocationsCompleted = 0;
+                    
+                    private double lastPercentCompleted = 0.0;
+                    @Override
+                    protected void clientCallback(ClientResponse clientResponse) {
+                        if (clientResponse.getStatus() != ClientResponse.SUCCESS){
+                            System.err.println(clientResponse.getExtra());
+                            System.exit(-1);
+                        }
+                        invocationsCompleted++;
+                        final double percentCompleted = invocationsCompleted / (double)totalInvocations;
+                        if (percentCompleted > lastPercentCompleted + .1) {
+                            lastPercentCompleted = percentCompleted;
+                            System.err.println("Finished " + invocationsCompleted + "/" + 
+                                    totalInvocations + " replicated load work");
+                        }
+                        maxOutstandingInvocations.release();
+                    }
+                    
+                };
+                
+                LinkedList<Pair<Integer, LinkedList<VoltTable>>> replicatedLoadWork = 
+                    new LinkedList<Pair<Integer, LinkedList<VoltTable>>>();
+
+                int totalLoadWorkGenerated = 0;
+                for (int w_id = 1; w_id <= m_parameters.warehouses; ++w_id) {
+                    replicatedLoadWork.add(
+                            new Pair<Integer, LinkedList<VoltTable>>( 
+                                    w_id, new LinkedList<VoltTable>(customerNamesTables), false));
+                    totalLoadWorkGenerated += customerNamesTables.size();
+                }
+                System.err.println("Total load work generated is " + totalLoadWorkGenerated);
+
+                /*
+                 * Only supply item table the first time.
+                 */
+                for (Pair<Integer, LinkedList<VoltTable>> p : replicatedLoadWork) {
+                    try {
+                        VoltTable table = p.getSecond().pop();
+                        boolean queued = false;
+                        while (!queued) {
+                            queued = m_voltClient.callProcedure(callback, Constants.LOAD_WAREHOUSE_REPLICATED,
+                                    (short)p.getFirst().intValue(), items, table);
+                            m_voltClient.backpressureBarrier();
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        System.exit(-1);
+                    }
+                }
+
+                
+                while (!replicatedLoadWork.isEmpty()) {
+                    Iterator<Pair<Integer, LinkedList<VoltTable>>> iter = replicatedLoadWork.iterator();
+                    while (iter.hasNext()) {
+                        Pair<Integer, LinkedList<VoltTable>> p = iter.next();
+                        if (p.getSecond().peek() == null) {
+                            iter.remove();
+                            continue;
+                        }
+                        try {
+                            maxOutstandingInvocations.acquire();
+                            VoltTable table = p.getSecond().pop();
+                            boolean queued = false;
+                            while (!queued) {
+                                queued = m_voltClient.callProcedure(callback, Constants.LOAD_WAREHOUSE_REPLICATED,
+                                        (short)p.getFirst().intValue(), null, table);
+                                m_voltClient.backpressureBarrier();
+                            }
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            System.exit(-1);
                         }
                     }
+                }
+
+                try {
+                    maxOutstandingInvocations.acquire(numPermits);
+                    System.err.println("Finished all replicated load work");
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                    System.exit(-1);
                 }
             }
 

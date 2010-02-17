@@ -284,9 +284,10 @@ class Distributer {
             if (totalConnections == 0) {
                 throw new NoConnectionsException("No connections.");
             }
-
+            int queuedInvocations = 0;
             for (int i=0; i < totalConnections; ++i) {
                 cxn = m_connections.get(Math.abs(++m_nextConnection % totalConnections));
+                queuedInvocations += cxn.m_callbacks.size();
                 if (!cxn.hadBackPressure() || ignoreBackpressure) {
                     // serialize and queue the invocation
                     backpressure = false;
@@ -294,6 +295,10 @@ class Distributer {
                 }
             }
 
+            if (queuedInvocations > 20000) {
+                backpressure = true;
+            }
+            
             if (backpressure) {
                 cxn = null;
                 for (ClientStatusListener s : m_listeners) {
