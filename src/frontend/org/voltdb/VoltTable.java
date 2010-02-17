@@ -439,7 +439,8 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
         final int pos = m_buffer.position();
 
         try {
-
+            // Allow the buffer to grow to max capacity
+            m_buffer.limit(m_buffer.capacity());
             // advance the row size value
             m_buffer.position(pos + 2);
 
@@ -621,6 +622,8 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
             m_rowCount++;
             m_buffer.putInt(m_rowStart, m_rowCount);
             final short rowsize = (short) (m_buffer.position() - pos);
+            // constrain buffer limit back to the new position
+            m_buffer.limit(m_buffer.position());
             assert(rowsize >= 2);
             // buffer overflow is caught and handled below.
             m_buffer.putShort(pos, rowsize);

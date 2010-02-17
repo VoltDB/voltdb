@@ -470,23 +470,16 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
             {
                 if (!m_txnIdResponses.containsKey(r.getTxnId()))
                 {
-//                    // HACK: need to clone the VoltTables so that we don't
-//                    // have race bugs with the underlying buffer metadata.
-//                    // This is a time-to-development hack; we'll see what the
-//                    // performance hit is like.
                     ClientResponseImpl curr_response = (ClientResponseImpl) r.getClientResponseData();
-//                    VoltTable[] curr_results = curr_response.getResults();
-//                    VoltTable[] saved_results = new VoltTable[curr_results.length];
-//                    for (int i = 0; i < curr_results.length; ++i)
-//                    {
-//                        saved_results[i] = curr_results[i].clone(0);
-//                        while (curr_results[i].advanceRow())
-//                        {
-//                            saved_results[i].add(curr_results[i].cloneRow());
-//                        }
-//                    }
-//                    m_txnIdResponses.put(r.getTxnId(), saved_results);
-                    m_txnIdResponses.put(r.getTxnId(), curr_response.getResults());
+                    VoltTable[] curr_results = curr_response.getResults();
+                    VoltTable[] saved_results = new VoltTable[curr_results.length];
+                    // Create shallow copies of all the VoltTables to avoid
+                    // race conditions with the ByteBuffer metadata
+                    for (int i = 0; i < curr_results.length; ++i)
+                    {
+                        saved_results[i] = new VoltTable(curr_results[i].getTableDataReference(), true);
+                    }
+                    m_txnIdResponses.put(r.getTxnId(), saved_results);
                     first_response = true;
                 }
                 else
@@ -496,16 +489,16 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
             }
             if (first_response)
             {
-//                // If this is a read-only transaction then we'll return
-//                // the first response to the client
-//                if (state.isReadOnly)
-//                {
-//                    r.setClientHandle(state.invocation.getClientHandle());
-//                    //Horrible but so much more efficient.
-//                    final Connection c = (Connection)state.clientData;
-//                    assert(c != null);
-//                    c.writeStream().enqueue(r.getClientResponseData());
-//                }
+                // If this is a read-only transaction then we'll return
+                // the first response to the client
+                if (state.isReadOnly)
+                {
+                    r.setClientHandle(state.invocation.getClientHandle());
+                    //Horrible but so much more efficient.
+                    final Connection c = (Connection)state.clientData;
+                    assert(c != null);
+                    c.writeStream().enqueue(r.getClientResponseData());
+                }
             }
             else
             {
@@ -523,7 +516,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                 }
                 for (int i = 0; i < first_results.length; ++i)
                 {
-                    if (!first_results[i].hasSameContents(curr_results[i]))
+                    if (!curr_results[i].hasSameContents(first_results[i]))
                     {
                         String msg = "Mismatched results received for transaction: " + r.getTxnId();
                         msg += "\n  from execution site: " + r.getCoordinatorSiteId();
@@ -548,14 +541,14 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                 {
                     m_txnIdResponses.remove(r.getTxnId());
                 }
-//                if (!state.isReadOnly)
-//                {
+                if (!state.isReadOnly)
+                {
                     r.setClientHandle(state.invocation.getClientHandle());
                     //Horrible but so much more efficient.
                     final Connection c = (Connection)state.clientData;
                     assert(c != null);
                     c.writeStream().enqueue(r.getClientResponseData());
-//                }
+                }
             }
 
             return true;
