@@ -622,7 +622,7 @@ public class MultiLoader extends ClientMain {
                 final int totalInvocations = customerNamesTables.size() * m_parameters.warehouses;
                 final ProcedureCallback callback = new ProcedureCallback() {
                     private int invocationsCompleted = 0;
-                    
+
                     private double lastPercentCompleted = 0.0;
                     @Override
                     protected void clientCallback(ClientResponse clientResponse) {
@@ -634,21 +634,21 @@ public class MultiLoader extends ClientMain {
                         final double percentCompleted = invocationsCompleted / (double)totalInvocations;
                         if (percentCompleted > lastPercentCompleted + .1) {
                             lastPercentCompleted = percentCompleted;
-                            System.err.println("Finished " + invocationsCompleted + "/" + 
+                            System.err.println("Finished " + invocationsCompleted + "/" +
                                     totalInvocations + " replicated load work");
                         }
                         maxOutstandingInvocations.release();
                     }
-                    
+
                 };
-                
-                LinkedList<Pair<Integer, LinkedList<VoltTable>>> replicatedLoadWork = 
+
+                LinkedList<Pair<Integer, LinkedList<VoltTable>>> replicatedLoadWork =
                     new LinkedList<Pair<Integer, LinkedList<VoltTable>>>();
 
                 int totalLoadWorkGenerated = 0;
                 for (int w_id = 1; w_id <= m_parameters.warehouses; ++w_id) {
                     replicatedLoadWork.add(
-                            new Pair<Integer, LinkedList<VoltTable>>( 
+                            new Pair<Integer, LinkedList<VoltTable>>(
                                     w_id, new LinkedList<VoltTable>(customerNamesTables), false));
                     totalLoadWorkGenerated += customerNamesTables.size();
                 }
@@ -672,7 +672,7 @@ public class MultiLoader extends ClientMain {
                     }
                 }
 
-                
+
                 while (!replicatedLoadWork.isEmpty()) {
                     Iterator<Pair<Integer, LinkedList<VoltTable>>> iter = replicatedLoadWork.iterator();
                     while (iter.hasNext()) {

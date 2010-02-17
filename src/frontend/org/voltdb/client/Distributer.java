@@ -298,7 +298,7 @@ class Distributer {
             if (queuedInvocations > 20000) {
                 backpressure = true;
             }
-            
+
             if (backpressure) {
                 cxn = null;
                 for (ClientStatusListener s : m_listeners) {
