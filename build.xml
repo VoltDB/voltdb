@@ -1170,7 +1170,7 @@ BENCHMARKS
     description="Call the standard benchmark target configured to use test cluster.">
     <antcall target="benchmark" inheritAll='true'>
         <param name="hostcount" value="12"/>
-        <param name="sitesperhost" value="10"/>
+        <param name="sitesperhost" value="12"/>
         <param name="clientcount" value="3"/>
         <param name="processesperclient" value="4"/>
         <param name="host1" value="volt3a"/>
@@ -1188,7 +1188,7 @@ BENCHMARKS
         <param name="clienthost1" value="volt4a"/>
         <param name="clienthost2" value="volt4b"/>
         <param name="clienthost3" value="volt4c"/>
-        <param name="warehouses" value="120"/>
+        <param name="warehouses" value="144"/>
     </antcall>
 </target>
 
