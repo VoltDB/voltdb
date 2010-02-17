@@ -21,7 +21,7 @@
 
 package org.voltdb.catalog;
 
-import java.util.*;
+import java.util.HashMap;
 
 /**
  * The root class in the Catalog hierarchy, which is essentially a tree of
@@ -97,7 +97,11 @@ public class Catalog extends CatalogType {
         // run either command
         if (cmd.equals("add")) {
             resolved.addChild(arg1, arg2);
-        } else if (cmd.equals("set")) {
+        }
+        else if (cmd.equals("delete")) {
+            resolved.delete(arg1, arg2);
+        }
+        else if (cmd.equals("set")) {
             resolved.set(arg1, arg2);
         }
     }

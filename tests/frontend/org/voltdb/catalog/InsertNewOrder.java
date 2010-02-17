@@ -50,8 +50,10 @@
 
 package org.voltdb.catalog;
 
-import java.util.Date;
-import org.voltdb.*;
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
 /**
  * This class is the same as org.voltdb.benchmark.tpcc.procedures.InsertHistory
@@ -69,7 +71,7 @@ public class InsertNewOrder extends VoltProcedure {
     public final SQLStmt insert = new SQLStmt("INSERT INTO HISTORY VALUES (?, ?, ?, ?, ?, ?, ?, ?);");
 
     public VoltTable[] run(long h_c_id, long h_c_d_id, long h_c_w_id, long h_d_id, long h_w_id,
-            Date h_date, double h_amount, String h_data) {
+            long h_date, double h_amount, String h_data) {
 
         // some dummy code
         @SuppressWarnings("unused")

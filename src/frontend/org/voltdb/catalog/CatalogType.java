@@ -21,7 +21,8 @@
 
 package org.voltdb.catalog;
 
-import java.util.*;
+import java.util.LinkedHashMap;
+import java.util.Set;
 import java.util.Map.Entry;
 
 /**
@@ -149,12 +150,6 @@ public abstract class CatalogType implements Comparable<CatalogType> {
     }
 
     void set(String field, String value) {
-        if (m_path.equals("/clusters[cluster]/databases[database]/procedures[delivery]")) {
-            if (field.equals("partitioncolumn")) {
-                System.out.printf("found it.");
-            }
-        }
-
         if ((field == null) || (value == null)) {
             throw new CatalogException("Null value where it shouldn't be.");
         }
@@ -211,6 +206,18 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         }
 
         update();
+    }
+
+    void delete(String collectionName, String childName) {
+        if ((collectionName == null) || (childName == null)) {
+            throw new CatalogException("Null value where it shouldn't be.");
+        }
+
+        if (m_childCollections.containsKey(collectionName) == false)
+            throw new CatalogException("Unexpected collection name '" + collectionName + "' for " + this);
+        CatalogMap<? extends CatalogType> collection = m_childCollections.get(collectionName);
+
+        collection.delete(childName);
     }
 
     void writeCreationCommand(StringBuilder sb) {

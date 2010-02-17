@@ -23,10 +23,10 @@
 
 package org.voltdb.catalog;
 
+import junit.framework.TestCase;
+
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.utils.CatalogUtil;
-
-import junit.framework.TestCase;
 
 public class TestCatalogDiffs extends TestCase {
 
@@ -70,16 +70,17 @@ public class TestCatalogDiffs extends TestCase {
         assertEquals(updatedOriginalSerialized, updatedSerialized);
     }
 
-    /*public void testModifyProcedureCode() {
+    public void testModifyProcedureCode() {
         String original = compile("base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
         String updated = compile("conflict", CONFLICTPROCS);
         Catalog catUpdated = catalogForJar(updated);
+        String updatedSerialized = catUpdated.serialize();
 
         String diffCommands = CatalogDiffEngine.getCommandsToDiff(catOriginal, catUpdated);
         catOriginal.execute(diffCommands);
-        String updatedOriginal = catOriginal.serialize();
-        assertEquals(updatedOriginal, updated);
+        String updatedOriginalSerialized = catOriginal.serialize();
+        assertEquals(updatedOriginalSerialized, updatedSerialized);
     }
 
     public void testDeleteProcedure() {
@@ -87,11 +88,12 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catOriginal = catalogForJar(original);
         String updated = compile("fewer", FEWERPROCS);
         Catalog catUpdated = catalogForJar(updated);
+        String updatedSerialized = catUpdated.serialize();
 
         String diffCommands = CatalogDiffEngine.getCommandsToDiff(catOriginal, catUpdated);
         catOriginal.execute(diffCommands);
-        String updatedOriginal = catOriginal.serialize();
-        assertEquals(updatedOriginal, updated);
-    }*/
+        String updatedOriginalSerialized = catOriginal.serialize();
+        assertEquals(updatedOriginalSerialized, updatedSerialized);
+    }
 
 }

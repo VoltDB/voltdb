@@ -72,11 +72,11 @@ public class CatalogDiffEngine {
             CatalogMap<? extends CatalogType> newMap = newType.m_childCollections.get(field);
             assert(newMap != null);
 
-            getCommandsToDiff(prevMap, newMap, sb);
+            getCommandsToDiff(field, prevMap, newMap, sb);
         }
     }
 
-    static void getCommandsToDiff(CatalogMap<? extends CatalogType> prevMap, CatalogMap<? extends CatalogType> newMap,
+    static void getCommandsToDiff(String mapName, CatalogMap<? extends CatalogType> prevMap, CatalogMap<? extends CatalogType> newMap,
             StringBuilder sb) {
 
         assert(prevMap != null);
@@ -88,8 +88,11 @@ public class CatalogDiffEngine {
             String name = prevType.getTypeName();
             CatalogType newType = newMap.get(name);
             if (newType == null) {
-                // delete the node
-                assert(false);
+                // write the catalog delete command of the form:
+                // delete parentname mapname childname
+                sb.append("delete ").append(prevType.getParent().getPath()).append(" ");
+                sb.append(mapName).append(" ").append(name).append("\n");
+                continue;
             }
 
             getCommandsToDiff(prevType, newType, sb);

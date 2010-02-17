@@ -21,7 +21,8 @@
 
 package org.voltdb.catalog;
 
-import java.util.*;
+import java.util.Iterator;
+import java.util.TreeMap;
 import java.util.Map.Entry;
 
 /**
@@ -119,6 +120,27 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
             }
 
             return x;
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+
+    /**
+     * Remove a {@link CatalogType} object from this collection.
+     * @param name The name of the object to remove.
+     */
+    public void delete(String name) {
+        try {
+            if (m_items.containsKey(name) == false)
+                throw new CatalogException("Catalog item '" + name + "' doesn't exists in " + m_parent);
+
+            m_items.remove(name);
+
+            // assign a relative index to every child item
+            int index = 1;
+            for (Entry<String, T> e : m_items.entrySet()) {
+                e.getValue().m_relativeIndex = index++;
+            }
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
