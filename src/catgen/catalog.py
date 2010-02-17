@@ -231,8 +231,8 @@ def gencpp( classes, prepath, postpath ):
         write (gpl_header)
         write (auto_gen_warning)
         pp_unique_str = "CATALOG_" + clsname.upper() + "_H_"
-        write("#ifndef ", pp_unique_str);
-        write("#define ", pp_unique_str);
+        write("#ifndef", pp_unique_str);
+        write("#define", pp_unique_str);
         write("")
 
         write('#include <string>')
