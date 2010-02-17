@@ -41,16 +41,16 @@ public class LoadWarehouseReplicated extends VoltProcedure {
 
     public VoltTable[] run(long w_id, VoltTable items, VoltTable customerNames)
     throws VoltAbortException {
+        if (items != null) {
+            // check if we've already set up this partition
+            voltQueueSQL(checkItemExists);
+            VoltTable item = voltExecuteSQL()[0];
+            if (item.getRowCount() > 0)
+                return null;
 
-        // check if we've already set up this partition
-        voltQueueSQL(checkItemExists);
-        VoltTable item = voltExecuteSQL()[0];
-        if (item.getRowCount() > 0)
-            return null;
-
-        // now we know the partition is not loaded yet
-        int allowELT = 0;
-        voltLoadTable("cluster", "database", "ITEM", items, allowELT);
+            // now we know the partition is not loaded yet
+            voltLoadTable("cluster", "database", "ITEM", items, allowELT);
+        }
         voltLoadTable("cluster", "database", "CUSTOMER_NAME", customerNames, allowELT);
         return null;
     }

@@ -55,6 +55,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -78,6 +79,16 @@ public class MultiLoader extends ClientMain {
     private final LoadThread m_loadThreads[];
     private final int m_warehouses;
 
+    private static final VoltTable.ColumnInfo customerTableColumnInfo[] =
+        new VoltTable.ColumnInfo[] {
+            new VoltTable.ColumnInfo("C_ID", VoltType.INTEGER),
+            new VoltTable.ColumnInfo("C_D_ID", VoltType.TINYINT),
+            new VoltTable.ColumnInfo("C_W_ID", VoltType.SMALLINT),
+            new VoltTable.ColumnInfo("C_FIRST", VoltType.STRING),
+            new VoltTable.ColumnInfo("C_LAST", VoltType.STRING)
+        };
+
+    private static final LinkedList<VoltTable> customerNamesTables = new LinkedList<VoltTable>();
     private static final Semaphore m_finishedLoadThreads = new Semaphore(0);
 
     public MultiLoader(String args[]) {
@@ -106,15 +117,6 @@ public class MultiLoader extends ClientMain {
         m_warehouses = warehouses;
         m_loadThreads = new LoadThread[loadThreads];
 
-        //replicated tables
-        VoltTable customerNames = new VoltTable(
-                new VoltTable.ColumnInfo("C_ID", VoltType.INTEGER),
-                new VoltTable.ColumnInfo("C_D_ID", VoltType.TINYINT),
-                new VoltTable.ColumnInfo("C_W_ID", VoltType.SMALLINT),
-                new VoltTable.ColumnInfo("C_FIRST", VoltType.STRING),
-                new VoltTable.ColumnInfo("C_LAST", VoltType.STRING)
-        );
-
         for (int ii = 0; ii < loadThreads; ii++) {
             ScaleParameters parameters = ScaleParameters.makeWithScaleFactor(warehouses, scaleFactor);
             assert parameters != null;
@@ -129,8 +131,7 @@ public class MultiLoader extends ClientMain {
                     generator,
                     generationDateTime,
                     parameters,
-                    ii,
-                    customerNames);
+                    ii);
         }
     }
 
@@ -206,7 +207,6 @@ public class MultiLoader extends ClientMain {
         private final ScaleParameters m_parameters;
 
         /** table data FOR CURRENT WAREHOUSE (LoadWarehouse is partitioned on WID).*/
-        private final VoltTable customerNames; // accumulated and replicated across all warehouses
         private final VoltTable[] data_tables = new VoltTable[8]; // non replicated tables
         private volatile boolean m_doMakeReplicated = false;
 
@@ -214,13 +214,11 @@ public class MultiLoader extends ClientMain {
                 RandomGenerator generator,
                 TimestampType generationDateTime,
                 ScaleParameters parameters,
-                int index,
-                VoltTable customer_names) {
+                int index) {
             super("Load Thread " + index);
             m_generator = generator;
             this.m_generationDateTime = generationDateTime;
             this.m_parameters = parameters;
-            this.customerNames = customer_names;
         }
 
         @Override
@@ -386,7 +384,12 @@ public class MultiLoader extends ClientMain {
             data_tables[IDX_CUSTOMERS].addRow(container_customer);
             if (doesReplicateName) {
                 //replicate name and id to every site
-                synchronized (customerNames) {
+                synchronized (customerNamesTables) {
+                    VoltTable customerNames = customerNamesTables.peekFirst();
+                    if (customerNames == null || customerNames.getRowCount() > 300000) {
+                        customerNames = new VoltTable(customerTableColumnInfo);
+                        customerNamesTables.push(customerNames);
+                    }
                     customerNames.addRow(c_id, c_d_id, c_w_id, c_first, c_last);
                 }
             }
@@ -611,7 +614,15 @@ public class MultiLoader extends ClientMain {
             if (m_voltClient != null) {
                 // XXX
                 for (long w_id = 1; w_id <= m_parameters.warehouses; ++w_id) {
-                    rethrowExceptionLoad(Constants.LOAD_WAREHOUSE_REPLICATED, w_id, items, customerNames);
+                    boolean first = true;
+                    for (VoltTable t : customerNamesTables) {
+                        if (first) {
+                            rethrowExceptionLoad(Constants.LOAD_WAREHOUSE_REPLICATED, w_id, items, t);
+                            first = false;
+                        } else {
+                            rethrowExceptionLoad(Constants.LOAD_WAREHOUSE_REPLICATED, w_id, null, t);
+                        }
+                    }
                 }
             }
 
