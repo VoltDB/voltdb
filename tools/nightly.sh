@@ -4,9 +4,8 @@
 # not cleaned up at end because plot tool runs after this script, not concurrently
 rm *.properties
 
-# build and distribute jars
-pushd newtrunk
-ant clean dist_internal voltbin
+# distribute jars
+pushd trunk
 scp -r obj/release/voltbin volt1:
 
 # run benchmarks
@@ -19,8 +18,4 @@ cd obj/release/voltbin
 
 # analysis
 popd # back to workspace root
-newtrunk/tools/parsenightlylog.py < benchmark-log > performance.properties
-
-# try to conserve disk space
-cd newtrunk
-ant clean
+trunk/tools/parsenightlylog.py < benchmark-log > performance.properties
