@@ -227,7 +227,6 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
 
     @Override
     public long getBytesWritten() {
-        // TODO Auto-generated method stub
         return m_bytesWritten;
     }
 

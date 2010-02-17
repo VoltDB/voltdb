@@ -49,7 +49,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
     }
 
     @Override
-    boolean isConsistent()
+    public boolean isConsistent()
     {
         // XXX right now there is nothing to check across all rows
         return true;

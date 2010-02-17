@@ -301,8 +301,8 @@ class SnapshotDaemon {
         while (result.advanceRow()) {
             if (!result.getString("RESULT").equals("SUCCESS")) {
                 hostLog.error("Snapshot save feasability test failed for host "
-                        + result.getString(0) + " table " + result.getString(1) +
-                        " with error message " + result.getString(3));
+                        + result.getString("HOST_ID") + " table " + result.getString("TABLE") +
+                        " with error message " + result.getString("ERR_MSG"));
             }
         }
     }
@@ -332,7 +332,7 @@ class SnapshotDaemon {
             assert(advanced);
             assert(result.getColumnCount() == 1);
             assert(result.getColumnType(0) == VoltType.STRING);
-            hostLog.error("Snapshot delete failed with failure response: " + result.getString(0));
+            hostLog.error("Snapshot delete failed with failure response: " + result.getString("ERR_MSG"));
             return;
         }
     }
@@ -360,12 +360,12 @@ class SnapshotDaemon {
             assert(advanced);
             assert(result.getColumnCount() == 1);
             assert(result.getColumnType(0) == VoltType.STRING);
-            hostLog.error("Initial snapshot scan failed with failure response: " + result.getString(0));
+            hostLog.error("Initial snapshot scan failed with failure response: " + result.getString("ERR_MSG"));
         }
         assert(results.length == 3);
 
         final VoltTable snapshots = results[0];
-        assert(snapshots.getColumnCount() == 6);
+        assert(snapshots.getColumnCount() == 8);
 
         final File myPath = new File(m_path);
         while (snapshots.advanceRow()) {

@@ -20,6 +20,7 @@ package org.voltdb.sysprocs;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.StringWriter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.TreeMap;
@@ -43,6 +44,7 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
+import org.voltdb.sysprocs.saverestore.SnapshotDigestUtil;
 import org.voltdb.utils.VoltLoggerFactory;
 
 @ProcInfo(singlePartition = false)
@@ -53,6 +55,11 @@ public class SnapshotScan extends VoltSystemProcedure {
 
     private static final Logger HOST_LOG =
         Logger.getLogger("HOST", VoltLoggerFactory.instance());
+
+    private static final int DEP_snapshotDigestScan = (int)
+        SysProcFragmentId.PF_snapshotDigestScan | DtxnConstants.MULTINODE_DEPENDENCY;
+    private static final int DEP_snapshotDigestScanResults = (int)
+        SysProcFragmentId.PF_snapshotDigestScanResults;
 
     private static final int DEP_snapshotScan = (int)
         SysProcFragmentId.PF_snapshotScan | DtxnConstants.MULTINODE_DEPENDENCY;
@@ -71,6 +78,8 @@ public class SnapshotScan extends VoltSystemProcedure {
                      BackendTarget eeType, HsqlBackend hsql, Cluster cluster)
     {
         super.init(site, catProc, eeType, hsql, cluster);
+        site.registerPlanFragment(SysProcFragmentId.PF_snapshotDigestScan, this);
+        site.registerPlanFragment(SysProcFragmentId.PF_snapshotDigestScanResults, this);
         site.registerPlanFragment(SysProcFragmentId.PF_snapshotScan, this);
         site.registerPlanFragment(SysProcFragmentId.PF_snapshotScanResults, this);
         site.registerPlanFragment(SysProcFragmentId.PF_hostDiskFreeScan, this);
@@ -110,6 +119,9 @@ public class SnapshotScan extends VoltSystemProcedure {
                         errorString);
             } else {
                 for (final File f : relevantFiles) {
+                    if (f.getName().endsWith(".digest")) {
+                        continue;
+                    }
                     if (f.canRead()) {
                         try {
                             FileInputStream savefile_input = new FileInputStream(f);
@@ -187,6 +199,64 @@ public class SnapshotScan extends VoltSystemProcedure {
             }
             return new
                 DependencyPair( DEP_snapshotScanResults, results);
+        } if (fragmentId == SysProcFragmentId.PF_snapshotDigestScan)
+        {
+            final VoltTable results = constructDigestResultsTable();
+            assert(params.toArray()[0] != null);
+            assert(params.toArray()[0] instanceof String);
+            final String path = (String)params.toArray()[0];
+            List<File> relevantFiles = retrieveRelevantFiles(path);
+            if (relevantFiles == null) {
+                results.addRow(
+                        context.getSite().getHost().getTypeName(),
+                        "",
+                        "",
+                        "",
+                        "FAILURE",
+                        errorString);
+            } else {
+                for (final File f : relevantFiles) {
+                    if (f.getName().endsWith(".vpt")) {
+                        continue;
+                    }
+                    if (f.canRead()) {
+                        try {
+                            List<String> tableNames = SnapshotDigestUtil.retrieveRelevantTableNames(f);
+                            final StringWriter sw = new StringWriter();
+                            for (int ii = 0; ii < tableNames.size(); ii++) {
+                                sw.append(tableNames.get(ii));
+                                if (ii != tableNames.size() - 1) {
+                                    sw.append(',');
+                                }
+                            }
+                            results.addRow(context.getSite().getHost().getTypeName(),
+                                    path,
+                                    f.getName(),
+                                    sw.toString(),
+                                    "SUCCESS",
+                                    "");
+                        } catch (Exception e) {
+                            HOST_LOG.warn(e);
+                        }
+                    }
+                }
+            }
+            return new DependencyPair( DEP_snapshotDigestScan, results);
+        } else if (fragmentId == SysProcFragmentId.PF_snapshotDigestScanResults) {
+            final VoltTable results = constructDigestResultsTable();
+            TRACE_LOG.trace("Aggregating Snapshot Digest Scan  results");
+            assert (dependencies.size() > 0);
+            List<VoltTable> dep = dependencies.get(DEP_snapshotDigestScan);
+            for (VoltTable table : dep)
+            {
+                while (table.advanceRow())
+                {
+                    // this will add the active row of table
+                    results.add(table);
+                }
+            }
+            return new
+                DependencyPair( DEP_snapshotDigestScanResults, results);
         } else if (fragmentId == SysProcFragmentId.PF_hostDiskFreeScan)
         {
             assert(params.toArray()[0] != null);
@@ -258,16 +328,30 @@ public class SnapshotScan extends VoltSystemProcedure {
         return new VoltTable(result_columns);
     }
 
-    private VoltTable constructClientResultsTable() {
+    private VoltTable constructDigestResultsTable() {
         ColumnInfo[] result_columns = new ColumnInfo[6];
+        int ii = 0;
+        result_columns[ii++] = new ColumnInfo("HOST_ID", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo("PATH", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo("NAME", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo("TABLES", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
+
+        return new VoltTable(result_columns);
+    }
+
+    private VoltTable constructClientResultsTable() {
+        ColumnInfo[] result_columns = new ColumnInfo[8];
         int ii = 0;
         result_columns[ii++] = new ColumnInfo("PATH", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("NONCE", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("CREATED", VoltType.BIGINT);
         result_columns[ii++] = new ColumnInfo("SIZE", VoltType.BIGINT);
-        result_columns[ii++] = new ColumnInfo("TABLES", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo("TABLES_REQUIRED", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo("TABLES_MISSING", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo("TABLES_INCOMPLETE", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("COMPLETE", VoltType.STRING);
-
 
         return new VoltTable(result_columns);
     }
@@ -330,6 +414,7 @@ public class SnapshotScan extends VoltSystemProcedure {
         private final String m_path;
         private final String m_nonce;
         private final TreeMap<String, Table> m_tables = new TreeMap<String, Table>();
+        private final HashSet<String> m_tableDigest = new HashSet<String>();
 
         private Snapshot(VoltTableRow r) {
             assert(r.getString("RESULT").equals("SUCCESS"));
@@ -356,6 +441,13 @@ public class SnapshotScan extends VoltSystemProcedure {
             }
         }
 
+        private void processDigest(String tablesString) {
+            String tables[] = tablesString.split(",");
+            for (String table : tables) {
+                m_tableDigest.add(table);
+            }
+        }
+
         private Long size() {
             long size = 0;
             for (Table t : m_tables.values()) {
@@ -364,13 +456,43 @@ public class SnapshotScan extends VoltSystemProcedure {
             return size;
         }
 
-        private String tables() {
+        private String tablesRequired() {
             StringBuilder sb = new StringBuilder();
-            for (Table t : m_tables.values()) {
-                sb.append(t.m_name);
+            for (String tableName : m_tableDigest) {
+                sb.append(tableName);
                 sb.append(',');
             }
-            sb.deleteCharAt(sb.length() - 1);
+            if (sb.length() > 0) {
+                sb.deleteCharAt(sb.length() - 1);
+            }
+            return sb.toString();
+        }
+
+        private String tablesMissing() {
+            StringBuilder sb = new StringBuilder();
+            for (String tableName : m_tableDigest) {
+                if (!m_tables.containsKey(tableName)) {
+                    sb.append(tableName);
+                    sb.append(',');
+                }
+            }
+            if (sb.length() > 0) {
+                sb.deleteCharAt(sb.length() - 1);
+            }
+            return sb.toString();
+        }
+
+        private String tablesIncomplete() {
+            StringBuilder sb = new StringBuilder();
+            for (Table t : m_tables.values()) {
+                if (!t.complete()) {
+                    sb.append(t.m_name);
+                    sb.append(',');
+                }
+            }
+            if (sb.length() > 0) {
+                sb.deleteCharAt(sb.length() - 1);
+            }
             return sb.toString();
         }
 
@@ -382,11 +504,30 @@ public class SnapshotScan extends VoltSystemProcedure {
                     break;
                 }
             }
+            for (String tableName : m_tableDigest) {
+                if (!m_tables.containsKey(tableName)) {
+                    complete = false;
+                }
+            }
             return complete ? "TRUE" : "FALSE";
+        }
+
+        private Object[] asRow() {
+            Object row[] = new Object[8];
+            int ii = 0;
+            row[ii++] = m_path;
+            row[ii++] = m_nonce;
+            row[ii++] = m_createTime;
+            row[ii++] = size();
+            row[ii++] = tablesRequired();
+            row[ii++] = tablesMissing();
+            row[ii++] = tablesIncomplete();
+            row[ii++] = complete();
+            return row;
         }
     }
 
-    public void hashToSnapshot(VoltTableRow r, HashMap<String, Snapshot> aggregates) {
+    private void hashToSnapshot(VoltTableRow r, HashMap<String, Snapshot> aggregates) {
         assert(r.getString("RESULT").equals("SUCCESS"));
         assert("TRUE".equals(r.getString("READABLE")));
         final String path = r.getString("PATH");
@@ -404,8 +545,22 @@ public class SnapshotScan extends VoltSystemProcedure {
         }
     }
 
+    private void hashDigestToSnapshot(VoltTableRow r, HashMap<String, Snapshot> aggregates) {
+        assert(r.getString("RESULT").equals("SUCCESS"));
+        final String path = r.getString("PATH");
+        final String nonce = r.getString("NAME").substring(0, r.getString("NAME").indexOf(".digest"));
+        final String combined = path + nonce;
+        Snapshot s = aggregates.get(combined);
+        if (s == null) {
+            return;
+        } else {
+            s.processDigest(r.getString("TABLES"));
+        }
+    }
+
     public VoltTable[] run(String path) throws VoltAbortException
     {
+        final long startTime = System.currentTimeMillis();
         if (path == null || path.equals("")) {
             ColumnInfo[] result_columns = new ColumnInfo[1];
             int ii = 0;
@@ -418,6 +573,7 @@ public class SnapshotScan extends VoltSystemProcedure {
         VoltTable scanResults = performSnapshotScanWork(path)[0];
         VoltTable clientResults = constructClientResultsTable();
         VoltTable diskFreeResults = performDiskFreeScanWork(path)[0];
+        VoltTable digestScanResults = performSnapshotDigestScanWork(path)[0];
         HashMap<String, Snapshot> aggregates = new HashMap<String, Snapshot>();
         while (scanResults.advanceRow())
         {
@@ -428,15 +584,19 @@ public class SnapshotScan extends VoltSystemProcedure {
             }
         }
 
-        for (Snapshot s : aggregates.values()) {
-            clientResults.addRow(
-                    s.m_path,
-                    s.m_nonce,
-                    s.m_createTime,
-                    s.size(),
-                    s.tables(),
-                    s.complete());
+        while (digestScanResults.advanceRow()) {
+            if (digestScanResults.getString("RESULT").equals("SUCCESS")) {
+                hashDigestToSnapshot(digestScanResults, aggregates);
+            }
         }
+
+        for (Snapshot s : aggregates.values()) {
+            clientResults.addRow(s.asRow());
+        }
+
+        final long endTime = System.currentTimeMillis();
+        final long duration = endTime -startTime;
+        HOST_LOG.info("Finished scanning snapshots. Took " + duration + " milliseconds");
         return new VoltTable[] { clientResults, diskFreeResults, scanResults };
     }
 
@@ -477,7 +637,7 @@ public class SnapshotScan extends VoltSystemProcedure {
                 }
                 retvals.addAll(retrieveRelevantFiles(file));
             } else {
-                if (!file.getName().endsWith(".vpt")) {
+                if (!file.getName().endsWith(".vpt") && !file.getName().endsWith(".digest")) {
                     continue;
                 }
                 if (!file.canRead()) {
@@ -513,6 +673,33 @@ public class SnapshotScan extends VoltSystemProcedure {
 
         VoltTable[] results;
         results = executeSysProcPlanFragments(pfs, DEP_snapshotScanResults);
+        return results;
+    }
+
+    private final VoltTable[] performSnapshotDigestScanWork(String path)
+    {
+        SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
+
+        pfs[0] = new SynthesizedPlanFragment();
+        pfs[0].fragmentId = SysProcFragmentId.PF_snapshotDigestScan;
+        pfs[0].outputDepId = DEP_snapshotDigestScan;
+        pfs[0].multipartition = false;
+        pfs[0].nonExecSites = true;
+        ParameterSet params = new ParameterSet();
+        params.setParameters(path);
+        pfs[0].parameters = params;
+
+        pfs[1] = new SynthesizedPlanFragment();
+        pfs[1].fragmentId = SysProcFragmentId.PF_snapshotDigestScanResults;
+        pfs[1].outputDepId = DEP_snapshotDigestScanResults;
+        pfs[1].inputDepIds  = new int[] { DEP_snapshotDigestScan };
+        pfs[1].multipartition = false;
+        pfs[1].nonExecSites = false;
+        pfs[1].parameters = new ParameterSet();
+
+
+        VoltTable[] results;
+        results = executeSysProcPlanFragments(pfs, DEP_snapshotDigestScanResults);
         return results;
     }
 

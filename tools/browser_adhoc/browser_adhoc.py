@@ -155,7 +155,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                     self.wfile.write(snapshot_path)
                     self.wfile.write(' with nonce ')
                     self.wfile.write(snapshot_nonce)
-                    initiate_proc = VoltProcedure(fs, "@SaveTablesToDisk", [FastSerializer.VOLTTYPE_STRING, FastSerializer.VOLTTYPE_STRING, FastSerializer.VOLTTYPE_TINYINT]);
+                    initiate_proc = VoltProcedure(fs, "@SnapshotSave", [FastSerializer.VOLTTYPE_STRING, FastSerializer.VOLTTYPE_STRING, FastSerializer.VOLTTYPE_TINYINT]);
                     if blocking_snapshot:
                         response = initiate_proc.call([snapshot_path, snapshot_nonce, 1], timeout = None);
                     else:
@@ -165,7 +165,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                     self.wfile.write(snapshot_path)
                     self.wfile.write(' with nonce ')
                     self.wfile.write(snapshot_nonce)
-                    initiate_proc = VoltProcedure(fs, "@RestoreTablesFromDisk", [FastSerializer.VOLTTYPE_STRING, FastSerializer.VOLTTYPE_STRING]);
+                    initiate_proc = VoltProcedure(fs, "@SnapshotRestore", [FastSerializer.VOLTTYPE_STRING, FastSerializer.VOLTTYPE_STRING]);
                     if blocking_snapshot:
                         response = initiate_proc.call([snapshot_path, snapshot_nonce], timeout = None);
                     else:

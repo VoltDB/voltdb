@@ -73,7 +73,7 @@ public abstract class TableSaveFileState
 
     abstract void addHostData(VoltTableRow row) throws IOException;
 
-    abstract boolean isConsistent();
+    public abstract boolean isConsistent();
 
     void addPlanDependencyId(int dependencyId)
     {

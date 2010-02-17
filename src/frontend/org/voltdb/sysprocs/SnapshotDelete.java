@@ -190,9 +190,11 @@ public class SnapshotDelete extends VoltSystemProcedure {
             results[0].addRow("A path must be provided for every nonce");
             return results;
         }
+
+        results = performSnapshotDeleteWork( paths, nonces);
+
         final long endTime = System.currentTimeMillis();
         final long duration = endTime -startTime;
-        results = performSnapshotDeleteWork( paths, nonces);
         hostLog.info("Finished deleting snapshots. Took " + duration + " milliseconds");
         return results;
     }
@@ -240,7 +242,7 @@ public class SnapshotDelete extends VoltSystemProcedure {
                     return false;
                 }
 
-                if (!pathname.getName().endsWith(".vpt")) {
+                if (!pathname.getName().endsWith(".vpt") && !pathname.getName().endsWith(".digest")) {
                     return false;
                 }
 

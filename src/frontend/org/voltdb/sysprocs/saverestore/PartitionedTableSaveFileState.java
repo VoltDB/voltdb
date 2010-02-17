@@ -79,7 +79,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
     }
 
     @Override
-    boolean isConsistent()
+    public boolean isConsistent()
     {
         return ((m_partitionsSeen.size() == m_totalPartitions) &&
                 (m_partitionsSeen.first() == 0) &&

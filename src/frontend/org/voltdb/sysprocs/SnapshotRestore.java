@@ -57,6 +57,7 @@ import org.voltdb.sysprocs.saverestore.ClusterSaveFileState;
 import org.voltdb.sysprocs.saverestore.SavedTableConverter;
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
 import org.voltdb.sysprocs.saverestore.TableSaveFileState;
+import org.voltdb.sysprocs.saverestore.SnapshotDigestUtil;
 import org.voltdb.utils.VoltLoggerFactory;
 import org.voltdb.utils.DBBPool.BBContainer;
 
@@ -530,6 +531,8 @@ public class SnapshotRestore extends VoltSystemProcedure
 
    // private final VoltSampler m_sampler = new VoltSampler(10, "sample" + String.valueOf(new Random().nextInt() % 10000) + ".txt");
 
+
+
     public VoltTable[] run(String path, String nonce) throws VoltAbortException
     {
       //  m_sampler.start();
@@ -549,8 +552,49 @@ public class SnapshotRestore extends VoltSystemProcedure
         {
             throw new VoltAbortException(e.getMessage());
         }
+        List<String> relevantTableNames = null;
+        try {
+            relevantTableNames = SnapshotDigestUtil.retrieveRelevantTableNames(path, nonce);
+        } catch (Exception e) {
+            ColumnInfo[] result_columns = new ColumnInfo[1];
+            int ii = 0;
+            result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
+            VoltTable results[] = new VoltTable[] { new VoltTable(result_columns) };
+            results[0].addRow(e.toString());
+            return results;
+        }
+        assert(relevantTableNames != null);
+        assert(relevantTableNames.size() > 0);
 
-        VoltTable[] results = performTableRestoreWork(savefile_state);
+        VoltTable[] results = null;
+        for (String tableName : relevantTableNames) {
+            if (!savefile_state.getSavedTableNames().contains(tableName)) {
+                if (results == null) {
+                    ColumnInfo[] result_columns = new ColumnInfo[1];
+                    int ii = 0;
+                    result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
+                    results = new VoltTable[] { new VoltTable(result_columns) };
+                }
+                results[0].addRow("Save data contains no information for table " + tableName);
+            }
+
+            if (!savefile_state.getTableState(tableName).isConsistent()) {
+                if (results == null) {
+                    ColumnInfo[] result_columns = new ColumnInfo[1];
+                    int ii = 0;
+                    result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
+                    results = new VoltTable[] { new VoltTable(result_columns) };
+                }
+                results[0].addRow(
+                        "Save data for " + tableName + " is inconsistent " +
+                        "(potentially missing partitions) or corrupted");
+            }
+        }
+        if (results != null) {
+            return results;
+        }
+
+        results = performTableRestoreWork(savefile_state);
         final long endTime = System.currentTimeMillis();
         final double duration = (endTime - startTime) / 1000.0;
         final StringWriter sw = new StringWriter();

@@ -102,6 +102,8 @@ public class SysProcFragmentId
     public static final long PF_scanSnapshotRegistriesResults = 111;
 
     // @SnapshotScan
+    public static final long PF_snapshotDigestScan = 124;
+    public static final long PF_snapshotDigestScanResults = 125;
     public static final long PF_snapshotScan = 120;
     public static final long PF_snapshotScanResults = 121;
     public static final long PF_hostDiskFreeScan = 122;
