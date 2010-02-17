@@ -305,7 +305,6 @@ public class BenchmarkController {
                         "-Djava.library.path=.",
                         "-Dlog4j.configuration=log.xml",
                         debugString,
-                        "-ea",
                         /*
                          * The vast majority of Volt heap usage is young generation. When running the benchmark
                          * there isn't a single full GC performed. They are all young gen GCs and there isn't
