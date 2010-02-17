@@ -195,7 +195,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         Client client = getClient();
         // make a TPCC warehouse table
         VoltTable partitioned_table = new VoltTable(
-                new VoltTable.ColumnInfo("W_ID", org.voltdb.VoltType.get((byte)3)),
+                new VoltTable.ColumnInfo("W_ID", org.voltdb.VoltType.SMALLINT),
                 new VoltTable.ColumnInfo("W_NAME", org.voltdb.VoltType.get((byte)9)),
                 new VoltTable.ColumnInfo("W_STREET_1", org.voltdb.VoltType.get((byte)9)),
                 new VoltTable.ColumnInfo("W_STREET_2", org.voltdb.VoltType.get((byte)9)),
@@ -207,7 +207,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         );
 
         for (int i = 1; i < 21; i++) {
-            Object[] row = new Object[] {new Byte((byte) i),
+            Object[] row = new Object[] {new Short((short) i),
                                          "name_" + i,
                                          "street1_" + i,
                                          "street2_" + i,

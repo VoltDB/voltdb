@@ -113,11 +113,11 @@ public class TPCCSimulation
             lastAssignedWarehouseId = 1;
     }
 
-    private byte generateWarehouseId() {
+    private short generateWarehouseId() {
         if (useWarehouseAffinity)
-            return (byte)this.affineWarehouse;
+            return (short)this.affineWarehouse;
         else
-            return (byte)generator.skewedNumber(1, parameters.warehouses, m_skewFactor);
+            return (short)generator.skewedNumber(1, parameters.warehouses, m_skewFactor);
     }
 
     private byte generateDistrict() {
@@ -179,10 +179,10 @@ public class TPCCSimulation
         int x = generator.number(1, 100);
         int y = generator.number(1, 100);
 
-        byte w_id = generateWarehouseId();
+        short w_id = generateWarehouseId();
         byte d_id = generateDistrict();
 
-        byte c_w_id;
+        short c_w_id;
         byte c_d_id;
         if (parameters.warehouses == 1 || x <= 85) {
             // 85%: paying through own warehouse (or there is only 1 warehouse)
@@ -191,7 +191,7 @@ public class TPCCSimulation
         } else {
             // 15%: paying through another warehouse:
             // select in range [1, num_warehouses] excluding w_id
-            c_w_id = (byte)generator.numberExcluding(1, parameters.warehouses,
+            c_w_id = (short)generator.numberExcluding(1, parameters.warehouses,
                     w_id);
             assert c_w_id != w_id;
             c_d_id = generateDistrict();
@@ -216,7 +216,7 @@ public class TPCCSimulation
 
     /** Executes a new order transaction. */
     public void doNewOrder() throws IOException {
-        byte warehouse_id = generateWarehouseId();
+        short warehouse_id = generateWarehouseId();
         int ol_cnt = generator.number(Constants.MIN_OL_CNT,
                 Constants.MAX_OL_CNT);
 
@@ -224,7 +224,7 @@ public class TPCCSimulation
         boolean rollback = generator.number(1, 100) == 1;
 
         int[] item_id = new int[ol_cnt];
-        byte[] supply_w_id = new byte[ol_cnt];
+        short[] supply_w_id = new short[ol_cnt];
         int[] quantity = new int[ol_cnt];
         for (int i = 0; i < ol_cnt; ++i) {
             if (rollback && i + 1 == ol_cnt) {
@@ -240,7 +240,7 @@ public class TPCCSimulation
             boolean remote = false; // TODO : currently cross partition query
             // fails. will revert soon.
             if (parameters.warehouses > 1 && remote) {
-                supply_w_id[i] = (byte)generator.numberExcluding(1,
+                supply_w_id[i] = (short)generator.numberExcluding(1,
                         parameters.warehouses, warehouse_id);
             } else {
                 supply_w_id[i] = warehouse_id;
