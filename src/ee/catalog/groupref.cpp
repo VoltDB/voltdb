@@ -19,6 +19,7 @@
             DO NOT MODIFY THIS SOURCE
             ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
 
+#include <cassert>
 #include "groupref.h"
 #include "catalog.h"
 #include "group.h"
@@ -44,6 +45,10 @@ CatalogType * GroupRef::addChild(const std::string &collectionName, const std::s
 
 CatalogType * GroupRef::getChild(const std::string &collectionName, const std::string &childName) const {
     return NULL;
+}
+
+void GroupRef::removeChild(const std::string &collectionName, const std::string &childName) {
+    assert (m_childCollections.find(collectionName) != m_childCollections.end());
 }
 
 const Group * GroupRef::group() const {

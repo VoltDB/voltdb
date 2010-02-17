@@ -19,6 +19,7 @@
             DO NOT MODIFY THIS SOURCE
             ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
 
+#include <cassert>
 #include "connectordestinationinfo.h"
 #include "catalog.h"
 
@@ -47,6 +48,10 @@ CatalogType * ConnectorDestinationInfo::addChild(const std::string &collectionNa
 
 CatalogType * ConnectorDestinationInfo::getChild(const std::string &collectionName, const std::string &childName) const {
     return NULL;
+}
+
+void ConnectorDestinationInfo::removeChild(const std::string &collectionName, const std::string &childName) {
+    assert (m_childCollections.find(collectionName) != m_childCollections.end());
 }
 
 const string & ConnectorDestinationInfo::ipaddr() const {

@@ -50,8 +50,8 @@ import org.voltdb.types.TimestampType;
 public class TestTPCCSuite extends RegressionSuite {
 
     // constants used int the benchmark
-    static final byte W_ID = 3;
-    static final byte W2_ID = 4;
+    static final short W_ID = 3;
+    static final short W2_ID = 4;
     static final byte D_ID = 7;
     static final byte D2_ID = 8;
     static final int O_ID = 9;
@@ -306,7 +306,7 @@ public class TestTPCCSuite extends RegressionSuite {
         // long w_id, long d_id, long c_id, long ol_cnt, long all_local, long[]
         // item_id, long[] supware, long[] quantity
         int[] items = { 4, 5, 6 };
-        byte[] warehouses = { W_ID, W_ID, W_ID };
+        short[] warehouses = { W_ID, W_ID, W_ID };
         int[] quantities = { 3, 5, 1 };
 
         TPCDataPrinter.printAllData(client);
@@ -358,7 +358,7 @@ public class TestTPCCSuite extends RegressionSuite {
 
         // New order with a missing item
         items = new int[] { Constants.NUM_ITEMS + 1 };
-        warehouses = new byte[] { W_ID };
+        warehouses = new short[] { W_ID };
         quantities = new int[] { 42 };
         try {
             client.callProcedure("neworder", W_ID, D_ID, C_ID, timestamp,

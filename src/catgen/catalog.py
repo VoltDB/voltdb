@@ -89,7 +89,7 @@ def genjava( classes, prepath, postpath, package ):
         write('package', package + ';\n')
 
         if cls.has_comment():
-            write('/**\n *', cls.comment, '\n */')
+            write('/**\n *', cls.comment + '\n */')
         write( interp( 'public class $clsname extends CatalogType {\n', locals() ) )
 
         # fields
@@ -229,8 +229,8 @@ def gencpp( classes, prepath, postpath ):
         write (gpl_header)
         write (auto_gen_warning)
         pp_unique_str = "CATALOG_" + clsname.upper() + "_H_"
-        write("#ifndef ", pp_unique_str);
-        write("#define ", pp_unique_str, '\n');
+        write("#ifndef", pp_unique_str);
+        write("#define", pp_unique_str + '\n');
 
         write('#include <string>')
         write('#include "catalogtype.h"')
@@ -241,7 +241,7 @@ def gencpp( classes, prepath, postpath ):
             write("class " + classType + ";")
 
         if cls.has_comment():
-            write('/**\n *', cls.comment, '\n */')
+            write('/**\n *', cls.comment + '\n */')
         write( interp( 'class $clsname : public CatalogType {', locals() ) )
         write( '    friend class Catalog;' )
         write( interp( '    friend class CatalogMap<$clsname>;', locals() ) )
@@ -266,6 +266,9 @@ def gencpp( classes, prepath, postpath ):
 
         # getChild method
         write("    virtual CatalogType * getChild(const std::string &collectionName, const std::string &childName) const;")
+
+        # removeChild method
+        write("    virtual void removeChild(const std::string &collectionName, const std::string &childName);")
 
         # public section
         write("\npublic:")
@@ -303,6 +306,7 @@ def gencpp( classes, prepath, postpath ):
         write (gpl_header)
         write (auto_gen_warning)
         filename = clsname.lower()
+        write ( '#include <cassert>' )
         write ( interp( '#include "$filename.h"', locals() ) )
         write ( '#include "catalog.h"' )
         otherhdrs = ['#include "%s.h"' % field.type[:-1].lower() for field in cls.fields if field.type[-1] in ['*', '?'] ]
@@ -319,7 +323,7 @@ def gencpp( classes, prepath, postpath ):
         write ( interp( '$clsname::$clsname(Catalog *catalog, CatalogType *parent, const string &path, const string &name)', locals() ) )
         comma = ''
         if len(mapcons): comma = ','
-        write ( interp( ': CatalogType(catalog, parent, path, name)$comma ', locals() ) )
+        write ( interp( ': CatalogType(catalog, parent, path, name)$comma', locals() ) )
         mapcons = ["m_%s(catalog, this, path + \"/\" + \"%s\")" % (field.name, field.name) for field in cls.fields if field.type[-1] == '*']
         if len(mapcons) > 0:
             write( "  " + ", ".join(mapcons))
@@ -375,6 +379,17 @@ def gencpp( classes, prepath, postpath ):
                 write ( interp( '    if (collectionName.compare("$pubname") == 0)', locals() ) )
                 write ( interp( '        return $privname.get(childName);', locals() ) )
         write ( '    return NULL;\n}\n' )
+
+        # write removeChild(...)
+        write ( interp( 'void $clsname::removeChild(const std::string &collectionName, const std::string &childName) {', locals() ) )
+        write ( interp( '    assert (m_childCollections.find(collectionName) != m_childCollections.end());', locals() ) )
+        for field in cls.fields:
+            if field.type[-1] == "*":
+                privname = 'm_' + field.name
+                pubname = field.name
+                write ( interp( '    if (collectionName.compare("$pubname") == 0)', locals() ) )
+                write ( interp( '        return $privname.remove(childName);', locals() ) )
+        write ( '}\n' )
 
         # write field getters
         for field in cls.fields:

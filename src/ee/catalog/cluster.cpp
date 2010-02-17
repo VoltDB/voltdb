@@ -19,6 +19,7 @@
             DO NOT MODIFY THIS SOURCE
             ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
 
+#include <cassert>
 #include "cluster.h"
 #include "catalog.h"
 #include "partition.h"
@@ -88,6 +89,18 @@ CatalogType * Cluster::getChild(const std::string &collectionName, const std::st
     if (collectionName.compare("partitions") == 0)
         return m_partitions.get(childName);
     return NULL;
+}
+
+void Cluster::removeChild(const std::string &collectionName, const std::string &childName) {
+    assert (m_childCollections.find(collectionName) != m_childCollections.end());
+    if (collectionName.compare("databases") == 0)
+        return m_databases.remove(childName);
+    if (collectionName.compare("hosts") == 0)
+        return m_hosts.remove(childName);
+    if (collectionName.compare("sites") == 0)
+        return m_sites.remove(childName);
+    if (collectionName.compare("partitions") == 0)
+        return m_partitions.remove(childName);
 }
 
 const CatalogMap<Database> & Cluster::databases() const {

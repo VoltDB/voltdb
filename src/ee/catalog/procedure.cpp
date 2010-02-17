@@ -19,6 +19,7 @@
             DO NOT MODIFY THIS SOURCE
             ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
 
+#include <cassert>
 #include "procedure.h"
 #include "catalog.h"
 #include "procparameter.h"
@@ -110,6 +111,20 @@ CatalogType * Procedure::getChild(const std::string &collectionName, const std::
     if (collectionName.compare("parameters") == 0)
         return m_parameters.get(childName);
     return NULL;
+}
+
+void Procedure::removeChild(const std::string &collectionName, const std::string &childName) {
+    assert (m_childCollections.find(collectionName) != m_childCollections.end());
+    if (collectionName.compare("authUsers") == 0)
+        return m_authUsers.remove(childName);
+    if (collectionName.compare("authGroups") == 0)
+        return m_authGroups.remove(childName);
+    if (collectionName.compare("authPrograms") == 0)
+        return m_authPrograms.remove(childName);
+    if (collectionName.compare("statements") == 0)
+        return m_statements.remove(childName);
+    if (collectionName.compare("parameters") == 0)
+        return m_parameters.remove(childName);
 }
 
 const string & Procedure::classname() const {

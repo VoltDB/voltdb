@@ -19,6 +19,7 @@
             DO NOT MODIFY THIS SOURCE
             ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
 
+#include <cassert>
 #include "group.h"
 #include "catalog.h"
 #include "userref.h"
@@ -56,6 +57,12 @@ CatalogType * Group::getChild(const std::string &collectionName, const std::stri
     if (collectionName.compare("users") == 0)
         return m_users.get(childName);
     return NULL;
+}
+
+void Group::removeChild(const std::string &collectionName, const std::string &childName) {
+    assert (m_childCollections.find(collectionName) != m_childCollections.end());
+    if (collectionName.compare("users") == 0)
+        return m_users.remove(childName);
 }
 
 const CatalogMap<UserRef> & Group::users() const {

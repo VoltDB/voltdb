@@ -19,6 +19,7 @@
             DO NOT MODIFY THIS SOURCE
             ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
 
+#include <cassert>
 #include "materializedviewinfo.h"
 #include "catalog.h"
 #include "table.h"
@@ -57,6 +58,12 @@ CatalogType * MaterializedViewInfo::getChild(const std::string &collectionName, 
     if (collectionName.compare("groupbycols") == 0)
         return m_groupbycols.get(childName);
     return NULL;
+}
+
+void MaterializedViewInfo::removeChild(const std::string &collectionName, const std::string &childName) {
+    assert (m_childCollections.find(collectionName) != m_childCollections.end());
+    if (collectionName.compare("groupbycols") == 0)
+        return m_groupbycols.remove(childName);
 }
 
 const Table * MaterializedViewInfo::dest() const {

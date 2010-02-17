@@ -19,8 +19,8 @@
             DO NOT MODIFY THIS SOURCE
             ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
 
-#ifndef  CATALOG_DATABASE_H_
-#define  CATALOG_DATABASE_H_
+#ifndef CATALOG_DATABASE_H_
+#define CATALOG_DATABASE_H_
 
 #include <string>
 #include "catalogtype.h"
@@ -58,6 +58,7 @@ protected:
 
     virtual CatalogType * addChild(const std::string &collectionName, const std::string &name);
     virtual CatalogType * getChild(const std::string &collectionName, const std::string &childName) const;
+    virtual void removeChild(const std::string &collectionName, const std::string &childName);
 
 public:
     /** GETTER: Full SQL DDL for the database's schema */

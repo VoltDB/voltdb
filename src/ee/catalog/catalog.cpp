@@ -221,6 +221,12 @@ CatalogType *Catalog::getChild(const string &collectionName, const string &child
     return NULL;
 }
 
+void Catalog::removeChild(const std::string &collectionName, const std::string &childName) {
+    assert (m_childCollections.find(collectionName) != m_childCollections.end());
+    if (collectionName.compare("clusters") == 0)
+        return m_clusters.remove(childName);
+}
+
 /** takes in 0-F, returns 0-15 */
 int32_t hexCharToInt(char c) {
     c = static_cast<char>(toupper(c));

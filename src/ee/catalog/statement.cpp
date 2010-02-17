@@ -19,6 +19,7 @@
             DO NOT MODIFY THIS SOURCE
             ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
 
+#include <cassert>
 #include "statement.h"
 #include "catalog.h"
 #include "stmtparameter.h"
@@ -92,6 +93,16 @@ CatalogType * Statement::getChild(const std::string &collectionName, const std::
     if (collectionName.compare("output_columns") == 0)
         return m_output_columns.get(childName);
     return NULL;
+}
+
+void Statement::removeChild(const std::string &collectionName, const std::string &childName) {
+    assert (m_childCollections.find(collectionName) != m_childCollections.end());
+    if (collectionName.compare("parameters") == 0)
+        return m_parameters.remove(childName);
+    if (collectionName.compare("fragments") == 0)
+        return m_fragments.remove(childName);
+    if (collectionName.compare("output_columns") == 0)
+        return m_output_columns.remove(childName);
 }
 
 const string & Statement::sqltext() const {

@@ -19,6 +19,7 @@
             DO NOT MODIFY THIS SOURCE
             ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
 
+#include <cassert>
 #include "table.h"
 #include "catalog.h"
 #include "index.h"
@@ -91,6 +92,18 @@ CatalogType * Table::getChild(const std::string &collectionName, const std::stri
     if (collectionName.compare("views") == 0)
         return m_views.get(childName);
     return NULL;
+}
+
+void Table::removeChild(const std::string &collectionName, const std::string &childName) {
+    assert (m_childCollections.find(collectionName) != m_childCollections.end());
+    if (collectionName.compare("columns") == 0)
+        return m_columns.remove(childName);
+    if (collectionName.compare("indexes") == 0)
+        return m_indexes.remove(childName);
+    if (collectionName.compare("constraints") == 0)
+        return m_constraints.remove(childName);
+    if (collectionName.compare("views") == 0)
+        return m_views.remove(childName);
 }
 
 const CatalogMap<Column> & Table::columns() const {

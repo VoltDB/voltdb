@@ -19,6 +19,7 @@
             DO NOT MODIFY THIS SOURCE
             ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
 
+#include <cassert>
 #include "cataloginteger.h"
 #include "catalog.h"
 
@@ -43,6 +44,10 @@ CatalogType * CatalogInteger::addChild(const std::string &collectionName, const 
 
 CatalogType * CatalogInteger::getChild(const std::string &collectionName, const std::string &childName) const {
     return NULL;
+}
+
+void CatalogInteger::removeChild(const std::string &collectionName, const std::string &childName) {
+    assert (m_childCollections.find(collectionName) != m_childCollections.end());
 }
 
 int32_t CatalogInteger::value() const {

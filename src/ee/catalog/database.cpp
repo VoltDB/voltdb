@@ -19,6 +19,7 @@
             DO NOT MODIFY THIS SOURCE
             ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
 
+#include <cassert>
 #include "database.h"
 #include "catalog.h"
 #include "user.h"
@@ -114,6 +115,24 @@ CatalogType * Database::getChild(const std::string &collectionName, const std::s
     if (collectionName.compare("snapshotSchedule") == 0)
         return m_snapshotSchedule.get(childName);
     return NULL;
+}
+
+void Database::removeChild(const std::string &collectionName, const std::string &childName) {
+    assert (m_childCollections.find(collectionName) != m_childCollections.end());
+    if (collectionName.compare("users") == 0)
+        return m_users.remove(childName);
+    if (collectionName.compare("groups") == 0)
+        return m_groups.remove(childName);
+    if (collectionName.compare("tables") == 0)
+        return m_tables.remove(childName);
+    if (collectionName.compare("programs") == 0)
+        return m_programs.remove(childName);
+    if (collectionName.compare("procedures") == 0)
+        return m_procedures.remove(childName);
+    if (collectionName.compare("connectors") == 0)
+        return m_connectors.remove(childName);
+    if (collectionName.compare("snapshotSchedule") == 0)
+        return m_snapshotSchedule.remove(childName);
 }
 
 const string & Database::schema() const {

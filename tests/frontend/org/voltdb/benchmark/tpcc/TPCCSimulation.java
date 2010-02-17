@@ -50,9 +50,10 @@
 
 package org.voltdb.benchmark.tpcc;
 
-import org.voltdb.types.TimestampType;
-import org.voltdb.benchmark.*;
 import java.io.IOException;
+
+import org.voltdb.benchmark.Clock;
+import org.voltdb.types.TimestampType;
 
 public class TPCCSimulation
 {

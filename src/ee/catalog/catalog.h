@@ -65,6 +65,7 @@ protected:
     virtual void update();
     virtual CatalogType *addChild(const std::string &collectionName, const std::string &childName);
     virtual CatalogType *getChild(const std::string &collectionName, const std::string &childName) const;
+    virtual void removeChild(const std::string &collectionName, const std::string &childName);
 
     void registerGlobally(CatalogType *catObj);
 

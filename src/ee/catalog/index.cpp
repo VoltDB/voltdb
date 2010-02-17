@@ -19,6 +19,7 @@
             DO NOT MODIFY THIS SOURCE
             ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
 
+#include <cassert>
 #include "index.h"
 #include "catalog.h"
 #include "columnref.h"
@@ -56,6 +57,12 @@ CatalogType * Index::getChild(const std::string &collectionName, const std::stri
     if (collectionName.compare("columns") == 0)
         return m_columns.get(childName);
     return NULL;
+}
+
+void Index::removeChild(const std::string &collectionName, const std::string &childName) {
+    assert (m_childCollections.find(collectionName) != m_childCollections.end());
+    if (collectionName.compare("columns") == 0)
+        return m_columns.remove(childName);
 }
 
 bool Index::unique() const {

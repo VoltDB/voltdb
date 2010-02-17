@@ -19,6 +19,7 @@
             DO NOT MODIFY THIS SOURCE
             ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
 
+#include <cassert>
 #include "constraint.h"
 #include "catalog.h"
 #include "index.h"
@@ -62,6 +63,12 @@ CatalogType * Constraint::getChild(const std::string &collectionName, const std:
     if (collectionName.compare("foreignkeycols") == 0)
         return m_foreignkeycols.get(childName);
     return NULL;
+}
+
+void Constraint::removeChild(const std::string &collectionName, const std::string &childName) {
+    assert (m_childCollections.find(collectionName) != m_childCollections.end());
+    if (collectionName.compare("foreignkeycols") == 0)
+        return m_foreignkeycols.remove(childName);
 }
 
 int32_t Constraint::type() const {

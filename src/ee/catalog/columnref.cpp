@@ -19,6 +19,7 @@
             DO NOT MODIFY THIS SOURCE
             ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
 
+#include <cassert>
 #include "columnref.h"
 #include "catalog.h"
 #include "column.h"
@@ -46,6 +47,10 @@ CatalogType * ColumnRef::addChild(const std::string &collectionName, const std::
 
 CatalogType * ColumnRef::getChild(const std::string &collectionName, const std::string &childName) const {
     return NULL;
+}
+
+void ColumnRef::removeChild(const std::string &collectionName, const std::string &childName) {
+    assert (m_childCollections.find(collectionName) != m_childCollections.end());
 }
 
 int32_t ColumnRef::index() const {

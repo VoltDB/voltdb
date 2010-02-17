@@ -19,6 +19,7 @@
             DO NOT MODIFY THIS SOURCE
             ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
 
+#include <cassert>
 #include "constraintref.h"
 #include "catalog.h"
 #include "constraint.h"
@@ -44,6 +45,10 @@ CatalogType * ConstraintRef::addChild(const std::string &collectionName, const s
 
 CatalogType * ConstraintRef::getChild(const std::string &collectionName, const std::string &childName) const {
     return NULL;
+}
+
+void ConstraintRef::removeChild(const std::string &collectionName, const std::string &childName) {
+    assert (m_childCollections.find(collectionName) != m_childCollections.end());
 }
 
 const Constraint * ConstraintRef::constraint() const {

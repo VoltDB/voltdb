@@ -19,8 +19,8 @@
             DO NOT MODIFY THIS SOURCE
             ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
 
-#ifndef  CATALOG_INDEX_H_
-#define  CATALOG_INDEX_H_
+#ifndef CATALOG_INDEX_H_
+#define CATALOG_INDEX_H_
 
 #include <string>
 #include "catalogtype.h"
@@ -47,6 +47,7 @@ protected:
 
     virtual CatalogType * addChild(const std::string &collectionName, const std::string &name);
     virtual CatalogType * getChild(const std::string &collectionName, const std::string &childName) const;
+    virtual void removeChild(const std::string &collectionName, const std::string &childName);
 
 public:
     /** GETTER: May the index contain duplicate keys? */

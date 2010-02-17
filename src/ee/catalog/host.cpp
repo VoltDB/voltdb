@@ -19,6 +19,7 @@
             DO NOT MODIFY THIS SOURCE
             ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
 
+#include <cassert>
 #include "host.h"
 #include "catalog.h"
 
@@ -43,6 +44,10 @@ CatalogType * Host::addChild(const std::string &collectionName, const std::strin
 
 CatalogType * Host::getChild(const std::string &collectionName, const std::string &childName) const {
     return NULL;
+}
+
+void Host::removeChild(const std::string &collectionName, const std::string &childName) {
+    assert (m_childCollections.find(collectionName) != m_childCollections.end());
 }
 
 const string & Host::ipaddr() const {

@@ -19,8 +19,8 @@
             DO NOT MODIFY THIS SOURCE
             ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
 
-#ifndef  CATALOG_COLUMN_H_
-#define  CATALOG_COLUMN_H_
+#ifndef CATALOG_COLUMN_H_
+#define CATALOG_COLUMN_H_
 
 #include <string>
 #include "catalogtype.h"
@@ -56,6 +56,7 @@ protected:
 
     virtual CatalogType * addChild(const std::string &collectionName, const std::string &name);
     virtual CatalogType * getChild(const std::string &collectionName, const std::string &childName) const;
+    virtual void removeChild(const std::string &collectionName, const std::string &childName);
 
 public:
     /** GETTER: The column's order in the table */

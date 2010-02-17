@@ -19,6 +19,7 @@
             DO NOT MODIFY THIS SOURCE
             ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
 
+#include <cassert>
 #include "authprogram.h"
 #include "catalog.h"
 
@@ -41,5 +42,9 @@ CatalogType * AuthProgram::addChild(const std::string &collectionName, const std
 
 CatalogType * AuthProgram::getChild(const std::string &collectionName, const std::string &childName) const {
     return NULL;
+}
+
+void AuthProgram::removeChild(const std::string &collectionName, const std::string &childName) {
+    assert (m_childCollections.find(collectionName) != m_childCollections.end());
 }
 

@@ -19,6 +19,7 @@
             DO NOT MODIFY THIS SOURCE
             ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
 
+#include <cassert>
 #include "connector.h"
 #include "catalog.h"
 #include "connectordestinationinfo.h"
@@ -66,6 +67,14 @@ CatalogType * Connector::getChild(const std::string &collectionName, const std::
     if (collectionName.compare("destInfo") == 0)
         return m_destInfo.get(childName);
     return NULL;
+}
+
+void Connector::removeChild(const std::string &collectionName, const std::string &childName) {
+    assert (m_childCollections.find(collectionName) != m_childCollections.end());
+    if (collectionName.compare("tableInfo") == 0)
+        return m_tableInfo.remove(childName);
+    if (collectionName.compare("destInfo") == 0)
+        return m_destInfo.remove(childName);
 }
 
 const string & Connector::loaderclass() const {
