@@ -26,10 +26,10 @@ package org.voltdb.sysprocs.saverestore;
 import java.io.IOException;
 import java.util.Set;
 
+import junit.framework.TestCase;
+
 import org.voltdb.VoltTable;
 import org.voltdb.utils.Pair;
-
-import junit.framework.TestCase;
 
 
 public class TestClusterSaveFileState extends TestCase
@@ -44,6 +44,7 @@ public class TestClusterSaveFileState extends TestCase
     private static int NUMBER_OF_HOSTS = 4;
     private static int NUMBER_OF_SITES = NUMBER_OF_SITES_PER_HOST * NUMBER_OF_HOSTS;
 
+    @Override
     public void setUp()
     {
         m_siteInput =
@@ -68,7 +69,7 @@ public class TestClusterSaveFileState extends TestCase
         ClusterSaveFileState state = null;
         try
         {
-            state = new ClusterSaveFileState(m_siteInput);
+            state = new ClusterSaveFileState(m_siteInput, m_allowELT);
         }
         catch (IOException e)
         {
@@ -94,7 +95,7 @@ public class TestClusterSaveFileState extends TestCase
         {
             @SuppressWarnings("unused")
             ClusterSaveFileState state =
-                new ClusterSaveFileState(m_siteInput);
+                new ClusterSaveFileState(m_siteInput, m_allowELT);
         }
         catch (IOException e)
         {
@@ -112,7 +113,7 @@ public class TestClusterSaveFileState extends TestCase
         {
             @SuppressWarnings("unused")
             ClusterSaveFileState state =
-                new ClusterSaveFileState(m_siteInput);
+                new ClusterSaveFileState(m_siteInput, m_allowELT);
         }
         catch (IOException e)
         {
@@ -130,7 +131,7 @@ public class TestClusterSaveFileState extends TestCase
         {
             @SuppressWarnings("unused")
             ClusterSaveFileState state =
-                new ClusterSaveFileState(m_siteInput);
+                new ClusterSaveFileState(m_siteInput, m_allowELT);
         }
         catch (IOException e)
         {
@@ -148,7 +149,7 @@ public class TestClusterSaveFileState extends TestCase
         {
             @SuppressWarnings("unused")
             ClusterSaveFileState state =
-                new ClusterSaveFileState(m_siteInput);
+                new ClusterSaveFileState(m_siteInput, m_allowELT);
         }
         catch (IOException e)
         {
@@ -164,7 +165,7 @@ public class TestClusterSaveFileState extends TestCase
         {
             @SuppressWarnings("unused")
             ClusterSaveFileState state =
-                new ClusterSaveFileState(m_siteInput);
+                new ClusterSaveFileState(m_siteInput, m_allowELT);
         }
         catch (IOException e)
         {
@@ -227,4 +228,5 @@ public class TestClusterSaveFileState extends TestCase
     }
 
     private VoltTable m_siteInput;
+    final private int m_allowELT = 0;
 }

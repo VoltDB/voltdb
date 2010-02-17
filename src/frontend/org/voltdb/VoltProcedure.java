@@ -33,7 +33,6 @@ import java.util.Set;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.PlanFragment;
@@ -501,7 +500,7 @@ public abstract class VoltProcedure {
      * @throws VoltAbortException
      */
     public void voltLoadTable(String clusterName, String databaseName,
-                              String tableName, VoltTable data)
+                              String tableName, VoltTable data, int allowELT)
     throws VoltAbortException
     {
         if (data == null || data.getRowCount() == 0) return;
@@ -520,9 +519,11 @@ public abstract class VoltProcedure {
         }
         try
         {
-            m_site.ee.loadTable(table.getRelativeIndex(), data, m_site.getCurrentTxnId(),
+            m_site.ee.loadTable(table.getRelativeIndex(), data,
+                                m_site.getCurrentTxnId(),
                                 m_site.lastCommittedTxnId,
-                                m_site.getNextUndoToken());
+                                m_site.getNextUndoToken(),
+                                allowELT != 0);
         }
         catch (EEException e)
         {

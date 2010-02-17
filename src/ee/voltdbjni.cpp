@@ -234,7 +234,8 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadC
 */
 SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable
 (JNIEnv *env, jobject obj, jlong engine_ptr, jint table_id, jbyteArray serialized_table,
-        jlong txnId, jlong lastCommittedTxnId, jlong undoToken) {
+ jlong txnId, jlong lastCommittedTxnId, jlong undoToken, jboolean allowELT)
+{
     VoltDBEngine *engine = castToEngine(engine_ptr);
     if (engine == NULL) {
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
@@ -243,12 +244,15 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadT
     engine->setUndoToken(undoToken);
     VOLT_DEBUG("loading table %d in C++...", table_id);
 
+    // convert jboolean to bool
+    bool bAllowELT = (allowELT == JNI_FALSE ? false : true);
+
     // deserialize dependency.
     jsize length = env->GetArrayLength(serialized_table);
     VOLT_DEBUG("deserializing %d bytes ...", (int) length);
     jbyte *bytes = env->GetByteArrayElements(serialized_table, NULL);
     ReferenceSerializeInput serialize_in(bytes, length);
-    bool success = engine->loadTable(table_id, serialize_in, txnId, lastCommittedTxnId);
+    bool success = engine->loadTable(bAllowELT, table_id, serialize_in, txnId, lastCommittedTxnId);
     env->ReleaseByteArrayElements(serialized_table, bytes, JNI_ABORT);
     VOLT_DEBUG("deserialized table");
 

@@ -22,6 +22,7 @@ import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map.Entry;
+
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.voltdb.DependencyPair;
@@ -326,8 +327,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     abstract public VoltTable serializeTable(int tableId) throws EEException;
 
     abstract public void loadTable(
-            int tableId, VoltTable table, long txnId,
-            long lastCommittedTxnId, long undoToken) throws EEException;
+        int tableId, VoltTable table, long txnId,
+        long lastCommittedTxnId, long undoToken, boolean allowELT) throws EEException;
 
     /**
      * Set the log levels to be used when logging in this engine
@@ -442,7 +443,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param undoToken token for undo quantum where changes should be logged.
      */
     protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table,
-            long txnId, long lastCommittedTxnId, long undoToken);
+            long txnId, long lastCommittedTxnId, long undoToken, boolean allowELT);
 
     //Execution
 

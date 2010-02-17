@@ -23,7 +23,10 @@
 
 package org.voltdb.benchmark.tpcc.procedures;
 
-import org.voltdb.*;
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
 @ProcInfo (
     partitionInfo = "WAREHOUSE.W_ID: 0",
@@ -46,8 +49,9 @@ public class LoadWarehouseReplicated extends VoltProcedure {
             return null;
 
         // now we know the partition is not loaded yet
-        voltLoadTable("cluster", "database", "ITEM", items);
-        voltLoadTable("cluster", "database", "CUSTOMER_NAME", customerNames);
+        int allowELT = 0;
+        voltLoadTable("cluster", "database", "ITEM", items, allowELT);
+        voltLoadTable("cluster", "database", "CUSTOMER_NAME", customerNames, allowELT);
         return null;
     }
 

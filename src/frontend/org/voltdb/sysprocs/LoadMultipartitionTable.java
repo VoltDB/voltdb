@@ -76,13 +76,15 @@ public class LoadMultipartitionTable extends VoltSystemProcedure {
             assert params.toArray() != null;
             assert params.toArray()[0] != null;
             assert params.toArray()[1] != null;
+            assert params.toArray()[2] != null;
 
             try {
                 // voltLoadTable is void. Assume success or exception.
-                super.voltLoadTable(context.getCluster().getTypeName(), context
-                        .getDatabase().getTypeName(),
-                        (String) (params.toArray()[0]), (VoltTable) (params
-                                .toArray()[1]));
+                super.voltLoadTable(context.getCluster().getTypeName(),
+                                    context.getDatabase().getTypeName(),
+                                    (String) (params.toArray()[0]),
+                                    (VoltTable) (params.toArray()[1]),
+                                    (Integer) (params.toArray()[2]));
             } catch (VoltAbortException e) {
                 // must continue and reply with dependency.
                 e.printStackTrace();
@@ -97,7 +99,9 @@ public class LoadMultipartitionTable extends VoltSystemProcedure {
         return null;
     }
 
-    public VoltTable[] run(String tableName, VoltTable table) throws VoltAbortException {
+    public VoltTable[] run(String tableName, VoltTable table, int allowELT)
+    throws VoltAbortException
+    {
         VoltTable[] results;
         SynthesizedPlanFragment pfs[];
 
@@ -106,7 +110,6 @@ public class LoadMultipartitionTable extends VoltSystemProcedure {
         // split up the incoming table .. then send those partial
         // tables to the appropriate sites.
 
-        // TODO: hard-codes database name.
         Table catTable =
             m_cluster.getDatabases().get("database").getTables().getIgnoreCase(tableName);
         if (catTable == null) {
@@ -123,11 +126,11 @@ public class LoadMultipartitionTable extends VoltSystemProcedure {
             pfs[1].multipartition = true;
             pfs[1].nonExecSites = false;
             ParameterSet params = new ParameterSet();
-            params.setParameters(tableName, table);
+            params.setParameters(tableName, table, allowELT);
             pfs[1].parameters = params;
 
             // create a work unit to aggregate the results.
-            // MULTIPARTION_DEPENDENCY bit set, requiring result from ea. site
+            // MULTIPARTION_DEPENDENCY bit set, requiring result from each site
             pfs[0] = new SynthesizedPlanFragment();
             pfs[0].fragmentId = SysProcFragmentId.PF_aggregate;
             pfs[0].outputDepId = DEP_aggregate;
@@ -179,7 +182,7 @@ public class LoadMultipartitionTable extends VoltSystemProcedure {
                 ParameterSet params = new ParameterSet();
                 int site_id = Integer.valueOf(site.getTypeName());
                 int partition = VoltDB.instance().getSiteTracker().getPartitionForSite(site_id);
-                params.setParameters(tableName, partitionedTables[partition]);
+                params.setParameters(tableName, partitionedTables[partition], allowELT);
                 pfs[site_index] = new SynthesizedPlanFragment();
                 pfs[site_index].fragmentId = SysProcFragmentId.PF_distribute;
                 pfs[site_index].outputDepId = DEP_distribute;

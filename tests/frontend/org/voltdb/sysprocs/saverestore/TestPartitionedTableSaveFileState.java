@@ -26,12 +26,14 @@ package org.voltdb.sysprocs.saverestore;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
+
+import junit.framework.TestCase;
+
 import org.voltdb.VoltTable;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
 import org.voltdb.catalog.Table;
 import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.utils.Pair;
-import junit.framework.TestCase;
 
 
 public class TestPartitionedTableSaveFileState extends TestCase
@@ -43,7 +45,7 @@ public class TestPartitionedTableSaveFileState extends TestCase
     @Override
     public void setUp()
     {
-        m_state = new PartitionedTableSaveFileState(TABLE_NAME);
+        m_state = new PartitionedTableSaveFileState(TABLE_NAME, m_allowELT);
         m_siteInput =
             ClusterSaveFileState.constructEmptySaveFileStateVoltTable();
         m_catalogCreator =
@@ -431,4 +433,5 @@ public class TestPartitionedTableSaveFileState extends TestCase
     private PartitionedTableSaveFileState m_state;
     private VoltTable m_siteInput;
     private CatalogCreatorTestHelper m_catalogCreator;
+    private int m_allowELT = 0;
 }

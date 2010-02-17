@@ -76,7 +76,7 @@ class TempTable : public Table {
         // ------------------------------------------------------------------
         // OPERATIONS
         // ------------------------------------------------------------------
-        void loadTuplesFrom(SerializeInput &serialize_in, Pool *stringPool);
+        void loadTuplesFrom(bool allowELT, SerializeInput &serialize_in, Pool *stringPool);
         void deleteAllTuples(bool freeAllocatedStrings);
         bool insertTuple(TableTuple &source);
         bool updateTuple(TableTuple &source, TableTuple &target, bool updatesIndexes);

@@ -169,7 +169,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         * Load table data into a persistent table specified by the tableId parameter.
         * This must be called at most only once before any data is loaded in to the table.
         */
-        bool loadTable(int32_t tableId, ReferenceSerializeInput &serializeIn, int64_t txnId, int64_t lastCommittedTxnId);
+        bool loadTable(bool allowELT, int32_t tableId,
+                       ReferenceSerializeInput &serializeIn,
+                       int64_t txnId, int64_t lastCommittedTxnId);
 
         void resetReusedResultOutputBuffer(const size_t headerSize = 0);
         inline ReferenceSerializeOutput* getResultOutputSerializer() { return &m_resultOutput; }

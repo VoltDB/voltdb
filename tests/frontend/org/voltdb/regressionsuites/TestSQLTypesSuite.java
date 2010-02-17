@@ -193,7 +193,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
     // Interesting sets of values for the various types
 
     // tests rely on this ordering of the string varchar widths
-    public VoltType[] m_types = {
+    public static VoltType[] m_types = {
         VoltType.TINYINT,
         VoltType.SMALLINT,
         VoltType.INTEGER,
@@ -226,7 +226,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
 
     // the column names from the DDL used to dynamically create
     // sql select lists.
-    public String[] m_columnNames = {
+    public static String[] m_columnNames = {
             "A_TINYINT",
             "A_SMALLINT",
             "A_INTEGER",

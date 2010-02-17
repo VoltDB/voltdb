@@ -904,7 +904,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     @Override
     public void loadTable(final int tableId, final VoltTable table, final long txnId,
-            final long lastCommittedTxnId, final long undoToken) throws EEException {
+            final long lastCommittedTxnId, final long undoToken, boolean allowELT)
+        throws EEException
+    {
         // big endian, not direct
         final FastSerializer fser = new FastSerializer();
 
@@ -920,6 +922,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putLong(txnId);
         m_data.putLong(lastCommittedTxnId);
         m_data.putLong(undoToken);
+
+        if(allowELT)
+            m_data.putShort((short) 1);
+        else
+            m_data.putShort((short) 0);
+
         final ByteBuffer tableBytes = fser.getBuffer();
         if (m_data.remaining() < tableBytes.remaining()) {
             m_data.flip();

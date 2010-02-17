@@ -185,12 +185,16 @@ public:
      */
     bool serializeTupleTo(SerializeOutput &serialize_out, TableTuple *tuples, int numTuples);
     bool deserializeFrom(SerializeInput &serialize_in, Pool *stringPool);
+
     /**
      * Loads only tuple data, not schema, from the serialized table.
      * Used for initial data loading and receiving dependencies.
-     * @return true if loading succeded.
-    */
-    virtual void loadTuplesFrom(SerializeInput &serialize_in, Pool *stringPool = NULL) {
+     * @param allowELT if false, elt enabled is overriden for this load.
+     */
+    virtual void loadTuplesFrom(bool allowELT,
+                                SerializeInput &serialize_in,
+                                Pool *stringPool = NULL)
+    {
     }
 
     /**

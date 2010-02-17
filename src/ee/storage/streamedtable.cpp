@@ -115,7 +115,7 @@ bool StreamedTable::deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings)
     return true;
 }
 
-void StreamedTable::loadTuplesFrom(SerializeInput &serialize_in, Pool *stringPool)
+void StreamedTable::loadTuplesFrom(bool, SerializeInput&, Pool*)
 {
     VOLT_ERROR("May not update a streamed table.");
     throw std::exception();

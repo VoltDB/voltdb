@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
@@ -310,6 +311,67 @@ public class TestELTSuite extends RegressionSuite {
         quiesceAndVerify(client);
     }
 
+    private VoltTable createLoadTableTable(boolean addToVerifier) {
+        final LocalSingleProcessServerELT config =
+            (LocalSingleProcessServerELT)getServerConfig();
+
+        VoltTable loadTable = new VoltTable(new ColumnInfo("PKEY", VoltType.INTEGER),
+          new ColumnInfo(TestSQLTypesSuite.m_columnNames[0], TestSQLTypesSuite.m_types[0]),
+          new ColumnInfo(TestSQLTypesSuite.m_columnNames[1], TestSQLTypesSuite.m_types[1]),
+          new ColumnInfo(TestSQLTypesSuite.m_columnNames[2], TestSQLTypesSuite.m_types[2]),
+          new ColumnInfo(TestSQLTypesSuite.m_columnNames[3], TestSQLTypesSuite.m_types[3]),
+          new ColumnInfo(TestSQLTypesSuite.m_columnNames[4], TestSQLTypesSuite.m_types[4]),
+          new ColumnInfo(TestSQLTypesSuite.m_columnNames[5], TestSQLTypesSuite.m_types[5]),
+          new ColumnInfo(TestSQLTypesSuite.m_columnNames[6], TestSQLTypesSuite.m_types[6]),
+          new ColumnInfo(TestSQLTypesSuite.m_columnNames[7], TestSQLTypesSuite.m_types[7]),
+          new ColumnInfo(TestSQLTypesSuite.m_columnNames[8], TestSQLTypesSuite.m_types[8]),
+          new ColumnInfo(TestSQLTypesSuite.m_columnNames[9], TestSQLTypesSuite.m_types[9]),
+          new ColumnInfo(TestSQLTypesSuite.m_columnNames[10], TestSQLTypesSuite.m_types[10]));
+
+        for (int i=0; i < 100; i++) {
+            if (addToVerifier) {
+                config.addRow("ALLOW_NULLS", convertValsToRow(i, TestSQLTypesSuite.m_midValues));
+            }
+            loadTable.addRow(convertValsToRow(i, TestSQLTypesSuite.m_midValues));
+        }
+        return loadTable;
+    }
+
+    /*
+     * Verify that allowELT = no is obeyed for @LoadMultipartitionTable
+     */
+    public void testLoadMultiPartitionTableELTOff() throws IOException, ProcCallException
+    {
+        // allow ELT is off. no rows added to the verifier
+        VoltTable loadTable = createLoadTableTable(false);
+        Client client = getClient();
+        client.callProcedure("@LoadMultipartitionTable", "ALLOW_NULLS", loadTable, 0);
+        quiesceAndVerify(client);
+    }
+
+    /*
+     * Verify that allowELT = yes is obeyed for @LoadMultipartitionTable
+     */
+    public void testLoadMultiPartitionTableELTOn() throws IOException, ProcCallException
+    {
+        // allow ELT is on. rows added to the verifier
+        VoltTable loadTable = createLoadTableTable(true);
+        Client client = getClient();
+        client.callProcedure("@LoadMultipartitionTable", "ALLOW_NULLS", loadTable, 1);
+        quiesceAndVerify(client);
+    }
+
+    /*
+     * Verify that allowELT = yes is obeyed for @LoadMultipartitionTable
+     */
+    public void testLoadMultiPartitionTableELTOn2() throws IOException, ProcCallException
+    {
+        // allow ELT is on but table is not opted in to ELT.
+        VoltTable loadTable = createLoadTableTable(false);
+        Client client = getClient();
+        client.callProcedure("@LoadMultipartitionTable", "NO_NULLS", loadTable, 1);
+        quiesceAndVerify(client);
+    }
 
     /*
      * Verify that planner rejects updates to append-only tables
@@ -361,7 +423,6 @@ public class TestELTSuite extends RegressionSuite {
         }
         assertTrue(passed);
     }
-
 
 
     /*

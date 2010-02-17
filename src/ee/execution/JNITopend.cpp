@@ -111,7 +111,7 @@ int JNITopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
     if (length > 0) {
         jbyte *bytes = m_jniEnv->GetByteArrayElements(jbuf, NULL);
         ReferenceSerializeInput serialize_in(bytes, length);
-        destination->loadTuplesFrom(serialize_in, stringPool);
+        destination->loadTuplesFrom(true, serialize_in, stringPool);
         return 1;
     }
     else {

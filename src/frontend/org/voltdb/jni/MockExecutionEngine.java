@@ -66,7 +66,10 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void loadTable(final int tableId, final VoltTable table, final long txnId, final long lastCommittedTxnId, final long undoToken) throws EEException {
+    public void loadTable(final int tableId, final VoltTable table, final long txnId,
+        final long lastCommittedTxnId, final long undoToken, final boolean allowELT)
+    throws EEException
+    {
         // TODO Auto-generated method stub
     }
 

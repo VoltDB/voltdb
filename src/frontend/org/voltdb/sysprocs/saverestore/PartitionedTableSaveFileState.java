@@ -18,14 +18,15 @@
 package org.voltdb.sysprocs.saverestore;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.List;
-import java.util.ArrayList;
 import java.util.TreeSet;
-import java.util.Iterator;
+
 import org.apache.log4j.Logger;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltTableRow;
@@ -34,8 +35,8 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
 import org.voltdb.sysprocs.SysProcFragmentId;
-import org.voltdb.utils.VoltLoggerFactory;
 import org.voltdb.utils.Pair;
+import org.voltdb.utils.VoltLoggerFactory;
 
 
 
@@ -45,9 +46,9 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
         Logger.getLogger(PartitionedTableSaveFileState.class.getName(),
                          VoltLoggerFactory.instance());
 
-    public PartitionedTableSaveFileState(String tableName)
+    public PartitionedTableSaveFileState(String tableName, int allowELT)
     {
-        super(tableName);
+        super(tableName, allowELT);
     }
 
     @Override
@@ -210,7 +211,11 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
         plan_fragment.inputDepIds = new int[] {};
         addPlanDependencyId(result_dependency_id);
         ParameterSet params = new ParameterSet();
-        params.setParameters(getTableName(), originalHostsArray, uncoveredPartitionsAtHost, result_dependency_id);
+        params.setParameters(getTableName(),
+                             originalHostsArray,
+                             uncoveredPartitionsAtHost,
+                             result_dependency_id,
+                             m_allowELT);
         plan_fragment.parameters = params;
         return plan_fragment;
     }

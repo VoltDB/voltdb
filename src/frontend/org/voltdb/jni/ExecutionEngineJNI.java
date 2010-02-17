@@ -345,7 +345,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * Wrapper for {@link #nativeLoadTable(long, int, byte[], long, long, long)}.
      */
     @Override
-    public void loadTable(final int tableId, final VoltTable table, final long txnId, final long lastCommittedTxnId, final long undoToken) throws EEException {
+    public void loadTable(final int tableId, final VoltTable table,
+        final long txnId, final long lastCommittedTxnId,
+        final long undoToken, boolean allowELT) throws EEException
+    {
         if (LOG.isTraceEnabled()) {
             LOG.trace("loading table id=" + tableId + "...");
         }
@@ -355,14 +358,15 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             fs.writeObject(table);
             serialized_table = fs.getBytes();
         } catch (final IOException exception) {
-            throw new RuntimeException(exception); // can't happen
+            throw new RuntimeException(exception);
         }
         if (LOG.isTraceEnabled()) {
             LOG.trace("passing " + serialized_table.length + " bytes to EE...");
         }
 
-        // TODO(evanj): Pass this via a direct ByteBuffer? agree. it's better, hideaki.
-        final int errorCode = nativeLoadTable(pointer, tableId, serialized_table, txnId, lastCommittedTxnId, undoToken);
+        final int errorCode = nativeLoadTable(pointer, tableId, serialized_table,
+                                              txnId, lastCommittedTxnId,
+                                              undoToken, allowELT);
         checkErrorCode(errorCode);
     }
 

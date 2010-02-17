@@ -49,9 +49,9 @@
  */
 package org.voltdb.benchmark.tpcc.procedures;
 
-import org.voltdb.VoltTable;
 import org.voltdb.ProcInfo;
 import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
 @ProcInfo (
     partitionInfo = "WAREHOUSE.W_ID: 0",
@@ -65,15 +65,15 @@ public class LoadWarehouse extends VoltProcedure {
     public VoltTable[] run(long w_id, VoltTable warehouses, VoltTable districts, VoltTable customers,
         VoltTable stocks, VoltTable orders, VoltTable neworders, VoltTable orderLines, VoltTable histories)
     throws VoltAbortException {
-
-        voltLoadTable("cluster", "database", "WAREHOUSE", warehouses);
-        voltLoadTable("cluster", "database", "DISTRICT", districts);
-        voltLoadTable("cluster", "database", "CUSTOMER", customers);
-        voltLoadTable("cluster", "database", "STOCK", stocks);
-        voltLoadTable("cluster", "database", "ORDERS", orders);
-        voltLoadTable("cluster", "database", "NEW_ORDER", neworders);
-        voltLoadTable("cluster", "database", "ORDER_LINE", orderLines);
-        voltLoadTable("cluster", "database", "HISTORY", histories);
+        final int allowELT = 0;
+        voltLoadTable("cluster", "database", "WAREHOUSE", warehouses, allowELT);
+        voltLoadTable("cluster", "database", "DISTRICT", districts, allowELT);
+        voltLoadTable("cluster", "database", "CUSTOMER", customers, allowELT);
+        voltLoadTable("cluster", "database", "STOCK", stocks, allowELT);
+        voltLoadTable("cluster", "database", "ORDERS", orders, allowELT);
+        voltLoadTable("cluster", "database", "NEW_ORDER", neworders, allowELT);
+        voltLoadTable("cluster", "database", "ORDER_LINE", orderLines, allowELT);
+        voltLoadTable("cluster", "database", "HISTORY", histories, allowELT);
         return null;
     }
 }

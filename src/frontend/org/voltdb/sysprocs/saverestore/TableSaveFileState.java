@@ -18,11 +18,12 @@
 package org.voltdb.sysprocs.saverestore;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Set;
 import java.util.List;
-import java.util.ArrayList;
+import java.util.Set;
+
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
 import org.voltdb.catalog.CatalogMap;
@@ -56,10 +57,11 @@ public abstract class TableSaveFileState
         return exec_sites;
     }
 
-    TableSaveFileState(String tableName)
+    TableSaveFileState(String tableName, int allowELT)
     {
         m_tableName = tableName;
         m_planDependencyIds = new HashSet<Integer>();
+        m_allowELT = allowELT;
     }
 
     abstract public SynthesizedPlanFragment[]
@@ -122,5 +124,6 @@ public abstract class TableSaveFileState
 
     private String m_tableName;
     private Set<Integer> m_planDependencyIds;
+    final int m_allowELT;
     int m_rootDependencyId;
 }

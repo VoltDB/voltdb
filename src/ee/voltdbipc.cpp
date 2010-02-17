@@ -106,6 +106,7 @@ typedef struct {
     int64_t txnId;
     int64_t lastCommittedTxnId;
     int64_t undoToken;
+    int16_t  allowELT;
     char data[0];
 }__attribute__((packed)) load_table_cmd;
 
@@ -562,20 +563,23 @@ void VoltDBIPC::executeCustomPlanFragmentAndGetResults(struct ipc_command *cmd) 
 int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
     load_table_cmd *loadTableCommand = (load_table_cmd*) cmd;
 
-    if (0)
-        std::cout << "loadTable:" << " tableId=" << ntohl(loadTableCommand->tableId) << " txnId=" << ntohll(loadTableCommand->txnId) << " lastCommitted="
+    if (0) {
+        std::cout << "loadTable:" << " tableId=" << ntohl(loadTableCommand->tableId)
+                  << " txnId=" << ntohll(loadTableCommand->txnId) << " lastCommitted="
                   << ntohll(loadTableCommand->lastCommittedTxnId) << std::endl;
+    }
 
     const int32_t tableId = ntohl(loadTableCommand->tableId);
     const int64_t txnId = ntohll(loadTableCommand->txnId);
     const int64_t lastCommittedTxnId = ntohll(loadTableCommand->lastCommittedTxnId);
     const int64_t undoToken = ntohll(loadTableCommand->undoToken);
+    const bool    allowELT = (loadTableCommand->allowELT != 0);
     // ...and fast serialized table last.
     void* offset = loadTableCommand->data;
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(load_table_cmd));
     ReferenceSerializeInput serialize_in(offset, sz);
     m_engine->setUndoToken(undoToken);
-    bool success = m_engine->loadTable(tableId, serialize_in, txnId, lastCommittedTxnId);
+    bool success = m_engine->loadTable(allowELT, tableId, serialize_in, txnId, lastCommittedTxnId);
     if (success) {
         return kErrorCode_Success;
     } else {

@@ -183,7 +183,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     public void testLoadMulipartitionTable_InvalidTableName() throws IOException, ProcCallException {
         Client client = getClient();
         try {
-            client.callProcedure("@LoadMultipartitionTable", "DOES_NOT_EXIST", null);
+            client.callProcedure("@LoadMultipartitionTable", "DOES_NOT_EXIST", null, 1);
         } catch (ProcCallException ex) {
             assertTrue(true);
             return;
@@ -239,9 +239,9 @@ public class TestSystemProcedureSuite extends RegressionSuite {
 
         try {
             client.callProcedure("@LoadMultipartitionTable", "WAREHOUSE",
-                                 partitioned_table);
+                                 partitioned_table, 1);
             client.callProcedure("@LoadMultipartitionTable", "ITEM",
-                                 replicated_table);
+                                 replicated_table, 1);
             VoltTable results[] = client.callProcedure("@Statistics", "table");
 
             int foundItem = 0;

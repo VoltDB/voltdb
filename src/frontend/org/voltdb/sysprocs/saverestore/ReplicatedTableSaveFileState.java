@@ -18,10 +18,11 @@
 package org.voltdb.sysprocs.saverestore;
 
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.HashMap;
-import java.util.Set;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
@@ -32,9 +33,9 @@ import org.voltdb.sysprocs.SysProcFragmentId;
 
 public class ReplicatedTableSaveFileState extends TableSaveFileState
 {
-    ReplicatedTableSaveFileState(String tableName)
+    ReplicatedTableSaveFileState(String tableName, int allowELT)
     {
-        super(tableName);
+        super(tableName, allowELT);
     }
 
     @Override
@@ -154,7 +155,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         plan_fragment.inputDepIds = new int[] {};
         addPlanDependencyId(result_dependency_id);
         ParameterSet params = new ParameterSet();
-        params.setParameters(getTableName(), result_dependency_id);
+        params.setParameters(getTableName(), result_dependency_id, m_allowELT);
         plan_fragment.parameters = params;
         return plan_fragment;
     }
@@ -174,7 +175,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         addPlanDependencyId(result_dependency_id);
         ParameterSet params = new ParameterSet();
         params.setParameters(getTableName(), destinationSiteId,
-                             result_dependency_id);
+                             result_dependency_id, m_allowELT);
         plan_fragment.parameters = params;
         return plan_fragment;
     }

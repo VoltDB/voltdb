@@ -548,7 +548,7 @@ bool VoltDBEngine::loadCatalog(const std::string &catalogPayload) {
     return true;
 }
 
-bool VoltDBEngine::loadTable(int32_t tableId,
+bool VoltDBEngine::loadTable(bool allowELT, int32_t tableId,
                              ReferenceSerializeInput &serializeIn,
                              int64_t txnId, int64_t lastCommittedTxnId)
 {
@@ -568,7 +568,7 @@ bool VoltDBEngine::loadTable(int32_t tableId,
         return false;
     }
 
-    table->loadTuplesFrom(serializeIn);
+    table->loadTuplesFrom(allowELT, serializeIn);
     return true;
 }
 

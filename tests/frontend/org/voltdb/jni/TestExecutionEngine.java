@@ -23,13 +23,14 @@
 
 package org.voltdb.jni;
 
-import org.voltdb.VoltDB;
+import junit.framework.TestCase;
+
 import org.voltdb.SysProcSelector;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.LoadCatalogToString;
-import junit.framework.TestCase;
 
 /**
  * Tests native execution engine JNI interface.
@@ -48,6 +49,7 @@ public class TestExecutionEngine extends TestCase {
 
     private void loadTestTables(Catalog catalog) throws Exception
     {
+        final boolean allowELT = false;
         int WAREHOUSE_TABLEID = catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("WAREHOUSE").getRelativeIndex();
         int STOCK_TABLEID = catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("STOCK").getRelativeIndex();
 
@@ -60,8 +62,7 @@ public class TestExecutionEngine extends TestCase {
         }
 
         System.out.println(warehousedata.toString());
-
-        engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, Long.MAX_VALUE);
+        engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, Long.MAX_VALUE, allowELT);
 
         VoltTable stockdata = new VoltTable(
                 new VoltTable.ColumnInfo("S_I_ID", VoltType.INTEGER),
@@ -71,7 +72,7 @@ public class TestExecutionEngine extends TestCase {
         for (int i = 0; i < 1000; ++i) {
             stockdata.addRow(i, i % 200, i * i);
         }
-        engine.loadTable(STOCK_TABLEID, stockdata, 0, 0, Long.MAX_VALUE);
+        engine.loadTable(STOCK_TABLEID, stockdata, 0, 0, Long.MAX_VALUE, allowELT);
     }
 
     public void testLoadTable() throws Exception {

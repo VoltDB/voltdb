@@ -26,14 +26,20 @@ package org.voltdb.regressionsuites;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
+
 import junit.framework.Test;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTable.ColumnInfo;
-import org.voltdb.VoltTableRow;
-import org.voltdb.catalog.*;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Site;
+import org.voltdb.catalog.Table;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.regressionsuites.saverestore.CatalogChangeSingleProcessServer;
@@ -46,6 +52,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
     private static final String TMPDIR = "/tmp";
     private static final String TESTNONCE = "testnonce";
+    private static final int ALLOWELT = 0;
 
     public TestSaveRestoreSysprocSuite(String name) {
         super(name);
@@ -126,10 +133,11 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                                   VoltTable table)
     {
         VoltTable[] results = null;
+        int allowELT = 0;
         try
         {
             client.callProcedure("@LoadMultipartitionTable", tableName,
-                                 table);
+                                 table, allowELT);
         }
         catch (Exception ex)
         {
@@ -321,7 +329,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
         try
         {
-            client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE);
+            client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT);
         }
         catch (Exception ex)
         {
@@ -370,7 +378,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         try
         {
             results = client.callProcedure("@SnapshotRestore", TMPDIR,
-                                           TESTNONCE);
+                                           TESTNONCE, ALLOWELT);
         }
         catch (Exception ex)
         {
@@ -423,7 +431,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         client = getClient();
 
         try {
-            client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE);
+            client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT);
         }
         catch (Exception e) {
             assertTrue(e.getMessage().contains("No savefile state to restore"));
@@ -502,7 +510,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         try
         {
             results = client.callProcedure("@SnapshotRestore", TMPDIR,
-                                           TESTNONCE);
+                                           TESTNONCE, ALLOWELT);
             // XXX Should check previous results for success but meh for now
         }
         catch (Exception ex)
@@ -582,7 +590,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         try
         {
             results = client.callProcedure("@SnapshotRestore", TMPDIR,
-                                           TESTNONCE);
+                                           TESTNONCE, ALLOWELT);
         }
         catch (Exception ex)
         {
@@ -666,7 +674,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         try
         {
             client.callProcedure("@SnapshotRestore", TMPDIR,
-                                           TESTNONCE);
+                                           TESTNONCE, ALLOWELT);
         }
         catch (Exception ex)
         {
@@ -734,7 +742,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         try
         {
             results = client.callProcedure("@SnapshotRestore", TMPDIR,
-                                           TESTNONCE);
+                                           TESTNONCE, ALLOWELT);
         }
         catch (Exception ex)
         {

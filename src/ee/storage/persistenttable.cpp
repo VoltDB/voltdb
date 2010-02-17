@@ -645,8 +645,10 @@ void PersistentTable::onSetColumns() {
     }
 }
 
-void PersistentTable::loadTuplesFrom(SerializeInput &serialize_io, Pool *stringPool) {
-
+void PersistentTable::loadTuplesFrom(bool allowELT,
+                                     SerializeInput &serialize_io,
+                                     Pool *stringPool)
+{
     serialize_io.readInt();
     serialize_io.readShort();
 
@@ -685,7 +687,7 @@ void PersistentTable::loadTuplesFrom(SerializeInput &serialize_io, Pool *stringP
         }
 
         // if EL is enabled, append the tuple to the buffer
-        if (m_exportEnabled) {
+        if (allowELT && m_exportEnabled) {
             appendToELBuffer(m_tmpTarget1, tsSeqNo++, TupleStreamWrapper::INSERT);
         }
     }

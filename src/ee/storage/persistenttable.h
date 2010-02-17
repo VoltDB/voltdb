@@ -171,7 +171,7 @@ public:
     // ------------------------------------------------------------------
     std::string tableType() const;
     virtual std::string debug();
-    void loadTuplesFrom(SerializeInput &serialize_in, Pool *stringPool = NULL);
+    void loadTuplesFrom(bool allowELT, SerializeInput &serialize_in, Pool *stringPool = NULL);
 
     int partitionColumn() { return m_partitionColumn; }
 
