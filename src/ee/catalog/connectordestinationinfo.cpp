@@ -30,13 +30,13 @@ ConnectorDestinationInfo::ConnectorDestinationInfo(Catalog *catalog, CatalogType
 : CatalogType(catalog, parent, path, name)
 {
     CatalogValue value;
-    m_fields["ipaddr"] = value;
+    m_fields["url"] = value;
     m_fields["username"] = value;
     m_fields["password"] = value;
 }
 
 void ConnectorDestinationInfo::update() {
-    m_ipaddr = m_fields["ipaddr"].strValue.c_str();
+    m_url = m_fields["url"].strValue.c_str();
     m_username = m_fields["username"].strValue.c_str();
     m_password = m_fields["password"].strValue.c_str();
 }
@@ -54,8 +54,8 @@ void ConnectorDestinationInfo::removeChild(const std::string &collectionName, co
     assert (m_childCollections.find(collectionName) != m_childCollections.end());
 }
 
-const string & ConnectorDestinationInfo::ipaddr() const {
-    return m_ipaddr;
+const string & ConnectorDestinationInfo::url() const {
+    return m_url;
 }
 
 const string & ConnectorDestinationInfo::username() const {

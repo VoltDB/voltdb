@@ -142,7 +142,7 @@ public class ELTManager implements SysManageable {
             return;
         }
 
-        String hostStr = dest.getIpaddr();
+        String urlStr = dest.getUrl();
         final String elloader = conn.getLoaderclass();
         String elusername = dest.getUsername();
         String elpassword = dest.getPassword();
@@ -157,8 +157,8 @@ public class ELTManager implements SysManageable {
             m_loader = (ELTDataProcessor)loaderClass.newInstance();
             m_loader.addLogger(eltLog);
 
-            eltLog.info("Adding host " + hostStr + " port " + "5433");
-            m_loader.addHost(hostStr, "5433", "database", elusername, elpassword);
+            eltLog.info("Adding destination: " + urlStr);
+            m_loader.addHost(urlStr, "database", elusername, elpassword);
             for (final Table table : tables) {
                 m_loader.addTable("database",
                                   table.getTypeName(),

@@ -47,27 +47,23 @@ import org.hsqldb.HSQLInterface;
 import org.voltdb.ProcInfo;
 import org.voltdb.ProcInfoData;
 import org.voltdb.TransactionIdManager;
-import org.voltdb.VoltDB;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
-import org.voltdb.catalog.Host;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.Site;
-import org.voltdb.catalog.Table;
 import org.voltdb.catalog.SnapshotSchedule;
-import org.voltdb.compiler.projectfile.SnapshotType;
+import org.voltdb.catalog.Table;
 import org.voltdb.compiler.projectfile.DatabaseType;
 import org.voltdb.compiler.projectfile.GroupsType;
 import org.voltdb.compiler.projectfile.ProceduresType;
 import org.voltdb.compiler.projectfile.ProjectType;
 import org.voltdb.compiler.projectfile.SchemasType;
 import org.voltdb.compiler.projectfile.SecurityType;
+import org.voltdb.compiler.projectfile.SnapshotType;
 import org.voltdb.compiler.projectfile.UsersType;
 import org.voltdb.compiler.projectfile.ClassdependenciesType.Classdependency;
 import org.voltdb.compiler.projectfile.ExportsType.Connector;
@@ -851,10 +847,10 @@ public class VoltCompiler {
             return;
         }
 
-        if (dest.getAddress() == null || dest.getAddress().length() <= 1) {
+        if (dest.getUrl() == null || dest.getUrl().length() <= 1) {
             throw new VoltCompilerException
             ("In parsing project file: export destination address" +
-            " must be a valid hostname or IP address.");
+            " must be a valid URL.");
         }
 
         // Figure out if the connector is enabled or disabled
@@ -881,7 +877,7 @@ public class VoltCompiler {
 
         // Catalog Connector.ConnectorDestinationInfo
         org.voltdb.catalog.ConnectorDestinationInfo catdest = catconn.getDestinfo().add("0");
-        catdest.setIpaddr(dest.getAddress());
+        catdest.setUrl(dest.getUrl());
         catdest.setUsername(dest.getUsername());
         catdest.setPassword(dest.getPassword());
 

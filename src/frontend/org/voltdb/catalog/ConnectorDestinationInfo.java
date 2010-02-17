@@ -23,26 +23,26 @@ package org.voltdb.catalog;
 
 public class ConnectorDestinationInfo extends CatalogType {
 
-    String m_ipaddr = new String();
+    String m_url = new String();
     String m_username = new String();
     String m_password = new String();
 
     void setBaseValues(Catalog catalog, CatalogType parent, String path, String name) {
         super.setBaseValues(catalog, parent, path, name);
-        m_fields.put("ipaddr", m_ipaddr);
+        m_fields.put("url", m_url);
         m_fields.put("username", m_username);
         m_fields.put("password", m_password);
     }
 
     void update() {
-        m_ipaddr = (String) m_fields.get("ipaddr");
+        m_url = (String) m_fields.get("url");
         m_username = (String) m_fields.get("username");
         m_password = (String) m_fields.get("password");
     }
 
-    /** GETTER: The IP address or hostname */
-    public String getIpaddr() {
-        return m_ipaddr;
+    /** GETTER: The protocol and address of the destination */
+    public String getUrl() {
+        return m_url;
     }
 
     /** GETTER: Authentication name */
@@ -54,9 +54,9 @@ public class ConnectorDestinationInfo extends CatalogType {
         return m_password;
     }
 
-    /** SETTER: The IP address or hostname */
-    public void setIpaddr(String value) {
-        m_ipaddr = value; m_fields.put("ipaddr", value);
+    /** SETTER: The protocol and address of the destination */
+    public void setUrl(String value) {
+        m_url = value; m_fields.put("url", value);
     }
 
     /** SETTER: Authentication name */

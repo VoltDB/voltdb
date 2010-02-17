@@ -43,7 +43,7 @@ begin ConnectorTableInfo      "Per-export connector table configuration"
 end
 
 begin ConnectorDestinationInfo
-  string ipaddr                 "The IP address or hostname"
+  string url                    "The protocol and address of the destination"
   string username               "Authentication name"
   string password
 end

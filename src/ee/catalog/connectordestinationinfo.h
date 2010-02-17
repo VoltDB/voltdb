@@ -35,7 +35,7 @@ class ConnectorDestinationInfo : public CatalogType {
 protected:
     ConnectorDestinationInfo(Catalog * catalog, CatalogType * parent, const std::string &path, const std::string &name);
 
-    std::string m_ipaddr;
+    std::string m_url;
     std::string m_username;
     std::string m_password;
 
@@ -46,8 +46,8 @@ protected:
     virtual void removeChild(const std::string &collectionName, const std::string &childName);
 
 public:
-    /** GETTER: The IP address or hostname */
-    const std::string & ipaddr() const;
+    /** GETTER: The protocol and address of the destination */
+    const std::string & url() const;
     /** GETTER: Authentication name */
     const std::string & username() const;
     const std::string & password() const;

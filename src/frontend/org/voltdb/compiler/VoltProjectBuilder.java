@@ -179,7 +179,7 @@ public class VoltProjectBuilder {
     final LinkedHashMap<String, String> m_partitionInfos = new LinkedHashMap<String, String>();
 
     String m_elloader = "org.voltdb.VerticaLoader";
-    String m_elhost = null;
+    String m_elurl = null;
     // private int m_elport;
     private String m_elusername;
     private String m_elpassword;
@@ -327,11 +327,10 @@ public class VoltProjectBuilder {
     }
 
     public void addELT(final String username, final String password,
-        final String loader, final String host, final int port, boolean enabled)
+        final String loader, final String url, boolean enabled)
     {
         m_elloader = loader;
-        m_elhost = host;
-        // m_elport = port;
+        m_elurl = url;
         m_elusername = username;
         m_elpassword = password;
         m_elenabled = enabled;
@@ -626,7 +625,7 @@ public class VoltProjectBuilder {
         }
 
         // project/database/exports
-        if ((m_elhost != null) && (m_elhost.length() > 0)) {
+        if ((m_elurl != null) && (m_elurl.length() > 0)) {
             final Element exports = doc.createElement("exports");
             database.appendChild(exports);
 
@@ -638,12 +637,12 @@ public class VoltProjectBuilder {
             final Element dests = doc.createElement("destinations");
             conn.appendChild(dests);
 
-            final String[] hosts = m_elhost.split("\\s+");
+            final String[] hosts = m_elurl.split("\\s+");
             for (int i=0; i < hosts.length; ++i) {
                 final Element dest = doc.createElement("destination");
                 dest.setAttribute("username", m_elusername);
                 dest.setAttribute("password", m_elpassword);
-                dest.setAttribute("address", hosts[i]);
+                dest.setAttribute("url", hosts[i]);
                 dests.appendChild(dest);
             }
 

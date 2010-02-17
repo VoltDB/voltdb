@@ -174,8 +174,8 @@
                   <!-- <destination> -->
                   <xsd:element name="destination" minOccurs="1" maxOccurs="1">
                     <xsd:complexType>
-                      <xsd:attribute name="address" type="xsd:string" use="required"/>
-                      <xsd:attribute name="username" type="xsd:string" use="required"/>
+                      <xsd:attribute name="url" type="xsd:string" use="required"/>
+                      <xsd:attribute name="username" type="xsd:string"/>
                       <xsd:attribute name="password" type="xsd:string"/>
                     </xsd:complexType>
                   </xsd:element>

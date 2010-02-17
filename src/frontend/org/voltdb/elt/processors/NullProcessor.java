@@ -42,10 +42,9 @@ public class NullProcessor implements ELTDataProcessor, Runnable, BlockingQueue<
     private Logger m_logger;
 
     @Override
-    public void addHost(final String host, final String port, final String database,
-            final String username, final String password) {
-        // TODO Auto-generated method stub
-
+    public void addHost(final String url, final String database,
+        final String username, final String password)
+    {
     }
 
     @Override

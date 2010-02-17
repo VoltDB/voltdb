@@ -147,7 +147,7 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
      *  Open a socket to the specified destination.
      */
     @Override
-    public void addHost(final String host, final String port, final String database,
+    public void addHost(final String url, final String database,
             final String username, final String password)
     {
         SocketAddress sockaddr;
@@ -161,12 +161,20 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
             return;
         }
 
+        // URL in this case is just host:port
+        String hostport[] = url.split(":");
+        if (hostport.length != 2) {
+            m_logger.error("RawProcessor URL must be formatted host:port");
+        }
+        String host = hostport[0];
+        String port = hostport[1];
+
         do {
             try {
-                sockaddr = new InetSocketAddress(InetAddress.getLocalHost(), 5443);
+                sockaddr = new InetSocketAddress(InetAddress.getLocalHost(), Integer.parseInt(port));
                 socket = SocketChannel.open(sockaddr);
                 m_connection = VoltDB.instance().getNetwork().registerChannel(socket, new NetworkHandler());
-                m_logger.info("Connected to host " + host + ":" + port);
+                m_logger.info("Connected to destination " + url);
                 connected = true;
 
             } catch (final NumberFormatException e) {

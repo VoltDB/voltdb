@@ -391,7 +391,7 @@ public class TestELTSuite extends RegressionSuite {
         // and the exportable tables (name, export-only)
         project.addELT("username", "password",
                        "org.voltdb.elt.processors.RawProcessor",
-                       "localhost", 5443, true /*enabled*/);
+                       "localhost:5443", true /*enabled*/);
         // project.addELTTable("NO_NULLS", false);   // non-elt'd persistent table
         project.addELTTable("ALLOW_NULLS", false);   // persistent table
         project.addELTTable("WITH_DEFAULTS", true);  // streamed table

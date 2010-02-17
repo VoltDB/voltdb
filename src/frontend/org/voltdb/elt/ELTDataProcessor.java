@@ -48,9 +48,8 @@ public interface ELTDataProcessor  {
      *  @param port number of destination.
      *  @param database name being connected to.
      *  @param username configured username from project.xml
-     *  @param password configured password from project.xml
      */
-    void addHost(String host, String port, String database,
+    void addHost(String url, String database,
                 String username, String password);
 
     /** Pass the loader each table in each database.
