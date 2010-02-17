@@ -89,7 +89,9 @@ def genjava( classes, prepath, postpath, package ):
         write('package', package + ';\n')
 
         if cls.has_comment():
-            write('/**\n *', cls.comment + '\n */')
+            write('/**\n *', cls.comment)
+            write(' */')
+
         write( interp( 'public class $clsname extends CatalogType {\n', locals() ) )
 
         # fields
@@ -108,7 +110,7 @@ def genjava( classes, prepath, postpath, package ):
 
         # setBaseValues
         write( '    void setBaseValues(Catalog catalog, CatalogType parent, String path, String name) {' )
-        write( '        super.setBaseValues(catalog, parent, path, name);' )
+        write( '        super.setBaseValues(catalog, parent, path, name);')
         for field in cls.fields:
             ftype = javatypify( field.type )
             fname = field.name
@@ -229,8 +231,9 @@ def gencpp( classes, prepath, postpath ):
         write (gpl_header)
         write (auto_gen_warning)
         pp_unique_str = "CATALOG_" + clsname.upper() + "_H_"
-        write("#ifndef", pp_unique_str);
-        write("#define", pp_unique_str + '\n');
+        write("#ifndef ", pp_unique_str);
+        write("#define ", pp_unique_str);
+        write("")
 
         write('#include <string>')
         write('#include "catalogtype.h"')
@@ -241,7 +244,9 @@ def gencpp( classes, prepath, postpath ):
             write("class " + classType + ";")
 
         if cls.has_comment():
-            write('/**\n *', cls.comment + '\n */')
+            write('/**\n *', cls.comment)
+            write(' */')
+
         write( interp( 'class $clsname : public CatalogType {', locals() ) )
         write( '    friend class Catalog;' )
         write( interp( '    friend class CatalogMap<$clsname>;', locals() ) )
@@ -323,7 +328,8 @@ def gencpp( classes, prepath, postpath ):
         write ( interp( '$clsname::$clsname(Catalog *catalog, CatalogType *parent, const string &path, const string &name)', locals() ) )
         comma = ''
         if len(mapcons): comma = ','
-        write ( interp( ': CatalogType(catalog, parent, path, name)$comma', locals() ) )
+        write ( interp( ': CatalogType(catalog, parent, path, name)$comma', locals()))
+
         mapcons = ["m_%s(catalog, this, path + \"/\" + \"%s\")" % (field.name, field.name) for field in cls.fields if field.type[-1] == '*']
         if len(mapcons) > 0:
             write( "  " + ", ".join(mapcons))
