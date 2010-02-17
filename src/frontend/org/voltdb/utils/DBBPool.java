@@ -480,7 +480,7 @@ public final class DBBPool {
      * @return Native address of the buffer as a long.
      */
     public static native long getBufferAddress( ByteBuffer b );
-    
+
     /**
      * Retrieve the CRC32 value of a DirectByteBuffer as a long
      * @param b Buffer you want to retrieve the CRC32 of

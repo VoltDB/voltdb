@@ -87,7 +87,7 @@ public class TableSaveFile
         m_saveFile = dataIn;
 
         final CRC32 crc = new CRC32();
-        
+
         /*
          * Get the header with the save restore specific information
          */
@@ -102,7 +102,7 @@ public class TableSaveFile
         final int originalCRC = lengthBuffer.getInt();
         int length = lengthBuffer.getInt();
         crc.update(lengthBuffer.array(), 4, 4);
-        
+
 
         final ByteBuffer saveRestoreHeader = ByteBuffer.allocate(length);
         while (saveRestoreHeader.hasRemaining()) {
@@ -165,7 +165,7 @@ public class TableSaveFile
             }
         }
         crc.update(m_tableHeader.array(), 2, length - 2);
-        
+
         final int actualCRC = (int)crc.getValue();
         if (originalCRC != actualCRC) {
             throw new IOException("Checksum mismatch");
@@ -391,7 +391,7 @@ public class TableSaveFile
                     if (calculatedCRC != nextChunkCRC) {
                         throw new IOException("CRC mismatch in saved table chunk");
                     }
-                    
+
                     c.b.limit(c.b.limit() - 4);
                     c.b.position(checksumStartPosition);
                     c.b.putInt(rowCount);

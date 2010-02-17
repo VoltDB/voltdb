@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2009 VoltDB L.L.C.
+ * Copyright (C) 2008-2010 VoltDB L.L.C.
  *
  * VoltDB is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -78,7 +78,7 @@ public class SnapshotSave extends VoltSystemProcedure
         SysProcFragmentId.PF_saveTables | DtxnConstants.MULTIPARTITION_DEPENDENCY;
     private static final int DEP_saveTablesResults = (int)
         SysProcFragmentId.PF_saveTablesResults;
-    
+
     /**
      * Ensure the first thread to run the fragment does the creation
      * of the targets and the distribution of the work.
@@ -201,13 +201,13 @@ public class SnapshotSave extends VoltSystemProcedure
                         new ArrayDeque<SnapshotTableTask>();
                     final ArrayList<SnapshotTableTask> replicatedSnapshotTasks =
                         new ArrayList<SnapshotTableTask>();
-    
+
                     final ArrayList<String> tableNames = new ArrayList<String>();
                     for (final Table table : getTablesToSave(context))
                     {
                         tableNames.add(table.getTypeName());
                     }
-    
+
                     final AtomicInteger numTables = new AtomicInteger(tableNames.size());
                     final SnapshotRegistry.Snapshot snapshotRecord =
                         SnapshotRegistry.startSnapshot(
@@ -215,7 +215,7 @@ public class SnapshotSave extends VoltSystemProcedure
                                 file_path,
                                 file_nonce,
                                 tableNames.toArray(new String[0]));
-    
+
                     for (final Table table : getTablesToSave(context))
                     {
                         String canSnapshot = "SUCCESS";
@@ -232,7 +232,7 @@ public class SnapshotSave extends VoltSystemProcedure
                                         context.getSite().getHost(),
                                         context.getCluster().getPartitions().size(),
                                         startTime);
-                            
+
                             final Runnable onClose = new Runnable() {
                                 @Override
                                 public void run() {
@@ -261,16 +261,16 @@ public class SnapshotSave extends VoltSystemProcedure
                                     }
                                 }
                             };
-    
+
                             sdt.setOnCloseHandler(onClose);
-    
+
                             final SnapshotTableTask task =
                                 new SnapshotTableTask(
                                         table.getRelativeIndex(),
                                         sdt,
                                         table.getIsreplicated(),
                                         table.getTypeName());
-    
+
                             if (table.getIsreplicated()) {
                                 replicatedSnapshotTasks.add(task);
                             } else {
@@ -281,7 +281,7 @@ public class SnapshotSave extends VoltSystemProcedure
                             err_msg = "SNAPSHOT INITIATION OF " + saveFilePath +
                             "RESULTED IN IOException: " + ex.getMessage();
                         }
-    
+
                         result.addRow(context.getSite().getHost().getTypeName(),
                                 table.getTypeName(),
                                 canSnapshot,
@@ -289,7 +289,7 @@ public class SnapshotSave extends VoltSystemProcedure
                     }
                     ExecutionSite.ExecutionSitesCurrentlySnapshotting.set(
                             VoltDB.instance().getLocalSites().values().size());
-    
+
                     /**
                      * Distribute the writing of replicated tables to exactly one partition.
                      */
@@ -297,13 +297,13 @@ public class SnapshotSave extends VoltSystemProcedure
                     for (int ii = 0; ii < numLocalSites; ii++) {
                         m_taskListsForSites.add(new ArrayDeque<SnapshotTableTask>(partitionedSnapshotTasks));
                     }
-    
+
                     int siteIndex = 0;
                     for (SnapshotTableTask t : replicatedSnapshotTasks) {
                         m_taskListsForSites.get(siteIndex++ % numLocalSites).offer(t);
                     }
                 }
-    
+
                 try {
                     m_snapshotCreateBarrier.await();
                 } catch (Exception e) {
@@ -313,7 +313,7 @@ public class SnapshotSave extends VoltSystemProcedure
                             e.toString());
                     return new DependencyPair( DEP_createSnapshotTargets, result);
                 }
-                
+
                 final Deque<SnapshotTableTask> m_taskList = m_taskListsForSites.remove(0);
                 context.getExecutionSite().initiateSnapshots(m_taskList);
                 return new DependencyPair( DEP_createSnapshotTargets, result);
@@ -392,7 +392,7 @@ public class SnapshotSave extends VoltSystemProcedure
             results[0].addRow("Provided path was null or the empty string");
             return results;
         }
-        
+
         if (nonce == null || nonce.equals("")) {
             ColumnInfo[] result_columns = new ColumnInfo[1];
             int ii = 0;
@@ -401,7 +401,7 @@ public class SnapshotSave extends VoltSystemProcedure
             results[0].addRow("Provided nonce was null or the empty string");
             return results;
         }
-        
+
         if (nonce.contains("-") || nonce.contains(",")) {
             ColumnInfo[] result_columns = new ColumnInfo[1];
             int ii = 0;
@@ -410,7 +410,7 @@ public class SnapshotSave extends VoltSystemProcedure
             results[0].addRow("Provided nonce " + nonce + " contains a prohitibited character (- or ,)");
             return results;
         }
-        
+
         // See if we think the save will succeed
         VoltTable[] results;
         results = performSaveFeasibilityWork(path, nonce);

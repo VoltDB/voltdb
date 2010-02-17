@@ -128,20 +128,20 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         container.b.position(4);
         container.b.putInt(container.b.remaining() - 4);
         container.b.position(0);
-        
+
         FastSerializer schemaSerializer = new FastSerializer();
         schemaTable.writeExternal(schemaSerializer);
         final BBContainer schemaContainer = schemaSerializer.getBBContainer();
         schemaContainer.b.limit(schemaContainer.b.limit() - 4);//Don't want the row count
         schemaContainer.b.position(schemaContainer.b.position() + 4);//Don't want total table length
-        
+
         final CRC32 crc = new CRC32();
         ByteBuffer aggregateBuffer = ByteBuffer.allocate(container.b.remaining() + schemaContainer.b.remaining());
         aggregateBuffer.put(container.b);
         aggregateBuffer.put(schemaContainer.b);
         aggregateBuffer.flip();
         crc.update(aggregateBuffer.array(), 4, aggregateBuffer.capacity() - 4);
-        
+
         final int crcValue = (int) crc.getValue();
         aggregateBuffer.putInt(crcValue).position(8);
         aggregateBuffer.put((byte)0).position(0);//Haven't actually finished writing file
@@ -201,7 +201,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             tupleData.b.putInt(tupleData.b.remaining() - 4);
             tupleData.b.position(0);
         }
-        
+
         return m_es.submit(new Runnable() {
             @Override
             public void run() {
