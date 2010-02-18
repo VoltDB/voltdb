@@ -3,7 +3,7 @@
 from subprocess import Popen, PIPE
 import os, sys, datetime, fcntl, time
 
-DURATION_IN_SECONDS = 7
+DURATION_IN_SECONDS = 240
 
 def cmd_readlines(cmd):
     "Run a shell command and get the output as a list of lines"
