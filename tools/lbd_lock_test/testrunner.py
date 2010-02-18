@@ -3,7 +3,31 @@
 from subprocess import Popen, PIPE
 import os, sys, datetime, fcntl, time
 
-DURATION_IN_SECONDS = 240
+DURATION_IN_SECONDS = 7
+
+def cmd_readlines(cmd):
+    "Run a shell command and get the output as a list of lines"
+    fd = os.popen(cmd)
+    retval = fd.readlines()
+    fd.close()
+    return retval
+    
+def killProcess(p):
+    "Kill all processes for this user named 'LBDLockPatternTest'"
+    # get all the java processes for this user
+    javaprocs = cmd_readlines("jps")
+    # split them into (pid, name) tuples
+    javaprocs = [line.split() for line in javaprocs]
+    # throw out any with no name
+    javaprocs = [t for t in javaprocs if len(t) > 1]
+    # find pids for processes with the right name
+    javaprocs = [int(t[0]) for t in javaprocs if t[1].startswith("LBDLockPatternTest")]
+    # kill all the running procs with the right name explicitly
+    # (only for this user usally)
+    for pid in javaprocs:
+        os.system("kill -9 {0}".format(pid))
+    # this seems to do nothing at all on many platforms :(
+    p.wait()
 
 # make stdin non-blocking
 fd = sys.stdin.fileno()
@@ -19,10 +43,6 @@ else:
     print "Failed to compile reproducer."
     print "Check the output of \"javac LBDLockPatternTest.java\" from your shell."
     sys.exit(-1)
-    
-def killProcess(p):
-    os.system("kill -9 {0}".format(p.pid))
-    p.wait()
 
 def runTest(i):
     """Start a subprocess that runs the java reproducer. If it hangs, let the user know and
