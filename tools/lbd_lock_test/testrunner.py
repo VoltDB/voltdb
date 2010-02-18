@@ -25,9 +25,16 @@ def killProcess(p):
     # kill all the running procs with the right name explicitly
     # (only for this user usally)
     for pid in javaprocs:
-        os.system("kill -9 {0}".format(pid))
+         killcmd = "kill -9 " + str(pid)
+         os.system(killcmd)
     # this seems to do nothing at all on many platforms :(
     p.wait()
+    
+def blockUntilInput(f):
+    "Assuming f is non blocking, block until you can read a line from it"
+    while True:
+        try: f.readline(); return
+        except: time.sleep(0.1)
 
 # make stdin non-blocking
 fd = sys.stdin.fileno()
@@ -49,7 +56,7 @@ def runTest(i):
        leave the subprocess process running until the user presses a key. If it runs for
        DURATION_IN_SECONDS seconds without hanging, kill the subprocess and repeat."""
 
-    print "\nBeginning run {0} for {1} seconds. Press ENTER or RETURN to end the test.\n".format(i, DURATION_IN_SECONDS)
+    print "\nBeginning run %d for %d seconds. Press ENTER or RETURN to end the test.\n" % (i, DURATION_IN_SECONDS)
 
     p = Popen("java LBDLockPatternTest", shell=True, bufsize=0, stdout=PIPE)
 
@@ -70,25 +77,25 @@ def runTest(i):
         # print a progress time out every 10 seconds
         if (now - prevnow).seconds == 10:
             prevnow = now
-            sys.stdout.write(" {0} seconds ".format((now - start).seconds))
+            sys.stdout.write(" %d seconds " % ((now - start).seconds))
 
         # if no dots read in 10 seconds, then we assume the java proc has hung
         if (now - lastdotprinted).seconds > 10:
             print("\nSorry, this platfrom has reproduced the issue. Press any key to end this script.")
-            raw_input()
+            blockUntilInput(sys.stdin)
             killProcess(p)
             return False
 
         # if all's gone well for DURATION_IN_SECONDS, we kill the proc and return true
         if (now - start).seconds > DURATION_IN_SECONDS:
-            print("\nThis run ({0}) did not reproduce the issue.".format(i))
+            print("\nThis run (%d) did not reproduce the issue." % (i))
             killProcess(p)
             return True
 
         # do a non-blocking input read to see if the user wants to stop
         try:
-            c = sys.stdin.read(1)
-            print("\nThis run ({0}) interrupted by user.".format(i))
+            sys.stdin.readline()
+            print("\nThis run (%d) interrupted by user." % (i))
             killProcess(p)
             sys.exit(-1)
         except:
