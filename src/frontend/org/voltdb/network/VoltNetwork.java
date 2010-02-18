@@ -83,6 +83,7 @@ import java.util.Set;
 import org.voltdb.utils.VoltLoggerFactory;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.EstTimeUpdater;
+import org.voltdb.utils.Pair;
 
 /** Produces work for registered ports that are selected for read, write */
  public class VoltNetwork implements Runnable
@@ -126,6 +127,18 @@ import org.voltdb.utils.EstTimeUpdater;
         m_periodicWork = new Runnable[0];
         m_useBlockingSelect = true;
         m_useExecutorService = true;
+    }
+
+    public Pair<Long, Long> getCounters() {
+        long totalRead = 0;
+        long totalWritten = 0;
+        synchronized (m_ports) {
+            for (VoltPort p : m_ports) {
+                totalRead += p.readStream().getBytesRead();
+                totalWritten += p.writeStream().getBytesWritten();
+            }
+        }
+        return Pair.of(totalRead, totalWritten);
     }
 
     public VoltNetwork() {

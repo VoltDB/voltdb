@@ -47,6 +47,7 @@ package org.voltdb.network;
 import java.io.IOException;
 import java.nio.channels.ReadableByteChannel;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.ArrayDeque;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
@@ -132,6 +133,7 @@ public class NIOReadStream {
             }
 
             lastRead = channel.read(m_writeBuffer.b);
+            m_bytesRead.addAndGet(lastRead);
 
             if (lastRead > 0) {
                 m_totalAvailable += lastRead;
@@ -182,4 +184,7 @@ public class NIOReadStream {
     private int m_totalAvailable = 0;
     private AtomicInteger m_globalAvailable = new AtomicInteger(0);
     private AtomicInteger m_numReadStreams = new AtomicInteger(0);
+    private AtomicLong m_bytesRead = new AtomicLong();
+
+    long getBytesRead() { return m_bytesRead.get(); }
 }

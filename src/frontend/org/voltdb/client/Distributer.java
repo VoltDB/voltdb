@@ -33,6 +33,7 @@ import org.voltdb.network.Connection;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.VoltTable;
+import org.voltdb.utils.Pair;
 
 /**
  *   De/multiplexes transactions across a cluster
@@ -236,6 +237,38 @@ class Distributer {
         m_network.start();
         m_context.invocationCount.put( this, new Long(0));
         m_pool = new DBBPool(false, arenaSizes, false);
+
+//        new Thread() {
+//            @Override
+//            public void run() {
+//                long lastBytesRead = 0;
+//                long lastBytesWritten = 0;
+//                long lastRuntime = System.currentTimeMillis();
+//                try {
+//                    while (true) {
+//                        Thread.sleep(10000);
+//                        final long now = System.currentTimeMillis();
+//                        Pair<Long, Long> counters = m_network.getCounters();
+//                        final long read = counters.getFirst();
+//                        final long written = counters.getSecond();
+//                        final long readDelta = read - lastBytesRead;
+//                        final long writeDelta = written - lastBytesWritten;
+//                        final long timeDelta = now - lastRuntime;
+//                        lastRuntime = now;
+//                        final double seconds = timeDelta / 1000.0;
+//                        final double megabytesRead = readDelta / (double)(1024 * 1024);
+//                        final double megabytesWritten = writeDelta / (double)(1024 * 1024);
+//                        final double readRate = megabytesRead / seconds;
+//                        final double writeRate = megabytesWritten / seconds;
+//                        lastBytesRead = read;
+//                        lastBytesWritten = written;
+//                        System.err.printf("Read rate %.2f Write rate %.2f\n", readRate, writeRate);
+//                    }
+//                } catch (Exception e) {
+//                    e.printStackTrace();
+//                }
+//            }
+//        }.start();
     }
 
     void createConnection(String host, String program, String password)
@@ -284,6 +317,7 @@ class Distributer {
             if (totalConnections == 0) {
                 throw new NoConnectionsException("No connections.");
             }
+
             int queuedInvocations = 0;
             for (int i=0; i < totalConnections; ++i) {
                 cxn = m_connections.get(Math.abs(++m_nextConnection % totalConnections));
@@ -293,10 +327,6 @@ class Distributer {
                     backpressure = false;
                     break;
                 }
-            }
-
-            if (queuedInvocations > 20000) {
-                backpressure = true;
             }
 
             if (backpressure) {

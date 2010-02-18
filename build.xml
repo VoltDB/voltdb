@@ -1174,7 +1174,8 @@ BENCHMARKS
         <param name="hostcount" value="12"/>
         <param name="sitesperhost" value="12"/>
         <param name="clientcount" value="3"/>
-        <param name="processesperclient" value="4"/>
+        <param name="processesperclient" value="1"/>
+        <param name="duration" value="60000" />
         <param name="host1" value="volt3a"/>
         <param name="host2" value="volt3b"/>
         <param name="host3" value="volt3c"/>
@@ -1191,6 +1192,7 @@ BENCHMARKS
         <param name="clienthost2" value="volt4b"/>
         <param name="clienthost3" value="volt4c"/>
         <param name="warehouses" value="144"/>
+        <param name="loadthreads" value="12" />
     </antcall>
 </target>
 

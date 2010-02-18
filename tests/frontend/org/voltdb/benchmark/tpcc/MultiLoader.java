@@ -390,7 +390,7 @@ public class MultiLoader extends ClientMain {
                 //replicate name and id to every site
                 synchronized (customerNamesTables) {
                     VoltTable customerNames = customerNamesTables.peekFirst();
-                    if (customerNames == null || customerNames.getRowCount() > 300000) {
+                    if (customerNames == null || customerNames.getRowCount() > 32760) {
                         customerNames = new VoltTable(customerTableColumnInfo);
                         customerNamesTables.push(customerNames);
                     }
@@ -617,7 +617,7 @@ public class MultiLoader extends ClientMain {
 
             if (m_voltClient != null) {
                 // XXX
-                final int numPermits = 24;
+                final int numPermits = 48;
                 final Semaphore maxOutstandingInvocations = new Semaphore(numPermits);
                 final int totalInvocations = customerNamesTables.size() * m_parameters.warehouses;
                 final ProcedureCallback callback = new ProcedureCallback() {
@@ -625,7 +625,7 @@ public class MultiLoader extends ClientMain {
 
                     private double lastPercentCompleted = 0.0;
                     @Override
-                    protected void clientCallback(ClientResponse clientResponse) {
+                    protected synchronized void clientCallback(ClientResponse clientResponse) {
                         if (clientResponse.getStatus() != ClientResponse.SUCCESS){
                             System.err.println(clientResponse.getExtra());
                             System.exit(-1);
@@ -652,6 +652,7 @@ public class MultiLoader extends ClientMain {
                                     w_id, new LinkedList<VoltTable>(customerNamesTables), false));
                     totalLoadWorkGenerated += customerNamesTables.size();
                 }
+                Collections.shuffle(replicatedLoadWork);
                 System.err.println("Total load work generated is " + totalLoadWorkGenerated);
 
                 /*

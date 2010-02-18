@@ -715,13 +715,12 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
     @Override
     public final void writeExternal(FastSerializer out) throws IOException {
         assert(verifyTableInvariants());
-        final int pos = m_buffer.position();
-        m_buffer.position(0);
-        m_buffer.limit(pos);
+        final ByteBuffer buffer = m_buffer.duplicate();
+        final int pos = buffer.position();
+        buffer.position(0);
+        buffer.limit(pos);
         out.writeInt(pos);
-        out.write(m_buffer);
-        m_buffer.limit(m_buffer.capacity());
-        m_buffer.position(pos);
+        out.write(buffer);
         assert(verifyTableInvariants());
     }
 

@@ -80,6 +80,10 @@ public class NIOWriteStream implements WriteStream {
 
     private final QueueMonitor m_monitor;
 
+    private long m_bytesWritten = 0;
+
+    synchronized long getBytesWritten() { return m_bytesWritten; }
+
     /**
      * Set to -1 when there are no pending writes. If there is a pending write it is set to the time
      * of the last successful write or the time the oldest pending write was queued.
@@ -191,6 +195,7 @@ public class NIOWriteStream implements WriteStream {
                 }
                 m_lastPendingWriteTime = -1;
                 updateQueued(-bytesWritten);
+                m_bytesWritten += bytesWritten;
                 return bytesWritten;
             }
 
@@ -344,6 +349,7 @@ public class NIOWriteStream implements WriteStream {
             m_lastPendingWriteTime = -1;
         }
         updateQueued(-bytesWritten);
+        m_bytesWritten += bytesWritten;
         return bytesWritten;
     }
 
