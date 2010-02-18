@@ -1020,7 +1020,9 @@ TEST CASES
             <formatter usefile="false" type="plain"/>
         </formatters>
         <tests>
-            <include name="**/${junitclass}.class"/>
+            <fileset dir='${build.test.dir}'>
+              <include name="**/${junitclass}.class"/>
+            </fileset>
         </tests>
     </run_junit>
     <fail if="junit.failures" message="JUnit had failures" />
