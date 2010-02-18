@@ -49,7 +49,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.Set;
 
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.StoredProcedureInvocation;

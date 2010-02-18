@@ -23,9 +23,6 @@
 
 package org.voltdb.dtxn;
 
-import java.util.HashSet;
-import java.util.Set;
-
 import org.voltdb.catalog.Catalog;
 import org.voltdb.sysprocs.saverestore.CatalogCreatorTestHelper;
 

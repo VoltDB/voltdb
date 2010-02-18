@@ -342,10 +342,9 @@ public class VoltdbCli {
 
     }
     static void voltShutdown() {
-        VoltTable[] results;
        if (!checkConnection()) return;
        try {
-           results = database.callProcedure("@Shutdown");
+           database.callProcedure("@Shutdown");
        }
        catch (Exception e)
        {
@@ -358,13 +357,10 @@ public class VoltdbCli {
 
    }
    static void voltSave(String loc, String guid) {
-       VoltTable[] results;
        if (!checkConnection()) return;
    }
    static void voltRestore(String loc, String guid) {
-       VoltTable[] results;
        if (!checkConnection()) return;
-
    }
    static void voltAdHoc(String sql) {
        VoltTable[] results;
@@ -469,9 +465,7 @@ public class VoltdbCli {
        System.out.println(s);
    }
    static void helpsystem(String cmd) {
-       boolean knowncommand = false;
        String tmpstr;
-       int i;
        if ((cmd == null) || (cmd == "")) {
                // Display list of commands.
            out("The VoltDB command line helps you perform common tasks for managing VoltDB databases. Usage:");
@@ -496,68 +490,47 @@ public class VoltdbCli {
                    "pointing to the directory where you installed VoltDB before using " +
                    "many of the preceding commands. Use HELP VOLTDB for more information " +
                    "about configuring the command line utility.");
-           knowncommand = true;
-
        } else {
            tmpstr = cmd.toUpperCase();
            if (tmpstr.compareTo("COMPILE")==0)  {
                out ("Compiles the project definition file into a runtime catalog.");
                out ("\nUsage: COMPILE input-file output-file [node [num-of-nodes [num-of-partitions]]]");
-               knowncommand = true;
-
            }
            if (tmpstr.compareTo("CONNECT")==0)  {
                out ("creates a connection to a database cluster.");
                out ("\nUsage: CONNECT node [username password]");
-               knowncommand = true;
-
            }
            if ( (tmpstr.compareTo( "START") == 0) || (tmpstr.compareTo("STARTUP") == 0 ) )  {
                out ("Starts the database.");
                out ("\nUsage: STARTUP catalog-file");
-               knowncommand = true;
            }
            if (tmpstr.compareTo("RESTORE")==0)  {
                out ("Restores the database from a previously saved backup.");
                out ("\nUsage: RESTORE directory-path unique-id");
-               knowncommand = true;
-
            }
            if (tmpstr.compareTo("SAVE") == 0 )  {
                out ("Saves the database to disk.");
                out ("\nUsage: SAVE directory-path unique-id");
-               knowncommand = true;
-
            }
            if (tmpstr.compareTo("SHUTDOWN") == 0 )  {
                out ("Shuts down the database.");
                out ("\nUsage: SHUTDOWN");
-               knowncommand = true;
-
            }
            if (tmpstr.compareTo("DELETE") == 0)  {
                out ("Executes an SQL DELETE statement on the currently open database.");
                out ("\nUsage: DELETE FROM table-name [WHERE expression...];");
-               knowncommand = true;
-
            }
            if (tmpstr.compareTo("INSERT")==0)  {
                out ("Executes an SQL INSERT statement on the currently open database.");
                out ("\nUsage: INSERT INTO table-name [(column-name[,...])] VALUES (value[,...]);");
-               knowncommand = true;
-
            }
            if (tmpstr.compareTo("SELECT")==0)  {
                out ("Executes an SQL SELECT query on the currently open database.");
                out ("\nUsage: SELECT expression [,...] FROM table-name [AS alias] [,...] [constraint [...] ];");
-               knowncommand = true;
-
            }
            if (tmpstr.compareTo("UPDATE")==0)  {
                out ("Executes an SQL UPDATE statement on the currently open database.");
                out ("\nUsage: UPDATE table-name SET column=value[,..] [WHERE expression...]");
-               knowncommand = true;
-
            }
        }
 
@@ -565,7 +538,6 @@ public class VoltdbCli {
    //********************************* Utility routines **********************
    static String[] tokenize(String s) {
        String[] tokens = new String[10];
-       String tmpstr = s.trim();
        int i;
        int currenttoken = 0;
 

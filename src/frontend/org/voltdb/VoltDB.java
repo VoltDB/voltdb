@@ -22,7 +22,6 @@ import java.util.Map;
 import java.util.TimeZone;
 
 import org.voltdb.elt.ELTManager;
-import org.voltdb.utils.VoltUncaughtExceptionHandler;
 
 /**
  * <code>VoltDB</code> is the main class for VoltDB server.
