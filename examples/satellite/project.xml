@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<project>
+     <security enabled="true"/>
+     <database name='database'>
+        <users>
+           <user name="tracker" password="vonbraun" />
+           <user name="signal" password="wernher" />
+           <user name="admin" password="nasa" adhoc="true" sysproc="true"/>
+        </users>
+        <schemas>
+            <schema path='satellite.ddl' />
+        </schemas>
+        <procedures>
+            <procedure class='procedures.AddSatellite' users="signal" />
+            <procedure class='procedures.UpdateLocation' users="signal" />
+            <procedure class='procedures.GetLocationData' users="tracker" />
+            <procedure class='procedures.GetSatelliteData' users="tracker"/>
+        </procedures>
+        <partitions>
+            <partition table='LOCATION' column='ID' />
+            <partition table='SATELLITE' column='ID' />
+        </partitions>
+    </database>
+</project>

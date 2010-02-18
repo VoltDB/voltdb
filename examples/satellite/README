@@ -1,0 +1,28 @@
+The satellite example is a simulation of satellite tracking. The example contains two client applications:
+
+- signal.Client - Simulates a data collector, pushing location information into the database with 0.1 second delays
+- tracker.UserInterface - Simulates a tracker, that queries to database every 3 seconds and graphically shows where the satellites are on a world map.
+
+The supplied build.xml file assumes that you have the VoltDB distribution installed in /opt/voltdb.  If this is not the case you must modify the following line in build.xml and set it to the directory where the VoltDB distribution is installed.
+
+    <property name='volt.dir' location='/opt/voltdb' />
+
+
+The easiest way to run the example is to use ant to build and run it:
+
+	ant  		   builds the applications and compiles the catalog
+	ant server	   runs the database server
+	ant tracker    runs the tracking client (tracker.UserInterface)
+	ant client 	   runs the signal.Client with 5 satellites.
+
+It is also possible to run multiple signal.Client applications, so you can demonstrate in real-time that the tracker is pulling data out of the database (as new satellites appear on the map). 
+To customize the signal.Client, you can specify the number of satellites it simulates and their country of origin:
+
+	java signal.Client <n> <country>
+
+Where <n> is any positive integer and <country> is one of the following: brazil, china, france, india, or usa.
+
+NOTE: You must set your CLASSPATH prior to executing the above command (such as "export CLASSPATH=/opt/voltdb/voltdb.jar:obj/").
+
+This content is available at
+https://hzproject.com/svn/repos/build/newtrunk/examples/satellite/README.
