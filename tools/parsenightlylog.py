@@ -7,6 +7,7 @@ import os, re, sys
 bestsingle = 0.0
 bestdouble = 0.0
 bestcluster = 0.0
+bestdozen = 0.0
 clustersize = 0
 
 logstring = "\d+ \[main\] INFO COMPILER - "
@@ -39,6 +40,10 @@ while True:
             fd = os.open("clustersize.properties", os.O_CREAT | os.O_WRONLY)
             os.write(fd, "YVALUE = " + str(clustersize) + "\n")
             os.close(fd)
+        if bestdozen != 0.0:
+            fd = os.open("bestdozen.properties", os.O_CREAT | os.O_WRONLY)
+            os.write(fd, "YVALUE = " + str(bestdozen) + "\n")
+            os.close(fd)
         exit(0)
 
     match = hostinfopattern.match(line)
@@ -65,13 +70,16 @@ while True:
             line = sys.stdin.readline()
             if line == '': break # whoops, truncated file!  try to recover
             match = clientpattern.match(line)
-        if (benchmark == "tpcc") and (hosts == 1) and (result > bestsingle):
-            bestsingle = result
-        if (benchmark == "tpcc") and (hosts == 2) and (result > bestdouble):
-            bestdouble = result
-        if (benchmark == "tpcc") and (hosts >= 5) and (result > bestcluster):
-            clustersize = hosts
-            bestcluster = result
+        if (benchmark == "tpcc"):
+            if (hosts == 1) and (result > bestsingle):
+                bestsingle = result
+            if (hosts == 2) and (result > bestdouble):
+                bestdouble = result
+            if (hosts >= 5) and (hosts <= 6) and (result > bestcluster):
+                clustersize = hosts
+                bestcluster = result
+            if (hosts == 12) and (result > bestdozen):
+                bestdozen = result
         # output properties
         print benchmark + "-" + str(hosts) + "h-" + str(sites) + "s-" + \
             str(len(clients)) + "c-" + str(len(processes)) + "p = " + \
