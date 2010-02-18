@@ -16,10 +16,13 @@ output = os.system("javac LBDLockPatternTest.java")
 if output == 0:
     print "Success"
 else:
-    print "Failed to compiler reproducer."
+    print "Failed to compile reproducer."
     print "Check the output of \"javac LBDLockPatternTest.java\" from your shell."
     sys.exit(-1)
-
+    
+def killProcess(p):
+    os.system("kill -9 {0}".format(p.pid))
+    p.wait()
 
 def runTest(i):
     """Start a subprocess that runs the java reproducer. If it hangs, let the user know and
@@ -40,6 +43,7 @@ def runTest(i):
     prevnow = start        # the last time a progress time was printed
     lastdotprinted = start # the last time a dot was successfully read
 
+    # while the java process isn't dead
     while p.poll() == None:
         now = datetime.datetime.utcnow()
 
@@ -52,20 +56,20 @@ def runTest(i):
         if (now - lastdotprinted).seconds > 10:
             print("\nSorry, this platfrom has reproduced the issue. Press any key to end this script.")
             raw_input()
-            p.terminate()
+            killProcess(p)
             return False
 
         # if all's gone well for DURATION_IN_SECONDS, we kill the proc and return true
         if (now - start).seconds > DURATION_IN_SECONDS:
             print("\nThis run ({0}) did not reproduce the issue.".format(i))
-            p.terminate()
+            killProcess(p)
             return True
 
         # do a non-blocking input read to see if the user wants to stop
         try:
             c = sys.stdin.read(1)
             print("\nThis run ({0}) interrupted by user.".format(i))
-            p.terminate()
+            killProcess(p)
             sys.exit(-1)
         except:
             pass
@@ -77,6 +81,9 @@ def runTest(i):
             lastdotprinted = now
         except:
             time.sleep(0.1)
+            
+    # before the function exits, make sure the process is gone
+    p.wait()
 
 # repeat until failure or the user presses ENTER or RETURN
 i = 1
