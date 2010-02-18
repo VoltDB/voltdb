@@ -32,6 +32,7 @@ public class BenchmarkConfig {
     public final String backend;
     public final String[] hosts;
     public final int sitesPerHost;
+    public final int k_factor;
     public final String[] clients;
     public final int processesPerClient;
     public final long interval;
@@ -56,6 +57,7 @@ public class BenchmarkConfig {
             String backend,
             String[] hosts,
             int sitesPerHost,
+            int kFactor,
             String[] clients,
             int processesPerClient,
             long interval,
@@ -80,6 +82,7 @@ public class BenchmarkConfig {
         for (int i = 0; i < hosts.length; i++)
             this.hosts[i] = hosts[i];
         this.sitesPerHost = sitesPerHost;
+        this.k_factor = kFactor;
         this.clients = new String[clients.length];
         for (int i = 0; i < clients.length; i++)
             this.clients[i] = clients[i];
@@ -108,6 +111,7 @@ public class BenchmarkConfig {
             sb.append(" ").append(host);
         sb.append("\n");
         sb.append("SITES PER HOST: ").append(sitesPerHost).append("\n");
+        sb.append("K-FACTOR: ").append(k_factor).append("\n");
         sb.append("CLIENTS:");
         for (String client : clients)
             sb.append(" ").append(client);

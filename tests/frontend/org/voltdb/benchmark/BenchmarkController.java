@@ -225,7 +225,7 @@ public class BenchmarkController {
                 m_jarFileName,
                 m_config.sitesPerHost,
                 m_config.hosts.length,
-                0,
+                m_config.k_factor,
                 m_config.hosts[0]);
 
         // copy the catalog to the servers, but don't bother in local mode
@@ -625,6 +625,7 @@ public class BenchmarkController {
         long duration = 60000;
         int hostCount = 1;
         int sitesPerHost = 2;
+        int k_factor = 0;
         int clientCount = 1;
         int processesPerClient = 1;
         String remotePath = "voltbin/";
@@ -673,6 +674,11 @@ public class BenchmarkController {
                  * The number of execution sites per host
                  */
                 sitesPerHost = Integer.parseInt(parts[1]);
+            } else if (parts[0].equals("KFACTOR")) {
+                /*
+                 * The number of partition replicas (k-factor)
+                 */
+                k_factor = Integer.parseInt(parts[1]);
             } else if (parts[0].equals("CLIENTCOUNT")) {
                 /*
                  * The number of client hosts to place client processes on
@@ -815,7 +821,7 @@ public class BenchmarkController {
 
         // create a config object, mostly for the results uploader at this point
         BenchmarkConfig config = new BenchmarkConfig(clientClassname, backend, hostNames,
-                sitesPerHost, clientNames, processesPerClient, interval, duration,
+                sitesPerHost, k_factor, clientNames, processesPerClient, interval, duration,
                 remotePath, remoteUser, listenForDebugger, serverHeapSize, clientHeapSize,
                 localmode, useProfile, checkTransaction, snapshotPath, snapshotPrefix,
                 snapshotFrequency, snapshotRetain);

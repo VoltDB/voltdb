@@ -54,6 +54,27 @@ public class StoredProcedureInvocation implements FastSerializable {
         returned to the client in the ClientResponse */
     long clientHandle = -1;
 
+    public StoredProcedureInvocation getShallowCopy()
+    {
+        StoredProcedureInvocation copy = new StoredProcedureInvocation();
+        copy.CIAcceptTime = CIAcceptTime;
+        copy.clientHandle = clientHandle;
+        copy.clientQueueTime = clientQueueTime;
+        copy.FHReceiveTime = FHReceiveTime;
+        copy.params = params;
+        copy.procName = procName;
+        if (unserializedParams != null)
+        {
+            copy.unserializedParams = unserializedParams.duplicate();
+        }
+        else
+        {
+            copy.unserializedParams = null;
+        }
+
+        return copy;
+    }
+
     public long CIAcceptTime() { return CIAcceptTime; }
     public long clientQueueTime() { return clientQueueTime; }
     public long FHReceiveTime() { return FHReceiveTime; }

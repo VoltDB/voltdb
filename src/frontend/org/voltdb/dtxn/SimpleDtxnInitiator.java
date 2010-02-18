@@ -218,7 +218,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                      null,
                                      isReadOnly,
                                      true,
-                                     invocation,
+                                     invocation.getShallowCopy(),
                                      clientData);
             txn_states.add(txn);
             synchronized (m_pendingTxns) {

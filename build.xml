@@ -1227,6 +1227,7 @@ BENCHMARKS
         <arg value="BACKEND=${backend}" />
         <arg value="HOSTCOUNT=${hostcount}" />
         <arg value="SITESPERHOST=${sitesperhost}"/>
+        <arg value="KFACTOR=${kfactor}"/>
         <arg value="CLIENTCOUNT=${clientcount}" />
         <arg value="PROCESSESPERCLIENT=${processesperclient}" />
         <arg value="INTERVAL=${interval}" />
