@@ -31,7 +31,7 @@ import org.voltdb.dtxn.DtxnConstants;
  *
  */
 @ProcInfo(singlePartition = false)
-public class AdHocSQL extends VoltSystemProcedure {
+public class AdHoc extends VoltSystemProcedure {
 
     Database m_db = null;
 

@@ -380,7 +380,7 @@ public class TestELTSuite extends RegressionSuite {
         final Client client = getClient();
         boolean passed = false;
         try {
-            client.callProcedure("@adhoc", "Update WITH_DEFAULTS SET A_TINYINT=0 WHERE PKEY=0;");
+            client.callProcedure("@AdHoc", "Update WITH_DEFAULTS SET A_TINYINT=0 WHERE PKEY=0;");
         }
         catch (ProcCallException e) {
             if (e.getMessage().contains("Illegal to update an export-only table.")) {
@@ -397,7 +397,7 @@ public class TestELTSuite extends RegressionSuite {
         final Client client = getClient();
         boolean passed = false;
         try {
-            client.callProcedure("@adhoc", "Select PKEY from WITH_DEFAULTS WHERE PKEY=0;");
+            client.callProcedure("@AdHoc", "Select PKEY from WITH_DEFAULTS WHERE PKEY=0;");
         }
         catch (ProcCallException e) {
             if (e.getMessage().contains("Illegal to read an export-only table.")) {
@@ -414,7 +414,7 @@ public class TestELTSuite extends RegressionSuite {
         final Client client = getClient();
         boolean passed = false;
         try {
-            client.callProcedure("@adhoc", "DELETE from WITH_DEFAULTS WHERE PKEY=0;");
+            client.callProcedure("@AdHoc", "DELETE from WITH_DEFAULTS WHERE PKEY=0;");
         }
         catch (ProcCallException e) {
             if (e.getMessage().contains("Illegal to delete from an export-only table.")) {

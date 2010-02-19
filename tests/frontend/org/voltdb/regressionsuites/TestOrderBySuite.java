@@ -157,7 +157,7 @@ public class TestOrderBySuite extends RegressionSuite {
         load(client);
 
         // sort column of ints ascending
-        vt = client.callProcedure("@adhoc", "select * from O1 order by A_INT ASC")[0];
+        vt = client.callProcedure("@AdHoc", "select * from O1 order by A_INT ASC")[0];
         assertTrue(vt.getRowCount() == 20);
         int it = 0;
         while (vt.advanceRow()) {
@@ -177,7 +177,7 @@ public class TestOrderBySuite extends RegressionSuite {
         }
 
         // sort column of inlined strings ascending
-        vt = client.callProcedure("@adhoc", "select * from O1 order by A_INLINE_STR ASC")[0];
+        vt = client.callProcedure("@AdHoc", "select * from O1 order by A_INLINE_STR ASC")[0];
         assertTrue(vt.getRowCount() == 20);
         String lastString = "a";
         while (vt.advanceRow()) {
@@ -197,7 +197,7 @@ public class TestOrderBySuite extends RegressionSuite {
 
 
         // sort column of non-inlined strings ascending
-        vt = client.callProcedure("@adhoc", "select * from O1 order by A_POOL_STR ASC")[0];
+        vt = client.callProcedure("@AdHoc", "select * from O1 order by A_POOL_STR ASC")[0];
         assertTrue(vt.getRowCount() == 20);
         lastString = "A";
         while (vt.advanceRow()) {
@@ -222,7 +222,7 @@ public class TestOrderBySuite extends RegressionSuite {
         load(client);
 
         // sort column of ints descending
-        vt = client.callProcedure("@adhoc", "select * from O1 order by A_INT DESC")[0];
+        vt = client.callProcedure("@AdHoc", "select * from O1 order by A_INT DESC")[0];
         assertTrue(vt.getRowCount() == 20);
         int it = 19;
         while (vt.advanceRow()) {
@@ -242,7 +242,7 @@ public class TestOrderBySuite extends RegressionSuite {
         }
 
         // sort column of inlined strings descending
-        vt = client.callProcedure("@adhoc", "select * from O1 order by A_INLINE_STR DESC")[0];
+        vt = client.callProcedure("@AdHoc", "select * from O1 order by A_INLINE_STR DESC")[0];
         assertTrue(vt.getRowCount() == 20);
         String lastString = "z";
         while (vt.advanceRow()) {
@@ -262,7 +262,7 @@ public class TestOrderBySuite extends RegressionSuite {
 
 
         // sort column of non-inlined strings ascending
-        vt = client.callProcedure("@adhoc", "select * from O1 order by A_POOL_STR DESC")[0];
+        vt = client.callProcedure("@AdHoc", "select * from O1 order by A_POOL_STR DESC")[0];
         assertTrue(vt.getRowCount() == 20);
         lastString = bigString + "99";
         while (vt.advanceRow()) {
@@ -303,7 +303,7 @@ public class TestOrderBySuite extends RegressionSuite {
         loadWithDupes(client);
 
         // order by reverse rank and ascending name ..
-        vt =  client.callProcedure("@adhoc", "select * from O1 order by A_INT DESC, A_INLINE_STR ASC" )[0];
+        vt =  client.callProcedure("@AdHoc", "select * from O1 order by A_INT DESC, A_INLINE_STR ASC" )[0];
         assertTrue(vt.getRowCount() == 9);
 
         vt.advanceRow();

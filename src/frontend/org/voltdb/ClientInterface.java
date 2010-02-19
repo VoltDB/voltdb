@@ -20,38 +20,46 @@ package org.voltdb;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
-import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SelectionKey;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
-import org.apache.log4j.Logger;
+
 import org.apache.log4j.Level;
-import org.voltdb.catalog.*;
+import org.apache.log4j.Logger;
+import org.voltdb.catalog.Partition;
+import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.Site;
+import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.debugstate.InitiatorContext;
-import org.voltdb.dtxn.*;
-import org.voltdb.messaging.*;
+import org.voltdb.dtxn.SimpleDtxnInitiator;
+import org.voltdb.dtxn.TransactionInitiator;
+import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.messaging.FastSerializable;
+import org.voltdb.messaging.FastSerializer;
+import org.voltdb.messaging.Mailbox;
+import org.voltdb.messaging.Messenger;
+import org.voltdb.network.Connection;
 import org.voltdb.network.NIOReadStream;
 import org.voltdb.network.QueueMonitor;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.network.VoltProtocolHandler;
-import org.voltdb.network.Connection;
 import org.voltdb.network.WriteStream;
 import org.voltdb.planner.AdHocPlannedStmt;
 import org.voltdb.planner.AdHocPlannerThread;
 import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.DumpManager;
-import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.EstTime;
+import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.Pair;
 import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.messaging.FastDeserializer;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -673,11 +681,11 @@ public class ClientInterface implements DumpManager.Dumpable {
         if (task.procName.startsWith("@")) {
 
             // ad-hoc queries need to be parsed and planned in another thread before they can be run
-            if (task.procName.equals("@adhoc")) {
+            if (task.procName.equals("@AdHoc")) {
                 if (!handler.m_user.hasAdhocPermission()) {
                     final ClientResponseImpl errorResponse =
                         new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                            new VoltTable[0], "User does not have @adhoc permission", task.clientHandle);
+                            new VoltTable[0], "User does not have @AdHoc permission", task.clientHandle);
                     authLog.l7dlog(Level.INFO,
                             LogKeys.auth_ClientInterface_LackingPermissionForAdhoc.name(),
                             new String[] {handler.m_user.m_name}, null);
@@ -801,7 +809,7 @@ public class ClientInterface implements DumpManager.Dumpable {
             {
                 // create the execution site task
                 StoredProcedureInvocation task = new StoredProcedureInvocation();
-                task.procName = "@AdHocSQL";
+                task.procName = "@AdHoc";
                 task.params = new ParameterSet();
                 task.params.m_params = new Object[] {
                         plannedStmt.aggregatorFragment, plannedStmt.collectorFragment,
@@ -811,7 +819,8 @@ public class ClientInterface implements DumpManager.Dumpable {
 
                 // initiate the transaction
                 m_initiator.createTransaction(plannedStmt.connectionId,
-                                              task, false, false, m_allPartitions, m_allPartitions.length, plannedStmt.clientData);
+                                              task, false, false, m_allPartitions,
+                                              m_allPartitions.length, plannedStmt.clientData);
 
             }
             else

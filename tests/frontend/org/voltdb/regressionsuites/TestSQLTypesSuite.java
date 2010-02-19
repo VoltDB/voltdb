@@ -894,7 +894,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
             final String sql = "SELECT (" + m_columnNames[i] + " + 11) from NO_NULLS where "
             + m_columnNames[3] + " = " + m_midValues[3];
             System.out.println("testsimpleexpression: " + sql);
-            final VoltTable[] result = client.callProcedure("@adhoc", sql);
+            final VoltTable[] result = client.callProcedure("@AdHoc", sql);
             final VoltTableRow row = result[0].fetchRow(0);
             final Object obj = row.get(0, m_types[i]);
 

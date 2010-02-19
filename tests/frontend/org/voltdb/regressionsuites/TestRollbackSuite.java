@@ -231,7 +231,7 @@ public class TestRollbackSuite extends RegressionSuite {
 
         boolean threwException = false;
         try {
-            client.callProcedure("@adhoc", insertQuery);
+            client.callProcedure("@AdHoc", insertQuery);
         } catch (ProcCallException e) {
             threwException = true;
         }
@@ -239,7 +239,7 @@ public class TestRollbackSuite extends RegressionSuite {
 
         VoltTable results[] = null;
         try {
-            results = client.callProcedure("@adhoc", "SELECT * FROM CUSTOMER_NAME");
+            results = client.callProcedure("@AdHoc", "SELECT * FROM CUSTOMER_NAME");
         } catch (ProcCallException e) {
             fail();
         }
@@ -249,14 +249,14 @@ public class TestRollbackSuite extends RegressionSuite {
 
 
         try {
-            client.callProcedure("@adhoc", "INSERT INTO CUSTOMER_NAME VALUES ( 0, 0, 0, 'foo', 'bar')");
+            client.callProcedure("@AdHoc", "INSERT INTO CUSTOMER_NAME VALUES ( 0, 0, 0, 'foo', 'bar')");
         } catch (ProcCallException e) {
             fail();
         }
 
         threwException = false;
         try {
-            client.callProcedure("@adhoc", updateQuery);
+            client.callProcedure("@AdHoc", updateQuery);
         } catch (ProcCallException e) {
             e.printStackTrace();
             threwException = true;
@@ -265,7 +265,7 @@ public class TestRollbackSuite extends RegressionSuite {
 
         results = null;
         try {
-            results = client.callProcedure("@adhoc", "SELECT * FROM CUSTOMER_NAME");
+            results = client.callProcedure("@AdHoc", "SELECT * FROM CUSTOMER_NAME");
         } catch (ProcCallException e) {
             fail();
         }
@@ -440,7 +440,7 @@ public class TestRollbackSuite extends RegressionSuite {
 
         try {
             String update = "UPDATE NEW_ORDER SET NO_O_ID = " + Long.MAX_VALUE + " WHERE NO_D_ID = 3;";
-            client.callProcedure("@adhoc", update);
+            client.callProcedure("@AdHoc", update);
             fail();
         }
         catch (ProcCallException e) {}
@@ -517,7 +517,7 @@ public class TestRollbackSuite extends RegressionSuite {
 
         try {
             String update = "UPDATE NEW_ORDER SET NO_O_ID = " + 2 + ", NO_D_ID = 2 WHERE NO_D_ID = 4;";
-            client.callProcedure("@adhoc", update);
+            client.callProcedure("@AdHoc", update);
             fail();
         }
         catch (ProcCallException e) {
@@ -597,7 +597,7 @@ public class TestRollbackSuite extends RegressionSuite {
 
         try {
             String update = "UPDATE NEW_ORDER SET NO_O_ID = -9223372036854775808, NO_D_ID = -9223372036854775808 WHERE NO_D_ID = 4;";
-            client.callProcedure("@adhoc", update);
+            client.callProcedure("@AdHoc", update);
             fail();
         }
         catch (ProcCallException e) {

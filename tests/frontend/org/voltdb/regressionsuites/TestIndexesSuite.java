@@ -67,57 +67,57 @@ public class TestIndexesSuite extends RegressionSuite {
             client.callProcedure("Insert", table, 8, "h", 300, 8, 19.5);
             String query = String.format("select * from %s where %s.ID > 1",
                                          table, table);
-            VoltTable[] results = client.callProcedure("@adhoc", query);
+            VoltTable[] results = client.callProcedure("@AdHoc", query);
             assertEquals(5, results[0].getRowCount());
             // make sure that we work if the value we want isn't present
             query = String.format("select * from %s where %s.ID > 4",
                                   table, table);
-            results = client.callProcedure("@adhoc", query);
+            results = client.callProcedure("@AdHoc", query);
             assertEquals(3, results[0].getRowCount());
             query = String.format("select * from %s where %s.ID > 8",
                                   table, table);
-            results = client.callProcedure("@adhoc", query);
+            results = client.callProcedure("@AdHoc", query);
             assertEquals(0, results[0].getRowCount());
             query = String.format("select * from %s where %s.ID >= 1",
                                   table, table);
-            results = client.callProcedure("@adhoc", query);
+            results = client.callProcedure("@AdHoc", query);
             assertEquals(6, results[0].getRowCount());
             query = String.format("select * from %s where %s.ID >= 4",
                                   table, table);
-            results = client.callProcedure("@adhoc", query);
+            results = client.callProcedure("@AdHoc", query);
             assertEquals(3, results[0].getRowCount());
             query = String.format("select * from %s where %s.ID >= 9",
                                   table, table);
-            results = client.callProcedure("@adhoc", query);
+            results = client.callProcedure("@AdHoc", query);
             assertEquals(0, results[0].getRowCount());
             query = String.format("select * from %s where %s.ID > 1 and %s.ID < 6",
                                   table, table, table);
-            results = client.callProcedure("@adhoc", query);
+            results = client.callProcedure("@AdHoc", query);
             assertEquals(2, results[0].getRowCount());
             query = String.format("select * from %s where %s.ID > 1 and %s.ID <= 6",
                                   table, table, table);
-            results = client.callProcedure("@adhoc", query);
+            results = client.callProcedure("@AdHoc", query);
             assertEquals(3, results[0].getRowCount());
             query = String.format("select * from %s where %s.ID > 1 and %s.ID <= 5",
                                   table, table, table);
-            results = client.callProcedure("@adhoc", query);
+            results = client.callProcedure("@AdHoc", query);
             assertEquals(2, results[0].getRowCount());
             query = String.format("select * from %s where %s.ID >= 1 and %s.ID < 7",
                                   table, table, table);
-            results = client.callProcedure("@adhoc", query);
+            results = client.callProcedure("@AdHoc", query);
             assertEquals(4, results[0].getRowCount());
             // Check that >= work in conjunction with <
             // run over the end of the index to catch the keyIterate bug
             // in the first >= index fix
             query = String.format("select * from %s where %s.ID >= 1 and %s.ID < 10",
                                   table, table, table);
-            results = client.callProcedure("@adhoc", query);
+            results = client.callProcedure("@AdHoc", query);
             assertEquals(6, results[0].getRowCount());
             // XXX THIS CASE CURRENTLY FAILS
             // SEE TICKET 194
 //            query = String.format("select * from %s where %s.ID >= 2.9",
 //                                  table, table);
-//            results = client.callProcedure("@adhoc", query);
+//            results = client.callProcedure("@AdHoc", query);
 //            assertEquals(4, results[0].getRowCount());
         }
     }
@@ -142,50 +142,50 @@ public class TestIndexesSuite extends RegressionSuite {
             client.callProcedure("Insert", table, 8, "h", 300, 8, 19.5);
             String query = String.format("select * from %s where %s.NUM > 100",
                                          table, table);
-            VoltTable[] results = client.callProcedure("@adhoc", query);
+            VoltTable[] results = client.callProcedure("@AdHoc", query);
             assertEquals(4, results[0].getRowCount());
             query = String.format("select * from %s where %s.NUM > 150",
                                   table, table);
-            results = client.callProcedure("@adhoc", query);
+            results = client.callProcedure("@AdHoc", query);
             assertEquals(4, results[0].getRowCount());
             query = String.format("select * from %s where %s.NUM > 300",
                                   table, table);
-            results = client.callProcedure("@adhoc", query);
+            results = client.callProcedure("@AdHoc", query);
             assertEquals(0, results[0].getRowCount());
             query = String.format("select * from %s where %s.NUM >= 100",
                                   table, table);
-            results = client.callProcedure("@adhoc", query);
+            results = client.callProcedure("@AdHoc", query);
             assertEquals(6, results[0].getRowCount());
             query = String.format("select * from %s where %s.NUM >= 150",
                                   table, table);
-            results = client.callProcedure("@adhoc", query);
+            results = client.callProcedure("@AdHoc", query);
             assertEquals(4, results[0].getRowCount());
             query = String.format("select * from %s where %s.NUM >= 301",
                                   table, table);
-            results = client.callProcedure("@adhoc", query);
+            results = client.callProcedure("@AdHoc", query);
             assertEquals(0, results[0].getRowCount());
             query = String.format("select * from %s where %s.NUM > 100 and %s.NUM < 300",
                                   table, table, table);
-            results = client.callProcedure("@adhoc", query);
+            results = client.callProcedure("@AdHoc", query);
             assertEquals(2, results[0].getRowCount());
             // Check that >= work in conjunction with <
             // run over the end of the index to catch the keyIterate bug
             // in the first >= index fix
             query = String.format("select * from %s where %s.NUM >= 100 and %s.NUM < 400",
                                   table, table, table);
-            results = client.callProcedure("@adhoc", query);
+            results = client.callProcedure("@AdHoc", query);
             assertEquals(6, results[0].getRowCount());
             query = String.format("select * from %s where %s.NUM = 100",
                                   table, table);
-            results = client.callProcedure("@adhoc", query);
+            results = client.callProcedure("@AdHoc", query);
             assertEquals(2, results[0].getRowCount());
             query = String.format("select * from %s where %s.NUM > 100 and %s.NUM <= 300",
                                   table, table, table);
-            results = client.callProcedure("@adhoc", query);
+            results = client.callProcedure("@AdHoc", query);
             assertEquals(4, results[0].getRowCount());
             query = String.format("select * from %s where %s.NUM > 100 and %s.NUM <= 250",
                                   table, table, table);
-            results = client.callProcedure("@adhoc", query);
+            results = client.callProcedure("@AdHoc", query);
             assertEquals(2, results[0].getRowCount());
         }
     }
@@ -205,7 +205,7 @@ public class TestIndexesSuite extends RegressionSuite {
             client.callProcedure("Insert", table, 8, "h", 300, 8, 19.5);
             String query = String.format("select * from %s where %s.NUM >= 100 and %s.NUM <= 400",
                                   table, table, table);
-            VoltTable[] results = client.callProcedure("@adhoc", query);
+            VoltTable[] results = client.callProcedure("@AdHoc", query);
             assertEquals(6, results[0].getRowCount());
         }
     }
@@ -230,7 +230,7 @@ public class TestIndexesSuite extends RegressionSuite {
             client.callProcedure("Insert", table, 8, "h", 300, 8, 19.5);
             String query = String.format("select * from %s where %s.NUM > 100 AND %s.NUM2 > 1",
                                          table, table, table);
-            VoltTable[] results = client.callProcedure("@adhoc", query);
+            VoltTable[] results = client.callProcedure("@AdHoc", query);
             assertEquals(4, results[0].getRowCount());
         }
     }

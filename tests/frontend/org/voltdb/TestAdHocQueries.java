@@ -56,19 +56,19 @@ public class TestAdHocQueries extends TestCase {
         Client client = ClientFactory.createClient();
         client.createConnection("localhost", "program", "password");
 
-        VoltTable modCount = client.callProcedure("@adhoc", "INSERT INTO NEW_ORDER VALUES (1, 1, 1);")[0];
+        VoltTable modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (1, 1, 1);")[0];
         assertTrue(modCount.getRowCount() == 1);
         assertTrue(modCount.asScalarLong() == 1);
 
 
-        VoltTable result = client.callProcedure("@adhoc", "SELECT * FROM NEW_ORDER;")[0];
+        VoltTable result = client.callProcedure("@AdHoc", "SELECT * FROM NEW_ORDER;")[0];
         assertTrue(result.getRowCount() == 1);
         System.out.println(result.toString());
 
         boolean caught = false;
         try
         {
-            client.callProcedure("@adhoc", "SLEECT * FROOM NEEEW_OOORDERERER;");
+            client.callProcedure("@AdHoc", "SLEECT * FROOM NEEEW_OOORDERERER;");
         }
         catch (Exception e)
         {

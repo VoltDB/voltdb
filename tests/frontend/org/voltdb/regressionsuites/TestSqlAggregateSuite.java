@@ -59,7 +59,7 @@ public class TestSqlAggregateSuite extends RegressionSuite {
             }
             String query = String.format("select distinct %s.NUM from %s",
                                          table, table);
-            VoltTable[] results = client.callProcedure("@adhoc", query);
+            VoltTable[] results = client.callProcedure("@AdHoc", query);
             // lazy check that we get 5 rows back, put off checking contents
             assertEquals(5, results[0].getRowCount());
         }
@@ -85,14 +85,14 @@ public class TestSqlAggregateSuite extends RegressionSuite {
             {
                 String query = String.format("select %s(%s.NUM) from %s",
                                              aggs[i], table, table);
-                VoltTable[] results = client.callProcedure("@adhoc", query);
+                VoltTable[] results = client.callProcedure("@AdHoc", query);
                 assertEquals(expected_results[i], results[0].asScalarLong());
             }
             // Do avg separately since the column is a float and makes
             // asScalarLong() unhappy
             String query = String.format("select avg(%s.NUM) from %s",
                                          table, table);
-            VoltTable[] results = client.callProcedure("@adhoc", query);
+            VoltTable[] results = client.callProcedure("@AdHoc", query);
             results[0].advanceRow();
             assertEquals(2.0,
                          ((Number)results[0].get(0, results[0].getColumnType(0))).doubleValue());
@@ -110,7 +110,7 @@ public class TestSqlAggregateSuite extends RegressionSuite {
             {
                 String query = String.format("select %s(%s.NUM) from %s",
                                              aggs[i], table, table);
-                VoltTable[] results = client.callProcedure("@adhoc", query);
+                VoltTable[] results = client.callProcedure("@AdHoc", query);
                 if (aggs[i].equals("count")) {
                     assertEquals(0, results[0].asScalarLong());
                 } else {
@@ -125,7 +125,7 @@ public class TestSqlAggregateSuite extends RegressionSuite {
             // asScalarLong() unhappy
             String query = String.format("select avg(%s.NUM) from %s",
                                          table, table);
-            VoltTable[] results = client.callProcedure("@adhoc", query);
+            VoltTable[] results = client.callProcedure("@AdHoc", query);
             results[0].advanceRow();
             @SuppressWarnings("unused")
             final double value = ((Number)results[0].get(0, results[0].getColumnType(0))).doubleValue();
@@ -159,14 +159,14 @@ public class TestSqlAggregateSuite extends RegressionSuite {
             {
                 String query = String.format("select %s(distinct(%s.NUM)) from %s",
                                              aggs[i], table, table);
-                VoltTable[] results = client.callProcedure("@adhoc", query);
+                VoltTable[] results = client.callProcedure("@AdHoc", query);
                 assertEquals(expected_results[i], results[0].asScalarLong());
             }
             // Do avg separately since the column is a float and makes
             // asScalarLong() unhappy
             String query = String.format("select avg(distinct(%s.NUM)) from %s",
                                          table, table);
-            VoltTable[] results = client.callProcedure("@adhoc", query);
+            VoltTable[] results = client.callProcedure("@AdHoc", query);
             results[0].advanceRow();
             assertEquals(2.0,
                          ((Number)results[0].get(0, results[0].getColumnType(0))).doubleValue());
@@ -192,17 +192,17 @@ public class TestSqlAggregateSuite extends RegressionSuite {
             }
             String query = String.format("select MIN(%s.DESC) from %s",
                                          table, table);
-            VoltTable[] results = client.callProcedure("@adhoc", query);
+            VoltTable[] results = client.callProcedure("@AdHoc", query);
             results[0].advanceRow();
             assertEquals("0", results[0].getString(0));
             query = String.format("select MAX(%s.DESC) from %s",
                                   table, table);
-            results = client.callProcedure("@adhoc", query);
+            results = client.callProcedure("@AdHoc", query);
             results[0].advanceRow();
             assertEquals("9", results[0].getString(0));
             query = String.format("select COUNT(%s.DESC) from %s",
                                   table, table);
-            results = client.callProcedure("@adhoc", query);
+            results = client.callProcedure("@AdHoc", query);
             assertEquals(ROWS, results[0].asScalarLong());
         }
     }
@@ -241,37 +241,37 @@ public class TestSqlAggregateSuite extends RegressionSuite {
             // do count separately since it's always integer return type
             String query = String.format("select count(%s.CASH) from %s",
                                          table, table);
-            VoltTable[] results = client.callProcedure("@adhoc", query);
+            VoltTable[] results = client.callProcedure("@AdHoc", query);
             assertEquals(good_rows, results[0].asScalarLong());
             query = String.format("select count(%s.NUM) from %s",
                                          table, table);
-            results = client.callProcedure("@adhoc", query);
+            results = client.callProcedure("@AdHoc", query);
             assertEquals(good_rows, results[0].asScalarLong());
             query = String.format("select count(%s.RATIO) from %s",
                                          table, table);
-            results = client.callProcedure("@adhoc", query);
+            results = client.callProcedure("@AdHoc", query);
             assertEquals(good_rows, results[0].asScalarLong());
             for (int i = 0; i < aggs.length; ++i)
             {
                 query = String.format("select %s(%s.CASH) from %s",
                                       aggs[i], table, table);
-                results = client.callProcedure("@adhoc", query);
+                results = client.callProcedure("@AdHoc", query);
                 results[0].advanceRow();
                 assertEquals(expected_float_results[i],
                              results[0].getDecimalAsBigDecimal(0).doubleValue());
                 query = String.format("select %s(%s.NUM) from %s",
                                              aggs[i], table, table);
-                results = client.callProcedure("@adhoc", query);
+                results = client.callProcedure("@AdHoc", query);
                 assertEquals(expected_int_results[i], results[0].asScalarLong());
                 query = String.format("select %s(%s.RATIO) from %s",
                                              aggs[i], table, table);
-                results = client.callProcedure("@adhoc", query);
+                results = client.callProcedure("@AdHoc", query);
                 results[0].advanceRow();
                 assertEquals(expected_float_results[i], results[0].getDouble(0));
             }
             // and finish up with count(*) for good measure
             query = String.format("select count(*) from %s", table);
-            results = client.callProcedure("@adhoc", query);
+            results = client.callProcedure("@AdHoc", query);
             results[0].advanceRow();
             assertEquals(good_rows + null_rows, results[0].asScalarLong());
         }
@@ -296,35 +296,35 @@ public class TestSqlAggregateSuite extends RegressionSuite {
             // do count separately since it's always integer return type
             String query = String.format("select count(%s.CASH) from %s",
                                          table, table);
-            VoltTable[] results = client.callProcedure("@adhoc", query);
+            VoltTable[] results = client.callProcedure("@AdHoc", query);
             assertEquals(0, results[0].asScalarLong());
             query = String.format("select count(%s.NUM) from %s",
                                          table, table);
-            results = client.callProcedure("@adhoc", query);
+            results = client.callProcedure("@AdHoc", query);
             assertEquals(0, results[0].asScalarLong());
             query = String.format("select count(%s.RATIO) from %s",
                                          table, table);
-            results = client.callProcedure("@adhoc", query);
+            results = client.callProcedure("@AdHoc", query);
             assertEquals(0, results[0].asScalarLong());
             for (int i = 0; i < aggs.length; ++i)
             {
                 query = String.format("select %s(%s.CASH) from %s",
                                       aggs[i], table, table);
-                results = client.callProcedure("@adhoc", query);
+                results = client.callProcedure("@AdHoc", query);
                 results[0].advanceRow();
                 @SuppressWarnings("unused")
                 BigDecimal dec_val = results[0].getDecimalAsBigDecimal(0);
                 assert(results[0].wasNull());
                 query = String.format("select %s(%s.NUM) from %s",
                                              aggs[i], table, table);
-                results = client.callProcedure("@adhoc", query);
+                results = client.callProcedure("@AdHoc", query);
                 results[0].advanceRow();
                 @SuppressWarnings("unused")
                 long long_val = results[0].getLong(0);
                 assert(results[0].wasNull());
                 query = String.format("select %s(%s.RATIO) from %s",
                                              aggs[i], table, table);
-                results = client.callProcedure("@adhoc", query);
+                results = client.callProcedure("@AdHoc", query);
                 results[0].advanceRow();
                 @SuppressWarnings("unused")
                 double doub_val = results[0].getDouble(0);
@@ -332,7 +332,7 @@ public class TestSqlAggregateSuite extends RegressionSuite {
             }
             // and finish up with count(*) for good measure
             query = String.format("select count(*) from %s", table);
-            results = client.callProcedure("@adhoc", query);
+            results = client.callProcedure("@AdHoc", query);
             results[0].advanceRow();
             assertEquals(null_rows, results[0].asScalarLong());
         }

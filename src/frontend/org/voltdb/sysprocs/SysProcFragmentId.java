@@ -38,7 +38,7 @@ public class SysProcFragmentId
     public static final long PF_shutdownCommand = 21;
     public static final long PF_procedureDone = 22;
 
-    // @AdHocSQL
+    // @AdHoc
     public static final long PF_runAdHocFragment = 31;
 
     // @SnapshotSave
