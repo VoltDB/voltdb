@@ -15,28 +15,20 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.planner;
+package org.voltdb.compiler;
 
-import java.io.Serializable;
+public class AdHocPlannedStmt extends AsyncCompilerResult {
+    private static final long serialVersionUID = -8627490621430290801L;
 
-public class AdHocPlannerWork implements Serializable {
-    private static final long serialVersionUID = 3297865891152100922L;
-
-    boolean shouldShutdown = false;
-    boolean shouldDump = false;
-    long clientHandle = -1;
-    String sql = null;
-    int connectionId = -1;
-    int sequenceNumber = -1;
-    transient public Object clientData = null;
+    public String aggregatorFragment;
+    public String collectorFragment;
+    public String sql;
+    public boolean isReplicatedTableDML;
 
     @Override
     public String toString() {
-        String retval = "shouldShutdown:" + String.valueOf(shouldShutdown) + ", ";
-        retval += "clientHandle:" + String.valueOf(clientHandle) + ", ";
-        retval += "connectionId:" + String.valueOf(connectionId) + ", ";
-        retval += "sequenceNumber:" + String.valueOf(sequenceNumber) + ", ";
-        retval += "\n  sql: " + ((sql != null) ? sql : "null");
+        String retval = super.toString();
+        retval += "sql: " + ((sql != null) ? sql : "null");
         return retval;
     }
 }

@@ -15,23 +15,23 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.debugstate;
+package org.voltdb.compiler;
 
 import java.io.Serializable;
 
-import org.voltdb.compiler.AsyncCompilerResult;
-import org.voltdb.compiler.AsyncCompilerWork;
+public class AsyncCompilerResult implements Serializable {
+    private static final long serialVersionUID = -1538141431615585812L;
 
-public class PlannerThreadContext extends VoltThreadContext implements Serializable, Comparable<PlannerThreadContext> {
-    private static final long serialVersionUID = -5981541715574116664L;
-
-    public int siteId;
-    public AsyncCompilerWork[] compilerWork = null;
-    public AsyncCompilerResult[] compilerResults = null;
+    public long clientHandle = -1;
+    public String errorMsg = null;
+    public int connectionId = -1;
+    transient public Object clientData = null;
 
     @Override
-    public int compareTo(PlannerThreadContext o) {
-        if (o == null) return -1;
-        return siteId - o.siteId;
+    public String toString() {
+        String retval = "clientHandle:" + String.valueOf(clientHandle) + ", ";
+        retval += "connectionId:" + String.valueOf(connectionId) + ", ";
+        retval += "\n  errorMsg: " + ((errorMsg != null) ? errorMsg : "null");
+        return retval;
     }
 }

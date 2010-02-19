@@ -38,6 +38,9 @@ import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
 import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.compiler.AdHocPlannedStmt;
+import org.voltdb.compiler.AsyncCompilerResult;
+import org.voltdb.compiler.AsyncCompilerWorkThread;
 import org.voltdb.debugstate.InitiatorContext;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
 import org.voltdb.dtxn.TransactionInitiator;
@@ -52,8 +55,6 @@ import org.voltdb.network.QueueMonitor;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.network.VoltProtocolHandler;
 import org.voltdb.network.WriteStream;
-import org.voltdb.planner.AdHocPlannedStmt;
-import org.voltdb.planner.AdHocPlannerThread;
 import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.EstTime;
@@ -74,7 +75,7 @@ public class ClientInterface implements DumpManager.Dumpable {
     private static final Logger networkLog = Logger.getLogger("NETWORK", org.voltdb.utils.VoltLoggerFactory.instance());
     private final ClientAcceptor m_acceptor;
     private final TransactionInitiator m_initiator;
-    private final AdHocPlannerThread m_plannerThread;
+    private final AsyncCompilerWorkThread m_plannerThread;
     private final ArrayList<Connection> m_connections = new ArrayList<Connection>();
     private final SnapshotDaemon m_snapshotDaemon;
     private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
@@ -620,7 +621,7 @@ public class ClientInterface implements DumpManager.Dumpable {
         queue.setInitiator(initiator);
 
         // create the adhoc planner thread
-        AdHocPlannerThread plannerThread = new AdHocPlannerThread(VoltDB.instance().getCatalog(), siteId);
+        AsyncCompilerWorkThread plannerThread = new AsyncCompilerWorkThread(VoltDB.instance().getCatalog(), siteId);
         plannerThread.start();
         final ClientInterface ci = new ClientInterface(
                 port, network,
@@ -633,7 +634,7 @@ public class ClientInterface implements DumpManager.Dumpable {
     }
 
     ClientInterface(int port, VoltNetwork network, int siteId, TransactionInitiator initiator,
-                    AdHocPlannerThread plannerThread, int[] allPartitions,
+                    AsyncCompilerWorkThread plannerThread, int[] allPartitions,
                     SnapshotSchedule schedule)
     {
         assert(VoltDB.instance().getCatalog() != null);
@@ -803,34 +804,39 @@ public class ClientInterface implements DumpManager.Dumpable {
 
     private final void checkForAdHocSQL() {
         if (m_plannerThread == null) return;
-        AdHocPlannedStmt plannedStmt = null;
-        while ((plannedStmt = m_plannerThread.getPlannedStmt()) != null) {
-            if (plannedStmt.errorMsg == null)
-            {
-                // create the execution site task
-                StoredProcedureInvocation task = new StoredProcedureInvocation();
-                task.procName = "@AdHoc";
-                task.params = new ParameterSet();
-                task.params.m_params = new Object[] {
-                        plannedStmt.aggregatorFragment, plannedStmt.collectorFragment,
-                        plannedStmt.sql, plannedStmt.isReplicatedTableDML ? 1 : 0
-                };
-                task.clientHandle = plannedStmt.clientHandle;
 
-                // initiate the transaction
-                m_initiator.createTransaction(plannedStmt.connectionId,
-                                              task, false, false, m_allPartitions,
-                                              m_allPartitions.length, plannedStmt.clientData);
+        AsyncCompilerResult result = null;
 
+        while ((result = m_plannerThread.getPlannedStmt()) != null) {
+            if (result.errorMsg == null) {
+                if (result instanceof AdHocPlannedStmt) {
+                    AdHocPlannedStmt plannedStmt = (AdHocPlannedStmt) result;
+                    // create the execution site task
+                    StoredProcedureInvocation task = new StoredProcedureInvocation();
+                    task.procName = "@AdHoc";
+                    task.params = new ParameterSet();
+                    task.params.m_params = new Object[] {
+                            plannedStmt.aggregatorFragment, plannedStmt.collectorFragment,
+                            plannedStmt.sql, plannedStmt.isReplicatedTableDML ? 1 : 0
+                    };
+                    task.clientHandle = plannedStmt.clientHandle;
+
+                    // initiate the transaction
+                    m_initiator.createTransaction(plannedStmt.connectionId,
+                                                  task, false, false, m_allPartitions,
+                                                  m_allPartitions.length, plannedStmt.clientData);
+                }
+                else {
+                    throw new RuntimeException("Should not be able to get here until catalog changes are supported.");
+                }
             }
-            else
-            {
+            else {
                 ClientResponseImpl errorResponse =
                     new ClientResponseImpl(
                             ClientResponseImpl.UNEXPECTED_FAILURE,
-                            new VoltTable[0], plannedStmt.errorMsg,
-                            plannedStmt.clientHandle);
-                final Connection c = (Connection) plannedStmt.clientData;
+                            new VoltTable[0], result.errorMsg,
+                            result.clientHandle);
+                final Connection c = (Connection) result.clientData;
                 c.writeStream().enqueue(errorResponse);
             }
         }

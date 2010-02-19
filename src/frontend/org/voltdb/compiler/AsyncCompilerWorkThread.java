@@ -15,30 +15,35 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.planner;
+package org.voltdb.compiler;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
+
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.hsqldb.HSQLInterface;
 import org.hsqldb.HSQLInterface.HSQLParseException;
 import org.voltdb.VoltDB;
-import org.voltdb.catalog.*;
-import org.voltdb.compiler.DatabaseEstimates;
+import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Database;
 import org.voltdb.debugstate.PlannerThreadContext;
+import org.voltdb.planner.CompiledPlan;
+import org.voltdb.planner.QueryPlanner;
+import org.voltdb.planner.TrivialCostModel;
 import org.voltdb.planner.CompiledPlan.Fragment;
 import org.voltdb.plannodes.PlanNodeList;
-import org.voltdb.utils.HexEncoder;
 import org.voltdb.utils.DumpManager;
+import org.voltdb.utils.HexEncoder;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltLoggerFactory;
-import org.apache.log4j.Logger;
-import org.apache.log4j.Level;
 
-public class AdHocPlannerThread extends Thread implements DumpManager.Dumpable {
+public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpable {
 
-    LinkedBlockingQueue<AdHocPlannerWork> m_work = new LinkedBlockingQueue<AdHocPlannerWork>();
-    final ArrayDeque<AdHocPlannedStmt> m_finished = new ArrayDeque<AdHocPlannedStmt>();
+    LinkedBlockingQueue<AsyncCompilerWork> m_work = new LinkedBlockingQueue<AsyncCompilerWork>();
+    final ArrayDeque<AsyncCompilerResult> m_finished = new ArrayDeque<AsyncCompilerResult>();
     Catalog m_catalog;
     HSQLInterface m_hsql;
     int counter = 0;
@@ -51,7 +56,7 @@ public class AdHocPlannerThread extends Thread implements DumpManager.Dumpable {
 
     private static final Logger ahpLog = Logger.getLogger("ADHOCPLANNERTHREAD", VoltLoggerFactory.instance());
 
-    public AdHocPlannerThread(Catalog catalog, int siteId) {
+    public AsyncCompilerWorkThread(Catalog catalog, int siteId) {
         m_catalog = catalog;
         m_hsql = null;
         m_siteId = siteId;
@@ -112,7 +117,7 @@ public class AdHocPlannerThread extends Thread implements DumpManager.Dumpable {
         m_work.add(work);
     }
 
-    public AdHocPlannedStmt getPlannedStmt() {
+    public AsyncCompilerResult getPlannedStmt() {
         synchronized (m_finished) {
             return m_finished.poll();
         }
@@ -120,7 +125,7 @@ public class AdHocPlannerThread extends Thread implements DumpManager.Dumpable {
 
     @Override
     public void run() {
-        AdHocPlannerWork work = null;
+        AsyncCompilerWork work = null;
         try {
             work = m_work.take();
         } catch (InterruptedException e) {
@@ -132,63 +137,15 @@ public class AdHocPlannerThread extends Thread implements DumpManager.Dumpable {
                 DumpManager.putDump(m_dumpId, m_currentDumpTimestamp, true, getDumpContents());
             }
             else {
-                TrivialCostModel costModel = new TrivialCostModel();
-                Cluster cluster = m_catalog.getClusters().get("cluster");
-                Database database = cluster.getDatabases().get("database");
-                QueryPlanner planner =
-                    new QueryPlanner(cluster, database, m_hsql,
-                                     new DatabaseEstimates(), false,
-                                     VoltDB.getQuietAdhoc());
-                CompiledPlan plan = null;
-                AdHocPlannedStmt plannedStmt = new AdHocPlannedStmt();
-                plannedStmt.clientHandle = work.clientHandle;
-                plannedStmt.connectionId = work.connectionId;
-                plannedStmt.clientData = work.clientData;
-                String error_msg = null;
-                try {
-                    plan = planner.compilePlan(costModel, work.sql, "adhocsql-" + String.valueOf(counter++), "adhocproc", false, null);
-                    error_msg = planner.m_recentErrorMsg;
-                } catch (Exception e) {
-                    plan = null;
-                    error_msg = e.getMessage();
-                }
-                if (plan != null)
-                {
-                    plan.sql = work.sql;
-                }
-                else
-                {
-                    plannedStmt.errorMsg =
-                        "Failed to ad-hoc-plan for stmt: " + work.sql;
-                    plannedStmt.errorMsg += " with error: " + error_msg;
-                }
-
-                if (plan != null) {
-                    assert(plan.fragments.size() <= 2);
-                    for (int i = 0; i < plan.fragments.size(); i++) {
-
-                        Fragment frag = plan.fragments.get(i);
-                        PlanNodeList planList = new PlanNodeList(frag.planGraph);
-                        String serializedPlan = planList.toJSONString();
-
-                        // assume multipartition is the collector fragment
-                        if (frag.multiPartition) {
-                            plannedStmt.collectorFragment = serializedPlan;
-                        }
-                        // assume non-multi is the aggregator fragment
-                        else {
-                            plannedStmt.aggregatorFragment = serializedPlan;
-                        }
-
-                    }
-
-                    // fill in stuff for the whole sql stmt
-                    plannedStmt.isReplicatedTableDML = plan.replicatedTableDML;
-                    plannedStmt.sql = plan.sql;
-                }
+                AsyncCompilerResult result = null;
+                if (work instanceof AdHocPlannerWork)
+                    result = compileAdHocPlan((AdHocPlannerWork) work);
+                if (work instanceof CatalogChangeWork)
+                    result = prepareApplicationCatalogDiff((CatalogChangeWork) work);
+                assert(result != null);
 
                 synchronized (m_finished) {
-                    m_finished.add(plannedStmt);
+                    m_finished.add(result);
                 }
             }
 
@@ -224,22 +181,85 @@ public class AdHocPlannerThread extends Thread implements DumpManager.Dumpable {
         // doing this with arraylists before arrays seems more stable
         // if the contents change while iterating
 
-        ArrayList<AdHocPlannerWork> toplan = new ArrayList<AdHocPlannerWork>();
-        ArrayList<AdHocPlannedStmt> planned = new ArrayList<AdHocPlannedStmt>();
+        ArrayList<AsyncCompilerWork> toplan = new ArrayList<AsyncCompilerWork>();
+        ArrayList<AsyncCompilerResult> planned = new ArrayList<AsyncCompilerResult>();
 
-        for (AdHocPlannerWork work : m_work)
+        for (AsyncCompilerWork work : m_work)
             toplan.add(work);
-        for (AdHocPlannedStmt stmt : m_finished)
+        for (AsyncCompilerResult stmt : m_finished)
             planned.add(stmt);
 
-        context.plannerWork = new AdHocPlannerWork[toplan.size()];
+        context.compilerWork = new AsyncCompilerWork[toplan.size()];
         for (int i = 0; i < toplan.size(); i++)
-            context.plannerWork[i] = toplan.get(i);
+            context.compilerWork[i] = toplan.get(i);
 
-        context.plannedStmts = new AdHocPlannedStmt[planned.size()];
+        context.compilerResults = new AsyncCompilerResult[planned.size()];
         for (int i = 0; i < planned.size(); i++)
-            context.plannedStmts[i] = planned.get(i);
+            context.compilerResults[i] = planned.get(i);
 
         return context;
+    }
+
+    private AsyncCompilerResult compileAdHocPlan(AdHocPlannerWork work) {
+        TrivialCostModel costModel = new TrivialCostModel();
+        Cluster cluster = m_catalog.getClusters().get("cluster");
+        Database database = cluster.getDatabases().get("database");
+        QueryPlanner planner =
+            new QueryPlanner(cluster, database, m_hsql,
+                             new DatabaseEstimates(), false,
+                             VoltDB.getQuietAdhoc());
+        CompiledPlan plan = null;
+        AdHocPlannedStmt plannedStmt = new AdHocPlannedStmt();
+        plannedStmt.clientHandle = work.clientHandle;
+        plannedStmt.connectionId = work.connectionId;
+        plannedStmt.clientData = work.clientData;
+        String error_msg = null;
+        try {
+            plan = planner.compilePlan(costModel, work.sql, "adhocsql-" + String.valueOf(counter++), "adhocproc", false, null);
+            error_msg = planner.getErrorMessage();
+        } catch (Exception e) {
+            plan = null;
+            error_msg = e.getMessage();
+        }
+        if (plan != null)
+        {
+            plan.sql = work.sql;
+        }
+        else
+        {
+            plannedStmt.errorMsg =
+                "Failed to ad-hoc-plan for stmt: " + work.sql;
+            plannedStmt.errorMsg += " with error: " + error_msg;
+        }
+
+        if (plan != null) {
+            assert(plan.fragments.size() <= 2);
+            for (int i = 0; i < plan.fragments.size(); i++) {
+
+                Fragment frag = plan.fragments.get(i);
+                PlanNodeList planList = new PlanNodeList(frag.planGraph);
+                String serializedPlan = planList.toJSONString();
+
+                // assume multipartition is the collector fragment
+                if (frag.multiPartition) {
+                    plannedStmt.collectorFragment = serializedPlan;
+                }
+                // assume non-multi is the aggregator fragment
+                else {
+                    plannedStmt.aggregatorFragment = serializedPlan;
+                }
+
+            }
+
+            // fill in stuff for the whole sql stmt
+            plannedStmt.isReplicatedTableDML = plan.replicatedTableDML;
+            plannedStmt.sql = plan.sql;
+        }
+
+        return plannedStmt;
+    }
+
+    private AsyncCompilerResult prepareApplicationCatalogDiff(CatalogChangeWork work) {
+        return null;
     }
 }
