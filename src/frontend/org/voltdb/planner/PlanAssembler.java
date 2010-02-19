@@ -423,10 +423,23 @@ public class PlanAssembler {
             root = addProjection(root);
         }
 
-        if ((m_parsedSelect.limit != -1) || (m_parsedSelect.offset > 0)) {
+        if ((m_parsedSelect.limit != -1) || (m_parsedSelect.limitParameterId != -1) ||
+            (m_parsedSelect.offset > 0) || (m_parsedSelect.offsetParameterId != -1))
+        {
             LimitPlanNode limit = new LimitPlanNode(m_context, getNextPlanNodeId());
             limit.setLimit((int) m_parsedSelect.limit);
             limit.setOffset((int) m_parsedSelect.offset);
+
+            if (m_parsedSelect.offsetParameterId != -1) {
+                ParameterInfo parameterInfo =
+                    m_parsedSelect.paramsById.get(m_parsedSelect.offsetParameterId);
+                limit.setOffsetParameterIndex(parameterInfo.index);
+            }
+            if (m_parsedSelect.limitParameterId != -1) {
+                ParameterInfo parameterInfo =
+                    m_parsedSelect.paramsById.get(m_parsedSelect.limitParameterId);
+                limit.setLimitParameterIndex(parameterInfo.index);
+            }
             limit.addAndLinkChild(root);
             root = limit;
         }

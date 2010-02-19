@@ -62,13 +62,18 @@ namespace voltdb
     {
     public:
         LimitExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node)
-            : AbstractExecutor(engine, abstract_node) { }
-        ~LimitExecutor();
+            : AbstractExecutor(engine, abstract_node)
+        {
+        }
+
+        ~LimitExecutor() {
+        }
 
     protected:
         bool p_init(AbstractPlanNode*, const catalog::Database* catalog_db, int* tempTableMemoryInBytes);
         bool p_execute(const NValueArray &params);
     };
+
 }
 
 #endif

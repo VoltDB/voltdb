@@ -20,6 +20,7 @@ package org.voltdb.planner;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map.Entry;
+
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
@@ -57,6 +58,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     public long limit = -1;
     public long offset = 0;
+    public long limitParameterId = -1;
+    public long offsetParameterId = -1;
     public boolean grouped = false;
     public boolean distinct = false;
 
@@ -69,10 +72,18 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             limit = Long.parseLong(node.getNodeValue());
         if ((node = attrs.getNamedItem("offset")) != null)
             offset = Long.parseLong(node.getNodeValue());
+        if ((node = attrs.getNamedItem("limit_paramid")) != null)
+            limitParameterId = Long.parseLong(node.getNodeValue());
+        if ((node = attrs.getNamedItem("offset_paramid")) != null)
+            offsetParameterId = Long.parseLong(node.getNodeValue());
         if ((node = attrs.getNamedItem("grouped")) != null)
             grouped = Boolean.parseBoolean(node.getNodeValue());
         if ((node = attrs.getNamedItem("distinct")) != null)
             distinct = Boolean.parseBoolean(node.getNodeValue());
+
+        // limit and offset can't have both value and parameter
+        if (limit != -1) assert limitParameterId == -1 : "Parsed value and param. limit.";
+        if (offset != 0) assert offsetParameterId == -1 : "Parsed value and param. offset.";
 
         for (Node child = stmtNode.getFirstChild(); child != null; child = child.getNextSibling()) {
             if (child.getNodeType() != Node.ELEMENT_NODE)

@@ -47,6 +47,7 @@
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/tabletuple.h"
+#include "common/ValuePeeker.hpp"
 #include "plannodes/limitnode.h"
 #include "storage/table.h"
 #include "storage/temptable.h"
@@ -63,6 +64,7 @@ LimitExecutor::p_init(AbstractPlanNode* abstract_node,
 
     LimitPlanNode* node = dynamic_cast<LimitPlanNode*>(abstract_node);
     assert(node);
+
     //
     // Skip if we are inline
     //
@@ -99,14 +101,25 @@ LimitExecutor::p_execute(const NValueArray &params)
     TableTuple tuple(input_table->schema());
     TableIterator iterator(input_table);
     int tuple_ctr = 0;
+
     int limit = node->getLimit();
     int offset = node->getOffset();
-    bool start = (offset == 0);
+    bool start = (node->getOffset() == 0);
+
+    // Limit and offset parameters strictly integers. Can't limit <?=varchar>.
+    // Converting the loop counter to NValue's doesn't make it cleaner -
+    // and probably makes it slower. Would have to initialize and nvalue for
+    // each loop iteration.
+    if (node->getLimitParamIdx() != -1) {
+        limit = ValuePeeker::peekInteger(params[node->getLimitParamIdx()]);
+    }
+    if (node->getOffsetParamIdx() != -1) {
+        offset = ValuePeeker::peekInteger(params[node->getOffsetParamIdx()]);
+    }
+
     while (iterator.next(tuple) && (tuple_ctr < limit))
     {
-        //
-        // We don't have a good way of jumping forward with our iterator...
-        //
+        // TODO: need a way to skip / iterate N items.
         if (start) {
             if (!output_table->insertTuple(tuple))
             {
@@ -123,8 +136,4 @@ LimitExecutor::p_execute(const NValueArray &params)
     }
 
     return true;
-}
-
-LimitExecutor::~LimitExecutor()
-{
 }

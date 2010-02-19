@@ -22,7 +22,7 @@ import org.json.JSONObject;
 import org.json.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.planner.PlannerContext;
-import org.voltdb.types.*;
+import org.voltdb.types.PlanNodeType;
 
 /**
  *
@@ -31,11 +31,17 @@ public class LimitPlanNode extends AbstractPlanNode {
 
     public enum Members {
         OFFSET,
-        LIMIT;
+        LIMIT,
+        OFFSET_PARAM_IDX,
+        LIMIT_PARAM_IDX;
     }
 
     protected int m_offset = 0;
     protected int m_limit = -1;
+
+    // -1 also interpreted by EE as uninitialized
+    private long m_limitParameterId = -1;
+    private long m_offsetParameterId = -1;
 
     /**
      * @param id
@@ -91,11 +97,21 @@ public class LimitPlanNode extends AbstractPlanNode {
         super.toJSONString(stringer);
         stringer.key(Members.OFFSET.name()).value(m_offset);
         stringer.key(Members.LIMIT.name()).value(m_limit);
+        stringer.key(Members.OFFSET_PARAM_IDX.name()).value(m_offsetParameterId);
+        stringer.key(Members.LIMIT_PARAM_IDX.name()).value(m_limitParameterId);
     }
 
     protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {
         m_offset = obj.getInt(Members.OFFSET.name());
         m_limit = obj.getInt(Members.LIMIT.name());
+    }
+
+    public void setLimitParameterIndex(long limitParameterId) {
+        m_limitParameterId = limitParameterId;
+    }
+
+    public void setOffsetParameterIndex(long offsetParameterId) {
+        m_offsetParameterId = offsetParameterId;
     }
 
 }

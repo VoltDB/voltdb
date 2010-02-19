@@ -31,7 +31,7 @@ import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.regressionsuites.fixedsql.*;
+import org.voltdb.regressionsuites.fixedsql.Insert;
 
 /**
  * Actual regression tests for SQL that I found that was broken and
@@ -836,6 +836,16 @@ public class TestFixedSQLSuite extends RegressionSuite {
         assertEquals(4, results[0].getRowCount());
     }
 
+    public void testTicketEng397() throws IOException, ProcCallException
+    {
+        Client client = getClient();
+        for (int i=0; i < 20; i++) {
+            client.callProcedure("Insert", "P1", i, "desc", 100 + i, 4.5);
+        }
+        VoltTable[] results = client.callProcedure("Eng397LimitParam", new Integer(10));
+        assertEquals(10, results[0].getRowCount());
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -854,14 +864,12 @@ public class TestFixedSQLSuite extends RegressionSuite {
         project.addPartitionInfo("P1", "ID");
         project.addPartitionInfo("P2", "ID");
         project.addProcedures(PROCEDURES);
+        project.addStmtProcedure("Eng397LimitParam", "Select P1.NUM from P1 order by P1.NUM limit ?;");
 
-/*
         // CONFIG #1: Local Site/Partitions running on IPC backend
-        config = new LocalSingleProcessServer("sqltypes-onesite.jar", 1, BackendTarget.NATIVE_EE_IPC);
-        config.compile(project);
-        builder.addServerConfig(config);
-*/
-
+        // config = new LocalSingleProcessServer("sqltypes-onesite.jar", 1, BackendTarget.NATIVE_EE_IPC);
+        // config.compile(project);
+        // builder.addServerConfig(config);
 
         // JNI
         config = new LocalSingleProcessServer("fixedsql-onesite.jar", 1, BackendTarget.NATIVE_EE_JNI);

@@ -62,10 +62,14 @@ class LimitPlanNode : public AbstractPlanNode {
         LimitPlanNode(CatalogId id) : AbstractPlanNode(id) {
             this->limit = -1;
             this->offset = 0;
+            this->limitParamIdx = -1;
+            this->offsetParamIdx = -1;
         }
         LimitPlanNode() : AbstractPlanNode() {
             this->limit = -1;
             this->offset = 0;
+            this->limitParamIdx = -1;
+            this->offsetParamIdx = -1;
         }
         ~LimitPlanNode();
         virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_LIMIT); }
@@ -76,6 +80,22 @@ class LimitPlanNode : public AbstractPlanNode {
         void setOffset(int offset);
         int getOffset() const;
 
+        void setLimitParamIdx(int paramIdx) {
+            limitParamIdx = paramIdx;
+        }
+
+        int getLimitParamIdx() const {
+            return limitParamIdx;
+        }
+
+        void setOffsetParamIdx(int paramIdx) {
+            offsetParamIdx = paramIdx;
+        }
+
+        int getOffsetParamIdx() const {
+            return offsetParamIdx;
+        }
+
         std::string debugInfo(const std::string &spacer) const;
 
     protected:
@@ -83,6 +103,8 @@ class LimitPlanNode : public AbstractPlanNode {
         virtual void loadFromJSONObject(json_spirit::Object &obj, const catalog::Database *catalog_db);
         int limit;
         int offset;
+        int limitParamIdx;
+        int offsetParamIdx;
 };
 
 }

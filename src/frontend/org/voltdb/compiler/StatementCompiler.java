@@ -19,17 +19,28 @@ package org.voltdb.compiler;
 
 import java.io.PrintStream;
 import java.util.Collections;
+
 import org.hsqldb.HSQLInterface;
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.voltdb.catalog.*;
+import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.PlanFragment;
+import org.voltdb.catalog.Statement;
+import org.voltdb.catalog.StmtParameter;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.ParameterInfo;
 import org.voltdb.planner.PlanColumn;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.TrivialCostModel;
-import org.voltdb.plannodes.*;
+import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractScanPlanNode;
+import org.voltdb.plannodes.DeletePlanNode;
+import org.voltdb.plannodes.InsertPlanNode;
+import org.voltdb.plannodes.PlanNodeList;
+import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.HexEncoder;
@@ -100,10 +111,11 @@ public abstract class StatementCompiler {
             throw compiler.new VoltCompilerException("Failed to plan for stmt: " + catalogStmt.getTypeName());
         }
         if (plan == null) {
-            String msg = "Failed to plan for stmt: " + catalogStmt.getTypeName();
+            String msg = "Failed to plan for stmt type(" + catalogStmt.getTypeName() + ") "
+                            + catalogStmt.getSqltext();
             String plannerMsg = planner.getErrorMessage();
             if (plannerMsg != null)
-                msg += " with error: \"" + plannerMsg + "\"";
+                msg += " Error: \"" + plannerMsg + "\"";
             throw compiler.new VoltCompilerException(msg);
         }
 

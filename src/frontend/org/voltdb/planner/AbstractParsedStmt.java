@@ -25,16 +25,29 @@ import java.util.HashSet;
 import java.util.InputMismatchException;
 import java.util.Map.Entry;
 
-import javax.xml.parsers.*;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
-import org.voltdb.expressions.*;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AggregateExpression;
+import org.voltdb.expressions.ConstantValueExpression;
+import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.ParameterValueExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.utils.StringInputStream;
-import org.w3c.dom.*;
-import org.xml.sax.*;
+import org.w3c.dom.Document;
+import org.w3c.dom.NamedNodeMap;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.ErrorHandler;
+import org.xml.sax.SAXException;
+import org.xml.sax.SAXParseException;
 
 /**
  *
@@ -417,7 +430,6 @@ public abstract class AbstractParsedStmt {
                 param.index = Integer.parseInt(attrs.getNamedItem("index").getNodeValue());
                 String typeName = attrs.getNamedItem("type").getNodeValue();
                 param.type = VoltType.typeFromString(typeName);
-
                 paramsById.put(id, param);
                 paramList.add(param);
             }

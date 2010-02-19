@@ -91,6 +91,15 @@ void LimitPlanNode::loadFromJSONObject(json_spirit::Object &obj, const catalog::
         throw std::runtime_error("LimitPlanNode::loadFromJSONObject: can't find OFFSET value");
     }
     offset = offsetValue.get_int();
+
+    json_spirit::Value paramIdx = json_spirit::find_value(obj, "LIMIT_PARAM_IDX");
+    if (!(paramIdx == json_spirit::Value::null)) {
+        setLimitParamIdx(paramIdx.get_int());
+    }
+    paramIdx = json_spirit::find_value(obj, "OFFSET_PARAM_IDX");
+    if (!(paramIdx == json_spirit::Value::null)) {
+        setOffsetParamIdx(paramIdx.get_int());
+    }
 }
 
 }

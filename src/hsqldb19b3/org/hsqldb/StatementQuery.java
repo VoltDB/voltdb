@@ -108,9 +108,9 @@ public class StatementQuery extends StatementDMQL {
 
         queryExpression.getBaseTableNames(set);
 
-        for (int i = 0; i < subqueries.length; i++) {
-            if (subqueries[i].queryExpression != null) {
-                subqueries[i].queryExpression.getBaseTableNames(set);
+        for (SubQuery subquerie : subqueries) {
+            if (subquerie.queryExpression != null) {
+                subquerie.queryExpression.getBaseTableNames(set);
             }
         }
     }
@@ -213,20 +213,33 @@ public class StatementQuery extends StatementDMQL {
         // limit
         if ((select.sortAndSlice != null) && (select.sortAndSlice.limitCondition != null)) {
             Expression limitCondition = select.sortAndSlice.limitCondition;
-            Integer offset = null;
-            Integer limit = null;
-            // XXX should this be a thrown HSQLParseException?
-            assert(limitCondition.nodes.length == 2);
+            if (limitCondition.nodes.length != 2) {
+                throw new HSQLParseException("Parser did not create limit and offset expression for LIMIT.");
+            }
             try {
-                offset = (Integer)limitCondition.nodes[0].getValue(session);
-                limit = (Integer)limitCondition.nodes[1].getValue(session);
+                // read offset. it may be a parameter token.
+                if (limitCondition.nodes[0].isParam() == false) {
+                    Integer offset = (Integer)limitCondition.nodes[0].getValue(session);
+                    if (offset > 0) {
+                        sb.append(" offset=\"" + offset + " \"");
+                    }
+                }
+                else {
+                    sb.append(" offset_paramid=\"" + limitCondition.nodes[0].getUniqueId() + "\"");
+                }
+
+                // read limit. it may be a parameter token.
+                if (limitCondition.nodes[1].isParam() == false) {
+                    Integer limit = (Integer)limitCondition.nodes[1].getValue(session);
+                    sb.append(" limit=\"" + limit + "\"");
+                }
+                else {
+                    sb.append(" limit_paramid=\"" + limitCondition.nodes[1].getUniqueId() + "\"");
+                }
             } catch (HsqlException ex) {
-                // XXX Again, eww, but leaving until I know why this doesn't just barf
+                // XXX really?
                 ex.printStackTrace();
             }
-            sb.append(" limit=\"" + limit + "\"");
-            if (offset > 0)
-                sb.append(" offset=\"" + offset + "\"");
         }
 
         sb.append(">\n");
@@ -303,8 +316,8 @@ public class StatementQuery extends StatementDMQL {
 
         // scans
         sb.append(indent + "<tablescans>\n");
-        for (int i = 0; i < rangeVariables.length; i++)
-            sb.append(rangeVariables[i].voltGetXML(session, indent + HSQLInterface.XML_INDENT)).append("\n");
+        for (RangeVariable rangeVariable : rangeVariables)
+            sb.append(rangeVariable.voltGetXML(session, indent + HSQLInterface.XML_INDENT)).append("\n");
         sb.append(indent + "</tablescans>\n");
 
         // conditions
