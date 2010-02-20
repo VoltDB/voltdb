@@ -112,9 +112,18 @@ LimitExecutor::p_execute(const NValueArray &params)
     // each loop iteration.
     if (node->getLimitParamIdx() != -1) {
         limit = ValuePeeker::peekInteger(params[node->getLimitParamIdx()]);
+        if (limit < 0) {
+            throw SQLException(SQLException::data_exception_invalid_parameter,
+                               "Negative parameter to LIMIT");
+        }
+
     }
     if (node->getOffsetParamIdx() != -1) {
         offset = ValuePeeker::peekInteger(params[node->getOffsetParamIdx()]);
+        if (offset < 0) {
+            throw SQLException(SQLException::data_exception_invalid_parameter,
+                               "Negative parameter to LIMIT OFFSET");
+        }
     }
 
     while (iterator.next(tuple) && (tuple_ctr < limit))

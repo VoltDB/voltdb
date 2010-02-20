@@ -24,6 +24,7 @@ namespace voltdb {
 const char* SQLException::data_exception_division_by_zero = "22012";
 const char* SQLException::data_exception_string_data_length_mismatch = "22026";
 const char* SQLException::data_exception_numeric_value_out_of_range = "22003";
+const char* SQLException::data_exception_invalid_parameter = "22023";
 const char* SQLException::integrity_constraint_violation = "23000";
 
 const char* SQLException::volt_output_buffer_overflow = "V0001";

@@ -30,6 +30,7 @@ public:
     static const char* data_exception_division_by_zero;
     static const char* data_exception_string_data_length_mismatch;
     static const char* data_exception_numeric_value_out_of_range;
+    static const char* data_exception_invalid_parameter;
     static const char* integrity_constraint_violation;
 
     // These are ordered by error code. Names and codes are volt
