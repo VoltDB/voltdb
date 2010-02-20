@@ -336,14 +336,18 @@ public abstract class VoltProcedure {
         // (this could be made faster, but with less code re-use)
         else {
             assert(catProc.getStatements().size() == 1);
-
-            if (!isNative) {
-                // HSQL handling
-                VoltTable table = hsql.runSQLWithSubstitutions(m_cachedSingleStmt[0], paramList);
-                results = new VoltTable[] { table };
+            try {
+                if (!isNative) {
+                    // HSQL handling
+                    VoltTable table = hsql.runSQLWithSubstitutions(m_cachedSingleStmt[0], paramList);
+                    results = new VoltTable[] { table };
+                }
+                else {
+                    results = executeQueriesInABatch(1, m_cachedSingleStmt, new Object[][] { paramList } , true);
+                }
             }
-            else {
-                results = executeQueriesInABatch(1, m_cachedSingleStmt, new Object[][] { paramList } , true);
+            catch (SerializableException ex) {
+                retval = getErrorResponse(ex);
             }
         }
 
