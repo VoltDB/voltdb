@@ -49,6 +49,7 @@
 #include <sstream>
 #include "abstractplannode.h"
 #include "common/debuglog.h"
+#include "common/valuevector.h"
 
 namespace voltdb {
 
@@ -73,6 +74,9 @@ class LimitPlanNode : public AbstractPlanNode {
         }
         ~LimitPlanNode();
         virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_LIMIT); }
+
+        // evaluate possibly parameterized limit and offsets.
+        void getLimitAndOffsetByReference(const NValueArray &params, int &limit, int &offset);
 
         void setLimit(int limit);
         int getLimit() const;

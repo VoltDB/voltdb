@@ -47,6 +47,7 @@
 #include <stdexcept>
 #include "limitnode.h"
 #include "common/serializeio.h"
+#include "common/ValuePeeker.hpp"
 #include "storage/table.h"
 
 namespace voltdb {
@@ -70,6 +71,40 @@ void LimitPlanNode::setOffset(int offset) {
 }
 int LimitPlanNode::getOffset() const {
     return (this->offset);
+}
+
+/*
+ * This code is needed in the limit executor as well as anywhere limit
+ * is inlined. Centralize it here.
+ */
+void
+LimitPlanNode::getLimitAndOffsetByReference(const NValueArray &params, int &limit, int &offset)
+{
+    assert(getLimit() >= 0);
+    assert(getOffset() >= 0);
+
+    limit = getLimit();
+    offset = getOffset();
+
+    // Limit and offset parameters strictly integers. Can't limit <?=varchar>.
+    // Converting the loop counter to NValue's doesn't make it cleaner -
+    // and probably makes it slower. Would have to initialize an nvalue for
+    // each loop iteration.
+    if (getLimitParamIdx() != -1) {
+        limit = ValuePeeker::peekInteger(params[getLimitParamIdx()]);
+        if (limit < 0) {
+            throw SQLException(SQLException::data_exception_invalid_parameter,
+                               "Negative parameter to LIMIT");
+        }
+
+    }
+    if (getOffsetParamIdx() != -1) {
+        offset = ValuePeeker::peekInteger(params[getOffsetParamIdx()]);
+        if (offset < 0) {
+            throw SQLException(SQLException::data_exception_invalid_parameter,
+                               "Negative parameter to LIMIT OFFSET");
+        }
+    }
 }
 
 std::string LimitPlanNode::debugInfo(const std::string &spacer) const {

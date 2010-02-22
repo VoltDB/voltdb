@@ -52,6 +52,24 @@ public class TestIndexesSuite extends RegressionSuite {
     // - multi-column
     // - multi-map
 
+    public void testParameterizedLimitOnIndexScan()
+    throws IOException, ProcCallException {
+        String[] tables = {"P1", "R1", "P2", "R2"};
+        Client client = getClient();
+        for (String table : tables)
+        {
+            client.callProcedure("Insert", table, 1, "a", 100, 1, 14.5);
+            client.callProcedure("Insert", table, 2, "b", 100, 2, 15.5);
+            client.callProcedure("Insert", table, 3, "c", 200, 3, 16.5);
+            client.callProcedure("Insert", table, 6, "f", 200, 6, 17.5);
+            client.callProcedure("Insert", table, 7, "g", 300, 7, 18.5);
+            client.callProcedure("Insert", table, 8, "h", 300, 8, 19.5);
+
+            VoltTable[] results = client.callProcedure("Eng397LimitIndex" + table, new Integer(2));
+            assertEquals(2, results[0].getRowCount());
+        }
+    }
+
     public void testOrderedUniqueOneColumnIntIndex()
     throws IOException, ProcCallException
     {
@@ -272,6 +290,10 @@ public class TestIndexesSuite extends RegressionSuite {
         project.addPartitionInfo("P2", "ID");
         project.addPartitionInfo("P3", "ID");
         project.addProcedures(PROCEDURES);
+        project.addStmtProcedure("Eng397LimitIndexR1", "select * from R1 where R1.ID > 2 Limit ?");
+        project.addStmtProcedure("Eng397LimitIndexP1", "select * from P1 where P1.ID > 2 Limit ?");
+        project.addStmtProcedure("Eng397LimitIndexR2", "select * from R2 where R2.ID > 2 Limit ?");
+        project.addStmtProcedure("Eng397LimitIndexP2", "select * from P2 where P2.ID > 2 Limit ?");
 
     /*
         // CONFIG #1: Local Site/Partitions running on IPC backend
@@ -288,7 +310,6 @@ public class TestIndexesSuite extends RegressionSuite {
         config = new LocalSingleProcessServer("testindexes-onesite.jar", 1, BackendTarget.NATIVE_EE_JNI);
         config.compile(project);
         builder.addServerConfig(config);
-
 
         // CLUSTER?
         config = new LocalCluster("testindexes-cluster.jar", 2, 2,

@@ -47,7 +47,6 @@
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/tabletuple.h"
-#include "common/ValuePeeker.hpp"
 #include "plannodes/limitnode.h"
 #include "storage/table.h"
 #include "storage/temptable.h"
@@ -102,29 +101,9 @@ LimitExecutor::p_execute(const NValueArray &params)
     TableIterator iterator(input_table);
     int tuple_ctr = 0;
 
-    int limit = node->getLimit();
-    int offset = node->getOffset();
+    int limit = 0, offset = 0;
     bool start = (node->getOffset() == 0);
-
-    // Limit and offset parameters strictly integers. Can't limit <?=varchar>.
-    // Converting the loop counter to NValue's doesn't make it cleaner -
-    // and probably makes it slower. Would have to initialize and nvalue for
-    // each loop iteration.
-    if (node->getLimitParamIdx() != -1) {
-        limit = ValuePeeker::peekInteger(params[node->getLimitParamIdx()]);
-        if (limit < 0) {
-            throw SQLException(SQLException::data_exception_invalid_parameter,
-                               "Negative parameter to LIMIT");
-        }
-
-    }
-    if (node->getOffsetParamIdx() != -1) {
-        offset = ValuePeeker::peekInteger(params[node->getOffsetParamIdx()]);
-        if (offset < 0) {
-            throw SQLException(SQLException::data_exception_invalid_parameter,
-                               "Negative parameter to LIMIT OFFSET");
-        }
-    }
+    node->getLimitAndOffsetByReference(params, limit, offset);
 
     while (iterator.next(tuple) && (tuple_ctr < limit))
     {

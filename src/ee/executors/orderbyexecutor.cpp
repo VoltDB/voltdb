@@ -179,8 +179,7 @@ OrderByExecutor::p_execute(const NValueArray &params)
     int offset = -1;
     if (limit_node != NULL)
     {
-        limit = limit_node->getLimit();
-        offset = limit_node->getOffset();
+        limit_node->getLimitAndOffsetByReference(params, limit, offset);
         if (offset > 0)
         {
             VOLT_ERROR("Nested Limit Offset is not yet supported for PlanNode '%s'",

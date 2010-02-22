@@ -199,17 +199,6 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
         m_limitNode =
             static_cast<LimitPlanNode*>
             (m_node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
-        // XXX again again, this assert is useless with static_cast
-        //assert(m_limitNode);
-        assert(m_limitNode->getLimit() >= 0);
-        assert(m_limitNode->getOffset() >= 0);
-        m_limitSize = m_limitNode->getLimit();
-        m_limitOffset = m_limitNode->getOffset();
-        if (m_limitOffset > 0)
-        {
-            VOLT_ERROR("The limit offset operation is not supported for IndexScans yet");
-            return false;
-        }
     }
 
     //
@@ -378,6 +367,20 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     {
         m_distinctValueSet.clear();
     }
+
+    //
+    // INLINE LIMIT
+    //
+    if (m_limitNode != NULL)
+    {
+        m_limitNode->getLimitAndOffsetByReference(params, m_limitSize, m_limitOffset);
+        if (m_limitOffset > 0)
+        {
+            VOLT_ERROR("The limit offset operation is not supported for IndexScans yet");
+            return false;
+        }
+    }
+
 
     //
     // SEARCH KEY
