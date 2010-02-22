@@ -17,6 +17,7 @@
 
 package org.voltdb.types;
 
+import java.text.DateFormat;
 import java.util.Date;
 
 public class TimestampType {
@@ -65,6 +66,14 @@ public class TimestampType {
             return false;
 
         return true;
+    }
+
+    /**
+     * toString for debugging and printing VoltTables
+     */
+    @Override
+    public String toString() {
+        return DateFormat.getInstance().format(m_date) + " +" + m_usecs + "us";
     }
 
     /**
