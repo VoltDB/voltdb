@@ -17,7 +17,7 @@
 
 package org.voltdb.types;
 
-import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.Date;
 
 public class TimestampType {
@@ -73,7 +73,9 @@ public class TimestampType {
      */
     @Override
     public String toString() {
-        return DateFormat.getInstance().format(m_date) + " +" + m_usecs + "us";
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS");
+        String format = sdf.format(m_date);
+        return format + "." + m_usecs;
     }
 
     /**

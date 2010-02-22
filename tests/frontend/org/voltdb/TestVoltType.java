@@ -24,6 +24,8 @@
 package org.voltdb;
 
 import java.math.BigDecimal;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 import junit.framework.TestCase;
 
@@ -159,4 +161,15 @@ public class TestVoltType extends TestCase {
         assertTrue(ts1.compareTo(ts4) < 0);
         assertTrue(ts4.compareTo(ts1) > 0);
     }
+
+    public void testTimestampToString() {
+        // I suppose these could fall across minute boundaries and fail the
+        // test.. but that would seem exceedingly unlikely?
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS");
+        TimestampType now = new TimestampType();
+        Date date = new Date();
+        System.out.println(now.toString());
+        assertTrue(now.toString().startsWith(sdf.format(date)));
+    }
+
 }
