@@ -132,7 +132,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                     self.wfile.write('SQL<br>\n');
                     self.wfile.write(sql_text + '<br>\n<br>\n');
                     self.wfile.write('RESULTS<br>\n');
-                    adhoc = VoltProcedure(fs, "@adhoc",[FastSerializer.VOLTTYPE_STRING])
+                    adhoc = VoltProcedure(fs, "@AdHoc",[FastSerializer.VOLTTYPE_STRING])
                     response = adhoc.call([sql_text], timeout = None)
                 elif (button_clicked == 'TABLES'):
                     self.wfile.write('Table Statistics<br>\n');
