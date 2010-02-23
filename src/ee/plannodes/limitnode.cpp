@@ -80,9 +80,6 @@ int LimitPlanNode::getOffset() const {
 void
 LimitPlanNode::getLimitAndOffsetByReference(const NValueArray &params, int &limit, int &offset)
 {
-    assert(getLimit() >= 0);
-    assert(getOffset() >= 0);
-
     limit = getLimit();
     offset = getOffset();
 
