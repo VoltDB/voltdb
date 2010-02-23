@@ -79,6 +79,7 @@ td {width: 50%%}
 </head>
 
 <body>
+<h2>%s</h2>
 <table cellpadding=3 cellspacing=1 border=1>
 <tr>
 <th>VoltDB Response</th>
@@ -101,6 +102,7 @@ td {width: 50%%}
 
 </html>
 """ % (cgi.escape(item["SQL"]),
+       cgi.escape(item["SQL"]),
        highlight(item["jni"]["Status"],
                  "highlight" in item and "Status" in item["highlight"]),
        highlight(item["hsqldb"]["Status"],
