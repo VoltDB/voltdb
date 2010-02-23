@@ -90,6 +90,28 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         }
     }
 
+    private void corruptTestFiles() throws Exception
+    {
+        FilenameFilter cleaner = new FilenameFilter()
+        {
+            public boolean accept(File dir, String file)
+            {
+                return file.startsWith(TESTNONCE);
+            }
+        };
+
+        java.util.Random r = new java.util.Random();
+        File tmp_dir = new File(TMPDIR);
+        File[] tmp_files = tmp_dir.listFiles(cleaner);
+        for (File tmp_file : tmp_files)
+        {
+            java.io.RandomAccessFile raf = new java.io.RandomAccessFile( tmp_file, "rw");
+            raf.seek(r.nextInt((int)raf.length()));
+            raf.writeByte(r.nextInt() % 127);
+            raf.close();
+        }
+    }
+
     private VoltTable createReplicatedTable(int numberOfItems,
                                             int indexBase)
     {
@@ -217,7 +239,11 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         }
     }
 
-    public void testSnapshotSave() throws IOException
+    /*
+     * Also does some basic smoke tests
+     * of @SnapshotStatus, @SnapshotScan and @SnapshotDelete
+     */
+    public void testSnapshotSave() throws Exception
     {
         Client client = getClient();
 
@@ -235,16 +261,65 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
         VoltTable[] results = null;
 
-        try
+        results = client.callProcedure("@SnapshotSave", TMPDIR,
+                                       TESTNONCE, (byte)1);
+
+        VoltTable statusResults[] = client.callProcedure("@SnapshotStatus");
+        assertNotNull(statusResults);
+        assertEquals( 2, statusResults.length);
+        assertEquals( 7, statusResults[0].getColumnCount());
+        assertEquals( 1, statusResults[0].getRowCount());
+        assertTrue(statusResults[0].advanceRow());
+        assertTrue(TMPDIR.equals(statusResults[0].getString("PATH")));
+        assertTrue(TESTNONCE.equals(statusResults[0].getString("NONCE")));
+        assertFalse( 0 == statusResults[0].getLong("END_TIME"));
+
+        VoltTable scanResults[] = client.callProcedure("@SnapshotScan", new Object[] { null });
+        assertNotNull(scanResults);
+        assertEquals( 1, scanResults.length);
+        assertEquals( 1, scanResults[0].getColumnCount());
+        assertEquals( 1, scanResults[0].getRowCount());
+        assertTrue( scanResults[0].advanceRow());
+        assertTrue( "ERR_MSG".equals(scanResults[0].getColumnName(0)));
+
+        scanResults = client.callProcedure("@SnapshotScan", "/doesntexist");
+        assertNotNull(scanResults);
+        assertEquals( 1, scanResults[1].getRowCount());
+        assertTrue( scanResults[1].advanceRow());
+        assertTrue( "FAILURE".equals(scanResults[1].getString("RESULT")));
+
+        scanResults = client.callProcedure("@SnapshotScan", TMPDIR);
+        assertNotNull(scanResults);
+        assertEquals( 3, scanResults.length);
+        assertEquals( 8, scanResults[0].getColumnCount());
+        assertEquals( 1, scanResults[0].getRowCount());
+        assertTrue( scanResults[0].advanceRow());
+        assertTrue(TMPDIR.equals(scanResults[0].getString("PATH")));
+        assertTrue(TESTNONCE.equals(scanResults[0].getString("NONCE")));
+        assertTrue("TRUE".equals(scanResults[0].getString("COMPLETE")));
+
+        FilenameFilter cleaner = new FilenameFilter()
         {
-            results = client.callProcedure("@SnapshotSave", TMPDIR,
-                                           TESTNONCE, (byte)1);
-        }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("SnapshotSave exception: " + ex.getMessage());
-        }
+            public boolean accept(File dir, String file)
+            {
+                return file.startsWith(TESTNONCE);
+            }
+        };
+
+        File tmp_dir = new File(TMPDIR);
+        File[] tmp_files = tmp_dir.listFiles(cleaner);
+        tmp_files[0].delete();
+
+        scanResults = client.callProcedure("@SnapshotScan", TMPDIR);
+        assertNotNull(scanResults);
+        assertEquals( 3, scanResults.length);
+        assertEquals( 8, scanResults[0].getColumnCount());
+        assertEquals( 1, scanResults[0].getRowCount());
+        assertTrue( scanResults[0].advanceRow());
+        assertTrue(TMPDIR.equals(scanResults[0].getString("PATH")));
+        assertTrue(TESTNONCE.equals(scanResults[0].getString("NONCE")));
+        assertTrue("FALSE".equals(scanResults[0].getString("COMPLETE")));
+        assertTrue(tmp_files[0].getName().contains(scanResults[0].getString("TABLES_MISSING")));
 
         // Instead of something exhaustive, let's just make sure that we get
         // the number of result rows corresponding to the number of ExecutionSites
@@ -301,9 +376,23 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         assertEquals(expected_entries, results[0].getRowCount());
         while (results[0].advanceRow())
         {
-            assertEquals(results[0].getString("RESULT"), "FAILURE");
-            assertTrue(results[0].getString("ERR_MSG").contains("SAVE FILE ALREADY EXISTS"));
+            if (!tmp_files[0].getName().contains(results[0].getString("TABLE"))) {
+                assertEquals(results[0].getString("RESULT"), "FAILURE");
+                assertTrue(results[0].getString("ERR_MSG").contains("SAVE FILE ALREADY EXISTS"));
+            }
         }
+
+        VoltTable deleteResults[] =
+            client.callProcedure(
+                "@SnapshotDelete",
+                new String[] {TMPDIR},
+                new String[]{TESTNONCE});
+        assertNotNull(deleteResults);
+        assertEquals( 1, deleteResults.length);
+        assertEquals( 8, deleteResults[0].getColumnCount());
+        assertEquals( 7, deleteResults[0].getRowCount());
+        tmp_files = tmp_dir.listFiles(cleaner);
+        assertEquals( 0, tmp_files.length);
     }
 
     public void testSaveAndRestoreReplicatedTable()
@@ -439,6 +528,36 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         }
         assertTrue(false);
     }
+
+ // Test that we fail properly when there are no savefiles available
+    public void testCorruptedFiles()
+    throws Exception
+    {
+        int num_replicated_items = 1000;
+        int num_partitioned_items = 126;
+
+        Client client = getClient();
+
+        VoltTable repl_table = createReplicatedTable(num_replicated_items, 0);
+        // make a TPCC warehouse table
+        VoltTable partition_table =
+            createPartitionedTable(num_partitioned_items, 0);
+
+        loadTable(client, "REPLICATED_TESTER", repl_table);
+        loadTable(client, "PARTITION_TESTER", partition_table);
+        saveTables(client);
+
+        // Kill and restart all the execution sites.
+        m_config.shutDown();
+        corruptTestFiles();
+        m_config.startUp();
+
+        client = getClient();
+
+        VoltTable results[] = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT);
+        assertNotNull(results);
+    }
+
 //
 //    public void testRestoreMissingPartitionFile()
 //    throws IOException, InterruptedException
