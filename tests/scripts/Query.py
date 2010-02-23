@@ -53,7 +53,7 @@ class VoltQueryClient(cmd.Cmd):
         self.__timeout = None
 
         self.fs = FastSerializer(host, port, username, password)
-        self.adhoc = VoltProcedure(self.fs, "@adhoc",
+        self.adhoc = VoltProcedure(self.fs, "@AdHoc",
                                    [FastSerializer.VOLTTYPE_STRING])
         self.stat = VoltProcedure(self.fs, "@Statistics",
                                   [FastSerializer.VOLTTYPE_STRING])
