@@ -90,7 +90,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         }
     }
 
-    private void corruptTestFiles() throws Exception
+    private void corruptTestFiles(boolean random) throws Exception
     {
         FilenameFilter cleaner = new FilenameFilter()
         {
@@ -100,16 +100,20 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             }
         };
 
-        java.util.Random r = new java.util.Random();
+        java.util.Random r;
+        if (random) {
+            r = new java.util.Random();
+        } else {
+            r = new java.util.Random(0);
+        }
+
         File tmp_dir = new File(TMPDIR);
         File[] tmp_files = tmp_dir.listFiles(cleaner);
-        for (File tmp_file : tmp_files)
-        {
-            java.io.RandomAccessFile raf = new java.io.RandomAccessFile( tmp_file, "rw");
-            raf.seek(r.nextInt((int)raf.length()));
-            raf.writeByte(r.nextInt() % 127);
-            raf.close();
-        }
+        int tmpIndex = r.nextInt(tmp_files.length);
+        java.io.RandomAccessFile raf = new java.io.RandomAccessFile( tmp_files[tmpIndex], "rw");
+        raf.seek(r.nextInt((int)raf.length()));
+        raf.writeByte(r.nextInt() % 127);
+        raf.close();
     }
 
     private VoltTable createReplicatedTable(int numberOfItems,
@@ -529,7 +533,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         assertTrue(false);
     }
 
- // Test that we fail properly when there are no savefiles available
+    // Test that we fail properly when the save files are corrupted
     public void testCorruptedFiles()
     throws Exception
     {
@@ -537,25 +541,60 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         int num_partitioned_items = 126;
 
         Client client = getClient();
+        for (int ii = 0; ii < 100; ii++) {
+            VoltTable repl_table = createReplicatedTable(num_replicated_items, 0);
+            // make a TPCC warehouse table
+            VoltTable partition_table =
+                createPartitionedTable(num_partitioned_items, 0);
 
-        VoltTable repl_table = createReplicatedTable(num_replicated_items, 0);
-        // make a TPCC warehouse table
-        VoltTable partition_table =
-            createPartitionedTable(num_partitioned_items, 0);
+            loadTable(client, "REPLICATED_TESTER", repl_table);
+            loadTable(client, "PARTITION_TESTER", partition_table);
+            saveTables(client);
 
-        loadTable(client, "REPLICATED_TESTER", repl_table);
-        loadTable(client, "PARTITION_TESTER", partition_table);
-        saveTables(client);
+            // Kill and restart all the execution sites.
+            m_config.shutDown();
+            corruptTestFiles(false);
+            m_config.startUp();
 
-        // Kill and restart all the execution sites.
-        m_config.shutDown();
-        corruptTestFiles();
-        m_config.startUp();
+            client = getClient();
 
-        client = getClient();
+            VoltTable results[] = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT);
+            assertNotNull(results);
+            deleteTestFiles();
+        }
+    }
 
-        VoltTable results[] = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT);
-        assertNotNull(results);
+    // Test that a random corruption doesn't mess up the table. Not reproducible but useful for detecting
+    // stuff we won't normally find
+    public void testCorruptedFilesRandom()
+    throws Exception
+    {
+        int num_replicated_items = 1000;
+        int num_partitioned_items = 126;
+
+        for (int ii = 0; ii < 30; ii++) {
+            Client client = getClient();
+
+            VoltTable repl_table = createReplicatedTable(num_replicated_items, 0);
+            // make a TPCC warehouse table
+            VoltTable partition_table =
+                createPartitionedTable(num_partitioned_items, 0);
+
+            loadTable(client, "REPLICATED_TESTER", repl_table);
+            loadTable(client, "PARTITION_TESTER", partition_table);
+            saveTables(client);
+
+            // Kill and restart all the execution sites.
+            m_config.shutDown();
+            corruptTestFiles(true);
+            m_config.startUp();
+
+            client = getClient();
+
+            VoltTable results[] = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT);
+            assertNotNull(results);
+            deleteTestFiles();
+        }
     }
 
 //

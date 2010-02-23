@@ -103,6 +103,13 @@ public class TableSaveFile
         int length = lengthBuffer.getInt();
         crc.update(lengthBuffer.array(), 4, 4);
 
+        if (length < 0) {
+            throw new IOException("Corrupted save file has negative header length");
+        }
+
+        if (length > 2097152) {
+            throw new IOException("Corrupted save file has unreasonable header length > 2 megs");
+        }
 
         final ByteBuffer saveRestoreHeader = ByteBuffer.allocate(length);
         while (saveRestoreHeader.hasRemaining()) {
@@ -113,25 +120,6 @@ public class TableSaveFile
         }
         saveRestoreHeader.flip();
         crc.update(saveRestoreHeader.array());
-
-        FastDeserializer fd = new FastDeserializer(saveRestoreHeader);
-        m_completed = fd.readByte() == 1 ? true : false;
-        for (int ii = 0; ii < 4; ii++) {
-            m_versionNum[ii] = fd.readInt();
-        }
-        m_createTime = fd.readLong();
-        m_hostId = fd.readInt();
-        m_clusterName = fd.readString();
-        m_databaseName = fd.readString();
-        m_tableName = fd.readString();
-        m_isReplicated = fd.readBoolean();
-        if (!m_isReplicated) {
-            m_partitionIds = (int[])fd.readArray(int.class);
-            m_totalPartitions = fd.readInt();
-        } else {
-            m_partitionIds = new int[] {0};
-            m_totalPartitions = 1;
-        }
 
         /*
          *  Get the template for the VoltTable serialization header.
@@ -156,6 +144,11 @@ public class TableSaveFile
         crc.update(lengthBuffer.array(), 0, 2);
         lengthBuffer.flip();
         length = lengthBuffer.getShort();
+
+        if (length < 0) {
+            throw new IOException("Corrupted save file has negative length for VoltTable header");
+        }
+
         m_tableHeader = ByteBuffer.allocate(length);
         m_tableHeader.putShort((short)length);
         while (m_tableHeader.hasRemaining()) {
@@ -169,6 +162,25 @@ public class TableSaveFile
         final int actualCRC = (int)crc.getValue();
         if (originalCRC != actualCRC) {
             throw new IOException("Checksum mismatch");
+        }
+
+        FastDeserializer fd = new FastDeserializer(saveRestoreHeader);
+        m_completed = fd.readByte() == 1 ? true : false;
+        for (int ii = 0; ii < 4; ii++) {
+            m_versionNum[ii] = fd.readInt();
+        }
+        m_createTime = fd.readLong();
+        m_hostId = fd.readInt();
+        m_clusterName = fd.readString();
+        m_databaseName = fd.readString();
+        m_tableName = fd.readString();
+        m_isReplicated = fd.readBoolean();
+        if (!m_isReplicated) {
+            m_partitionIds = (int[])fd.readArray(int.class);
+            m_totalPartitions = fd.readInt();
+        } else {
+            m_partitionIds = new int[] {0};
+            m_totalPartitions = 1;
         }
     }
 
@@ -347,13 +359,12 @@ public class TableSaveFile
                     final int nextChunkCRC = chunkLengthB.getInt();
                     final int nextChunkPartitionId = chunkLengthB.getInt();
 
-                    /*
-                     * Skip irrelevant chunks
-                     */
-                    if (m_relevantPartitionIds != null) {
-                        if (!m_relevantPartitionIds.contains(nextChunkPartitionId)) {
-                            m_saveFile.position(m_saveFile.position() + (nextChunkLength - 8));
-                        }
+                    if (nextChunkLength < 0) {
+                        throw new IOException("Corrupted TableSaveFile chunk has negative chunk length");
+                    }
+
+                    if (nextChunkLength > 2097152) {
+                        throw new IOException("Corrupted TableSaveFile chunk has unreasonable header length > 2 megs");
                     }
 
                     /*
@@ -390,6 +401,15 @@ public class TableSaveFile
 
                     if (calculatedCRC != nextChunkCRC) {
                         throw new IOException("CRC mismatch in saved table chunk");
+                    }
+
+                    /*
+                     * Skip irrelevant chunks after CRC is calculated
+                     */
+                    if (m_relevantPartitionIds != null) {
+                        if (!m_relevantPartitionIds.contains(nextChunkPartitionId)) {
+                            m_saveFile.position(m_saveFile.position() + (nextChunkLength - 8));
+                        }
                     }
 
                     c.b.limit(c.b.limit() - 4);

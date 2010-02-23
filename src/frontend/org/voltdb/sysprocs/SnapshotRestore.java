@@ -591,7 +591,8 @@ public class SnapshotRestore extends VoltSystemProcedure
                 results[0].addRow("Save data contains no information for table " + tableName);
             }
 
-            if (!savefile_state.getTableState(tableName).isConsistent()) {
+            final TableSaveFileState saveFileState = savefile_state.getTableState(tableName);
+            if (saveFileState == null || !saveFileState.isConsistent()) {
                 if (results == null) {
                     ColumnInfo[] result_columns = new ColumnInfo[1];
                     int ii = 0;
