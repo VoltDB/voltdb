@@ -19,7 +19,17 @@ package org.voltdb.sysprocs;
 
 import java.util.HashMap;
 import java.util.List;
-import org.voltdb.*;
+
+import org.voltdb.BackendTarget;
+import org.voltdb.DependencyPair;
+import org.voltdb.ExecutionSite;
+import org.voltdb.HsqlBackend;
+import org.voltdb.ParameterSet;
+import org.voltdb.ProcInfo;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltSystemProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
@@ -151,10 +161,10 @@ public class AdHoc extends VoltSystemProcedure {
         if (replicatedTableDML) {
             assert(results.length == 1);
             long changedTuples = results[0].asScalarLong();
-            assert((changedTuples % VoltDB.instance().getNumberOfPartitions()) == 0);
+            assert((changedTuples % VoltDB.instance().getCatalogContext().numberOfPartitions) == 0);
 
             VoltTable retval = new VoltTable(new VoltTable.ColumnInfo("", VoltType.BIGINT));
-            retval.addRow(changedTuples / VoltDB.instance().getNumberOfPartitions());
+            retval.addRow(changedTuples / VoltDB.instance().getCatalogContext().numberOfPartitions);
             results[0] = retval;
         }
 

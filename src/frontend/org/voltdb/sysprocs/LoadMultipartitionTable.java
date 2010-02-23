@@ -170,7 +170,7 @@ public class LoadMultipartitionTable extends VoltSystemProcedure {
                 partitionedTables[p].add(table);
             }
 
-            int num_exec_sites = VoltDB.instance().getNumberOfExecSites();
+            int num_exec_sites = VoltDB.instance().getCatalogContext().numberOfExecSites;
             pfs = new SynthesizedPlanFragment[num_exec_sites + 1];
             int site_index = 0;
             for (Site site : m_cluster.getSites())

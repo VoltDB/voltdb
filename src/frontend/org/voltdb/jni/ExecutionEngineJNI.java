@@ -26,7 +26,6 @@ import org.voltdb.ExecutionSite;
 import org.voltdb.ParameterSet;
 import org.voltdb.SysProcSelector;
 import org.voltdb.VoltTable;
-import org.voltdb.catalog.Catalog;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.messaging.FastDeserializer;
@@ -146,10 +145,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * Wrapper for {@link #nativeLoadCatalog(long, String)}.
      */
     @Override
-    public void loadCatalog(final Catalog catalog) throws EEException {
+    public void loadCatalog(final String serializedCatalog) throws EEException {
         //C++ JSON deserializer is not thread safe, must synchronize
         LOG.trace("Loading Application Catalog...");
-        final String serializedCatalog = catalog.serialize();
         int errorCode = 0;
         synchronized (ExecutionEngineJNI.class) {
             errorCode = nativeLoadCatalog(pointer, serializedCatalog);

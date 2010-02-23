@@ -328,7 +328,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         // Instead of something exhaustive, let's just make sure that we get
         // the number of result rows corresponding to the number of ExecutionSites
         // that did save work
-        Cluster cluster = VoltDB.instance().getCatalog().getClusters().get("cluster");
+        Cluster cluster = VoltDB.instance().getCatalogContext().cluster;
         Database database = cluster.getDatabases().get("database");
         CatalogMap<Table> tables = database.getTables();
         CatalogMap<Site> sites = cluster.getSites();

@@ -39,7 +39,6 @@ import org.voltdb.ParameterSet;
 import org.voltdb.SysProcSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.catalog.Catalog;
 import org.voltdb.elt.ELTManager;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
@@ -655,13 +654,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     /** write the catalog as a UTF-8 byte string via connection */
     @Override
-    public void loadCatalog(final Catalog catalog) throws EEException {
+    public void loadCatalog(final String serializedCatalog) throws EEException {
         int result = ExecutionEngine.ERRORCODE_ERROR;
         m_data.clear();
 
-        final String catalog_text = catalog.serialize();
         try {
-            final byte catalogBytes[] = catalog_text.getBytes("UTF-8");
+            final byte catalogBytes[] = serializedCatalog.getBytes("UTF-8");
             if (m_data.capacity() < catalogBytes.length + 100) {
                 m_data = ByteBuffer.allocate(catalogBytes.length + 100);
             }

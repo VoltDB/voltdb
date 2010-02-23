@@ -24,13 +24,22 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+
 import junit.framework.Test;
+
 import org.voltdb.BackendTarget;
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.VoltTable;
-import org.voltdb.regressionsuites.failureprocs.*;
+import org.voltdb.regressionsuites.failureprocs.CleanupFail;
+import org.voltdb.regressionsuites.failureprocs.DivideByZero;
+import org.voltdb.regressionsuites.failureprocs.FetchTooMuch;
+import org.voltdb.regressionsuites.failureprocs.InsertBigString;
+import org.voltdb.regressionsuites.failureprocs.InsertLotsOfData;
+import org.voltdb.regressionsuites.failureprocs.TooFewParams;
+import org.voltdb.regressionsuites.failureprocs.ViolateUniqueness;
+import org.voltdb.regressionsuites.failureprocs.ViolateUniquenessAndCatchException;
 import org.voltdb.regressionsuites.sqlfeatureprocs.WorkWithBigString;
 
 public class TestFailuresSuite extends RegressionSuite {
@@ -308,7 +317,7 @@ public class TestFailuresSuite extends RegressionSuite {
             fail();
 
         // add this config to the set of tests to run
-        builder.addServerConfig(config);
+        //builder.addServerConfig(config);
 
         /////////////////////////////////////////////////////////////
         // CONFIG #2: 2 Local Site/Partitions running on JNI backend

@@ -19,11 +19,11 @@ package org.voltdb;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Deque;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Level;
@@ -56,11 +56,11 @@ import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.VoltMessage;
 import org.voltdb.utils.DumpManager;
+import org.voltdb.utils.EstTime;
 import org.voltdb.utils.HexEncoder;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltLoggerFactory;
 import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.utils.EstTime;
 
 /**
  * The main executor of transactional work in the system. Controls running
@@ -111,6 +111,7 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
 
     // Catalog objects
     Catalog catalog;
+    public CatalogContext m_context;
     Cluster cluster;
     Database database;
     Host host;
@@ -361,15 +362,19 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
      * Initialize the StoredProcedure runner and EE for this Site.
      * @param siteManager
      * @param siteId
-     * @param srcCatalog A reference to a catalog (which should be copied)
+     * @param context A reference to the current catalog context
      * newlines that, when executed, reconstruct the complete m_catalog.
      */
-    ExecutionSite(final int siteId, final Catalog srcCatalog) {
+    ExecutionSite(final int siteId, final CatalogContext context, String serializedCatalog) {
         hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_Initializing.name(), new Object[] { String.valueOf(siteId) }, null);
+
+        if (serializedCatalog == null)
+            serializedCatalog = context.catalog.serialize();
 
         m_watchdog = new Watchdog(siteId, siteIndex);
         this.siteId = siteId;
-        catalog = srcCatalog.deepCopy();
+        m_context = context;
+        catalog = context.catalog;
         cluster = catalog.getClusters().get("cluster");
         site = cluster.getSites().get(Integer.toString(siteId));
         database = cluster.getDatabases().get("database");
@@ -422,14 +427,14 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
             else if (target == BackendTarget.NATIVE_EE_JNI) {
                 // set up the EE
                 eeTemp = new ExecutionEngineJNI(this, cluster.getRelativeIndex(), siteId);
-                eeTemp.loadCatalog(catalog);
+                eeTemp.loadCatalog(serializedCatalog);
                 lastTickTime = EstTime.currentTimeMillis();
                 eeTemp.tick( lastTickTime, 0);
             }
             else {
                 // set up the EE over IPC
                 eeTemp = new ExecutionEngineIPC(this, cluster.getRelativeIndex(), siteId, target);
-                eeTemp.loadCatalog(catalog);
+                eeTemp.loadCatalog(serializedCatalog);
                 lastTickTime = EstTime.currentTimeMillis();
                 eeTemp.tick( lastTickTime, 0);
             }
@@ -451,7 +456,7 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
                 final String className = proc.getClassname();
                 Class<?> procClass = null;
                 try {
-                    procClass = VoltDB.instance().classForProcedure(className);
+                    procClass = m_context.classForProcedure(className);
                 }
                 catch (final ClassNotFoundException e) {
                     hostLog.l7dlog(

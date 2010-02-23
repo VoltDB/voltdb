@@ -31,7 +31,6 @@ import org.voltdb.ParameterSet;
 import org.voltdb.SysProcSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.catalog.Catalog;
 import org.voltdb.elt.ELTManager;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.messaging.FastDeserializer;
@@ -300,7 +299,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     abstract public void release() throws EEException, InterruptedException;
 
     /** Pass the catalog to the engine */
-    abstract public void loadCatalog(Catalog catalog) throws EEException;
+    abstract public void loadCatalog(final String serializedCatalog) throws EEException;
 
     /** Run a plan fragment */
     abstract public DependencyPair executePlanFragment(

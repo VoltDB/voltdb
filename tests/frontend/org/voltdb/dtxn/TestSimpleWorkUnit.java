@@ -53,7 +53,9 @@ package org.voltdb.dtxn;
 import java.util.ArrayList;
 import java.util.Hashtable;
 
-import org.voltdb.AuthSystem;
+import junit.framework.TestCase;
+
+import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
 import org.voltdb.ExecutionSite;
 import org.voltdb.StatsAgent;
@@ -63,19 +65,13 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Host;
 import org.voltdb.catalog.Partition;
-import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
-import org.voltdb.dtxn.WorkUnit;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.VoltMessage;
 import org.voltdb.messaging.impl.HostMessenger;
 import org.voltdb.network.VoltNetwork;
-
-import junit.framework.TestCase;
 
 public class TestSimpleWorkUnit extends TestCase {
 
@@ -83,35 +79,39 @@ public class TestSimpleWorkUnit extends TestCase {
     // ponder a way to reuse/fold/eliminate the other.
     public class MockVoltDB implements VoltDBInterface
     {
-        Catalog m_catalog = new Catalog();
+        CatalogContext m_context;
         final String m_clusterName = "cluster";
         final String m_databaseName = "database";
         int m_execSiteCount = 0;
 
         MockVoltDB()
         {
-            m_catalog.execute("add / clusters " + m_clusterName);
-            m_catalog.execute("add " + getCluster().getPath() + " databases " +
+            Catalog catalog = new Catalog();
+            catalog.execute("add / clusters " + m_clusterName);
+            catalog.execute("add " + catalog.getClusters().get(m_clusterName).getPath() + " databases " +
                               m_databaseName);
+            m_context = new CatalogContext(catalog, CatalogContext.NO_PATH);
         }
 
         public void addHost(int hostId)
         {
-            m_catalog.execute("add " + getCluster().getPath() + " hosts " + hostId);
+            m_context.catalog.execute("add " + m_context.cluster.getPath() + " hosts " + hostId);
+            m_context = new CatalogContext(m_context.catalog, CatalogContext.NO_PATH);
         }
 
         public void addPartition(int partitionId)
         {
-            m_catalog.execute("add " + getCluster().getPath() + " partitions " +
+            m_context.catalog.execute("add " + m_context.cluster.getPath() + " partitions " +
                               partitionId);
+            m_context = new CatalogContext(m_context.catalog, CatalogContext.NO_PATH);
         }
 
         public void addSite(int siteId, int hostId, int partitionId, boolean isExec)
         {
-            m_catalog.execute("add " + getCluster().getPath() + " sites " + siteId);
-            m_catalog.execute("set " + getSite(siteId).getPath() + " host " +
+            m_context.catalog.execute("add " + m_context.cluster.getPath() + " sites " + siteId);
+            m_context.catalog.execute("set " + getSite(siteId).getPath() + " host " +
                               getHost(hostId).getPath());
-            m_catalog.execute("set " + getSite(siteId).getPath() + " isexec " +
+            m_context.catalog.execute("set " + getSite(siteId).getPath() + " isexec " +
                               isExec);
             String partition_path = "null";
             if (isExec)
@@ -119,38 +119,24 @@ public class TestSimpleWorkUnit extends TestCase {
                 partition_path = getPartition(partitionId).getPath();
                 m_execSiteCount++;
             }
-            m_catalog.execute("set " + getSite(siteId).getPath() + " partition " +
+            m_context.catalog.execute("set " + getSite(siteId).getPath() + " partition " +
                     partition_path);
+            m_context = new CatalogContext(m_context.catalog, CatalogContext.NO_PATH);
         }
 
         Host getHost(int hostId)
         {
-            return getCluster().getHosts().get(String.valueOf(hostId));
+            return m_context.cluster.getHosts().get(String.valueOf(hostId));
         }
 
         Partition getPartition(int partitionId)
         {
-            return getCluster().getPartitions().get(String.valueOf(partitionId));
+            return m_context.cluster.getPartitions().get(String.valueOf(partitionId));
         }
 
         Site getSite(int siteId)
         {
-            return getCluster().getSites().get(String.valueOf(siteId));
-        }
-
-        @Override
-        public Class<?> classForProcedure(String procedureClassName)
-                                                                    throws ClassNotFoundException
-        {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public AuthSystem getAuthSystem()
-        {
-            // TODO Auto-generated method stub
-            return null;
+            return m_context.sites.get(String.valueOf(siteId));
         }
 
         @Override
@@ -161,23 +147,10 @@ public class TestSimpleWorkUnit extends TestCase {
         }
 
         @Override
-        public Catalog getCatalog()
-        {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
         public ArrayList<ClientInterface> getClientInterfaces()
         {
             // TODO Auto-generated method stub
             return null;
-        }
-
-        @Override
-        public Cluster getCluster()
-        {
-            return m_catalog.getClusters().get(m_clusterName);
         }
 
         @Override
@@ -216,43 +189,9 @@ public class TestSimpleWorkUnit extends TestCase {
         }
 
         @Override
-        public int getNumberOfExecSites()
-        {
-            return m_execSiteCount;
-        }
-
-        @Override
-        public int getNumberOfPartitions()
-        {
-            // TODO Auto-generated method stub
-            return 0;
-        }
-
-        @Override
-        public int getNumberOfNodes()
-        {
-            // TODO Auto-generated method stub
-            return 0;
-        }
-
-        @Override
-        public CatalogMap<Procedure> getProcedures()
-        {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
         public SiteTracker getSiteTracker()
         {
-            return new SiteTracker(getSites());
-        }
-
-        @Override
-        public CatalogMap<Site> getSites()
-        {
-            // TODO Auto-generated method stub
-            return getCluster().getSites();
+            return new SiteTracker(m_context.sites);
         }
 
         @Override
@@ -316,6 +255,12 @@ public class TestSimpleWorkUnit extends TestCase {
             return false;
         }
 
+        @Override
+        public CatalogContext getCatalogContext() {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
     }
 
     static final VoltMessage work = VoltMessage.createNewMessage(VoltMessage.INITIATE_RESPONSE_ID);
@@ -364,19 +309,19 @@ public class TestSimpleWorkUnit extends TestCase {
 
     public void testNoDependenciesNoReplicas() {
         setUpSites(1, 2, 1);
-        WorkUnit w = new WorkUnit(work, new int[]{}, false);
+        WorkUnit w = new WorkUnit(m_voltdb.m_context, work, new int[]{}, false);
         assertTrue(w.allDependenciesSatisfied());
         assertEquals(work, w.getPayload());
         assertNull(w.getDependencies());
         assertNull(w.getDependency(0));
 
-        w = new WorkUnit(work, null, false);
+        w = new WorkUnit(m_voltdb.m_context, work, null, false);
         assertTrue(w.allDependenciesSatisfied());
     }
 
     public void testDependenciesNoReplicas() {
         setUpSites(1, 2, 1);
-        WorkUnit w = new WorkUnit(work, new int[]{ 4, 5 }, false);
+        WorkUnit w = new WorkUnit(m_voltdb.m_context, work, new int[]{ 4, 5 }, false);
         assertFalse(w.allDependenciesSatisfied());
         assertEquals(w.getDependency(4).size(), 0);
         assertEquals(w.getDependency(5).size(), 0);
@@ -390,7 +335,7 @@ public class TestSimpleWorkUnit extends TestCase {
 
     public void testBadPutDependencyNoReplicas() {
         setUpSites(1, 2, 1);
-        WorkUnit w = new WorkUnit(work, new int[]{ 4, 5 }, false);
+        WorkUnit w = new WorkUnit(m_voltdb.m_context, work, new int[]{ 4, 5 }, false);
 
         // Put a dependency that does not exist
         try {
@@ -416,7 +361,7 @@ public class TestSimpleWorkUnit extends TestCase {
     {
         setUpSites(2, 2, 1);
         int multi_dep = 5 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-        WorkUnit w = new WorkUnit(work, new int[]{ 4, multi_dep }, false);
+        WorkUnit w = new WorkUnit(m_voltdb.m_context, work, new int[]{ 4, multi_dep }, false);
         assertFalse(w.allDependenciesSatisfied());
         assertEquals(w.getDependency(4).size(), 0);
         assertEquals(w.getDependency(5).size(), 0);
@@ -442,7 +387,7 @@ public class TestSimpleWorkUnit extends TestCase {
 
         setUpSites(2, 2, 1);
         int multi_dep = 5 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-        WorkUnit w = new WorkUnit(work, new int[]{ 4, multi_dep }, false);
+        WorkUnit w = new WorkUnit(m_voltdb.m_context, work, new int[]{ 4, multi_dep }, false);
         assertFalse(w.allDependenciesSatisfied());
         assertEquals(w.getDependency(4).size(), 0);
         assertEquals(w.getDependency(5).size(), 0);

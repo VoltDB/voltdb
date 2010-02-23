@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.Map.Entry;
 
+import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState.WorkUnitState;
@@ -161,7 +162,7 @@ class WorkUnit {
         return m_shouldResumeProcedure;
     }
 
-    WorkUnit(VoltMessage payload, int[] dependencyIds, boolean shouldResumeProcedure) {
+    WorkUnit(CatalogContext context, VoltMessage payload, int[] dependencyIds, boolean shouldResumeProcedure) {
         this.m_payload = payload;
         m_shouldResumeProcedure = shouldResumeProcedure;
         if (payload != null && payload instanceof FragmentTask)
@@ -175,10 +176,10 @@ class WorkUnit {
             for (int dependency : dependencyIds) {
                 int depsToExpect = 1;
                 if ((dependency & DtxnConstants.MULTIPARTITION_DEPENDENCY) != 0) {
-                    depsToExpect = VoltDB.instance().getNumberOfExecSites();
+                    depsToExpect = context.numberOfExecSites;
                 }
                 else if ((dependency & DtxnConstants.MULTINODE_DEPENDENCY) != 0) {
-                    depsToExpect = VoltDB.instance().getNumberOfNodes();
+                    depsToExpect = context.numberOfNodes;
                 }
                 m_unsatisfiedDependencies += depsToExpect;
                 m_dependencies.put(dependency, new HashMap<Integer, VoltTable>());

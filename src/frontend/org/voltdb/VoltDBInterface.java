@@ -19,11 +19,6 @@ package org.voltdb;
 import java.util.ArrayList;
 import java.util.Hashtable;
 
-import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.Site;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.impl.HostMessenger;
@@ -57,34 +52,17 @@ public interface VoltDBInterface
      */
     public void shutdown(Thread mainSiteThread) throws InterruptedException;
 
-    /**
-     * Given a class name in the catalog jar, loads it from the jar, even if the
-     * jar is served from a url and isn't in the classpath.
-     *
-     * @param procedureClassName The name of the class to load.
-     * @return A java Class variable assocated with the class.
-     * @throws ClassNotFoundException if the class is not in the jar file.
-     */
-    public Class<?> classForProcedure(String procedureClassName) throws ClassNotFoundException;
-
     public void startSampler();
 
     public VoltDB.Configuration getConfig();
-    public AuthSystem getAuthSystem();
-    public int getNumberOfExecSites();
-    public int getNumberOfPartitions();
-    public int getNumberOfNodes();
+    public CatalogContext getCatalogContext();
     public String getBuildString();
     public String getVersionString();
     public Messenger getMessenger();
     public HostMessenger getHostMessenger();
     public ArrayList<ClientInterface> getClientInterfaces();
     public Hashtable<Integer, ExecutionSite> getLocalSites();
-    public Catalog getCatalog();
-    public Cluster getCluster();
     public VoltNetwork getNetwork();
-    public CatalogMap<Procedure> getProcedures();
-    public CatalogMap<Site> getSites();
     public StatsAgent getStatsAgent();
     public SiteTracker getSiteTracker();
 

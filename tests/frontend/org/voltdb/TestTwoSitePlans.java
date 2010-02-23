@@ -25,16 +25,24 @@ package org.voltdb;
 
 import java.io.File;
 import java.io.IOException;
+
+import junit.framework.TestCase;
+
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.benchmark.tpcc.procedures.InsertNewOrder;
-import org.voltdb.catalog.*;
+import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.PlanFragment;
+import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.Statement;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.SiteConnection;
-import org.voltdb.jni.*;
+import org.voltdb.jni.ExecutionEngine;
+import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.regressionsuites.multipartitionprocs.MultiSiteSelect;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
-import junit.framework.TestCase;
 
 public class TestTwoSitePlans extends TestCase {
 
@@ -107,10 +115,10 @@ public class TestTwoSitePlans extends TestCase {
         // create two EEs
         site1 = new MockSite();
         ee1 = new ExecutionEngineJNI(site1, cluster.getRelativeIndex(), 1);
-        ee1.loadCatalog(catalog);
+        ee1.loadCatalog(catalog.serialize());
         site2 = new MockSite();
         ee2 = new ExecutionEngineJNI(site2, cluster.getRelativeIndex(), 2);
-        ee2.loadCatalog(catalog);
+        ee2.loadCatalog(catalog.serialize());
 
         // cache some plan fragments
         selectStmt = selectProc.getStatements().get("selectAll");

@@ -40,7 +40,7 @@ public class TestExecutionEngine extends TestCase {
     public void testLoadCatalogs() throws Exception {
         Catalog catalog = new Catalog();
         catalog.execute(LoadCatalogToString.THE_CATALOG);
-        engine.loadCatalog(catalog);
+        engine.loadCatalog(catalog.serialize());
     }
 
     public void testMultiSiteInSamePhysicalNodeWithExecutionSite() throws Exception {
@@ -78,7 +78,7 @@ public class TestExecutionEngine extends TestCase {
     public void testLoadTable() throws Exception {
         Catalog catalog = new Catalog();
         catalog.execute(LoadCatalogToString.THE_CATALOG);
-        engine.loadCatalog(catalog);
+        engine.loadCatalog(catalog.serialize());
 
         int WAREHOUSE_TABLEID = catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("WAREHOUSE").getRelativeIndex();
         int STOCK_TABLEID = catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("STOCK").getRelativeIndex();
@@ -92,7 +92,7 @@ public class TestExecutionEngine extends TestCase {
     public void testGetStats() throws Exception {
         final Catalog catalog = new Catalog();
         catalog.execute(LoadCatalogToString.THE_CATALOG);
-        engine.loadCatalog(catalog);
+        engine.loadCatalog(catalog.serialize());
 
         final int WAREHOUSE_TABLEID = catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("WAREHOUSE").getRelativeIndex();
         final int STOCK_TABLEID = catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("STOCK").getRelativeIndex();

@@ -79,6 +79,7 @@ public class ClientInterface implements DumpManager.Dumpable {
     private final ArrayList<Connection> m_connections = new ArrayList<Connection>();
     private final SnapshotDaemon m_snapshotDaemon;
     private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
+    private CatalogContext m_catalogContext;
 
     /**
      * Counter of the number of client connections. Used to enforce a limit on the maximum number of connections
@@ -398,7 +399,7 @@ public class ClientInterface implements DumpManager.Dumpable {
             final byte password[] = new byte[20];
             message.get(password);
 
-            final AuthSystem.AuthUser user = VoltDB.instance().getAuthSystem().authenticate(username, password);
+            final AuthSystem.AuthUser user = m_catalogContext.authSystem.authenticate(username, password);
 
             if (user == null) {
                 //Send negative response
@@ -576,6 +577,7 @@ public class ClientInterface implements DumpManager.Dumpable {
     public static ClientInterface create(
             VoltNetwork network,
             Messenger messenger,
+            CatalogContext context,
             int hostCount,
             int siteId,
             int initiatorId,
@@ -585,7 +587,7 @@ public class ClientInterface implements DumpManager.Dumpable {
         int myHostId = -1;
 
         // create a topology for the initiator
-        for (Site site : VoltDB.instance().getSites()) {
+        for (Site site : context.sites) {
             int aSiteId = Integer.parseInt(site.getTypeName());
             int hostId = Integer.parseInt(site.getHost().getTypeName());
 
@@ -595,12 +597,11 @@ public class ClientInterface implements DumpManager.Dumpable {
         }
 
         // create a list of all partitions
-        int partitionCount = VoltDB.instance().getCluster().getPartitions().size();
-        int[] allPartitions = new int[partitionCount];
+        int[] allPartitions = new int[context.numberOfPartitions];
         int index = 0;
-        for (Partition partition : VoltDB.instance().getCluster().getPartitions())
+        for (Partition partition : context.cluster.getPartitions())
             allPartitions[index++] = Integer.parseInt(partition.getTypeName());
-        assert(index == partitionCount);
+        assert(index == context.numberOfPartitions);
 
         // create the dtxn initiator
         SimpleDtxnInitiator.DummyBlockingQueue queue =
@@ -621,11 +622,10 @@ public class ClientInterface implements DumpManager.Dumpable {
         queue.setInitiator(initiator);
 
         // create the adhoc planner thread
-        AsyncCompilerWorkThread plannerThread = new AsyncCompilerWorkThread(VoltDB.instance().getCatalog(), siteId);
+        AsyncCompilerWorkThread plannerThread = new AsyncCompilerWorkThread(context, siteId);
         plannerThread.start();
         final ClientInterface ci = new ClientInterface(
-                port, network,
-                siteId, initiator,
+                port, context, network, siteId, initiator,
                 plannerThread, allPartitions, schedule);
         onBackPressure.m_ci = ci;
         offBackPressure.m_ci = ci;
@@ -633,11 +633,11 @@ public class ClientInterface implements DumpManager.Dumpable {
         return ci;
     }
 
-    ClientInterface(int port, VoltNetwork network, int siteId, TransactionInitiator initiator,
-                    AsyncCompilerWorkThread plannerThread, int[] allPartitions,
-                    SnapshotSchedule schedule)
+    ClientInterface(int port, CatalogContext context, VoltNetwork network, int siteId,
+                    TransactionInitiator initiator, AsyncCompilerWorkThread plannerThread,
+                    int[] allPartitions, SnapshotSchedule schedule)
     {
-        assert(VoltDB.instance().getCatalog() != null);
+        m_catalogContext = context;
         m_initiator = initiator;
         m_plannerThread = plannerThread;
 
@@ -665,7 +665,7 @@ public class ClientInterface implements DumpManager.Dumpable {
         final StoredProcedureInvocation task = fds.readObject(StoredProcedureInvocation.class);
 
         // get procedure from the catalog
-        final Procedure catProc = VoltDB.instance().getProcedures().get(task.procName);
+        final Procedure catProc = m_catalogContext.procedures.get(task.procName);
 
         // For now, comment out any subset of lines below to start the sampler
         // but you will need to rebuild and distribute voltdbfat.jar, etc...
@@ -951,7 +951,7 @@ public class ClientInterface implements DumpManager.Dumpable {
     private void initiateSnapshotDaemonWork(Pair<String, Object[]>  invocation) {
         if (invocation != null) {
             // get procedure from the catalog
-           final Procedure catProc = VoltDB.instance().getProcedures().get(invocation.getFirst());
+           final Procedure catProc = m_catalogContext.procedures.get(invocation.getFirst());
            if (catProc == null) {
                throw new RuntimeException("SnapshotDaemon attempted to invoke " + invocation.getFirst() +
                        " which is not a known procedure");

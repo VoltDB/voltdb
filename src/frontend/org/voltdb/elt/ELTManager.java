@@ -93,9 +93,6 @@ public class ELTManager implements SysManageable {
     /** Map buffer pointers to their containers for lookup */
     Hashtable<Long, ELBBContainer> m_bufferMap = new Hashtable<Long, ELBBContainer>();
 
-    /** Maintain a reference to the catalog */
-    Catalog m_catalog;
-
     /** Obtain the global ELTManager via its instance() method */
     private static ELTManager m_self;
 
@@ -120,9 +117,7 @@ public class ELTManager implements SysManageable {
 
     /** Read the catalog to setup manager and loader(s) */
     private ELTManager(final Catalog catalog) throws ELTManager.SetupException {
-        m_catalog = catalog;
-
-        final Cluster cluster = m_catalog.getClusters().get("cluster");
+        final Cluster cluster = catalog.getClusters().get("cluster");
         final Database db = cluster.getDatabases().get("database");
         final Connector conn= db.getConnectors().get("0");
 

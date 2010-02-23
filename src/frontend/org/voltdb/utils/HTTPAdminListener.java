@@ -20,6 +20,7 @@ package org.voltdb.utils;
 import java.io.IOException;
 import java.util.Properties;
 
+import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 
 public class HTTPAdminListener extends NanoHTTPD {
@@ -45,13 +46,15 @@ public class HTTPAdminListener extends NanoHTTPD {
 
         msg += "</body></html>\n";*/
 
+        CatalogContext context = VoltDB.instance().getCatalogContext();
+
         // just print voltdb version for now
         String msg = "<html><body>\n";
         msg += "<h2>VoltDB Version " + VoltDB.instance().getVersionString() + "</h2>\n";
         msg += "<p><b>Buildstring:</b> " + VoltDB.instance().getBuildString() + "</p>\n";
-        msg += "<p>Running on a cluser of " + VoltDB.instance().getNumberOfNodes() + " hosts ";
-        msg += " with " + VoltDB.instance().getNumberOfExecSites() + " sites ";
-        msg += " (" + VoltDB.instance().getNumberOfExecSites() / VoltDB.instance().getNumberOfNodes() + " per host).</p>\n";
+        msg += "<p>Running on a cluser of " + context.numberOfNodes + " hosts ";
+        msg += " with " + context.numberOfExecSites + " sites ";
+        msg += " (" + context.numberOfExecSites / context.numberOfNodes + " per host).</p>\n";
         msg += "</body></html>\n";
 
         return new NanoHTTPD.Response(HTTP_OK, MIME_HTML, msg);

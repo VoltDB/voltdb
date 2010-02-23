@@ -21,7 +21,6 @@ import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.SysProcSelector;
 import org.voltdb.VoltTable;
-import org.voltdb.catalog.Catalog;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.utils.DBBPool.BBContainer;
 
@@ -61,7 +60,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void loadCatalog(final Catalog catalog) throws EEException {
+    public void loadCatalog(final String serializedCatalog) throws EEException {
         // TODO Auto-generated method stub
     }
 

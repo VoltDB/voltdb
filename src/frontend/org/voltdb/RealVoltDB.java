@@ -14,6 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 package org.voltdb;
 
 import java.io.File;
@@ -31,9 +32,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.dtxn.InitiatorStats;
@@ -45,7 +43,6 @@ import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.HTTPAdminListener;
-import org.voltdb.utils.JarClassLoader;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltLoggerFactory;
 import org.voltdb.utils.VoltSampler;
@@ -66,19 +63,20 @@ public class RealVoltDB implements VoltDBInterface
 
         private volatile boolean m_isSiteCreated = false;
         private final int m_siteId;
-        private Catalog m_srcCatalog;
+        private final CatalogContext m_context;
+        private final String m_serializedCatalog;
         private volatile ExecutionSite m_siteObj;
 
-        public ExecutionSiteRunner(int siteId, Catalog srcCatalog) {
+        public ExecutionSiteRunner(final int siteId, final CatalogContext context, final String serializedCatalog) {
             m_siteId = siteId;
-            m_srcCatalog = srcCatalog;
+            m_context = context;
+            m_serializedCatalog = serializedCatalog;
         }
 
         @Override
         public void run() {
             m_siteObj =
-                new ExecutionSite(m_siteId, m_srcCatalog);
-            m_srcCatalog = null;
+                new ExecutionSite(m_siteId, m_context, m_serializedCatalog);
             synchronized (this) {
                 m_isSiteCreated = true;
                 this.notifyAll();
@@ -94,22 +92,15 @@ public class RealVoltDB implements VoltDBInterface
     }
 
     public VoltDB.Configuration m_config = new VoltDB.Configuration();
+    private CatalogContext m_catalogContext;
     private String m_buildString;
     private String m_versionString = "0.6.01";
     // fields accessed via the singleton
-    private int m_numberOfExecSites = 0;
-    private int m_numberOfNodes = 0;
     private HostMessenger m_messenger = null;
     private final ArrayList<ClientInterface> m_clientInterfaces =
         new ArrayList<ClientInterface>();
     private Hashtable<Integer, ExecutionSite> m_localSites;
-    private Catalog m_catalog;
-    private Cluster m_cluster;
     private VoltNetwork m_network = null;
-    private CatalogMap<Procedure> m_procedures;
-    private CatalogMap<Site> m_sites;
-    private AuthSystem m_authSystem;
-    private JarClassLoader m_catalogClassLoader;
     @SuppressWarnings("unused")
     private HTTPAdminListener m_adminListener;
     private Hashtable<Integer, Thread> m_siteThreads;
@@ -129,23 +120,6 @@ public class RealVoltDB implements VoltDBInterface
         if (m_hasStartedSampler.compareAndSet(false, true)) {
             m_sampler.start();
         }
-    }
-
-    /**
-     * Given a class name in the catalog jar, loads it from the jar, even if the
-     * jar is served from a url and isn't in the classpath.
-     *
-     * @param procedureClassName The name of the class to load.
-     * @return A java Class variable assocated with the class.
-     * @throws ClassNotFoundException if the class is not in the jar file.
-     */
-    public Class<?> classForProcedure(String procedureClassName) throws ClassNotFoundException {
-        // this is a safety mechanism to prevent catalog classes overriding voltdb stuff
-        if (procedureClassName.startsWith("org.voltdb."))
-            return Class.forName(procedureClassName);
-
-        // look in the catalog for the file
-        return m_catalogClassLoader.loadClass(procedureClassName);
     }
 
     /**
@@ -184,27 +158,22 @@ public class RealVoltDB implements VoltDBInterface
             hostLog.info("Loading application catalog jarfile from " + f.getAbsolutePath());
         }
 
-        String serializedCatalog = CatalogUtil.loadCatalogFromJar(m_config.m_pathToCatalog, hostLog);
+        final String serializedCatalog = CatalogUtil.loadCatalogFromJar(m_config.m_pathToCatalog, hostLog);
         if (serializedCatalog == null)
             VoltDB.crashVoltDB();
 
-        m_catalog = new Catalog();
-        m_catalog.execute(serializedCatalog);
-        m_cluster = m_catalog.getClusters().get("cluster");
-        final org.voltdb.catalog.Database db = m_cluster.getDatabases().get("database");
-        m_procedures = db.getProcedures();
-        final SnapshotSchedule schedule = db.getSnapshotschedule().get("default");
-        m_authSystem = new AuthSystem(m_cluster.getDatabases().get("database"), m_cluster.getSecurityenabled());
-        m_sites = m_cluster.getSites();
-        m_siteTracker = new SiteTracker(m_sites);
-        int hostCount = m_cluster.getHosts().size();
+        Catalog catalog = new Catalog();
+        catalog.execute(serializedCatalog);
+        m_catalogContext = new CatalogContext(catalog, m_config.m_pathToCatalog);
+        final SnapshotSchedule schedule = m_catalogContext.database.getSnapshotschedule().get("default");
+        m_siteTracker = new SiteTracker(m_catalogContext.sites);
 
         /*
          * The lowest non-exec siteId (ClientInterface) is tasked with
          * running a SnapshotDaemon.
          */
         int lowestNonExecSiteId = -1;
-        for (Site site : m_sites) {
+        for (Site site : m_catalogContext.sites) {
             if (!site.getIsexec()) {
                 if (lowestNonExecSiteId == -1) {
                     lowestNonExecSiteId = Integer.parseInt(site.getTypeName());
@@ -214,11 +183,8 @@ public class RealVoltDB implements VoltDBInterface
             }
         }
 
-        // initialize the procedure loader
-        m_catalogClassLoader = new JarClassLoader(m_config.m_pathToCatalog);
-
         // Initialize the complex partitioning scheme
-        TheHashinator.initialize(m_catalog);
+        TheHashinator.initialize(catalog);
 
         // Prepare the network socket manager for work
         m_network = new VoltNetwork( new Runnable[] { new Runnable() {
@@ -232,7 +198,7 @@ public class RealVoltDB implements VoltDBInterface
 
         // Let the ELT system read its configuration from the catalog.
         try {
-            ELTManager.initialize(m_catalog);
+            ELTManager.initialize(catalog);
         } catch (ELTManager.SetupException e) {
             hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ELTInitFailure.name(), e);
             System.exit(-1);
@@ -241,19 +207,19 @@ public class RealVoltDB implements VoltDBInterface
         // Create the intra-cluster mesh
         InetAddress leader = null;
         try {
-            leader = InetAddress.getByName(m_cluster.getLeaderaddress());
+            leader = InetAddress.getByName(m_catalogContext.cluster.getLeaderaddress());
         } catch (UnknownHostException ex) {
-            hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_CouldNotRetrieveLeaderAddress.name(), new Object[] { m_cluster.getLeaderaddress() }, ex);
+            hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_CouldNotRetrieveLeaderAddress.name(), new Object[] { m_catalogContext.cluster.getLeaderaddress() }, ex);
             throw new RuntimeException(ex);
         }
-        // ensure at least one host (catalog compiler should check this too)
-        if (hostCount <= 0) {
-            hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_InvalidHostCount.name(), new Object[] { hostCount }, null);
+        // ensure at least one host (catalog compiler should check this too
+        if (m_catalogContext.numberOfNodes <= 0) {
+            hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_InvalidHostCount.name(), new Object[] { m_catalogContext.numberOfNodes }, null);
             VoltDB.crashVoltDB();
         }
 
-        hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_CreatingVoltDB.name(), new Object[] { hostCount, leader }, null);
-        m_messenger = new HostMessenger(m_network, leader, hostCount, hostLog);
+        hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_CreatingVoltDB.name(), new Object[] { m_catalogContext.numberOfNodes, leader }, null);
+        m_messenger = new HostMessenger(m_network, leader, m_catalogContext.numberOfNodes, hostLog);
         m_messenger.waitForGroupJoin();
 
         // Use the host messenger's hostId.
@@ -264,10 +230,6 @@ public class RealVoltDB implements VoltDBInterface
         m_siteThreads = new Hashtable<Integer, Thread>();
         m_runners = new ArrayList<ExecutionSiteRunner>();
 
-        // find all the m_sites on this host
-        m_numberOfExecSites = 0;
-        m_numberOfNodes = hostCount;
-
         /*
          * Create execution sites runners (and threads) for all exec sites except the first one.
          * This allows the sites to be set up in the thread that will end up running them.
@@ -275,14 +237,9 @@ public class RealVoltDB implements VoltDBInterface
          */
         Site siteForThisThread = null;
         m_currentThreadSite = null;
-        for (Site site : m_sites) {
+        for (Site site : m_catalogContext.sites) {
             int sitesHostId = Integer.parseInt(site.getHost().getTypeName());
             int siteId = Integer.parseInt(site.getTypeName());
-
-            if (site.getPartition() != null) {
-                assert (site.getIsexec());
-                m_numberOfExecSites++;
-            }
 
             // start a local site
             if (sitesHostId == myHostId) {
@@ -292,7 +249,7 @@ public class RealVoltDB implements VoltDBInterface
                     if (siteForThisThread == null) {
                         siteForThisThread = site;
                     } else {
-                        ExecutionSiteRunner runner = new ExecutionSiteRunner(siteId, m_catalog);
+                        ExecutionSiteRunner runner = new ExecutionSiteRunner(siteId, m_catalogContext, serializedCatalog);
                         m_runners.add(runner);
                         Thread runnerThread = new Thread(runner, "Site " + siteId);
                         runnerThread.start();
@@ -308,7 +265,7 @@ public class RealVoltDB implements VoltDBInterface
          * this thread can set up its own execution site.
          */
         ExecutionSite siteObj =
-            new ExecutionSite(Integer.parseInt(siteForThisThread.getTypeName()), m_catalog);
+            new ExecutionSite(Integer.parseInt(siteForThisThread.getTypeName()), m_catalogContext, serializedCatalog);
         m_localSites.put(Integer.parseInt(siteForThisThread.getTypeName()), siteObj);
         m_currentThreadSite = siteObj;
 
@@ -349,11 +306,11 @@ public class RealVoltDB implements VoltDBInterface
         }
 
         // if a workload tracer is specified, start her up!
-        ProcedureProfiler.initializeWorkloadTrace(m_catalog);
+        ProcedureProfiler.initializeWorkloadTrace(catalog);
 
         // Create the client interfaces and associated dtxn initiators
         int portOffset = 0;
-        for (Site site : m_sites) {
+        for (Site site : m_catalogContext.sites) {
             int sitesHostId = Integer.parseInt(site.getHost().getTypeName());
             int siteId = Integer.parseInt(site.getTypeName());
 
@@ -363,7 +320,8 @@ public class RealVoltDB implements VoltDBInterface
                     ClientInterface.create(
                             m_network,
                             m_messenger,
-                            hostCount,
+                            m_catalogContext,
+                            m_catalogContext.numberOfNodes,
                             siteId,
                             site.getInitiatorid(),
                             config.m_port + portOffset++,
@@ -511,25 +469,19 @@ public class RealVoltDB implements VoltDBInterface
         m_isRunning = false;
     }
 
+    /**
+     *
+     *
+     * @param newCatalogURL
+     * @param diffCommands
+     */
+    public synchronized void catalogUpdate(String newCatalogURL, String diffCommands) {
+
+    }
+
     public VoltDB.Configuration getConfig()
     {
         return m_config;
-    }
-
-    public AuthSystem getAuthSystem() {
-        return m_authSystem;
-    }
-
-    public int getNumberOfExecSites() {
-        return m_numberOfExecSites;
-    }
-
-    public int getNumberOfPartitions() {
-        return m_cluster.getPartitions().size();
-    }
-
-    public int getNumberOfNodes() {
-        return m_numberOfNodes;
     }
 
     public String getBuildString() {
@@ -556,33 +508,20 @@ public class RealVoltDB implements VoltDBInterface
         return m_localSites;
     }
 
-    public Catalog getCatalog() {
-        return m_catalog;
-    }
-
-    public Cluster getCluster() {
-        return m_cluster;
-    }
-
     public VoltNetwork getNetwork() {
         return m_network;
-    }
-
-    public CatalogMap<Procedure> getProcedures() {
-        return m_procedures;
-    }
-
-    public CatalogMap<Site> getSites() {
-        return m_sites;
     }
 
     public StatsAgent getStatsAgent() {
         return m_statsAgent;
     }
 
-    public SiteTracker getSiteTracker()
-    {
+    public SiteTracker getSiteTracker() {
         return m_siteTracker;
+    }
+
+    public synchronized CatalogContext getCatalogContext() {
+        return m_catalogContext;
     }
 
     /**

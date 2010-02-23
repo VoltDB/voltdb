@@ -23,51 +23,25 @@
 
 package org.voltdb;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
 import java.util.Hashtable;
 
-import org.voltdb.EELibraryLoader;
-import org.voltdb.VoltDBInterface;
-import org.voltdb.VoltDB;
+import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.Site;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.impl.HostMessenger;
 import org.voltdb.network.VoltNetwork;
 
-import org.junit.*;
-
 public class TestEELibraryLoader {
 
     private class Interface implements VoltDBInterface {
-        @Override
-        public Class<?> classForProcedure(String procedureClassName)
-                throws ClassNotFoundException {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public AuthSystem getAuthSystem() {
-            // TODO Auto-generated method stub
-            return null;
-        }
 
         @Override
         public String getBuildString() {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public Catalog getCatalog() {
             // TODO Auto-generated method stub
             return null;
         }
@@ -79,13 +53,13 @@ public class TestEELibraryLoader {
         }
 
         @Override
-        public Cluster getCluster() {
+        public Configuration getConfig() {
             // TODO Auto-generated method stub
             return null;
         }
 
         @Override
-        public Configuration getConfig() {
+        public CatalogContext getCatalogContext() {
             // TODO Auto-generated method stub
             return null;
         }
@@ -115,37 +89,7 @@ public class TestEELibraryLoader {
         }
 
         @Override
-        public int getNumberOfExecSites() {
-            // TODO Auto-generated method stub
-            return 0;
-        }
-
-        @Override
-        public int getNumberOfNodes() {
-            // TODO Auto-generated method stub
-            return 0;
-        }
-
-        @Override
-        public int getNumberOfPartitions() {
-            // TODO Auto-generated method stub
-            return 0;
-        }
-
-        @Override
-        public CatalogMap<Procedure> getProcedures() {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
         public SiteTracker getSiteTracker() {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public CatalogMap<Site> getSites() {
             // TODO Auto-generated method stub
             return null;
         }
@@ -205,8 +149,8 @@ public class TestEELibraryLoader {
         }
 
         private boolean m_crash = false;
-        private boolean m_loadLibVoltDB = true;
     }
+
     @Test
     public void testLoader() {
         final VoltDB.Configuration configuration = new VoltDB.Configuration();

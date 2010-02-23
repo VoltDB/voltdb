@@ -25,16 +25,16 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.hsqldb.HSQLInterface;
 import org.hsqldb.HSQLInterface.HSQLParseException;
+import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Database;
 import org.voltdb.debugstate.PlannerThreadContext;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.TrivialCostModel;
 import org.voltdb.planner.CompiledPlan.Fragment;
 import org.voltdb.plannodes.PlanNodeList;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.HexEncoder;
 import org.voltdb.utils.LogKeys;
@@ -44,11 +44,11 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
 
     LinkedBlockingQueue<AsyncCompilerWork> m_work = new LinkedBlockingQueue<AsyncCompilerWork>();
     final ArrayDeque<AsyncCompilerResult> m_finished = new ArrayDeque<AsyncCompilerResult>();
-    Catalog m_catalog;
     HSQLInterface m_hsql;
     int counter = 0;
     final int m_siteId;
     boolean m_isLoaded = false;
+    CatalogContext m_context;
 
     // store the id used by the DumpManager to identify this execution site
     final String m_dumpId;
@@ -56,10 +56,10 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
 
     private static final Logger ahpLog = Logger.getLogger("ADHOCPLANNERTHREAD", VoltLoggerFactory.instance());
 
-    public AsyncCompilerWorkThread(Catalog catalog, int siteId) {
-        m_catalog = catalog;
+    public AsyncCompilerWorkThread(CatalogContext context, int siteId) {
         m_hsql = null;
         m_siteId = siteId;
+        m_context = context;
 
         setName("Ad Hoc Planner");
 
@@ -71,9 +71,8 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
         if (m_isLoaded == true)
             return;
         m_hsql = HSQLInterface.loadHsqldb();
-        Cluster cluster = m_catalog.getClusters().get("cluster");
-        Database database = cluster.getDatabases().get("database");
-        String hexDDL = database.getSchema();
+
+        String hexDDL = m_context.database.getSchema();
         String ddl = HexEncoder.hexDecodeToString(hexDDL);
         String[] commands = ddl.split(";");
         for (String command : commands) {
@@ -202,10 +201,9 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
 
     private AsyncCompilerResult compileAdHocPlan(AdHocPlannerWork work) {
         TrivialCostModel costModel = new TrivialCostModel();
-        Cluster cluster = m_catalog.getClusters().get("cluster");
-        Database database = cluster.getDatabases().get("database");
+        CatalogContext context = VoltDB.instance().getCatalogContext();
         QueryPlanner planner =
-            new QueryPlanner(cluster, database, m_hsql,
+            new QueryPlanner(context.cluster, context.database, m_hsql,
                              new DatabaseEstimates(), false,
                              VoltDB.getQuietAdhoc());
         CompiledPlan plan = null;
@@ -260,6 +258,18 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
     }
 
     private AsyncCompilerResult prepareApplicationCatalogDiff(CatalogChangeWork work) {
+        CatalogChangeResult retval = new CatalogChangeResult();
+        retval.clientData = work.clientData;
+        retval.clientHandle = work.clientHandle;
+        retval.connectionId = work.connectionId;
+
+        retval.catalogURL = work.catalogURL;
+
+        String newCatalogCommands = CatalogUtil.loadCatalogFromJar(work.catalogURL, null);
+        assert(newCatalogCommands != null);
+        Catalog newCatalog = new Catalog();
+        newCatalog.execute(newCatalogCommands);
+
         return null;
     }
 }

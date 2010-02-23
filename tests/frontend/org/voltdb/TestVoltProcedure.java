@@ -50,19 +50,18 @@
 
 package org.voltdb;
 
-import junit.framework.TestCase;
-
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Hashtable;
 
+import junit.framework.TestCase;
+
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.impl.HostMessenger;
@@ -148,7 +147,7 @@ public class TestVoltProcedure extends TestCase {
         manager.addProcedureForTest(LongArrayProcedure.class.getName()).setClassname(LongArrayProcedure.class.getName());
         manager.addProcedureForTest(NPEProcedure.class.getName()).setClassname(NPEProcedure.class.getName());
         manager.addSiteForTest("1");
-        site = new MockExecutionSite(1, VoltDB.instance().getCatalog().serialize());
+        site = new MockExecutionSite(1, VoltDB.instance().getCatalogContext().catalog.serialize());
         nullParam = new ParameterSet();
         nullParam.setParameters(new Object[]{null});
     }
@@ -253,38 +252,18 @@ public class TestVoltProcedure extends TestCase {
         }
 
         @Override
-        public Class<?> classForProcedure(String procedureClassName)
-        throws ClassNotFoundException
-        {
-            return null;
-        }
-
-        @Override
-        public AuthSystem getAuthSystem()
-        {
-            return null;
-        }
-
-        @Override
         public String getBuildString()
         {
             return null;
         }
 
         @Override
-        public Catalog getCatalog()
-        {
-            return m_catalog;
+        public CatalogContext getCatalogContext() {
+            return new CatalogContext(m_catalog, CatalogContext.NO_PATH);
         }
 
         @Override
         public ArrayList<ClientInterface> getClientInterfaces()
-        {
-            return null;
-        }
-
-        @Override
-        public Cluster getCluster()
         {
             return null;
         }
@@ -315,36 +294,6 @@ public class TestVoltProcedure extends TestCase {
 
         @Override
         public VoltNetwork getNetwork()
-        {
-            return null;
-        }
-
-        @Override
-        public int getNumberOfNodes()
-        {
-            return 0;
-        }
-
-        @Override
-        public int getNumberOfPartitions()
-        {
-            return 0;
-        }
-
-        @Override
-        public int getNumberOfExecSites()
-        {
-            return 0;
-        }
-
-        @Override
-        public CatalogMap<Procedure> getProcedures()
-        {
-            return null;
-        }
-
-        @Override
-        public CatalogMap<Site> getSites()
         {
             return null;
         }
