@@ -528,22 +528,26 @@ public class SnapshotSave extends VoltSystemProcedure
 
     private final VoltTable constructNodeResultsTable()
     {
-        ColumnInfo[] result_columns = new ColumnInfo[4];
-        result_columns[0] = new ColumnInfo("HOST_ID", VoltType.STRING);
-        result_columns[1] = new ColumnInfo("TABLE", VoltType.STRING);
-        result_columns[2] = new ColumnInfo("RESULT", VoltType.STRING);
-        result_columns[3] = new ColumnInfo("ERR_MSG", VoltType.STRING);
-        return new VoltTable(result_columns);
+        return new VoltTable(nodeResultsColumns);
     }
+
+    public static final ColumnInfo nodeResultsColumns[] = new ColumnInfo[] {
+        new ColumnInfo("HOST_ID", VoltType.STRING),
+        new ColumnInfo("TABLE", VoltType.STRING),
+        new ColumnInfo("RESULT", VoltType.STRING),
+        new ColumnInfo("ERR_MSG", VoltType.STRING)
+    };
+
+    public static final ColumnInfo partitionResultsColumns[] = new ColumnInfo[] {
+        new ColumnInfo("HOST_ID", VoltType.STRING),
+        new ColumnInfo("SITE_ID", VoltType.STRING),
+        new ColumnInfo("RESULT", VoltType.STRING),
+        new ColumnInfo("ERR_MSG", VoltType.STRING)
+    };
 
     private final VoltTable constructPartitionResultsTable()
     {
-        ColumnInfo[] result_columns = new ColumnInfo[4];
-        result_columns[0] = new ColumnInfo("HOST_ID", VoltType.STRING);
-        result_columns[1] = new ColumnInfo("SITE_ID", VoltType.STRING);
-        result_columns[2] = new ColumnInfo("RESULT", VoltType.STRING);
-        result_columns[3] = new ColumnInfo("ERR_MSG", VoltType.STRING);
-        return new VoltTable(result_columns);
+        return new VoltTable(partitionResultsColumns);
     }
 
     private final VoltTable[] performSaveFeasibilityWork(String filePath,

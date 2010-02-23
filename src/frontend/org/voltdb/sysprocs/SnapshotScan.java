@@ -341,19 +341,19 @@ public class SnapshotScan extends VoltSystemProcedure {
         return new VoltTable(result_columns);
     }
 
-    private VoltTable constructClientResultsTable() {
-        ColumnInfo[] result_columns = new ColumnInfo[8];
-        int ii = 0;
-        result_columns[ii++] = new ColumnInfo("PATH", VoltType.STRING);
-        result_columns[ii++] = new ColumnInfo("NONCE", VoltType.STRING);
-        result_columns[ii++] = new ColumnInfo("CREATED", VoltType.BIGINT);
-        result_columns[ii++] = new ColumnInfo("SIZE", VoltType.BIGINT);
-        result_columns[ii++] = new ColumnInfo("TABLES_REQUIRED", VoltType.STRING);
-        result_columns[ii++] = new ColumnInfo("TABLES_MISSING", VoltType.STRING);
-        result_columns[ii++] = new ColumnInfo("TABLES_INCOMPLETE", VoltType.STRING);
-        result_columns[ii++] = new ColumnInfo("COMPLETE", VoltType.STRING);
+    public static final ColumnInfo clientColumnInfo[] = new ColumnInfo[] {
+            new ColumnInfo("PATH", VoltType.STRING),
+            new ColumnInfo("NONCE", VoltType.STRING),
+            new ColumnInfo("CREATED", VoltType.BIGINT),
+            new ColumnInfo("SIZE", VoltType.BIGINT),
+            new ColumnInfo("TABLES_REQUIRED", VoltType.STRING),
+            new ColumnInfo("TABLES_MISSING", VoltType.STRING),
+            new ColumnInfo("TABLES_INCOMPLETE", VoltType.STRING),
+            new ColumnInfo("COMPLETE", VoltType.STRING)
+    };
 
-        return new VoltTable(result_columns);
+    private VoltTable constructClientResultsTable() {
+        return new VoltTable(clientColumnInfo);
     }
 
     private VoltTable constructDiskFreeResultsTable() {

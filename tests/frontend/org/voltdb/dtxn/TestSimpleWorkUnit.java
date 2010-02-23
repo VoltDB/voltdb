@@ -311,6 +311,11 @@ public class TestSimpleWorkUnit extends TestCase {
 
         }
 
+        @Override
+        public boolean ignoreCrash() {
+            return false;
+        }
+
     }
 
     static final VoltMessage work = VoltMessage.createNewMessage(VoltMessage.INITIATE_RESPONSE_ID);

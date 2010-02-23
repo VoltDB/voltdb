@@ -66,4 +66,8 @@ public class EELibraryLoader {
         }
         return voltSharedLibraryLoaded;
     }
+
+    public static void reset() {
+        voltSharedLibraryLoadAttempted = false;
+    }
 }

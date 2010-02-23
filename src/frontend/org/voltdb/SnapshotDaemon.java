@@ -67,7 +67,7 @@ class SnapshotDaemon {
      * States the daemon can be in
      *
      */
-    private enum State {
+    enum State {
         /*
          * Initial state
          */
@@ -319,6 +319,9 @@ class SnapshotDaemon {
         //Continue snapshotting even if a delete fails.
         m_state = State.WAITING;
         if (response.getStatus() != ClientResponse.SUCCESS){
+            /*
+             * The delete may fail but the procedure should at least return success...
+             */
             m_state = State.FAILURE;
             logFailureResponse("Delete of snapshots failed", response);
             return;
@@ -361,6 +364,7 @@ class SnapshotDaemon {
             assert(result.getColumnCount() == 1);
             assert(result.getColumnType(0) == VoltType.STRING);
             hostLog.error("Initial snapshot scan failed with failure response: " + result.getString("ERR_MSG"));
+            return null;
         }
         assert(results.length == 3);
 
@@ -419,6 +423,10 @@ class SnapshotDaemon {
         if (response.getExtra() != null) {
             hostLog.error(response.getExtra());
         }
+    }
+
+    State getState() {
+        return m_state;
     }
 
 }

@@ -204,6 +204,9 @@ public class VoltDB {
      * For now, just die.
      */
     public static void crashVoltDB() {
+        if (instance().ignoreCrash()) {
+            return;
+        }
         Map<Thread, StackTraceElement[]> traces = Thread.getAllStackTraces();
         StackTraceElement[] myTrace = traces.get(Thread.currentThread());
         for (StackTraceElement t : myTrace) {

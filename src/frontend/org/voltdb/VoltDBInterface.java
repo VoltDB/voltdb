@@ -31,6 +31,12 @@ import org.voltdb.network.VoltNetwork;
 
 public interface VoltDBInterface
 {
+    /**
+     * Whether calls to crashVoltDB should result in a crash or be ignored
+     * @return
+     */
+    public boolean ignoreCrash();
+
     public void readBuildInfo();
 
     /**

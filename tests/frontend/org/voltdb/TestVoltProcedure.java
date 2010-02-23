@@ -402,6 +402,11 @@ public class TestVoltProcedure extends TestCase {
         public void startSampler()
         {
         }
+
+        @Override
+        public boolean ignoreCrash() {
+            return false;
+        }
     }
 
     private class MockExecutionSite extends ExecutionSite {

@@ -617,4 +617,9 @@ public class RealVoltDB implements VoltDBInterface
 
         out.print("\n\n--reportsection--");
     }
+
+    @Override
+    public boolean ignoreCrash() {
+        return false;
+    }
 }
