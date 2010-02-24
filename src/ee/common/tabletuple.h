@@ -532,7 +532,7 @@ inline void TableTuple::serializeTo(voltdb::SerializeOutput &output) {
     }
 
     // write the length of the tuple
-    output.writeShortAt(start, static_cast<int16_t>(output.position() - start));
+    output.writeShortAt(start, static_cast<int16_t>(output.position() - start - 2));
 }
 
 inline

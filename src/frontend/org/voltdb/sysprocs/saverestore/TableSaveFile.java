@@ -21,9 +21,9 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.ArrayDeque;
 import java.util.HashSet;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
 import java.util.zip.CRC32;
 
@@ -149,7 +149,7 @@ public class TableSaveFile
             throw new IOException("Corrupted save file has negative length or too small length for VoltTable header");
         }
 
-        m_tableHeader = ByteBuffer.allocate(length);
+        m_tableHeader = ByteBuffer.allocate(length + 2);
         m_tableHeader.putShort((short)length);
         while (m_tableHeader.hasRemaining()) {
             final int read = m_saveFile.read(m_tableHeader);
@@ -157,7 +157,7 @@ public class TableSaveFile
                 throw new EOFException();
             }
         }
-        crc.update(m_tableHeader.array(), 2, length - 2);
+        crc.update(m_tableHeader.array(), 2, length);
 
         final int actualCRC = (int)crc.getValue();
         if (originalCRC != actualCRC) {

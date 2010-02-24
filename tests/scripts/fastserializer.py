@@ -661,7 +661,7 @@ class VoltTable:
             map(lambda x: row_fser.write(self.columns[x].type, i[x]),
                 xrange(len(i)))
 
-            table_fser.writeInt16(row_fser.size() + 2)
+            table_fser.writeInt16(row_fser.size())
             table_fser.writeRawBytes(row_fser.getRawBytes())
 
         table_fser.prependLength()

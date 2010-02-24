@@ -39,13 +39,13 @@ import org.voltdb.types.VoltDecimalHelper;
 A brief overview of the serialized format:
 
 COLUMN HEADER:
-[short: column header size in bytes]
+[short: column header size in bytes (non-inclusive)]
 [short: num columns]
 [byte: column type] * num columns
 [string: column name] * num columns
 TABLE BODY DATA:
 [int: num tuples]
-[short: row size, blob row data] * num tuples
+[short: row size (non inclusive), blob row data] * num tuples
 
 Strings are represented as:
 
@@ -163,7 +163,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
      */
     public VoltTable(ByteBuffer backing, boolean readOnly) {
         m_buffer = backing;
-        m_rowStart = m_buffer.getShort(0);
+        m_rowStart = m_buffer.getShort(0) + 2;
         m_colCount = m_buffer.getShort(2);
         m_rowCount = m_buffer.getInt(m_rowStart);
         m_buffer.position(m_buffer.limit());
@@ -205,9 +205,9 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
             }
             writeStringToBuffer(columns[i].name, METADATA_ENCODING, m_buffer);
         }
-        // write the header size to the first two bytes
+        // write the header size to the first two bytes (length-prefixed non-inclusive)
         m_rowStart = m_buffer.position();
-        m_buffer.putShort(0, (short) m_rowStart);
+        m_buffer.putShort(0, (short) (m_rowStart - 2));
         // write the row count to the next 4 bytes after the header
         m_buffer.putInt(0);
 
@@ -391,7 +391,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
 
         int pos = m_rowStart + 4;
         for (int i = 0; i < index; i++) {
-            pos += m_buffer.getShort(pos);
+            pos += m_buffer.getShort(pos) + 2;
         }
         Row retval = new Row(pos + 2);
         retval.m_activeRowIndex = index;
@@ -621,10 +621,10 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
 
             m_rowCount++;
             m_buffer.putInt(m_rowStart, m_rowCount);
-            final short rowsize = (short) (m_buffer.position() - pos);
+            final short rowsize = (short) (m_buffer.position() - pos - 2);
             // constrain buffer limit back to the new position
             m_buffer.limit(m_buffer.position());
-            assert(rowsize >= 2);
+            assert(rowsize >= 0);
             // buffer overflow is caught and handled below.
             m_buffer.putShort(pos, rowsize);
         }
@@ -664,6 +664,8 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
      * @return The integer row value.
      */
     public final long asScalarLong() {
+        verifyTableInvariants();
+
         if (m_rowCount != 1) {
             throw new IllegalStateException(
                     "table must contain exactly 1 tuple; tuples = " + m_rowCount);
@@ -701,7 +703,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
         m_buffer = in.readBuffer(len);
         m_buffer.position(m_buffer.limit());
 
-        m_rowStart = m_buffer.getShort(0);
+        m_rowStart = m_buffer.getShort(0) + 2;
         m_colCount = m_buffer.getShort(2);
         m_rowCount = m_buffer.getInt(m_rowStart);
 
@@ -971,7 +973,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
             return false;
         }
 
-        int rowStart = m_buffer.getShort(0);
+        int rowStart = m_buffer.getShort(0) + 2;
         if (rowStart < (2 + 2 + 1 + 2)) {
             System.err.printf("rowStart with value %d is smaller than it should be.\n", rowStart);
             return false;

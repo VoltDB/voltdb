@@ -142,7 +142,7 @@ bool VoltDBEngine::initialize(int32_t clusterIndex, int32_t siteId) {
     m_templateSingleLongTable = new char[m_templateSingleLongTableSize];
     memset(m_templateSingleLongTable, 0, m_templateSingleLongTableSize);
     m_templateSingleLongTable[7] = 21; // table size
-    m_templateSingleLongTable[9] = 7; // size of header
+    m_templateSingleLongTable[9] = 5; // size of header
     m_templateSingleLongTable[11] = 1; // number of columns
     m_templateSingleLongTable[12] = VALUE_TYPE_BIGINT; // column type
     m_templateSingleLongTable[13] = 0; // column name length

@@ -26,15 +26,17 @@ package org.voltdb.sysprocs.saverestore;
 import java.io.File;
 import java.io.FileInputStream;
 import java.nio.ByteBuffer;
+import java.util.zip.CRC32;
+
 import junit.framework.TestCase;
+
+import org.voltdb.DefaultSnapshotDataTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.DefaultSnapshotDataTarget;
 import org.voltdb.utils.Pair;
 import org.voltdb.utils.DBBPool.BBContainer;
-import java.util.zip.CRC32;
 
 /**
  * This test also provides pretty good coverage of DefaultSnapshotTarget
@@ -62,7 +64,7 @@ public class TestTableSaveFile extends TestCase
         ByteBuffer b = c.b;
         b.getInt();
         int headerLength = b.getShort();
-        b.position(b.position() + (headerLength - 2));// at row count
+        b.position(b.position() + headerLength);// at row count
         final int rowCount = b.getInt();
         ByteBuffer chunkBuffer = ByteBuffer.allocate(b.remaining() + 12 + target.getHeaderSize());
         final CRC32 crc = new CRC32();
@@ -170,7 +172,7 @@ public class TestTableSaveFile extends TestCase
         ByteBuffer tableHeader = savefile.getTableHeader();
         tableHeader.position(0);
         assertEquals(2 + 2 + 1 + 2 + 3, tableHeader.remaining());
-        assertEquals(tableHeader.getShort(), 10);
+        assertEquals(tableHeader.getShort(), 8);
         assertEquals(tableHeader.getShort(), 1);
         assertEquals(tableHeader.get(), VoltType.STRING.getValue());
         assertEquals(tableHeader.getShort(), 3);

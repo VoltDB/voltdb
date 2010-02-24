@@ -45,6 +45,97 @@ public class TestVoltTable extends TestCase {
         t2 = new VoltTable();
     }
 
+    void addAllPrimitives(Class<?>[] permittedTypes) {
+        Object[] primitives = {
+            null,
+            (byte) 0,
+            (short) 1,
+            (short) 2,
+            3,
+            4L,
+            5.01f,
+            6.02,
+            "string",
+            new byte[] { 'b', 'y', 't', 'e', 's' },
+            new TimestampType(99),
+            new BigDecimal(7654321).setScale(VoltDecimalHelper.kDefaultScale),
+            new Object(),
+        };
+
+        for (Object o : primitives) {
+            try {
+                t.addRow(o);
+                if (o != null && !contains(permittedTypes, o.getClass())) {
+                    fail(o.getClass() + " is not permitted but addRow succeeded");
+                }
+            } catch (VoltTypeException e) {
+                if (contains(permittedTypes, o.getClass())) {
+                    fail(o.getClass() + " is permitted by addRow failed");
+                }
+            }
+        }
+    }
+
+    // VoltTable initially sizes itself to fit exactly, so 2 longs should be sufficient to get
+    // resizing. Use 16 to be on the safe side.
+    private static final int LONGS_TO_RESIZE = 16;
+
+    // return an VoltTable that needed to grow once.
+    private VoltTable makeResizedTable() {
+        VoltTable temp = new VoltTable(new ColumnInfo("Foo", VoltType.BIGINT));
+        for (int i = 0; i < LONGS_TO_RESIZE; ++i) {
+            temp.addRow((long) i);
+        }
+        return temp;
+    }
+
+    private static boolean contains(Class<?>[] types, Class<?> type) {
+        for (Class<?> c : types) {
+            if (type == c) return true;
+        }
+        return false;
+    }
+
+    private boolean comparisonHelper(Object lhs, Object rhs, VoltType vt) {
+        switch (vt) {
+        case TINYINT:
+            Byte b1 = (Byte)lhs;
+            Byte b2 = (Byte)rhs;
+            return b1.byteValue() == b2.byteValue();
+        case SMALLINT:
+            Short s1 = (Short)lhs;
+            Short s2 = (Short)rhs;
+            return s1.shortValue() == s2.shortValue();
+        case INTEGER:
+            Integer i1 = (Integer)lhs;
+            Integer i2 = (Integer)rhs;
+            return i1.intValue() == i2.intValue();
+        case BIGINT:
+            Long l1 = (Long)lhs;
+            Long l2 = (Long)rhs;
+            return l1.longValue() == l2.longValue();
+        case FLOAT:
+            Double d1 = (Double)lhs;
+            Double d2 = (Double)rhs;
+            return (d1.compareTo(d2) == 0);
+        case STRING:
+            if (lhs == null && rhs == null) return true;
+            if (lhs == VoltType.NULL_STRING && rhs == null) return true;
+            return ((String)lhs).equals(rhs);
+        case TIMESTAMP:
+            if (lhs == null && rhs == null) return true;
+            if (lhs == VoltType.NULL_TIMESTAMP && rhs == null) return true;
+            return ((TimestampType)lhs).equals(rhs);
+        case DECIMAL:
+            if (lhs == null && rhs == null) return true;
+            if (lhs == VoltType.NULL_DECIMAL && rhs == null) return true;
+            if (lhs == null || rhs == null) return false;
+            return ((BigDecimal)lhs).equals(rhs);
+        }
+
+        return false;
+    }
+
     public void testMakeFromScalar() {
         assertEquals(1, LONG_FIVE.getColumnCount());
         assertEquals(1, LONG_FIVE.getRowCount());
@@ -119,19 +210,6 @@ public class TestVoltTable extends TestCase {
         } catch (IllegalArgumentException e) {}
     }
 
-    // VoltTable initially sizes itself to fit exactly, so 2 longs should be sufficient to get
-    // resizing. Use 16 to be on the safe side.
-    private static final int LONGS_TO_RESIZE = 16;
-
-    /** @return an VoltTable that needed to grow once. */
-    private VoltTable makeResizedTable() {
-        VoltTable temp = new VoltTable(new ColumnInfo("Foo", VoltType.BIGINT));
-        for (int i = 0; i < LONGS_TO_RESIZE; ++i) {
-            temp.addRow((long) i);
-        }
-        return temp;
-    }
-
     public void testResizedTable() {
         // Create a table big enough to require resizing
         t = makeResizedTable();
@@ -187,48 +265,11 @@ public class TestVoltTable extends TestCase {
         assertTrue(equal);
     }
 
-    private static boolean contains(Class<?>[] types, Class<?> type) {
-        for (Class<?> c : types) {
-            if (type == c) return true;
-        }
-        return false;
-    }
-
-    void addAllPrimitives(Class<?>[] permittedTypes) {
-        Object[] primitives = {
-            null,
-            (byte) 0,
-            (short) 1,
-            (short) 2,
-            3,
-            4L,
-            5.01f,
-            6.02,
-            "string",
-            new byte[] { 'b', 'y', 't', 'e', 's' },
-            new TimestampType(99),
-            new BigDecimal(7654321).setScale(VoltDecimalHelper.kDefaultScale),
-            new Object(),
-        };
-
-        for (Object o : primitives) {
-            try {
-                t.addRow(o);
-                if (o != null && !contains(permittedTypes, o.getClass())) {
-                    fail(o.getClass() + " is not permitted but addRow succeeded");
-                }
-            } catch (VoltTypeException e) {
-                if (contains(permittedTypes, o.getClass())) {
-                    fail(o.getClass() + " is permitted by addRow failed");
-                }
-            }
-        }
-    }
-
     public void testStrings() {
         t = new VoltTable(new ColumnInfo("", VoltType.STRING));
         addAllPrimitives(new Class[]{ String.class, byte[].class });
         t.addRow("");
+        assertEquals("string", t.fetchRow(1).getString(0));
 
         t2 = FastSerializableTestUtil.roundTrip(t);
         assertEquals("", t2.getColumnName(0));
@@ -501,46 +542,6 @@ public class TestVoltTable extends TestCase {
             rowcount++;
         }
         assertEquals(10, rowcount);
-    }
-
-    private boolean comparisonHelper(Object lhs, Object rhs, VoltType vt) {
-        switch (vt) {
-        case TINYINT:
-            Byte b1 = (Byte)lhs;
-            Byte b2 = (Byte)rhs;
-            return b1.byteValue() == b2.byteValue();
-        case SMALLINT:
-            Short s1 = (Short)lhs;
-            Short s2 = (Short)rhs;
-            return s1.shortValue() == s2.shortValue();
-        case INTEGER:
-            Integer i1 = (Integer)lhs;
-            Integer i2 = (Integer)rhs;
-            return i1.intValue() == i2.intValue();
-        case BIGINT:
-            Long l1 = (Long)lhs;
-            Long l2 = (Long)rhs;
-            return l1.longValue() == l2.longValue();
-        case FLOAT:
-            Double d1 = (Double)lhs;
-            Double d2 = (Double)rhs;
-            return (d1.compareTo(d2) == 0);
-        case STRING:
-            if (lhs == null && rhs == null) return true;
-            if (lhs == VoltType.NULL_STRING && rhs == null) return true;
-            return ((String)lhs).equals(rhs);
-        case TIMESTAMP:
-            if (lhs == null && rhs == null) return true;
-            if (lhs == VoltType.NULL_TIMESTAMP && rhs == null) return true;
-            return ((TimestampType)lhs).equals(rhs);
-        case DECIMAL:
-            if (lhs == null && rhs == null) return true;
-            if (lhs == VoltType.NULL_DECIMAL && rhs == null) return true;
-            if (lhs == null || rhs == null) return false;
-            return ((BigDecimal)lhs).equals(rhs);
-        }
-
-        return false;
     }
 
     public void testStupidAdvanceRowUse() {

@@ -43,7 +43,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-
+#include <sstream>
+#include <cassert>
+#include <cstdio>
 #include "table.h"
 #include "common/debuglog.h"
 #include "common/serializeio.h"
@@ -52,9 +54,6 @@
 #include "common/Pool.hpp"
 #include "indexes/tableindex.h"
 #include "storage/tableiterator.h"
-
-#include <sstream>
-#include <cassert>
 
 using std::string;
 
@@ -319,7 +318,8 @@ bool Table::serializeColumnHeaderTo(SerializeOutput &serialize_io) {
         // write the header size
         size_t position = serialize_io.position();
         m_columnHeaderSize = static_cast<int16_t>(position - start);
-        serialize_io.writeShortAt(start, m_columnHeaderSize);
+        short nonInclusiveHeaderSize = static_cast<int16_t>(m_columnHeaderSize - sizeof(int16_t));
+        serialize_io.writeShortAt(start, nonInclusiveHeaderSize);
     }
     catch(...) {
         VOLT_ERROR("Failed while serializing table header.");

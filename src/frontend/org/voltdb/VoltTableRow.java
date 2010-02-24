@@ -183,8 +183,7 @@ public abstract class VoltTableRow {
      * {@link #resetRowPosition()} must be called to re-iterate through the
      * rows.
      *
-     * @param rowIndex
-     *            The row to jump to.
+     * @param rowIndex The row to jump to.
      * @return True if a valid row became active. False otherwise.
      */
     public boolean advanceToRow(int rowIndex) {
@@ -200,10 +199,10 @@ public abstract class VoltTableRow {
             m_position = getRowStart() + ROW_COUNT_SIZE + ROW_HEADER_SIZE;
         else {
             short rowlength = m_buffer.getShort(m_position - ROW_HEADER_SIZE);
-            if (rowlength <= 2) {
+            if (rowlength <= 0) {
                 throw new RuntimeException("Invalid row length.");
             }
-            m_position += rowlength;
+            m_position += rowlength + 2;
             if (m_position >= m_buffer.limit())
                 throw new RuntimeException("Row length exceeds table boundary.");
         }
