@@ -145,8 +145,8 @@ public class TableSaveFile
         lengthBuffer.flip();
         length = lengthBuffer.getShort();
 
-        if (length < 0) {
-            throw new IOException("Corrupted save file has negative length for VoltTable header");
+        if (length < 2) {
+            throw new IOException("Corrupted save file has negative length or too small length for VoltTable header");
         }
 
         m_tableHeader = ByteBuffer.allocate(length);
