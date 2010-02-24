@@ -41,6 +41,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.compiler.AdHocPlannedStmt;
 import org.voltdb.compiler.AsyncCompilerResult;
 import org.voltdb.compiler.AsyncCompilerWorkThread;
+import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.debugstate.InitiatorContext;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
 import org.voltdb.dtxn.TransactionInitiator;
@@ -802,7 +803,7 @@ public class ClientInterface implements DumpManager.Dumpable {
         }
     }
 
-    private final void checkForAdHocSQL() {
+    private final void checkForFinishedCompilerWork() {
         if (m_plannerThread == null) return;
 
         AsyncCompilerResult result = null;
@@ -826,8 +827,25 @@ public class ClientInterface implements DumpManager.Dumpable {
                                                   task, false, false, m_allPartitions,
                                                   m_allPartitions.length, plannedStmt.clientData);
                 }
+                else if (result instanceof CatalogChangeResult) {
+                    CatalogChangeResult changeResult = (CatalogChangeResult) result;
+                    // create the execution site task
+                    StoredProcedureInvocation task = new StoredProcedureInvocation();
+                    task.procName = "@UpdateApplicationCatalog";
+                    task.params = new ParameterSet();
+                    /*task.params.m_params = new Object[] {
+                            plannedStmt.aggregatorFragment, plannedStmt.collectorFragment,
+                            plannedStmt.sql, plannedStmt.isReplicatedTableDML ? 1 : 0
+                    };*/
+                    task.clientHandle = changeResult.clientHandle;
+
+                    // initiate the transaction
+                    m_initiator.createTransaction(changeResult.connectionId,
+                                                  task, false, false, m_allPartitions,
+                                                  m_allPartitions.length, changeResult.clientData);
+                }
                 else {
-                    throw new RuntimeException("Should not be able to get here until catalog changes are supported.");
+                    throw new RuntimeException("Should not be able to get here (ClientInterface.checkForFinishedCompilerWork())");
                 }
             }
             else {
@@ -866,7 +884,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                 }
             }
             // poll planner queue
-            checkForAdHocSQL();
+            checkForFinishedCompilerWork();
 
             initiateSnapshotDaemonWork(m_snapshotDaemon.processPeriodicWork(time));
         } finally {

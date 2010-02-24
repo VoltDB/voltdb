@@ -30,7 +30,10 @@ public class CatalogContext {
     /** Pass this to constructor for catalog path in tests */
     public static final String NO_PATH = "EMPTY_PATH";
 
+    // THE CATALOG!
     public final Catalog catalog;
+
+    // PUBLIC IMMUTABLE CACHED INFORMATION
     public final Cluster cluster;
     public final Database database;
     public final CatalogMap<Procedure> procedures;
@@ -40,6 +43,8 @@ public class CatalogContext {
     public final int numberOfExecSites;
     public final int numberOfNodes;
 
+    // PRIVATE
+    private final String m_path;
     private final JarClassLoader m_catalogClassLoader;
 
     public CatalogContext(Catalog catalog, String pathToCatalogJar) {
@@ -51,6 +56,7 @@ public class CatalogContext {
         if (pathToCatalogJar == null)
             throw new RuntimeException("Can't create CatalogContext with null jar path.");
 
+        m_path = pathToCatalogJar;
         if (pathToCatalogJar.startsWith(NO_PATH) == false)
             m_catalogClassLoader = new JarClassLoader(pathToCatalogJar);
         else
@@ -77,6 +83,17 @@ public class CatalogContext {
 
         // count partitions
         numberOfPartitions = cluster.getPartitions().size();
+    }
+
+    public CatalogContext deepCopy() {
+        return new CatalogContext(catalog.deepCopy(), m_path);
+    }
+
+    public CatalogContext update(String pathToNewJar, String diffCommands) {
+        Catalog newCatalog = catalog.deepCopy();
+        newCatalog.execute(diffCommands);
+        CatalogContext retval = new CatalogContext(newCatalog, pathToNewJar);
+        return retval;
     }
 
     /**

@@ -476,7 +476,7 @@ public class RealVoltDB implements VoltDBInterface
      * @param diffCommands
      */
     public synchronized void catalogUpdate(String newCatalogURL, String diffCommands) {
-
+        m_catalogContext = m_catalogContext.update(newCatalogURL, diffCommands);
     }
 
     public VoltDB.Configuration getConfig()

@@ -28,6 +28,7 @@ import org.hsqldb.HSQLInterface.HSQLParseException;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.debugstate.PlannerThreadContext;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.QueryPlanner;
@@ -258,18 +259,36 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
     }
 
     private AsyncCompilerResult prepareApplicationCatalogDiff(CatalogChangeWork work) {
+        // create the change result and set up all the boiler plate
         CatalogChangeResult retval = new CatalogChangeResult();
         retval.clientData = work.clientData;
         retval.clientHandle = work.clientHandle;
         retval.connectionId = work.connectionId;
 
+        // catalog change specific boiler plate
         retval.catalogURL = work.catalogURL;
 
-        String newCatalogCommands = CatalogUtil.loadCatalogFromJar(work.catalogURL, null);
-        assert(newCatalogCommands != null);
-        Catalog newCatalog = new Catalog();
-        newCatalog.execute(newCatalogCommands);
+        // get the diff between catalogs
+        try {
+            // try to get the new catalog from the params
+            String newCatalogCommands = CatalogUtil.loadCatalogFromJar(work.catalogURL, null);
+            assert(newCatalogCommands != null);
+            Catalog newCatalog = new Catalog();
+            newCatalog.execute(newCatalogCommands);
 
-        return null;
+            // get the current catalog
+            CatalogContext context = VoltDB.instance().getCatalogContext();
+
+            // compute the diff
+            String diffCommands = CatalogDiffEngine.getCommandsToDiff(context.catalog, newCatalog);
+            retval.diffCommands = diffCommands;
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            retval.diffCommands = null;
+            retval.errorMsg = e.getMessage();
+        }
+
+        return retval;
     }
 }
