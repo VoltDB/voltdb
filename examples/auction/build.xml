@@ -31,7 +31,7 @@ PATHS AND PROPERTIES
 PRIMARY ENTRY POINTS
 ***************************************
 -->
-    
+
 <target name="main" depends="compile" description="default. Compile Java stored procedures and jar them up and then run VoltCompile on the stored procedures" />
 
 <!--
@@ -57,7 +57,7 @@ JAVA & CATALOG COMPILATION
 
 <target name="compile"
     description="Example: ant compile    Compile a project xml file and stored procedures into a catalog. You must have the stored procedures specified in the project file in your classpath.">
-    
+
     <!-- Build the Java code (procs and driver) for the Auction example -->
     <mkdir dir='${build.dir}' />
     <javac target="1.6" srcdir="${procedures.dir}" destdir='${build.dir}' debug='true'>
@@ -72,15 +72,16 @@ JAVA & CATALOG COMPILATION
             <include name="*.txt"/>
         </fileset>
     </copy>
-    
+
     <!-- this next line makes the auto-tests work and has no other use -->
     <copy todir='${build.dir}/com/auctionexample' file='auction-ddl.sql' />
-    
+
     <!-- Build the VoltDB Catalog for the Auction example -->
     <java fork="yes" classname="org.voltdb.compiler.VoltCompiler" >
         <arg value="project.xml"/> <!-- project file -->
         <arg value="1"/>           <!-- hosts -->
         <arg value="1"/>           <!-- sites -->
+        <arg value="0"/>           <!-- k-safety factor -->
         <arg value="localhost"/>   <!-- leader -->
         <arg value="${catalog_jar}"/> <!-- output -->
         <classpath refid='project.classpath' />
@@ -99,7 +100,7 @@ SERVER & CLIENT TARGETS
         <jvmarg value="-Djava.library.path=../../voltdb" />
         <jvmarg value="-server" />
         <jvmarg value="-Xmx512m" />
-        <arg value="catalog"/> 
+        <arg value="catalog"/>
         <arg value="auction.jar"/>
         <classpath refid='project.classpath' />
         <assertions><disable /></assertions>

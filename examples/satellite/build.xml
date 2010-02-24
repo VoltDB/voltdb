@@ -31,7 +31,7 @@ PATHS AND PROPERTIES
 PRIMARY ENTRY POINTS
 ***************************************
 -->
-    
+
 <target name="main" depends="compile" description="default. Compile Java stored procedures and jar them up and then run VoltCompile on the stored procedures" />
 
 <!--
@@ -57,7 +57,7 @@ JAVA & CATALOG COMPILATION
 
 <target name="compile"
     description="Example: ant compile    Compile a project xml file and stored procedures into a catalog. You must have the stored procedures specified in the project file in your classpath.">
-    
+
     <!-- Build the Java code (procs and driver) for the Auction example -->
     <mkdir dir='${build.dir}' />
     <javac target="1.6" srcdir="${procedures.dir}" destdir='${build.dir}' debug='true'>
@@ -66,15 +66,16 @@ JAVA & CATALOG COMPILATION
     <javac target="1.6" srcdir="${src.dir}" destdir='${build.dir}' debug='true'>
         <classpath refid="project.classpath" />
     </javac>
-    
+
     <!-- this next line makes the auto-tests work and has no other use -->
     <copy todir='${build.dir}' file='satellite.ddl' />
-    
+
     <!-- Build the VoltDB Catalog for the Satellite example -->
     <java fork="yes" classname="org.voltdb.compiler.VoltCompiler" >
         <arg value="project.xml"/> <!-- project file -->
         <arg value="1"/>           <!-- hosts -->
         <arg value="1"/>           <!-- sites -->
+        <arg value="0"/>           <!-- k-safety factor -->
         <arg value="localhost"/>   <!-- leader -->
         <arg value="${catalog_jar}"/> <!-- output -->
         <classpath refid='project.classpath' />
@@ -94,14 +95,14 @@ SERVER & CLIENT TARGETS
         <jvmarg value="-Djava.library.path=../../voltdb" />
         <jvmarg value="-server" />
         <jvmarg value="-Xmx512m" />
-        <arg value="catalog"/> 
+        <arg value="catalog"/>
         <arg value="${catalog_jar}"/>
         <classpath refid='project.classpath' />
         <assertions><disable /></assertions>
     </java>
 </target>
 
-<target name="client" 
+<target name="client"
     description="Example: ant client    Run Satellite signal client.">
     <java fork="yes" classname="signal.Client" >
      <arg value="5"/>    <!-- number of satellites -->
@@ -112,7 +113,7 @@ SERVER & CLIENT TARGETS
 </target>
 
 
-<target name="tracker" 
+<target name="tracker"
     description="Example: ant tracker    Run Satellite tracker client.">
     <java fork="yes" classname="tracker.UserInterface" >
         <classpath refid='project.classpath' />
