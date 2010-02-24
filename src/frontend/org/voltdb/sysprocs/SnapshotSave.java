@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Deque;
 import java.util.LinkedList;
 import java.util.ArrayDeque;
+import java.util.HashSet;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.Semaphore;
 import org.apache.log4j.Logger;
@@ -243,7 +244,8 @@ public class SnapshotSave extends VoltSystemProcedure
                                                 return snapshotRecord.new Table(
                                                         registryTable,
                                                         sdt.getBytesWritten(),
-                                                        now);
+                                                        now,
+                                                        sdt.getLastWriteException());
                                             }
                                         });
                                         int tablesLeft = numTables.decrementAndGet();
@@ -290,7 +292,7 @@ public class SnapshotSave extends VoltSystemProcedure
                             /**
                              * Distribute the writing of replicated tables to exactly one partition.
                              */
-                            for (int ii = 0; ii < numLocalSites; ii++) {
+                            for (int ii = 0; ii < numLocalSites && !partitionedSnapshotTasks.isEmpty(); ii++) {
                                 m_taskListsForSites.add(new ArrayDeque<SnapshotTableTask>(partitionedSnapshotTasks));
                             }
 
@@ -299,8 +301,12 @@ public class SnapshotSave extends VoltSystemProcedure
                                 m_taskListsForSites.get(siteIndex++ % numLocalSites).offer(t);
                             }
                         }
-                        ExecutionSite.ExecutionSitesCurrentlySnapshotting.set(
-                                VoltDB.instance().getLocalSites().values().size());
+                        if (!partitionedSnapshotTasks.isEmpty() && !replicatedSnapshotTasks.isEmpty()) {
+                            ExecutionSite.ExecutionSitesCurrentlySnapshotting.set(
+                                    VoltDB.instance().getLocalSites().values().size());
+                        } else {
+                            SnapshotRegistry.discardSnapshot(snapshotRecord);
+                        }
                     } catch (Exception ex) {
                         result.addRow(context.getSite().getHost().getTypeName(),
                                 "",
@@ -358,18 +364,33 @@ public class SnapshotSave extends VoltSystemProcedure
             TRACE_LOG.trace("Blocking to write tables to disk");
             String status = "SUCCESS";
             String err = "";
+            HashSet<Exception> failures = null;
             try {
-                context.getExecutionSite().completeSnapshotWork();
+                failures = context.getExecutionSite().completeSnapshotWork();
             } catch (InterruptedException e) {
                 status = "FAILURE";
                 err = e.toString();
             }
             VoltTable result = constructPartitionResultsTable();
-            result.addRow(
-                    context.getSite().getHost().getTypeName(),
-                    context.getSite().getTypeName(),
-                    status,
-                    err);
+
+            if (failures.isEmpty()) {
+                result.addRow(
+                        context.getSite().getHost().getTypeName(),
+                        context.getSite().getTypeName(),
+                        status,
+                        err);
+            } else {
+                status = "FAILURE";
+                for (Exception e : failures) {
+                    err = e.toString();
+                }
+                result.addRow(
+                        context.getSite().getHost().getTypeName(),
+                        context.getSite().getTypeName(),
+                        status,
+                        err);
+            }
+
             return new
                 DependencyPair( DEP_saveTables, result);
         }
@@ -444,7 +465,7 @@ public class SnapshotSave extends VoltSystemProcedure
         // Test snapshot creation results for fail
         while (results[0].advanceRow())
         {
-            if (results[0].getString(3).equals("FAILURE"))
+            if (results[0].getString("RESULT").equals("FAILURE"))
             {
                 // Something lost, bomb out and just return the whole
                 // table of results to the client for analysis

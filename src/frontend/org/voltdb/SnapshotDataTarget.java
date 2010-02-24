@@ -19,6 +19,7 @@ package org.voltdb;
 
 import org.voltdb.utils.DBBPool.BBContainer;
 import java.io.IOException;
+import java.util.concurrent.Future;
 
 public interface SnapshotDataTarget {
     /**
@@ -34,7 +35,7 @@ public interface SnapshotDataTarget {
      * @param tupleData Tuple data in a <code>ByteBuffer</code> with the required number of bytes available
      * for a header
      */
-    public void write(BBContainer tupleData) throws IOException;
+    public Future<?> write(BBContainer tupleData);
 
     /**
      * Close this target releasing any held resources and writing any footer info
@@ -45,4 +46,10 @@ public interface SnapshotDataTarget {
     public long getBytesWritten();
 
     public void setOnCloseHandler(Runnable onClose);
+
+    /**
+     * Get last cached exception that occured during writes
+     * @return
+     */
+    public IOException getLastWriteException();
 }

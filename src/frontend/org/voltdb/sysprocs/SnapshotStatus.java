@@ -86,7 +86,9 @@ public class SnapshotStatus extends VoltSystemProcedure {
                                 s.nonce,
                                 t.timeCreated,
                                 t.timeClosed,
-                                t.size);
+                                t.size,
+                                t.error == null ? "SUCCESS" : "FAILURE",
+                                t.error != null ? t.error.toString() : "");
                     }
                 });
             }
@@ -116,6 +118,7 @@ public class SnapshotStatus extends VoltSystemProcedure {
         public final long startTime;
         public long endTime;
         public long size;
+        public boolean result = true;//true success, false failure
 
         public SnapshotResult(final VoltTableRow r) {
             path = r.getString(2);
@@ -123,16 +126,22 @@ public class SnapshotStatus extends VoltSystemProcedure {
             startTime = r.getLong(4);
             endTime = r.getLong(5);
             size = r.getLong(6);
+            if (!r.getString("RESULT").equals("SUCCESS")) {
+                result = false;
+            }
         }
 
         public void processRow(final VoltTableRow r) {
             endTime = Math.max(endTime, r.getLong(5));
             size += r.getLong(6);
+            if (!r.getString("RESULT").equals("SUCCESS")) {
+                result = false;
+            }
         }
     }
     private VoltTable constructFragmentResultsTable() {
 
-        ColumnInfo[] result_columns = new ColumnInfo[7];
+        ColumnInfo[] result_columns = new ColumnInfo[9];
         int ii = 0;
         result_columns[ii++] = new ColumnInfo("HOST_ID", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("TABLE", VoltType.STRING);
@@ -141,12 +150,13 @@ public class SnapshotStatus extends VoltSystemProcedure {
         result_columns[ii++] = new ColumnInfo("START_TIME", VoltType.BIGINT);
         result_columns[ii++] = new ColumnInfo("END_TIME", VoltType.BIGINT);
         result_columns[ii++] = new ColumnInfo("SIZE", VoltType.BIGINT);
-
+        result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
         return new VoltTable(result_columns);
     }
 
     private VoltTable constructClientResultsTable() {
-        ColumnInfo[] result_columns = new ColumnInfo[7];
+        ColumnInfo[] result_columns = new ColumnInfo[8];
         int ii = 0;
         result_columns[ii++] = new ColumnInfo("PATH", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("NONCE", VoltType.STRING);
@@ -155,7 +165,7 @@ public class SnapshotStatus extends VoltSystemProcedure {
         result_columns[ii++] = new ColumnInfo("SIZE", VoltType.BIGINT);
         result_columns[ii++] = new ColumnInfo("DURATION", VoltType.BIGINT);
         result_columns[ii++] = new ColumnInfo("THROUGHPUT", VoltType.STRING);
-
+        result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
         return new VoltTable(result_columns);
     }
 
@@ -187,7 +197,8 @@ public class SnapshotStatus extends VoltSystemProcedure {
                     s.endTime,
                     s.size,
                     s.endTime - s.startTime,
-                    sw.toString());
+                    sw.toString(),
+                    s.result ? "SUCCESS" : "FAILURE");
         }
         return new VoltTable[] { clientResults, scanResults };
     }

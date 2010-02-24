@@ -30,6 +30,7 @@ import java.io.IOException;
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.DefaultSnapshotDataTarget;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
@@ -63,6 +64,9 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
     {
         deleteTestFiles();
         super.setUp();
+        DefaultSnapshotDataTarget.m_simulateFullDiskWritingChunk = false;
+        DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = false;
+        org.voltdb.sysprocs.SnapshotRegistry.clear();
     }
 
     @Override
@@ -268,15 +272,19 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         results = client.callProcedure("@SnapshotSave", TMPDIR,
                                        TESTNONCE, (byte)1);
 
+        /*
+         * Check that snapshot status returns a reasonable result
+         */
         VoltTable statusResults[] = client.callProcedure("@SnapshotStatus");
         assertNotNull(statusResults);
         assertEquals( 2, statusResults.length);
-        assertEquals( 7, statusResults[0].getColumnCount());
+        assertEquals( 8, statusResults[0].getColumnCount());
         assertEquals( 1, statusResults[0].getRowCount());
         assertTrue(statusResults[0].advanceRow());
         assertTrue(TMPDIR.equals(statusResults[0].getString("PATH")));
         assertTrue(TESTNONCE.equals(statusResults[0].getString("NONCE")));
         assertFalse( 0 == statusResults[0].getLong("END_TIME"));
+        assertTrue("SUCCESS".equals(statusResults[0].getString("RESULT")));
 
         VoltTable scanResults[] = client.callProcedure("@SnapshotScan", new Object[] { null });
         assertNotNull(scanResults);
@@ -460,7 +468,31 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                                   num_partitioned_items_per_chunk,
                                   num_partitioned_chunks);
         VoltTable[] results = null;
+
+        DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = true;
         results = saveTables(client);
+        deleteTestFiles();
+
+        while (results[0].advanceRow()) {
+            assertTrue(results[0].getString("RESULT").equals("FAILURE"));
+        }
+
+        DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = false;
+
+        results = saveTables(client);
+
+        try
+        {
+            results = client.callProcedure("@SnapshotStatus");
+            assertTrue(results[0].advanceRow());
+            assertTrue(results[0].getString("RESULT").equals("SUCCESS"));
+            assertEquals( 1, results[0].getRowCount());
+        }
+        catch (Exception ex)
+        {
+            ex.printStackTrace();
+            fail("SnapshotRestore exception: " + ex.getMessage());
+        }
 
         // Kill and restart all the execution sites.
         m_config.shutDown();
@@ -485,6 +517,73 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         results = client.callProcedure("@Statistics", "table");
 
         int foundItem = 0;
+        while (results[0].advanceRow())
+        {
+            if (results[0].getString(2).equals("PARTITION_TESTER"))
+            {
+                ++foundItem;
+                assertEquals((num_partitioned_items_per_chunk * num_partitioned_chunks) / 3,
+                        results[0].getLong(4));
+            }
+        }
+        // make sure all sites were loaded
+        assertEquals(3, foundItem);
+
+        // Kill and restart all the execution sites.
+        m_config.shutDown();
+        m_config.startUp();
+        deleteTestFiles();
+
+        DefaultSnapshotDataTarget.m_simulateFullDiskWritingChunk = true;
+
+        org.voltdb.sysprocs.SnapshotRegistry.clear();
+        client = getClient();
+
+        loadLargePartitionedTable(client, "PARTITION_TESTER",
+                                  num_partitioned_items_per_chunk,
+                                  num_partitioned_chunks);
+
+        results = saveTables(client);
+
+        try
+        {
+            results = client.callProcedure("@SnapshotStatus");
+            assertTrue(results[0].advanceRow());
+            assertTrue(results[0].getString("RESULT").equals("FAILURE"));
+        }
+        catch (Exception ex)
+        {
+            ex.printStackTrace();
+            fail("SnapshotRestore exception: " + ex.getMessage());
+        }
+
+        DefaultSnapshotDataTarget.m_simulateFullDiskWritingChunk = false;
+        deleteTestFiles();
+        results = saveTables(client);
+
+        // Kill and restart all the execution sites.
+        m_config.shutDown();
+        m_config.startUp();
+
+        client = getClient();
+
+        try
+        {
+            results = client.callProcedure("@SnapshotRestore", TMPDIR,
+                                           TESTNONCE, ALLOWELT);
+        }
+        catch (Exception ex)
+        {
+            ex.printStackTrace();
+            fail("SnapshotRestore exception: " + ex.getMessage());
+        }
+
+        checkTable(client, "PARTITION_TESTER", "PT_ID",
+                   num_partitioned_items_per_chunk * num_partitioned_chunks);
+
+        results = client.callProcedure("@Statistics", "table");
+
+        foundItem = 0;
         while (results[0].advanceRow())
         {
             if (results[0].getString(2).equals("PARTITION_TESTER"))

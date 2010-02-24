@@ -45,6 +45,7 @@ public class SnapshotRegistry {
 
         public final String path;
         public final String nonce;
+        public final boolean result; //true success, false failure
 
         private final HashMap< String, Table> tables = new HashMap< String, Table>();
 
@@ -58,6 +59,7 @@ public class SnapshotRegistry {
                     this.tables.put( table, new Table(table, startTime));
                 }
             }
+            result = false;
         }
 
         private Snapshot(Snapshot incomplete, long timeFinished) {
@@ -68,6 +70,13 @@ public class SnapshotRegistry {
             synchronized (tables) {
                 tables.putAll(incomplete.tables);
             }
+            for (Table t : tables.values()) {
+                if (t.error != null) {
+                    result = false;
+                    return;
+                }
+            }
+            result = true;
         }
 
         public interface TableUpdater {
@@ -98,19 +107,22 @@ public class SnapshotRegistry {
             public final long size;
             public final long timeClosed;
             public final long timeCreated;
+            public final Exception error;
 
             private Table(String name, long timeCreated) {
                 this.name = name;
                 this.timeCreated = timeCreated;
                 size = 0;
                 timeClosed = 0;
+                error = null;
             }
 
-            public Table(Table t, long size, long timeClosed) {
+            public Table(Table t, long size, long timeClosed, Exception error) {
                 this.name = t.name;
                 this.size = size;
                 this.timeClosed = timeClosed;
                 this.timeCreated = t.timeCreated;
+                this.error = error;
             }
         }
     }
@@ -128,6 +140,10 @@ public class SnapshotRegistry {
         return s;
     }
 
+    public static synchronized void discardSnapshot(Snapshot s) {
+        m_snapshots.remove(s);
+    }
+
     public static synchronized Snapshot finishSnapshot(Snapshot incomplete) {
         boolean removed = m_snapshots.remove(incomplete);
         assert(removed);
@@ -138,5 +154,9 @@ public class SnapshotRegistry {
 
     public static synchronized TreeSet<Snapshot> getSnapshotHistory() {
         return new TreeSet<Snapshot>(m_snapshots);
+    }
+
+    public static synchronized void clear() {
+        m_snapshots.clear();
     }
 }

@@ -29,6 +29,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.Callable;
 import java.util.zip.CRC32;
 
 import org.apache.log4j.Logger;
@@ -38,6 +40,10 @@ import org.voltdb.utils.VoltLoggerFactory;
 import org.voltdb.utils.DBBPool.BBContainer;
 
 public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
+
+    public static volatile boolean m_simulateFullDiskWritingHeader = false;
+    public static volatile boolean m_simulateFullDiskWritingChunk = false;
+
     private final FileChannel m_channel;
     private final FileOutputStream m_fos;
     private static final Logger hostLog = Logger.getLogger("HOST", VoltLoggerFactory.instance());
@@ -55,6 +61,11 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     private volatile boolean m_writeFailed = false;
     private volatile IOException m_writeException = null;
     private volatile long m_bytesWritten = 0;
+
+    /*
+     * Accept a single write even though simulating a full disk is enabled;
+     */
+    private volatile boolean m_acceptOneWrite = false;
 
     public DefaultSnapshotDataTarget(
             final File file,
@@ -146,10 +157,19 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         aggregateBuffer.putInt(crcValue).position(8);
         aggregateBuffer.put((byte)0).position(0);//Haven't actually finished writing file
 
+        if (m_simulateFullDiskWritingHeader) {
+            m_writeException = new IOException("Disk full");
+            m_writeFailed = true;
+            m_fos.close();
+            m_es.shutdown();
+            throw m_writeException;
+        }
+
         /*
          * Be completely sure the write succeeded. If it didn't
          * the disk is probably full or the path is bunk etc.
          */
+        m_acceptOneWrite = true;
         Future<?> writeFuture = write(DBBPool.wrapBB(aggregateBuffer), false);
         try {
             writeFuture.get();
@@ -160,7 +180,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         } catch (ExecutionException e) {
             m_fos.close();
             m_es.shutdown();
-            return;
+            throw m_writeException;
         }
         if (m_writeFailed) {
             m_fos.close();
@@ -202,10 +222,17 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             tupleData.b.position(0);
         }
 
-        return m_es.submit(new Runnable() {
+        return m_es.submit(new Callable<Object>() {
             @Override
-            public void run() {
+            public Object call() throws Exception {
                 try {
+                    if (m_acceptOneWrite) {
+                        m_acceptOneWrite = false;
+                    } else {
+                        if (m_simulateFullDiskWritingChunk) {
+                            throw new IOException("Disk full");
+                        }
+                    }
                     while (tupleData.b.hasRemaining()) {
                         m_bytesWritten += m_channel.write(tupleData.b);
                     }
@@ -213,16 +240,18 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     m_writeException = e;
                     hostLog.error("Error while attempting to write snapshot data to disk", e);
                     m_writeFailed = true;
+                    throw e;
                 } finally {
                     tupleData.discard();
                 }
+                return null;
             }
         });
     }
 
     @Override
-    public void write(final BBContainer tupleData) throws IOException {
-        write(tupleData, true);
+    public Future<?> write(final BBContainer tupleData) {
+        return write(tupleData, true);
     }
 
     @Override
@@ -233,6 +262,11 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     @Override
     public void setOnCloseHandler(Runnable onClose) {
         m_onCloseHandler = onClose;
+    }
+
+    @Override
+    public IOException getLastWriteException() {
+        return m_writeException;
     }
 
 }

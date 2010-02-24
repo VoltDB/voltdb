@@ -24,7 +24,10 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
+import java.util.HashSet;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -694,34 +697,46 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
      * Do snapshot work exclusively until there is no more. Also blocks
      * until the syncing and closing of snapshot data targets has completed.
      */
-    public void completeSnapshotWork() throws InterruptedException {
-        synchronized (m_stupidSnapshotContainer) {
-            m_snapshotTargetTerminators = new ArrayList<Thread>();
-            while (m_snapshotTableTasks != null) {
-                doSnapshotWork();
-                if (m_snapshotTableTasks != null) {
-                    m_stupidSnapshotContainer.wait();
+    public HashSet<Exception> completeSnapshotWork() throws InterruptedException {
+        HashSet<Exception> retval = new HashSet<Exception>();
+        m_snapshotTargetTerminators = new ArrayList<Thread>();
+        while (m_snapshotTableTasks != null) {
+            Future<?> result = doSnapshotWork();
+            if (result != null) {
+                try {
+                    result.get();
+                } catch (ExecutionException e) {
+                    final boolean added = retval.add((Exception)e.getCause());
+                    assert(added);
+                } catch (Exception e) {
+                    final boolean added = retval.add((Exception)e.getCause());
+                    assert(added);
                 }
             }
-            /**
-             * Block until the sync has actually occured in the forked threads.
-             * The threads are spawned even in the blocking case to keep it simple.
-             */
-            for (final Thread t : m_snapshotTargetTerminators) {
-                t.join();
-            }
-            m_snapshotTargetTerminators = null;
         }
+
+        /**
+         * Block until the sync has actually occured in the forked threads.
+         * The threads are spawned even in the blocking case to keep it simple.
+         */
+        for (final Thread t : m_snapshotTargetTerminators) {
+            t.join();
+        }
+        m_snapshotTargetTerminators = null;
+
+        return retval;
     }
 
-    private void doSnapshotWork() {
+    private Future<?> doSnapshotWork() {
+        Future<?> retval = null;
+
         /*
          * This thread will null out the reference to m_snapshotTableTasks when
          * a snapshot is finished. If the snapshot buffer is loaned out that means
          * it is pending I/O somewhere so there is no work to do until it comes back.
          */
         if (m_snapshotTableTasks == null || m_snapshotBufferIsLoaned) {
-            return;
+            return retval;
         }
 
         /*
@@ -782,33 +797,18 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
             m_snapshotBuffer.limit(headerSize + serialized);
             m_snapshotBuffer.position(0);
             m_snapshotBufferIsLoaned = true;
-            try {
-                currentTask.m_target.write(new BBContainer(m_snapshotBuffer, m_snapshotBufferAddress) {
-                    @Override
-                    public void discard() {
-                        /*
-                         * Use a volatile to find out when the buffer is returned
-                         * because it is cheaper then syncing. Useful for the EE so
-                         * it doesn't have to do an extra sync every single time it does
-                         * snapshot work while a snapshot is done on a running system
-                         */
-                        m_snapshotBufferIsLoaned = false;
-
-                        /*
-                         * This sync is only done by the target thread which can afford to wait.
-                         * It is necessary so a site can block waiting for the buffer to come
-                         * back. It will only block when a blocking save operation is being done
-                         * (as opposed to a running snapshot) and it is okay to pay the overhead of syncing
-                         * in that scenario.
-                         */
-                        synchronized (m_stupidSnapshotContainer) {
-                            m_stupidSnapshotContainer.notify();
-                        }
-                    }
-                });
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
+            retval = currentTask.m_target.write(new BBContainer(m_snapshotBuffer, m_snapshotBufferAddress) {
+                @Override
+                public void discard() {
+                    /*
+                     * Use a volatile to find out when the buffer is returned
+                     * because it is cheaper then syncing. Useful for the EE so
+                     * it doesn't have to do an extra sync every single time it does
+                     * snapshot work while a snapshot is done on a running system
+                     */
+                    m_snapshotBufferIsLoaned = false;
+                }
+            });
             break;
         }
 
@@ -858,7 +858,7 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
                 ExecutionSitesCurrentlySnapshotting.decrementAndGet();
             }
         }
-        return;
+        return retval;
     }
 
     public InitiateResponse processInitiateTask(final VoltMessage task) {
