@@ -226,14 +226,8 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
     private long batchBeginUndoToken = kInvalidUndoToken;
     private long latestUndoToken = 0L;
 
-    /**
-     * Set the txn id from the WorkUnit and set/release undo tokens as
-     * necessary. The DTXN currently has no notion of maintaining undo
-     * tokens beyond the life of a transaction so it is up to the execution
-     * site to release the undo data in the EE up until the current point
-     * when the transaction ID changes.
-     */
-    public final void beginNewTxn(long txnId, boolean readOnly) {
+
+    public void tick() {
         // invoke native ee tick if at least one second has passed
         final long time = EstTime.currentTimeMillis();
         if ((time - lastTickTime) >= 1000) {
@@ -243,14 +237,25 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
             lastTickTime = time;
         }
 
+        doSnapshotWork();
+
+        // sing it: stay'n alive..
+        m_watchdog.pet();
+    }
+
+    /**
+     * Set the txn id from the WorkUnit and set/release undo tokens as
+     * necessary. The DTXN currently has no notion of maintaining undo
+     * tokens beyond the life of a transaction so it is up to the execution
+     * site to release the undo data in the EE up until the current point
+     * when the transaction ID changes.
+     */
+    public final void beginNewTxn(long txnId, boolean readOnly) {
         // push log level changes to the ee.
         if (ee != null && m_haveToUpdateLogLevels) {
             m_haveToUpdateLogLevels = false;
             ee.setLogLevels(org.voltdb.jni.EELoggers.getLogLevels());
         }
-
-        // sing it: stay'n alive..
-        m_watchdog.pet();
 
         m_currentTxnId = txnId;
 

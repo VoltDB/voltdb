@@ -305,7 +305,8 @@ public class SimpleDtxnConnection extends SiteConnection {
             //////////////////////////////////////////////////////
             // PULL ONE MESSAGE OFF OF QUEUE FROM MESSAGING LAYER
             //////////////////////////////////////////////////////
-            VoltMessage message = m_mailbox.recvBlocking();
+            VoltMessage message = m_mailbox.recvBlocking(5);
+            m_site.tick();
             if (message == null)
                 continue;
 
@@ -346,6 +347,7 @@ public class SimpleDtxnConnection extends SiteConnection {
         // PULL ONE MESSAGE OFF OF QUEUE FROM MESSAGING LAYER
         //////////////////////////////////////////////////////
         VoltMessage message = m_mailbox.recv();
+        m_site.tick();
         if (message == null)
             return;
 

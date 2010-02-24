@@ -407,6 +407,44 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         assertEquals( 0, tmp_files.length);
     }
 
+    public void testIdleOnlineSnapshot() throws Exception
+    {
+        Client client = getClient();
+
+        int num_replicated_items_per_chunk = 100;
+        int num_replicated_chunks = 10;
+        int num_partitioned_items_per_chunk = 120;
+        int num_partitioned_chunks = 10;
+
+        loadLargeReplicatedTable(client, "REPLICATED_TESTER",
+                                 num_replicated_items_per_chunk,
+                                 num_replicated_chunks);
+        loadLargePartitionedTable(client, "PARTITION_TESTER",
+                                  num_partitioned_items_per_chunk,
+                                  num_partitioned_chunks);
+
+        VoltTable[] results = null;
+
+        results = client.callProcedure("@SnapshotSave", TMPDIR,
+                                       TESTNONCE, (byte)0);
+
+        Thread.sleep(300);
+
+        /*
+         * Check that snapshot status returns a reasonable result
+         */
+        VoltTable statusResults[] = client.callProcedure("@SnapshotStatus");
+        assertNotNull(statusResults);
+        assertEquals( 2, statusResults.length);
+        assertEquals( 8, statusResults[0].getColumnCount());
+        assertEquals( 1, statusResults[0].getRowCount());
+        assertTrue(statusResults[0].advanceRow());
+        assertTrue(TMPDIR.equals(statusResults[0].getString("PATH")));
+        assertTrue(TESTNONCE.equals(statusResults[0].getString("NONCE")));
+        assertFalse( 0 == statusResults[0].getLong("END_TIME"));
+        assertTrue("SUCCESS".equals(statusResults[0].getString("RESULT")));
+    }
+
     public void testSaveAndRestoreReplicatedTable()
     throws IOException, InterruptedException, ProcCallException
     {
