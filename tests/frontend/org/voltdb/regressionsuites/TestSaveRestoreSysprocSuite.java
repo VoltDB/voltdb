@@ -423,9 +423,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                                   num_partitioned_items_per_chunk,
                                   num_partitioned_chunks);
 
-        VoltTable[] results = null;
-
-        results = client.callProcedure("@SnapshotSave", TMPDIR,
+        client.callProcedure("@SnapshotSave", TMPDIR,
                                        TESTNONCE, (byte)0);
 
         Thread.sleep(300);

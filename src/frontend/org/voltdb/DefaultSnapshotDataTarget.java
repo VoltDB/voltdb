@@ -17,20 +17,18 @@
 
 package org.voltdb;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
-
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.io.FileOutputStream;
-import java.io.File;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.Callable;
 import java.util.zip.CRC32;
 
 import org.apache.log4j.Logger;

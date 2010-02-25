@@ -23,17 +23,17 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.HashMap;
+
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.VoltTable;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.network.QueueMonitor;
-import org.voltdb.network.VoltProtocolHandler;
-import org.voltdb.network.VoltNetwork;
 import org.voltdb.network.Connection;
+import org.voltdb.network.QueueMonitor;
+import org.voltdb.network.VoltNetwork;
+import org.voltdb.network.VoltProtocolHandler;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.VoltTable;
-import org.voltdb.utils.Pair;
 
 /**
  *   De/multiplexes transactions across a cluster
