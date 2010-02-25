@@ -163,7 +163,12 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
      */
     public VoltTable(ByteBuffer backing, boolean readOnly) {
         m_buffer = backing;
+
+        // rowstart represents and offset to the start of row data,
+        //  but the serialization is the non-inclusive length of the header,
+        //  so add two bytes.
         m_rowStart = m_buffer.getShort(0) + 2;
+
         m_colCount = m_buffer.getShort(2);
         m_rowCount = m_buffer.getInt(m_rowStart);
         m_buffer.position(m_buffer.limit());
@@ -391,6 +396,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
 
         int pos = m_rowStart + 4;
         for (int i = 0; i < index; i++) {
+            // add two bytes as the row size is non-inclusive
             pos += m_buffer.getShort(pos) + 2;
         }
         Row retval = new Row(pos + 2);
@@ -696,6 +702,9 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
      */
     @Override
     public final void readExternal(FastDeserializer in) throws IOException {
+        // Note: some of the snapshot and save/restore code makes assumptions
+        // about the binary layout of tables.
+
         final int len = in.readInt();
         // smallest table is 4-bytes with zero value
         // indicating rowcount is 0
@@ -703,7 +712,11 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
         m_buffer = in.readBuffer(len);
         m_buffer.position(m_buffer.limit());
 
+        // rowstart represents and offset to the start of row data,
+        //  but the serialization is the non-inclusive length of the header,
+        //  so add two bytes.
         m_rowStart = m_buffer.getShort(0) + 2;
+
         m_colCount = m_buffer.getShort(2);
         m_rowCount = m_buffer.getInt(m_rowStart);
 
@@ -716,6 +729,9 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
      */
     @Override
     public final void writeExternal(FastSerializer out) throws IOException {
+        // Note: some of the snapshot and save/restore code makes assumptions
+        // about the binary layout of tables.
+
         assert(verifyTableInvariants());
         final ByteBuffer buffer = m_buffer.duplicate();
         final int pos = buffer.position();

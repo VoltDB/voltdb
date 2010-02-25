@@ -277,6 +277,12 @@ int Table::getApproximateSizeToSerialize() const {
 
 bool Table::serializeColumnHeaderTo(SerializeOutput &serialize_io) {
 
+    /* NOTE:
+       VoltDBEngine uses a binary template to create tables of single integers.
+       It's called m_templateSingleLongTable and if you are seeing a serialization
+       bug in tables of single integers, make sure that's correct.
+    */
+
     // skip header position
     std::size_t start;
 
@@ -294,14 +300,17 @@ bool Table::serializeColumnHeaderTo(SerializeOutput &serialize_io) {
         // skip header position
         serialize_io.writeShort(-1);
 
-        //column
+        // column counts as a short
         serialize_io.writeShort(static_cast<int16_t>(m_columnCount));
 
+        // write an array of column types as bytes
         for (int i = 0; i < m_columnCount; ++i) {
             ValueType type = m_schema->columnType(i);
             serialize_io.writeByte(static_cast<int8_t>(type));
         }
 
+        // write the array of column names as voltdb strings
+        // NOTE: strings are ASCII only in metadata (UTF-8 in table storage)
         for (int i = 0; i < m_columnCount; ++i) {
             // column name: write (offset, length) for column definition, and string to string table
             const string& name = columnName(i);
@@ -309,13 +318,13 @@ bool Table::serializeColumnHeaderTo(SerializeOutput &serialize_io) {
             int16_t length = static_cast<int16_t>(name.size());
             assert(length >= 0);
 
+            // this is standard string serialization for voltdb
             serialize_io.writeShort(length);
-
             serialize_io.writeBytes(name.data(), length);
         }
 
 
-        // write the header size
+        // write the header size which is a non-inclusive short
         size_t position = serialize_io.position();
         m_columnHeaderSize = static_cast<int16_t>(position - start);
         short nonInclusiveHeaderSize = static_cast<int16_t>(m_columnHeaderSize - sizeof(int16_t));
@@ -340,6 +349,12 @@ bool Table::serializeTo(SerializeOutput &serialize_io) {
     // [(short) header size] [num columns] [column types] [column names]
     // [(int) num tuples] [tuple data]
 
+    /* NOTE:
+       VoltDBEngine uses a binary template to create tables of single integers.
+       It's called m_templateSingleLongTable and if you are seeing a serialization
+       bug in tables of single integers, make sure that's correct.
+    */
+
     try {
         // a placeholder for the total table size
         std::size_t pos = serialize_io.position();
@@ -359,6 +374,7 @@ bool Table::serializeTo(SerializeOutput &serialize_io) {
         }
         assert(written_count == m_tupleCount);
 
+        // length prefix is non-inclusive
         int32_t sz = static_cast<int32_t>(serialize_io.position() - pos - sizeof(int32_t));
         assert(sz > 0);
         serialize_io.writeIntAt(pos, sz);
