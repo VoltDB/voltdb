@@ -30,54 +30,57 @@ import decimal
 import socket
 import threading
 import struct
+import sys
+import subprocess
+import time
 
 from fastserializer import *
 
+SERVER_NAME = "EchoServer"
 decimal.getcontext().prec = 19
 
-def signalHandler(signum, frame):
+def signalHandler(server, signum, frame):
+    server.shutdown()
+    server.join()
     raise Exception, "Interrupted by SIGINT."
 
 class EchoServer(threading.Thread):
-    def __init__(self):
+    def __init__(self, cmd, lock):
         threading.Thread.__init__(self)
-        # some struct typing magic
-        self.int32Type = lambda length : '%c%di' % ('>', length)
-        # setup a socket
-        self.client = None
-        self.socket = None
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.bind(("localhost", 21213))
-        self.socket.listen(1)
-        self.running = 1;
-        self.start()
+
+        self.__server_cmd = cmd
+        self.__lock = threading.Event()
+        self.__start = lock
 
     def run(self):
-        while (self.running == 1):
-            self.client, addr = self.socket.accept()
+        server = subprocess.Popen(self.__server_cmd, shell = True)
 
-            # now spin handling normal messages
-            while (self.running == 1):
-                try:
-                    prefix = ""
-                    while (len(prefix) < 4):
-                        prefix += self.client.recv(4 - len(prefix))
-                    responseLength = struct.unpack(self.int32Type(1), prefix)[0]
+        time.sleep(1)
+        self.__start.set()
+        self.__lock.wait()
 
-                    rstr = ""
-                    while (len(rstr) < responseLength):
-                        rstr += self.client.recv(responseLength - len(rstr))
+        # Get the server pid
+        jps = subprocess.Popen("jps", stdout = subprocess.PIPE, shell = True)
+        (stdout, stderr) = jps.communicate()
+        pid = None
+        lines = stdout.split("\n")
+        for l in lines:
+            if SERVER_NAME in l:
+                pid = l.split()[0]
+        if pid == None:
+            return
+        # Should kill the server now
+        killer = subprocess.Popen("kill -9 %s" % (pid), shell = True)
+        killer.communicate()
+        if killer.returncode != 0:
+            print >> sys.stderr, \
+                "Failed to kill the server process %d" % (server.pid)
+            return
 
-                    # echo
-                    self.client.sendall(prefix)
-                    self.client.sendall(rstr)
-                except Exception:
-                    pass
+        server.communicate()
 
-    def close(self):
-        self.running = 0;
-        self.socket.close()
-        self.client.close()
+    def shutdown(self):
+        self.__lock.set()
 
 class TestFastSerializer(unittest.TestCase):
     byteArray = (1, -21, 127)
@@ -98,13 +101,10 @@ class TestFastSerializer(unittest.TestCase):
     ARRAY_END = 127
 
     def setUp(self):
-        self.echo = EchoServer()
-        self.fs = FastSerializer('localhost', 21213, None, None)
+        self.fs = FastSerializer('localhost', 21212, None, None)
 
     def tearDown(self):
         self.fs.socket.close()
-        self.echo.close()
-        self.echo.join()
 
     def sendAndCompare(self, type, value):
         self.fs.writeWireType(type, value)
@@ -166,14 +166,14 @@ class TestFastSerializer(unittest.TestCase):
         for i in self.decimalArray:
             self.sendAndCompare(self.fs.VOLTTYPE_DECIMAL, i)
 
-    def testDecimalString(self):
-        for i in self.decimalArray:
-            self.sendAndCompare(self.fs.VOLTTYPE_DECIMAL_STRING, i)
+    # def testDecimalString(self):
+    #     for i in self.decimalArray:
+    #         self.sendAndCompare(self.fs.VOLTTYPE_DECIMAL_STRING, i)
 
     def testArray(self):
-        # self.fs.writeByte(self.ARRAY_BEGIN)
-        # self.fs.prependLength()
-        # self.fs.flush()
+        self.fs.writeByte(self.ARRAY_BEGIN)
+        self.fs.prependLength()
+        self.fs.flush()
 
         self.sendArrayAndCompare(self.fs.VOLTTYPE_TINYINT, self.byteArray)
         self.sendArrayAndCompare(self.fs.VOLTTYPE_SMALLINT, self.int16Array)
@@ -182,12 +182,12 @@ class TestFastSerializer(unittest.TestCase):
         self.sendArrayAndCompare(self.fs.VOLTTYPE_STRING, self.stringArray)
         self.sendArrayAndCompare(self.fs.VOLTTYPE_TIMESTAMP, self.dateArray)
         self.sendArrayAndCompare(self.fs.VOLTTYPE_DECIMAL, self.decimalArray)
-        self.sendArrayAndCompare(self.fs.VOLTTYPE_DECIMAL_STRING,
-                                 self.decimalArray)
+        # self.sendArrayAndCompare(self.fs.VOLTTYPE_DECIMAL_STRING,
+        #                          self.decimalArray)
 
-        # self.fs.writeByte(self.ARRAY_END)
-        # self.fs.prependLength()
-        # self.fs.flush()
+        self.fs.writeByte(self.ARRAY_END)
+        self.fs.prependLength()
+        self.fs.flush()
 
     def testTable(self):
         type = FastSerializer.VOLTTYPE_VOLTTABLE
@@ -225,6 +225,21 @@ class TestFastSerializer(unittest.TestCase):
         self.assertEqual(result, table)
 
 if __name__ == "__main__":
-    signal.signal(signal.SIGINT, signalHandler)
-    unittest.main()
+    if len(sys.argv) < 2:
+        sys.exit(-1)
+
+    lock = threading.Event()
+    echo = EchoServer(sys.argv[1], lock)
+    handler = lambda x, y: signalHandler(echo, x, y)
+    signal.signal(signal.SIGINT, handler)
+
+    echo.start()
+    lock.wait()
+    del sys.argv[1]
+    try:
+        unittest.main()
+    except SystemExit:
+        pass
+    echo.shutdown()
+    echo.join()
 

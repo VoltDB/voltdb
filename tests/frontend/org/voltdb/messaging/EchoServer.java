@@ -70,27 +70,22 @@ public class EchoServer {
                 case TINYINT:
                     byte b = fds.readByte();
                     fs.write(b);
-                    System.err.println("Type: tiny int " + b);
                     break;
                 case SMALLINT:
                     short s = fds.readShort();
                     fs.writeShort(s);
-                    System.err.println("Type: small int " + s);
                     break;
                 case INTEGER:
                     int i = fds.readInt();
                     fs.writeInt(i);
-                    System.err.println("Type: int " + i);
                     break;
                 case BIGINT:
                     long l = fds.readLong();
                     fs.writeLong(l);
-                    System.err.println("Type: big int " + l);
                     break;
                 case FLOAT:
                     double f = fds.readDouble();
                     fs.writeDouble(f);
-                    System.err.println("Type: double " + f);
                     break;
                 case STRING:
                     String str = fds.readString();
@@ -99,20 +94,16 @@ public class EchoServer {
                         strLen += str.getBytes("UTF-8").length;
                     }
                     fs.writeString(str);
-                    System.err.println("Type: string " + str);
                     break;
                 case TIMESTAMP:
                     fs.writeTimestamp(fds.readTimestamp());
-                    System.err.println("Type: timestamp");
                     break;
                 case DECIMAL:
                     BigDecimal bd = VoltDecimalHelper.deserializeBigDecimal(fds);
                     VoltDecimalHelper.serializeBigDecimal(bd, fs);
-                    System.err.println("Type: big decimal " + bd);
                     break;
                 case VOLTTABLE:
                     VoltTable table = fds.readObject(VoltTable.class);
-                    System.err.println("Type: table " + table);
                     fs.writeObject(table);
                     break;
                 default:

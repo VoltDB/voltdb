@@ -103,7 +103,8 @@ PRIMARY ENTRY POINTS
     description="Compile Java classes and C++ JNI library."
 />
 <target name="check"
-    depends="compile, eecheck, junit, distcheck, voltdbipc, licensecheck"
+    depends="compile, eecheck, junit, distcheck, voltdbipc, pythonfser,
+             licensecheck"
     description="Run Java and C++ JNI testcases and test plan fragments."
 />
 <target name="check_quick"
@@ -641,9 +642,16 @@ TEST CASES
 ***************************************
 -->
 
-<target name='pythonfser' description="run python fastserializer tests">
+<target name="pythonfser" description="run python fastserializer tests">
+    <property name="build.dir.suffix" value="" /> <!-- Default -->
+    <property name='classpath' refid='project.classpath' />
+    <property name='echoserver.command' value="java
+    -Djava.library.path=${build.dir}${build.dir.suffix}/nativelibs -classpath
+    ${classpath} -server -Xmx64m -XX:+AggressiveOpts -ea
+    org.voltdb.messaging.EchoServer" />
     <exec dir='tests/scripts/' executable='python' failonerror='true'>
         <arg line="Testfastserializer.py"/>
+        <arg line='"${echoserver.command}"'/>
     </exec>
 </target>
 
