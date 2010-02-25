@@ -44,6 +44,47 @@ public class TestFixedSQLSuite extends RegressionSuite {
     /** Procedures used by this suite */
     static final Class<?>[] PROCEDURES = { Insert.class };
 
+
+    public void testTicket309() throws IOException, ProcCallException
+    {
+        String[] tables = {"P1", "R1", "P2", "R2"};
+        Client client = getClient();
+        for (String table : tables)
+        {
+            client.callProcedure("Insert", table, 1, "desc", 100, 14.5);
+            client.callProcedure("Insert", table, 2, "desc", 100, 14.5);
+            client.callProcedure("Insert", table, 3, "desc", 100, 14.5);
+            client.callProcedure("Insert", table, 6, "desc", 300, 14.5);
+            client.callProcedure("Insert", table, 7, "desc", 300, 14.5);
+            client.callProcedure("Insert", table, 8, "desc", 500, 14.5);
+
+            String query =
+                String.format("select count(*), %s.NUM from %s group by %s.NUM",
+                              table, table, table);
+            VoltTable[] results = client.callProcedure("@AdHoc", query);
+            assertEquals(3, results[0].getRowCount());
+            while (results[0].advanceRow())
+            {
+                if (results[0].getLong(1) == 100)
+                {
+                    assertEquals(3, results[0].getLong(0));
+                }
+                else if (results[0].getLong(1) == 300)
+                {
+                    assertEquals(2, results[0].getLong(0));
+                }
+                else if (results[0].getLong(1) == 500)
+                {
+                    assertEquals(1, results[0].getLong(0));
+                }
+                else
+                {
+                    fail();
+                }
+            }
+        }
+    }
+
     /**
      * Regression test for broken SQL of the variety:
      *

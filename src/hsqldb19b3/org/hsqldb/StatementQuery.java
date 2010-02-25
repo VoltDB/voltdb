@@ -32,7 +32,6 @@
 package org.hsqldb;
 
 import java.util.ArrayList;
-
 import org.hsqldb.HSQLInterface.HSQLParseException;
 import org.hsqldb.HsqlNameManager.HsqlName;
 import org.hsqldb.HsqlNameManager.SimpleName;
@@ -195,14 +194,14 @@ public class StatementQuery extends StatementDMQL {
         }
         catch (Exception e)
         {
-            // XXX eww.  leaving until I understand why this is here, though
+            // XXX coward.
         }
 
         StringBuffer sb = new StringBuffer();
         String indent = orig_indent + HSQLInterface.XML_INDENT;
 
+        // select
         sb.append(orig_indent).append("<select");
-        // booleans here
         if (select.isDistinctSelect)
             sb.append(" distinct=\"true\"");
         if (select.isGrouped)
@@ -247,26 +246,37 @@ public class StatementQuery extends StatementDMQL {
         // columns
         sb.append(indent + "<columns>\n");
 
-        ArrayList<Expression> simpleCols = new ArrayList<Expression>();
-        ArrayList<Expression> otherCols = new ArrayList<Expression>();
         ArrayList<Expression> orderByCols = new ArrayList<Expression>();
         ArrayList<Expression> groupByCols = new ArrayList<Expression>();
-
+        ArrayList<Expression> displayCols = new ArrayList<Expression>();
         ArrayList<Pair<Integer, SimpleName>> aliases = new ArrayList<Pair<Integer, SimpleName>>();
+
+        /*
+         * select.exprColumn stores all of the columns needed by HSQL to
+         * calculate the query's result set. It contains more than just the
+         * columns in the output; for example, it contains columns representing
+         * aliases, columns for groups, etc.
+         *
+         * Volt uses multiple collections to organize these columns.
+         *
+         * Observing this loop in a debugger, the following seems true:
+         *
+         * 1. Columns in exprColumns that appear in the output schema, appear in
+         * exprColumns in the same order that they occur in the output schema.
+         *
+         * 2. expr.columnIndex is an index back in to the select.exprColumns
+         * array. This allows multiple exprColumn entries to refer to each
+         * other; for example, an OpType.SIMPLE_COLUMN type storing an alias
+         * will have its columnIndex set to the offset of the expr it aliases.
+         */
         for (int i = 0; i < select.exprColumns.length; i++) {
             final Expression expr = select.exprColumns[i];
 
-            /*
-             * For some reason HSQL has two entries for what is output as one column entry in the output XML.
-             * One contains column contains the real column name and the other contains the alias name.
-             * Push back the alias and the index of the actual column so they can be set after this loop finishes.
-             */
             if (expr.alias != null) {
                 /*
-                 * For a statement like SELECT C1.C_LAST AS C1_LAST, C2.C_LAST AS C2_LAST FROM CUSTOMER AS C1, CUSTOMER C2
-                 * HSQLDB will produce two ExpressionColumns with the name and alias already set in the same ExpressionColumn object.
-                 * Since the alias is already set it is not necessary (or possible) to add them to the list of aliases since the columnIndex
-                 * refers to something that may not be a valid index into select.exprColumns.
+                 * Remember how aliases relate to columns. Will iterate again later
+                 * and mutate the exprColumn entries setting the alias string on the aliased
+                 * column entry.
                  */
                 if (expr instanceof ExpressionColumn) {
                     ExpressionColumn exprColumn = (ExpressionColumn)expr;
@@ -275,31 +285,90 @@ public class StatementQuery extends StatementDMQL {
                     }
                 } else if (expr.columnIndex > -1) {
                     /*
-                     * Only add it to the list of aliases that need to be propagated to columns
-                     * if the column index is valid. ExpressionArithmetic will have an alias but not necessarily
-                     * a column index.
+                     * Only add it to the list of aliases that need to be
+                     * propagated to columns if the column index is valid.
+                     * ExpressionArithmetic will have an alias but not
+                     * necessarily a column index.
                      */
                     aliases.add(Pair.of(expr.columnIndex, expr.alias));
                 }
             }
 
+            // If the column doesn't refer to another exprColumn entry, set its
+            // column index to itself. If all columns have a valid column index,
+            // it's easier to patch up display column ordering later.
+            if (expr.columnIndex == -1) {
+                expr.columnIndex = i;
+            }
+
             if (isGroupByColumn(select, i)) {
                 groupByCols.add(expr);
-            } else if (expr.opType == OpTypes.SIMPLE_COLUMN) {
-                simpleCols.add(select.exprColumns[i]);
             } else if (expr.opType == OpTypes.ORDER_BY) {
                 orderByCols.add(expr);
+            } else if (expr.opType == OpTypes.SIMPLE_COLUMN && expr.isAggregate && expr.alias != null) {
+                // Add aggregate aliases to the display columns to maintain
+                // the output schema column ordering.
+                displayCols.add(expr);
+            } else if (expr.opType == OpTypes.SIMPLE_COLUMN) {
+                // Other simple columns are ignored. If others exist, maybe
+                // volt infers a display column from another column collection?
             } else {
-                otherCols.add(expr);
+                displayCols.add(expr);
             }
         }
 
         for (Pair<Integer, SimpleName> alias : aliases) {
+            // set the alias data into the expression being aliased.
             select.exprColumns[alias.getFirst()].alias = alias.getSecond();
         }
 
-        for (Expression otherCol : otherCols)
-            sb.append(otherCol.voltGetXML(session, indent + HSQLInterface.XML_INDENT)).append("\n");
+        /*
+         * The columns chosen above as display columns aren't always the same
+         * expr objects HSQL would use as display columns - some data were
+         * unified (namely, SIMPLE_COLUMN aliases were pushed into COLUMNS).
+         *
+         * However, the correct output schema ordering was correct in exprColumns.
+         * This order was maintained by adding SIMPLE_COLUMNs to displayCols.
+         *
+         * Now need to serialize the displayCols, serializing the non-simple-columns
+         * corresponding to simple_columns for any simple_columns that woodchucks
+         * could chuck.
+         *
+         * Serialize the display columns in the exprColumn order.
+         */
+        for (int jj=0; jj < displayCols.size(); ++jj) {
+            Expression expr = displayCols.get(jj);
+            if (expr == null) {
+                continue;
+            }
+            else if (expr.opType == OpTypes.SIMPLE_COLUMN)
+            {
+                // simple columns are not serialized as display columns
+                // but they are place holders for another column
+                // in the output schema. Go find that corresponding column
+                // and serialize it in this place.
+                for (int ii=jj; ii < displayCols.size(); ++ii)
+                {
+                    Expression otherCol = displayCols.get(ii);
+                    if (otherCol == null) {
+                        continue;
+                    }
+                    else if ((otherCol.opType != OpTypes.SIMPLE_COLUMN) &&
+                             (otherCol.columnIndex == expr.columnIndex))
+                    {
+                        // serialize the column this simple column stands-in for
+                        sb.append(otherCol.voltGetXML(session, indent + HSQLInterface.XML_INDENT)).append("\n");
+                        // null-out otherCol to not serialize it twice
+                        displayCols.set(ii, null);
+                        // quit seeking simple_column's replacement
+                        break;
+                    }
+                }
+            }
+            else {
+                sb.append(expr.voltGetXML(session, indent + HSQLInterface.XML_INDENT)).append("\n");
+            }
+        }
 
         sb.append(indent + "</columns>\n");
 
