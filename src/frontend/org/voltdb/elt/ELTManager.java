@@ -178,7 +178,7 @@ public class ELTManager implements SysManageable {
         }
 
         if (b == null) {
-            final ByteBuffer buffer = ByteBuffer.allocateDirect(kBufferSize);
+            final ByteBuffer buffer = DBBPool.allocateDirect(kBufferSize);
             final long address = DBBPool.getBufferAddress(buffer);
             b = new ELBBContainer( buffer, address);
         }

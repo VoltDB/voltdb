@@ -58,14 +58,6 @@ public class SysProcFragmentId
      * Confirm the targets were successfully created
      */
     public static final long PF_createSnapshotTargetsResults = 43;
-    /*
-     * Optional fragment. Blocks each EE until all snapshots are written.
-     */
-    public static final long PF_saveTables = 44;
-    /*
-     * Return result when all PFs have been written.
-     */
-    public static final long PF_saveTablesResults = 45;
 
     // @LoadMultipartitionTable
     public static final long PF_distribute = 50;

@@ -74,10 +74,6 @@ public class SnapshotSave extends VoltSystemProcedure
         SysProcFragmentId.PF_createSnapshotTargets | DtxnConstants.MULTIPARTITION_DEPENDENCY;
     private static final int DEP_createSnapshotTargetsResults = (int)
         SysProcFragmentId.PF_createSnapshotTargetsResults;
-    private static final int DEP_saveTables = (int)
-        SysProcFragmentId.PF_saveTables | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-    private static final int DEP_saveTablesResults = (int)
-        SysProcFragmentId.PF_saveTablesResults;
 
     /**
      * Ensure the first thread to run the fragment does the creation
@@ -100,8 +96,6 @@ public class SnapshotSave extends VoltSystemProcedure
         site.registerPlanFragment(SysProcFragmentId.PF_saveTestResults, this);
         site.registerPlanFragment(SysProcFragmentId.PF_createSnapshotTargets, this);
         site.registerPlanFragment(SysProcFragmentId.PF_createSnapshotTargetsResults, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_saveTables, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_saveTablesResults, this);
     }
 
     @Override
@@ -187,161 +181,199 @@ public class SnapshotSave extends VoltSystemProcedure
             TRACE_LOG.trace("Creating snapshot target and handing to EEs");
             assert(params.toArray()[0] != null);
             assert(params.toArray()[1] != null);
+            assert(params.toArray()[2] != null);
             final String file_path = (String) params.toArray()[0];
             final String file_nonce = (String) params.toArray()[1];
+            long block = (Long)params.toArray()[2];
             final VoltTable result = constructNodeResultsTable();
             boolean willDoSetup = m_snapshotCreateSetupPermit.tryAcquire();
             final int numLocalSites = VoltDB.instance().getLocalSites().values().size();
-            try {
-                if (willDoSetup) {
-                    try {
-                        assert(ExecutionSite.ExecutionSitesCurrentlySnapshotting.get() == -1);
-                        final long startTime = (Long)params.toArray()[2];
-                        final ArrayDeque<SnapshotTableTask> partitionedSnapshotTasks =
-                            new ArrayDeque<SnapshotTableTask>();
-                        final ArrayList<SnapshotTableTask> replicatedSnapshotTasks =
-                            new ArrayList<SnapshotTableTask>();
-
-                        final ArrayList<String> tableNames = new ArrayList<String>();
-                        for (final Table table : getTablesToSave(context))
-                        {
-                            tableNames.add(table.getTypeName());
-                        }
-                        SnapshotDigestUtil.recordSnapshotTableList(file_path, file_nonce, tableNames);
-                        final AtomicInteger numTables = new AtomicInteger(tableNames.size());
-                        final SnapshotRegistry.Snapshot snapshotRecord =
-                            SnapshotRegistry.startSnapshot(
-                                    startTime,
-                                    file_path,
-                                    file_nonce,
-                                    tableNames.toArray(new String[0]));
-                        for (final Table table : getTablesToSave(context))
-                        {
-                            String canSnapshot = "SUCCESS";
-                            String err_msg = "";
-                            final File saveFilePath =
-                                constructFileForTable(table, file_path, file_nonce,
-                                                      context.getSite().getHost().getTypeName());
-                            try {
-                                final SnapshotDataTarget sdt =
-                                    constructSnapshotDataTargetForTable(
-                                            context,
-                                            saveFilePath,
-                                            table,
-                                            context.getSite().getHost(),
-                                            context.getCluster().getPartitions().size(),
-                                            startTime);
-
-                                final Runnable onClose = new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        final long now = System.currentTimeMillis();
-                                        snapshotRecord.updateTable(table.getTypeName(),
-                                                new SnapshotRegistry.Snapshot.TableUpdater() {
-                                            @Override
-                                            public SnapshotRegistry.Snapshot.Table update(
-                                                    SnapshotRegistry.Snapshot.Table registryTable) {
-                                                return snapshotRecord.new Table(
-                                                        registryTable,
-                                                        sdt.getBytesWritten(),
-                                                        now,
-                                                        sdt.getLastWriteException());
-                                            }
-                                        });
-                                        int tablesLeft = numTables.decrementAndGet();
-                                        if (tablesLeft == 0) {
-                                            final SnapshotRegistry.Snapshot completed =
-                                                SnapshotRegistry.finishSnapshot(snapshotRecord);
-                                            final double duration =
-                                                (completed.timeFinished - completed.timeStarted) / 1000.0;
-                                            HOST_LOG.info(
-                                                    "Snapshot " + snapshotRecord.nonce + " finished at " +
-                                                     completed.timeFinished + " and took " + duration
-                                                     + " seconds ");
-                                        }
-                                    }
-                                };
-
-                                sdt.setOnCloseHandler(onClose);
-
-                                final SnapshotTableTask task =
-                                    new SnapshotTableTask(
-                                            table.getRelativeIndex(),
-                                            sdt,
-                                            table.getIsreplicated(),
-                                            table.getTypeName());
-
-                                if (table.getIsreplicated()) {
-                                    replicatedSnapshotTasks.add(task);
-                                } else {
-                                    partitionedSnapshotTasks.offer(task);
-                                }
-                            } catch (IOException ex) {
-                                canSnapshot = "FAILURE";
-                                err_msg = "SNAPSHOT INITIATION OF " + saveFilePath +
-                                "RESULTED IN IOException: " + ex.getMessage();
-                            }
-
-                            result.addRow(context.getSite().getHost().getTypeName(),
-                                    table.getTypeName(),
-                                    canSnapshot,
-                                    err_msg);
-                        }
-
-                        synchronized (m_taskListsForSites) {
-                            /**
-                             * Distribute the writing of replicated tables to exactly one partition.
-                             */
-                            for (int ii = 0; ii < numLocalSites && !partitionedSnapshotTasks.isEmpty(); ii++) {
-                                m_taskListsForSites.add(new ArrayDeque<SnapshotTableTask>(partitionedSnapshotTasks));
-                            }
-
-                            int siteIndex = 0;
-                            for (SnapshotTableTask t : replicatedSnapshotTasks) {
-                                m_taskListsForSites.get(siteIndex++ % numLocalSites).offer(t);
-                            }
-                        }
-                        if (!partitionedSnapshotTasks.isEmpty() && !replicatedSnapshotTasks.isEmpty()) {
-                            ExecutionSite.ExecutionSitesCurrentlySnapshotting.set(
-                                    VoltDB.instance().getLocalSites().values().size());
-                        } else {
-                            SnapshotRegistry.discardSnapshot(snapshotRecord);
-                        }
-                    } catch (Exception ex) {
-                        result.addRow(context.getSite().getHost().getTypeName(),
-                                "",
-                                "FAILURE",
-                                "SNAPSHOT INITIATION OF " + file_path + file_nonce +
-                                "RESULTED IN Exception: " + ex.getMessage());
-                    } finally {
-                        m_snapshotPermits.release(numLocalSites);
-                    }
-                }
-
+            if (willDoSetup) {
                 try {
-                    m_snapshotPermits.acquire();
-                } catch (Exception e) {
+                    assert(ExecutionSite.ExecutionSitesCurrentlySnapshotting.get() == -1);
+                    final long startTime = (Long)params.toArray()[2];
+                    final ArrayDeque<SnapshotTableTask> partitionedSnapshotTasks =
+                        new ArrayDeque<SnapshotTableTask>();
+                    final ArrayList<SnapshotTableTask> replicatedSnapshotTasks =
+                        new ArrayList<SnapshotTableTask>();
+
+                    final ArrayList<String> tableNames = new ArrayList<String>();
+                    for (final Table table : getTablesToSave(context))
+                    {
+                        tableNames.add(table.getTypeName());
+                    }
+                    SnapshotDigestUtil.recordSnapshotTableList(file_path, file_nonce, tableNames);
+                    final AtomicInteger numTables = new AtomicInteger(tableNames.size());
+                    final SnapshotRegistry.Snapshot snapshotRecord =
+                        SnapshotRegistry.startSnapshot(
+                                startTime,
+                                file_path,
+                                file_nonce,
+                                tableNames.toArray(new String[0]));
+                    for (final Table table : getTablesToSave(context))
+                    {
+                        String canSnapshot = "SUCCESS";
+                        String err_msg = "";
+                        final File saveFilePath =
+                            constructFileForTable(table, file_path, file_nonce,
+                                                  context.getSite().getHost().getTypeName());
+                        try {
+                            final SnapshotDataTarget sdt =
+                                constructSnapshotDataTargetForTable(
+                                        context,
+                                        saveFilePath,
+                                        table,
+                                        context.getSite().getHost(),
+                                        context.getCluster().getPartitions().size(),
+                                        startTime);
+
+                            final Runnable onClose = new Runnable() {
+                                @Override
+                                public void run() {
+                                    final long now = System.currentTimeMillis();
+                                    snapshotRecord.updateTable(table.getTypeName(),
+                                            new SnapshotRegistry.Snapshot.TableUpdater() {
+                                        @Override
+                                        public SnapshotRegistry.Snapshot.Table update(
+                                                SnapshotRegistry.Snapshot.Table registryTable) {
+                                            return snapshotRecord.new Table(
+                                                    registryTable,
+                                                    sdt.getBytesWritten(),
+                                                    now,
+                                                    sdt.getLastWriteException());
+                                        }
+                                    });
+                                    int tablesLeft = numTables.decrementAndGet();
+                                    if (tablesLeft == 0) {
+                                        final SnapshotRegistry.Snapshot completed =
+                                            SnapshotRegistry.finishSnapshot(snapshotRecord);
+                                        final double duration =
+                                            (completed.timeFinished - completed.timeStarted) / 1000.0;
+                                        HOST_LOG.info(
+                                                "Snapshot " + snapshotRecord.nonce + " finished at " +
+                                                 completed.timeFinished + " and took " + duration
+                                                 + " seconds ");
+                                    }
+                                }
+                            };
+
+                            sdt.setOnCloseHandler(onClose);
+
+                            final SnapshotTableTask task =
+                                new SnapshotTableTask(
+                                        table.getRelativeIndex(),
+                                        sdt,
+                                        table.getIsreplicated(),
+                                        table.getTypeName());
+
+                            if (table.getIsreplicated()) {
+                                replicatedSnapshotTasks.add(task);
+                            } else {
+                                partitionedSnapshotTasks.offer(task);
+                            }
+                        } catch (IOException ex) {
+                            canSnapshot = "FAILURE";
+                            err_msg = "SNAPSHOT INITIATION OF " + saveFilePath +
+                            "RESULTED IN IOException: " + ex.getMessage();
+                        }
+
+                        result.addRow(context.getSite().getHost().getTypeName(),
+                                table.getTypeName(),
+                                canSnapshot,
+                                err_msg);
+                    }
+
+                    synchronized (m_taskListsForSites) {
+                        /**
+                         * Distribute the writing of replicated tables to exactly one partition.
+                         */
+                        for (int ii = 0; ii < numLocalSites && !partitionedSnapshotTasks.isEmpty(); ii++) {
+                            m_taskListsForSites.add(new ArrayDeque<SnapshotTableTask>(partitionedSnapshotTasks));
+                        }
+
+                        int siteIndex = 0;
+                        for (SnapshotTableTask t : replicatedSnapshotTasks) {
+                            m_taskListsForSites.get(siteIndex++ % numLocalSites).offer(t);
+                        }
+                    }
+                    if (!partitionedSnapshotTasks.isEmpty() && !replicatedSnapshotTasks.isEmpty()) {
+                        ExecutionSite.ExecutionSitesCurrentlySnapshotting.set(
+                                VoltDB.instance().getLocalSites().values().size());
+                    } else {
+                        SnapshotRegistry.discardSnapshot(snapshotRecord);
+                    }
+                } catch (Exception ex) {
                     result.addRow(context.getSite().getHost().getTypeName(),
                             "",
                             "FAILURE",
-                            e.toString());
-                    return new DependencyPair( DEP_createSnapshotTargets, result);
+                            "SNAPSHOT INITIATION OF " + file_path + file_nonce +
+                            "RESULTED IN Exception: " + ex.getMessage());
+                } finally {
+                    m_snapshotPermits.release(numLocalSites);
                 }
+            }
 
-                synchronized (m_taskListsForSites) {
-                    final Deque<SnapshotTableTask> m_taskList = m_taskListsForSites.poll();
-                    if (m_taskList == null) {
-
-                    } else {
-                        context.getExecutionSite().initiateSnapshots(m_taskList);
-                    }
-                }
+            try {
+                m_snapshotPermits.acquire();
+            } catch (Exception e) {
+                result.addRow(context.getSite().getHost().getTypeName(),
+                        "",
+                        "FAILURE",
+                        e.toString());
                 return new DependencyPair( DEP_createSnapshotTargets, result);
             } finally {
-                if (willDoSetup) {
+                /*
+                 * The last thead to acquire a snapshot permit has to be the one
+                 * to release the setup permit to ensure that a thread
+                 * doesn't come late and think it is supposed to do the setup work
+                 */
+                if (m_snapshotPermits.availablePermits() == 0) {
                     m_snapshotCreateSetupPermit.release();
                 }
             }
+
+            synchronized (m_taskListsForSites) {
+                final Deque<SnapshotTableTask> m_taskList = m_taskListsForSites.poll();
+                if (m_taskList == null) {
+                    return new DependencyPair( DEP_createSnapshotTargets, result);
+                } else {
+                    context.getExecutionSite().initiateSnapshots(m_taskList);
+                }
+            }
+
+            if (block != 0) {
+                HashSet<Exception> failures = null;
+                String status = "SUCCESS";
+                String err = "";
+                try {
+                    failures = context.getExecutionSite().completeSnapshotWork();
+                } catch (InterruptedException e) {
+                    status = "FAILURE";
+                    err = e.toString();
+                }
+                final VoltTable blockingResult = constructPartitionResultsTable();
+
+                if (failures.isEmpty()) {
+                    blockingResult.addRow(
+                            context.getSite().getHost().getTypeName(),
+                            context.getSite().getTypeName(),
+                            status,
+                            err);
+                } else {
+                    status = "FAILURE";
+                    for (Exception e : failures) {
+                        err = e.toString();
+                    }
+                    blockingResult.addRow(
+                            context.getSite().getHost().getTypeName(),
+                            context.getSite().getTypeName(),
+                            status,
+                            err);
+                }
+                return new DependencyPair( DEP_createSnapshotTargets, blockingResult);
+            }
+
+            return new DependencyPair( DEP_createSnapshotTargets, result);
         } else if (fragmentId == SysProcFragmentId.PF_createSnapshotTargetsResults)
         {
             TRACE_LOG.trace("Aggregating create snapshot target results");
@@ -358,57 +390,6 @@ public class SnapshotSave extends VoltSystemProcedure
             }
             return new
                 DependencyPair( DEP_createSnapshotTargetsResults, result);
-        }
-        else if (fragmentId == SysProcFragmentId.PF_saveTables)
-        {
-            TRACE_LOG.trace("Blocking to write tables to disk");
-            String status = "SUCCESS";
-            String err = "";
-            HashSet<Exception> failures = null;
-            try {
-                failures = context.getExecutionSite().completeSnapshotWork();
-            } catch (InterruptedException e) {
-                status = "FAILURE";
-                err = e.toString();
-            }
-            VoltTable result = constructPartitionResultsTable();
-
-            if (failures.isEmpty()) {
-                result.addRow(
-                        context.getSite().getHost().getTypeName(),
-                        context.getSite().getTypeName(),
-                        status,
-                        err);
-            } else {
-                status = "FAILURE";
-                for (Exception e : failures) {
-                    err = e.toString();
-                }
-                result.addRow(
-                        context.getSite().getHost().getTypeName(),
-                        context.getSite().getTypeName(),
-                        status,
-                        err);
-            }
-
-            return new
-                DependencyPair( DEP_saveTables, result);
-        }
-        else if (fragmentId == SysProcFragmentId.PF_saveTablesResults)
-        {
-            TRACE_LOG.trace("Aggregating save results");
-            assert (dependencies.size() > 0);
-            List<VoltTable> dep = dependencies.get(DEP_saveTables);
-            VoltTable result = constructPartitionResultsTable();
-            for (VoltTable table : dep)
-            {
-                while (table.advanceRow())
-                {
-                    // this adds the active row of table
-                    result.add(table);
-                }
-            }
-            return new DependencyPair(DEP_saveTablesResults, result);
         }
         assert (false);
         return null;
@@ -461,24 +442,7 @@ public class SnapshotSave extends VoltSystemProcedure
             }
         }
 
-        results = performSnapshotCreationWork( path, nonce, startTime);
-        // Test snapshot creation results for fail
-        while (results[0].advanceRow())
-        {
-            if (results[0].getString("RESULT").equals("FAILURE"))
-            {
-                // Something lost, bomb out and just return the whole
-                // table of results to the client for analysis
-                return results;
-            }
-        }
-
-        if (block != 0) {
-            HOST_LOG.info("Blocking until snapshot completes");
-            // Now, block until all the snapshot work is finished. For now we'll dump the whole result table on
-            // the client whether or not we succeeded.
-            results = performSaveToDiskWork();
-        }
+        results = performSnapshotCreationWork( path, nonce, startTime, (byte)block);
 
         final long finishTime = System.currentTimeMillis();
         final long duration = finishTime - startTime;
@@ -604,7 +568,8 @@ public class SnapshotSave extends VoltSystemProcedure
 
     private final VoltTable[] performSnapshotCreationWork(String filePath,
             String fileNonce,
-            long startTime)
+            long startTime,
+            byte block)
     {
         SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
 
@@ -617,7 +582,7 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[0].multipartition = true;
         pfs[0].nonExecSites = false;
         ParameterSet params = new ParameterSet();
-        params.setParameters(filePath, fileNonce, startTime);
+        params.setParameters(filePath, fileNonce, startTime, block);
         pfs[0].parameters = params;
 
         // This fragment aggregates the save-to-disk sanity check results
@@ -631,36 +596,6 @@ public class SnapshotSave extends VoltSystemProcedure
 
         VoltTable[] results;
         results = executeSysProcPlanFragments(pfs, DEP_createSnapshotTargetsResults);
-        return results;
-    }
-
-    private final VoltTable[] performSaveToDiskWork()
-    {
-        SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
-
-        // This fragment causes each execution site to attempt the write
-        // to disk
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_saveTables;
-        pfs[0].outputDepId = DEP_saveTables;
-        pfs[0].inputDepIds = new int[] {};
-        pfs[0].multipartition = true;
-        pfs[0].nonExecSites = false;
-        ParameterSet params = new ParameterSet();
-        params.setParameters();
-        pfs[0].parameters = params;
-
-        // This fragment aggregates the final save-to-disk results
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_saveTablesResults;
-        pfs[1].outputDepId = DEP_saveTablesResults;
-        pfs[1].inputDepIds = new int[] { DEP_saveTables };
-        pfs[1].multipartition = false;
-        pfs[1].nonExecSites = false;
-        pfs[1].parameters = new ParameterSet();
-
-        VoltTable[] results;
-        results = executeSysProcPlanFragments(pfs, DEP_saveTablesResults);
         return results;
     }
 

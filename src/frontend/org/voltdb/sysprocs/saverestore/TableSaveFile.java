@@ -375,7 +375,7 @@ public class TableSaveFile
                      */
                     Container c = m_buffers.poll();
                     if (c == null) {
-                        final ByteBuffer b = ByteBuffer.allocateDirect(DEFAULT_CHUNKSIZE);
+                        final ByteBuffer b = DBBPool.allocateDirect(DEFAULT_CHUNKSIZE);
                         final long pointer = org.voltdb.utils.DBBPool.getBufferAddress(b);
                         c = new Container(b, pointer);
                     }

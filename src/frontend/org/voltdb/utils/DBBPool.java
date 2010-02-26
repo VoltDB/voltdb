@@ -21,6 +21,9 @@ import org.apache.log4j.Logger;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.VoltLoggerFactory;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.ArrayList;
@@ -646,7 +649,7 @@ public final class DBBPool {
         bytesAllocatedGlobally.getAndAdd(bufferSize);
         bytesAllocatedLocally += bufferSize;
         try {
-            final ByteBuffer buffer = ByteBuffer.allocateDirect( bufferSize);
+            final ByteBuffer buffer = DBBPool.allocateDirect( bufferSize);
             return buffer;
         } catch (java.lang.OutOfMemoryError e) {
             m_logger.fatal("Total bytes allocated globally before OOM is " + bytesAllocatedGlobally.get(), e);
@@ -741,6 +744,42 @@ public final class DBBPool {
     public final void finalize() {
         synchronized(m_pools) {
             m_pools.remove(this);
+        }
+    }
+
+    /**
+     * Functional for global process wide pooling of ByteBuffers that can be reset
+     */
+    private static final HashMap<Integer, ArrayList<ByteBuffer>> m_bufferStock =
+        new HashMap<Integer, ArrayList<ByteBuffer>>();
+
+    private static final HashMap<Integer, ArrayDeque<ByteBuffer>> m_availableBufferStock =
+            new HashMap<Integer, ArrayDeque<ByteBuffer>>();
+
+    public static synchronized ByteBuffer allocateDirect(final int capacity) {
+        ArrayDeque<ByteBuffer> buffers = m_availableBufferStock.get(capacity);
+        ByteBuffer retval = null;
+        if (buffers != null) {
+            retval = buffers.poll();
+        }
+        if (retval != null) {
+            retval.clear();
+        } else {
+            retval = ByteBuffer.allocateDirect(capacity);
+            ArrayList<ByteBuffer> bufferStock = m_bufferStock.get(capacity);
+            if (bufferStock == null) {
+                bufferStock = new ArrayList<ByteBuffer>();
+                m_bufferStock.put(capacity, bufferStock);
+            }
+            bufferStock.add(retval);
+        }
+        return retval;
+    }
+
+    public static synchronized void resetBufferStock() {
+        m_availableBufferStock.clear();
+        for (int capacity : m_bufferStock.keySet()) {
+            m_availableBufferStock.put(capacity, new ArrayDeque<ByteBuffer>(m_bufferStock.get(capacity)));
         }
     }
 }

@@ -492,7 +492,7 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
             procs.put(proc.getTypeName(), wrapper);
         }
 
-        m_snapshotBuffer = ByteBuffer.allocateDirect(m_snapshotBufferLength);
+        m_snapshotBuffer = org.voltdb.utils.DBBPool.allocateDirect(m_snapshotBufferLength);
         if (VoltDB.getLoadLibVOLTDB()) {
             m_snapshotBufferAddress = org.voltdb.utils.DBBPool.getBufferAddress(m_snapshotBuffer);
         } else {

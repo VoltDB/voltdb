@@ -845,7 +845,8 @@ public class ClientInterface implements DumpManager.Dumpable {
                                                   m_allPartitions.length, changeResult.clientData);
                 }
                 else {
-                    throw new RuntimeException("Should not be able to get here (ClientInterface.checkForFinishedCompilerWork())");
+                    throw new RuntimeException(
+                            "Should not be able to get here (ClientInterface.checkForFinishedCompilerWork())");
                 }
             }
             else {

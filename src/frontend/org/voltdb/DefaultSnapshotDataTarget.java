@@ -65,6 +65,8 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
      */
     private volatile boolean m_acceptOneWrite = false;
 
+    private final String m_tableName;
+
     public DefaultSnapshotDataTarget(
             final File file,
             final int hostId,
@@ -103,6 +105,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             final long createTime,
             int version[]
             ) throws IOException {
+        m_tableName = tableName;
         m_fos = new FileOutputStream(file);
         m_channel = m_fos.getChannel();
         m_es = Executors.newSingleThreadExecutor(new ThreadFactory() {

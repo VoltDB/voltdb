@@ -68,9 +68,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * when using the IPC backend.
      **/
     private FastDeserializer deserializer =
-        new FastDeserializer(ByteBuffer.allocateDirect(1024 * 1024 * 10));
+        new FastDeserializer(org.voltdb.utils.DBBPool.allocateDirect(1024 * 1024 * 10));
 
-    private ByteBuffer exceptionBuffer = ByteBuffer.allocateDirect(4096);
+    private ByteBuffer exceptionBuffer = org.voltdb.utils.DBBPool.allocateDirect(4096);
 
     /**
      * initialize the native Engine object.

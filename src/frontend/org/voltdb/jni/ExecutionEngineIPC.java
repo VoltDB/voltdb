@@ -608,7 +608,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_connection = new Connection(target);
 
         // voltdbipc assumes host byte order everywhere
-        m_dataNetwork = ByteBuffer.allocateDirect(1024 * 1024 * 10);
+        m_dataNetwork = org.voltdb.utils.DBBPool.allocateDirect(1024 * 1024 * 10);
         m_dataNetwork.position(4);
         m_data = m_dataNetwork.slice();
 
