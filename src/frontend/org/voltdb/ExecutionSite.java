@@ -89,6 +89,7 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
     public static final int m_snapshotBufferLength = 131072;
     private final ByteBuffer m_snapshotBuffer;
     private final long m_snapshotBufferAddress;
+    private final BBContainer m_snapshotBufferOrigin;
     private final BBContainer m_stupidSnapshotContainer;//pairs ByteBuffer with address
     /**
      * Set to true when the buffer is sent to a SnapshotDataTarget for I/O
@@ -361,6 +362,7 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
         ee = null;
         hsql = null;
         m_dumpId = "MockExecSite";
+        m_snapshotBufferOrigin = null;
         m_snapshotBuffer = null;
         m_snapshotBufferAddress = 0;
         m_stupidSnapshotContainer = null;
@@ -492,17 +494,17 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
             procs.put(proc.getTypeName(), wrapper);
         }
 
-        m_snapshotBuffer = org.voltdb.utils.DBBPool.allocateDirect(m_snapshotBufferLength);
+        m_snapshotBufferOrigin = org.voltdb.utils.DBBPool.allocateDirect(m_snapshotBufferLength);
+        m_snapshotBuffer = m_snapshotBufferOrigin.b;
         if (VoltDB.getLoadLibVOLTDB()) {
             m_snapshotBufferAddress = org.voltdb.utils.DBBPool.getBufferAddress(m_snapshotBuffer);
         } else {
             m_snapshotBufferAddress = 0;
         }
-        m_stupidSnapshotContainer = new BBContainer(m_snapshotBuffer, m_snapshotBufferAddress){
-
+        m_stupidSnapshotContainer = new BBContainer(m_snapshotBuffer, m_snapshotBufferAddress) {
             @Override
-            public void discard() {
-            }};
+            public void discard() {}
+        };
     }
 
     public long getCurrentTxnId() {
@@ -963,6 +965,7 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
                 //Ignore interruptions and finish shutting down.
             }
         }
+        m_stupidSnapshotContainer.discard();
     }
 
     /**

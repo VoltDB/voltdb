@@ -253,7 +253,6 @@ public class VoltDB {
      */
     public static void initialize(VoltDB.Configuration config)
     {
-        org.voltdb.utils.DBBPool.resetBufferStock();
         m_config = config;
         instance().initialize(config);
     }

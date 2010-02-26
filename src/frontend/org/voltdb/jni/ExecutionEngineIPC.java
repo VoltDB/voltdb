@@ -594,6 +594,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     private final int m_siteId;
     // private final FastSerializer m_fser;
     private final Connection m_connection;
+    private BBContainer m_dataNetworkOrigin;
     private ByteBuffer m_dataNetwork;
     private ByteBuffer m_data;
 
@@ -608,7 +609,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_connection = new Connection(target);
 
         // voltdbipc assumes host byte order everywhere
-        m_dataNetwork = org.voltdb.utils.DBBPool.allocateDirect(1024 * 1024 * 10);
+        m_dataNetworkOrigin = org.voltdb.utils.DBBPool.allocateDirect(1024 * 1024 * 10);
+        m_dataNetwork = m_dataNetworkOrigin.b;
         m_dataNetwork.position(4);
         m_data = m_dataNetwork.slice();
 
@@ -628,6 +630,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     @Override
     public void release() throws EEException, InterruptedException {
         m_connection.close();
+        m_dataNetworkOrigin.discard();
     }
 
     /**

@@ -52,8 +52,10 @@ public class TableSaveFile
 {
 
     private static class Container extends BBContainer {
-        Container(ByteBuffer b, long pointer) {
+        private final BBContainer m_origin;
+        Container(ByteBuffer b, long pointer, BBContainer origin) {
             super(b, pointer);
+            m_origin = origin;
         }
 
         @Override
@@ -375,9 +377,10 @@ public class TableSaveFile
                      */
                     Container c = m_buffers.poll();
                     if (c == null) {
-                        final ByteBuffer b = DBBPool.allocateDirect(DEFAULT_CHUNKSIZE);
+                        final BBContainer originContainer = DBBPool.allocateDirect(DEFAULT_CHUNKSIZE);
+                        final ByteBuffer b = originContainer.b;
                         final long pointer = org.voltdb.utils.DBBPool.getBufferAddress(b);
-                        c = new Container(b, pointer);
+                        c = new Container(b, pointer, originContainer);
                     }
 
                     c.b.clear();

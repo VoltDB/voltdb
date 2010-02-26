@@ -56,8 +56,10 @@ public class ELTManager implements SysManageable {
      * Store address along with ByteBuffer in a container that can return the ByteBuffer to the ELT manager
      */
     private class ELBBContainer extends BBContainer {
-        private ELBBContainer(final ByteBuffer b, final long address) {
+        private final BBContainer m_originContainer;
+        private ELBBContainer(final ByteBuffer b, final long address, BBContainer origin) {
             super(b, address);
+            m_originContainer = origin;
         }
 
         @Override
@@ -178,9 +180,10 @@ public class ELTManager implements SysManageable {
         }
 
         if (b == null) {
-            final ByteBuffer buffer = DBBPool.allocateDirect(kBufferSize);
+            final BBContainer originContainer = DBBPool.allocateDirect(kBufferSize);
+            final ByteBuffer buffer = originContainer.b;
             final long address = DBBPool.getBufferAddress(buffer);
-            b = new ELBBContainer( buffer, address);
+            b = new ELBBContainer( buffer, address, originContainer);
         }
         assert b.address != 0;
         m_bufferMap.put(b.address, b);

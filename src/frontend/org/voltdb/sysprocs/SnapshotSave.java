@@ -182,9 +182,10 @@ public class SnapshotSave extends VoltSystemProcedure
             assert(params.toArray()[0] != null);
             assert(params.toArray()[1] != null);
             assert(params.toArray()[2] != null);
+            assert(params.toArray()[3] != null);
             final String file_path = (String) params.toArray()[0];
             final String file_nonce = (String) params.toArray()[1];
-            long block = (Long)params.toArray()[2];
+            byte block = (Byte)params.toArray()[3];
             final VoltTable result = constructNodeResultsTable();
             boolean willDoSetup = m_snapshotCreateSetupPermit.tryAcquire();
             final int numLocalSites = VoltDB.instance().getLocalSites().values().size();
@@ -284,6 +285,13 @@ public class SnapshotSave extends VoltSystemProcedure
                     }
 
                     synchronized (m_taskListsForSites) {
+                        if (!partitionedSnapshotTasks.isEmpty() && !replicatedSnapshotTasks.isEmpty()) {
+                            ExecutionSite.ExecutionSitesCurrentlySnapshotting.set(
+                                    VoltDB.instance().getLocalSites().values().size());
+                        } else {
+                            SnapshotRegistry.discardSnapshot(snapshotRecord);
+                        }
+
                         /**
                          * Distribute the writing of replicated tables to exactly one partition.
                          */
@@ -296,18 +304,13 @@ public class SnapshotSave extends VoltSystemProcedure
                             m_taskListsForSites.get(siteIndex++ % numLocalSites).offer(t);
                         }
                     }
-                    if (!partitionedSnapshotTasks.isEmpty() && !replicatedSnapshotTasks.isEmpty()) {
-                        ExecutionSite.ExecutionSitesCurrentlySnapshotting.set(
-                                VoltDB.instance().getLocalSites().values().size());
-                    } else {
-                        SnapshotRegistry.discardSnapshot(snapshotRecord);
-                    }
                 } catch (Exception ex) {
                     result.addRow(context.getSite().getHost().getTypeName(),
                             "",
                             "FAILURE",
                             "SNAPSHOT INITIATION OF " + file_path + file_nonce +
                             "RESULTED IN Exception: " + ex.getMessage());
+                    HOST_LOG.error(ex);
                 } finally {
                     m_snapshotPermits.release(numLocalSites);
                 }
@@ -327,8 +330,11 @@ public class SnapshotSave extends VoltSystemProcedure
                  * to release the setup permit to ensure that a thread
                  * doesn't come late and think it is supposed to do the setup work
                  */
-                if (m_snapshotPermits.availablePermits() == 0) {
-                    m_snapshotCreateSetupPermit.release();
+                synchronized (m_snapshotPermits) {
+                    if (m_snapshotPermits.availablePermits() == 0 &&
+                            m_snapshotCreateSetupPermit.availablePermits() == 0) {
+                        m_snapshotCreateSetupPermit.release();
+                    }
                 }
             }
 
@@ -337,6 +343,11 @@ public class SnapshotSave extends VoltSystemProcedure
                 if (m_taskList == null) {
                     return new DependencyPair( DEP_createSnapshotTargets, result);
                 } else {
+                    if (m_taskListsForSites.isEmpty()) {
+                        assert(m_snapshotCreateSetupPermit.availablePermits() == 1);
+                        assert(m_snapshotPermits.availablePermits() == 0);
+                    }
+                    assert(ExecutionSite.ExecutionSitesCurrentlySnapshotting.get() > 0);
                     context.getExecutionSite().initiateSnapshots(m_taskList);
                 }
             }
@@ -395,7 +406,7 @@ public class SnapshotSave extends VoltSystemProcedure
         return null;
     }
 
-    public VoltTable[] run(String path, String nonce, int block) throws VoltAbortException
+    public VoltTable[] run(String path, String nonce, byte block) throws VoltAbortException
     {
         final long startTime = System.currentTimeMillis();
         HOST_LOG.info("Saving database to path: " + path + ", ID: " + nonce + " at " + System.currentTimeMillis());

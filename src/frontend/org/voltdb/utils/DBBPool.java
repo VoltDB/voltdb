@@ -23,11 +23,9 @@ import org.voltdb.utils.VoltLoggerFactory;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Map;
+import java.util.HashSet;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.ArrayList;
-import java.util.HashSet;
 
 /**
  * A pool of {@link java.nio.ByteBuffer ByteBuffers} that are
@@ -121,7 +119,7 @@ public final class DBBPool {
             /**
              * The larger ByteBuffer that is the source of the views of the smaller ByteBuffers
              */
-            private final ByteBuffer m_b;
+            private final BBContainer m_b;
 
             /**
              * The number of slices this DicedBB contains
@@ -160,13 +158,13 @@ public final class DBBPool {
                 m_availableSlices = m_numSlices - 1;
                 m_slices = new DBBContainer[m_numSlices];
                 for (int ii = 0; ii < m_numSlices; ii++) {
-                    m_b.limit(allocationSize * (ii + 1));
-                    m_b.position(allocationSize * ii);
+                    m_b.b.limit(allocationSize * (ii + 1));
+                    m_b.b.position(allocationSize * ii);
                     long address = 0;
                     if (foundNativeSupport) {
-                        address = getBufferAddress(m_b);
+                        address = getBufferAddress(m_b.b);
                     }
-                    m_slices[ii] = new DBBContainer( m_b.slice(), address );
+                    m_slices[ii] = new DBBContainer( m_b.b.slice(), address );
                 }
             }
 
@@ -185,6 +183,7 @@ public final class DBBPool {
                     m_slices[ii].b = null;
                     m_slices[ii].address = 0;
                 }
+                m_b.discard();
             }
 
             /**
@@ -645,12 +644,12 @@ public final class DBBPool {
      * @param bufferSize Requested size of the buffer in bytes
      * @return A <tt>ByteBuffer</tt> of the requested size.
      */
-    private final ByteBuffer allocateBuffer(final int bufferSize) {
+    private final BBContainer allocateBuffer(final int bufferSize) {
         bytesAllocatedGlobally.getAndAdd(bufferSize);
         bytesAllocatedLocally += bufferSize;
         try {
-            final ByteBuffer buffer = DBBPool.allocateDirect( bufferSize);
-            return buffer;
+            final BBContainer container = DBBPool.allocateDirect( bufferSize);
+            return container;
         } catch (java.lang.OutOfMemoryError e) {
             m_logger.fatal("Total bytes allocated globally before OOM is " + bytesAllocatedGlobally.get(), e);
             VoltDB.crashVoltDB();
@@ -747,39 +746,37 @@ public final class DBBPool {
         }
     }
 
-    /**
-     * Functional for global process wide pooling of ByteBuffers that can be reset
-     */
-    private static final HashMap<Integer, ArrayList<ByteBuffer>> m_bufferStock =
-        new HashMap<Integer, ArrayList<ByteBuffer>>();
-
     private static final HashMap<Integer, ArrayDeque<ByteBuffer>> m_availableBufferStock =
             new HashMap<Integer, ArrayDeque<ByteBuffer>>();
 
-    public static synchronized ByteBuffer allocateDirect(final int capacity) {
-        ArrayDeque<ByteBuffer> buffers = m_availableBufferStock.get(capacity);
-        ByteBuffer retval = null;
-        if (buffers != null) {
-            retval = buffers.poll();
-        }
-        if (retval != null) {
-            retval.clear();
-        } else {
-            retval = ByteBuffer.allocateDirect(capacity);
-            ArrayList<ByteBuffer> bufferStock = m_bufferStock.get(capacity);
-            if (bufferStock == null) {
-                bufferStock = new ArrayList<ByteBuffer>();
-                m_bufferStock.put(capacity, bufferStock);
+    public static BBContainer allocateDirect(final int capacity) {
+        synchronized (m_availableBufferStock) {
+            ArrayDeque<ByteBuffer> buffers = m_availableBufferStock.get(capacity);
+            ByteBuffer retval = null;
+            if (buffers != null) {
+                retval = buffers.poll();
             }
-            bufferStock.add(retval);
+            if (retval != null) {
+                retval.clear();
+            } else {
+                retval = ByteBuffer.allocateDirect(capacity);
+            }
+            return new BBContainer(retval, 0) {
+
+                @Override
+                public void discard() {
+                    synchronized (m_availableBufferStock) {
+                        ArrayDeque<ByteBuffer> buffers = m_availableBufferStock.get(b.capacity());
+                        if (buffers == null) {
+                            buffers = new ArrayDeque<ByteBuffer>();
+                            m_availableBufferStock.put(b.capacity(), buffers);
+                        }
+                        buffers.offer(b);
+                    }
+                }
+
+            };
         }
-        return retval;
     }
 
-    public static synchronized void resetBufferStock() {
-        m_availableBufferStock.clear();
-        for (int capacity : m_bufferStock.keySet()) {
-            m_availableBufferStock.put(capacity, new ArrayDeque<ByteBuffer>(m_bufferStock.get(capacity)));
-        }
-    }
 }

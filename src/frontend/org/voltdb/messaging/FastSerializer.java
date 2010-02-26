@@ -106,7 +106,7 @@ public class FastSerializer implements DataOutput {
         } else if (isDirect) {
             assert(pool == null);
            m_pool = null;
-           buffer = DBBPool.wrapBB(DBBPool.allocateDirect(initialAllocation));
+           buffer = DBBPool.allocateDirect(initialAllocation);
         } else {
            buffer = DBBPool.wrapBB(ByteBuffer.allocate(initialAllocation));
            m_pool = null;
@@ -139,7 +139,7 @@ public class FastSerializer implements DataOutput {
             // Allocate and copy
             BBContainer next;
             if (isDirect) {
-                next = DBBPool.wrapBB(DBBPool.allocateDirect(newCapacity));
+                next = DBBPool.allocateDirect(newCapacity);
             } else if (m_pool != null) {
                 next = m_pool.acquire(newCapacity);
             } else {

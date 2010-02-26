@@ -28,6 +28,7 @@ import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.HashSet;
 
 import junit.framework.TestCase;
 
@@ -129,6 +130,15 @@ public class RegressionSuite extends TestCase {
         client.createConnection(listener, m_username, m_password);
         m_clients.add(client);
         return client;
+    }
+
+    /**
+     * Release a client instance and any resources associated with it
+     */
+    public void releaseClient(Client c) throws IOException, InterruptedException {
+        boolean removed = m_clients.remove(c);
+        assert(removed);
+        c.shutdown();
     }
 
     /**

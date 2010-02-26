@@ -114,9 +114,14 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         File tmp_dir = new File(TMPDIR);
         File[] tmp_files = tmp_dir.listFiles(cleaner);
         int tmpIndex = r.nextInt(tmp_files.length);
+        int corruptValue = r.nextInt() % 127;
         java.io.RandomAccessFile raf = new java.io.RandomAccessFile( tmp_files[tmpIndex], "rw");
-        raf.seek(r.nextInt((int)raf.length()));
-        raf.writeByte(r.nextInt() % 127);
+        final int fileLength = (int)raf.length();
+        int corruptPosition = r.nextInt((int)raf.length());
+        System.out.println("Corrupting file " + tmp_files[tmpIndex].getName() +
+                " at byte " + corruptPosition + " with value " + corruptPosition);
+        raf.seek(corruptPosition);
+        raf.writeByte(corruptValue);
         raf.close();
     }
 
@@ -517,6 +522,13 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
         results = saveTables(client);
 
+        while (results[0].advanceRow()) {
+            if (!results[0].getString("RESULT").equals("SUCCESS")) {
+                System.out.println(results[0].getString("ERR_MSG"));
+            }
+            assertTrue(results[0].getString("RESULT").equals("SUCCESS"));
+        }
+
         try
         {
             results = client.callProcedure("@SnapshotStatus");
@@ -675,8 +687,8 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         int num_replicated_items = 1000;
         int num_partitioned_items = 126;
 
-        Client client = getClient();
         for (int ii = 0; ii < 100; ii++) {
+            Client client = getClient();
             VoltTable repl_table = createReplicatedTable(num_replicated_items, 0);
             // make a TPCC warehouse table
             VoltTable partition_table =
@@ -684,18 +696,26 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
             loadTable(client, "REPLICATED_TESTER", repl_table);
             loadTable(client, "PARTITION_TESTER", partition_table);
-            saveTables(client);
+            VoltTable results[] = saveTables(client);
+            while (results[0].advanceRow()) {
+                if (results[0].getString("RESULT").equals("FAILURE")) {
+                    System.out.println(results[0].getString("ERR_MSG"));
+                }
+                assertTrue(results[0].getString("RESULT").equals("SUCCESS"));
+            }
 
+            corruptTestFiles(false);
+            releaseClient(client);
             // Kill and restart all the execution sites.
             m_config.shutDown();
-            corruptTestFiles(false);
             m_config.startUp();
 
             client = getClient();
 
-            VoltTable results[] = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT);
+            results = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT);
             assertNotNull(results);
             deleteTestFiles();
+            releaseClient(client);
         }
     }
 
@@ -719,6 +739,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             loadTable(client, "PARTITION_TESTER", partition_table);
             saveTables(client);
 
+            releaseClient(client);
             // Kill and restart all the execution sites.
             m_config.shutDown();
             corruptTestFiles(true);
@@ -729,6 +750,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             VoltTable results[] = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT);
             assertNotNull(results);
             deleteTestFiles();
+            releaseClient(client);
         }
     }
 

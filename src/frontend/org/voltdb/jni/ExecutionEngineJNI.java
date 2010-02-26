@@ -67,10 +67,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * that rely on being able to serialize large results sets will get the same amount of storage
      * when using the IPC backend.
      **/
+    private final BBContainer deserializerBufferOrigin = org.voltdb.utils.DBBPool.allocateDirect(1024 * 1024 * 10);
     private FastDeserializer deserializer =
-        new FastDeserializer(org.voltdb.utils.DBBPool.allocateDirect(1024 * 1024 * 10));
+        new FastDeserializer(deserializerBufferOrigin.b);
 
-    private ByteBuffer exceptionBuffer = org.voltdb.utils.DBBPool.allocateDirect(4096);
+    private final BBContainer exceptionBufferOrigin = org.voltdb.utils.DBBPool.allocateDirect(4096);
+    private ByteBuffer exceptionBuffer = exceptionBufferOrigin.b;
 
     /**
      * initialize the native Engine object.
@@ -137,7 +139,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             checkErrorCode(errorCode);
         }
         deserializer = null;
+        deserializerBufferOrigin.discard();
         exceptionBuffer = null;
+        exceptionBufferOrigin.discard();
         LOG.trace("Released Execution Engine.");
     }
 
