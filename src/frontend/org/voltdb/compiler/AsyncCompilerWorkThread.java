@@ -117,6 +117,16 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
         m_work.add(work);
     }
 
+    public void prepareCatalogUpdate(String catalogURL, long clientHandle, int connectionId, int sequenceNumber, Object clientData) {
+        CatalogChangeWork work = new CatalogChangeWork();
+        work.clientHandle = clientHandle;
+        work.connectionId = connectionId;
+        work.sequenceNumber = sequenceNumber;
+        work.clientData = clientData;
+        work.catalogURL = catalogURL;
+        m_work.add(work);
+    }
+
     public AsyncCompilerResult getPlannedStmt() {
         synchronized (m_finished) {
             return m_finished.poll();
@@ -272,7 +282,10 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
         try {
             // try to get the new catalog from the params
             String newCatalogCommands = CatalogUtil.loadCatalogFromJar(work.catalogURL, null);
-            assert(newCatalogCommands != null);
+            if (newCatalogCommands == null) {
+                retval.errorMsg = "Unable to read from catalog at: " + work.catalogURL;
+                return retval;
+            }
             Catalog newCatalog = new Catalog();
             newCatalog.execute(newCatalogCommands);
 

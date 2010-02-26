@@ -38,7 +38,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         return null;
     }
 
-    public VoltTable[] run(String catalogDiffCommands) {
+    public VoltTable[] run(String catalogDiffCommands, String catalogURL) {
         System.out.println(catalogDiffCommands);
         return null;
     }

@@ -709,6 +709,32 @@ public class ClientInterface implements DumpManager.Dumpable {
                 return;
             }
 
+            if (task.procName.equals("@UpdateApplicationCatalog")) {
+                if (!handler.m_user.hasAdhocPermission()) {
+                    final ClientResponseImpl errorResponse =
+                        new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                            new VoltTable[0], "User does not have @AdHoc permission", task.clientHandle);
+                    authLog.l7dlog(Level.INFO,
+                            LogKeys.auth_ClientInterface_LackingPermissionForAdhoc.name(),
+                            new String[] {handler.m_user.m_name}, null);
+                    c.writeStream().enqueue(errorResponse);
+                    return;
+                }
+                task.buildParameterSet();
+                if (task.params.m_params.length != 1) {
+                    final ClientResponseImpl errorResponse =
+                        new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                            new VoltTable[0],
+                            "Adhoc system procedure requires exactly one parameter, the SQL statement to execute.",
+                            task.clientHandle);
+                    c.writeStream().enqueue(errorResponse);
+                    return;
+                }
+                String catalogURL = (String) task.params.m_params[0];
+                m_plannerThread.prepareCatalogUpdate(catalogURL, task.clientHandle, handler.connectionId(), handler.sequenceId(), c);
+                return;
+            }
+
             // dump requests are pretty direct and to the point, but only affect the local machine
             if (task.procName.equals("@dump")) {
                 // currently you don't need permissions to do a dump
@@ -833,10 +859,9 @@ public class ClientInterface implements DumpManager.Dumpable {
                     StoredProcedureInvocation task = new StoredProcedureInvocation();
                     task.procName = "@UpdateApplicationCatalog";
                     task.params = new ParameterSet();
-                    /*task.params.m_params = new Object[] {
-                            plannedStmt.aggregatorFragment, plannedStmt.collectorFragment,
-                            plannedStmt.sql, plannedStmt.isReplicatedTableDML ? 1 : 0
-                    };*/
+                    task.params.m_params = new Object[] {
+                            changeResult.diffCommands, changeResult.catalogURL,
+                    };
                     task.clientHandle = changeResult.clientHandle;
 
                     // initiate the transaction
