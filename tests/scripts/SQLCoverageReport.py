@@ -207,7 +207,7 @@ Generates HTML reports based on the given XML report file. The generated reports
 contain the SQL statements which caused different responses on both backends.
 """ % (prog_name)
 
-def generate_html_reports(report, random_seed, report_all, output_dir):
+def generate_html_reports(report, report_all, output_dir):
     """report: It can be the filename of the XML report, or the actual Python
     object of the report.
     """
@@ -244,7 +244,7 @@ Random seed: %s
 Total statements: %d
 <br/>
 Failed (*not* necessarily mismatched) statements: %d
-""" % (random_seed, len(result["Statements"]), failures)
+""" % (result["Seed"], len(result["Statements"]), failures)
 
     mismatches = filter(is_different, result["Statements"])
     report += print_section("Mismatched Statements",

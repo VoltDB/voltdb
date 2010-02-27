@@ -122,15 +122,15 @@ def run_config(config, basedir, output_dir, random_seed, report_all, args):
     if run_once("hsqldb", command, statements) != 0:
         exit(-1)
 
-    report = XMLGenerator({"Statements": statements})
+    report_dict = {"Seed": random_seed, "Statements": statements}
+    report = XMLGenerator(report_dict)
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     fd = open(report_filename, "w")
     fd.write(report.toXML())
     fd.close()
 
-    success = generate_html_reports({"Statements": statements},
-                                    random_seed, report_all, output_dir)
+    success = generate_html_reports(report_dict, report_all, output_dir)
     return success
 
 

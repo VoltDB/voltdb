@@ -50,7 +50,7 @@ class ContentParser(ContentHandler):
     """
 
     __parallels = ("Statements",)
-    __terminals = ("SQL", "Status", "Info", "Result")
+    __terminals = ("SQL", "Status", "Info", "Result", "Seed")
 
     def __init__(self, l):
         """Constructor.
