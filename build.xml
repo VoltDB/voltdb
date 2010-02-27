@@ -1111,8 +1111,9 @@ TEST CASES
     <property name="build.dir.suffix" value="" /> <!-- Default -->
     <property name="test.example.dir"
     location="tests/scripts/examples/sql_coverage" />
-    <property name="default_ddl" location="${test.example.dir}/DDL.sql" />
     <property name="default_config" location="${test.example.dir}/config.py" />
+    <property name="regression_config"
+              location="${test.example.dir}/regression-config.py" />
     <property name="sqlcov.dir" location="${build.dir}/sqlcoverage" />
     <mkdir dir="${sqlcov.dir}" />
     <condition property="" value="${env.VOLTBUILD}" else='release'>
@@ -1120,6 +1121,10 @@ TEST CASES
     </condition>
     <condition property="seed_arg" value="-s ${sql_coverage_seed}" else="">
         <isset property="sql_coverage_seed"/>
+    </condition>
+    <condition property="meta_config" value="${default_config}"
+               else="${regression_config}">
+        <isset property="sql_coverage_default"/>
     </condition>
     <condition property="config_arg" value="-c ${sql_coverage_config}" else="">
         <isset property="sql_coverage_config"/>
@@ -1164,7 +1169,7 @@ TEST CASES
         <arg line="${seed_arg}" />
         <arg line="${config_arg}" />
         <arg line="${config_verbose}" />
-        <arg file="${default_config}" />
+        <arg file="${meta_config}" />
         <arg file="${sqlcov.dir}" />
         <arg line='"${simpleserver.command}"' />
     </exec>

@@ -133,7 +133,6 @@ def run_config(config, basedir, output_dir, random_seed, report_all, args):
     success = generate_html_reports(report_dict, report_all, output_dir)
     return success
 
-
 def usage():
     print sys.argv[0], "config output_dir command"
     print """

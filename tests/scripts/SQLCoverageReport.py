@@ -65,7 +65,7 @@ def generate_table_str(res):
     return tablestr
 
 def generate_detail(name, item, output_dir):
-    filename = "%s-%s.html" % (name, item["id"])
+    filename = "%s.html" % (item["id"])
 
     tablestr = generate_table_str(item)
 
@@ -294,7 +294,7 @@ Summary:
     fd.close()
 
 if __name__ == "__main__":
-    if len(sys.argv) < 4:
+    if len(sys.argv) < 3:
         usage(sys.argv[0])
         exit(-1)
 
@@ -302,4 +302,4 @@ if __name__ == "__main__":
     data = fd.read()
     fd.close()
 
-    generate_html_reports(data, int(sys.argv[1]), True, sys.argv[3])
+    generate_html_reports(data, True, sys.argv[3])
