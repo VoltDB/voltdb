@@ -7,7 +7,6 @@
 	<classpathentry excluding="edu/mit/net/" kind="src" path="tests/frontend"/>
 	<classpathentry kind="src" path="tests/hsqldb"/>
 	<classpathentry excluding="ca/" kind="src" path="third_party/java/src"/>
-	<classpathentry kind="src" path="tools"/>
 	<classpathentry kind="lib" path="third_party/java/jars/ant_doxygen.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/ant-junit.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/ant.jar"/>
