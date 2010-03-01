@@ -130,7 +130,7 @@ def run_config(config, basedir, output_dir, random_seed, report_all, args):
     fd.write(report.toXML())
     fd.close()
 
-    success = generate_html_reports(report_dict, report_all, output_dir)
+    success = generate_html_reports(report_dict, output_dir, report_all)
     return success
 
 def usage():

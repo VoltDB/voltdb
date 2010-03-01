@@ -27,8 +27,12 @@ import cgi
 import os
 import cPickle
 from base64 import decodestring
+from distutils.util import strtobool
 from xml2 import XMLParser
+from optparse import OptionParser
 from fastserializer import VoltColumn, VoltTable
+
+__quiet = True
 
 def highlight(s, flag = True):
     if not isinstance(s, basestring):
@@ -66,6 +70,8 @@ def generate_table_str(res):
 
 def generate_detail(name, item, output_dir):
     filename = "%s.html" % (item["id"])
+    if output_dir == None:
+        return
 
     tablestr = generate_table_str(item)
 
@@ -118,6 +124,10 @@ td {width: 50%%}
 
     return filename
 
+def safe_print(s):
+    if not __quiet:
+        print s
+
 def print_section(name, mismatches, output_dir):
     result = """
 <h2>%s: %d</h2>
@@ -131,6 +141,7 @@ def print_section(name, mismatches, output_dir):
 """ % (name, len(mismatches))
 
     for i in mismatches:
+        safe_print(i["SQL"])
         detail_page = generate_detail(name, i, output_dir)
 
         result += """
@@ -164,7 +175,7 @@ def is_different(x):
     # can't easily match with the HSQL backend.  Reject only pairs of
     # status values where one of them wasn't an error
     if x["jni"]["Status"] != x["hsqldb"]["Status"]:
-        if x["jni"]["Status"] > 0 or x["hsqldb"]["Status"] > 0:
+        if int(x["jni"]["Status"]) > 0 or int(x["hsqldb"]["Status"]) > 0:
             x["highlight"] = ["Status"]
             return True
 
@@ -201,13 +212,13 @@ def deserialize(x):
 def usage(prog_name):
     print """
 Usage:
-\t%s random_seed report output_dir
+\t%s report [-o output_dir] [-f true/false] [-a]
 
 Generates HTML reports based on the given XML report file. The generated reports
 contain the SQL statements which caused different responses on both backends.
 """ % (prog_name)
 
-def generate_html_reports(report, report_all, output_dir):
+def generate_html_reports(report, output_dir, report_all, is_matching = False):
     """report: It can be the filename of the XML report, or the actual Python
     object of the report.
     """
@@ -221,12 +232,12 @@ def generate_html_reports(report, report_all, output_dir):
     # deserialize results
     map(deserialize, result["Statements"])
 
-    if not os.path.exists(output_dir):
+    if output_dir != None and not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
     failures = 0
     for r in result["Statements"]:
-        if r["jni"]["Status"] != 1:
+        if int(r["jni"]["Status"]) != 1:
             failures += 1
 
     report = """
@@ -246,7 +257,16 @@ Total statements: %d
 Failed (*not* necessarily mismatched) statements: %d
 """ % (result["Seed"], len(result["Statements"]), failures)
 
-    mismatches = filter(is_different, result["Statements"])
+    is_same = lambda x: not is_different(x)
+    if is_matching:
+        mismatches = filter(is_same, result["Statements"])
+    else:
+        mismatches = filter(is_different, result["Statements"])
+
+    def key(x):
+        return int(x["id"])
+    sorted(mismatches, cmp=cmp, key=key)
+
     report += print_section("Mismatched Statements",
                             mismatches, output_dir)
 
@@ -259,9 +279,10 @@ Failed (*not* necessarily mismatched) statements: %d
 </html>
 """
 
-    summary = open(os.path.join(output_dir, "index.html"), "w")
-    summary.write(report.encode("utf-8"))
-    summary.close()
+    if output_dir != None:
+        summary = open(os.path.join(output_dir, "index.html"), "w")
+        summary.write(report.encode("utf-8"))
+        summary.close()
 
     return (failures, len(mismatches))
 
@@ -294,12 +315,28 @@ Summary:
     fd.close()
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
+    parser = OptionParser()
+    parser.add_option("-o", "--output", dest="output_dir",
+                      help="The directory to put all the output HTML files.")
+    parser.add_option("-f", "--flag", dest="flag",
+                      help="true to print out matching statements, "
+                      "false to print out mismatching statements")
+    parser.add_option("-a", action="store_true", dest="all", default=False,
+                      help="Whether or not to report all statements")
+    (options, args) = parser.parse_args()
+
+    if len(args) != 1:
         usage(sys.argv[0])
         exit(-1)
 
-    fd = open(sys.argv[2], "rb")
+    is_matching = False
+
+    fd = open(args[0], "rb")
     data = fd.read()
     fd.close()
 
-    generate_html_reports(data, True, sys.argv[3])
+    if options.flag != None:
+        __quiet = False
+        is_matching = strtobool(options.flag)
+
+    generate_html_reports(data, options.output_dir, options.all, is_matching)
