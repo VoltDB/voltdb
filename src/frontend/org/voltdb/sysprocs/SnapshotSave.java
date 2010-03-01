@@ -285,7 +285,7 @@ public class SnapshotSave extends VoltSystemProcedure
                     }
 
                     synchronized (m_taskListsForSites) {
-                        if (!partitionedSnapshotTasks.isEmpty() && !replicatedSnapshotTasks.isEmpty()) {
+                        if (!partitionedSnapshotTasks.isEmpty() || !replicatedSnapshotTasks.isEmpty()) {
                             ExecutionSite.ExecutionSitesCurrentlySnapshotting.set(
                                     VoltDB.instance().getLocalSites().values().size());
                         } else {
