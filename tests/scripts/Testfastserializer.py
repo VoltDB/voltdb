@@ -238,7 +238,7 @@ if __name__ == "__main__":
     del sys.argv[1]
     try:
         unittest.main()
-    except SystemExit as e:
+    except SystemExit:
         echo.shutdown()
         echo.join()
         raise
