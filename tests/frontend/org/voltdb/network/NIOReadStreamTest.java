@@ -152,7 +152,8 @@ public class NIOReadStreamTest extends TestCase {
 
         // Read most of the block
         byte[] most = new byte[SIZE-2];
-        assertEquals(SIZE-1, stream.read(channel, most.length, pool));
+        final int remainingToRead = (SIZE - 1) - stream.dataAvailable();
+        assertEquals(remainingToRead, stream.read(channel, most.length, pool));
         assertEquals(SIZE-1, stream.dataAvailable());
         stream.getBytes(most);
 
@@ -173,12 +174,12 @@ public class NIOReadStreamTest extends TestCase {
     }
 
     public void testIncompleteReads() throws IOException {
-        channel.nextRead = new byte[1000];
-        assertEquals(1000, stream.read(channel, 1500, pool));
-        assertEquals(1000, stream.dataAvailable());
+        channel.nextRead = new byte[17408];
+        assertEquals(NIOReadStream.BUFFER_SIZE, stream.read(channel, 1500, pool));
+        assertEquals(NIOReadStream.BUFFER_SIZE, stream.dataAvailable());
         channel.nextRead = new byte[500];
-        assertEquals(1500, stream.read(channel, 1500, pool));
-        assertEquals(1500, stream.dataAvailable());
+        assertEquals(500, stream.read(channel, 1500, pool));
+        assertEquals(8692, stream.dataAvailable());
     }
 
     public void testReadInt() throws IOException {

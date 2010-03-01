@@ -687,7 +687,9 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         int num_replicated_items = 1000;
         int num_partitioned_items = 126;
 
-        for (int ii = 0; ii < 100; ii++) {
+        final int iterations = isValgrind() ? 5 : 100;
+
+        for (int ii = 0; ii < iterations; ii++) {
             Client client = getClient();
             VoltTable repl_table = createReplicatedTable(num_replicated_items, 0);
             // make a TPCC warehouse table
@@ -727,7 +729,9 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         int num_replicated_items = 1000;
         int num_partitioned_items = 126;
 
-        for (int ii = 0; ii < 30; ii++) {
+        final int iterations = isValgrind() ? 5 : 100;
+
+        for (int ii = 0; ii < iterations; ii++) {
             Client client = getClient();
 
             VoltTable repl_table = createReplicatedTable(num_replicated_items, 0);

@@ -154,6 +154,10 @@ public class FastDeserializer implements DataInput {
             return null;
         assert len >= 0;
 
+        if (len > Short.MAX_VALUE - 2) {
+            throw new IOException("Serializable strings cannot be longer then (2 ^ 15) - 2");
+        }
+
         // now assume not null
         final byte[] strbytes = new byte[len];
         readFully(strbytes);

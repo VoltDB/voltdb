@@ -142,11 +142,11 @@ import org.voltdb.utils.Pair;
     }
 
     public VoltNetwork() {
-        this( true, true, new Runnable[0]);
+        this( true, true, new Runnable[0], null);
     }
 
     public VoltNetwork( Runnable periodicWork[]) {
-        this( true, true, periodicWork);
+        this( true, true, periodicWork, null);
     }
 
     /**
@@ -154,7 +154,7 @@ import org.voltdb.utils.Pair;
      * If the network is not going to provide any threads provideOwnThread should be false
      * and runOnce should be called periodically
      **/
-    public VoltNetwork(boolean useExecutorService, boolean blockingSelect, Runnable periodicWork[]) {
+    public VoltNetwork(boolean useExecutorService, boolean blockingSelect, Runnable periodicWork[], Integer threads) {
         m_thread = new Thread(this, "Volt Network");
         m_thread.setDaemon(true);
 
@@ -169,17 +169,19 @@ import org.voltdb.utils.Pair;
             throw new RuntimeException(ex);
         }
 
+        final int availableProcessors = Runtime.getRuntime().availableProcessors();
         if (!useExecutorService) {
             m_executor = null;
             return;
         }
 
-        final int availableProcessors = Runtime.getRuntime().availableProcessors();
         int threadPoolSize = 1;
-        if (availableProcessors <= 4) {
+        if (threads != null) {
+            threadPoolSize = threads.intValue();
+        } else if (availableProcessors <= 4) {
             threadPoolSize = 1;
         } else if (availableProcessors <= 8) {
-            threadPoolSize = 1;
+            threadPoolSize = 2;
         } else if (availableProcessors <= 16) {
             threadPoolSize = 2;
 

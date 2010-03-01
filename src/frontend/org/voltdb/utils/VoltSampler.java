@@ -269,7 +269,7 @@ public class VoltSampler extends Thread {
     @Override
     public void run() {
         assert Thread.currentThread().getThreadGroup().getParent() == null;
-        System.out.println("sampling every " + intersampleMillis);
+        System.err.println("sampling every " + intersampleMillis);
 
         long start = System.currentTimeMillis();
         while (!doStop.get()) {
@@ -282,7 +282,7 @@ public class VoltSampler extends Thread {
         }
         long end = System.currentTimeMillis();
 
-        System.out.println("duration = " + (end - start) + " " + samples.size()
+        System.err.println("duration = " + (end - start) + " " + samples.size()
                 + " samples; real rate = " + ((end - start) / samples.size()));
         try {
             PrintStream out = new PrintStream(new File(outputPath));

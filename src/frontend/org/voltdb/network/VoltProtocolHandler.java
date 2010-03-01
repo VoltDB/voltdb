@@ -95,4 +95,8 @@ public abstract class VoltProtocolHandler implements InputHandler {
         return m_sequenceId;
     }
 
+    protected int getNextMessageLength() {
+        return m_nextLength;
+    }
+
 }

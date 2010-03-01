@@ -41,9 +41,32 @@ final class ClientImpl implements Client {
                         Public API
      ****************************************************/
 
+    /**
+     * Clients may queue a wide variety of messages and a lot of them
+     * so give them a large max arena size.
+     */
+    private static final int m_defaultMaxArenaSize = 134217728;
+
     /** Create a new client without any initial connections. */
     ClientImpl() {
-        this( 128, null);
+        this( 128, new int[] {
+                m_defaultMaxArenaSize,//16
+                m_defaultMaxArenaSize,//32
+                m_defaultMaxArenaSize,//64
+                m_defaultMaxArenaSize,//128
+                m_defaultMaxArenaSize,//256
+                m_defaultMaxArenaSize,//512
+                m_defaultMaxArenaSize,//1024
+                m_defaultMaxArenaSize,//2048
+                m_defaultMaxArenaSize,//4096
+                m_defaultMaxArenaSize,//8192
+                m_defaultMaxArenaSize,//16384
+                m_defaultMaxArenaSize,//32768
+                m_defaultMaxArenaSize,//65536
+                m_defaultMaxArenaSize,//131072
+                m_defaultMaxArenaSize//262144
+        },
+        false);
     }
 
     /**
@@ -53,10 +76,11 @@ final class ClientImpl implements Client {
      * for serializing network writes
      * @param expectedOutgoingMessageSize Expected size of procedure invocations in bytes
      * @param maxArenaSizes Maximum size arenas in the memory pool should grow to
+     * @param heavyweight Whether to use multiple or a single thread
      */
-    ClientImpl(int expectedOutgoingMessageSize, int maxArenaSizes[]) {
+    ClientImpl(int expectedOutgoingMessageSize, int maxArenaSizes[], boolean heavyweight) {
         m_expectedOutgoingMessageSize = expectedOutgoingMessageSize;
-        m_distributer = new Distributer(expectedOutgoingMessageSize, maxArenaSizes);
+        m_distributer = new Distributer(expectedOutgoingMessageSize, maxArenaSizes, heavyweight);
         m_distributer.addClientStatusListener(new CSL());
     }
 

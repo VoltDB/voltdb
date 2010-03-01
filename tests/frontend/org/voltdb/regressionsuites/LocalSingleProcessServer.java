@@ -141,4 +141,9 @@ public class LocalSingleProcessServer implements VoltServerConfig {
     public boolean isHSQL() {
         return m_target == BackendTarget.HSQLDB_BACKEND;
     }
+
+    @Override
+    public boolean isValgrind() {
+        return m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC;
+    }
 }

@@ -115,21 +115,30 @@ public class VoltPort implements Callable<VoltPort>, Connection
     public VoltPort call() throws IOException {
         try {
             final DBBPool pool = m_pool.get();
+
             /*
              * Have the read stream fill from the network
              */
             if (readyForRead()) {
-                fillReadStream( m_handler.getMaxRead(), pool);
-            }
+                int read = 0;
+                do {
+                    final int maxRead = m_handler.getMaxRead();
+                    if (maxRead > 0) {
+                        read = fillReadStream( maxRead, pool);
+                    } else {
+                        break;
+                    }
 
-            ByteBuffer message;
+                    ByteBuffer message;
 
-            /*
-             * Process all the buffered bytes and retrieve as many messages as possible
-             * and pass them off to the input handler.
-             */
-            while ((message = m_handler.retrieveNextMessage( this )) != null) {
-                m_handler.handleMessage( message, this);
+                    /*
+                     * Process all the buffered bytes and retrieve as many messages as possible
+                     * and pass them off to the input handler.
+                     */
+                    while ((message = m_handler.retrieveNextMessage( this )) != null) {
+                        m_handler.handleMessage( message, this);
+                    }
+                } while (read > 0);
             }
 
             drainWriteStream(pool);
@@ -143,9 +152,9 @@ public class VoltPort implements Callable<VoltPort>, Connection
         return this;
     }
 
-    private final void fillReadStream(int maxBytes, final DBBPool pool) throws IOException {
+    private final int fillReadStream(int maxBytes, final DBBPool pool) throws IOException {
         if ( maxBytes == 0 || m_isShuttingDown)
-            return;
+            return 0;
 
         final int read = m_readStream.read(m_channel, maxBytes, pool);
 
@@ -168,6 +177,7 @@ public class VoltPort implements Callable<VoltPort>, Connection
              */
             enableWriteSelection();
         }
+        return read;
     }
 
     private final void drainWriteStream(final DBBPool pool) throws IOException {

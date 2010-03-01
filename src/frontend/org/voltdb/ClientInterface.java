@@ -444,7 +444,7 @@ public class ClientInterface implements DumpManager.Dumpable {
             if (m_hasDTXNBackPressure) {
                 return 0;
             } else {
-                return MAX_READ;
+                return Math.max( MAX_READ, getNextMessageLength());
             }
         }
 
@@ -814,7 +814,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                 // initiate the transaction
                 m_initiator.createTransaction(handler.connectionId(), task, isReadOnly,
                                               catProc.getSinglepartition(),
-                                              involvedPartitions, involvedPartitions.length, c);
+                                              involvedPartitions, involvedPartitions.length, c, buf.capacity());
             }
         }
         else {
@@ -851,7 +851,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                     // initiate the transaction
                     m_initiator.createTransaction(plannedStmt.connectionId,
                                                   task, false, false, m_allPartitions,
-                                                  m_allPartitions.length, plannedStmt.clientData);
+                                                  m_allPartitions.length, plannedStmt.clientData, 0);
                 }
                 else if (result instanceof CatalogChangeResult) {
                     CatalogChangeResult changeResult = (CatalogChangeResult) result;
@@ -867,7 +867,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                     // initiate the transaction
                     m_initiator.createTransaction(changeResult.connectionId,
                                                   task, false, false, m_allPartitions,
-                                                  m_allPartitions.length, changeResult.clientData);
+                                                  m_allPartitions.length, changeResult.clientData, 0);
                 }
                 else {
                     throw new RuntimeException(
@@ -1012,7 +1012,7 @@ public class ClientInterface implements DumpManager.Dumpable {
             // initiate the transaction
            m_initiator.createTransaction(-1, spi, catProc.getReadonly(),
                                          catProc.getSinglepartition(),
-                                         m_allPartitions, m_allPartitions.length, m_snapshotDaemonAdapter);
+                                         m_allPartitions, m_allPartitions.length, m_snapshotDaemonAdapter, 0);
        }
     }
 

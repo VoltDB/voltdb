@@ -403,8 +403,8 @@ public class TestSQLTypesSuite extends RegressionSuite {
         params[0] = "NO_NULLS";
 
         // array to build the Big String.
-        final char blob[] = new char[Short.MAX_VALUE];
-        for (int i=0; i < Short.MAX_VALUE; i++) {
+        final char blob[] = new char[Short.MAX_VALUE - 2];
+        for (int i=0; i < Short.MAX_VALUE - 2; i++) {
             blob[i] = 'a';
         }
 

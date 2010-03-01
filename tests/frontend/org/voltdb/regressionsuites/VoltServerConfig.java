@@ -78,4 +78,9 @@ public interface VoltServerConfig {
      * @return Is the underlying instance of VoltDB running HSQL?
      */
     public boolean isHSQL();
+
+    /**
+     * @return Is the underlying instance of VoltDB running IPC with Valgrind?
+     */
+    public boolean isValgrind();
 }

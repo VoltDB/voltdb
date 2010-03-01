@@ -29,11 +29,17 @@ public abstract class ClientFactory {
      * be allowed to grow to
      * @param expectedOutgoingMessageSize Expected serialized size of most stored procedure invocations
      * @param maxArenaSizes Maximum size each arena will be allowed to grow to. Can be <code>null</code>
+     * @param heavyweight If set to true the Client API will use multiple threads in order to be able
+     * to saturate bonded gigabit connections. Only set to true if you have at least 2 bonded links
+     * and intend to saturate them using this client instance. When set to false it can still saturate a gigabit
+     * connection. Arena sizes are ignored when heavyweight is set. This is ignored on systems with < 4 cores.
      * @return Newly constructed {@link Client}
      * @see Client
      */
-    public static Client createClient(int expectedOutgoingMessageSize, int maxArenaSizes[]) {
-        return new ClientImpl(expectedOutgoingMessageSize, maxArenaSizes);
+    public static Client createClient(
+            int expectedOutgoingMessageSize, int maxArenaSizes[], boolean heavyweight) {
+        final int cores = Runtime.getRuntime().availableProcessors();
+        return new ClientImpl(expectedOutgoingMessageSize, maxArenaSizes, cores > 4 ? heavyweight : false);
     }
 
     /**

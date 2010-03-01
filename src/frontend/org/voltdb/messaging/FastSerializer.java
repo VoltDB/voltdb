@@ -272,6 +272,7 @@ public class FastSerializer implements DataOutput {
      * @throws IOException Rethrows any IOExceptions thrown.
      */
     public void writeString(String string) throws IOException {
+        final short MAX_LENGTH = Short.MAX_VALUE - 2;
         final short NULL_STRING_INDICATOR = -1;
         if (string == null) {
             writeShort(NULL_STRING_INDICATOR);
@@ -286,9 +287,9 @@ public class FastSerializer implements DataOutput {
         } catch (UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }
-        if (len > Short.MAX_VALUE) {
+        if (len > MAX_LENGTH) {
             throw new IOException("String exceeds maximum length of "
-                                  + Short.MAX_VALUE + " bytes.");
+                                  + MAX_LENGTH + " bytes.");
         }
         writeShort(len);
         write(strbytes);

@@ -191,7 +191,7 @@ public class SimpleDtxnInitiatorTest extends TestCase {
 
     public void testCreateTransactionComplete() {
         final DummyConnection c = new DummyConnection();
-        initiator.createTransaction(42, work, true, true, new int[] { LOCAL_SITE }, 1, c);
+        initiator.createTransaction( 42, work, true, true, new int[] { LOCAL_SITE }, 1, c,  32);
         assertTrue(mqueue.lastEquals(LOCAL_SITE, 0));
         final InitiateTask request = (InitiateTask) mqueue.popLastMessage();
         assertEquals(LOCAL_SITE, request.getInitiatorSiteId());

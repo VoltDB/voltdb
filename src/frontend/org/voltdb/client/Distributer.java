@@ -29,11 +29,13 @@ import org.voltdb.VoltTable;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.network.Connection;
+import org.voltdb.messaging.FastSerializable;
 import org.voltdb.network.QueueMonitor;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.network.VoltProtocolHandler;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltdb.VoltTable;
 
 /**
  *   De/multiplexes transactions across a cluster
@@ -51,7 +53,7 @@ class Distributer {
     private final ArrayList<ClientStatusListener> m_listeners = new ArrayList<ClientStatusListener>();
 
     //Selector and connection handling, does all work in blocking selection thread
-    private VoltNetwork m_network = new VoltNetwork( false, true, new Runnable[0]);
+    private VoltNetwork m_network;
 
     // Temporary until a distribution/affinity algorithm is written
     private int m_nextConnection = 0;
@@ -59,6 +61,8 @@ class Distributer {
     private final int m_expectedOutgoingMessageSize;
 
     private final DBBPool m_pool;
+
+    private final boolean m_useMultipleThreads;
 
     class NodeConnection extends VoltProtocolHandler {
         private final HashMap<Long, ProcedureCallback> m_callbacks;
@@ -84,6 +88,20 @@ class Distributer {
                 m_callbacks.put(handle, callback);
             }
             m_connection.writeStream().enqueue(c);
+        }
+
+        public void createWork(long handle, FastSerializable f, ProcedureCallback callback) {
+            synchronized (this) {
+                if (!m_isConnected) {
+                    final ClientResponse r = new ClientResponseImpl(
+                            ClientResponse.CONNECTION_LOST, new VoltTable[0],
+                            "Connection to the database was lost before a response was received");
+                    callback.clientCallback(r);
+                    return;
+                }
+                m_callbacks.put(handle, callback);
+            }
+            m_connection.writeStream().enqueue(f);
         }
 
         @Override
@@ -226,10 +244,12 @@ class Distributer {
     }
 
     Distributer() {
-        this( 128, null);
+        this( 128, null, false);
     }
 
-    Distributer(int expectedOutgoingMessageSize, int arenaSizes[]) {
+    Distributer(int expectedOutgoingMessageSize, int arenaSizes[], boolean useMultipleThreads) {
+        m_useMultipleThreads = useMultipleThreads;
+        m_network = new VoltNetwork( useMultipleThreads, true, new Runnable[0], 3);
         synchronized (m_context) {
             m_context.totalInvocationCount.put( this, new Long(0));
         }
@@ -248,7 +268,7 @@ class Distributer {
 //                    while (true) {
 //                        Thread.sleep(10000);
 //                        final long now = System.currentTimeMillis();
-//                        Pair<Long, Long> counters = m_network.getCounters();
+//                        org.voltdb.utils.Pair<Long, Long> counters = m_network.getCounters();
 //                        final long read = counters.getFirst();
 //                        final long written = counters.getSecond();
 //                        final long readDelta = read - lastBytesRead;
@@ -342,15 +362,19 @@ class Distributer {
          * createWork synchronizes on an individual connection which allows for more concurrency
          */
         if (cxn != null) {
-            final FastSerializer fs = new FastSerializer(m_pool, expectedSerializedSize);
-            BBContainer c = null;
-            try {
-                c = fs.writeObjectForMessaging(invocation);
-            } catch (IOException e) {
-                fs.getBBContainer().discard();
-                throw new RuntimeException(e);
+            if (m_useMultipleThreads) {
+                cxn.createWork(invocation.getHandle(), invocation, cb);
+            } else {
+                final FastSerializer fs = new FastSerializer(m_pool, expectedSerializedSize);
+                BBContainer c = null;
+                try {
+                    c = fs.writeObjectForMessaging(invocation);
+                } catch (IOException e) {
+                    fs.getBBContainer().discard();
+                    throw new RuntimeException(e);
+                }
+                cxn.createWork(invocation.getHandle(), c, cb);
             }
-
 //            final String invocationName = invocation.getProcName();
 //            if (reportedSizes.containsKey(invocationName)) {
 //                if (reportedSizes.get(invocationName) < c.b.remaining()) {
@@ -362,7 +386,7 @@ class Distributer {
 //                System.err.println("Queued invocation for " + invocationName + " is " + c.b.remaining());
 //            }
 
-            cxn.createWork(invocation.getHandle(), c, cb);
+
         }
 
         return !backpressure;

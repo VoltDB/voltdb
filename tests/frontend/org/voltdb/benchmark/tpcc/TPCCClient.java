@@ -34,12 +34,14 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.utils.VoltSampler;
 
 import java.io.IOException;
 
 public class TPCCClient extends org.voltdb.benchmark.ClientMain
 implements TPCCSimulation.ProcCaller {
     final TPCCSimulation m_tpccSim;
+    final TPCCSimulation m_tpccSim2;
     private final ScaleParameters m_scaleParams;
 
     /** Complies with our benchmark client remote controller scheme */
@@ -66,6 +68,7 @@ implements TPCCSimulation.ProcCaller {
         super(client);
         m_scaleParams = params;
         m_tpccSim = new TPCCSimulation(this, generator, clock, m_scaleParams, false, skewFactor);
+        m_tpccSim2 = new TPCCSimulation(this, generator, clock, m_scaleParams, false, skewFactor);
     }
 
     /** Complies with our benchmark client remote controller scheme */
@@ -112,13 +115,23 @@ implements TPCCSimulation.ProcCaller {
         RandomGenerator rng = new RandomGenerator.Implementation(0);
         rng.setC(base_runC);
 
+        RandomGenerator.NURandC base_loadC2 = new RandomGenerator.NURandC(0,0,0);
+        RandomGenerator.NURandC base_runC2 = RandomGenerator.NURandC.makeForRun(
+                new RandomGenerator.Implementation(0), base_loadC2);
+        RandomGenerator rng2 = new RandomGenerator.Implementation(0);
+        rng.setC(base_runC2);
+
         m_scaleParams =
             ScaleParameters.makeWithScaleFactor(warehouses, scalefactor);
         m_tpccSim =
             new TPCCSimulation(this, rng, new Clock.RealTime(), m_scaleParams, false, skewfactor);
+        m_tpccSim2 =
+            new TPCCSimulation(this, rng2, new Clock.RealTime(), m_scaleParams, false, skewfactor);
 
         // Set up checking
         buildConstraints();
+
+        //m_sampler = new VoltSampler(20, "tpcc-cliet-sampling");
     }
 
     protected void buildConstraints() {
@@ -262,8 +275,16 @@ implements TPCCSimulation.ProcCaller {
      * Whether a message was queued when attempting the last invocation.
      */
     private boolean m_queuedMessage = false;
+
+    /*
+     * callXXX methods should spin on backpressure barrier until they successfully queue rather then
+     * setting m_queuedMessage and returning immediately.
+     */
+    private boolean m_blockOnBackpressure = true;
+
     @Override
     protected boolean runOnce() throws NoConnectionsException {
+        m_blockOnBackpressure = false;
         // will send procedures to first connection w/o backpressure
         // if all connections have backpressure, will round robin across
         // busy servers (but the loop will spend more time running the
@@ -289,19 +310,30 @@ implements TPCCSimulation.ProcCaller {
 
     @Override
     protected void runLoop() throws NoConnectionsException {
+        m_blockOnBackpressure = true;
+        if (Runtime.getRuntime().availableProcessors() > 4) {
+            new Thread() {
+                @Override
+                public void run() {
+                    try {
+                        while (true) {
+                            m_tpccSim2.doOne();
+                        }
+                    } catch (IOException e) {
+                    }
+                }
+            }.start();
+        }
         try {
             while (true) {
                 // will send procedures to first connection w/o backpressure
                 // if all connections have backpressure, will round robin across
                 // busy servers (but the loop will spend more time running the
                 // network below.)
-                m_voltClient.backpressureBarrier();
                 m_tpccSim.doOne();
             }
         } catch (IOException e) {
             throw (NoConnectionsException)e;
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
         }
     }
 
@@ -324,8 +356,21 @@ implements TPCCSimulation.ProcCaller {
 
     @Override
     public void callDelivery(short w_id, int carrier, TimestampType date) throws IOException {
-        m_queuedMessage = m_voltClient.callProcedure(new DeliveryCallback(),
-                Constants.DELIVERY, w_id, carrier, date);
+        if (m_blockOnBackpressure) {
+            final DeliveryCallback cb = new DeliveryCallback();
+            while (!m_voltClient.callProcedure(cb,
+                Constants.DELIVERY, w_id, carrier, date)) {
+                try {
+                    m_voltClient.backpressureBarrier();
+                } catch (InterruptedException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+            }
+        } else {
+            m_queuedMessage = m_voltClient.callProcedure(new DeliveryCallback(),
+                    Constants.DELIVERY, w_id, carrier, date);
+        }
     }
 
 
@@ -340,7 +385,7 @@ implements TPCCSimulation.ProcCaller {
 
         @Override
         public void clientCallback(ClientResponse clientResponse) {
-            boolean status = checkTransaction(Constants.NEWORDER, clientResponse, true);
+            boolean status = checkTransaction(Constants.NEWORDER, clientResponse, cbRollback);
             assert this.cbRollback || status;
             m_counts[TPCCSimulation.Transaction.NEW_ORDER.ordinal()].incrementAndGet();
         }
@@ -351,8 +396,21 @@ implements TPCCSimulation.ProcCaller {
     int randomIndex = 0;
     @Override
     public void callNewOrder(boolean rollback, Object... paramlist) throws IOException {
-        m_queuedMessage = m_voltClient.callProcedure(new NewOrderCallback(rollback),
-                Constants.NEWORDER, paramlist);
+        if (m_blockOnBackpressure) {
+            final NewOrderCallback cb = new NewOrderCallback(rollback);
+            while (!m_voltClient.callProcedure( cb,
+                Constants.NEWORDER, paramlist)) {
+                try {
+                    m_voltClient.backpressureBarrier();
+                } catch (InterruptedException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+            }
+        } else {
+            m_queuedMessage = m_voltClient.callProcedure(new NewOrderCallback(rollback),
+                    Constants.NEWORDER, paramlist);
+        }
     }
 
     // Order status
@@ -394,9 +452,23 @@ implements TPCCSimulation.ProcCaller {
 
     @Override
     public void callOrderStatus(String proc, Object... paramlist) throws IOException {
-        m_queuedMessage = m_voltClient.callProcedure(new VerifyBasicCallback(TPCCSimulation.Transaction.ORDER_STATUS,
+        if (m_blockOnBackpressure) {
+            final VerifyBasicCallback cb = new VerifyBasicCallback(TPCCSimulation.Transaction.ORDER_STATUS,
+                    proc);
+            while (!m_voltClient.callProcedure( cb,
+                                                                             proc, paramlist)) {
+                try {
+                    m_voltClient.backpressureBarrier();
+                } catch (InterruptedException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+            }
+        } else {
+            m_queuedMessage = m_voltClient.callProcedure(new VerifyBasicCallback(TPCCSimulation.Transaction.ORDER_STATUS,
                                                                              proc),
                 proc, paramlist);
+        }
     }
 
 
@@ -406,41 +478,124 @@ implements TPCCSimulation.ProcCaller {
     @Override
     public void callPaymentById(short w_id, byte d_id, double h_amount,
             short c_w_id, byte c_d_id, int c_id, TimestampType now) throws IOException {
-
-       if (m_scaleParams.warehouses > 1) {
-           m_voltClient.callProcedure(new VerifyBasicCallback(),
-                   Constants.PAYMENT_BY_ID_W,
-                   w_id, d_id, h_amount, c_w_id, c_d_id, c_id, now);
-            m_queuedMessage = m_voltClient.callProcedure(new VerifyBasicCallback(TPCCSimulation.Transaction.PAYMENT,
-                                                                                 Constants.PAYMENT_BY_ID_C),
-                   Constants.PAYMENT_BY_ID_C,
-                   w_id, d_id, h_amount, c_w_id, c_d_id, c_id, now);
-       }
-       else {
-            m_queuedMessage = m_voltClient.callProcedure(new VerifyBasicCallback(TPCCSimulation.Transaction.PAYMENT,
-                                                                                 Constants.PAYMENT_BY_ID),
-                   Constants.PAYMENT_BY_ID,
-                   w_id, d_id, h_amount, c_w_id, c_d_id, c_id, now);
+       if (m_blockOnBackpressure) {
+           if (m_scaleParams.warehouses > 1) {
+               final VerifyBasicCallback cb = new VerifyBasicCallback();
+               while(!m_voltClient.callProcedure( cb,
+                      Constants.PAYMENT_BY_ID_W,
+                      w_id, d_id, h_amount, c_w_id, c_d_id, c_id, now)) {
+                   try {
+                    m_voltClient.backpressureBarrier();
+                } catch (InterruptedException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+               }
+               final VerifyBasicCallback cb2 = new VerifyBasicCallback(TPCCSimulation.Transaction.PAYMENT,
+                       Constants.PAYMENT_BY_ID_C);
+               while (!m_voltClient.callProcedure( cb2,
+                      Constants.PAYMENT_BY_ID_C,
+                      w_id, d_id, h_amount, c_w_id, c_d_id, c_id, now)) {
+                   try {
+                    m_voltClient.backpressureBarrier();
+                } catch (InterruptedException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+               }
+          }
+          else {
+              final VerifyBasicCallback cb = new VerifyBasicCallback(TPCCSimulation.Transaction.PAYMENT,
+                      Constants.PAYMENT_BY_ID);
+               while (!m_voltClient.callProcedure( cb,
+                      Constants.PAYMENT_BY_ID,
+                      w_id, d_id, h_amount, c_w_id, c_d_id, c_id, now)) {
+                   try {
+                    m_voltClient.backpressureBarrier();
+                } catch (InterruptedException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+               }
+          }
+       } else {
+           if (m_scaleParams.warehouses > 1) {
+                m_voltClient.callProcedure(new VerifyBasicCallback(),
+                       Constants.PAYMENT_BY_ID_W,
+                       w_id, d_id, h_amount, c_w_id, c_d_id, c_id, now);
+                m_queuedMessage = m_voltClient.callProcedure(new VerifyBasicCallback(TPCCSimulation.Transaction.PAYMENT,
+                                                                                     Constants.PAYMENT_BY_ID_C),
+                       Constants.PAYMENT_BY_ID_C,
+                       w_id, d_id, h_amount, c_w_id, c_d_id, c_id, now);
+           }
+           else {
+                m_queuedMessage = m_voltClient.callProcedure(new VerifyBasicCallback(TPCCSimulation.Transaction.PAYMENT,
+                                                                                     Constants.PAYMENT_BY_ID),
+                       Constants.PAYMENT_BY_ID,
+                       w_id, d_id, h_amount, c_w_id, c_d_id, c_id, now);
+           }
        }
     }
 
     @Override
     public void callPaymentByName(short w_id, byte d_id, double h_amount,
             short c_w_id, byte c_d_id, byte[] c_last, TimestampType now) throws IOException {
-        if ((m_scaleParams.warehouses > 1) || (c_last != null)) {
-            m_voltClient.callProcedure(new VerifyBasicCallback(),
-                    Constants.PAYMENT_BY_NAME_W, w_id, d_id, h_amount,
-                    c_w_id, c_d_id, c_last, now);
-            m_queuedMessage = m_voltClient.callProcedure(new VerifyBasicCallback(TPCCSimulation.Transaction.PAYMENT,
-                                                                                 Constants.PAYMENT_BY_NAME_C),
-                    Constants.PAYMENT_BY_NAME_C, w_id, d_id, h_amount,
-                    c_w_id, c_d_id, c_last, now);
-        }
-        else {
-            m_queuedMessage = m_voltClient.callProcedure(new VerifyBasicCallback(TPCCSimulation.Transaction.PAYMENT,
-                                                                                 Constants.PAYMENT_BY_ID),
-                    Constants.PAYMENT_BY_ID, w_id,
-                    d_id, h_amount, c_w_id, c_d_id, c_last, now);
+        if (m_blockOnBackpressure) {
+            if ((m_scaleParams.warehouses > 1) || (c_last != null)) {
+                final VerifyBasicCallback cb = new VerifyBasicCallback();
+                while(!m_voltClient.callProcedure(cb,
+                        Constants.PAYMENT_BY_NAME_W, w_id, d_id, h_amount,
+                        c_w_id, c_d_id, c_last, now)) {
+                    try {
+                        m_voltClient.backpressureBarrier();
+                    } catch (InterruptedException e) {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    }
+                }
+                final VerifyBasicCallback cb2 = new VerifyBasicCallback(TPCCSimulation.Transaction.PAYMENT,
+                        Constants.PAYMENT_BY_NAME_C);
+                while(!m_voltClient.callProcedure( cb2,
+                        Constants.PAYMENT_BY_NAME_C, w_id, d_id, h_amount,
+                        c_w_id, c_d_id, c_last, now)) {
+                    try {
+                        m_voltClient.backpressureBarrier();
+                    } catch (InterruptedException e) {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    }
+                }
+            }
+            else {
+                final VerifyBasicCallback cb = new VerifyBasicCallback(TPCCSimulation.Transaction.PAYMENT,
+                        Constants.PAYMENT_BY_ID);
+                while(!m_voltClient.callProcedure( cb,
+                        Constants.PAYMENT_BY_ID, w_id,
+                        d_id, h_amount, c_w_id, c_d_id, c_last, now)) {
+                    try {
+                        m_voltClient.backpressureBarrier();
+                    } catch (InterruptedException e) {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    }
+                }
+            }
+        } else {
+            if ((m_scaleParams.warehouses > 1) || (c_last != null)) {
+                m_voltClient.callProcedure(new VerifyBasicCallback(),
+                        Constants.PAYMENT_BY_NAME_W, w_id, d_id, h_amount,
+                        c_w_id, c_d_id, c_last, now);
+                m_queuedMessage = m_voltClient.callProcedure(new VerifyBasicCallback(TPCCSimulation.Transaction.PAYMENT,
+                                                                                     Constants.PAYMENT_BY_NAME_C),
+                        Constants.PAYMENT_BY_NAME_C, w_id, d_id, h_amount,
+                        c_w_id, c_d_id, c_last, now);
+            }
+            else {
+                m_queuedMessage = m_voltClient.callProcedure(new VerifyBasicCallback(TPCCSimulation.Transaction.PAYMENT,
+                                                                                     Constants.PAYMENT_BY_ID),
+                        Constants.PAYMENT_BY_ID, w_id,
+                        d_id, h_amount, c_w_id, c_d_id, c_last, now);
+            }
         }
     }
 
@@ -459,8 +614,16 @@ implements TPCCSimulation.ProcCaller {
 
     @Override
     public void callStockLevel(short w_id, byte d_id, int threshold) throws IOException {
-        m_queuedMessage = m_voltClient.callProcedure(new StockLevelCallback(), Constants.STOCK_LEVEL,
-                w_id, d_id, threshold);
+        final StockLevelCallback cb = new StockLevelCallback();
+        while (!m_voltClient.callProcedure( cb, Constants.STOCK_LEVEL,
+                w_id, d_id, threshold)) {
+            try {
+                m_voltClient.backpressureBarrier();
+            } catch (InterruptedException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }
 
     }
 

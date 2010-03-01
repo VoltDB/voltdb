@@ -126,44 +126,45 @@ public class NIOReadStream {
      */
     final int read(ReadableByteChannel channel, int maxBytes, final DBBPool pool) throws IOException {
         int bytesRead = 0;
-        int lastRead = 0;
-        while (bytesRead < maxBytes) {
-            if (m_writeBuffer == null) {
-                m_writeBuffer = pool.acquire(BUFFER_SIZE);
-            }
-
-            lastRead = channel.read(m_writeBuffer.b);
-            m_bytesRead.addAndGet(lastRead);
-
-            if (lastRead > 0) {
-                m_totalAvailable += lastRead;
-                bytesRead += lastRead;
-                m_writeBuffer.b.flip();
-                m_readBuffers.add(m_writeBuffer);
-                m_writeBuffer = null;
-            }
-
-            // EOF
-            if (lastRead < 0 && bytesRead == 0) {
-                m_writeBuffer.discard();
-                m_writeBuffer = null;
-                return -1;
-            }
-
-            // Couldn't fill buffer w/o blocking
-            if (lastRead < BUFFER_SIZE) {
-                if (bytesRead > 0) {
-                    m_globalAvailable.addAndGet(bytesRead);
+        int lastRead = 1;
+        try {
+            while (bytesRead < maxBytes && lastRead > 0) {
+                if (m_writeBuffer == null) {
+                    m_writeBuffer = pool.acquire(BUFFER_SIZE);
                 }
-                return m_totalAvailable;
+
+                lastRead = channel.read(m_writeBuffer.b);
+
+                // EOF, no data read
+                if (lastRead < 0 && bytesRead == 0) {
+                    if (m_writeBuffer.b.position() == 0) {
+                        m_writeBuffer.discard();
+                        m_writeBuffer = null;
+                    }
+                    return -1;
+                }
+
+                //Data read
+                if (lastRead > 0) {
+                    bytesRead += lastRead;
+                    if (!m_writeBuffer.b.hasRemaining()) {
+                        m_writeBuffer.b.flip();
+                        m_readBuffers.add(m_writeBuffer);
+                        m_writeBuffer = null;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        } finally {
+            if (bytesRead > 0) {
+                m_globalAvailable.addAndGet(bytesRead);
+                m_bytesRead.addAndGet(bytesRead);
+                m_totalAvailable += bytesRead;
             }
         }
 
-        if (bytesRead > 0) {
-            m_globalAvailable.addAndGet(bytesRead);
-        }
-
-        return m_totalAvailable;
+        return bytesRead;
     }
 
     void shutdown() {

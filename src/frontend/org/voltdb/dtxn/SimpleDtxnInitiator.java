@@ -67,6 +67,7 @@ import java.util.concurrent.BlockingQueue;
 import org.voltdb.network.Connection;
 import org.apache.log4j.Logger;
 import org.voltdb.utils.VoltLoggerFactory;
+//import org.voltdb.utils.EstTime;
 
 /** Supports correct execution of multiple partition transactions by executing them one at a time. */
 public class SimpleDtxnInitiator extends TransactionInitiator {
@@ -107,6 +108,22 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         m_siteTracker = VoltDB.instance().getSiteTracker();
         m_onBackPressure = onBackPressure;
         m_offBackPressure = offBackPressure;
+//        new Thread() {
+//            @Override
+//            public void run() {
+//                while (true) {
+//                    try {
+//                        Thread.sleep(10000);
+//                    } catch (InterruptedException e) {
+//                        // TODO Auto-generated catch block
+//                        e.printStackTrace();
+//                    }
+//                    synchronized (SimpleDtxnInitiator.this) {
+//                        System.out.println("m_pendingTxnBytes " + m_pendingTxnBytes + " pending transactions " + m_pendingTxns.size());
+//                    }
+//                }
+//            }
+//        }.start();
     }
 
     @Override
@@ -117,7 +134,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                   boolean isSinglePartition,
                                   int partitions[],
                                   int numPartitions,
-                                  Object clientData) {
+                                  Object clientData,
+                                  int messageSize) {
 
         assert(invocation != null);
         assert(partitions != null);
@@ -127,7 +145,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         {
             assert(numPartitions == 1);
             createSinglePartitionTxn(connectionId, invocation, isReadOnly,
-                                     partitions[0], clientData);
+                                     partitions[0], clientData, messageSize);
             return;
         }
         else
@@ -162,7 +180,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                                         isReadOnly,
                                                         false,
                                                         invocation,
-                                                        clientData);
+                                                        clientData,
+                                                        messageSize);
 
             m_stats.logTransactionCreated(connectionId, invocation);
             dispatchMultiPartitionTxn(txn);
@@ -194,7 +213,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                              StoredProcedureInvocation invocation,
                              boolean isReadOnly,
                              int partition,
-                             Object clientData)
+                             Object clientData,
+                             int messageSize)
     {
         long txnId = m_idManager.getNextUniqueTransactionId();
 
@@ -205,6 +225,16 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         ArrayList<InFlightTxnState> txn_states = new ArrayList<InFlightTxnState>();
 
         m_stats.logTransactionCreated(connectionId, invocation);
+
+        m_pendingTxnBytes += messageSize;
+        m_pendingTxnCount++;
+        if (m_pendingTxnCount > MAX_DESIRED_PENDING_TXNS || m_pendingTxnBytes > MAX_DESIRED_PENDING_BYTES) {
+            if (!m_hadBackPressure) {
+                transactionLog.trace("DTXN back pressure began");
+                m_hadBackPressure = true;
+                m_onBackPressure.run();
+            }
+        }
 
         // create and register each replicated transaction with the pending
         // transaction structure.  do this before transmitting them to avoid
@@ -219,18 +249,11 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                      isReadOnly,
                                      true,
                                      invocation.getShallowCopy(),
-                                     clientData);
+                                     clientData,
+                                     messageSize);
             txn_states.add(txn);
-            synchronized (m_pendingTxns) {
-                m_pendingTxns.addTxn(txn.txnId, txn.coordinatorId, txn);
-                if (m_pendingTxns.size() > MAX_DESIRED_PENDING) {
-                    if (!m_hadBackPressure) {
-                        transactionLog.trace("DTXN back pressure began");
-                        m_hadBackPressure = true;
-                        m_onBackPressure.run();
-                    }
-                }
-            }
+            m_pendingTxns.addTxn(txn.txnId, txn.coordinatorId, txn);
+
         }
 
         for (InFlightTxnState txn_state : txn_states)
@@ -249,14 +272,14 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
      */
     private void dispatchMultiPartitionTxn(InFlightTxnState txn)
     {
-        synchronized (m_pendingTxns) {
-            m_pendingTxns.addTxn(txn.txnId, txn.coordinatorId, txn);
-            if (m_pendingTxns.size() > MAX_DESIRED_PENDING) {
-                if (!m_hadBackPressure) {
-                    transactionLog.trace("DTXN back pressure began");
-                    m_hadBackPressure = true;
-                    m_onBackPressure.run();
-                }
+        m_pendingTxns.addTxn(txn.txnId, txn.coordinatorId, txn);
+        m_pendingTxnBytes += txn.messageSize;
+        m_pendingTxnCount++;
+        if (m_pendingTxnBytes > MAX_DESIRED_PENDING_BYTES || m_pendingTxnCount > MAX_DESIRED_PENDING_TXNS) {
+            if (!m_hadBackPressure) {
+                transactionLog.trace("DTXN back pressure began");
+                m_hadBackPressure = true;
+                m_onBackPressure.run();
             }
         }
 
@@ -304,7 +327,10 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     // small number. On the other hand, backPressure() is just a hint to the ClientInterface.
     // CI will submit ClientPort.MAX_READ * clients / bytesPerStoredProcInvocation txns
     // on average if clients present constant uninterrupted load.
-    private final static int MAX_DESIRED_PENDING = 5000;
+    private final static int MAX_DESIRED_PENDING_BYTES = 67108864;
+    private final static int MAX_DESIRED_PENDING_TXNS = 15000;
+    private long m_pendingTxnBytes = 0;
+    private int m_pendingTxnCount = 0;
     private final Mailbox m_mailbox;
     private final int m_siteId;
 
@@ -319,8 +345,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         {
             m_txnIdMap =
                 new HashMap<Long,
-                            HashMap<Integer, InFlightTxnState>>
-                (MAX_DESIRED_PENDING * 4, (float).5);
+                            HashMap<Integer, InFlightTxnState>>();
         }
 
         void addTxn(long txnId, int coordinatorSiteId, InFlightTxnState txn)
@@ -406,8 +431,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         public DummyBlockingQueue()
         {
             m_txnIdResponses =
-                new HashMap<Long, VoltTable[]>
-            (MAX_DESIRED_PENDING * 2, (float).5);
+                new HashMap<Long, VoltTable[]>();
         }
 
         public void setInitiator(SimpleDtxnInitiator initiator) {
@@ -434,6 +458,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
             throw new UnsupportedOperationException();
         }
 
+        //private long lastReportedStarvation = System.currentTimeMillis();
+
         @Override
         public synchronized boolean offer(VoltMessage message) {
             assert(message instanceof InitiateResponse);
@@ -441,20 +467,11 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
 
             InFlightTxnState state;
             int sites_left = -1;
-            synchronized (m_initiator.m_pendingTxns)
+            synchronized (m_initiator)
             {
                 state =
                     m_initiator.m_pendingTxns.getTxn(r.getTxnId(), r.getCoordinatorSiteId());
                 sites_left = m_initiator.m_pendingTxns.getTxnIdSize(r.getTxnId());
-                if (m_initiator.m_pendingTxns.size() < (MAX_DESIRED_PENDING * .8))
-                {
-                    if (m_initiator.m_hadBackPressure)
-                    {
-                        transactionLog.trace("DTXN backpressure ended");
-                        m_initiator.m_hadBackPressure = false;
-                        m_initiator.m_offBackPressure.run();
-                    }
-                }
             }
 
             assert(state.coordinatorId == r.getCoordinatorSiteId());
@@ -465,26 +482,23 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
             // XXX HACK I hacked this up to avoid optimistic return to the client
             // because then I could avoid cloning a table which was killing performance
             // Will need to revisit this soon.  --izzy
-            synchronized (m_txnIdResponses)
+            if (!m_txnIdResponses.containsKey(r.getTxnId()))
             {
-                if (!m_txnIdResponses.containsKey(r.getTxnId()))
+                ClientResponseImpl curr_response = (ClientResponseImpl) r.getClientResponseData();
+                VoltTable[] curr_results = curr_response.getResults();
+                VoltTable[] saved_results = new VoltTable[curr_results.length];
+                // Create shallow copies of all the VoltTables to avoid
+                // race conditions with the ByteBuffer metadata
+                for (int i = 0; i < curr_results.length; ++i)
                 {
-                    ClientResponseImpl curr_response = (ClientResponseImpl) r.getClientResponseData();
-                    VoltTable[] curr_results = curr_response.getResults();
-                    VoltTable[] saved_results = new VoltTable[curr_results.length];
-                    // Create shallow copies of all the VoltTables to avoid
-                    // race conditions with the ByteBuffer metadata
-                    for (int i = 0; i < curr_results.length; ++i)
-                    {
-                        saved_results[i] = new VoltTable(curr_results[i].getTableDataReference(), true);
-                    }
-                    m_txnIdResponses.put(r.getTxnId(), saved_results);
-                    first_response = true;
+                    saved_results[i] = new VoltTable(curr_results[i].getTableDataReference(), true);
                 }
-                else
-                {
-                    first_results = m_txnIdResponses.get(r.getTxnId());
-                }
+                m_txnIdResponses.put(r.getTxnId(), saved_results);
+                first_response = true;
+            }
+            else
+            {
+                first_results = m_txnIdResponses.get(r.getTxnId());
             }
             if (first_response)
             {
@@ -532,14 +546,30 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
             // to tell us to clean up
             if (sites_left == 0)
             {
-                synchronized (m_initiator.m_pendingTxns)
+                synchronized (m_initiator)
                 {
                     m_initiator.m_pendingTxns.removeTxnId(r.getTxnId());
+                    m_initiator.m_pendingTxnBytes -= state.messageSize;
+                    m_initiator.m_pendingTxnCount--;
+                    if (m_initiator.m_pendingTxnBytes < (MAX_DESIRED_PENDING_BYTES * .8) &&
+                            m_initiator.m_pendingTxnCount < (MAX_DESIRED_PENDING_TXNS * .8))
+                    {
+                        if (m_initiator.m_hadBackPressure)
+                        {
+                            transactionLog.trace("DTXN backpressure ended");
+                            m_initiator.m_hadBackPressure = false;
+                            m_initiator.m_offBackPressure.run();
+                        }
+                    }
+//                    if (m_initiator.m_pendingTxns.size() < 100) {
+//                        final long now = EstTime.currentTimeMillis();
+//                        if (now - lastReportedStarvation > 10000) {
+//                            lastReportedStarvation = now;
+//                            System.out.println("Initiator " + m_initiator.m_siteId + " had starvation");
+//                        }
+//                    }
                 }
-                synchronized (m_txnIdResponses)
-                {
-                    m_txnIdResponses.remove(r.getTxnId());
-                }
+                m_txnIdResponses.remove(r.getTxnId());
                 if (!state.isReadOnly)
                 {
                     r.setClientHandle(state.invocation.getClientHandle());

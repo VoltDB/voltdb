@@ -108,6 +108,13 @@ public class RegressionSuite extends TestCase {
     }
 
     /**
+     * @return Is the underlying instance of VoltDB running Valgrind with the IPC client?
+     */
+    public boolean isValgrind() {
+        return m_config.isValgrind();
+    }
+
+    /**
      * @return a reference to the associated VoltServerConfig
      */
     public final VoltServerConfig getServerConfig() {

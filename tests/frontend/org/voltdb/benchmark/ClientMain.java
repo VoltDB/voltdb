@@ -39,6 +39,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
 import org.voltdb.utils.Pair;
+import org.voltdb.utils.VoltSampler;
 
 /**
  * Base class for clients that will work with the multi-host multi-process
@@ -110,6 +111,7 @@ public abstract class ClientMain {
     private final float m_checkTransaction;
     private final Random m_checkGenerator = new Random();
     private final LinkedHashMap<Pair<String, Integer>, Verification.Expression> m_constraints;
+    protected VoltSampler m_sampler = null;
 
     /** The states important to the remote controller */
     public static enum ControlState {
@@ -182,6 +184,10 @@ public abstract class ClientMain {
                         // the run loop at which point ControlWorker can call
                         // System.exit()
                         try {
+                            if (m_sampler != null) {
+                                m_sampler.setShouldStop();
+                                m_sampler.join();
+                            }
                             NullCallback cb = new NullCallback();
                             while(!m_voltClient.callProcedure(cb, "@Shutdown")) {
                                 m_voltClient.backpressureBarrier();
@@ -250,6 +256,9 @@ public abstract class ClientMain {
         @Override
         public void run() {
             if (m_txnRate == -1) {
+                if (m_sampler != null) {
+                    m_sampler.start();
+                }
                 try {
                     runLoop();
                 }
@@ -391,7 +400,7 @@ public abstract class ClientMain {
      * @param args
      */
     public ClientMain(String args[]) {
-        m_voltClient = ClientFactory.createClient(getExpectedOutgoingMessageSize(), null);
+        m_voltClient = ClientFactory.createClient(getExpectedOutgoingMessageSize(), null, true);
 
         /*
          * Input parameters: HOST=host:port (may occur multiple times)

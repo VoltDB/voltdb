@@ -47,6 +47,7 @@ public abstract class TransactionInitiator {
      * @param numPartitions Number of relevant partitions in the array (allows
      * for the array to be oversized).
      * @param clientData Client data returned with the completed transaction
+     * @param messageSize Size in bytes of the message that created this invocation
      */
     public abstract void createTransaction(
             int connectionId,
@@ -55,7 +56,8 @@ public abstract class TransactionInitiator {
             boolean isSinglePartition,
             int partitions[],
             int numPartitions,
-            Object clientData);
+            Object clientData,
+            int messageSize);
 
     /**
      * This method should be called every X ms or so, where X is probably
