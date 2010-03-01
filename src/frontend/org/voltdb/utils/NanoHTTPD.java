@@ -46,9 +46,25 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package org.voltdb.utils;
 
-import java.io.*;
-import java.util.*;
-import java.net.*;
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.URLEncoder;
+import java.util.Date;
+import java.util.Enumeration;
+import java.util.Hashtable;
+import java.util.Locale;
+import java.util.Properties;
+import java.util.StringTokenizer;
+import java.util.TimeZone;
 
 /**
  * A simple, tiny, nicely embeddable HTTP 1.0 server in Java
@@ -225,68 +241,43 @@ public class NanoHTTPD
     {
         myTcpPort = port;
 
-        final ServerSocket ss = new ServerSocket( myTcpPort );
-        Thread t = new Thread( new Runnable()
+        myServerSocket = new ServerSocket( myTcpPort );
+        myThread = new Thread( new Runnable()
             {
                 public void run()
                 {
                     try
                     {
                         while( true )
-                            new HTTPSession( ss.accept());
+                            new HTTPSession( myServerSocket.accept());
                     }
                     catch ( IOException ioe )
                     {}
                 }
             }, "NanoHTTPD");
-        t.setDaemon( true );
-        t.start();
+        myThread.setDaemon( true );
+        myThread.start();
     }
 
-    /**
-     * Starts as a standalone file server and waits for Enter.
-     */
-    public static void main( String[] args )
-    {
-        System.out.println( "NanoHTTPD 1.11 (C) 2001,2005-2008 Jarno Elonen\n" +
-                            "(Command line options: [port] [--licence])\n" );
-
-        // Show licence if requested
-        int lopt = -1;
-        for ( int i=0; i<args.length; ++i )
-        if ( args[i].toLowerCase().endsWith( "licence" ))
-        {
-            lopt = i;
-            System.out.println( LICENCE + "\n" );
-        }
-
-        // Change port if requested
-        int port = 80;
-        if ( args.length > 0 && lopt != 0 )
-            port = Integer.parseInt( args[0] );
-
-        if ( args.length > 1 &&
-             args[1].toLowerCase().endsWith( "licence" ))
-                System.out.println( LICENCE + "\n" );
-
-        NanoHTTPD nh = null;
-        try
-        {
-            nh = new NanoHTTPD( port );
-        }
-        catch( IOException ioe )
-        {
-            System.err.println( "Couldn't start server:\n" + ioe );
-            System.exit( -1 );
-        }
-        nh.myFileDir = new File("");
-
-        System.out.println( "Now serving files in port " + port + " from \"" +
-                            new File("").getAbsolutePath() + "\"" );
-        System.out.println( "Hit Enter to stop.\n" );
-
-        try { System.in.read(); } catch( Throwable t ) {};
+    @Override
+    protected void finalize() throws Throwable {
+        super.finalize();
+        shutdown(false);
     }
+
+    public void shutdown(boolean blocking) {
+        try {
+            if (myThread.isAlive()) {
+                myServerSocket.close();
+                if (blocking)
+                    myThread.join();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+
 
     /**
      * Handles one session, i.e. parses the HTTP request
@@ -551,8 +542,9 @@ public class NanoHTTPD
         return newUri;
     }
 
-    private int myTcpPort;
-    File myFileDir;
+    final int myTcpPort;
+    final ServerSocket myServerSocket;
+    final Thread myThread;
 
     // ==================================================
     // File server code
@@ -737,33 +729,4 @@ public class NanoHTTPD
         gmtFrmt = new java.text.SimpleDateFormat( "E, d MMM yyyy HH:mm:ss 'GMT'", Locale.US);
         gmtFrmt.setTimeZone(TimeZone.getTimeZone("GMT"));
     }
-
-    /**
-     * The distribution licence
-     */
-    private static final String LICENCE =
-        "Copyright (C) 2001,2005-2008 by Jarno Elonen <elonen@iki.fi>\n"+
-        "\n"+
-        "Redistribution and use in source and binary forms, with or without\n"+
-        "modification, are permitted provided that the following conditions\n"+
-        "are met:\n"+
-        "\n"+
-        "Redistributions of source code must retain the above copyright notice,\n"+
-        "this list of conditions and the following disclaimer. Redistributions in\n"+
-        "binary form must reproduce the above copyright notice, this list of\n"+
-        "conditions and the following disclaimer in the documentation and/or other\n"+
-        "materials provided with the distribution. The name of the author may not\n"+
-        "be used to endorse or promote products derived from this software without\n"+
-        "specific prior written permission. \n"+
-        " \n"+
-        "THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR\n"+
-        "IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES\n"+
-        "OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.\n"+
-        "IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,\n"+
-        "INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT\n"+
-        "NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,\n"+
-        "DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY\n"+
-        "THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT\n"+
-        "(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE\n"+
-        "OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.";
 }

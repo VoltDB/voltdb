@@ -101,7 +101,6 @@ public class RealVoltDB implements VoltDBInterface
         new ArrayList<ClientInterface>();
     private Hashtable<Integer, ExecutionSite> m_localSites;
     private VoltNetwork m_network = null;
-    @SuppressWarnings("unused")
     private HTTPAdminListener m_adminListener;
     private Hashtable<Integer, Thread> m_siteThreads;
     private ArrayList<ExecutionSiteRunner> m_runners;
@@ -407,6 +406,9 @@ public class RealVoltDB implements VoltDBInterface
             m_sampler.setShouldStop();
             m_sampler.join();
         }
+
+        // shutdown the web monitoring
+        m_adminListener.shutdown(true);
 
         // shut down the client interface
         for (ClientInterface ci : m_clientInterfaces) {
