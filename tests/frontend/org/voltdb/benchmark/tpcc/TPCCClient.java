@@ -34,7 +34,6 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.types.ExpressionType;
-import org.voltdb.utils.VoltSampler;
 
 import java.io.IOException;
 

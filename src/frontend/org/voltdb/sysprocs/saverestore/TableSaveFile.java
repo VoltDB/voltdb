@@ -52,6 +52,7 @@ public class TableSaveFile
 {
 
     private static class Container extends BBContainer {
+        @SuppressWarnings("unused")
         private final BBContainer m_origin;
         Container(ByteBuffer b, long pointer, BBContainer origin) {
             super(b, pointer);

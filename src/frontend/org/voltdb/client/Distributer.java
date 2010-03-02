@@ -35,7 +35,6 @@ import org.voltdb.network.VoltNetwork;
 import org.voltdb.network.VoltProtocolHandler;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.VoltTable;
 
 /**
  *   De/multiplexes transactions across a cluster

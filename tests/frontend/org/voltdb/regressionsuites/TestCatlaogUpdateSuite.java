@@ -55,6 +55,7 @@ public class TestCatlaogUpdateSuite extends RegressionSuite {
     }
 
     public void testUpdate() throws Exception {
+        @SuppressWarnings("unused")
         Client client = getClient();
 
         /*VoltTable[] results = client.callProcedure("@UpdateApplicationCatalog", "catalogupdate-onesite-expanded.jar");

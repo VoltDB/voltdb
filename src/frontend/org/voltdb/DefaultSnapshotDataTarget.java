@@ -65,6 +65,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
      */
     private volatile boolean m_acceptOneWrite = false;
 
+    @SuppressWarnings("unused")
     private final String m_tableName;
 
     public DefaultSnapshotDataTarget(

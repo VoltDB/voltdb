@@ -56,6 +56,7 @@ public class ELTManager implements SysManageable {
      * Store address along with ByteBuffer in a container that can return the ByteBuffer to the ELT manager
      */
     private class ELBBContainer extends BBContainer {
+        @SuppressWarnings("unused")
         private final BBContainer m_originContainer;
         private ELBBContainer(final ByteBuffer b, final long address, BBContainer origin) {
             super(b, address);
