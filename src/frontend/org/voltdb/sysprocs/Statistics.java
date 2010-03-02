@@ -76,6 +76,8 @@ public class Statistics extends VoltSystemProcedure {
         site.registerPlanFragment(SysProcFragmentId.PF_initiatorData, this);
         site.registerPlanFragment(SysProcFragmentId.PF_initiatorAggregator,
                                   this);
+        site.registerPlanFragment(SysProcFragmentId.PF_partitionCount,
+                this);
     }
 
     @Override
