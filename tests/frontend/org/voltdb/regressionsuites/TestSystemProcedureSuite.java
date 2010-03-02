@@ -28,6 +28,7 @@ import java.io.IOException;
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.SysProcSelector;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
@@ -156,6 +157,20 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             exceptionThrown = true;
         }
         assertTrue(exceptionThrown);
+    }
+
+    public void testStatistics_PartitionCount() throws Exception {
+        Client client = getClient();
+        final VoltTable results[] =
+            client.callProcedure("@Statistics", SysProcSelector.PARTITIONCOUNT.name());
+        assertEquals( 1, results.length);
+        assertTrue( results[0] != null);
+        assertEquals( 1, results[0].getRowCount());
+        assertEquals( 1, results[0].getColumnCount());
+        assertEquals( VoltType.INTEGER, results[0].getColumnType(0));
+        assertTrue( results[0].advanceRow());
+        final int columnCount = (int)results[0].getLong(0);
+        assertTrue (columnCount == 2 || columnCount == 4);
     }
 
     //public void testShutdown() {
