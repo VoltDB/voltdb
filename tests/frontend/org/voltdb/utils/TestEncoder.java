@@ -25,20 +25,16 @@ package org.voltdb.utils;
 
 import java.util.Random;
 
-import org.voltdb.utils.HexEncoder;
-
 import junit.framework.TestCase;
 
-public class TestHexEncoder extends TestCase {
+import org.voltdb.catalog.LoadCatalogToString;
+
+public class TestEncoder extends TestCase {
 
     public void testHexEncoderWithString() {
         String someText = "This is some text\nwith a newline.";
-        String hexText = HexEncoder.hexEncode(someText);
-        String result = HexEncoder.hexDecodeToString(hexText);
-
-        System.out.println(someText);
-        System.out.println(hexText);
-        System.out.println(result);
+        String hexText = Encoder.hexEncode(someText);
+        String result = Encoder.hexDecodeToString(hexText);
 
         assertEquals(someText, result);
     }
@@ -48,14 +44,14 @@ public class TestHexEncoder extends TestCase {
         new Random().nextBytes(bytes);
 
         for (int i = 0; i < bytes.length; i++)
-            System.out.print(String.valueOf((int) bytes[i]) + " ");
+            System.out.print(String.valueOf(bytes[i]) + " ");
         System.out.println();
 
-        String hexText = HexEncoder.hexEncode(bytes);
-        byte[] result = HexEncoder.hexDecode(hexText);
+        String hexText = Encoder.hexEncode(bytes);
+        byte[] result = Encoder.hexDecode(hexText);
 
         for (int i = 0; i < result.length; i++)
-            System.out.print(String.valueOf((int) result[i]) + " ");
+            System.out.print(String.valueOf(result[i]) + " ");
         System.out.println();
 
         System.out.println(hexText);
@@ -64,4 +60,20 @@ public class TestHexEncoder extends TestCase {
             assertEquals(bytes[i], result[i]);
     }
 
+    public void testCompressionAndBase64EncoderWithString() {
+        String someText = "This is some text\nwith a newline.";
+        String b64Text = Encoder.compressAndBase64Encode(someText);
+        String result = Encoder.decodeBase64AndDecompress(b64Text);
+
+        assertEquals(someText, result);
+    }
+
+    public void testB64WithBigness() {
+        String someText = LoadCatalogToString.THE_CATALOG;
+
+        String b64Text = Encoder.compressAndBase64Encode(someText);
+        String result = Encoder.decodeBase64AndDecompress(b64Text);
+
+        assertEquals(someText, result);
+    }
 }

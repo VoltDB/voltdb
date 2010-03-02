@@ -1,0 +1,61 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2010 VoltDB L.L.C.
+ *
+ * This file contains original code and/or modifications of original code.
+ * Any modifications made by VoltDB L.L.C. are licensed under the following
+ * terms and conditions:
+ *
+ * VoltDB is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * VoltDB is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+/**
+ * <p>Encodes and decodes to and from Base64 notation.</p>
+ * <p>Homepage: <a href="http://iharder.net/base64">http://iharder.net/base64</a>.</p>
+ *
+ * <p>Example:</p>
+ *
+ * <code>String encoded = Base64.encode( myByteArray );</code>
+ * <br />
+ * <code>byte[] myByteArray = Base64.decode( encoded );</code>
+ *
+ * <p>The <tt>options</tt> parameter, which appears in a few places, is used to pass
+ * several pieces of information to the encoder. In the "higher level" methods such as
+ * encodeBytes( bytes, options ) the options parameter can be used to indicate such
+ * things as first gzipping the bytes before encoding them, not inserting linefeeds,
+ * and encoding using the URL-safe and Ordered dialects.</p>
+ *
+ * <p>Note, according to <a href="http://www.faqs.org/rfcs/rfc3548.html">RFC3548</a>,
+ * Section 2.1, implementations should not add line feeds unless explicitly told
+ * to do so. I've got Base64 set to this behavior now, although earlier versions
+ * broke lines by default.</p>
+ *
+ * <p>The constants defined in Base64 can be OR-ed together to combine options, so you
+ * might make a call like this:</p>
+ *
+ * <code>String encoded = Base64.encodeBytes( mybytes, Base64.GZIP | Base64.DO_BREAK_LINES );</code>
+ * <p>to compress the data before encoding it and then making the output have newline characters.</p>
+ * <p>Also...</p>
+ * <code>String encoded = Base64.encodeBytes( crazyString.getBytes() );</code>
+ *
+ * <p>
+ * I am placing this code in the Public Domain. Do with it as you will.
+ * This software comes with no guarantees or warranties but with
+ * plenty of well-wishing instead!
+ * Please visit <a href="http://iharder.net/base64">http://iharder.net/base64</a>
+ * periodically to check for updates or to contribute improvements.
+ * </p>
+ *
+ * @author Robert Harder
+ * @author rob@iharder.net
+ * @version 2.3.7
+ */

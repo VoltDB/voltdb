@@ -25,7 +25,7 @@ import java.security.NoSuchAlgorithmException;
 
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.utils.HexEncoder;
+import org.voltdb.utils.Encoder;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.Level;
@@ -212,7 +212,7 @@ public class AuthSystem {
          * First associate all users with groups and vice versa
          */
         for (org.voltdb.catalog.User catalogUser : db.getUsers()) {
-            final AuthUser user = new AuthUser( HexEncoder.hexDecode(catalogUser.getShadowpassword()),
+            final AuthUser user = new AuthUser( Encoder.hexDecode(catalogUser.getShadowpassword()),
                     catalogUser.getTypeName(), catalogUser.getSysproc(), catalogUser.getAdhoc());
             m_users.put(user.m_name, user);
             for (org.voltdb.catalog.GroupRef catalogGroupRef : catalogUser.getGroups()) {

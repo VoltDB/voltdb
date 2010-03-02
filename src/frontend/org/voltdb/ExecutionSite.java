@@ -60,7 +60,7 @@ import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.VoltMessage;
 import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.EstTime;
-import org.voltdb.utils.HexEncoder;
+import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltLoggerFactory;
 import org.voltdb.utils.DBBPool.BBContainer;
@@ -423,7 +423,7 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
             if (target == BackendTarget.HSQLDB_BACKEND) {
                 hsqlTemp = new HsqlBackend(siteId);
                 final String hexDDL = database.getSchema();
-                final String ddl = HexEncoder.hexDecodeToString(hexDDL);
+                final String ddl = Encoder.hexDecodeToString(hexDDL);
                 final String[] commands = ddl.split(";");
                 for (String command : commands) {
                     command = command.trim();

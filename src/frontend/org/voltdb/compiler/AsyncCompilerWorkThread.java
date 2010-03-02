@@ -37,7 +37,7 @@ import org.voltdb.planner.CompiledPlan.Fragment;
 import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.DumpManager;
-import org.voltdb.utils.HexEncoder;
+import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltLoggerFactory;
 
@@ -74,7 +74,7 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
         m_hsql = HSQLInterface.loadHsqldb();
 
         String hexDDL = m_context.database.getSchema();
-        String ddl = HexEncoder.hexDecodeToString(hexDDL);
+        String ddl = Encoder.hexDecodeToString(hexDDL);
         String[] commands = ddl.split(";");
         for (String command : commands) {
             command = command.trim();

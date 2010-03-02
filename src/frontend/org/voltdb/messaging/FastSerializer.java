@@ -27,7 +27,7 @@ import java.nio.ByteOrder;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.HexEncoder;
+import org.voltdb.utils.Encoder;
 import org.voltdb.utils.DBBPool.BBContainer;
 
 
@@ -234,7 +234,7 @@ public class FastSerializer implements DataOutput {
         buffer.b.flip();
         byte bytes[] = new byte[buffer.b.remaining()];
         buffer.b.get(bytes);
-        String hex = HexEncoder.hexEncode(bytes);
+        String hex = Encoder.hexEncode(bytes);
         buffer.discard();
         return hex;
     }
@@ -279,6 +279,7 @@ public class FastSerializer implements DataOutput {
             return;
         }
 
+        int strlen = string.length();
         int len = 0;
         byte[] strbytes = {};
         try {

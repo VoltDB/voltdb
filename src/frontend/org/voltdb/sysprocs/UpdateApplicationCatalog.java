@@ -25,20 +25,98 @@ import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 
 @ProcInfo(singlePartition = false)
 public class UpdateApplicationCatalog extends VoltSystemProcedure {
 
+    final int ROUNDONE_DEP = 1;
+    final int ROUNDTWO_DEP = 1;
+
+
+
     @Override
     public DependencyPair executePlanFragment(
             HashMap<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params, SystemProcedureExecutionContext context) {
-        // TODO Auto-generated method stub
-        return null;
+
+        VoltTable t = new VoltTable(new VoltTable.ColumnInfo("", VoltType.BIGINT));
+
+        Object[] paramObj = params.toArray();
+        assert(paramObj.length >= 1);
+        String catalogDiffCommands = (String) paramObj[0];
+
+        if (fragmentId == SysProcFragmentId.PF_catalogUpdateGlobal) {
+            assert(paramObj.length == 2);
+            String catalogURL = (String) paramObj[1];
+            if (updateVoltDBSingleton(context, catalogDiffCommands, catalogURL))
+                t.addRow(1);
+            else
+                t.addRow(0);
+            return new DependencyPair(ROUNDONE_DEP, t);
+        }
+        else if (fragmentId == SysProcFragmentId.PF_catalogUptateExecSite) {
+            assert(paramObj.length == 1);
+            String catalogURL = (String) paramObj[1];
+            if (updateVoltDBSingleton(context, catalogDiffCommands, catalogURL))
+                t.addRow(1);
+            else
+                t.addRow(0);
+            return new DependencyPair(ROUNDTWO_DEP, t);
+        }
+
+        throw new RuntimeException("UpdateApplicationCatalog was given an invalid fragment id: " + String.valueOf(fragmentId));
+    }
+
+    public boolean updateVoltDBSingleton(SystemProcedureExecutionContext context, String catalogDiffCommands, String catalogURL) {
+
+        return true;
+    }
+
+    public boolean updateExecutionSite(SystemProcedureExecutionContext context, String catalogDiffCommands) {
+
+        return true;
     }
 
     public VoltTable[] run(String catalogDiffCommands, String catalogURL) {
+        int strlen = catalogDiffCommands.length();
+
+        System.err.println("Running update catalog system procedure with url = " + catalogURL);
+        SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[1];
+
+        // Give the new catalog to all the nodes and have their VoltDB singleton update
+        pfs[0] = new SynthesizedPlanFragment();
+        pfs[0].fragmentId = SysProcFragmentId.PF_catalogUpdateGlobal;
+        pfs[0].outputDepId = ROUNDONE_DEP;
+        pfs[0].inputDepIds = new int[]{};
+        pfs[0].multipartition = false;
+        pfs[0].nonExecSites = true;
+        pfs[0].parameters = new ParameterSet();
+        pfs[0].parameters.setParameters(new Object[] { catalogDiffCommands, catalogURL });
+
+        VoltTable[] retval = executeSysProcPlanFragments(pfs, ROUNDONE_DEP);
+        assert(retval != null);
+        assert(retval.length > 0);
+        for (VoltTable t : retval)
+            assert(t.asScalarLong() == 1);
+
+        // Get all of the exec sites to update
+        pfs[0] = new SynthesizedPlanFragment();
+        pfs[0].fragmentId = SysProcFragmentId.PF_catalogUptateExecSite;
+        pfs[0].outputDepId = ROUNDTWO_DEP;
+        pfs[0].inputDepIds = new int[]{};
+        pfs[0].multipartition = true;
+        pfs[0].nonExecSites = false;
+        pfs[0].parameters = new ParameterSet();
+        pfs[0].parameters.setParameters(new Object[] { catalogDiffCommands });
+
+        retval = executeSysProcPlanFragments(pfs, ROUNDTWO_DEP);
+        assert(retval != null);
+        assert(retval.length > 0);
+        for (VoltTable t : retval)
+            assert(t.asScalarLong() == 1);
+
         System.out.println(catalogDiffCommands);
         return null;
     }

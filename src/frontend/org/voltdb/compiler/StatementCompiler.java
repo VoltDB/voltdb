@@ -43,7 +43,7 @@ import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
-import org.voltdb.utils.HexEncoder;
+import org.voltdb.utils.Encoder;
 
 /**
  * Compiles individual SQL statements and updates the given catalog.
@@ -134,7 +134,7 @@ public abstract class StatementCompiler {
                 // hopefully someone will notice
                 e.printStackTrace();
             }
-            String hexString = HexEncoder.hexEncode(json);
+            String hexString = Encoder.hexEncode(json);
             catalogStmt.setExptree(hexString);
         }
 
@@ -153,7 +153,7 @@ public abstract class StatementCompiler {
                 // hopefully someone will notice
                 e.printStackTrace();
             }
-            String hexString = HexEncoder.hexEncode(json);
+            String hexString = Encoder.hexEncode(json);
             catalogStmt.setFullplan(hexString);
         }
 

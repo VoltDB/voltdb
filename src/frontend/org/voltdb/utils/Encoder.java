@@ -17,7 +17,9 @@
 
 package org.voltdb.utils;
 
+import java.io.ByteArrayOutputStream;
 import java.io.UnsupportedEncodingException;
+import java.util.zip.GZIPOutputStream;
 
 /**
  * Encode and decode strings and byte arrays to/from hexidecimal
@@ -25,7 +27,7 @@ import java.io.UnsupportedEncodingException;
  * be added to the VoltDB catalogs.
  *
  */
-public class HexEncoder {
+public class Encoder {
     private static final int caseDiff = ('a' - 'A');
     /**
      *
@@ -97,6 +99,33 @@ public class HexEncoder {
             e.printStackTrace();
         }
         return retval;
+    }
+
+    public static String compressAndBase64Encode(String string) {
+        try {
+            byte[] inBytes = string.getBytes("UTF-8");
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            GZIPOutputStream gzos = new GZIPOutputStream(baos);
+            gzos.write(inBytes);
+            gzos.close();
+            byte[] outBytes = baos.toByteArray();
+            return Base64.encodeBytes(outBytes);
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static String decodeBase64AndDecompress(String string) {
+        try {
+            byte[] bytes = Base64.decode(string);
+            return new String(bytes, "UTF-8");
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
     }
 
 }

@@ -36,7 +36,7 @@ import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.HexEncoder;
+import org.voltdb.utils.Encoder;
 import org.voltdb.utils.StringInputStream;
 import org.w3c.dom.*;
 import org.xml.sax.*;
@@ -120,7 +120,7 @@ public class DDLCompiler {
     }
 
     public void compileToCatalog(Catalog catalog, Database db) throws VoltCompilerException {
-        String hexDDL = HexEncoder.hexEncode(m_fullDDL);
+        String hexDDL = Encoder.hexEncode(m_fullDDL);
         catalog.execute("set " + db.getPath() + " schema \"" + hexDDL + "\"");
 
         String xmlCatalog;
@@ -515,7 +515,7 @@ public class DDLCompiler {
             if (stmt.where == null)
                 matviewinfo.setPredicate("");
             else {
-                String hex = HexEncoder.hexEncode(stmt.where.toJSONString());
+                String hex = Encoder.hexEncode(stmt.where.toJSONString());
                 matviewinfo.setPredicate(hex);
             }
             destTable.setMaterializer(srcTable);

@@ -69,7 +69,7 @@ import org.voltdb.compiler.projectfile.ClassdependenciesType.Classdependency;
 import org.voltdb.compiler.projectfile.ExportsType.Connector;
 import org.voltdb.compiler.projectfile.ExportsType.Connector.Tables;
 import org.voltdb.compiler.projectfile.ExportsType.Connector.Destinations.Destination;
-import org.voltdb.utils.HexEncoder;
+import org.voltdb.utils.Encoder;
 import org.voltdb.utils.JarReader;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.StringInputStream;
@@ -562,7 +562,7 @@ public class VoltCompiler {
                 catUser.setAdhoc(user.isAdhoc());
                 catUser.setSysproc(user.isSysproc());
                 byte passwordHash[] = extractPassword(user.getPassword());
-                catUser.setShadowpassword(HexEncoder.hexEncode(passwordHash));
+                catUser.setShadowpassword(Encoder.hexEncode(passwordHash));
 
                 // process the @groups comma separated list
                 if (user.getGroups() != null) {

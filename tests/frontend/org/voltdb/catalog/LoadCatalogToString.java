@@ -23,7 +23,7 @@
 
 package org.voltdb.catalog;
 
-import java.io.*;
+import java.io.File;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.Scanner;
@@ -42,7 +42,7 @@ public class LoadCatalogToString {
                 value += scanner.nextLine() + "\n";
 
             THE_CATALOG = value;
-            System.out.println("Catalog to be tested:\n" + THE_CATALOG);
+            //System.out.println("Catalog to be tested:\n" + THE_CATALOG);
         } catch (Exception e) {
             System.err.println("FAILED TO LOAD CATALOG!");
             throw new RuntimeException(e);

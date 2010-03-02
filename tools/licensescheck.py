@@ -106,6 +106,7 @@ testLicenses =   ['approved_licenses/mit_x11_hstore_and_voltdb.txt',
 srcLicenses =    ['approved_licenses/gpl3_hstore_and_voltdb.txt',
                   'approved_licenses/gpl3_evanjones_and_voltdb.txt',
                   'approved_licenses/gpl3_nanohttpd_and_voltdb.txt',
+                  'approved_licenses/gpl3_base64_and_voltdb.txt',
                   'approved_licenses/gpl3_voltdb.txt']
 
 testLicensesPy = ['approved_licenses/mit_x11_voltdb_python.txt']
