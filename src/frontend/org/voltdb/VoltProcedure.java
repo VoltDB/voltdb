@@ -105,11 +105,11 @@ public abstract class VoltProcedure {
     // data copied from EE proc wrapper
     private final SQLStmt batchQueryStmts[] = new SQLStmt[1000];
     private int batchQueryStmtIndex = 0;
-    private final Object[] batchQueryArgs[] = new Object[1000][];
+    private Object[] batchQueryArgs[];
     private int batchQueryArgsIndex = 0;
     private final long fragmentIds[] = new long[1000];
     private final int expectedDeps[] = new int[1000];
-    private final ParameterSet parameterSets[] = new ParameterSet[1000];
+    private ParameterSet parameterSets[];
 
     // data from hsql wrapper
     private final ArrayList<VoltTable> queryResults = new ArrayList<VoltTable>();
@@ -271,7 +271,6 @@ public abstract class VoltProcedure {
         //  clear the queue here.
         batchQueryStmtIndex = 0;
         batchQueryArgsIndex = 0;
-
         //lastBatchNeedsRollback = false;
 
         VoltTable[] results = new VoltTable[0];
@@ -314,6 +313,8 @@ public abstract class VoltProcedure {
                     log.trace("invoking... procMethod=" + procMethod.getName() + ", class=" + getClass().getName());
                 }
                 try {
+                    batchQueryArgs = new Object[1000][];
+                    parameterSets = new ParameterSet[1000];
                     Object rawResult = procMethod.invoke(this, paramList);
                     results = getResultsFromRawResults(rawResult);
                     if (results == null)
@@ -321,6 +322,9 @@ public abstract class VoltProcedure {
                 } catch (IllegalAccessException e) {
                     // If reflection fails, invoke the same error handling that other exceptions do
                     throw new InvocationTargetException(e);
+                } finally {
+                    batchQueryArgs = null;
+                    parameterSets = null;
                 }
                 log.trace("invoked");
             }
@@ -339,6 +343,8 @@ public abstract class VoltProcedure {
         else {
             assert(catProc.getStatements().size() == 1);
             try {
+                batchQueryArgs = new Object[1000][];
+                parameterSets = new ParameterSet[1000];
                 if (!isNative) {
                     // HSQL handling
                     VoltTable table = hsql.runSQLWithSubstitutions(m_cachedSingleStmt[0], paramList);
@@ -350,6 +356,9 @@ public abstract class VoltProcedure {
             }
             catch (SerializableException ex) {
                 retval = getErrorResponse(ex);
+            } finally {
+                batchQueryArgs = null;
+                parameterSets = null;
             }
         }
 

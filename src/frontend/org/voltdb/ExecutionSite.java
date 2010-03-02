@@ -902,7 +902,7 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
         }
         catch (final Exception e) {
             // Show the WHOLE exception in the log
-            hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_UnexpectedProcedureException.name(), e);
+            hostLog.l7dlog( Level.ERROR, LogKeys.host_ExecutionSite_UnexpectedProcedureException.name(), e);
             VoltDB.crashVoltDB();
         }
 
