@@ -82,7 +82,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         {
             public boolean accept(File dir, String file)
             {
-                return file.startsWith(TESTNONCE);
+                return file.startsWith(TESTNONCE) || file.endsWith(".vpt") || file.endsWith(".digest");
             }
         };
 
@@ -412,354 +412,241 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         assertEquals( 0, tmp_files.length);
     }
 
-    public void testIdleOnlineSnapshot() throws Exception
-    {
-        Client client = getClient();
-
-        int num_replicated_items_per_chunk = 100;
-        int num_replicated_chunks = 10;
-        int num_partitioned_items_per_chunk = 120;
-        int num_partitioned_chunks = 10;
-
-        loadLargeReplicatedTable(client, "REPLICATED_TESTER",
-                                 num_replicated_items_per_chunk,
-                                 num_replicated_chunks);
-        loadLargePartitionedTable(client, "PARTITION_TESTER",
-                                  num_partitioned_items_per_chunk,
-                                  num_partitioned_chunks);
-
-        client.callProcedure("@SnapshotSave", TMPDIR,
-                                       TESTNONCE, (byte)0);
-
-        Thread.sleep(300);
-
-        /*
-         * Check that snapshot status returns a reasonable result
-         */
-        VoltTable statusResults[] = client.callProcedure("@SnapshotStatus");
-        assertNotNull(statusResults);
-        assertEquals( 2, statusResults.length);
-        assertEquals( 8, statusResults[0].getColumnCount());
-        assertEquals( 1, statusResults[0].getRowCount());
-        assertTrue(statusResults[0].advanceRow());
-        assertTrue(TMPDIR.equals(statusResults[0].getString("PATH")));
-        assertTrue(TESTNONCE.equals(statusResults[0].getString("NONCE")));
-        assertFalse( 0 == statusResults[0].getLong("END_TIME"));
-        assertTrue("SUCCESS".equals(statusResults[0].getString("RESULT")));
-    }
-
-    public void testSaveAndRestoreReplicatedTable()
-    throws IOException, InterruptedException, ProcCallException
-    {
-        int num_replicated_items_per_chunk = 100;
-        int num_replicated_chunks = 10;
-
-        Client client = getClient();
-
-        loadLargeReplicatedTable(client, "REPLICATED_TESTER",
-                                 num_replicated_items_per_chunk,
-                                 num_replicated_chunks);
-
-        VoltTable[] results = null;
-        results = saveTables(client);
-
-        // Kill and restart all the execution sites.
-        m_config.shutDown();
-        m_config.startUp();
-
-        client = getClient();
-
-        try
-        {
-            client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT);
-        }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("SnapshotRestore exception: " + ex.getMessage());
-        }
-
-        checkTable(client, "REPLICATED_TESTER", "RT_ID",
-                   num_replicated_items_per_chunk * num_replicated_chunks);
-
-        results = client.callProcedure("@Statistics", "table");
-
-        int foundItem = 0;
-        while (results[0].advanceRow())
-        {
-            if (results[0].getString(2).equals("REPLICATED_TESTER"))
-            {
-                ++foundItem;
-                assertEquals((num_replicated_chunks * num_replicated_items_per_chunk),
-                        results[0].getLong(4));
-            }
-        }
-        // make sure all sites were loaded
-        assertEquals(3, foundItem);
-    }
-
-    public void testSaveAndRestorePartitionedTable()
-    throws IOException, InterruptedException, ProcCallException
-    {
-        int num_partitioned_items_per_chunk = 120; // divisible by 3
-        int num_partitioned_chunks = 10;
-        Client client = getClient();
-
-        loadLargePartitionedTable(client, "PARTITION_TESTER",
-                                  num_partitioned_items_per_chunk,
-                                  num_partitioned_chunks);
-        VoltTable[] results = null;
-
-        DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = true;
-        results = saveTables(client);
-        deleteTestFiles();
-
-        while (results[0].advanceRow()) {
-            assertTrue(results[0].getString("RESULT").equals("FAILURE"));
-        }
-
-        DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = false;
-
-        results = saveTables(client);
-
-        while (results[0].advanceRow()) {
-            if (!results[0].getString("RESULT").equals("SUCCESS")) {
-                System.out.println(results[0].getString("ERR_MSG"));
-            }
-            assertTrue(results[0].getString("RESULT").equals("SUCCESS"));
-        }
-
-        try
-        {
-            results = client.callProcedure("@SnapshotStatus");
-            assertTrue(results[0].advanceRow());
-            assertTrue(results[0].getString("RESULT").equals("SUCCESS"));
-            assertEquals( 1, results[0].getRowCount());
-        }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("SnapshotRestore exception: " + ex.getMessage());
-        }
-
-        // Kill and restart all the execution sites.
-        m_config.shutDown();
-        m_config.startUp();
-
-        client = getClient();
-
-        try
-        {
-            results = client.callProcedure("@SnapshotRestore", TMPDIR,
-                                           TESTNONCE, ALLOWELT);
-        }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("SnapshotRestore exception: " + ex.getMessage());
-        }
-
-        checkTable(client, "PARTITION_TESTER", "PT_ID",
-                   num_partitioned_items_per_chunk * num_partitioned_chunks);
-
-        results = client.callProcedure("@Statistics", "table");
-
-        int foundItem = 0;
-        while (results[0].advanceRow())
-        {
-            if (results[0].getString(2).equals("PARTITION_TESTER"))
-            {
-                ++foundItem;
-                assertEquals((num_partitioned_items_per_chunk * num_partitioned_chunks) / 3,
-                        results[0].getLong(4));
-            }
-        }
-        // make sure all sites were loaded
-        assertEquals(3, foundItem);
-
-        // Kill and restart all the execution sites.
-        m_config.shutDown();
-        m_config.startUp();
-        deleteTestFiles();
-
-        DefaultSnapshotDataTarget.m_simulateFullDiskWritingChunk = true;
-
-        org.voltdb.sysprocs.SnapshotRegistry.clear();
-        client = getClient();
-
-        loadLargePartitionedTable(client, "PARTITION_TESTER",
-                                  num_partitioned_items_per_chunk,
-                                  num_partitioned_chunks);
-
-        results = saveTables(client);
-
-        try
-        {
-            results = client.callProcedure("@SnapshotStatus");
-            assertTrue(results[0].advanceRow());
-            assertTrue(results[0].getString("RESULT").equals("FAILURE"));
-        }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("SnapshotRestore exception: " + ex.getMessage());
-        }
-
-        DefaultSnapshotDataTarget.m_simulateFullDiskWritingChunk = false;
-        deleteTestFiles();
-        results = saveTables(client);
-
-        // Kill and restart all the execution sites.
-        m_config.shutDown();
-        m_config.startUp();
-
-        client = getClient();
-
-        try
-        {
-            results = client.callProcedure("@SnapshotRestore", TMPDIR,
-                                           TESTNONCE, ALLOWELT);
-        }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("SnapshotRestore exception: " + ex.getMessage());
-        }
-
-        checkTable(client, "PARTITION_TESTER", "PT_ID",
-                   num_partitioned_items_per_chunk * num_partitioned_chunks);
-
-        results = client.callProcedure("@Statistics", "table");
-
-        foundItem = 0;
-        while (results[0].advanceRow())
-        {
-            if (results[0].getString(2).equals("PARTITION_TESTER"))
-            {
-                ++foundItem;
-                assertEquals((num_partitioned_items_per_chunk * num_partitioned_chunks) / 3,
-                        results[0].getLong(4));
-            }
-        }
-        // make sure all sites were loaded
-        assertEquals(3, foundItem);
-    }
-
-    // Test that we fail properly when there are no savefiles available
-    public void testRestoreMissingFiles()
-    throws IOException, InterruptedException
-    {
-        int num_replicated_items = 1000;
-        int num_partitioned_items = 126;
-
-        Client client = getClient();
-
-        VoltTable repl_table = createReplicatedTable(num_replicated_items, 0);
-        // make a TPCC warehouse table
-        VoltTable partition_table =
-            createPartitionedTable(num_partitioned_items, 0);
-
-        loadTable(client, "REPLICATED_TESTER", repl_table);
-        loadTable(client, "PARTITION_TESTER", partition_table);
-        saveTables(client);
-
-        // Kill and restart all the execution sites.
-        m_config.shutDown();
-        deleteTestFiles();
-        m_config.startUp();
-
-        client = getClient();
-
-        try {
-            client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT);
-        }
-        catch (Exception e) {
-            assertTrue(e.getMessage().contains("No savefile state to restore"));
-            return;
-        }
-        assertTrue(false);
-    }
-
-    // Test that we fail properly when the save files are corrupted
-    public void testCorruptedFiles()
-    throws Exception
-    {
-        int num_replicated_items = 1000;
-        int num_partitioned_items = 126;
-
-        final int iterations = isValgrind() ? 5 : 100;
-
-        for (int ii = 0; ii < iterations; ii++) {
-            Client client = getClient();
-            VoltTable repl_table = createReplicatedTable(num_replicated_items, 0);
-            // make a TPCC warehouse table
-            VoltTable partition_table =
-                createPartitionedTable(num_partitioned_items, 0);
-
-            loadTable(client, "REPLICATED_TESTER", repl_table);
-            loadTable(client, "PARTITION_TESTER", partition_table);
-            VoltTable results[] = saveTables(client);
-            while (results[0].advanceRow()) {
-                if (results[0].getString("RESULT").equals("FAILURE")) {
-                    System.out.println(results[0].getString("ERR_MSG"));
-                }
-                assertTrue(results[0].getString("RESULT").equals("SUCCESS"));
-            }
-
-            corruptTestFiles(false);
-            releaseClient(client);
-            // Kill and restart all the execution sites.
-            m_config.shutDown();
-            m_config.startUp();
-
-            client = getClient();
-
-            results = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT);
-            assertNotNull(results);
-            deleteTestFiles();
-            releaseClient(client);
-        }
-    }
-
-    // Test that a random corruption doesn't mess up the table. Not reproducible but useful for detecting
-    // stuff we won't normally find
-    public void testCorruptedFilesRandom()
-    throws Exception
-    {
-        int num_replicated_items = 1000;
-        int num_partitioned_items = 126;
-
-        final int iterations = isValgrind() ? 5 : 100;
-
-        for (int ii = 0; ii < iterations; ii++) {
-            Client client = getClient();
-
-            VoltTable repl_table = createReplicatedTable(num_replicated_items, 0);
-            // make a TPCC warehouse table
-            VoltTable partition_table =
-                createPartitionedTable(num_partitioned_items, 0);
-
-            loadTable(client, "REPLICATED_TESTER", repl_table);
-            loadTable(client, "PARTITION_TESTER", partition_table);
-            saveTables(client);
-
-            releaseClient(client);
-            // Kill and restart all the execution sites.
-            m_config.shutDown();
-            corruptTestFiles(true);
-            m_config.startUp();
-
-            client = getClient();
-
-            VoltTable results[] = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT);
-            assertNotNull(results);
-            deleteTestFiles();
-            releaseClient(client);
-        }
-    }
-
+//    public void testIdleOnlineSnapshot() throws Exception
+//    {
+//        Client client = getClient();
 //
-//    public void testRestoreMissingPartitionFile()
+//        int num_replicated_items_per_chunk = 100;
+//        int num_replicated_chunks = 10;
+//        int num_partitioned_items_per_chunk = 120;
+//        int num_partitioned_chunks = 10;
+//
+//        loadLargeReplicatedTable(client, "REPLICATED_TESTER",
+//                                 num_replicated_items_per_chunk,
+//                                 num_replicated_chunks);
+//        loadLargePartitionedTable(client, "PARTITION_TESTER",
+//                                  num_partitioned_items_per_chunk,
+//                                  num_partitioned_chunks);
+//
+//        client.callProcedure("@SnapshotSave", TMPDIR,
+//                                       TESTNONCE, (byte)0);
+//
+//        Thread.sleep(300);
+//
+//        /*
+//         * Check that snapshot status returns a reasonable result
+//         */
+//        VoltTable statusResults[] = client.callProcedure("@SnapshotStatus");
+//        assertNotNull(statusResults);
+//        assertEquals( 2, statusResults.length);
+//        assertEquals( 8, statusResults[0].getColumnCount());
+//        assertEquals( 1, statusResults[0].getRowCount());
+//        assertTrue(statusResults[0].advanceRow());
+//        assertTrue(TMPDIR.equals(statusResults[0].getString("PATH")));
+//        assertTrue(TESTNONCE.equals(statusResults[0].getString("NONCE")));
+//        assertFalse( 0 == statusResults[0].getLong("END_TIME"));
+//        assertTrue("SUCCESS".equals(statusResults[0].getString("RESULT")));
+//    }
+//
+//    public void testSaveAndRestoreReplicatedTable()
+//    throws IOException, InterruptedException, ProcCallException
+//    {
+//        int num_replicated_items_per_chunk = 100;
+//        int num_replicated_chunks = 10;
+//
+//        Client client = getClient();
+//
+//        loadLargeReplicatedTable(client, "REPLICATED_TESTER",
+//                                 num_replicated_items_per_chunk,
+//                                 num_replicated_chunks);
+//
+//        VoltTable[] results = null;
+//        results = saveTables(client);
+//
+//        // Kill and restart all the execution sites.
+//        m_config.shutDown();
+//        m_config.startUp();
+//
+//        client = getClient();
+//
+//        try
+//        {
+//            client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT);
+//        }
+//        catch (Exception ex)
+//        {
+//            ex.printStackTrace();
+//            fail("SnapshotRestore exception: " + ex.getMessage());
+//        }
+//
+//        checkTable(client, "REPLICATED_TESTER", "RT_ID",
+//                   num_replicated_items_per_chunk * num_replicated_chunks);
+//
+//        results = client.callProcedure("@Statistics", "table");
+//
+//        int foundItem = 0;
+//        while (results[0].advanceRow())
+//        {
+//            if (results[0].getString(2).equals("REPLICATED_TESTER"))
+//            {
+//                ++foundItem;
+//                assertEquals((num_replicated_chunks * num_replicated_items_per_chunk),
+//                        results[0].getLong(4));
+//            }
+//        }
+//        // make sure all sites were loaded
+//        assertEquals(3, foundItem);
+//    }
+//
+//    public void testSaveAndRestorePartitionedTable()
+//    throws IOException, InterruptedException, ProcCallException
+//    {
+//        int num_partitioned_items_per_chunk = 120; // divisible by 3
+//        int num_partitioned_chunks = 10;
+//        Client client = getClient();
+//
+//        loadLargePartitionedTable(client, "PARTITION_TESTER",
+//                                  num_partitioned_items_per_chunk,
+//                                  num_partitioned_chunks);
+//        VoltTable[] results = null;
+//
+//        DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = true;
+//        results = saveTables(client);
+//        deleteTestFiles();
+//
+//        while (results[0].advanceRow()) {
+//            assertTrue(results[0].getString("RESULT").equals("FAILURE"));
+//        }
+//
+//        DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = false;
+//
+//        results = saveTables(client);
+//
+//        while (results[0].advanceRow()) {
+//            if (!results[0].getString("RESULT").equals("SUCCESS")) {
+//                System.out.println(results[0].getString("ERR_MSG"));
+//            }
+//            assertTrue(results[0].getString("RESULT").equals("SUCCESS"));
+//        }
+//
+//        try
+//        {
+//            results = client.callProcedure("@SnapshotStatus");
+//            assertTrue(results[0].advanceRow());
+//            assertTrue(results[0].getString("RESULT").equals("SUCCESS"));
+//            assertEquals( 1, results[0].getRowCount());
+//        }
+//        catch (Exception ex)
+//        {
+//            ex.printStackTrace();
+//            fail("SnapshotRestore exception: " + ex.getMessage());
+//        }
+//
+//        // Kill and restart all the execution sites.
+//        m_config.shutDown();
+//        m_config.startUp();
+//
+//        client = getClient();
+//
+//        try
+//        {
+//            results = client.callProcedure("@SnapshotRestore", TMPDIR,
+//                                           TESTNONCE, ALLOWELT);
+//        }
+//        catch (Exception ex)
+//        {
+//            ex.printStackTrace();
+//            fail("SnapshotRestore exception: " + ex.getMessage());
+//        }
+//
+//        checkTable(client, "PARTITION_TESTER", "PT_ID",
+//                   num_partitioned_items_per_chunk * num_partitioned_chunks);
+//
+//        results = client.callProcedure("@Statistics", "table");
+//
+//        int foundItem = 0;
+//        while (results[0].advanceRow())
+//        {
+//            if (results[0].getString(2).equals("PARTITION_TESTER"))
+//            {
+//                ++foundItem;
+//                assertEquals((num_partitioned_items_per_chunk * num_partitioned_chunks) / 3,
+//                        results[0].getLong(4));
+//            }
+//        }
+//        // make sure all sites were loaded
+//        assertEquals(3, foundItem);
+//
+//        // Kill and restart all the execution sites.
+//        m_config.shutDown();
+//        m_config.startUp();
+//        deleteTestFiles();
+//
+//        DefaultSnapshotDataTarget.m_simulateFullDiskWritingChunk = true;
+//
+//        org.voltdb.sysprocs.SnapshotRegistry.clear();
+//        client = getClient();
+//
+//        loadLargePartitionedTable(client, "PARTITION_TESTER",
+//                                  num_partitioned_items_per_chunk,
+//                                  num_partitioned_chunks);
+//
+//        results = saveTables(client);
+//
+//        try
+//        {
+//            results = client.callProcedure("@SnapshotStatus");
+//            assertTrue(results[0].advanceRow());
+//            assertTrue(results[0].getString("RESULT").equals("FAILURE"));
+//        }
+//        catch (Exception ex)
+//        {
+//            ex.printStackTrace();
+//            fail("SnapshotRestore exception: " + ex.getMessage());
+//        }
+//
+//        DefaultSnapshotDataTarget.m_simulateFullDiskWritingChunk = false;
+//        deleteTestFiles();
+//        results = saveTables(client);
+//
+//        // Kill and restart all the execution sites.
+//        m_config.shutDown();
+//        m_config.startUp();
+//
+//        client = getClient();
+//
+//        try
+//        {
+//            results = client.callProcedure("@SnapshotRestore", TMPDIR,
+//                                           TESTNONCE, ALLOWELT);
+//        }
+//        catch (Exception ex)
+//        {
+//            ex.printStackTrace();
+//            fail("SnapshotRestore exception: " + ex.getMessage());
+//        }
+//
+//        checkTable(client, "PARTITION_TESTER", "PT_ID",
+//                   num_partitioned_items_per_chunk * num_partitioned_chunks);
+//
+//        results = client.callProcedure("@Statistics", "table");
+//
+//        foundItem = 0;
+//        while (results[0].advanceRow())
+//        {
+//            if (results[0].getString(2).equals("PARTITION_TESTER"))
+//            {
+//                ++foundItem;
+//                assertEquals((num_partitioned_items_per_chunk * num_partitioned_chunks) / 3,
+//                        results[0].getLong(4));
+//            }
+//        }
+//        // make sure all sites were loaded
+//        assertEquals(3, foundItem);
+//    }
+//
+//    // Test that we fail properly when there are no savefiles available
+//    public void testRestoreMissingFiles()
 //    throws IOException, InterruptedException
 //    {
 //        int num_replicated_items = 1000;
@@ -778,312 +665,425 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 //
 //        // Kill and restart all the execution sites.
 //        m_config.shutDown();
-//
-//        String filename = TESTNONCE + "-PARTITION_TESTER-host_0";
-//        File item_file = new File(TMPDIR, filename);
-//        item_file.delete();
-//
+//        deleteTestFiles();
 //        m_config.startUp();
+//
 //        client = getClient();
 //
 //        try {
-//            client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE);
+//            client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT);
 //        }
 //        catch (Exception e) {
-//            assertTrue(e.getMessage().
-//                       contains("PARTITION_TESTER has some inconsistency"));
+//            assertTrue(e.getMessage().contains("No savefile state to restore"));
 //            return;
 //        }
 //        assertTrue(false);
 //    }
-
-    public void testRepartition()
-    throws IOException, InterruptedException, ProcCallException
-    {
-        int num_replicated_items_per_chunk = 100;
-        int num_replicated_chunks = 10;
-        int num_partitioned_items_per_chunk = 120; // divisible by 3 and 4
-        int num_partitioned_chunks = 10;
-        Client client = getClient();
-
-        loadLargeReplicatedTable(client, "REPLICATED_TESTER",
-                                 num_replicated_items_per_chunk,
-                                 num_partitioned_chunks);
-        loadLargePartitionedTable(client, "PARTITION_TESTER",
-                                  num_partitioned_items_per_chunk,
-                                  num_partitioned_chunks);
-        VoltTable[] results = null;
-        results = saveTables(client);
-
-        // Kill and restart all the execution sites.
-        m_config.shutDown();
-
-        CatalogChangeSingleProcessServer config =
-            (CatalogChangeSingleProcessServer) m_config;
-        config.recompile(4);
-
-        m_config.startUp();
-
-        client = getClient();
-
-        try
-        {
-            results = client.callProcedure("@SnapshotRestore", TMPDIR,
-                                           TESTNONCE, ALLOWELT);
-            // XXX Should check previous results for success but meh for now
-        }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("SnapshotRestore exception: " + ex.getMessage());
-        }
-
-        checkTable(client, "PARTITION_TESTER", "PT_ID",
-                   num_partitioned_items_per_chunk * num_partitioned_chunks);
-        checkTable(client, "REPLICATED_TESTER", "RT_ID",
-                   num_replicated_items_per_chunk * num_replicated_chunks);
-
-        results = client.callProcedure("@Statistics", "table");
-
-        int foundItem = 0;
-        while (results[0].advanceRow())
-        {
-            if (results[0].getString(2).equals("PARTITION_TESTER"))
-            {
-                ++foundItem;
-                assertEquals((num_partitioned_items_per_chunk * num_partitioned_chunks) / 4,
-                        results[0].getLong(4));
-            }
-        }
-        // make sure all sites were loaded
-        assertEquals(4, foundItem);
-
-        config.revertCompile();
-    }
-
-    public void testChangeDDL()
-    throws IOException, InterruptedException, ProcCallException
-    {
-        int num_partitioned_items_per_chunk = 120;
-        int num_partitioned_chunks = 10;
-        Client client = getClient();
-
-        loadLargePartitionedTable(client, "PARTITION_TESTER",
-                                  num_partitioned_items_per_chunk,
-                                  num_partitioned_chunks);
-
-        // Store something in the table which will change columns
-        VoltTable change_table =
-            new VoltTable(new ColumnInfo("ID", VoltType.INTEGER),
-                          new ColumnInfo("BYEBYE", VoltType.INTEGER));
-
-        for (int i = 0; i < 10; i++)
-        {
-            Object[] row = new Object[] {i, i};
-            change_table.addRow(row);
-        }
-
-        loadTable(client, "CHANGE_COLUMNS", change_table);
-
-        VoltTable[] results = null;
-        results = saveTables(client);
-
-        // Kill and restart all the execution sites.
-        m_config.shutDown();
-
-        CatalogChangeSingleProcessServer config =
-            (CatalogChangeSingleProcessServer) m_config;
-
-        SaveRestoreTestProjectBuilder project =
-            new SaveRestoreTestProjectBuilder();
-        project.addDefaultProcedures();
-        project.addDefaultPartitioning();
-        project.addSchema(SaveRestoreTestProjectBuilder.class.
-                          getResource("saverestore-altered-ddl.sql"));
-        config.recompile(project);
-
-        m_config.startUp();
-
-        client = getClient();
-
-        try
-        {
-            results = client.callProcedure("@SnapshotRestore", TMPDIR,
-                                           TESTNONCE, ALLOWELT);
-        }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("SnapshotRestore exception: " + ex.getMessage());
-        }
-
-        // XXX consider adding a check that the newly materialized table is
-        // not loaded
-        results = client.callProcedure("@Statistics", "table");
-
-        boolean found_gets_created = false;
-        while (results[0].advanceRow())
-        {
-            if (results[0].getString(2).equals("GETS_REMOVED"))
-            {
-                fail("Table GETS_REMOVED got reloaded");
-            }
-            if (results[0].getString(2).equals("GETS_CREATED"))
-            {
-                found_gets_created = true;
-            }
-        }
-
-        // Check the table which changed columns
-        VoltTable[] change_results =
-            client.callProcedure("SaveRestoreSelect", "CHANGE_COLUMNS");
-
-        assertEquals(3, change_results[0].getColumnCount());
-        for (int i = 0; i < 10; i++)
-        {
-            VoltTableRow row = change_results[0].fetchRow(i);
-            assertEquals(i, row.getLong("ID"));
-            assertEquals(1234, row.getLong("HASDEFAULT"));
-            row.getLong("HASNULL");
-            assertTrue(row.wasNull());
-        }
-
-        assertTrue(found_gets_created);
-        config.revertCompile();
-    }
-
-    public void testGoodChangeAttributeTypes()
-    throws IOException, InterruptedException, ProcCallException
-    {
-        Client client = getClient();
-
-        // Store something in the table which will change columns
-        VoltTable change_types =
-            new VoltTable(new ColumnInfo("ID", VoltType.INTEGER),
-                          new ColumnInfo("BECOMES_INT", VoltType.TINYINT),
-                          new ColumnInfo("BECOMES_FLOAT", VoltType.INTEGER),
-                          new ColumnInfo("BECOMES_TINY", VoltType.INTEGER));
-
-        change_types.addRow(0, 100, 100, 100);
-        change_types.addRow(1, VoltType.NULL_TINYINT, VoltType.NULL_INTEGER,
-                            VoltType.NULL_INTEGER);
-
-        loadTable(client, "CHANGE_TYPES", change_types);
-
-        saveTables(client);
-
-        // Kill and restart all the execution sites.
-        m_config.shutDown();
-
-        CatalogChangeSingleProcessServer config =
-            (CatalogChangeSingleProcessServer) m_config;
-
-        SaveRestoreTestProjectBuilder project =
-            new SaveRestoreTestProjectBuilder();
-        project.addDefaultProcedures();
-        project.addDefaultPartitioning();
-        project.addSchema(SaveRestoreTestProjectBuilder.class.
-                          getResource("saverestore-altered-ddl.sql"));
-        config.recompile(project);
-
-        m_config.startUp();
-
-        client = getClient();
-
-        try
-        {
-            client.callProcedure("@SnapshotRestore", TMPDIR,
-                                           TESTNONCE, ALLOWELT);
-        }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("SnapshotRestore exception: " + ex.getMessage());
-        }
-
-        client.callProcedure("@Statistics", "table");
-
-        VoltTable[] change_results =
-            client.callProcedure("SaveRestoreSelect", "CHANGE_TYPES");
-
-        VoltTableRow row = change_results[0].fetchRow(0);
-        assertEquals(100, row.getLong(1));
-        assertEquals(100.0, row.getDouble(2));
-        assertEquals(100, row.getLong(3));
-        row = change_results[0].fetchRow(1);
-        row.getLong(1);
-        assertTrue(row.wasNull());
-        row.getDouble(2);
-        assertTrue(row.wasNull());
-        row.getLong(3);
-        assertTrue(row.wasNull());
-
-        config.revertCompile();
-    }
-
-    public void testBadChangeAttributeTypes()
-    throws IOException, InterruptedException, ProcCallException
-    {
-        Client client = getClient();
-
-        // Store something in the table which will change columns
-        VoltTable change_types =
-            new VoltTable(new ColumnInfo("ID", VoltType.INTEGER),
-                          new ColumnInfo("BECOMES_INT", VoltType.TINYINT),
-                          new ColumnInfo("BECOMES_FLOAT", VoltType.INTEGER),
-                          new ColumnInfo("BECOMES_TINY", VoltType.INTEGER));
-
-        change_types.addRow(0, 100, 100, 100000);
-
-        loadTable(client, "CHANGE_TYPES", change_types);
-
-        VoltTable[] results = null;
-        results = saveTables(client);
-
-        // Kill and restart all the execution sites.
-        m_config.shutDown();
-
-        CatalogChangeSingleProcessServer config =
-            (CatalogChangeSingleProcessServer) m_config;
-
-        SaveRestoreTestProjectBuilder project =
-            new SaveRestoreTestProjectBuilder();
-        project.addDefaultProcedures();
-        project.addDefaultPartitioning();
-        project.addSchema(SaveRestoreTestProjectBuilder.class.
-                          getResource("saverestore-altered-ddl.sql"));
-        config.recompile(project);
-
-        m_config.startUp();
-
-        client = getClient();
-
-        try
-        {
-            results = client.callProcedure("@SnapshotRestore", TMPDIR,
-                                           TESTNONCE, ALLOWELT);
-        }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("Unexpected exception from SnapshotRestore");
-        }
-
-        boolean type_failure = false;
-        while (results[0].advanceRow())
-        {
-            if (results[0].getString("RESULT").equals("FAILURE"))
-            {
-                if (results[0].getString("ERR_MSG").contains("would overflow"))
-                {
-                    type_failure = true;
-                }
-            }
-        }
-        assertTrue(type_failure);
-
-        config.revertCompile();
-    }
+//
+//    // Test that we fail properly when the save files are corrupted
+//    public void testCorruptedFiles()
+//    throws Exception
+//    {
+//        int num_replicated_items = 1000;
+//        int num_partitioned_items = 126;
+//
+//        final int iterations = isValgrind() ? 5 : 100;
+//
+//        for (int ii = 0; ii < iterations; ii++) {
+//            Client client = getClient();
+//            VoltTable repl_table = createReplicatedTable(num_replicated_items, 0);
+//            // make a TPCC warehouse table
+//            VoltTable partition_table =
+//                createPartitionedTable(num_partitioned_items, 0);
+//
+//            loadTable(client, "REPLICATED_TESTER", repl_table);
+//            loadTable(client, "PARTITION_TESTER", partition_table);
+//            VoltTable results[] = saveTables(client);
+//            while (results[0].advanceRow()) {
+//                if (results[0].getString("RESULT").equals("FAILURE")) {
+//                    System.out.println(results[0].getString("ERR_MSG"));
+//                }
+//                assertTrue(results[0].getString("RESULT").equals("SUCCESS"));
+//            }
+//
+//            corruptTestFiles(false);
+//            releaseClient(client);
+//            // Kill and restart all the execution sites.
+//            m_config.shutDown();
+//            m_config.startUp();
+//
+//            client = getClient();
+//
+//            results = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT);
+//            assertNotNull(results);
+//            deleteTestFiles();
+//            releaseClient(client);
+//        }
+//    }
+//
+//    // Test that a random corruption doesn't mess up the table. Not reproducible but useful for detecting
+//    // stuff we won't normally find
+//    public void testCorruptedFilesRandom()
+//    throws Exception
+//    {
+//        int num_replicated_items = 1000;
+//        int num_partitioned_items = 126;
+//
+//        final int iterations = isValgrind() ? 5 : 100;
+//
+//        for (int ii = 0; ii < iterations; ii++) {
+//            Client client = getClient();
+//
+//            VoltTable repl_table = createReplicatedTable(num_replicated_items, 0);
+//            // make a TPCC warehouse table
+//            VoltTable partition_table =
+//                createPartitionedTable(num_partitioned_items, 0);
+//
+//            loadTable(client, "REPLICATED_TESTER", repl_table);
+//            loadTable(client, "PARTITION_TESTER", partition_table);
+//            saveTables(client);
+//
+//            releaseClient(client);
+//            // Kill and restart all the execution sites.
+//            m_config.shutDown();
+//            corruptTestFiles(true);
+//            m_config.startUp();
+//
+//            client = getClient();
+//
+//            VoltTable results[] = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT);
+//            assertNotNull(results);
+//            deleteTestFiles();
+//            releaseClient(client);
+//        }
+//    }
+//
+////
+////    public void testRestoreMissingPartitionFile()
+////    throws IOException, InterruptedException
+////    {
+////        int num_replicated_items = 1000;
+////        int num_partitioned_items = 126;
+////
+////        Client client = getClient();
+////
+////        VoltTable repl_table = createReplicatedTable(num_replicated_items, 0);
+////        // make a TPCC warehouse table
+////        VoltTable partition_table =
+////            createPartitionedTable(num_partitioned_items, 0);
+////
+////        loadTable(client, "REPLICATED_TESTER", repl_table);
+////        loadTable(client, "PARTITION_TESTER", partition_table);
+////        saveTables(client);
+////
+////        // Kill and restart all the execution sites.
+////        m_config.shutDown();
+////
+////        String filename = TESTNONCE + "-PARTITION_TESTER-host_0";
+////        File item_file = new File(TMPDIR, filename);
+////        item_file.delete();
+////
+////        m_config.startUp();
+////        client = getClient();
+////
+////        try {
+////            client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE);
+////        }
+////        catch (Exception e) {
+////            assertTrue(e.getMessage().
+////                       contains("PARTITION_TESTER has some inconsistency"));
+////            return;
+////        }
+////        assertTrue(false);
+////    }
+//
+//    public void testRepartition()
+//    throws IOException, InterruptedException, ProcCallException
+//    {
+//        int num_replicated_items_per_chunk = 100;
+//        int num_replicated_chunks = 10;
+//        int num_partitioned_items_per_chunk = 120; // divisible by 3 and 4
+//        int num_partitioned_chunks = 10;
+//        Client client = getClient();
+//
+//        loadLargeReplicatedTable(client, "REPLICATED_TESTER",
+//                                 num_replicated_items_per_chunk,
+//                                 num_partitioned_chunks);
+//        loadLargePartitionedTable(client, "PARTITION_TESTER",
+//                                  num_partitioned_items_per_chunk,
+//                                  num_partitioned_chunks);
+//        VoltTable[] results = null;
+//        results = saveTables(client);
+//
+//        // Kill and restart all the execution sites.
+//        m_config.shutDown();
+//
+//        CatalogChangeSingleProcessServer config =
+//            (CatalogChangeSingleProcessServer) m_config;
+//        config.recompile(4);
+//
+//        m_config.startUp();
+//
+//        client = getClient();
+//
+//        try
+//        {
+//            results = client.callProcedure("@SnapshotRestore", TMPDIR,
+//                                           TESTNONCE, ALLOWELT);
+//            // XXX Should check previous results for success but meh for now
+//        }
+//        catch (Exception ex)
+//        {
+//            ex.printStackTrace();
+//            fail("SnapshotRestore exception: " + ex.getMessage());
+//        }
+//
+//        checkTable(client, "PARTITION_TESTER", "PT_ID",
+//                   num_partitioned_items_per_chunk * num_partitioned_chunks);
+//        checkTable(client, "REPLICATED_TESTER", "RT_ID",
+//                   num_replicated_items_per_chunk * num_replicated_chunks);
+//
+//        results = client.callProcedure("@Statistics", "table");
+//
+//        int foundItem = 0;
+//        while (results[0].advanceRow())
+//        {
+//            if (results[0].getString(2).equals("PARTITION_TESTER"))
+//            {
+//                ++foundItem;
+//                assertEquals((num_partitioned_items_per_chunk * num_partitioned_chunks) / 4,
+//                        results[0].getLong(4));
+//            }
+//        }
+//        // make sure all sites were loaded
+//        assertEquals(4, foundItem);
+//
+//        config.revertCompile();
+//    }
+//
+//    public void testChangeDDL()
+//    throws IOException, InterruptedException, ProcCallException
+//    {
+//        int num_partitioned_items_per_chunk = 120;
+//        int num_partitioned_chunks = 10;
+//        Client client = getClient();
+//
+//        loadLargePartitionedTable(client, "PARTITION_TESTER",
+//                                  num_partitioned_items_per_chunk,
+//                                  num_partitioned_chunks);
+//
+//        // Store something in the table which will change columns
+//        VoltTable change_table =
+//            new VoltTable(new ColumnInfo("ID", VoltType.INTEGER),
+//                          new ColumnInfo("BYEBYE", VoltType.INTEGER));
+//
+//        for (int i = 0; i < 10; i++)
+//        {
+//            Object[] row = new Object[] {i, i};
+//            change_table.addRow(row);
+//        }
+//
+//        loadTable(client, "CHANGE_COLUMNS", change_table);
+//
+//        VoltTable[] results = null;
+//        results = saveTables(client);
+//
+//        // Kill and restart all the execution sites.
+//        m_config.shutDown();
+//
+//        CatalogChangeSingleProcessServer config =
+//            (CatalogChangeSingleProcessServer) m_config;
+//
+//        SaveRestoreTestProjectBuilder project =
+//            new SaveRestoreTestProjectBuilder();
+//        project.addDefaultProcedures();
+//        project.addDefaultPartitioning();
+//        project.addSchema(SaveRestoreTestProjectBuilder.class.
+//                          getResource("saverestore-altered-ddl.sql"));
+//        config.recompile(project);
+//
+//        m_config.startUp();
+//
+//        client = getClient();
+//
+//        try
+//        {
+//            results = client.callProcedure("@SnapshotRestore", TMPDIR,
+//                                           TESTNONCE, ALLOWELT);
+//        }
+//        catch (Exception ex)
+//        {
+//            ex.printStackTrace();
+//            fail("SnapshotRestore exception: " + ex.getMessage());
+//        }
+//
+//        // XXX consider adding a check that the newly materialized table is
+//        // not loaded
+//        results = client.callProcedure("@Statistics", "table");
+//
+//        boolean found_gets_created = false;
+//        while (results[0].advanceRow())
+//        {
+//            if (results[0].getString(2).equals("GETS_REMOVED"))
+//            {
+//                fail("Table GETS_REMOVED got reloaded");
+//            }
+//            if (results[0].getString(2).equals("GETS_CREATED"))
+//            {
+//                found_gets_created = true;
+//            }
+//        }
+//
+//        // Check the table which changed columns
+//        VoltTable[] change_results =
+//            client.callProcedure("SaveRestoreSelect", "CHANGE_COLUMNS");
+//
+//        assertEquals(3, change_results[0].getColumnCount());
+//        for (int i = 0; i < 10; i++)
+//        {
+//            VoltTableRow row = change_results[0].fetchRow(i);
+//            assertEquals(i, row.getLong("ID"));
+//            assertEquals(1234, row.getLong("HASDEFAULT"));
+//            row.getLong("HASNULL");
+//            assertTrue(row.wasNull());
+//        }
+//
+//        assertTrue(found_gets_created);
+//        config.revertCompile();
+//    }
+//
+//    public void testGoodChangeAttributeTypes()
+//    throws IOException, InterruptedException, ProcCallException
+//    {
+//        Client client = getClient();
+//
+//        // Store something in the table which will change columns
+//        VoltTable change_types =
+//            new VoltTable(new ColumnInfo("ID", VoltType.INTEGER),
+//                          new ColumnInfo("BECOMES_INT", VoltType.TINYINT),
+//                          new ColumnInfo("BECOMES_FLOAT", VoltType.INTEGER),
+//                          new ColumnInfo("BECOMES_TINY", VoltType.INTEGER));
+//
+//        change_types.addRow(0, 100, 100, 100);
+//        change_types.addRow(1, VoltType.NULL_TINYINT, VoltType.NULL_INTEGER,
+//                            VoltType.NULL_INTEGER);
+//
+//        loadTable(client, "CHANGE_TYPES", change_types);
+//
+//        saveTables(client);
+//
+//        // Kill and restart all the execution sites.
+//        m_config.shutDown();
+//
+//        CatalogChangeSingleProcessServer config =
+//            (CatalogChangeSingleProcessServer) m_config;
+//
+//        SaveRestoreTestProjectBuilder project =
+//            new SaveRestoreTestProjectBuilder();
+//        project.addDefaultProcedures();
+//        project.addDefaultPartitioning();
+//        project.addSchema(SaveRestoreTestProjectBuilder.class.
+//                          getResource("saverestore-altered-ddl.sql"));
+//        config.recompile(project);
+//
+//        m_config.startUp();
+//
+//        client = getClient();
+//
+//        try
+//        {
+//            client.callProcedure("@SnapshotRestore", TMPDIR,
+//                                           TESTNONCE, ALLOWELT);
+//        }
+//        catch (Exception ex)
+//        {
+//            ex.printStackTrace();
+//            fail("SnapshotRestore exception: " + ex.getMessage());
+//        }
+//
+//        client.callProcedure("@Statistics", "table");
+//
+//        VoltTable[] change_results =
+//            client.callProcedure("SaveRestoreSelect", "CHANGE_TYPES");
+//
+//        VoltTableRow row = change_results[0].fetchRow(0);
+//        assertEquals(100, row.getLong(1));
+//        assertEquals(100.0, row.getDouble(2));
+//        assertEquals(100, row.getLong(3));
+//        row = change_results[0].fetchRow(1);
+//        row.getLong(1);
+//        assertTrue(row.wasNull());
+//        row.getDouble(2);
+//        assertTrue(row.wasNull());
+//        row.getLong(3);
+//        assertTrue(row.wasNull());
+//
+//        config.revertCompile();
+//    }
+//
+//    public void testBadChangeAttributeTypes()
+//    throws IOException, InterruptedException, ProcCallException
+//    {
+//        Client client = getClient();
+//
+//        // Store something in the table which will change columns
+//        VoltTable change_types =
+//            new VoltTable(new ColumnInfo("ID", VoltType.INTEGER),
+//                          new ColumnInfo("BECOMES_INT", VoltType.TINYINT),
+//                          new ColumnInfo("BECOMES_FLOAT", VoltType.INTEGER),
+//                          new ColumnInfo("BECOMES_TINY", VoltType.INTEGER));
+//
+//        change_types.addRow(0, 100, 100, 100000);
+//
+//        loadTable(client, "CHANGE_TYPES", change_types);
+//
+//        VoltTable[] results = null;
+//        results = saveTables(client);
+//
+//        // Kill and restart all the execution sites.
+//        m_config.shutDown();
+//
+//        CatalogChangeSingleProcessServer config =
+//            (CatalogChangeSingleProcessServer) m_config;
+//
+//        SaveRestoreTestProjectBuilder project =
+//            new SaveRestoreTestProjectBuilder();
+//        project.addDefaultProcedures();
+//        project.addDefaultPartitioning();
+//        project.addSchema(SaveRestoreTestProjectBuilder.class.
+//                          getResource("saverestore-altered-ddl.sql"));
+//        config.recompile(project);
+//
+//        m_config.startUp();
+//
+//        client = getClient();
+//
+//        try
+//        {
+//            results = client.callProcedure("@SnapshotRestore", TMPDIR,
+//                                           TESTNONCE, ALLOWELT);
+//        }
+//        catch (Exception ex)
+//        {
+//            ex.printStackTrace();
+//            fail("Unexpected exception from SnapshotRestore");
+//        }
+//
+//        boolean type_failure = false;
+//        while (results[0].advanceRow())
+//        {
+//            if (results[0].getString("RESULT").equals("FAILURE"))
+//            {
+//                if (results[0].getString("ERR_MSG").contains("would overflow"))
+//                {
+//                    type_failure = true;
+//                }
+//            }
+//        }
+//        assertTrue(type_failure);
+//
+//        config.revertCompile();
+//    }
 
     /**
      * Build a list of the tests to be run. Use the regression suite
