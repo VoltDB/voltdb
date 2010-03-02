@@ -14,11 +14,21 @@
  * You should have received a copy of the GNU General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.voltdb;
 
-public enum SysProcSelector {
-    TABLE,            // invoked as @stat table
-    PROCEDURE,        // invoked as @stat procedure
-    INITIATOR,         // invoked as @stat initiator
-    PARTITIONCOUNT
+package org.voltdb.messaging;
+
+public enum Subject {
+    DEFAULT;//All original message types are in the default subject
+
+    private final byte m_id;
+
+    private Subject() {
+        final int ordinal = ordinal();
+        assert(ordinal < Byte.MAX_VALUE);
+        m_id = (byte)ordinal;
+    }
+
+    public byte getId() {
+        return m_id;
+    }
 }

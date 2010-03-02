@@ -30,6 +30,7 @@ import org.voltdb.ProcInfo;
 import org.voltdb.SysProcSelector;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
@@ -57,6 +58,11 @@ public class Statistics extends VoltSystemProcedure {
         SysProcFragmentId.PF_initiatorData | DtxnConstants.MULTINODE_DEPENDENCY;
     static final int DEP_initiatorAggregator = (int)
         SysProcFragmentId.PF_initiatorAggregator;
+
+    static final int DEP_partitionCount = (int)
+        SysProcFragmentId.PF_partitionCount;
+//    static final int DEP_initiatorAggregator = (int)
+//        SysProcFragmentId.PF_initiatorAggregator;
 
     @Override
     public void init(ExecutionSite site, Procedure catProc,
@@ -184,6 +190,10 @@ public class Statistics extends VoltSystemProcedure {
                 }
             }
             return new DependencyPair(DEP_initiatorAggregator, result);
+        } else if (fragmentId == SysProcFragmentId.PF_partitionCount) {
+            VoltTable result = new VoltTable(new VoltTable.ColumnInfo("Partition count", VoltType.INTEGER));
+            result.addRow(context.getCluster().getPartitions().size());
+            return new DependencyPair(DEP_partitionCount, result);
         }
 
         assert (false);
@@ -193,9 +203,8 @@ public class Statistics extends VoltSystemProcedure {
     public VoltTable[] run(String selector) throws VoltAbortException {
         VoltTable[] results;
 
-        SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
-
         if (selector.toUpperCase().equals(SysProcSelector.TABLE.name())) {
+            SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
             // create a work fragment to gather table data from each of the sites.
             pfs[1] = new SynthesizedPlanFragment();
             pfs[1].fragmentId = SysProcFragmentId.PF_tableData;
@@ -221,6 +230,7 @@ public class Statistics extends VoltSystemProcedure {
                 executeSysProcPlanFragments(pfs, DEP_tableAggregator);
         }
         else if (selector.toUpperCase().equals(SysProcSelector.PROCEDURE.name())) {
+            SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
             // create a work fragment to gather procedure data from each of the sites.
             pfs[1] = new SynthesizedPlanFragment();
             pfs[1].fragmentId = SysProcFragmentId.PF_procedureData;
@@ -246,7 +256,8 @@ public class Statistics extends VoltSystemProcedure {
                 executeSysProcPlanFragments(pfs, DEP_procedureAggregator);
         }
         else if (selector.toUpperCase().equals(SysProcSelector.INITIATOR.name())) {
-            // create a work fragment to gether procedure data from each of the sites.
+            SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
+            // create a work fragment to gather initiator data from each of the sites.
             pfs[1] = new SynthesizedPlanFragment();
             pfs[1].fragmentId = SysProcFragmentId.PF_initiatorData;
             pfs[1].outputDepId = DEP_initiatorData;
@@ -269,6 +280,19 @@ public class Statistics extends VoltSystemProcedure {
             // aggregator's output dependency table.
             results =
                 executeSysProcPlanFragments(pfs, DEP_initiatorAggregator);
+        } else if (selector.toUpperCase().equals(SysProcSelector.PARTITIONCOUNT.name())) {
+            SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[1];
+            // create a work fragment to gather the partition count the catalog.
+            pfs[0] = new SynthesizedPlanFragment();
+            pfs[0].fragmentId = SysProcFragmentId.PF_partitionCount;
+            pfs[0].outputDepId = DEP_partitionCount;
+            pfs[0].inputDepIds = new int[]{};
+            pfs[0].multipartition = false;
+            pfs[0].nonExecSites = false;
+            pfs[0].parameters = new ParameterSet();
+
+            results =
+                executeSysProcPlanFragments(pfs, DEP_partitionCount);
         }
         else {
             throw new VoltAbortException("Invalid Statistics selector.");

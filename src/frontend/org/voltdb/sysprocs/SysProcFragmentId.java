@@ -33,6 +33,7 @@ public class SysProcFragmentId
     public static final long PF_procedureAggregator = 14;
     public static final long PF_initiatorData = 15;
     public static final long PF_initiatorAggregator = 16;
+    public static final long PF_partitionCount = 17;
 
     // @Shutdown
     public static final long PF_shutdownCommand = 21;
