@@ -62,14 +62,14 @@ public interface Mailbox {
     public int getWaitingCount();
 
     /**
-     * Get the next Object from this messaging queue.
+     * Get the next Object from this messaging queue from the default subject.
      *
      * @return A message object on success or null if no object is waiting.
      */
     public VoltMessage recv();
 
     /**
-     * Get the next Object from this messaging queue. Blocks if no messages
+     * Get the next Object from this messaging queue from the default subject. Blocks if no messages
      * are available.
      *
      * @return A message object on success or null if interrupted
@@ -77,10 +77,33 @@ public interface Mailbox {
     public VoltMessage recvBlocking();
 
     /**
-     * Get the next Object from this messaging queue. Blocks if no messages
+     * Get the next Object from this messaging queue from the default subject.. Blocks if no messages
      * are available.
      * @param  Timeout Number of milliseconds to wait for work
      * @return A message object on success or null if interrupted
      */
     public VoltMessage recvBlocking(long timeout);
+
+    /**
+     * Get the next Object from this messaging queue from the default subject.
+     *
+     * @return A message object on success or null if no object is waiting.
+     */
+    public VoltMessage recv(Subject s);
+
+    /**
+     * Get the next Object from this messaging queue from the default subject. Blocks if no messages
+     * are available.
+     *
+     * @return A message object on success or null if interrupted
+     */
+    public VoltMessage recvBlocking(Subject s);
+
+    /**
+     * Get the next Object from this messaging queue from the default subject.. Blocks if no messages
+     * are available.
+     * @param  Timeout Number of milliseconds to wait for work
+     * @return A message object on success or null if interrupted
+     */
+    public VoltMessage recvBlocking(Subject s, long timeout);
 }

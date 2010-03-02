@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.messaging.Subject;
 import org.voltdb.ParameterSet;
 import org.voltdb.utils.DBBPool;
 
@@ -46,7 +47,9 @@ public class FragmentTask extends MembershipNotice
     int m_inputDepCount = 0;
 
     /** Empty constructor for de-serialization */
-    public FragmentTask() {}
+    public FragmentTask() {
+        m_subject = Subject.DEFAULT.getId();
+    }
 
     /**
      *
@@ -77,7 +80,7 @@ public class FragmentTask extends MembershipNotice
         m_outputDepIds = outputDepIds;
         m_parameterSets = parameterSets;
         m_isFinal = isFinal;
-
+        m_subject = Subject.DEFAULT.getId();
         assert(selfCheck());
     }
 

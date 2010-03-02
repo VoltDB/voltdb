@@ -17,6 +17,7 @@
 
 package org.voltdb.messages;
 
+import org.voltdb.messaging.Subject;
 import org.voltdb.messaging.VoltMessage;
 import org.voltdb.utils.DBBPool;
 
@@ -26,6 +27,11 @@ import org.voltdb.utils.DBBPool;
  *
  */
 public class DebugMessage extends VoltMessage {
+
+
+    public DebugMessage() {
+        m_subject = Subject.DEFAULT.getId();
+    }
 
     /** should the receiver dump state */
     public boolean shouldDump = false;

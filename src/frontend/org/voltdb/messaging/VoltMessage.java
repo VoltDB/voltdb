@@ -51,6 +51,7 @@ public abstract class VoltMessage {
 
     protected BBContainer m_container = null;
     protected ByteBuffer m_buffer = null;
+    protected byte m_subject;
 
     public static VoltMessage createNewMessage(byte messageType) {
         // instantiate a new message instance according to the type
@@ -187,5 +188,9 @@ public abstract class VoltMessage {
             m_container = null;
             m_buffer = null;
         }
+    }
+
+    public byte getSubject() {
+        return m_subject;
     }
 }

@@ -23,6 +23,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.debugstate.MailboxHistory.MessageState;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
+import org.voltdb.messaging.Subject;
 import org.voltdb.messaging.VoltMessage;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.utils.DBBPool;
@@ -52,12 +53,15 @@ public class FragmentResponse extends VoltMessage {
     SerializableException m_exception;
 
     /** Empty constructor for de-serialization */
-    public FragmentResponse() {}
+    public FragmentResponse() {
+        m_subject = Subject.DEFAULT.getId();
+    }
 
     public FragmentResponse(FragmentTask task, int siteId) {
         m_executorSiteId = siteId;
         m_txnId = task.m_txnId;
         m_destinationSiteId = task.m_coordinatorSiteId;
+        m_subject = Subject.DEFAULT.getId();
     }
 
     /**

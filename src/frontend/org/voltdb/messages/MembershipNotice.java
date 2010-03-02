@@ -18,6 +18,7 @@
 package org.voltdb.messages;
 
 import org.voltdb.debugstate.MailboxHistory.MessageState;
+import org.voltdb.messaging.Subject;
 import org.voltdb.messaging.VoltMessage;
 import org.voltdb.utils.DBBPool;
 
@@ -37,7 +38,9 @@ public class MembershipNotice extends VoltMessage {
     boolean m_isHeartBeat;
 
     /** Empty constructor for de-serialization */
-    public MembershipNotice() {}
+    public MembershipNotice() {
+        m_subject = Subject.DEFAULT.getId();
+    }
 
     public MembershipNotice(int initiatorSiteId,
                             int coordinatorSiteId,
@@ -47,6 +50,7 @@ public class MembershipNotice extends VoltMessage {
         m_coordinatorSiteId = coordinatorSiteId;
         m_txnId = txnId;
         m_isReadOnly = isReadOnly;
+        m_subject = Subject.DEFAULT.getId();
     }
 
     public void setIsHeartBeat(boolean isHeartBeat) {

@@ -74,10 +74,27 @@ public class MockMailbox implements Mailbox {
     }
 
     public VoltMessage recv() {
-        throw new UnsupportedOperationException();
+        return recv(Subject.DEFAULT);
     }
 
     public VoltMessage recvBlocking() {
+        return recvBlocking(Subject.DEFAULT);
+    }
+
+    @Override
+    public VoltMessage recvBlocking(long timeout) {
+        return recvBlocking(Subject.DEFAULT, timeout);
+    }
+    @Override
+    public VoltMessage recv(Subject s) {
+        throw new UnsupportedOperationException();
+    }
+    @Override
+    public VoltMessage recvBlocking(Subject s) {
+        throw new UnsupportedOperationException();
+    }
+    @Override
+    public VoltMessage recvBlocking(Subject s, long timeout) {
         throw new UnsupportedOperationException();
     }
 
@@ -117,8 +134,4 @@ public class MockMailbox implements Mailbox {
 
     private final SimpleDtxnInitiator.DummyBlockingQueue incomingMessages;
     private final ArrayDeque<Message> outgoingMessages = new ArrayDeque<Message>();
-    @Override
-    public VoltMessage recvBlocking(long timeout) {
-        throw new UnsupportedOperationException();
-    }
 }

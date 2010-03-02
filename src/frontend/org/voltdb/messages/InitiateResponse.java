@@ -24,6 +24,7 @@ import org.voltdb.debugstate.MailboxHistory.MessageState;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FastSerializable;
+import org.voltdb.messaging.Subject;
 import org.voltdb.messaging.VoltMessage;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.utils.DBBPool;
@@ -48,6 +49,7 @@ public class InitiateResponse extends VoltMessage {
     {
         m_initiatorSiteId = -1;
         m_coordinatorSiteId = -1;
+        m_subject = Subject.DEFAULT.getId();
     }
 
     /**
@@ -60,6 +62,7 @@ public class InitiateResponse extends VoltMessage {
         m_txnId = task.m_txnId;
         m_initiatorSiteId = task.m_initiatorSiteId;
         m_coordinatorSiteId = task.m_coordinatorSiteId;
+        m_subject = Subject.DEFAULT.getId();
     }
 
     public void setClientHandle(long clientHandle) {
