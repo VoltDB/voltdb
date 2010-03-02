@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Hashtable;
 
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.fault.FaultDistributor;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.impl.HostMessenger;
 import org.voltdb.network.VoltNetwork;
@@ -65,6 +66,7 @@ public interface VoltDBInterface
     public VoltNetwork getNetwork();
     public StatsAgent getStatsAgent();
     public SiteTracker getSiteTracker();
+    public FaultDistributor getFaultDistributor();
 
     /**
      * Tells if the VoltDB is running. m_isRunning needs to be set to true

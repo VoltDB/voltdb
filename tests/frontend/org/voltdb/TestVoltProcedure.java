@@ -63,6 +63,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.fault.FaultDistributor;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.impl.HostMessenger;
 import org.voltdb.network.VoltNetwork;
@@ -312,6 +313,12 @@ public class TestVoltProcedure extends TestCase {
 
         @Override
         public SiteTracker getSiteTracker()
+        {
+            return null;
+        }
+
+        @Override
+        public FaultDistributor getFaultDistributor()
         {
             return null;
         }

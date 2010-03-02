@@ -32,6 +32,7 @@ import java.util.Hashtable;
 import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.fault.FaultDistributor;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.impl.HostMessenger;
 import org.voltdb.network.VoltNetwork;
@@ -97,6 +98,12 @@ public class TestEELibraryLoader {
         @Override
         public StatsAgent getStatsAgent() {
             // TODO Auto-generated method stub
+            return null;
+        }
+
+        @Override
+        public FaultDistributor getFaultDistributor()
+        {
             return null;
         }
 

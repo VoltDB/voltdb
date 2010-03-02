@@ -68,6 +68,7 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Host;
 import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Site;
+import org.voltdb.fault.FaultDistributor;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.VoltMessage;
 import org.voltdb.messaging.impl.HostMessenger;
@@ -192,6 +193,12 @@ public class TestSimpleWorkUnit extends TestCase {
         public SiteTracker getSiteTracker()
         {
             return new SiteTracker(m_context.sites);
+        }
+
+        @Override
+        public FaultDistributor getFaultDistributor()
+        {
+            return null;
         }
 
         @Override

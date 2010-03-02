@@ -37,6 +37,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.dtxn.InitiatorStats;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.elt.ELTManager;
+import org.voltdb.fault.FaultDistributor;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.impl.HostMessenger;
 import org.voltdb.network.VoltNetwork;
@@ -107,6 +108,7 @@ public class RealVoltDB implements VoltDBInterface
     private ExecutionSite m_currentThreadSite;
     private StatsAgent m_statsAgent = new StatsAgent();
     private SiteTracker m_siteTracker;
+    private FaultDistributor m_faultManager;
 
     // add a random number to the sampler output to make it likely to be unique for this process.
     private final VoltSampler m_sampler = new VoltSampler(10, "sample" + String.valueOf(new Random().nextInt() % 10000) + ".txt");
@@ -126,6 +128,8 @@ public class RealVoltDB implements VoltDBInterface
      */
     public synchronized void initialize(VoltDB.Configuration config) {
         hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+
+        m_faultManager = new FaultDistributor();
 
         // start the dumper thread
         if (config.listenForDumpRequests)
@@ -520,6 +524,11 @@ public class RealVoltDB implements VoltDBInterface
 
     public SiteTracker getSiteTracker() {
         return m_siteTracker;
+    }
+
+    public FaultDistributor getFaultDistributor()
+    {
+        return m_faultManager;
     }
 
     public synchronized CatalogContext getCatalogContext() {

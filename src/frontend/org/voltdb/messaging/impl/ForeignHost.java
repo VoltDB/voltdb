@@ -22,6 +22,8 @@ import java.nio.channels.SocketChannel;
 import java.nio.ByteBuffer;
 
 import org.voltdb.VoltDB;
+import org.voltdb.fault.VoltFault;
+import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.messaging.*;
 import org.voltdb.network.QueueMonitor;
 import org.voltdb.network.VoltProtocolHandler;
