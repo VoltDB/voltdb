@@ -39,7 +39,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
     // procedures used by these tests
     static final Class<?>[] PROCEDURES = {
         AddPerson.class, DeletePerson.class, UpdatePerson.class, AggAges.class,
-        SelectAllPeople.class, AggThings.class, AddThing.class
+        SelectAllPeople.class, AggThings.class, AddThing.class, OverflowTest.class
     };
 
     public TestMaterializedViewSuite(String name) {
@@ -251,6 +251,45 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assert(results != null);
     }
 
+    public void testInsertAndOverflowSum() throws IOException, ProcCallException {
+        if (isHSQL()) {
+            return;
+        }
+        Client client = getClient();
+        int invocationIndex = 0;
+        VoltTable[] results = client.callProcedure("OverflowTest", 0, 0, invocationIndex++);
+        results = client.callProcedure("OverflowTest", 2, 0, invocationIndex++);
+        results = client.callProcedure("OverflowTest", 1, 0, 0);
+        results[0].advanceRow();
+        long preRollbackValue = results[0].getLong(3);
+        boolean threwException = false;
+        try {
+            results = client.callProcedure("OverflowTest", 0, 0, invocationIndex++);
+        } catch (Exception e) {
+           threwException = true;
+        }
+        assertTrue(threwException);
+        results = client.callProcedure("OverflowTest", 1, 0, 0);
+        results[0].advanceRow();
+        assertEquals(preRollbackValue, results[0].getLong(3));
+        preRollbackValue = 0;
+        threwException = false;
+        while (!threwException) {
+            try {
+                results = client.callProcedure("OverflowTest", 2, 0, invocationIndex++);
+                results = client.callProcedure("OverflowTest", 1, 0, 0);
+                results[0].advanceRow();
+                preRollbackValue = results[0].getLong(2);
+            } catch (Exception e) {
+                threwException = true;
+                break;
+            }
+        }
+        results = client.callProcedure("OverflowTest", 1, 0, 0);
+        results[0].advanceRow();
+        assertEquals(preRollbackValue, results[0].getLong(2));
+    }
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
@@ -281,6 +320,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         //project.setBackendTarget(BackendTarget.NATIVE_EE_IPC);
         project.addSchema(schemaPath);
         project.addPartitionInfo("PEOPLE", "PARTITION");
+        project.addPartitionInfo("OVERFLOWTEST", "COL_1");
         project.addProcedures(PROCEDURES);
         // build the jarfile
         //config.compile(project);

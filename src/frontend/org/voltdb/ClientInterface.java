@@ -96,7 +96,7 @@ public class ClientInterface implements DumpManager.Dumpable {
     final String m_dumpId;
 
     private final QueueMonitor m_clientQueueMonitor = new QueueMonitor() {
-        private int MAX_QUEABLE = 268435456;
+        private int MAX_QUEABLE = 33554432;
 
         private int m_queued = 0;
 
