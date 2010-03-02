@@ -23,13 +23,17 @@
 
 package org.voltdb.utils;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
 
 import junit.framework.TestCase;
 
 public class TestHTTPD extends TestCase {
 
-    public void testSimple() throws IOException {
+    public void testSimpleWithQuit() throws IOException {
         NanoHTTPD server = new NanoHTTPD(9999);
         assertTrue(server.myServerSocket != null);
         assertTrue(server.myTcpPort == 9999);
@@ -37,6 +41,26 @@ public class TestHTTPD extends TestCase {
         assertTrue(server.myThread.isAlive());
         server.shutdown(true);
         assertFalse(server.myThread.isAlive());
+    }
+
+    public void testSingleFileServer() throws IOException {
+        File f = File.createTempFile("testSingleFileServer", ".jar");
+        byte[] data = new byte[1000];
+        data[777] = 31;
+        FileOutputStream fos = new FileOutputStream(f);
+        fos.write(data);
+        fos.close();
+
+        SingleFileHTTPServer server = SingleFileHTTPServer.serveFile(f);
+        String uri = server.m_uri;
+
+        URL url = new URL(uri);
+        InputStream is = url.openStream();
+        byte[] data2 = new byte[1000];
+        is.read(data2);
+        assertTrue(data2[777] == data[777]);
+
+        server.shutdown(true);
     }
 
 }

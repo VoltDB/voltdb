@@ -654,12 +654,7 @@ public class NanoHTTPD
         try
         {
             // Get MIME type from file name extension, if possible
-            String mime = null;
-            int dot = f.getCanonicalPath().lastIndexOf( '.' );
-            if ( dot >= 0 )
-                mime = theMimeTypes.get( f.getCanonicalPath().substring( dot + 1 ).toLowerCase());
-            if ( mime == null )
-                mime = MIME_DEFAULT_BINARY;
+            String mime = mimeFromExtention(f);
 
             // Support (simple) skipping:
             long startFrom = 0;
@@ -691,6 +686,16 @@ public class NanoHTTPD
         {
             return new Response( HTTP_FORBIDDEN, MIME_PLAINTEXT, "FORBIDDEN: Reading file failed." );
         }
+    }
+
+    public static String mimeFromExtention(File f) throws IOException {
+        String mime = null;
+        int dot = f.getCanonicalPath().lastIndexOf( '.' );
+        if ( dot >= 0 )
+            mime = theMimeTypes.get( f.getCanonicalPath().substring( dot + 1 ).toLowerCase());
+        if ( mime == null )
+            mime = MIME_DEFAULT_BINARY;
+        return mime;
     }
 
     /**
