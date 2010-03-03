@@ -67,7 +67,12 @@ class TableStats;
 class TempTable : public Table {
     friend class TableFactory;
 
-    public:
+  private:
+    // no copies, no assignment
+    TempTable(TempTable const&);
+    TempTable operator=(TempTable const&);
+
+  public:
         virtual ~TempTable();
 
         virtual void cleanupManagedBuffers(Topend *cxt) {
@@ -108,9 +113,10 @@ class TempTable : public Table {
         std::string tableType() const;
         void getNextFreeTupleInlined(TableTuple *tuple);
         voltdb::TableStats* getTableStats();
-;
+
     protected:
-        TempTable();
+        // can not use this constructor to coerce a cast
+        explicit TempTable();
         void onSetColumns();
 
         /** not temptuple. these are for internal use. */
@@ -157,12 +163,15 @@ inline void TempTable::updateTupleNonVirtual(TableTuple &source, TableTuple &tar
 }
 
 inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
-    if (m_tupleCount == 0) return;
-    assert (m_tupleCount == m_usedTuples); // as there must be no hole.
-    // first, we have to mark tuples as deleted and free strings
-    // we don't call deleteTuple() here!
-    // note that we can do this because this is a temptable which
-    // doesn't have indexes.
+    // as there must be no hole.
+    assert (m_tupleCount == m_usedTuples);
+
+    if (m_tupleCount == 0) {
+        return;
+    }
+
+    // Mark tuples as deleted and free strings. No indexes to update.
+    // Don't call deleteTuple() here.
     const uint16_t uninlinedStringColumnCount = m_schema->getUninlinedStringColumnCount();
     if (freeAllocatedStrings && uninlinedStringColumnCount > 0) {
         for (int64_t i = m_tupleCount - 1; i >= 0; i--) {
@@ -171,15 +180,13 @@ inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
         }
     }
 
-    // a quick way to make this table empty.
-    // hole_free_tuples.clear(); there can't be a hole!
     m_tupleCount = 0;
     m_usedTuples = 0;
 
     // make temp tables free memory allocated during fragment execution
     // reset back to base size
     while (m_data.size() > 1) {
-#ifdef MEMCHECK_NOFREELIST
+#if defined(MEMCHECK_NOFREELIST)
         //Chunks and individual tuples storage are the same in the memcheck build so
         //when doing memcheck call delete tuple storage to delete the chunk in order
         //to correctly update the metadata kept in the memcheck build
@@ -193,7 +200,15 @@ inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
         TableTuple tuple(this->schema());
         tuple.move(chunk);
         deleteTupleStorage(tuple);
-        m_tupleCount = 0;
+#elif defined(MEMCHECK)
+        char* chunk = m_data.back();
+        m_data.pop_back();
+        m_allocatedTuples -= m_tuplesPerBlock;
+        if (m_tempTableMemoryInBytes) {
+            (*m_tempTableMemoryInBytes) -= (m_schema->tupleLength() + TUPLE_HEADER_SIZE);
+        }
+        assert(chunk != NULL);
+        delete[] chunk;
 #else
         char* chunk = m_data.back();
         m_data.pop_back();
