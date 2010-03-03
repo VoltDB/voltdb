@@ -337,6 +337,18 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+================================================================================
+Base64
+
+ * I am placing this code in the Public Domain. Do with it as you will.
+ * This software comes with no guarantees or warranties but with
+ * plenty of well-wishing instead!
+
+ * @author Robert Harder
+ * @author rob@iharder.net
+ * @version 2.3.7
+
+
 ================================================================================ 
 Build System Only (VoltDB includes these jars or binaries in our svn repository)
 ================================================================================
