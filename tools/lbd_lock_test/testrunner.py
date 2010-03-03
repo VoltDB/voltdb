@@ -69,28 +69,31 @@ def runTest(i):
     start = datetime.datetime.utcnow()
     prevnow = start        # the last time a progress time was printed
     lastdotprinted = start # the last time a dot was successfully read
+    
+    # true if there was a break in the dots
+    possiblyFailed = False
 
     # while the java process isn't dead
     while p.poll() == None:
         now = datetime.datetime.utcnow()
 
         # print a progress time out every 10 seconds
-        if (now - prevnow).seconds == 10:
-            prevnow = now
-            sys.stdout.write(" %d seconds " % ((now - start).seconds))
+        if possiblyFailed == False:
+            if (now - prevnow).seconds == 10:
+                prevnow = now
+                sys.stdout.write(" %d seconds " % ((now - start).seconds))
 
         # if no dots read in 10 seconds, then we assume the java proc has hung
-        if (now - lastdotprinted).seconds > 10:
-            print("\nSorry, this platfrom has reproduced the issue. Press any key to end this script.")
-            blockUntilInput(sys.stdin)
-            killProcess(p)
-            return False
+        if (now - lastdotprinted).seconds > 20:
+            print("\nSorry, this platfrom may have reproduced the issue. If you do not see more dots, it's sadness time.")
+            possiblyFailed = True
 
         # if all's gone well for DURATION_IN_SECONDS, we kill the proc and return true
-        if (now - start).seconds > DURATION_IN_SECONDS:
-            print("\nThis run (%d) did not reproduce the issue." % (i))
-            killProcess(p)
-            return True
+        if possiblyFailed == False:
+            if (now - start).seconds > DURATION_IN_SECONDS:
+                print("\nThis run (%d) did not reproduce the issue." % (i))
+                killProcess(p)
+                return True
 
         # do a non-blocking input read to see if the user wants to stop
         try:
@@ -106,6 +109,7 @@ def runTest(i):
             c = p.stdout.read(1)
             sys.stdout.write(c)
             lastdotprinted = now
+            possiblyFailed = False
         except:
             time.sleep(0.1)
             
