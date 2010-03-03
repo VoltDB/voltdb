@@ -266,9 +266,11 @@ public class NanoHTTPD
     }
 
     public void shutdown(boolean blocking) {
+        if (myThread == null) return;
         try {
             if (myThread.isAlive()) {
-                myServerSocket.close();
+                if (myServerSocket != null)
+                    myServerSocket.close();
                 if (blocking)
                     myThread.join();
             }

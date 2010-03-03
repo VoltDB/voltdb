@@ -41,6 +41,7 @@ public class TestHTTPD extends TestCase {
         assertTrue(server.myThread.isAlive());
         server.shutdown(true);
         assertFalse(server.myThread.isAlive());
+        server.shutdown(true);
     }
 
     public void testSingleFileServer() throws IOException {
