@@ -114,6 +114,11 @@ class Table {
     friend class TableStats;
     friend class StatsSource;
 
+  private:
+    // no default constructor, no copy
+    Table();
+    Table(Table const&);
+
 public:
     virtual ~Table();
     /** Release EL or checkpoint buffers associated to the table */
@@ -312,7 +317,6 @@ inline void Table::allocateNextBlock() {
     int bytes = m_tableAllocationTargetSize;
 #endif
     char *memory = (char*)(new char[bytes]);
-    //::memset(memory, 0, TABLE_ALLOCATION_TARGET_SIZE * sizeof(SlimValue));
     m_data.push_back(memory);
 #ifdef MEMCHECK_NOFREELIST
     assert(m_allocatedTuplePointers.insert(memory).second);
@@ -320,17 +324,11 @@ inline void Table::allocateNextBlock() {
 #endif
     m_allocatedTuples += m_tuplesPerBlock;
     if (m_tempTableMemoryInBytes) {
-        //printf("Temp table memory for a fragment used to be: %d\n", *m_tempTableMemoryInBytes);
         (*m_tempTableMemoryInBytes) += bytes;
-        //printf(" - Incremented by %d and is now: %d (info %d, %d, %d)\n", bytes, *m_tempTableMemoryInBytes,
-        //    m_tableAllocationTargetSize, m_schema->tupleLength(), TUPLE_HEADER_SIZE);
-        //fflush(stdout);
-        if ((*m_tempTableMemoryInBytes) > MAX_TEMP_TABLE_MEMORY)
-            throw SQLException(SQLException::volt_temp_table_memory_overflow, "More than 100MB of temp table memory used while executing SQL. Aborting.");
-    }
-    else {
-        //printf("Table memory explanded, but not tracked\n");
-        //fflush(stdout);
+        if ((*m_tempTableMemoryInBytes) > MAX_TEMP_TABLE_MEMORY) {
+            throw SQLException(SQLException::volt_temp_table_memory_overflow,
+                               "More than 100MB of temp table memory used while executing SQL. Aborting.");
+        }
     }
 }
 
