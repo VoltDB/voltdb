@@ -17,21 +17,21 @@
 
 package org.voltdb.messaging.impl;
 
-import java.net.*;
-import java.nio.channels.SocketChannel;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
 
 import org.voltdb.VoltDB;
-import org.voltdb.fault.VoltFault;
-import org.voltdb.fault.VoltFault.FaultType;
-import org.voltdb.messaging.*;
+import org.voltdb.messaging.FastSerializer;
+import org.voltdb.messaging.VoltMessage;
+import org.voltdb.network.Connection;
 import org.voltdb.network.QueueMonitor;
 import org.voltdb.network.VoltProtocolHandler;
+import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.utils.DBBPool;
-import org.voltdb.network.Connection;
-import java.io.IOException;
 
 public class ForeignHost {
     private final Connection m_connection;

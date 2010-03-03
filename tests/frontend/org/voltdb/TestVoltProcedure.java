@@ -363,6 +363,12 @@ public class TestVoltProcedure extends TestCase {
         public boolean ignoreCrash() {
             return false;
         }
+
+        @Override
+        public void catalogUpdate(String diffCommands, String newCatalogURL) {
+            // TODO Auto-generated method stub
+
+        }
     }
 
     private class MockExecutionSite extends ExecutionSite {

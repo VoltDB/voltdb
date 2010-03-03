@@ -21,6 +21,6 @@ public class CatalogChangeResult extends AsyncCompilerResult {
     private static final long serialVersionUID = 5065393610771307485L;
 
     public String catalogURL;
-    public String diffCommands;
+    public String encodedDiffCommands;
 
 }

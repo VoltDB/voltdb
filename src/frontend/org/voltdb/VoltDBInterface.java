@@ -69,6 +69,15 @@ public interface VoltDBInterface
     public FaultDistributor getFaultDistributor();
 
     /**
+    * Updates the catalog context stored by this VoltDB without destroying the old one,
+    * in case anything still links to it.
+    *
+    * @param newCatalogURL A URL for the new catalog (http: or file:).
+    * @param diffCommands The commands to update the current catalog to the new one.
+    */
+   public void catalogUpdate(String diffCommands, String newCatalogURL);
+
+    /**
      * Tells if the VoltDB is running. m_isRunning needs to be set to true
      * when the run() method is called, and set to false when shutting down.
      *

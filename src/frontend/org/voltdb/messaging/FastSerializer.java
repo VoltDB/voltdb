@@ -279,7 +279,6 @@ public class FastSerializer implements DataOutput {
             return;
         }
 
-        int strlen = string.length();
         int len = 0;
         byte[] strbytes = {};
         try {

@@ -294,11 +294,18 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
 
             // compute the diff
             String diffCommands = CatalogDiffEngine.getCommandsToDiff(context.catalog, newCatalog);
-            retval.diffCommands = diffCommands;
+
+            // since diff commands can be stupidly big, compress them here
+            retval.encodedDiffCommands = Encoder.compressAndBase64Encode(diffCommands);
+            // check if the resulting string is small enough to fit in our parameter sets
+            if (retval.encodedDiffCommands.length() > 32000) {
+                throw new Exception("The requested catalog change is too large for this version of VoltDB. " +
+                                    "Try a series of smaller updates.");
+            }
         }
         catch (Exception e) {
             e.printStackTrace();
-            retval.diffCommands = null;
+            retval.encodedDiffCommands = null;
             retval.errorMsg = e.getMessage();
         }
 

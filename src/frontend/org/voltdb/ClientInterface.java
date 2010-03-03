@@ -860,7 +860,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                     task.procName = "@UpdateApplicationCatalog";
                     task.params = new ParameterSet();
                     task.params.m_params = new Object[] {
-                            changeResult.diffCommands, changeResult.catalogURL,
+                            changeResult.encodedDiffCommands, changeResult.catalogURL,
                     };
                     task.clientHandle = changeResult.clientHandle;
 

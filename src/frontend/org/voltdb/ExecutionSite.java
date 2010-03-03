@@ -23,11 +23,11 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
-import java.util.List;
 import java.util.HashSet;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -59,8 +59,8 @@ import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.VoltMessage;
 import org.voltdb.utils.DumpManager;
-import org.voltdb.utils.EstTime;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.EstTime;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltLoggerFactory;
 import org.voltdb.utils.DBBPool.BBContainer;
@@ -505,6 +505,10 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
             @Override
             public void discard() {}
         };
+    }
+
+    public boolean updateCatalog() {
+        return true;
     }
 
     public long getCurrentTxnId() {

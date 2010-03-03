@@ -268,6 +268,12 @@ public class TestSimpleWorkUnit extends TestCase {
             return null;
         }
 
+        @Override
+        public void catalogUpdate(String diffCommands, String newCatalogURL) {
+            // TODO Auto-generated method stub
+
+        }
+
     }
 
     static final VoltMessage work = VoltMessage.createNewMessage(VoltMessage.INITIATE_RESPONSE_ID);
