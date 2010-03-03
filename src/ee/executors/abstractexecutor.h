@@ -106,10 +106,6 @@ class AbstractExecutor {
 
     // cache to avoid runtime virtual function call
     bool needs_outputtable_clear_cached;
-
-    // pointer to a counter that is shared among all executors for a given fragment
-    // represents bytes used by temp tables in aggregate
-    //int* m_tempTableMemoryInBytes;
 };
 
 /**

@@ -76,9 +76,6 @@ bool AbstractExecutor::init(VoltDBEngine *engine, const catalog::Database* catal
     }
     abstract_node->setInputTables(input_tables);
 
-    // set the fragment-wide counter for bytes used
-    //m_tempTableMemoryInBytes = tempTableMemoryInBytes;
-
     // Some tables have target tables (scans + operations) that are
     // based on tables under the control of the local storage manager
     // (as opposed to an intermediate result table). We'll grab them
