@@ -425,20 +425,20 @@ class FastSerializer:
 
     # date
     def readDate(self):
-        # milliseconds before or after Jan 1, 1970
-        return datetime.datetime.fromtimestamp(self.readInt64()/1000)
+        # microseconds before or after Jan 1, 1970
+        return datetime.datetime.fromtimestamp(self.readInt64()/1000000.0)
 
     def readDateArray(self):
         retval = []
         raw = self.readInt64Array()
 
         for i in raw:
-            retval.append(datetime.datetime.fromtimestamp(i/1000))
+            retval.append(datetime.datetime.fromtimestamp(i/1000000.0))
 
         return tuple(retval)
 
     def writeDate(self, value):
-        val = int(time.mktime(value.timetuple())*1000)
+        val = int(time.mktime(value.timetuple())*1000000)
         self.wbuf.extend(struct.pack(self.int64Type(1), val))
 
     def readDecimal(self):
