@@ -75,7 +75,6 @@ JAVA & CATALOG COMPILATION
         <arg value="project.xml"/> <!-- project file -->
         <arg value="1"/>           <!-- hosts -->
         <arg value="1"/>           <!-- sites -->
-        <arg value="0"/>           <!-- k-safety factor -->
         <arg value="localhost"/>   <!-- leader -->
         <arg value="${catalog_jar}"/> <!-- output -->
         <classpath refid='project.classpath' />

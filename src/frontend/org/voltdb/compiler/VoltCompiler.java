@@ -967,16 +967,20 @@ public class VoltCompiler {
 
     public static void main(final String[] args) {
         // Parse arguments
-        if (args.length != 6) {
-            System.err.println("VoltCompiler [project file] [hosts] [sites per host] [k-safety factor] [leader IP] [output JAR]");
+        if (args.length < 5 || args.length > 6) {
+            System.err.println("VoltCompiler [project file] [hosts] [sites per host] [leader IP] [output JAR] [k-safety factor (optional/future)] ");
             System.exit(1);
         }
         final String projectPath = args[0];
         final int hostCount = Integer.parseInt(args[1]);
         final int siteCount = Integer.parseInt(args[2]);
-        final int k_factor = Integer.parseInt(args[3]);
-        final String leaderAddress = args[4];
-        final String outputJar = args[5];
+        final String leaderAddress = args[3];
+        final String outputJar = args[4];
+        int k_factor = 0;
+        if (args.length == 6)
+        {
+            k_factor = Integer.parseInt(args[5]);
+        }
 
         // Compile and exit with error code if we failed
         final ClusterConfig cluster_config =
