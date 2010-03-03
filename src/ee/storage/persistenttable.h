@@ -104,7 +104,13 @@ class PersistentTable : public Table {
     friend class TableIterator;
     friend class PersistentTableStats;
 
-public:
+  private:
+    // no default ctor, no copy, no assignment
+    PersistentTable();
+    PersistentTable(PersistentTable const&);
+    PersistentTable operator=(PersistentTable const&);
+
+  public:
     virtual ~PersistentTable();
 
     virtual void cleanupManagedBuffers(Topend *cxt) {
