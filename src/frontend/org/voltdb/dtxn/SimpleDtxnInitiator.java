@@ -44,12 +44,14 @@
 
 package org.voltdb.dtxn;
 
-import java.util.HashMap;
-import java.util.concurrent.TimeUnit;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
 
+import org.apache.log4j.Logger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TransactionIdManager;
@@ -63,11 +65,8 @@ import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.VoltMessage;
 import org.voltdb.messaging.impl.SiteMailbox;
-import java.util.concurrent.BlockingQueue;
 import org.voltdb.network.Connection;
-import org.apache.log4j.Logger;
 import org.voltdb.utils.VoltLoggerFactory;
-//import org.voltdb.utils.EstTime;
 
 /** Supports correct execution of multiple partition transactions by executing them one at a time. */
 public class SimpleDtxnInitiator extends TransactionInitiator {
@@ -100,6 +99,9 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                int initiatorId,
             Runnable onBackPressure, Runnable offBackPressure) {
         assert(mailbox != null);
+
+        System.out.printf("INITIATILING INITIATOR ID: %d, SITEID: %d\n", initiatorId, siteId);
+        System.out.flush();
 
         m_stats = new InitiatorStats("Initiator " + siteId + " stats", siteId);
         m_idManager = new TransactionIdManager(initiatorId);

@@ -171,14 +171,14 @@ public class TestVoltProcedure extends TestCase {
 
     public void testProcedureStatsCollector() {
         NullProcedureWrapper wrapper = new LongProcedure();
-        wrapper.init(site, site.database.getProcedures().get(LongProcedure.class.getName()), BackendTarget.NATIVE_EE_JNI, null, null);
+        wrapper.init(site, site.m_context.database.getProcedures().get(LongProcedure.class.getName()), BackendTarget.NATIVE_EE_JNI, null, null);
         ParameterSet params = new ParameterSet();
         params.m_params = new Object[1];
         params.m_params[0] = new Long(1);
         assertNotNull(agent.m_selector);
         assertNotNull(agent.m_source);
         assertEquals(agent.m_selector, SysProcSelector.PROCEDURE);
-        assertEquals(agent.m_catalogId, Integer.parseInt(site.cluster.getSites().get(Integer.toString(site.siteId)).getTypeName()));
+        assertEquals(agent.m_catalogId, Integer.parseInt(site.m_context.cluster.getSites().get(Integer.toString(site.siteId)).getTypeName()));
         Object statsRow[][] = agent.m_source.getStatsRows();
         assertNotNull(statsRow);
         assertEquals(statsRow[0][1], new Long(site.siteId));
@@ -212,7 +212,7 @@ public class TestVoltProcedure extends TestCase {
             e.printStackTrace();
         }
 
-        wrapper.init(site, site.database.getProcedures().get(procedure.getName()), BackendTarget.NATIVE_EE_JNI, null, null);
+        wrapper.init(site, site.m_context.database.getProcedures().get(procedure.getName()), BackendTarget.NATIVE_EE_JNI, null, null);
         return wrapper.call((Object) null);
     }
 
@@ -223,11 +223,10 @@ public class TestVoltProcedure extends TestCase {
             // get some catalog shortcuts ready
             catalog = new Catalog();
             catalog.execute(serializedCatalog);
-            cluster = catalog.getClusters().get("cluster");
-            site = cluster.getSites().get(Integer.toString(siteId));
+            m_context = new CatalogContext(catalog, CatalogContext.NO_PATH);
+            site = m_context.cluster.getSites().get(Integer.toString(siteId));
             //host = cluster.getHosts().get("host");
             //site = host.getSites().get(String.valueOf(siteId));
-            database = cluster.getDatabases().get("database");
         }
     }
 

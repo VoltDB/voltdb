@@ -51,6 +51,7 @@ public class MembershipNotice extends VoltMessage {
         m_txnId = txnId;
         m_isReadOnly = isReadOnly;
         m_subject = Subject.DEFAULT.getId();
+        m_isHeartBeat = false;
     }
 
     public void setIsHeartBeat(boolean isHeartBeat) {

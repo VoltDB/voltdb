@@ -107,21 +107,26 @@ public class TransactionIdManager {
             counterValue = 0;
         }
 
+        lastTxnId = makeIdFromComponents(currentTime, counterValue, initiatorId);
+
+        return lastTxnId;
+    }
+
+    static long makeIdFromComponents(long ts, long seqNo, long initiatorId) {
         // compute the time in millis since VOLT_EPOCH
-        long txnId = currentTime - VOLT_EPOCH;
+        long txnId = ts - VOLT_EPOCH;
         // verify all fields are the right size
         assert(txnId <= TIMESTAMP_MAX_VALUE);
-        assert(counterValue <= COUNTER_MAX_VALUE);
+        assert(seqNo <= COUNTER_MAX_VALUE);
         assert(initiatorId <= INITIATORID_MAX_VALUE);
 
         // put this time value in the right offset
         txnId = txnId << (COUNTER_BITS + INITIATORID_BITS);
         // add the counter value at the right offset
-        txnId |= counterValue << INITIATORID_BITS;
+        txnId |= seqNo << INITIATORID_BITS;
         // finally add the siteid at the end
         txnId |= initiatorId;
 
-        lastTxnId = txnId;
         return txnId;
     }
 
@@ -156,8 +161,14 @@ public class TransactionIdManager {
      * @param txnId The transaction id value to examine.
      * @return The site id embedded within the transaction id.
      */
-    public static long getSiteIdFromTransactionId(long txnId) {
+    public static long getInitiatorIdFromTransactionId(long txnId) {
         return txnId & INITIATORID_MAX_VALUE;
+    }
+
+    public static long getSequenceNumberFromTransactionId(long txnId) {
+        long seq = txnId >> INITIATORID_BITS;
+        seq = seq & COUNTER_MAX_VALUE;
+        return seq;
     }
 
     /**
@@ -173,8 +184,20 @@ public class TransactionIdManager {
      */
     public static String toString(long txnId) {
         final StringBuilder sb = new StringBuilder(128);
-        sb.append("SiteId: ").append(getSiteIdFromTransactionId(txnId));
-        sb.append(" Timestamp: ").append(getTimestampFromTransactionId(txnId));
+        sb.append("Timestamp: ").append(getTimestampFromTransactionId(txnId));
+        sb.append(".").append(getSequenceNumberFromTransactionId(txnId));
+        sb.append(" InititatorId: ").append(getInitiatorIdFromTransactionId(txnId));
         return sb.toString();
+    }
+
+    public static String toBitString(long txnId) {
+        String retval = "";
+        long mask = 0x8000000000000000L;
+        for(int i = 0; i < 64; i++) {
+            if ((txnId & mask) == 0) retval += "0";
+            else retval += "1";
+            mask >>>= 1;
+        }
+        return retval;
     }
 }

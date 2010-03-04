@@ -25,11 +25,11 @@ package org.voltdb.dtxn;
 
 import java.util.Vector;
 
+import junit.framework.TestCase;
+
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.messages.InitiateTask;
-
-import junit.framework.TestCase;
 
 public class TestRestrictedPriorityQueue extends TestCase{
     int[] m_initiators;
@@ -96,7 +96,7 @@ public class TestRestrictedPriorityQueue extends TestCase{
 
     private void addTxnToQueue(TransactionState state)
     {
-        m_queue.gotTransaction(state.initiatorSiteId, state.txnId);
+        m_queue.gotTransaction(state.initiatorSiteId, state.txnId, false);
         m_queue.add(state);
     }
 

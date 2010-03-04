@@ -47,18 +47,25 @@ package org.voltdb.dtxn;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.voltdb.ExecutionSite;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.ExecutionSite;
+import org.voltdb.debugstate.ExecutorContext;
+import org.voltdb.messages.DebugMessage;
+import org.voltdb.messages.FragmentResponse;
+import org.voltdb.messages.FragmentTask;
+import org.voltdb.messages.InitiateTask;
+import org.voltdb.messages.MembershipNotice;
+import org.voltdb.messaging.Mailbox;
+import org.voltdb.messaging.MessagingException;
+import org.voltdb.messaging.VoltMessage;
+import org.voltdb.messaging.impl.SiteMailbox;
 import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltLoggerFactory;
-import org.voltdb.debugstate.ExecutorContext;
-import org.voltdb.messages.*;
-import org.voltdb.messaging.*;
-import org.voltdb.messaging.impl.SiteMailbox;
 
 public class SimpleDtxnConnection extends SiteConnection {
 
@@ -185,7 +192,7 @@ public class SimpleDtxnConnection extends SiteConnection {
             return null;
         }
 
-        m_transactionQueue.gotTransaction(notice.getInitiatorSiteId(), notice.getTxnId());
+        m_transactionQueue.gotTransaction(notice.getInitiatorSiteId(), notice.getTxnId(), notice.isHeartBeat());
 
         // ignore heartbeats
         if (notice.isHeartBeat())

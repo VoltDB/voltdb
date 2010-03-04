@@ -19,8 +19,10 @@ package org.voltdb.dtxn;
 
 import java.util.Arrays;
 import java.util.LinkedHashMap;
-import java.util.Map.Entry;
 import java.util.PriorityQueue;
+import java.util.Map.Entry;
+
+import org.voltdb.TransactionIdManager;
 import org.voltdb.debugstate.ExecutorContext;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
 
@@ -91,11 +93,20 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
      * Update the information stored about the latest transaction
      * seen from each initiator. Compute the newest safe transaction id.
      */
-    void gotTransaction(int initiatorId, long txnId) {
+    void gotTransaction(int initiatorId, long txnId, boolean isHeartbeat) {
         assert(m_lastTxnFromEachInitiator.containsKey(initiatorId));
 
-        if (m_lastTxnPopped > txnId)
-            throw new RuntimeException("Deadlock at site " + String.valueOf(m_siteId) + ": txn executed out of order.");
+        if (m_lastTxnPopped > txnId) {
+            StringBuilder msg = new StringBuilder();
+            msg.append("Txn ordering deadlock at site ").append(m_siteId).append(":\n");
+            msg.append("   txn ").append(m_lastTxnPopped).append(" (");
+            msg.append(TransactionIdManager.toString(m_lastTxnPopped)).append(" HB:");
+            msg.append(isHeartbeat).append(") before\n");
+            msg.append("   txn ").append(txnId).append(" (");
+            msg.append(TransactionIdManager.toString(txnId)).append(" HB:");
+            msg.append(isHeartbeat).append(").\n");
+            throw new RuntimeException(msg.toString());
+        }
 
         // update the latest transaction for the specified initiator
         long prevTxnId = m_lastTxnFromEachInitiator.get(initiatorId);

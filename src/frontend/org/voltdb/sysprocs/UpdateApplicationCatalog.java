@@ -135,7 +135,6 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         for (VoltTable t : retval)
             assert(t.asScalarLong() == 1);
 
-        System.out.println(catalogDiffCommands);
         return null;
     }
 }

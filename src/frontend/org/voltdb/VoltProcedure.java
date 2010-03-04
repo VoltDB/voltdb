@@ -139,7 +139,7 @@ public abstract class VoltProcedure {
         this.isNative = (eeType != BackendTarget.HSQLDB_BACKEND);
         this.hsql = hsql;
         this.m_cluster = cluster;
-        numberOfPartitions = site.cluster.getPartitions().size();
+        numberOfPartitions = site.m_context.cluster.getPartitions().size();
         statsCollector = new ProcedureStatsCollector();
         VoltDB.instance().getStatsAgent().registerStatsSource(SysProcSelector.PROCEDURE, Integer.parseInt(site.site.getTypeName()), statsCollector);
 

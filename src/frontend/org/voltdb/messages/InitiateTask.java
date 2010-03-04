@@ -19,6 +19,7 @@ package org.voltdb.messages;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
@@ -50,6 +51,7 @@ public class InitiateTask extends MembershipNotice {
         m_nonCoordinatorSites = siteIds;
     }
 
+    @Override
     public boolean isReadOnly() {
         return m_isReadOnly;
     }
@@ -142,6 +144,9 @@ public class InitiateTask extends MembershipNotice {
             e.printStackTrace();
             assert(false);
         }
+
+        // no way an initiate task can be a heartbeat
+        assert(m_isHeartBeat == false);
     }
 
     @Override

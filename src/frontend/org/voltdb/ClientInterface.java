@@ -28,6 +28,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
@@ -81,6 +82,9 @@ public class ClientInterface implements DumpManager.Dumpable {
     private final SnapshotDaemon m_snapshotDaemon;
     private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
     private CatalogContext m_catalogContext;
+
+    /** If this is true, update the catalog */
+    private AtomicBoolean m_shouldUpdateCatalog = new AtomicBoolean(false);
 
     /**
      * Counter of the number of client connections. Used to enforce a limit on the maximum number of connections

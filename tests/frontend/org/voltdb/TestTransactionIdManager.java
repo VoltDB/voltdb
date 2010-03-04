@@ -23,15 +23,15 @@
 
 package org.voltdb;
 
-import junit.framework.TestCase;
-
-import org.voltdb.TransactionIdManager;
 import java.util.HashSet;
+
+import junit.framework.TestCase;
 
 public class TestTransactionIdManager extends TestCase {
 
     private TransactionIdManager tim;
 
+    @Override
     public void setUp() {
         tim = new TransactionIdManager(VoltDB.INITIATOR_SITE_ID);
     }
@@ -73,24 +73,26 @@ public class TestTransactionIdManager extends TestCase {
     }
 
     public void testSiteIdFromTransactionId() {
-        long siteid = TransactionIdManager.getSiteIdFromTransactionId(tim.getNextUniqueTransactionId());
+        long siteid = TransactionIdManager.getInitiatorIdFromTransactionId(tim.getNextUniqueTransactionId());
         assertEquals(siteid, VoltDB.INITIATOR_SITE_ID);
 
         TransactionIdManager tim2 = new TransactionIdManager(5);
-        siteid = TransactionIdManager.getSiteIdFromTransactionId(tim2.getNextUniqueTransactionId());
+        siteid = TransactionIdManager.getInitiatorIdFromTransactionId(tim2.getNextUniqueTransactionId());
         assertEquals(5, siteid);
-        siteid = TransactionIdManager.getSiteIdFromTransactionId(tim2.getNextUniqueTransactionId());
+        siteid = TransactionIdManager.getInitiatorIdFromTransactionId(tim2.getNextUniqueTransactionId());
         assertEquals(5, siteid);
     }
 
     public void testLastTxnId() {
-        long id = tim.getNextUniqueTransactionId();
-        assertEquals(id, tim.getLastTxnId());
+        for (int i = 0; i < 1000; i++) {
+            long id = tim.getNextUniqueTransactionId();
+            assertEquals(id, tim.getLastTxnId());
 
-        long id2 = tim.getNextUniqueTransactionId();
-        assertEquals(id2, tim.getLastTxnId());
+            long id2 = tim.getNextUniqueTransactionId();
+            assertEquals(id2, tim.getLastTxnId());
 
-        assertTrue(id2 != id);
+            assertTrue(id2 > id);
+        }
     }
 
     public void testTimestampFromId() {
@@ -100,6 +102,33 @@ public class TestTransactionIdManager extends TestCase {
 
         assertTrue(then <= TransactionIdManager.getDateFromTransactionId(tid).getTime());
         assertTrue(now >= TransactionIdManager.getDateFromTransactionId(tid).getTime());
+    }
+
+    public void testInAndOut() {
+        long ts1 = 1267732596224L;
+        //long ts1 = TransactionIdManager.VOLT_EPOCH;
+        long seq1 = 2;
+        long init1 = 6;
+        long txnId1 = TransactionIdManager.makeIdFromComponents(ts1, seq1, init1);
+        System.out.printf("%20d : %s\n", txnId1, TransactionIdManager.toBitString(txnId1));
+
+        assertEquals(ts1, TransactionIdManager.getTimestampFromTransactionId(txnId1));
+        assertEquals(seq1, TransactionIdManager.getSequenceNumberFromTransactionId(txnId1));
+        assertEquals(init1, TransactionIdManager.getInitiatorIdFromTransactionId(txnId1));
+
+        long ts2 = 1267732596224L;
+        //long ts2 = TransactionIdManager.VOLT_EPOCH + 1;
+        long seq2 = 4;
+        long init2 = 6;
+        long txnId2 = TransactionIdManager.makeIdFromComponents(ts2, seq2, init2);
+        System.out.printf("%20d : %s\n", txnId2, TransactionIdManager.toBitString(txnId2));
+
+        assertEquals(ts2, TransactionIdManager.getTimestampFromTransactionId(txnId2));
+        assertEquals(seq2, TransactionIdManager.getSequenceNumberFromTransactionId(txnId2));
+        assertEquals(init2, TransactionIdManager.getInitiatorIdFromTransactionId(txnId2));
+
+        assertTrue(txnId2 > txnId1);
+        System.out.printf("%d > %d\n", txnId1, txnId2);
     }
 
 }

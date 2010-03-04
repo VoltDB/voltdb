@@ -20,9 +20,10 @@ package org.voltdb.messages;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+
+import org.voltdb.ParameterSet;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.Subject;
-import org.voltdb.ParameterSet;
 import org.voltdb.utils.DBBPool;
 
 /**
@@ -300,6 +301,9 @@ public class FragmentTask extends MembershipNotice
         m_isFinal = m_buffer.get() == 1;
         m_taskType = m_buffer.get();
         m_shouldUndo = m_buffer.get() == 1;
+
+        // no way a fragment task can be a heartbeat
+        assert(m_isHeartBeat == false);
     }
 
     @Override

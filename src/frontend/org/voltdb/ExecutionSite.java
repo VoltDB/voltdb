@@ -116,8 +116,6 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
     // Catalog objects
     Catalog catalog;
     public CatalogContext m_context;
-    Cluster cluster;
-    Database database;
     Host host;
     Site site;
 
@@ -342,8 +340,8 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
 
     protected class SystemProcedureContext implements SystemProcedureExecutionContext {
         public Catalog getCatalog()                 { return catalog; }
-        public Database getDatabase()               { return cluster.getDatabases().get("database"); }
-        public Cluster getCluster()                 { return cluster; }
+        public Database getDatabase()               { return m_context.database; }
+        public Cluster getCluster()                 { return m_context.cluster; }
         public Site getSite()                       { return site; }
         public ExecutionEngine getExecutionEngine() { return ee; }
         public long getLastCommittedTxnId()         { return lastCommittedTxnId; }
@@ -385,9 +383,7 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
         this.siteId = siteId;
         m_context = context;
         catalog = context.catalog;
-        cluster = catalog.getClusters().get("cluster");
-        site = cluster.getSites().get(Integer.toString(siteId));
-        database = cluster.getDatabases().get("database");
+        site = m_context.cluster.getSites().get(Integer.toString(siteId));
         m_systemProcedureContext = new SystemProcedureContext();
 
         m_dumpId = "ExecutionSite." + String.valueOf(siteId);
@@ -395,12 +391,12 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
 
         // get an array of all the initiators
         int initiatorCount = 0;
-        for (final Site s : cluster.getSites())
+        for (final Site s : m_context.cluster.getSites())
             if (s.getIsexec() == false)
                 initiatorCount++;
         final int[] initiatorIds = new int[initiatorCount];
         int index = 0;
-        for (final Site s : cluster.getSites())
+        for (final Site s : m_context.cluster.getSites())
             if (s.getIsexec() == false)
                 initiatorIds[index++] = Integer.parseInt(s.getTypeName());
 
@@ -422,7 +418,7 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
             final BackendTarget target = VoltDB.getEEBackendType();
             if (target == BackendTarget.HSQLDB_BACKEND) {
                 hsqlTemp = new HsqlBackend(siteId);
-                final String hexDDL = database.getSchema();
+                final String hexDDL = m_context.database.getSchema();
                 final String ddl = Encoder.hexDecodeToString(hexDDL);
                 final String[] commands = ddl.split(";");
                 for (String command : commands) {
@@ -436,14 +432,14 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
             }
             else if (target == BackendTarget.NATIVE_EE_JNI) {
                 // set up the EE
-                eeTemp = new ExecutionEngineJNI(this, cluster.getRelativeIndex(), siteId);
+                eeTemp = new ExecutionEngineJNI(this, m_context.cluster.getRelativeIndex(), siteId);
                 eeTemp.loadCatalog(serializedCatalog);
                 lastTickTime = EstTime.currentTimeMillis();
                 eeTemp.tick( lastTickTime, 0);
             }
             else {
                 // set up the EE over IPC
-                eeTemp = new ExecutionEngineIPC(this, cluster.getRelativeIndex(), siteId, target);
+                eeTemp = new ExecutionEngineIPC(this, m_context.cluster.getRelativeIndex(), siteId, target);
                 eeTemp.loadCatalog(serializedCatalog);
                 lastTickTime = EstTime.currentTimeMillis();
                 eeTemp.tick( lastTickTime, 0);
@@ -458,7 +454,31 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
         hsql = hsqlTemp;
 
         // load up all the stored procedures
-        final CatalogMap<Procedure> catalogProcedures = database.getProcedures();
+        loadProceduresFromCatalog();
+
+        m_snapshotBufferOrigin = org.voltdb.utils.DBBPool.allocateDirect(m_snapshotBufferLength);
+        m_snapshotBuffer = m_snapshotBufferOrigin.b;
+        if (VoltDB.getLoadLibVOLTDB()) {
+            m_snapshotBufferAddress = org.voltdb.utils.DBBPool.getBufferAddress(m_snapshotBuffer);
+        } else {
+            m_snapshotBufferAddress = 0;
+        }
+        m_stupidSnapshotContainer = new BBContainer(m_snapshotBuffer, m_snapshotBufferAddress) {
+            @Override
+            public void discard() {}
+        };
+    }
+
+    public boolean updateCatalog() {
+        m_context = VoltDB.instance().getCatalogContext();
+        loadProceduresFromCatalog();
+        return true;
+    }
+
+    void loadProceduresFromCatalog() {
+        procs.clear();
+        // load up all the stored procedures
+        final CatalogMap<Procedure> catalogProcedures = m_context.database.getProcedures();
         for (final Procedure proc : catalogProcedures) {
             VoltProcedure wrapper = null;
 
@@ -490,25 +510,9 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
                 wrapper = new VoltProcedure.StmtProcedure();
             }
 
-            wrapper.init(this, proc, VoltDB.getEEBackendType(), hsql, cluster);
+            wrapper.init(this, proc, VoltDB.getEEBackendType(), hsql, m_context.cluster);
             procs.put(proc.getTypeName(), wrapper);
         }
-
-        m_snapshotBufferOrigin = org.voltdb.utils.DBBPool.allocateDirect(m_snapshotBufferLength);
-        m_snapshotBuffer = m_snapshotBufferOrigin.b;
-        if (VoltDB.getLoadLibVOLTDB()) {
-            m_snapshotBufferAddress = org.voltdb.utils.DBBPool.getBufferAddress(m_snapshotBuffer);
-        } else {
-            m_snapshotBufferAddress = 0;
-        }
-        m_stupidSnapshotContainer = new BBContainer(m_snapshotBuffer, m_snapshotBufferAddress) {
-            @Override
-            public void discard() {}
-        };
-    }
-
-    public boolean updateCatalog() {
-        return true;
     }
 
     public long getCurrentTxnId() {

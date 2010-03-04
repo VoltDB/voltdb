@@ -27,7 +27,6 @@ import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
-import org.voltdb.client.Client;
 
 /**
  * Tests a mix of multi-partition and single partition procedures on a
@@ -55,16 +54,20 @@ public class TestCatlaogUpdateSuite extends RegressionSuite {
     }
 
     public void testUpdate() throws Exception {
-        @SuppressWarnings("unused")
-        Client client = getClient();
+        /*Client client = getClient();
 
-        /*VoltTable[] results = client.callProcedure("@UpdateApplicationCatalog", "catalogupdate-onesite-expanded.jar");
+        String newCatalogURL;
+
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-onesite-expanded.jar");
+        VoltTable[] results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
         assertTrue(results.length == 0);
 
-        results = client.callProcedure("@UpdateApplicationCatalog", "catalogupdate-onesite-base.jar");
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-onesite-base.jar");
+        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
         assertTrue(results.length == 0);
 
-        results = client.callProcedure("@UpdateApplicationCatalog", "catalogupdate-onesite-conflict.jar");
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-onesite-conflict.jar");
+        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
         assertTrue(results.length == 0);*/
 
         assertTrue(true);
