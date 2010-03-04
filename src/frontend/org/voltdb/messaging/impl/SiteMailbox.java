@@ -18,8 +18,7 @@
 package org.voltdb.messaging.impl;
 
 import java.util.ArrayDeque;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.BlockingQueue;
+import java.util.Queue;
 import java.util.ArrayList;
 import org.voltdb.debugstate.MailboxHistory;
 import org.voltdb.debugstate.MailboxHistory.MessageState;
@@ -34,7 +33,7 @@ import org.voltdb.messaging.*;
 public class SiteMailbox implements Mailbox {
 
     final HostMessenger m_hostMessenger;
-    final ArrayList<BlockingQueue<VoltMessage>> m_messages = new ArrayList<BlockingQueue<VoltMessage>>();
+    final ArrayList<Queue<VoltMessage>> m_messages = new ArrayList<Queue<VoltMessage>>();
     final int m_siteId;
 
     // deques to store recent inter-site messages
@@ -44,27 +43,31 @@ public class SiteMailbox implements Mailbox {
     ArrayDeque<VoltMessage> m_lastTenMembershipNotices = new ArrayDeque<VoltMessage>();
     ArrayDeque<VoltMessage> m_lastTenHeartbeats = new ArrayDeque<VoltMessage>();
 
-    SiteMailbox(HostMessenger hostMessenger, int siteId, int mailboxId, BlockingQueue<VoltMessage> queue) {
+    SiteMailbox(HostMessenger hostMessenger, int siteId, int mailboxId, Queue<VoltMessage> queue) {
         this.m_hostMessenger = hostMessenger;
         this.m_siteId = siteId;
         MESSAGE_HISTORY_SIZE = 0;
         for (Subject s : Subject.values()) {
             if (s.equals(Subject.DEFAULT)) {
                 if (queue == null) {
-                    m_messages.add( s.getId(), new LinkedBlockingQueue<VoltMessage>());
+                    m_messages.add( s.getId(), new ArrayDeque<VoltMessage>());
                 } else {
                     m_messages.add( s.getId(), queue);
                 }
             } else {
-                m_messages.add( s.getId(), new LinkedBlockingQueue<VoltMessage>());
+                m_messages.add( s.getId(), new ArrayDeque<VoltMessage>());
             }
         }
     }
 
     void deliver(VoltMessage message) {
         assert(message != null);
-        boolean ok = m_messages.get(message.getSubject()).offer(message);
-        assert(ok);
+        final Queue<VoltMessage> dq = m_messages.get(message.getSubject());
+        assert(dq != null);
+        synchronized (dq) {
+            dq.offer(message);
+            dq.notify();
+        }
 
         // tag some extra transient data for debugging
         message.receivedFromSiteId = m_siteId;
@@ -194,13 +197,26 @@ public class SiteMailbox implements Mailbox {
 
     @Override
     public VoltMessage recv(Subject s) {
-        return m_messages.get(s.getId()).poll();
+        final Queue<VoltMessage> dq = m_messages.get(s.getId());
+        assert(dq != null);
+        synchronized (dq) {
+            return dq.poll();
+        }
     }
 
     @Override
     public VoltMessage recvBlocking(Subject s) {
         try {
-            return m_messages.get(s.getId()).take();
+            final Queue<VoltMessage> dq = m_messages.get(s.getId());
+            assert(dq != null);
+            synchronized (dq) {
+                while (dq.isEmpty()) {
+                    dq.wait();
+                }
+                final VoltMessage message = dq.poll();
+                assert(message != null);
+                return message;
+            }
         } catch (InterruptedException e) {
         }
         return null;
@@ -209,7 +225,14 @@ public class SiteMailbox implements Mailbox {
     @Override
     public VoltMessage recvBlocking(Subject s, long timeout) {
         try {
-            return m_messages.get(s.getId()).poll( timeout, java.util.concurrent.TimeUnit.MILLISECONDS);
+            final Queue<VoltMessage> dq = m_messages.get(s.getId());
+            assert(dq != null);
+            synchronized (dq) {
+                if (dq.isEmpty()) {
+                    dq.wait(timeout);
+                }
+                return dq.poll();
+            }
         } catch (InterruptedException e) {
         }
         return null;

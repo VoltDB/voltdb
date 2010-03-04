@@ -29,17 +29,9 @@ import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.spi.SelectorProvider;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
+import java.util.HashSet;
 import junit.framework.*;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 public class VoltNetworkTest extends TestCase {
 

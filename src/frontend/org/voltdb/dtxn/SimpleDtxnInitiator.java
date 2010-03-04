@@ -48,8 +48,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.TimeUnit;
+import java.util.Queue;
 
 import org.apache.log4j.Logger;
 import org.voltdb.ClientResponseImpl;
@@ -425,12 +424,12 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         }
     }
 
-    public static class DummyBlockingQueue implements BlockingQueue<VoltMessage> {
+    public static class DummyQueue implements Queue<VoltMessage> {
 
         private SimpleDtxnInitiator m_initiator;
         private HashMap<Long, VoltTable[]> m_txnIdResponses;
 
-        public DummyBlockingQueue()
+        public DummyQueue()
         {
             m_txnIdResponses =
                 new HashMap<Long, VoltTable[]>();
@@ -449,17 +448,6 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         public boolean contains(Object arg0) {
             throw new UnsupportedOperationException();
         }
-
-        @Override
-        public int drainTo(Collection<? super VoltMessage> arg0) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public int drainTo(Collection<? super VoltMessage> arg0, int arg1) {
-            throw new UnsupportedOperationException();
-        }
-
         //private long lastReportedStarvation = System.currentTimeMillis();
 
         @Override
@@ -585,33 +573,9 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
             return true;
         }
 
-        @Override
-        public boolean offer(VoltMessage arg0, long arg1, TimeUnit arg2) throws InterruptedException {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public VoltMessage poll(long arg0, TimeUnit arg1) throws InterruptedException {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void put(VoltMessage arg0) throws InterruptedException {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public int remainingCapacity() {
-            throw new UnsupportedOperationException();
-        }
 
         @Override
         public boolean remove(Object arg0) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public VoltMessage take() throws InterruptedException {
             throw new UnsupportedOperationException();
         }
 

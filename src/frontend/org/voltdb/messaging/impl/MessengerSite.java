@@ -18,7 +18,6 @@
 package org.voltdb.messaging.impl;
 
 import java.util.*;
-import java.util.concurrent.BlockingQueue;
 
 import org.voltdb.messaging.*;
 
@@ -33,7 +32,7 @@ class MessengerSite {
         m_siteId = siteId;
     }
 
-    public synchronized Mailbox createMailbox(int mailboxId, BlockingQueue<VoltMessage> queue) {
+    public synchronized Mailbox createMailbox(int mailboxId, Queue<VoltMessage> queue) {
         SiteMailbox mbox = getMailbox(mailboxId);
         if (mbox != null) return null;
 

@@ -609,8 +609,8 @@ public class ClientInterface implements DumpManager.Dumpable {
         assert(index == context.numberOfPartitions);
 
         // create the dtxn initiator
-        SimpleDtxnInitiator.DummyBlockingQueue queue =
-            new SimpleDtxnInitiator.DummyBlockingQueue();
+        SimpleDtxnInitiator.DummyQueue queue =
+            new SimpleDtxnInitiator.DummyQueue();
         Mailbox mqueue = messenger.createMailbox(siteId, VoltDB.DTXN_MAILBOX_ID, queue);
 
         /*

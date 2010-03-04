@@ -17,7 +17,7 @@
 
 package org.voltdb.messaging;
 
-import java.util.concurrent.BlockingQueue;
+import java.util.Queue;
 
 /**
  * The interface to the global VoltDB messaging system.
@@ -36,5 +36,5 @@ public interface Messenger {
      * queue can process the message inside the offer call.
      * @return A new Mailbox instance or null based on success.
      */
-    public abstract Mailbox createMailbox(int siteId, int mailboxId, BlockingQueue<VoltMessage> queue);
+    public abstract Mailbox createMailbox(int siteId, int mailboxId, Queue<VoltMessage> queue);
 }

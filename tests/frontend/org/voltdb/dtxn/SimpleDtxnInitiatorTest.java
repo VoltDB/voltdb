@@ -96,7 +96,7 @@ public class SimpleDtxnInitiatorTest extends TestCase {
 
     @Override
     public void setUp() {
-        final SimpleDtxnInitiator.DummyBlockingQueue queue = new SimpleDtxnInitiator.DummyBlockingQueue();
+        final SimpleDtxnInitiator.DummyQueue queue = new SimpleDtxnInitiator.DummyQueue();
         mqueue = new MockMailbox(queue);
         onBackPressure = new WasRun();
         offBackPressure = new WasRun();

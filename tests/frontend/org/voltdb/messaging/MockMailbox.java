@@ -58,7 +58,7 @@ import org.voltdb.messaging.MessagingException;
 
 public class MockMailbox implements Mailbox {
 
-    public MockMailbox(SimpleDtxnInitiator.DummyBlockingQueue queue) {
+    public MockMailbox(SimpleDtxnInitiator.DummyQueue queue) {
         incomingMessages = queue;
     }
     public void send(int siteId, int mailboxId, VoltMessage message) throws MessagingException {
@@ -132,6 +132,6 @@ public class MockMailbox implements Mailbox {
         public final VoltMessage contents;
     }
 
-    private final SimpleDtxnInitiator.DummyBlockingQueue incomingMessages;
+    private final SimpleDtxnInitiator.DummyQueue incomingMessages;
     private final ArrayDeque<Message> outgoingMessages = new ArrayDeque<Message>();
 }
