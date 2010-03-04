@@ -83,13 +83,12 @@ def runTest(i):
                 prevnow = now
                 sys.stdout.write(" %d seconds " % ((now - start).seconds))
 
-        # if no dots read in 10 seconds, then we assume the java proc has hung
-        if (now - lastdotprinted).seconds > 20:
-            print("\nSorry, this platfrom may have reproduced the issue. If you do not see more dots, it's sadness time.")
-            possiblyFailed = True
+            # if no dots read in 10 seconds, then we assume the java proc has hung
+            if (now - lastdotprinted).seconds > 20:
+                print("\nSorry, this platfrom may have reproduced the issue. If you do not see more dots, it's sadness time.")
+                possiblyFailed = True
 
-        # if all's gone well for DURATION_IN_SECONDS, we kill the proc and return true
-        if possiblyFailed == False:
+            # if all's gone well for DURATION_IN_SECONDS, we kill the proc and return true
             if (now - start).seconds > DURATION_IN_SECONDS:
                 print("\nThis run (%d) did not reproduce the issue." % (i))
                 killProcess(p)
