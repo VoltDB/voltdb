@@ -50,23 +50,12 @@
 
 package org.voltdb;
 
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.Hashtable;
 
 import junit.framework.TestCase;
 
-import org.voltdb.VoltDB.Configuration;
 import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.Site;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.fault.FaultDistributor;
-import org.voltdb.messaging.Messenger;
-import org.voltdb.messaging.impl.HostMessenger;
-import org.voltdb.network.VoltNetwork;
 
 public class TestVoltProcedure extends TestCase {
     static class DateProcedure extends NullProcedureWrapper {
@@ -147,7 +136,9 @@ public class TestVoltProcedure extends TestCase {
         manager.addProcedureForTest(LongProcedure.class.getName()).setClassname(LongProcedure.class.getName());
         manager.addProcedureForTest(LongArrayProcedure.class.getName()).setClassname(LongArrayProcedure.class.getName());
         manager.addProcedureForTest(NPEProcedure.class.getName()).setClassname(NPEProcedure.class.getName());
-        manager.addSiteForTest("1");
+        manager.addHost(0);
+        manager.addPartition(0);
+        manager.addSite(1, 0, 0, true);
         site = new MockExecutionSite(1, VoltDB.instance().getCatalogContext().catalog.serialize());
         nullParam = new ParameterSet();
         nullParam.setParameters(new Object[]{null});
@@ -223,152 +214,6 @@ public class TestVoltProcedure extends TestCase {
 
         wrapper.init(site, site.database.getProcedures().get(procedure.getName()), BackendTarget.NATIVE_EE_JNI, null, null);
         return wrapper.call((Object) null);
-    }
-
-    private class MockVoltDB implements VoltDBInterface
-    {
-        private Catalog m_catalog = new Catalog();
-
-        private CatalogMap<Procedure> m_procedures;
-        private CatalogMap<Site> m_sites;
-        private StatsAgent m_statsAgent;
-
-        MockVoltDB()
-        {
-            m_catalog.execute("add / clusters cluster\nadd /clusters[cluster] databases database\n");
-            m_procedures = m_catalog.getClusters().get("cluster").getDatabases().get("database").getProcedures();
-            m_sites = m_catalog.getClusters().get("cluster").getSites();
-        }
-
-        public Procedure addProcedureForTest(String name) {
-            Procedure retval = m_procedures.add(name);
-            retval.setHasjava(true);
-            return retval;
-        }
-
-        public Site addSiteForTest(String name) {
-            // The tests that use this function conflate partitions and sites.
-            m_catalog.getClusters().get("cluster").getPartitions().add(name);
-            return m_sites.add(name);
-        }
-
-        @Override
-        public String getBuildString()
-        {
-            return null;
-        }
-
-        @Override
-        public CatalogContext getCatalogContext() {
-            return new CatalogContext(m_catalog, CatalogContext.NO_PATH);
-        }
-
-        @Override
-        public ArrayList<ClientInterface> getClientInterfaces()
-        {
-            return null;
-        }
-
-        @Override
-        public Configuration getConfig()
-        {
-            return null;
-        }
-
-        @Override
-        public HostMessenger getHostMessenger()
-        {
-            return null;
-        }
-
-        @Override
-        public Hashtable<Integer, ExecutionSite> getLocalSites()
-        {
-            return null;
-        }
-
-        @Override
-        public Messenger getMessenger()
-        {
-            return null;
-        }
-
-        @Override
-        public VoltNetwork getNetwork()
-        {
-            return null;
-        }
-
-        @Override
-        public StatsAgent getStatsAgent()
-        {
-            return m_statsAgent;
-        }
-
-        @Override
-        public String getVersionString()
-        {
-            return null;
-        }
-
-        @Override
-        public SiteTracker getSiteTracker()
-        {
-            return null;
-        }
-
-        @Override
-        public FaultDistributor getFaultDistributor()
-        {
-            return null;
-        }
-
-        @Override
-        public void initialize(Configuration config)
-        {
-        }
-
-        @Override
-        public boolean isRunning()
-        {
-            return false;
-        }
-
-        @Override
-        public void readBuildInfo()
-        {
-        }
-
-        @Override
-        public void run()
-        {
-        }
-
-        public void setStatsAgent(StatsAgent statsAgent)
-        {
-            m_statsAgent = statsAgent;
-        }
-
-        @Override
-        public void shutdown(Thread mainSiteThread) throws InterruptedException
-        {
-        }
-
-        @Override
-        public void startSampler()
-        {
-        }
-
-        @Override
-        public boolean ignoreCrash() {
-            return false;
-        }
-
-        @Override
-        public void catalogUpdate(String diffCommands, String newCatalogURL) {
-            // TODO Auto-generated method stub
-
-        }
     }
 
     private class MockExecutionSite extends ExecutionSite {

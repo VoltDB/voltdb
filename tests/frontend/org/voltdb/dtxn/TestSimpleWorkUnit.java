@@ -50,232 +50,16 @@
 
 package org.voltdb.dtxn;
 
-import java.util.ArrayList;
-import java.util.Hashtable;
-
 import junit.framework.TestCase;
 
-import org.voltdb.CatalogContext;
-import org.voltdb.ClientInterface;
-import org.voltdb.ExecutionSite;
-import org.voltdb.StatsAgent;
+import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltdb.VoltDB.Configuration;
-import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.Host;
-import org.voltdb.catalog.Partition;
-import org.voltdb.catalog.Site;
-import org.voltdb.fault.FaultDistributor;
-import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.VoltMessage;
-import org.voltdb.messaging.impl.HostMessenger;
-import org.voltdb.network.VoltNetwork;
 
-public class TestSimpleWorkUnit extends TestCase {
-
-    // TODO: this dupes a bunch of functionality in CatalogCreatorTestHelper
-    // ponder a way to reuse/fold/eliminate the other.
-    public class MockVoltDB implements VoltDBInterface
-    {
-        CatalogContext m_context;
-        final String m_clusterName = "cluster";
-        final String m_databaseName = "database";
-        int m_execSiteCount = 0;
-
-        MockVoltDB()
-        {
-            Catalog catalog = new Catalog();
-            catalog.execute("add / clusters " + m_clusterName);
-            catalog.execute("add " + catalog.getClusters().get(m_clusterName).getPath() + " databases " +
-                              m_databaseName);
-            m_context = new CatalogContext(catalog, CatalogContext.NO_PATH);
-        }
-
-        public void addHost(int hostId)
-        {
-            m_context.catalog.execute("add " + m_context.cluster.getPath() + " hosts " + hostId);
-            m_context = new CatalogContext(m_context.catalog, CatalogContext.NO_PATH);
-        }
-
-        public void addPartition(int partitionId)
-        {
-            m_context.catalog.execute("add " + m_context.cluster.getPath() + " partitions " +
-                              partitionId);
-            m_context = new CatalogContext(m_context.catalog, CatalogContext.NO_PATH);
-        }
-
-        public void addSite(int siteId, int hostId, int partitionId, boolean isExec)
-        {
-            m_context.catalog.execute("add " + m_context.cluster.getPath() + " sites " + siteId);
-            m_context.catalog.execute("set " + getSite(siteId).getPath() + " host " +
-                              getHost(hostId).getPath());
-            m_context.catalog.execute("set " + getSite(siteId).getPath() + " isexec " +
-                              isExec);
-            String partition_path = "null";
-            if (isExec)
-            {
-                partition_path = getPartition(partitionId).getPath();
-                m_execSiteCount++;
-            }
-            m_context.catalog.execute("set " + getSite(siteId).getPath() + " partition " +
-                    partition_path);
-            m_context = new CatalogContext(m_context.catalog, CatalogContext.NO_PATH);
-        }
-
-        Host getHost(int hostId)
-        {
-            return m_context.cluster.getHosts().get(String.valueOf(hostId));
-        }
-
-        Partition getPartition(int partitionId)
-        {
-            return m_context.cluster.getPartitions().get(String.valueOf(partitionId));
-        }
-
-        Site getSite(int siteId)
-        {
-            return m_context.sites.get(String.valueOf(siteId));
-        }
-
-        @Override
-        public String getBuildString()
-        {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public ArrayList<ClientInterface> getClientInterfaces()
-        {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public Configuration getConfig()
-        {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public HostMessenger getHostMessenger()
-        {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public Hashtable<Integer, ExecutionSite> getLocalSites()
-        {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public Messenger getMessenger()
-        {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public VoltNetwork getNetwork()
-        {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public SiteTracker getSiteTracker()
-        {
-            return new SiteTracker(m_context.sites);
-        }
-
-        @Override
-        public FaultDistributor getFaultDistributor()
-        {
-            return null;
-        }
-
-        @Override
-        public StatsAgent getStatsAgent()
-        {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public String getVersionString()
-        {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public void initialize(Configuration config)
-        {
-            // TODO Auto-generated method stub
-
-        }
-
-        @Override
-        public boolean isRunning()
-        {
-            // TODO Auto-generated method stub
-            return false;
-        }
-
-        @Override
-        public void readBuildInfo()
-        {
-            // TODO Auto-generated method stub
-
-        }
-
-        @Override
-        public void run()
-        {
-            // TODO Auto-generated method stub
-
-        }
-
-        @Override
-        public void shutdown(Thread mainSiteThread) throws InterruptedException
-        {
-            // TODO Auto-generated method stub
-
-        }
-
-        @Override
-        public void startSampler()
-        {
-            // TODO Auto-generated method stub
-
-        }
-
-        @Override
-        public boolean ignoreCrash() {
-            return false;
-        }
-
-        @Override
-        public CatalogContext getCatalogContext() {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public void catalogUpdate(String diffCommands, String newCatalogURL) {
-            // TODO Auto-generated method stub
-
-        }
-
-    }
-
+public class TestSimpleWorkUnit extends TestCase
+{
     static final VoltMessage work = VoltMessage.createNewMessage(VoltMessage.INITIATE_RESPONSE_ID);
     VoltTable t1;
     VoltTable t2;
@@ -322,19 +106,19 @@ public class TestSimpleWorkUnit extends TestCase {
 
     public void testNoDependenciesNoReplicas() {
         setUpSites(1, 2, 1);
-        WorkUnit w = new WorkUnit(m_voltdb.m_context, work, new int[]{}, false);
+        WorkUnit w = new WorkUnit(m_voltdb.getCatalogContext(), work, new int[]{}, false);
         assertTrue(w.allDependenciesSatisfied());
         assertEquals(work, w.getPayload());
         assertNull(w.getDependencies());
         assertNull(w.getDependency(0));
 
-        w = new WorkUnit(m_voltdb.m_context, work, null, false);
+        w = new WorkUnit(m_voltdb.getCatalogContext(), work, null, false);
         assertTrue(w.allDependenciesSatisfied());
     }
 
     public void testDependenciesNoReplicas() {
         setUpSites(1, 2, 1);
-        WorkUnit w = new WorkUnit(m_voltdb.m_context, work, new int[]{ 4, 5 }, false);
+        WorkUnit w = new WorkUnit(m_voltdb.getCatalogContext(), work, new int[]{ 4, 5 }, false);
         assertFalse(w.allDependenciesSatisfied());
         assertEquals(w.getDependency(4).size(), 0);
         assertEquals(w.getDependency(5).size(), 0);
@@ -348,7 +132,7 @@ public class TestSimpleWorkUnit extends TestCase {
 
     public void testBadPutDependencyNoReplicas() {
         setUpSites(1, 2, 1);
-        WorkUnit w = new WorkUnit(m_voltdb.m_context, work, new int[]{ 4, 5 }, false);
+        WorkUnit w = new WorkUnit(m_voltdb.getCatalogContext(), work, new int[]{ 4, 5 }, false);
 
         // Put a dependency that does not exist
         try {
@@ -374,7 +158,8 @@ public class TestSimpleWorkUnit extends TestCase {
     {
         setUpSites(2, 2, 1);
         int multi_dep = 5 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-        WorkUnit w = new WorkUnit(m_voltdb.m_context, work, new int[]{ 4, multi_dep }, false);
+        WorkUnit w = new WorkUnit(m_voltdb.getCatalogContext(),
+                                  work, new int[]{ 4, multi_dep }, false);
         assertFalse(w.allDependenciesSatisfied());
         assertEquals(w.getDependency(4).size(), 0);
         assertEquals(w.getDependency(5).size(), 0);
@@ -400,7 +185,8 @@ public class TestSimpleWorkUnit extends TestCase {
 
         setUpSites(2, 2, 1);
         int multi_dep = 5 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-        WorkUnit w = new WorkUnit(m_voltdb.m_context, work, new int[]{ 4, multi_dep }, false);
+        WorkUnit w = new WorkUnit(m_voltdb.getCatalogContext(),
+                                  work, new int[]{ 4, multi_dep }, false);
         assertFalse(w.allDependenciesSatisfied());
         assertEquals(w.getDependency(4).size(), 0);
         assertEquals(w.getDependency(5).size(), 0);
