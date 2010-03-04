@@ -128,82 +128,6 @@ public class VoltNetworkTest extends TestCase {
 
     }
 
-    public static class MockExecutorService implements ExecutorService {
-
-        @Override
-        public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
-            // TODO Auto-generated method stub
-            return false;
-        }
-
-        @Override
-        public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks) throws InterruptedException {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
-                throws InterruptedException {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public <T> T invokeAny(Collection<? extends Callable<T>> tasks) throws InterruptedException, ExecutionException {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public <T> T invokeAny(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) throws InterruptedException,
-                ExecutionException, TimeoutException {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public boolean isShutdown() {
-            // TODO Auto-generated method stub
-            return true;
-        }
-
-        @Override
-        public boolean isTerminated() {
-            // TODO Auto-generated method stub
-            return true;
-        }
-
-        @Override
-        public void shutdown() {
-        }
-
-        @Override
-        public List<Runnable> shutdownNow() {
-            return null;
-        }
-
-        @Override
-        public <T> Future<T> submit(Callable<T> task) {
-            return null;
-        }
-
-        @Override
-        public Future<?> submit(Runnable task) {
-            return null;
-        }
-
-        @Override
-        public <T> Future<T> submit(Runnable task, T result) {
-            return null;
-        }
-
-        @Override
-        public void execute(Runnable command) {
-            command.run();
-        }
-    }
-
     public static class MockSelectionKey extends SelectionKey {
         @Override
         public
@@ -345,8 +269,7 @@ public class VoltNetworkTest extends TestCase {
 
     public void testInvokeCallbacks() throws InterruptedException{
         MockSelector selector = new MockSelector();
-        MockExecutorService executor = new MockExecutorService();
-        VoltNetwork vn = new VoltNetwork(selector, executor);               // network with fake selector
+        VoltNetwork vn = new VoltNetwork(selector);               // network with fake selector
         MockVoltPort vp = new MockVoltPort(vn, new MockInputHandler());             // implement abstract run()
         MockSelectionKey selectionKey = new MockSelectionKey();   // fake selection key
 
@@ -359,14 +282,14 @@ public class VoltNetworkTest extends TestCase {
 
         // invoke call backs and see that the volt port has the expected
         // selected operations.
-        vn.invokeCallbacks(true);
+        vn.invokeCallbacks(false);
         assertEquals(SelectionKey.OP_WRITE, vp.readyOps());
 
         // and another time through, should have the new interests selected
         vp.setInterests(SelectionKey.OP_ACCEPT, 0);
         selectionKey.readyOps(SelectionKey.OP_ACCEPT);
         vn.installInterests();
-        vn.invokeCallbacks(true);
+        vn.invokeCallbacks(false);
         vn.shutdown();
         assertEquals(SelectionKey.OP_ACCEPT, vp.readyOps());
     }

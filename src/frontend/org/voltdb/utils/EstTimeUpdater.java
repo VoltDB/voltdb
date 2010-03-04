@@ -18,10 +18,11 @@
 package org.voltdb.utils;
 
 public class EstTimeUpdater {
-    public static void update(final long now) {
+    public static boolean update(final long now) {
         if (EstTime.m_now == now) {
-            return;
+            return false;
         }
         EstTime.m_now = now;
+        return true;
     }
 }

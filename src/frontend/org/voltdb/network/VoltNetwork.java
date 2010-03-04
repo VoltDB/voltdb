@@ -68,17 +68,14 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.lang.ref.WeakReference;
 
 import org.apache.log4j.Logger;
 
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.Set;
+import java.util.ArrayDeque;
 
 import org.voltdb.utils.VoltLoggerFactory;
 import org.voltdb.utils.DBBPool;
@@ -93,17 +90,17 @@ import org.voltdb.utils.Pair;
         Logger.getLogger(VoltNetwork.class.getName(), VoltLoggerFactory.instance());
     private static final Logger networkLog =
         Logger.getLogger("NETWORK", VoltLoggerFactory.instance());
+    private final ArrayDeque<Runnable> m_tasks = new ArrayDeque<Runnable>();
     // keep two lists and swap them in and out to minimize contention
     private final ArrayList<VoltPort> m_selectorUpdates_1 = new ArrayList<VoltPort>();//Used as the lock for swapping lists
     private final ArrayList<VoltPort> m_selectorUpdates_2 = new ArrayList<VoltPort>();
     private ArrayList<VoltPort> m_activeUpdateList = m_selectorUpdates_1;
     private volatile boolean m_shouldStop = false;//volatile boolean is sufficient
-    private final ExecutorService m_executor;
     private final Thread m_thread;
     private final HashSet<VoltPort> m_ports = new HashSet<VoltPort>();
     private final boolean m_useBlockingSelect;
     private final boolean m_useExecutorService;
-    private final ArrayList<Thread> m_networkThreads = new ArrayList<Thread>();
+    private final ArrayList<WeakReference<Thread>> m_networkThreads = new ArrayList<WeakReference<Thread>>();
     private final Runnable m_periodicWork[];
     private final ArrayList<DBBPool> m_poolsToClearOnShutdown = new ArrayList<DBBPool>();
 
@@ -120,13 +117,12 @@ import org.voltdb.utils.Pair;
     }
 
     /** Used for test only! */
-    public VoltNetwork(Selector selector, ExecutorService executorService) {
+    public VoltNetwork(Selector selector) {
         m_thread = null;
         m_selector = selector;
-        m_executor = executorService;
         m_periodicWork = new Runnable[0];
         m_useBlockingSelect = true;
-        m_useExecutorService = true;
+        m_useExecutorService = false;
     }
 
     public Pair<Long, Long> getCounters() {
@@ -171,7 +167,6 @@ import org.voltdb.utils.Pair;
 
         final int availableProcessors = Runtime.getRuntime().availableProcessors();
         if (!useExecutorService) {
-            m_executor = null;
             return;
         }
 
@@ -184,8 +179,8 @@ import org.voltdb.utils.Pair;
             threadPoolSize = 2;
         } else if (availableProcessors <= 16) {
             threadPoolSize = 2;
-
         }
+
         final ThreadFactory tf = new ThreadFactory() {
             private ThreadGroup group = new ThreadGroup(Thread.currentThread().getThreadGroup(), "Network threads");
             private int threadIndex = 0;
@@ -204,7 +199,7 @@ import org.voltdb.utils.Pair;
                     };
                 };
                 synchronized (m_networkThreads) {
-                    m_networkThreads.add(t);
+                    m_networkThreads.add(new WeakReference<Thread>(t));
                 }
                 t.setDaemon(true);
                 return t;
@@ -212,7 +207,31 @@ import org.voltdb.utils.Pair;
 
         };
 
-        m_executor = Executors.newFixedThreadPool(threadPoolSize, tf);
+        for (int ii = 0; ii < threadPoolSize; ii++) {
+            tf.newThread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        //final ArrayDeque<VoltPortFutureTask> nextTasks = new ArrayDeque<VoltPortFutureTask>(3);0
+                        while (true) {
+                            Runnable nextTask = null;
+                            synchronized (m_tasks) {
+                                nextTask = m_tasks.poll();
+                                while (nextTask == null && !m_shouldStop) {
+                                    m_tasks.wait();
+                                    nextTask = m_tasks.poll();
+                                }
+                            }
+                            if (nextTask == null) {
+                                return;
+                            }
+
+                            nextTask.run();
+                        }
+                    } catch (InterruptedException e) {}
+                }
+            }).start();
+        }
     }
 
 
@@ -249,6 +268,8 @@ import org.voltdb.utils.Pair;
                 wait();
             }
             m_thread.join();
+        } else {
+            m_shouldStop = true;
         }
     }
 
@@ -354,21 +375,20 @@ import org.voltdb.utils.Pair;
         //Synchronized so the interruption won't interrupt the network thread
         //while it is waiting for the executor service to shutdown
         try {
-            if (m_executor != null) {
-                m_executor.shutdown();
-                try {
-                    m_executor.awaitTermination( 60, TimeUnit.SECONDS);
-
-                    synchronized (m_networkThreads) {
-                        for (final Thread t : m_networkThreads) {
-                            if (t != null) {
-                                t.join();
-                            }
+            try {
+                synchronized (m_networkThreads) {
+                    synchronized (m_tasks) {
+                        m_tasks.notifyAll();
+                    }
+                    for (final WeakReference<Thread> r : m_networkThreads) {
+                        final Thread t = r.get();
+                        if (t != null) {
+                            t.join();
                         }
                     }
-                } catch (InterruptedException e) {
-                    m_logger.error(null, e);
                 }
+            } catch (InterruptedException e) {
+                m_logger.error(e);
             }
 
             Set<SelectionKey> keys = m_selector.keys();
@@ -445,15 +465,35 @@ import org.voltdb.utils.Pair;
     /** Set the selected interest set on the port and run it. */
     protected void invokeCallbacks(final boolean useExecutor) {
         final Set<SelectionKey> selectedKeys = m_selector.selectedKeys();
+        final ArrayList<Runnable> generatedTasks = new ArrayList<Runnable>();
         for(SelectionKey key : selectedKeys) {
             final VoltPort port = (VoltPort) key.attachment();
             try {
                 port.lockForHandlingWork();
                 key.interestOps(0);
+
+                final Runnable runner = new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            port.call();
+                        } catch (Exception e) {
+                            port.die();
+                            if (e instanceof IOException) {
+                                m_logger.trace( "VoltPort died, probably of natural causes", e);
+                            } else {
+                                networkLog.error( "VoltPort died due to an unexpected exception", e);
+                            }
+                        } finally {
+                            addToChangeList (port);
+                        }
+                    }
+                };
+
                 if (useExecutor) {
-                    m_executor.execute( new VoltPortFutureTask(port));
+                    generatedTasks.add(runner);
                 } else {
-                    new VoltPortFutureTask(port).run();
+                    runner.run();
                 }
             }
             catch (CancelledKeyException e) {
@@ -461,41 +501,29 @@ import org.voltdb.utils.Pair;
                 // shutdown makes more sense
             }
         }
+
+        if (!generatedTasks.isEmpty()) {
+            synchronized (m_tasks) {
+                m_tasks.addAll(generatedTasks);
+                if (m_tasks.size() > 1) {
+                    m_tasks.notifyAll();
+                } else {
+                    m_tasks.notify();
+                }
+            }
+        }
+
         selectedKeys.clear();
     }
 
     private final void periodicWork() {
         final long fnow = System.currentTimeMillis();
-        EstTimeUpdater.update(fnow);
-        for (final Runnable r : m_periodicWork) {
-            m_executor.execute(r);
-        }
-    }
-
-    private class VoltPortFutureTask extends FutureTask<VoltPort> {
-        private final VoltPort m_port;
-
-        public VoltPortFutureTask (VoltPort p) {
-            super (p);
-            m_port = p;
-        }
-
-        protected void done() {
-            try {
-                get();
-            } catch (ExecutionException e) {
-                m_port.die();
-                if (e.getCause() instanceof IOException) {
-                    m_logger.trace( "VoltPort died, probably of natural causes", e.getCause());
-                } else {
-                    networkLog.error( "VoltPort died due to an unexpected exception", e.getCause());
+        if (EstTimeUpdater.update(fnow)) {
+            synchronized (m_tasks) {
+                for (final Runnable r : m_periodicWork) {
+                    m_tasks.offer(r);
                 }
-
-            } catch (InterruptedException e) {
-                Thread.interrupted();
-                m_logger.warn("VoltPort interrupted", e);
-            } finally {
-                addToChangeList (m_port);
+                m_tasks.notifyAll();
             }
         }
     }
