@@ -200,6 +200,8 @@ inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
         TableTuple tuple(this->schema());
         tuple.move(chunk);
         deleteTupleStorage(tuple);
+        // deleteTupleStorage mutates m_tupleCount. Fix it explictly.
+        m_tupleCount = 0;
 #elif defined(MEMCHECK)
         char* chunk = m_data.back();
         m_data.pop_back();
