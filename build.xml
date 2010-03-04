@@ -771,6 +771,7 @@ TEST CASES
                 <exclude name="**/TestFixedSQLSuite" />
                 <exclude name="**/TestPlansGroupBySuite" />
                 <exclude name="**/TestRollbackSuite" />
+                <exclude name="**/TestSaveRestoreSysprocSuite" />
                 <exclude name="**/TestSQLFeaturesSuite" />
                 <exclude name="**/TestSQLTypesSuite" />
                 <exclude name="**/TestSqlUpdateSuite" />
