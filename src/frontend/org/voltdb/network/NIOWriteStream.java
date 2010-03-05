@@ -75,6 +75,8 @@ public class NIOWriteStream implements WriteStream {
 
     private ArrayDeque<DeferredSerialization> m_queuedWrites = m_queuedWrites1;
 
+    private final int m_maxQueuedWrites = 1000;
+
     private final Runnable m_offBackPressureCallback;
     private final Runnable m_onBackPressureCallback;
 
@@ -113,12 +115,15 @@ public class NIOWriteStream implements WriteStream {
     }
 
     /**
-     * Returns true when a drainTo invocation was unable to completely drain all queued bytes
+     * Returns true when a drainTo invocation was unable to completely drain all queued bytes ||
+     * > 1000 writes are queued
      */
     @Override
     public boolean hadBackPressure() {
         return m_hadBackPressure;
     }
+
+
 
     /**
      * Called when not all queued data could be flushed to the channel
@@ -190,7 +195,7 @@ public class NIOWriteStream implements WriteStream {
              * Nothing to write
              */
             if (m_queuedBuffers.isEmpty()) {
-                if (m_hadBackPressure) {
+                if (m_hadBackPressure && m_queuedWrites.size() <= m_maxQueuedWrites) {
                     backpressureEnded();
                 }
                 m_lastPendingWriteTime = -1;
@@ -337,7 +342,7 @@ public class NIOWriteStream implements WriteStream {
         //has to be queued in the above loop resulting in rc == 0. Since rc == 0
         //it won't loop around a last time and see that there are no more queued buffers
         //and thus no backpressure
-        if (m_queuedBuffers.isEmpty() && m_hadBackPressure) {
+        if (m_queuedBuffers.isEmpty() && m_hadBackPressure && m_queuedWrites.size() <= m_maxQueuedWrites) {
             backpressureEnded();
         }
 
@@ -385,7 +390,7 @@ public class NIOWriteStream implements WriteStream {
                 c.discard();
                 return false;
             }
-            updateLastPendingWriteTime();
+            updateLastPendingWriteTimeAndQueueBackpressure();
             updateQueued(c.b.remaining());
             m_queuedBuffers.offer(c);
             m_port.setInterests( SelectionKey.OP_WRITE, 0);
@@ -407,7 +412,7 @@ public class NIOWriteStream implements WriteStream {
             if (m_isShutdown) {
                 return false;
             }
-            updateLastPendingWriteTime();
+            updateLastPendingWriteTimeAndQueueBackpressure();
             m_queuedWrites.offer(new DeferredSerialization() {
                 @Override
                 public BBContainer serialize(final DBBPool pool) throws IOException {
@@ -437,7 +442,7 @@ public class NIOWriteStream implements WriteStream {
             if (m_isShutdown) {
                 return false;
             }
-            updateLastPendingWriteTime();
+            updateLastPendingWriteTimeAndQueueBackpressure();
             m_queuedWrites.offer(new DeferredSerialization() {
                 @Override
                 public BBContainer serialize(final DBBPool pool) throws IOException {
@@ -467,7 +472,7 @@ public class NIOWriteStream implements WriteStream {
                 ds.cancel();
                 return false;
             }
-            updateLastPendingWriteTime();
+            updateLastPendingWriteTimeAndQueueBackpressure();
             m_queuedWrites.offer(ds);
             m_port.setInterests( SelectionKey.OP_WRITE, 0);
         }
@@ -495,7 +500,7 @@ public class NIOWriteStream implements WriteStream {
                 return false;
             }
 
-            updateLastPendingWriteTime();
+            updateLastPendingWriteTimeAndQueueBackpressure();
 
             /*
              * Attempt to use one of our own pooled direct byte buffers
@@ -589,9 +594,12 @@ public class NIOWriteStream implements WriteStream {
         return (int)(now - m_lastPendingWriteTime);
     }
 
-    private void updateLastPendingWriteTime() {
+    private void updateLastPendingWriteTimeAndQueueBackpressure() {
         if (m_lastPendingWriteTime == -1) {
             m_lastPendingWriteTime = EstTime.currentTimeMillis();
+        }
+        if (m_queuedWrites.size() > 1000 && !m_hadBackPressure) {
+            backpressureStarted();
         }
     }
 
