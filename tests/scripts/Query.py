@@ -52,14 +52,43 @@ class VoltQueryClient(cmd.Cmd):
         self.__quiet = False
         self.__timeout = None
 
+        self.__initialize(host, port, username, password)
+
+    def __initialize(self, host, port, username, password):
         self.fs = FastSerializer(host, port, username, password)
+
         self.adhoc = VoltProcedure(self.fs, "@AdHoc",
                                    [FastSerializer.VOLTTYPE_STRING])
+
         self.stat = VoltProcedure(self.fs, "@Statistics",
                                   [FastSerializer.VOLTTYPE_STRING])
-        self.shutdown = VoltProcedure(self.fs, "@Shutdown", [])
+
+        self.snapshotsave = VoltProcedure(self.fs, "@SnapshotSave",
+                                          [FastSerializer.VOLTTYPE_STRING,
+                                           FastSerializer.VOLTTYPE_STRING,
+                                           FastSerializer.VOLTTYPE_TINYINT])
+        self.snapshotscan = VoltProcedure(self.fs, "@SnapshotScan",
+                                          [FastSerializer.VOLTTYPE_STRING])
+        self.snapshotdelete = VoltProcedure(self.fs, "@SnapshotDelete",
+                                            [FastSerializer.VOLTTYPE_STRING,
+                                             FastSerializer.VOLTTYPE_STRING])
+        self.snapshotrestore = VoltProcedure(self.fs, "@SnapshotRestore",
+                                             [FastSerializer.VOLTTYPE_STRING,
+                                              FastSerializer.VOLTTYPE_STRING,
+                                              FastSerializer.VOLTTYPE_TINYINT])
+        self.snapshotstatus = VoltProcedure(self.fs, "@SnapshotStatus")
+
+        self.systeminformation = VoltProcedure(self.fs, "@SystemInformation")
+
+        self.quiesce = VoltProcedure(self.fs, "@Quiesce")
+
+        self.shutdown = VoltProcedure(self.fs, "@Shutdown")
 
         self.response = None
+
+    def execute(self, command):
+        self.onecmd(command)
+        return self.response
 
     def precmd(self, command):
         return command.decode("utf-8")
@@ -90,6 +119,25 @@ class VoltQueryClient(cmd.Cmd):
     def set_timeout(self, timeout):
         self.__timeout = timeout
 
+    def do_connect(self, command):
+        if not command:
+            return self.help_connect()
+
+        args = command.split()
+        if len(args) < 2:
+            return self.help_connect()
+        host = args[0]
+        port = int(args[1])
+        username = len(args) >= 3 and args[2] or ""
+        password = len(args) >= 4 and args[3] or ""
+
+        self.safe_print("Connecting to server %s on port %d" % (host, port))
+        self.__initialize(host, port, username, password)
+
+    def help_connect(self):
+        self.safe_print("Connect to a server")
+        self.safe_print("\tconnect host port [username] [password]")
+
     def do_quit(self, command):
         return True
 
@@ -102,18 +150,112 @@ class VoltQueryClient(cmd.Cmd):
             return True
 
         self.safe_print("Unknown Command:", command)
+        self.do_help(None)
 
     def do_stat(self, command):
         if not command:
             return self.help_stat()
 
         self.safe_print("Getting statistics")
-        self.response = self.stat.call([command])
+        self.response = self.stat.call([command], timeout = self.__timeout)
         self.safe_print(self.response)
 
     def help_stat(self):
         self.safe_print("Get the statistics:")
         self.safe_print("\tstat procedure")
+
+    def do_snapshotsave(self, command):
+        if not command:
+            return self.help_snapshotsave()
+
+        args = command.split()
+        if len(args) != 3:
+            return self.help_snapshotsave()
+
+        self.safe_print("Taking snapshot")
+        self.response = self.snapshotsave.call([args[0], args[1], int(args[2])],
+                                               timeout = self.__timeout)
+        self.safe_print(self.response)
+
+    def help_snapshotsave(self):
+        self.safe_print("Take a snapshot:")
+        self.safe_print("\tsnapshotsave directory nounce blocking")
+
+    def do_snapshotscan(self, command):
+        if not command:
+            return self.help_snapshotscan()
+
+        self.safe_print("Scanning snapshots")
+        self.response = self.snapshotscan.call([command],
+                                               timeout = self.__timeout)
+        self.safe_print(self.response)
+
+    def help_snapshotscan(self):
+        self.safe_print("Scan snapshots")
+        self.safe_print("\tsnapshotsave directory")
+
+    def do_snapshotdelete(self, command):
+        if not command:
+            return self.help_snapshotdelete()
+
+        (paths, nounces) = command.split()
+        paths = paths.split(",")
+        nounces = nounces.split(",")
+
+        self.safe_print("Deleting snapshots")
+        self.response = self.snapshotdelete.call([paths, nounces],
+                                                 timeout = self.__timeout)
+        self.safe_print(self.response)
+
+    def help_snapshotdelete(self):
+        self.safe_print("Delete snapshots")
+        self.safe_print("\tsnapshotdelete directory,directory,... "
+                        "nounce,nounce,...")
+
+    def do_snapshotrestore(self, command):
+        if not command:
+            return self.help_snapshotrestore()
+
+        args = command.split()
+        if len(args) != 3:
+            return self.help_snapshotrestore()
+
+        self.safe_print("Restoring snapshot")
+        self.response = self.snapshotrestore.call([args[0], args[1],
+                                                   int(args[2])],
+                                                  timeout = self.__timeout)
+        self.safe_print(self.response)
+
+    def help_snapshotrestore(self):
+        self.safe_print("Restore a snapshot:")
+        self.safe_print("\tsnapshotrestore directory nounce")
+
+    def do_snapshotstatus(self, command):
+        self.safe_print("Getting snapshot status")
+        self.response = self.snapshotstatus.call(timeout = self.__timeout)
+        self.safe_print(self.response)
+
+    def help_snapshotstatus(self):
+        self.safe_print("Get snapshot status")
+        self.safe_print("\tsnapshotstatus")
+
+    def do_sysinfo(self, command):
+        self.safe_print("Getting system information")
+        self.response = self.systeminformation.call(timeout = self.__timeout)
+        self.safe_print(self.response)
+
+    def help_sysinfo(self):
+        self.safe_print("Get system information")
+        self.safe_print("\tsysinfo")
+
+    def do_quiesce(self, command):
+        self.safe_print("Quiesce...")
+        self.response = self.quiesce.call(timeout = self.__timeout)
+        self.safe_print(self.response)
+
+    def help_quiesce(self):
+        self.safe_print("Quiesce the system")
+        self.safe_print("\tquiesce")
 
     def do_adhoc(self, command):
         if not command:
@@ -129,7 +271,7 @@ class VoltQueryClient(cmd.Cmd):
 
     def do_shutdown(self, command):
         self.safe_print("Shutting down the server")
-        self.shutdown.call(None, False)
+        self.shutdown.call(response = False, timeout = self.__timeout)
 
     def help_shutdown(self):
         self.safe_print("Shutdown the server")
@@ -152,7 +294,7 @@ class VoltQueryClient(cmd.Cmd):
                 def %s(self, command):
                     self.safe_print("Executing stored procedure: %s")
                     try:
-                        self.response = self.%s.call(self.prepare_params(self.%s, command))
+                        self.response = self.%s.call(self.prepare_params(self.%s, command), timeout = self.__timeout)
                         self.safe_print(self.response)
                     except SyntaxError, strerr:
                         self.safe_print(strerr)

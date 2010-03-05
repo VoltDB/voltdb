@@ -1,8 +1,10 @@
+#!/usr/bin/env python
+
 from os import curdir, sep
 import mimetypes
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 import cgi
-from fastserializer import *
+from Query import VoltQueryClient
 import socket
 
 # volt server IP address and port
@@ -13,7 +15,7 @@ volt_server_port = 21212
 volt_username = ''
 volt_password = ''
 
-# port on local server to listen for http requests, URL is formatted as http://localhost:9001 
+# port on local server to listen for http requests, URL is formatted as http://localhost:9001
 http_server_port = 9001
 
 
@@ -78,14 +80,14 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 self.wfile.write('  &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp')
                 self.wfile.write('  &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp')
                 self.wfile.write('  <input type=submit name="bsubmit" value="Delete Snapshot" /><br/>\n')
-                
+
                 self.wfile.write('</form>\n')
                 self.wfile.write('</body></html>\n')
                 return
-                
+
         except IOError:
             self.send_error(404,'Cannot locate index.html')
-     
+
 
     def do_POST(self):
         try:
@@ -104,7 +106,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
             print "Connecting to server at ", volt_server_ip, " on port ", volt_server_port
 
             try:
-                fs = FastSerializer(volt_server_ip, volt_server_port, volt_username, volt_password)
+                client = VoltQueryClient(volt_server_ip, volt_server_port, volt_username, volt_password)
+                client.set_quiet(True)
             except socket.error:
                 print "Error connecting to the server"
                 exit(-1)
@@ -132,60 +135,58 @@ class HTTPHandler(BaseHTTPRequestHandler):
                     self.wfile.write('SQL<br>\n');
                     self.wfile.write(sql_text + '<br>\n<br>\n');
                     self.wfile.write('RESULTS<br>\n');
-                    adhoc = VoltProcedure(fs, "@AdHoc",[FastSerializer.VOLTTYPE_STRING])
-                    response = adhoc.call([sql_text], timeout = None)
+                    response = client.execute('adhoc %s' % (sql_text))
                 elif (button_clicked == 'TABLES'):
                     self.wfile.write('Table Statistics<br>\n');
-                    stats = VoltProcedure(fs, "@Statistics",[FastSerializer.VOLTTYPE_STRING])
-                    response = stats.call(['table'], timeout = None)
+                    response = client.execute('stat table')
                 elif (button_clicked == 'PROCEDURES'):
                     self.wfile.write('Procedure Statistics<br>\n');
-                    stats = VoltProcedure(fs, "@Statistics",[FastSerializer.VOLTTYPE_STRING])
-                    response = stats.call(['procedure'], timeout = None)
+                    response = client.execute('stat procedure')
                 elif (button_clicked == 'INITIATORS'):
                     self.wfile.write('Initiator Statistics<br>\n');
-                    stats = VoltProcedure(fs, "@Statistics",[FastSerializer.VOLTTYPE_STRING])
-                    response = stats.call(['initiator'], timeout = None)
+                    response = client.execute('stat initiator')
                 elif (button_clicked == 'SYSTEMINFO'):
                     self.wfile.write('System Information<br>\n');
-                    stats = VoltProcedure(fs, "@SystemInformation",[])
-                    response = stats.call([], timeout = None)
+                    response = client.execute('sysinfo')
                 elif (button_clicked == "INITIATE SNAPSHOT"):
                     self.wfile.write("Attempting to initiate snapshot to ")
                     self.wfile.write(snapshot_path)
                     self.wfile.write(' with nonce ')
                     self.wfile.write(snapshot_nonce)
-                    initiate_proc = VoltProcedure(fs, "@SnapshotSave", [FastSerializer.VOLTTYPE_STRING, FastSerializer.VOLTTYPE_STRING, FastSerializer.VOLTTYPE_TINYINT]);
                     if blocking_snapshot:
-                        response = initiate_proc.call([snapshot_path, snapshot_nonce, 1], timeout = None);
+                        response = client.execute('snapshotsave %s %s %d' %
+                                                  (snapshot_path, snapshot_nonce, 1));
                     else:
-                        response = initiate_proc.call([snapshot_path, snapshot_nonce, 0], timeout = None);
+                        response = client.execute('snapshotsave %s %s %d' %
+                                                  (snapshot_path, snapshot_nonce, 0));
                 elif (button_clicked == "RESTORE SNAPSHOT"):
                     self.wfile.write("Attempting to restore snapshot from ")
                     self.wfile.write(snapshot_path)
                     self.wfile.write(' with nonce ')
                     self.wfile.write(snapshot_nonce)
-                    initiate_proc = VoltProcedure(fs, "@SnapshotRestore", [FastSerializer.VOLTTYPE_STRING, FastSerializer.VOLTTYPE_STRING]);
+                    # The third parameter is actually 'allowELT', maybe we
+                    # should change the condition here
                     if blocking_snapshot:
-                        response = initiate_proc.call([snapshot_path, snapshot_nonce], timeout = None);
+                        response = client.execute('snapshotrestore %s %s %d' %
+                                                  (snapshot_path, snapshot_nonce, 1));
                     else:
-                        response = initiate_proc.call([snapshot_path, snapshot_nonce], timeout = None);
+                        response = client.execute('snapshotrestore %s %s %d' %
+                                                  (snapshot_path, snapshot_nonce, 0));
                 elif (button_clicked == "SNAPSHOT STATUS"):
                     self.wfile.write("Retrieving snapshot status")
-                    initiate_proc = VoltProcedure(fs, "@SnapshotStatus", [])
-                    response = initiate_proc.call([], timeout = None);
+                    response = client.execute('snapshotstatus')
                 elif (button_clicked == "SCAN SNAPSHOTS"):
                     self.wfile.write("Scanning for snapshots in ")
                     self.wfile.write(snapshot_path)
-                    initiate_proc = VoltProcedure(fs, "@SnapshotScan", [FastSerializer.VOLTTYPE_STRING]);
-                    response = initiate_proc.call([snapshot_path], timeout = None);
+                    response = client.execute('snapshotscan %s' %
+                                              (snapshot_path))
                 elif (button_clicked == "DELETE SNAPSHOT"):
                     self.wfile.write("Attempting to delete snapshot in ")
                     self.wfile.write(snapshot_path)
                     self.wfile.write(' with nonce ')
                     self.wfile.write(snapshot_nonce)
-                    initiate_proc = VoltProcedure(fs, "@SnapshotDelete", [FastSerializer.VOLTTYPE_STRING, FastSerializer.VOLTTYPE_STRING]);
-                    response = initiate_proc.call([[snapshot_path], [snapshot_nonce]], timeout = None);
+                    response = client.execute('snapshotdelete %s %s' %
+                                              (snapshot_path, snapshot_nonce))
                 else:
                     print "Illegal call attempted by page."
                     exit(-1)
@@ -212,7 +213,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                         else:
                             self.wfile.write('  <tr id="grayrow">\n');
                             grayBar = 0
-                            
+
                         rowsDisplayed = rowsDisplayed + 1
                         colCounter = 0
                         for thisValue in thisTuple:
@@ -237,7 +238,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write("<br>\n<br>\n<a href='index.html>Click here to enter another SQL statement.</a>\n");
             self.wfile.write("</body>\n");
             self.wfile.write("</html>\n");
-            
+
         except :
             pass
 
@@ -256,6 +257,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-

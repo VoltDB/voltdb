@@ -746,18 +746,18 @@ class VoltResponse:
         self.clientHandle = self.fser.readInt64()
 
     def __str__(self):
-        tablestr = "\n".join([str(i) for i in self.tables])
+        tablestr = "\n\n".join([str(i) for i in self.tables])
         return "Status: %d\nInformation: %s\n%s" % (self.status, self.info,
                                                     tablestr)
 
 class VoltProcedure:
     "VoltDB called procedure interface"
-    def __init__(self, fser, name, paramtypes):
+    def __init__(self, fser, name, paramtypes = []):
         self.fser = fser             # FastSerializer object
         self.name = name             # procedure class name
         self.paramtypes = paramtypes # list of fser.WIRE_* values
 
-    def call(self, params, response = True, timeout = None):
+    def call(self, params = None, response = True, timeout = None):
         self.fser.writeByte(0)  # version number
         self.fser.writeString(self.name)
         self.fser.writeInt64(1)            # client handle
