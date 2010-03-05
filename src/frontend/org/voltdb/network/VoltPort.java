@@ -122,7 +122,7 @@ public class VoltPort implements Callable<VoltPort>, Connection
             if (readyForRead()) {
                 final int maxRead = m_handler.getMaxRead();
                 if (maxRead > 0) {
-                    read = fillReadStream( maxRead, pool);
+                    fillReadStream( maxRead, pool);
                     ByteBuffer message;
 
                     /*
