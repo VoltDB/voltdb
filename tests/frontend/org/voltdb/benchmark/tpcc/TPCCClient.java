@@ -133,6 +133,11 @@ implements TPCCSimulation.ProcCaller {
         //m_sampler = new VoltSampler(20, "tpcc-cliet-sampling");
     }
 
+    @Override
+    protected boolean useHeavyweightClient() {
+        return true;
+    }
+
     protected void buildConstraints() {
         Expression constraint = null;
         Expression constraint1 = null;

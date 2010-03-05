@@ -348,6 +348,10 @@ public abstract class ClientMain {
      */
     abstract protected void runLoop() throws NoConnectionsException;
 
+    protected boolean useHeavyweightClient() {
+        return false;
+    }
+
     /**
      * Implemented by derived classes. Invoke a single procedure without running
      * the network. This allows ClientMain to control the rate at which
@@ -400,7 +404,7 @@ public abstract class ClientMain {
      * @param args
      */
     public ClientMain(String args[]) {
-        m_voltClient = ClientFactory.createClient(getExpectedOutgoingMessageSize(), null, true);
+        m_voltClient = ClientFactory.createClient(getExpectedOutgoingMessageSize(), null, useHeavyweightClient());
 
         /*
          * Input parameters: HOST=host:port (may occur multiple times)
