@@ -108,7 +108,7 @@ PRIMARY ENTRY POINTS
     description="Run Java and C++ JNI testcases and test plan fragments."
 />
 <target name="check_quick"
-    depends="compile, junit_quick, distcheck"
+    depends="compile, junit_quick, distcheck, voltdbipc"
     description="Run a subset of Java testcases and test fragments."
 />
 <target name="all"
