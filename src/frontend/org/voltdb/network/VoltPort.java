@@ -120,15 +120,9 @@ public class VoltPort implements Callable<VoltPort>, Connection
              * Have the read stream fill from the network
              */
             if (readyForRead()) {
-                int read = 0;
-                do {
-                    final int maxRead = m_handler.getMaxRead();
-                    if (maxRead > 0) {
-                        read = fillReadStream( maxRead, pool);
-                    } else {
-                        break;
-                    }
-
+                final int maxRead = m_handler.getMaxRead();
+                if (maxRead > 0) {
+                    read = fillReadStream( maxRead, pool);
                     ByteBuffer message;
 
                     /*
@@ -138,7 +132,7 @@ public class VoltPort implements Callable<VoltPort>, Connection
                     while ((message = m_handler.retrieveNextMessage( this )) != null) {
                         m_handler.handleMessage( message, this);
                     }
-                } while (read > 0);
+                }
             }
 
             drainWriteStream(pool);
