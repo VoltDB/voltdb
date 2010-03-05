@@ -51,6 +51,7 @@ import java.util.Map;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.voltdb.ExecutionSite;
+import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.debugstate.ExecutorContext;
@@ -186,10 +187,26 @@ public class SimpleDtxnConnection extends SiteConnection {
      * @return The SimpleTxnState object created or found.
      */
     private TransactionState processTransactionMembership(MembershipNotice notice) {
-        // ignore out of date messages
+        // handle out of order messages
         if (notice.getTxnId() <= m_lastCompletedTxnId) {
-            //System.out.printf("Site %d got an old notice\n", m_siteId);
-            return null;
+            // because of our rollback implementation, fragment
+            // tasks can come in late and it's not a problem
+            if (notice instanceof FragmentTask) {
+                //System.out.printf("Site %d got an old notice\n", m_siteId);
+                return null;
+            }
+
+            // vanilla membership notices and initiate tasks are
+            // not allowed to come in out of order
+            StringBuilder msg = new StringBuilder();
+            msg.append("Txn ordering deadlock (DTXN) at site ").append(m_siteId).append(":\n");
+            msg.append("   txn ").append(m_lastCompletedTxnId).append(" (");
+            msg.append(TransactionIdManager.toString(m_lastCompletedTxnId)).append(" HB: ?");
+            msg.append(") before\n");
+            msg.append("   txn ").append(notice.getTxnId()).append(" (");
+            msg.append(TransactionIdManager.toString(notice.getTxnId())).append(" HB:");
+            msg.append(notice.isHeartBeat()).append(").\n");
+            throw new RuntimeException(msg.toString());
         }
 
         m_transactionQueue.gotTransaction(notice.getInitiatorSiteId(), notice.getTxnId(), notice.isHeartBeat());

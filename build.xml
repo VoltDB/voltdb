@@ -680,7 +680,7 @@ TEST CASES
 
 <!-- common junit parameters go here -->
 <macrodef name='run_junit'>
-    <attribute name='timeout' default='180000' />
+    <attribute name='timeout' default='240000' />
     <attribute name='printsummary' default='off' />
     <attribute name='showoutput' default='false' />
     <element name='tests'/>
@@ -790,7 +790,7 @@ TEST CASES
 
 <target name="junit" description="Run testcases for Java classes.">
     <!-- Run the unit tests -->
-    <condition property="timeoutLength" value="${timeoutLength}" else='180000'>
+    <condition property="timeoutLength" value="${timeoutLength}" else='240000'>
         <isset property="timeoutLength"/>
     </condition>
 

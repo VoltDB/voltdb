@@ -98,10 +98,9 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
 
         if (m_lastTxnPopped > txnId) {
             StringBuilder msg = new StringBuilder();
-            msg.append("Txn ordering deadlock at site ").append(m_siteId).append(":\n");
+            msg.append("Txn ordering deadlock (QUEUE) at site ").append(m_siteId).append(":\n");
             msg.append("   txn ").append(m_lastTxnPopped).append(" (");
-            msg.append(TransactionIdManager.toString(m_lastTxnPopped)).append(" HB:");
-            msg.append(isHeartbeat).append(") before\n");
+            msg.append(TransactionIdManager.toString(m_lastTxnPopped)).append(" HB: ?) before\n");
             msg.append("   txn ").append(txnId).append(" (");
             msg.append(TransactionIdManager.toString(txnId)).append(" HB:");
             msg.append(isHeartbeat).append(").\n");
