@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -81,23 +82,28 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
     public int siteId;
 
     /**
+     * Number of snapshot buffers to keep
+     */
+    private static final int m_numSnapshotBuffers = 4;
+
+    /**
      * Dedicated byte buffer to write snapshot tuples to. Only one buffer
      * is needed because the bottleneck is always going to be I/O and the EE
      * always has other work to do besides serializing.
      */
     //public static final int m_snapshotBufferLength = 1024 * 1024 * 2;
     public static final int m_snapshotBufferLength = 131072;
-    private final ByteBuffer m_snapshotBuffer;
-    private final long m_snapshotBufferAddress;
-    private final BBContainer m_snapshotBufferOrigin;
-    private final BBContainer m_stupidSnapshotContainer;//pairs ByteBuffer with address
+    private final ArrayList<BBContainer> m_snapshotBufferOrigins =
+        new ArrayList<BBContainer>();
     /**
      * Set to true when the buffer is sent to a SnapshotDataTarget for I/O
      * and back to false when the container is discarded.
      * A volatile allows the EE to check for the buffer without
      * synchronization when the snapshot is done online.
      */
-    private volatile boolean m_snapshotBufferIsLoaned = false;
+    private ConcurrentLinkedQueue<BBContainer> m_availableSnapshotBuffers
+        = new ConcurrentLinkedQueue<BBContainer>();
+
     /**
      * The last EE out has to shut off the lights. Cache a list
      * of targets in case this EE ends up being the one that needs
@@ -360,10 +366,6 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
         ee = null;
         hsql = null;
         m_dumpId = "MockExecSite";
-        m_snapshotBufferOrigin = null;
-        m_snapshotBuffer = null;
-        m_snapshotBufferAddress = 0;
-        m_stupidSnapshotContainer = null;
     }
 
     /**
@@ -456,17 +458,20 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
         // load up all the stored procedures
         loadProceduresFromCatalog();
 
-        m_snapshotBufferOrigin = org.voltdb.utils.DBBPool.allocateDirect(m_snapshotBufferLength);
-        m_snapshotBuffer = m_snapshotBufferOrigin.b;
-        if (VoltDB.getLoadLibVOLTDB()) {
-            m_snapshotBufferAddress = org.voltdb.utils.DBBPool.getBufferAddress(m_snapshotBuffer);
-        } else {
-            m_snapshotBufferAddress = 0;
+        for (int ii = 0; ii < m_numSnapshotBuffers; ii++) {
+            final BBContainer origin = org.voltdb.utils.DBBPool.allocateDirect(m_snapshotBufferLength);
+            m_snapshotBufferOrigins.add(origin);
+            long snapshotBufferAddress = 0;
+            if (VoltDB.getLoadLibVOLTDB()) {
+                snapshotBufferAddress = org.voltdb.utils.DBBPool.getBufferAddress(origin.b);
+            }
+            m_availableSnapshotBuffers.offer(new BBContainer(origin.b, snapshotBufferAddress) {
+                @Override
+                public void discard() {
+                    m_availableSnapshotBuffers.offer(this);
+                }
+            });
         }
-        m_stupidSnapshotContainer = new BBContainer(m_snapshotBuffer, m_snapshotBufferAddress) {
-            @Override
-            public void discard() {}
-        };
     }
 
     public boolean updateCatalog() {
@@ -750,7 +755,7 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
          * a snapshot is finished. If the snapshot buffer is loaned out that means
          * it is pending I/O somewhere so there is no work to do until it comes back.
          */
-        if (m_snapshotTableTasks == null || m_snapshotBufferIsLoaned) {
+        if (m_snapshotTableTasks == null || m_availableSnapshotBuffers.isEmpty()) {
             return retval;
         }
 
@@ -763,9 +768,11 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
             final SnapshotTableTask currentTask = m_snapshotTableTasks.peek();
             assert(currentTask != null);
             final int headerSize = currentTask.m_target.getHeaderSize();
-            m_snapshotBuffer.clear();
-            m_snapshotBuffer.position(headerSize);
-            final int serialized = ee.cowSerializeMore(m_stupidSnapshotContainer, currentTask.m_tableId);
+            final BBContainer snapshotBuffer = m_availableSnapshotBuffers.poll();
+            assert(snapshotBuffer != null);
+            snapshotBuffer.b.clear();
+            snapshotBuffer.b.position(headerSize);
+            final int serialized = ee.cowSerializeMore( snapshotBuffer, currentTask.m_tableId);
 
             if (serialized < 0) {
                 hostLog.error("Failure while serialize data from a table for COW snapshot");
@@ -803,27 +810,16 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
                     }
                     terminatorThread.start();
                 }
+                m_availableSnapshotBuffers.offer(snapshotBuffer);
                 continue;
             }
 
             /**
              * The block from the EE will contain raw tuple data with no length prefix etc.
              */
-            m_snapshotBuffer.limit(headerSize + serialized);
-            m_snapshotBuffer.position(0);
-            m_snapshotBufferIsLoaned = true;
-            retval = currentTask.m_target.write(new BBContainer(m_snapshotBuffer, m_snapshotBufferAddress) {
-                @Override
-                public void discard() {
-                    /*
-                     * Use a volatile to find out when the buffer is returned
-                     * because it is cheaper then syncing. Useful for the EE so
-                     * it doesn't have to do an extra sync every single time it does
-                     * snapshot work while a snapshot is done on a running system
-                     */
-                    m_snapshotBufferIsLoaned = false;
-                }
-            });
+            snapshotBuffer.b.limit(headerSize + serialized);
+            snapshotBuffer.b.position(0);
+            retval = currentTask.m_target.write(snapshotBuffer);
             break;
         }
 
@@ -878,12 +874,6 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
 
     public InitiateResponse processInitiateTask(final VoltMessage task) {
         final InitiateTask itask = (InitiateTask)task;
-
-        /*
-         * Before processing an initiate task is a good time to do this work
-         * since it won't delay multi-partition fragment type stuff.
-         */
-        doSnapshotWork();
 
         // keep track of the current procedure
         m_currentSPTask = itask;
@@ -973,7 +963,10 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
                 //Ignore interruptions and finish shutting down.
             }
         }
-        m_stupidSnapshotContainer.discard();
+        for (BBContainer c : m_snapshotBufferOrigins ) {
+            c.discard();
+        }
+        m_availableSnapshotBuffers.clear();
     }
 
     /**
