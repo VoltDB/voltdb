@@ -43,7 +43,7 @@ import org.voltdb.VoltTable;
  *  </p>
  *
  *  <p>
- *  The expected serialized message size parameter provided to {@link ClientFactory#createClient(int, int[]) createClient}
+ *  The expected serialized message size parameter provided to {@link ClientFactory#createClient(int, int[], boolean) createClient}
  *  determines the default size of the initial memory allocation used when serializing stored procedure invocations.
  *  If the initial allocation is insufficient then the allocation is doubled necessitating an extra allocation and copy
  *  If the allocation is excessively small it may be doubled and copied several times when serializing large

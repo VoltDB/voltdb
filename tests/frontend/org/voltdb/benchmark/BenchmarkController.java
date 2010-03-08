@@ -311,10 +311,6 @@ public class BenchmarkController {
                          * anywhere near enough data to fill the tenured gen.
                          */
                         "-Xmn" + String.valueOf((m_config.serverHeapSize / 4) * 3) + "m",
-                        /*
-                         * Start the heap off at the max size
-                         */
-                        "-Xms" + String.valueOf(m_config.serverHeapSize) + "m",
                         "-Xmx" + String.valueOf(m_config.serverHeapSize) + "m",
                         "-server",
                         "-cp", "\"voltdbfat.jar:vertica_4.0_jdk_5.jar:" + m_jarFileName + "\"",
