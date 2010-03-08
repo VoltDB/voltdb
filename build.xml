@@ -103,12 +103,12 @@ PRIMARY ENTRY POINTS
     description="Compile Java classes and C++ JNI library."
 />
 <target name="check"
-    depends="compile, eecheck, junit, distcheck, voltdbipc, pythonfser,
+    depends="compile, voltdbipc, eecheck, junit, distcheck, pythonfser,
              licensecheck"
     description="Run Java and C++ JNI testcases and test plan fragments."
 />
 <target name="check_quick"
-    depends="compile, junit_quick, distcheck, voltdbipc"
+    depends="compile, voltdbipc, junit_quick, distcheck"
     description="Run a subset of Java testcases and test fragments."
 />
 <target name="all"
@@ -790,7 +790,7 @@ TEST CASES
 
 <target name="junit" description="Run testcases for Java classes.">
     <!-- Run the unit tests -->
-    <condition property="timeoutLength" value="${timeoutLength}" else='240000'>
+    <condition property="timeoutLength" value="${timeoutLength}" else='600000'>
         <isset property="timeoutLength"/>
     </condition>
 
