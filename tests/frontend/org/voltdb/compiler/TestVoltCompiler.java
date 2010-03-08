@@ -521,7 +521,7 @@ public class TestVoltCompiler extends TestCase {
         jar.delete();
     }
 
-    /*public void testXMLFileWithELEnabled() throws IOException {
+    public void testXMLFileWithELEnabled() throws IOException {
         final String simpleSchema =
             "create table books (cash integer default 23, title varchar default 'foo', PRIMARY KEY(cash));";
 
@@ -536,7 +536,7 @@ public class TestVoltCompiler extends TestCase {
             "  <procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
             "  <exports><connector class='org.voltdb.VerticaLoader'> " +
             "             <tables><table name='foo' exportonly='true'/></tables>" +
-            "             <destinations><destination address='localhost' username='foo' password='bar'/></destinations>" +
+            "             <destinations><destination url='localhost:9999' username='foo' password='bar'/></destinations>" +
             "           </connector>" +
             "  </exports>" +
             " </database>" +
@@ -567,7 +567,7 @@ public class TestVoltCompiler extends TestCase {
 
         final File jar = new File("testout.jar");
         jar.delete();
-    }*/
+    }
 
     public void testOverrideProcInfo() throws IOException {
         final String simpleSchema =
