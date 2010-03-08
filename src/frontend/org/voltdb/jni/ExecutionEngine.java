@@ -301,6 +301,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Pass the catalog to the engine */
     abstract public void loadCatalog(final String serializedCatalog) throws EEException;
 
+    /** Pass diffs to apply to the EE's catalog to update it */
+    abstract public void updateCatalog(final String diffCommands) throws EEException;
+
     /** Run a plan fragment */
     abstract public DependencyPair executePlanFragment(
         long planFragmentId, int outputDepId,
@@ -432,6 +435,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @return error code
      */
     protected native int nativeLoadCatalog(long pointer, String serialized_catalog);
+
+    /**
+     * Update the EE's catalog.
+     * @param pointer the VoltDBEngine pointer
+     * @param diff_commands Commands to apply to the existing EE catalog to update it
+     * @return error code
+     */
+    protected native int nativeUpdateCatalog(long pointer, String diff_commands);
 
     /**
      * This method is called to initially load table data.

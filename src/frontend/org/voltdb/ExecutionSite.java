@@ -25,10 +25,10 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -481,6 +481,7 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
     }
 
     void loadProceduresFromCatalog() {
+        m_registeredSysProcPlanFragments.clear();
         procs.clear();
         // load up all the stored procedures
         final CatalogMap<Procedure> catalogProcedures = m_context.database.getProcedures();

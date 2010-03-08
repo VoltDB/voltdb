@@ -87,6 +87,8 @@ private:
 
     int8_t loadCatalog(struct ipc_command *cmd);
 
+    int8_t updateCatalog(struct ipc_command *cmd);
+
     int8_t initialize(struct ipc_command *cmd);
 
     int8_t toggleProfiler(struct ipc_command *cmd);

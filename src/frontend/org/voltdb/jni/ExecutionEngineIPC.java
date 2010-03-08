@@ -119,7 +119,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         SetLogLevels(13),
         Quiesce(16),
         ActivateCopyOnWrite(17),
-        COWSerializeMore(18);
+        COWSerializeMore(18),
+        UpdateCatalog(19);
 
         Commands(final int id) {
             m_id = id;
@@ -663,6 +664,36 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
         try {
             final byte catalogBytes[] = serializedCatalog.getBytes("UTF-8");
+            if (m_data.capacity() < catalogBytes.length + 100) {
+                m_data = ByteBuffer.allocate(catalogBytes.length + 100);
+            }
+            m_data.putInt(Commands.UpdateCatalog.m_id);
+            m_data.put(catalogBytes);
+            m_data.put((byte)'\0');
+        } catch (final UnsupportedEncodingException ex) {
+            Logger.getLogger(ExecutionEngineIPC.class.getName()).log(
+                    Level.SEVERE, null, ex);
+        }
+
+        try {
+            m_data.flip();
+            m_connection.write();
+            result = m_connection.readStatusByte();
+        } catch (final IOException e) {
+            System.out.println("Exception: " + e.getMessage());
+            throw new RuntimeException(e);
+        }
+        checkErrorCode(result);
+    }
+
+    /** write the diffs as a UTF-8 byte string via connection */
+    @Override
+    public void updateCatalog(final String catalogDiffs) throws EEException {
+        int result = ExecutionEngine.ERRORCODE_ERROR;
+        m_data.clear();
+
+        try {
+            final byte catalogBytes[] = catalogDiffs.getBytes("UTF-8");
             if (m_data.capacity() < catalogBytes.length + 100) {
                 m_data = ByteBuffer.allocate(catalogBytes.length + 100);
             }

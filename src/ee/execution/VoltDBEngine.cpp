@@ -473,7 +473,7 @@ bool VoltDBEngine::loadCatalog(const std::string &catalogPayload) {
         return false;
     }
     m_database = cluster->databases().get("database");
-    if (!cluster) {
+    if (!m_database) {
         VOLT_ERROR("Unable to find database catalog information");
         return false;
     }
@@ -545,6 +545,27 @@ bool VoltDBEngine::loadCatalog(const std::string &catalogPayload) {
     m_executorContext->setEpoch(epoch);
 
     VOLT_DEBUG("Loaded catalog...");
+    return true;
+}
+
+bool VoltDBEngine::updateCatalog(const std::string &catalogPayload) {
+    assert(m_catalog != NULL); // the engine must be initialized
+    VOLT_DEBUG("Updating catalog...");
+
+    m_catalog->execute(catalogPayload);
+
+    catalog::Cluster *cluster = m_catalog->clusters().get("cluster");
+    if (!cluster) {
+        VOLT_ERROR("Unable to find cluster catalog information");
+        return false;
+    }
+    m_database = cluster->databases().get("database");
+    if (!m_database) {
+        VOLT_ERROR("Unable to find database catalog information");
+        return false;
+    }
+
+    VOLT_DEBUG("Updated catalog...");
     return true;
 }
 

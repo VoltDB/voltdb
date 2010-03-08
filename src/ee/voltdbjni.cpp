@@ -225,6 +225,40 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadC
     }
 }
 
+/**
+ * Load the system catalog for this engine.
+ * @param engine_ptr the VoltDBEngine pointer
+ * @param serialized_catalog the root catalog object serialized as text strings.
+ * this parameter is jstring, not jbytearray because Catalog is serialized into
+ * human-readable text strings separated by line feeds.
+ * @return error code
+*/
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeUpdateCatalog(
+    JNIEnv *env, jobject obj,
+    jlong engine_ptr, jstring catalog_diffs) {
+    VOLT_DEBUG("nativeUpdateCatalog() start");
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+    if (engine == NULL) {
+        VOLT_ERROR("engine_ptr was NULL or invalid pointer");
+        return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
+    }
+    updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
+
+    //copy to std::string. utf_chars may or may not by a copy of the string
+    const char* utf_chars = env->GetStringUTFChars(catalog_diffs, NULL);
+    string str(utf_chars);
+    env->ReleaseStringUTFChars(catalog_diffs, utf_chars);
+    VOLT_DEBUG("calling loadCatalog...");
+    bool success = engine->updateCatalog(str);
+
+    if (success) {
+        VOLT_DEBUG("updateCatalog succeeded");
+        return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
+    } else {
+        VOLT_ERROR("updateCatalog failed");
+        return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
+    }
+}
 
 /**
  * This method is called to initially load table data.

@@ -161,6 +161,21 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     /**
+     * Wrapper for {@link #nativeUpdateCatalog(long, String)}.
+     */
+    @Override
+    public void updateCatalog(final String catalogDiffs) throws EEException {
+        //C++ JSON deserializer is not thread safe, must synchronize
+        LOG.trace("Loading Application Catalog...");
+        int errorCode = 0;
+        synchronized (ExecutionEngineJNI.class) {
+            errorCode = nativeUpdateCatalog(pointer, catalogDiffs);
+        }
+        checkErrorCode(errorCode);
+        //LOG.info("Loaded Catalog.");
+    }
+
+    /**
      * @param undoToken Token identifying undo quantum for generated undo info
      * Wrapper for {@link #nativeExecutePlanFragment(long, long, int, int, long, long, long)}.
      */

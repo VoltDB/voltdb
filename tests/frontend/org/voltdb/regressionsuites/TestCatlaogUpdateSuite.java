@@ -26,7 +26,10 @@ package org.voltdb.regressionsuites;
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltDB.Configuration;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
+import org.voltdb.client.Client;
 
 /**
  * Tests a mix of multi-partition and single partition procedures on a
@@ -54,7 +57,7 @@ public class TestCatlaogUpdateSuite extends RegressionSuite {
     }
 
     public void testUpdate() throws Exception {
-        /*Client client = getClient();
+        Client client = getClient();
 
         String newCatalogURL;
 
@@ -68,7 +71,7 @@ public class TestCatlaogUpdateSuite extends RegressionSuite {
 
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-onesite-conflict.jar");
         results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
-        assertTrue(results.length == 0);*/
+        assertTrue(results.length == 0);
 
         assertTrue(true);
     }

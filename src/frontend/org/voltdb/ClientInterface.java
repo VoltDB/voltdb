@@ -31,6 +31,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Level;
@@ -77,14 +78,16 @@ public class ClientInterface implements DumpManager.Dumpable {
     private static final Logger networkLog = Logger.getLogger("NETWORK", org.voltdb.utils.VoltLoggerFactory.instance());
     private final ClientAcceptor m_acceptor;
     private final TransactionInitiator m_initiator;
-    private final AsyncCompilerWorkThread m_plannerThread;
+    private final AsyncCompilerWorkThread m_asyncCompilerWorkThread;
     private final ArrayList<Connection> m_connections = new ArrayList<Connection>();
     private final SnapshotDaemon m_snapshotDaemon;
     private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
-    private CatalogContext m_catalogContext;
+
+    // Atomically allows the catalog reference to change between access
+    private AtomicReference<CatalogContext> m_catalogContext = new AtomicReference<CatalogContext>(null);
 
     /** If this is true, update the catalog */
-    private AtomicBoolean m_shouldUpdateCatalog = new AtomicBoolean(false);
+    private final AtomicBoolean m_shouldUpdateCatalog = new AtomicBoolean(false);
 
     /**
      * Counter of the number of client connections. Used to enforce a limit on the maximum number of connections
@@ -404,7 +407,7 @@ public class ClientInterface implements DumpManager.Dumpable {
             final byte password[] = new byte[20];
             message.get(password);
 
-            final AuthSystem.AuthUser user = m_catalogContext.authSystem.authenticate(username, password);
+            final AuthSystem.AuthUser user = m_catalogContext.get().authSystem.authenticate(username, password);
 
             if (user == null) {
                 //Send negative response
@@ -642,9 +645,9 @@ public class ClientInterface implements DumpManager.Dumpable {
                     TransactionInitiator initiator, AsyncCompilerWorkThread plannerThread,
                     int[] allPartitions, SnapshotSchedule schedule)
     {
-        m_catalogContext = context;
+        m_catalogContext.set(context);
         m_initiator = initiator;
-        m_plannerThread = plannerThread;
+        m_asyncCompilerWorkThread = plannerThread;
 
         // pre-allocate single partition array
         m_allPartitions = allPartitions;
@@ -670,7 +673,7 @@ public class ClientInterface implements DumpManager.Dumpable {
         final StoredProcedureInvocation task = fds.readObject(StoredProcedureInvocation.class);
 
         // get procedure from the catalog
-        final Procedure catProc = m_catalogContext.procedures.get(task.procName);
+        final Procedure catProc = m_catalogContext.get().procedures.get(task.procName);
 
         // For now, comment out any subset of lines below to start the sampler
         // but you will need to rebuild and distribute voltdbfat.jar, etc...
@@ -709,7 +712,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                     return;
                 }
                 String sql = (String) task.params.m_params[0];
-                m_plannerThread.planSQL(sql, task.clientHandle, handler.connectionId(), handler.sequenceId(), c);
+                m_asyncCompilerWorkThread.planSQL(sql, task.clientHandle, handler.connectionId(), handler.sequenceId(), c);
                 return;
             }
 
@@ -735,7 +738,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                     return;
                 }
                 String catalogURL = (String) task.params.m_params[0];
-                m_plannerThread.prepareCatalogUpdate(catalogURL, task.clientHandle, handler.connectionId(), handler.sequenceId(), c);
+                m_asyncCompilerWorkThread.prepareCatalogUpdate(catalogURL, task.clientHandle, handler.connectionId(), handler.sequenceId(), c);
                 return;
             }
 
@@ -834,11 +837,11 @@ public class ClientInterface implements DumpManager.Dumpable {
     }
 
     private final void checkForFinishedCompilerWork() {
-        if (m_plannerThread == null) return;
+        if (m_asyncCompilerWorkThread == null) return;
 
         AsyncCompilerResult result = null;
 
-        while ((result = m_plannerThread.getPlannedStmt()) != null) {
+        while ((result = m_asyncCompilerWorkThread.getPlannedStmt()) != null) {
             if (result.errorMsg == null) {
                 if (result instanceof AdHocPlannedStmt) {
                     AdHocPlannedStmt plannedStmt = (AdHocPlannedStmt) result;
@@ -913,9 +916,17 @@ public class ClientInterface implements DumpManager.Dumpable {
                     checkForDeadConnections(time);
                 }
             }
+
+            // check for catalog updates
+            if (m_shouldUpdateCatalog.compareAndSet(true, false)) {
+                m_catalogContext.set(VoltDB.instance().getCatalogContext());
+                m_asyncCompilerWorkThread.notifyShouldUpdateCatalog();
+            }
+
             // poll planner queue
             checkForFinishedCompilerWork();
 
+            // snapshot work
             initiateSnapshotDaemonWork(m_snapshotDaemon.processPeriodicWork(time));
         } finally {
             periodicWorkLock.unlock();
@@ -959,9 +970,9 @@ public class ClientInterface implements DumpManager.Dumpable {
             m_acceptor.shutdown();
         }
 
-        if (m_plannerThread != null) {
-            m_plannerThread.shutdown();
-            m_plannerThread.join();
+        if (m_asyncCompilerWorkThread != null) {
+            m_asyncCompilerWorkThread.shutdown();
+            m_asyncCompilerWorkThread.join();
         }
     }
 
@@ -996,10 +1007,10 @@ public class ClientInterface implements DumpManager.Dumpable {
         return context;
     }
 
-    private void initiateSnapshotDaemonWork(Pair<String, Object[]>  invocation) {
+    private void initiateSnapshotDaemonWork(Pair<String, Object[]> invocation) {
         if (invocation != null) {
             // get procedure from the catalog
-           final Procedure catProc = m_catalogContext.procedures.get(invocation.getFirst());
+           final Procedure catProc = m_catalogContext.get().procedures.get(invocation.getFirst());
            if (catProc == null) {
                throw new RuntimeException("SnapshotDaemon attempted to invoke " + invocation.getFirst() +
                        " which is not a known procedure");

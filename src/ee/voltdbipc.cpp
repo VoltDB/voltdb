@@ -231,6 +231,9 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
         cowSerializeMore(cmd);
         result = kErrorCode_None;
         break;
+      case 19:
+        result = loadCatalog(cmd);
+        break;
       default:
         result = stub(cmd);
     }
@@ -271,6 +274,18 @@ int8_t VoltDBIPC::loadCatalog(struct ipc_command *cmd) {
         return kErrorCode_Error;
 
     if (m_engine->loadCatalog(std::string(cmd->data)) == true) {
+        return kErrorCode_Success;
+    }
+    return kErrorCode_Error;
+}
+
+int8_t VoltDBIPC::updateCatalog(struct ipc_command *cmd) {
+    printf("updateCatalog\n");
+    assert(m_engine);
+    if (!m_engine)
+        return kErrorCode_Error;
+
+    if (m_engine->updateCatalog(std::string(cmd->data)) == true) {
         return kErrorCode_Success;
     }
     return kErrorCode_Error;

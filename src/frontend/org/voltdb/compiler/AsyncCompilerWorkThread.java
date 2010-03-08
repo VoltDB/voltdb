@@ -20,6 +20,7 @@ package org.voltdb.compiler;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -50,6 +51,9 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
     final int m_siteId;
     boolean m_isLoaded = false;
     CatalogContext m_context;
+
+    /** If this is true, update the catalog */
+    private final AtomicBoolean m_shouldUpdateCatalog = new AtomicBoolean(false);
 
     // store the id used by the DumpManager to identify this execution site
     final String m_dumpId;
@@ -89,7 +93,6 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
         }
         m_isLoaded = true;
     }
-
 
     public void shutdown() {
         AdHocPlannerWork work = new AdHocPlannerWork();
@@ -147,6 +150,11 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
                 DumpManager.putDump(m_dumpId, m_currentDumpTimestamp, true, getDumpContents());
             }
             else {
+                // deal with reloading the global catalog
+                if (m_shouldUpdateCatalog.compareAndSet(true, false)) {
+                    m_context = VoltDB.instance().getCatalogContext();
+                }
+
                 AsyncCompilerResult result = null;
                 if (work instanceof AdHocPlannerWork)
                     result = compileAdHocPlan((AdHocPlannerWork) work);
@@ -169,6 +177,9 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
             m_hsql.close();
     }
 
+    public void notifyShouldUpdateCatalog() {
+        m_shouldUpdateCatalog.set(true);
+    }
 
     @Override
     public void goDumpYourself(long timestamp) {

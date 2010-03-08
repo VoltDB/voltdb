@@ -165,6 +165,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // Catalog Functions
         // -------------------------------------------------
         bool loadCatalog(const std::string &catalogPayload);
+        bool updateCatalog(const std::string &catalogPayload);
         /**
         * Load table data into a persistent table specified by the tableId parameter.
         * This must be called at most only once before any data is loaded in to the table.
