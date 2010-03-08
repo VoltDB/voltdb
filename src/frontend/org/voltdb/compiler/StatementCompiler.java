@@ -59,6 +59,9 @@ public abstract class StatementCompiler {
 
         // Strip newlines for catalog compatibility
         stmt = stmt.replaceAll("\n", " ");
+        // remove leading and trailing whitespace so the lines not
+        // too far below this doesn't fail (starts with "insert", etc...)
+        stmt = stmt.trim();
 
         //LOG.fine("Compiling Statement: ");
         //LOG.fine(stmt);

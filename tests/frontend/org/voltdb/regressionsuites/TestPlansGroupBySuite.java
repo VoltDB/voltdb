@@ -30,8 +30,8 @@ import java.util.Comparator;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.VoltTableRow;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
@@ -576,10 +576,6 @@ public class TestPlansGroupBySuite extends RegressionSuite {
 
     public TestPlansGroupBySuite(String name) {
         super(name);
-    }
-
-    public static void main(String args[]) {
-        org.junit.runner.JUnitCore.runClasses(TestPlansGroupBySuite.class);
     }
 
     static public junit.framework.Test suite() {

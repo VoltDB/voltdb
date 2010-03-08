@@ -366,6 +366,7 @@ public class TestVoltCompiler extends TestCase {
         assertFalse(success);
     }
 
+    // NOTE: TPCCTest proc also tests whitespaces regressions in SQL literals
     public void testWithTPCCDDL() {
         String schemaPath = "";
         try {

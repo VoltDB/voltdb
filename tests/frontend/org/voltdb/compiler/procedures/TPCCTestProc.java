@@ -23,15 +23,18 @@
 
 package org.voltdb.compiler.procedures;
 
-import org.voltdb.*;
+import org.voltdb.ProcInfo;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
 @ProcInfo (
     singlePartition = false
 )
 public class TPCCTestProc extends VoltProcedure {
 
+    // starting with whitespace and containing newlines on purpose
     public final String
-    neword000 = "SELECT C_DISCOUNT, C_LAST, C_CREDIT, W_TAX FROM CUSTOMER, WAREHOUSE WHERE W_ID = ? AND C_W_ID = W_ID AND C_D_ID = ? AND C_ID = ?;";
+    neword000 = " SELECT C_DISCOUNT, C_LAST, \nC_CREDIT, W_TAX FROM CUSTOMER, WAREHOUSE WHERE W_ID = ? AND C_W_ID = W_ID AND C_D_ID = ? AND C_ID = ?;";
 
     public final String
     neword001 = "SELECT D_NEXT_O_ID, D_TAX FROM DISTRICT WHERE D_ID = ? AND D_W_ID = ?;";
