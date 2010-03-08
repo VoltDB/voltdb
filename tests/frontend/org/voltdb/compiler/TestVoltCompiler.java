@@ -25,14 +25,28 @@ package org.voltdb.compiler;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URL;
+import java.net.URLDecoder;
+import java.util.HashMap;
+import java.util.Map;
+
 import junit.framework.TestCase;
 
+import org.voltdb.ProcInfoData;
+import org.voltdb.benchmark.tpcc.TPCCClient;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.Connector;
+import org.voltdb.catalog.ConnectorDestinationInfo;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.regressionsuites.TestELTSuite;
 import org.voltdb.utils.JarReader;
 
 public class TestVoltCompiler extends TestCase {
 
-    /*public void testSnapshotSettings() throws IOException {
+    public void testSnapshotSettings() throws IOException {
         String schemaPath = "";
         try {
             final URL url = TPCCClient.class.getResource("tpcc-ddl.sql");
@@ -80,7 +94,7 @@ public class TestVoltCompiler extends TestCase {
         project.addPartitionInfo("EXPRESSIONS_NO_NULLS", "PKEY");
         project.addELT("bob", "forapples",
                        "org.voltdb.elt.processors.RawProcessor",
-                       "faraway", 5443, false);
+                       "faraway", false);
         project.addELTTable("ALLOW_NULLS", false);   // persistent table
         project.addELTTable("WITH_DEFAULTS", true);  // streamed table
         try {
@@ -97,7 +111,7 @@ public class TestVoltCompiler extends TestCase {
             ConnectorDestinationInfo dest = connector.getDestinfo().get("0");
             assertTrue(dest.getUsername().equals("bob"));
             assertTrue(dest.getPassword().equals("forapples"));
-            assertTrue(dest.getIpaddr().equals("faraway"));
+            assertTrue(dest.getUrl().equals("faraway"));
         } finally {
             final File jar = new File("/tmp/eltsettingstest.jar");
             jar.delete();
@@ -225,13 +239,14 @@ public class TestVoltCompiler extends TestCase {
 
         File jar = new File("testout.jar");
         jar.delete();
-    }*/
+    }
 
     public void testXMLFileWithDDL() throws IOException {
         final String simpleSchema1 =
             "create table books (cash integer default 23, title varchar default 'foo', PRIMARY KEY(cash));";
+        // newline inserted to test catalog friendliness
         final String simpleSchema2 =
-            "create table books2 (cash integer default 23, title varchar default 'foo', PRIMARY KEY(cash));";
+            "create table books2\n (cash integer default 23, title varchar default 'foo', PRIMARY KEY(cash));";
 
         final File schemaFile1 = VoltProjectBuilder.writeStringToTempFile(simpleSchema1);
         final String schemaPath1 = schemaFile1.getPath();
@@ -287,7 +302,7 @@ public class TestVoltCompiler extends TestCase {
         jar.delete();
     }
 
-    /*public void testNullablePartitionColumn() throws IOException {
+    public void testNullablePartitionColumn() throws IOException {
         final String simpleSchema =
             "create table books (cash integer default 23, title varchar default 'foo', PRIMARY KEY(cash));";
 
@@ -505,7 +520,7 @@ public class TestVoltCompiler extends TestCase {
         jar.delete();
     }
 
-    public void testXMLFileWithELEnabled() throws IOException {
+    /*public void testXMLFileWithELEnabled() throws IOException {
         final String simpleSchema =
             "create table books (cash integer default 23, title varchar default 'foo', PRIMARY KEY(cash));";
 
@@ -551,7 +566,7 @@ public class TestVoltCompiler extends TestCase {
 
         final File jar = new File("testout.jar");
         jar.delete();
-    }
+    }*/
 
     public void testOverrideProcInfo() throws IOException {
         final String simpleSchema =
@@ -605,7 +620,53 @@ public class TestVoltCompiler extends TestCase {
         jar.delete();
     }
 
-    public void testForeignKeys() {
+    public void testMaterializedView() throws IOException {
+        final String simpleSchema =
+            "create table books (cash integer default 23, title varchar default 'foo', PRIMARY KEY(cash));\n" +
+            "create view matt (title, num, foo) as select title, count(*), sum(cash) from books group by title;";
+
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+        final String schemaPath = schemaFile.getPath();
+
+        final String simpleProject =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "<database name='database'>" +
+            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
+            "<procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
+            "</database>" +
+            "</project>";
+
+        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
+        final String projectPath = projectFile.getPath();
+
+        final VoltCompiler compiler = new VoltCompiler();
+        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
+
+        final boolean success = compiler.compile(projectPath, cluster_config,
+                                                 "testout.jar", System.out, null);
+
+        assertTrue(success);
+
+        final Catalog c1 = compiler.getCatalog();
+        //System.out.println("PRINTING Catalog 1");
+        //System.out.println(c1.serialize());
+
+        final String catalogContents = JarReader.readFileFromJarfile("testout.jar", "catalog.txt");
+
+        final Catalog c2 = new Catalog();
+        c2.execute(catalogContents);
+
+        assertTrue(c2.serialize().equals(c1.serialize()));
+
+        //System.out.println(c1.serialize());
+        //System.out.println(c2.serialize());
+
+        final File jar = new File("testout.jar");
+        jar.delete();
+    }
+
+    /*public void testForeignKeys() {
         String schemaPath = "";
         try {
             final URL url = TPCCClient.class.getResource("tpcc-ddl-fkeys.sql");
@@ -680,51 +741,5 @@ public class TestVoltCompiler extends TestCase {
             }
         }
         assertTrue(found);
-    }
-
-    public void testMaterializedView() throws IOException {
-        final String simpleSchema =
-            "create table books (cash integer default 23, title varchar default 'foo', PRIMARY KEY(cash));\n" +
-            "create view matt (title, num, foo) as select title, count(*), sum(cash) from books group by title;";
-
-        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
-        final String schemaPath = schemaFile.getPath();
-
-        final String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
-            "</database>" +
-            "</project>";
-
-        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        final String projectPath = projectFile.getPath();
-
-        final VoltCompiler compiler = new VoltCompiler();
-        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
-
-        final boolean success = compiler.compile(projectPath, cluster_config,
-                                                 "testout.jar", System.out, null);
-
-        assertTrue(success);
-
-        final Catalog c1 = compiler.getCatalog();
-        //System.out.println("PRINTING Catalog 1");
-        //System.out.println(c1.serialize());
-
-        final String catalogContents = JarReader.readFileFromJarfile("testout.jar", "catalog.txt");
-
-        final Catalog c2 = new Catalog();
-        c2.execute(catalogContents);
-
-        assertTrue(c2.serialize().equals(c1.serialize()));
-
-        //System.out.println(c1.serialize());
-        //System.out.println(c2.serialize());
-
-        final File jar = new File("testout.jar");
-        jar.delete();
     }*/
 }

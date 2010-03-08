@@ -54,8 +54,11 @@ public abstract class StatementCompiler {
 
     static void compile(VoltCompiler compiler, HSQLInterface hsql,
             Catalog catalog, Database db, DatabaseEstimates estimates,
-            Statement catalogStmt, final String stmt, boolean singlePartition)
+            Statement catalogStmt, String stmt, boolean singlePartition)
     throws VoltCompiler.VoltCompilerException {
+
+        // Strip newlines for catalog compatibility
+        stmt = stmt.replaceAll("\n", " ");
 
         //LOG.fine("Compiling Statement: ");
         //LOG.fine(stmt);
