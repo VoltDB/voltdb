@@ -766,16 +766,16 @@ TEST CASES
                 <include name='org/voltdb/utils/**/*Test.class'/>
                 <exclude name="**/*$*.class"/>
                 <exclude name="**/TestMaliciousClientSuite.class" />
-                <exclude name="**/TestELTSuite" />
-                <exclude name="**/TestFailuresSuite" />
-                <exclude name="**/TestFixedSQLSuite" />
-                <exclude name="**/TestPlansGroupBySuite" />
-                <exclude name="**/TestRollbackSuite" />
-                <exclude name="**/TestSaveRestoreSysprocSuite" />
-                <exclude name="**/TestSQLFeaturesSuite" />
-                <exclude name="**/TestSQLTypesSuite" />
-                <exclude name="**/TestSqlUpdateSuite" />
-                <exclude name="**/TestTPCCSuite" />
+                <exclude name="**/TestELTSuite.class" />
+                <exclude name="**/TestFailuresSuite.class" />
+                <exclude name="**/TestFixedSQLSuite.class" />
+                <exclude name="**/TestPlansGroupBySuite.class" />
+                <exclude name="**/TestRollbackSuite.class" />
+                <exclude name="**/TestSaveRestoreSysprocSuite.class" />
+                <exclude name="**/TestSQLFeaturesSuite.class" />
+                <exclude name="**/TestSQLTypesSuite.class" />
+                <exclude name="**/TestSqlUpdateSuite.class" />
+                <exclude name="**/TestTPCCSuite.class" />
             </fileset>
         </tests>
     </run_junit>
