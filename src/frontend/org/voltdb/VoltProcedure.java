@@ -826,12 +826,12 @@ public abstract class VoltProcedure {
         /**
          * Shortest amount of time this procedure has executed in
          */
-        protected int minExecutionTime = 0;
+        protected int minExecutionTime = Integer.MAX_VALUE;
 
         /**
          * Longest amount of time this procedure has executed in
          */
-        protected int maxExecutionTime = 0;
+        protected int maxExecutionTime = Integer.MIN_VALUE;
 
         /**
          * Time the procedure was last started
@@ -867,7 +867,8 @@ public abstract class VoltProcedure {
 
                 if (delta < minExecutionTime) {
                     minExecutionTime = delta;
-                } else if (delta > maxExecutionTime) {
+                }
+                if (delta > maxExecutionTime) {
                     maxExecutionTime = delta;
                 }
             }
