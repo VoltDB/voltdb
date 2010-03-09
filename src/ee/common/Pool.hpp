@@ -108,10 +108,10 @@ public:
                 /*
                  * Need to allocate a new chunk
                  */
-                std::cout << "Pool had to allocate a new chunk. Not a good thing "
-                  "from a performance perspective. If you see this we need to look "
-                  "into structuring our pool sizes and allocations so the this doesn't "
-                  "happen frequently" << std::endl;
+//                std::cout << "Pool had to allocate a new chunk. Not a good thing "
+//                  "from a performance perspective. If you see this we need to look "
+//                  "into structuring our pool sizes and allocations so the this doesn't "
+//                  "happen frequently" << std::endl;
                 m_chunks.push_back(Chunk(m_allocationSize, new char[m_allocationSize]));
                 currentChunk = &(*(m_chunks.rbegin()));
                 currentChunk->m_offset = size;
