@@ -305,8 +305,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
      *
      * @param txn Information about the transaction to send.
      */
-    private void sendTransactionToCoordinator(InFlightTxnState txn) {
-        // note, this always sets readonly = false, which is not always true
+    private void sendTransactionToCoordinator(InFlightTxnState txn)
+    {
         InitiateTask workRequest = new InitiateTask(
                 m_siteId,
                 txn.coordinatorId,
