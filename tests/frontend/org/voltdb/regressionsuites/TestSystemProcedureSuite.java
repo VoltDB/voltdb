@@ -125,6 +125,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         Client client  = getClient();
         VoltTable results[] = null;
         results = client.callProcedure("@Statistics", "INITIATOR");
+        results = client.callProcedure("@Statistics", "INITIATOR");
         // one aggregate table returned
         assertTrue(results.length == 1);
         System.out.println("Test initiators table: " + results[0].toString());
