@@ -106,7 +106,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         m_idManager = new TransactionIdManager(initiatorId);
         m_mailbox = mailbox;
         m_siteId = siteId;
-        m_siteTracker = VoltDB.instance().getSiteTracker();
+        m_siteTracker = VoltDB.instance().getCatalogContext().siteTracker;
         m_onBackPressure = onBackPressure;
         m_offBackPressure = offBackPressure;
 //        new Thread() {

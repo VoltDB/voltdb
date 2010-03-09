@@ -181,7 +181,7 @@ public class LoadMultipartitionTable extends VoltSystemProcedure {
                 }
                 ParameterSet params = new ParameterSet();
                 int site_id = Integer.valueOf(site.getTypeName());
-                int partition = VoltDB.instance().getSiteTracker().getPartitionForSite(site_id);
+                int partition = VoltDB.instance().getCatalogContext().siteTracker.getPartitionForSite(site_id);
                 params.setParameters(tableName, partitionedTables[partition], allowELT);
                 pfs[site_index] = new SynthesizedPlanFragment();
                 pfs[site_index].fragmentId = SysProcFragmentId.PF_distribute;

@@ -523,10 +523,6 @@ public class RealVoltDB implements VoltDBInterface
         return m_statsAgent;
     }
 
-    public SiteTracker getSiteTracker() {
-        return m_siteTracker;
-    }
-
     public FaultDistributor getFaultDistributor()
     {
         return m_faultManager;

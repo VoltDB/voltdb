@@ -23,6 +23,7 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
+import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.utils.JarClassLoader;
 
 public class CatalogContext {
@@ -42,6 +43,7 @@ public class CatalogContext {
     public final int numberOfPartitions;
     public final int numberOfExecSites;
     public final int numberOfNodes;
+    public final SiteTracker siteTracker;
 
     // PRIVATE
     private final String m_path;
@@ -67,6 +69,7 @@ public class CatalogContext {
         procedures = database.getProcedures();
         authSystem = new AuthSystem(database, cluster.getSecurityenabled());
         sites = cluster.getSites();
+        siteTracker = new SiteTracker(cluster.getSites());
 
         // count nodes
         numberOfNodes = cluster.getHosts().size();

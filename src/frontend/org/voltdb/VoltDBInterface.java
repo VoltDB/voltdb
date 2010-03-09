@@ -19,7 +19,6 @@ package org.voltdb;
 import java.util.ArrayList;
 import java.util.Hashtable;
 
-import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.fault.FaultDistributor;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.impl.HostMessenger;
@@ -65,7 +64,6 @@ public interface VoltDBInterface
     public Hashtable<Integer, ExecutionSite> getLocalSites();
     public VoltNetwork getNetwork();
     public StatsAgent getStatsAgent();
-    public SiteTracker getSiteTracker();
     public FaultDistributor getFaultDistributor();
 
     /**

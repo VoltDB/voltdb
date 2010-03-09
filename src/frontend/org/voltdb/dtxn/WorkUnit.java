@@ -194,7 +194,7 @@ class WorkUnit {
         assert m_dependencies.containsKey(dependencyId);
         assert m_dependencies.get(dependencyId) != null;
 
-        int partition = VoltDB.instance().getSiteTracker().getPartitionForSite(siteId);
+        int partition = VoltDB.instance().getCatalogContext().siteTracker.getPartitionForSite(siteId);
         int map_id = partition;
         if (m_taskType == FragmentTask.SYS_PROC_PER_SITE)
         {

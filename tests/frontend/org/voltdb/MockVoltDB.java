@@ -27,6 +27,7 @@ import java.util.Hashtable;
 
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Host;
 import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Procedure;
@@ -39,7 +40,8 @@ import org.voltdb.network.VoltNetwork;
 
 public class MockVoltDB implements VoltDBInterface
 {
-    CatalogContext m_context;
+    private Catalog m_catalog;
+    private CatalogContext m_context;
     final String m_clusterName = "cluster";
     final String m_databaseName = "database";
     int m_execSiteCount = 0;
@@ -47,39 +49,36 @@ public class MockVoltDB implements VoltDBInterface
 
     public MockVoltDB()
     {
-        Catalog catalog = new Catalog();
-        catalog.execute("add / clusters " + m_clusterName);
-        catalog.execute("add " + catalog.getClusters().get(m_clusterName).getPath() + " databases " +
+        m_catalog = new Catalog();
+        m_catalog.execute("add / clusters " + m_clusterName);
+        m_catalog.execute("add " + m_catalog.getClusters().get(m_clusterName).getPath() + " databases " +
                           m_databaseName);
-        m_context = new CatalogContext(catalog, CatalogContext.NO_PATH);
     }
 
     public Procedure addProcedureForTest(String name)
     {
-        Procedure retval = m_context.catalog.getClusters().get(m_clusterName).getDatabases().get(m_databaseName).getProcedures().add(name);
+        Procedure retval = getCluster().getDatabases().get(m_databaseName).getProcedures().add(name);
         retval.setHasjava(true);
         return retval;
     }
 
     public void addHost(int hostId)
     {
-        m_context.catalog.execute("add " + m_context.cluster.getPath() + " hosts " + hostId);
-        m_context = new CatalogContext(m_context.catalog, CatalogContext.NO_PATH);
+        m_catalog.execute("add " + getCluster().getPath() + " hosts " + hostId);
     }
 
     public void addPartition(int partitionId)
     {
-        m_context.catalog.execute("add " + m_context.cluster.getPath() + " partitions " +
+        m_catalog.execute("add " + getCluster().getPath() + " partitions " +
                           partitionId);
-        m_context = new CatalogContext(m_context.catalog, CatalogContext.NO_PATH);
     }
 
     public void addSite(int siteId, int hostId, int partitionId, boolean isExec)
     {
-        m_context.catalog.execute("add " + m_context.cluster.getPath() + " sites " + siteId);
-        m_context.catalog.execute("set " + getSite(siteId).getPath() + " host " +
+        m_catalog.execute("add " + getCluster().getPath() + " sites " + siteId);
+        m_catalog.execute("set " + getSite(siteId).getPath() + " host " +
                           getHost(hostId).getPath());
-        m_context.catalog.execute("set " + getSite(siteId).getPath() + " isexec " +
+        m_catalog.execute("set " + getSite(siteId).getPath() + " isexec " +
                           isExec);
         String partition_path = "null";
         if (isExec)
@@ -87,24 +86,28 @@ public class MockVoltDB implements VoltDBInterface
             partition_path = getPartition(partitionId).getPath();
             m_execSiteCount++;
         }
-        m_context.catalog.execute("set " + getSite(siteId).getPath() + " partition " +
+        m_catalog.execute("set " + getSite(siteId).getPath() + " partition " +
                 partition_path);
-        m_context = new CatalogContext(m_context.catalog, CatalogContext.NO_PATH);
+    }
+
+    Cluster getCluster()
+    {
+        return m_catalog.getClusters().get(m_clusterName);
     }
 
     Host getHost(int hostId)
     {
-        return m_context.cluster.getHosts().get(String.valueOf(hostId));
+        return getCluster().getHosts().get(String.valueOf(hostId));
     }
 
     Partition getPartition(int partitionId)
     {
-        return m_context.cluster.getPartitions().get(String.valueOf(partitionId));
+        return getCluster().getPartitions().get(String.valueOf(partitionId));
     }
 
     Site getSite(int siteId)
     {
-        return m_context.sites.get(String.valueOf(siteId));
+        return getCluster().getSites().get(String.valueOf(siteId));
     }
 
     @Override
@@ -117,6 +120,7 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public CatalogContext getCatalogContext()
     {
+        m_context = new CatalogContext(m_catalog, CatalogContext.NO_PATH);
         return m_context;
     }
 
@@ -167,12 +171,6 @@ public class MockVoltDB implements VoltDBInterface
     {
         // TODO Auto-generated method stub
         return null;
-    }
-
-    @Override
-    public SiteTracker getSiteTracker()
-    {
-        return new SiteTracker(m_context.sites);
     }
 
     public void setStatsAgent(StatsAgent agent)

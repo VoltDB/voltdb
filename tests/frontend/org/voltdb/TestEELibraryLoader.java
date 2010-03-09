@@ -90,12 +90,6 @@ public class TestEELibraryLoader {
         }
 
         @Override
-        public SiteTracker getSiteTracker() {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
         public StatsAgent getStatsAgent() {
             // TODO Auto-generated method stub
             return null;
