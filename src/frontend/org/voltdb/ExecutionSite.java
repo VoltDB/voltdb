@@ -19,20 +19,16 @@ package org.voltdb;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.NDC;
+import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
@@ -64,7 +60,6 @@ import org.voltdb.utils.Encoder;
 import org.voltdb.utils.EstTime;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltLoggerFactory;
-import org.voltdb.utils.DBBPool.BBContainer;
 
 /**
  * The main executor of transactional work in the system. Controls running
@@ -75,58 +70,20 @@ import org.voltdb.utils.DBBPool.BBContainer;
 public class ExecutionSite implements Runnable, DumpManager.Dumpable {
     private static final Logger log = Logger.getLogger(ExecutionSite.class.getName(), VoltLoggerFactory.instance());
     private static final Logger hostLog = Logger.getLogger("HOST", VoltLoggerFactory.instance());
-
     private static AtomicInteger siteIndexCounter = new AtomicInteger(0);
+
     private final int siteIndex = siteIndexCounter.getAndIncrement();
-    public static final AtomicInteger ExecutionSitesCurrentlySnapshotting = new AtomicInteger(-1);
     public int siteId;
 
-    /**
-     * Number of snapshot buffers to keep
-     */
-    private static final int m_numSnapshotBuffers = 4;
-
-    /**
-     * Dedicated byte buffer to write snapshot tuples to. Only one buffer
-     * is needed because the bottleneck is always going to be I/O and the EE
-     * always has other work to do besides serializing.
-     */
-    //public static final int m_snapshotBufferLength = 1024 * 1024 * 2;
-    public static final int m_snapshotBufferLength = 131072;
-    private final ArrayList<BBContainer> m_snapshotBufferOrigins =
-        new ArrayList<BBContainer>();
-    /**
-     * Set to true when the buffer is sent to a SnapshotDataTarget for I/O
-     * and back to false when the container is discarded.
-     * A volatile allows the EE to check for the buffer without
-     * synchronization when the snapshot is done online.
-     */
-    private ConcurrentLinkedQueue<BBContainer> m_availableSnapshotBuffers
-        = new ConcurrentLinkedQueue<BBContainer>();
-
-    /**
-     * The last EE out has to shut off the lights. Cache a list
-     * of targets in case this EE ends up being the one that needs
-     * to close each target.
-     */
-    private ArrayList<SnapshotDataTarget> m_snapshotTargets;
-
-    /**
-     * Queue of tasks for tables that still need to be snapshotted.
-     * This is polled from until there are no more tasks.
-     */
-    private ArrayDeque<SnapshotTableTask> m_snapshotTableTasks;
-
     SiteConnection dtxnConn;
+    final ExecutionEngine ee;
+    final HsqlBackend hsql;
 
     // Catalog objects
     Catalog catalog;
     public CatalogContext m_context;
     Host host;
     Site site;
-
-    final ExecutionEngine ee;
-    final HsqlBackend hsql;
 
     final HashMap<String, VoltProcedure> procs = new HashMap<String, VoltProcedure>(16, (float) .1);
     VoltProcedure currentProc = null;
@@ -149,8 +106,10 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
     private long m_currentTxnId = 0;
     int m_currentInitiatorSiteId;
 
-    private final Watchdog m_watchdog;
+    // Each execution site manages snapshot using a SnapshotSiteProcessor
+    private final SnapshotSiteProcessor m_snapshotter;
 
+    private final Watchdog m_watchdog;
     private class Watchdog extends Thread {
         private volatile boolean m_shouldContinue = true;
         private volatile boolean m_petted = false;
@@ -242,7 +201,7 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
             lastTickTime = time;
         }
 
-        doSnapshotWork();
+        m_snapshotter.doSnapshotWork(ee);
 
         // sing it: stay'n alive..
         m_watchdog.pet();
@@ -366,6 +325,7 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
         ee = null;
         hsql = null;
         m_dumpId = "MockExecSite";
+        m_snapshotter = null;
     }
 
     /**
@@ -457,21 +417,7 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
 
         // load up all the stored procedures
         loadProceduresFromCatalog();
-
-        for (int ii = 0; ii < m_numSnapshotBuffers; ii++) {
-            final BBContainer origin = org.voltdb.utils.DBBPool.allocateDirect(m_snapshotBufferLength);
-            m_snapshotBufferOrigins.add(origin);
-            long snapshotBufferAddress = 0;
-            if (VoltDB.getLoadLibVOLTDB()) {
-                snapshotBufferAddress = org.voltdb.utils.DBBPool.getBufferAddress(origin.b);
-            }
-            m_availableSnapshotBuffers.offer(new BBContainer(origin.b, snapshotBufferAddress) {
-                @Override
-                public void discard() {
-                    m_availableSnapshotBuffers.offer(this);
-                }
-            });
-        }
+        m_snapshotter = new SnapshotSiteProcessor();
     }
 
     public boolean updateCatalog() {
@@ -712,166 +658,15 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
         return currentFragResponse;
     }
 
-    private ArrayList<Thread> m_snapshotTargetTerminators = null;
 
     /*
      * Do snapshot work exclusively until there is no more. Also blocks
      * until the syncing and closing of snapshot data targets has completed.
      */
     public HashSet<Exception> completeSnapshotWork() throws InterruptedException {
-        HashSet<Exception> retval = new HashSet<Exception>();
-        m_snapshotTargetTerminators = new ArrayList<Thread>();
-        while (m_snapshotTableTasks != null) {
-            Future<?> result = doSnapshotWork();
-            if (result != null) {
-                try {
-                    result.get();
-                } catch (ExecutionException e) {
-                    final boolean added = retval.add((Exception)e.getCause());
-                    assert(added);
-                } catch (Exception e) {
-                    final boolean added = retval.add((Exception)e.getCause());
-                    assert(added);
-                }
-            }
-        }
-
-        /**
-         * Block until the sync has actually occured in the forked threads.
-         * The threads are spawned even in the blocking case to keep it simple.
-         */
-        for (final Thread t : m_snapshotTargetTerminators) {
-            t.join();
-        }
-        m_snapshotTargetTerminators = null;
-
-        return retval;
+        return m_snapshotter.completeSnapshotWork(ee);
     }
 
-    private Future<?> doSnapshotWork() {
-        Future<?> retval = null;
-
-        /*
-         * This thread will null out the reference to m_snapshotTableTasks when
-         * a snapshot is finished. If the snapshot buffer is loaned out that means
-         * it is pending I/O somewhere so there is no work to do until it comes back.
-         */
-        if (m_snapshotTableTasks == null || m_availableSnapshotBuffers.isEmpty()) {
-            return retval;
-        }
-
-        /*
-         * There definitely is snapshot work to do. There should be a task
-         * here. If there isn't something is wrong because when the last task
-         * is polled cleanup and nulling should occur.
-         */
-        while (!m_snapshotTableTasks.isEmpty()) {
-            final SnapshotTableTask currentTask = m_snapshotTableTasks.peek();
-            assert(currentTask != null);
-            final int headerSize = currentTask.m_target.getHeaderSize();
-            final BBContainer snapshotBuffer = m_availableSnapshotBuffers.poll();
-            assert(snapshotBuffer != null);
-            snapshotBuffer.b.clear();
-            snapshotBuffer.b.position(headerSize);
-            final int serialized = ee.cowSerializeMore( snapshotBuffer, currentTask.m_tableId);
-
-            if (serialized < 0) {
-                hostLog.error("Failure while serialize data from a table for COW snapshot");
-                VoltDB.crashVoltDB();
-            }
-
-            /**
-             * The EE will return 0 when there is no more data left to pull from that table.
-             * The enclosing loop ensures that the next table is then addressed.
-             */
-            if (serialized == 0) {
-                final SnapshotTableTask t = m_snapshotTableTasks.poll();
-                /**
-                 * Replicated tables are assigned to a single ES on each site and that ES
-                 * is responsible for closing the data target. Done in a separate
-                 * thread so the EE can continue working.
-                 */
-                if (t.m_isReplicated) {
-                    final Thread terminatorThread =
-                        new Thread("Replicated SnapshotDataTarget terminator ") {
-                        @Override
-                        public void run() {
-                            try {
-                                t.m_target.close();
-                            } catch (IOException e) {
-                                throw new RuntimeException(e);
-                            } catch (InterruptedException e) {
-                                throw new RuntimeException(e);
-                            }
-
-                        }
-                    };
-                    if (m_snapshotTargetTerminators != null) {
-                        m_snapshotTargetTerminators.add(terminatorThread);
-                    }
-                    terminatorThread.start();
-                }
-                m_availableSnapshotBuffers.offer(snapshotBuffer);
-                continue;
-            }
-
-            /**
-             * The block from the EE will contain raw tuple data with no length prefix etc.
-             */
-            snapshotBuffer.b.limit(headerSize + serialized);
-            snapshotBuffer.b.position(0);
-            retval = currentTask.m_target.write(snapshotBuffer);
-            break;
-        }
-
-        /**
-         * If there are no more tasks then this particular EE is finished doing snapshot work
-         * Check the AtomicInteger to find out if this is the last one.
-         */
-        if (m_snapshotTableTasks.isEmpty()) {
-            final ArrayList<SnapshotDataTarget> snapshotTargets = m_snapshotTargets;
-            m_snapshotTargets = null;
-            m_snapshotTableTasks = null;
-            final int result = ExecutionSitesCurrentlySnapshotting.decrementAndGet();
-
-            /**
-             * If this is the last one then this EE must close all the SnapshotDataTargets.
-             * Done in a separate thread so the EE can go and do other work. It will
-             * sync every file descriptor and that may block for a while.
-             */
-            if (result == 0) {
-
-                final Thread terminatorThread =
-                    new Thread("Snapshot terminator") {
-                    @Override
-                    public void run() {
-                        for (final SnapshotDataTarget t : snapshotTargets) {
-                            try {
-                                t.close();
-                            } catch (IOException e) {
-                                throw new RuntimeException(e);
-                            } catch (InterruptedException e) {
-                                throw new RuntimeException(e);
-                            }
-                        }
-                    }
-                };
-
-                if (m_snapshotTargetTerminators != null) {
-                    m_snapshotTargetTerminators.add(terminatorThread);
-                }
-
-                terminatorThread.start();
-
-                /**
-                 * Sets it to -1 indicating the system is ready to perform anothe snapshot.
-                 * The terminator threads may still run for some time while data flushes to disk
-                 */
-                ExecutionSitesCurrentlySnapshotting.decrementAndGet();
-            }
-        }
-        return retval;
-    }
 
     public InitiateResponse processInitiateTask(final VoltMessage task) {
         final InitiateTask itask = (InitiateTask)task;
@@ -964,10 +759,8 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
                 //Ignore interruptions and finish shutting down.
             }
         }
-        for (BBContainer c : m_snapshotBufferOrigins ) {
-            c.discard();
-        }
-        m_availableSnapshotBuffers.clear();
+
+        m_snapshotter.shutdown();
     }
 
     /**
@@ -979,21 +772,7 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
     }
 
     public void initiateSnapshots(Deque<SnapshotTableTask> tasks) {
-        this.m_snapshotTableTasks = new ArrayDeque<SnapshotTableTask>(tasks);
-        m_snapshotTargets = new ArrayList<SnapshotDataTarget>();
-        for (final SnapshotTableTask task : tasks) {
-            if (!task.m_isReplicated) {
-                assert(task != null);
-                assert(m_snapshotTargets != null);
-                m_snapshotTargets.add(task.m_target);
-            }
-            if (!ee.activateCopyOnWrite(task.m_tableId)) {
-                hostLog.error("Attempted to activate copy on write mode for table "
-                        + task.m_name + " and failed");
-                hostLog.error(task);
-                VoltDB.crashVoltDB();
-            }
-        }
+        m_snapshotter.initiateSnapshots(ee, tasks);
     }
 
     @Override
@@ -1025,33 +804,5 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
             ((SimpleDtxnConnection) dtxnConn).getDumpContents(context);
 
         return context;
-    }
-
-    /**
-     * A class identifying a table that should be snapshotted as well as the destination
-     * for the resulting tuple blocks
-     *
-     */
-    public static class SnapshotTableTask {
-        private final int m_tableId;
-        private final SnapshotDataTarget m_target;
-        private final boolean m_isReplicated;
-        private final String m_name;
-
-        public SnapshotTableTask(
-                final int tableId,
-                final SnapshotDataTarget target,
-                boolean isReplicated,
-                final String tableName) {
-            m_tableId = tableId;
-            m_target = target;
-            m_isReplicated = isReplicated;
-            m_name = tableName;
-        }
-
-        @Override
-        public String toString() {
-            return ("SnapshotTableTask for " + m_name + " replicated " + m_isReplicated);
-        }
     }
 }

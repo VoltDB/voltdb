@@ -70,7 +70,7 @@ public class TableSaveFile
      * big enough...
      */
     private static final int DEFAULT_CHUNKSIZE =
-        org.voltdb.ExecutionSite.m_snapshotBufferLength + Short.MAX_VALUE;
+        org.voltdb.SnapshotSiteProcessor.m_snapshotBufferLength + Short.MAX_VALUE;
 
     // XXX maybe consider an IOException subclass at some point
     public TableSaveFile(
@@ -321,7 +321,7 @@ public class TableSaveFile
     private final long m_createTime;
     private boolean m_hasMoreChunks = true;
     private static ConcurrentLinkedQueue<Container> m_buffers = new ConcurrentLinkedQueue<Container>();
-    private ArrayDeque<Container> m_availableChunks = new ArrayDeque<Container>();
+    private final ArrayDeque<Container> m_availableChunks = new ArrayDeque<Container>();
     private final HashSet<Integer> m_relevantPartitionIds;
 
     /**

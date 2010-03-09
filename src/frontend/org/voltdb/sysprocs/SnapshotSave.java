@@ -32,14 +32,9 @@ import org.apache.log4j.Logger;
 import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite;
-import org.voltdb.ExecutionSite.SnapshotTableTask;
+import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
-import org.voltdb.HsqlBackend;
-import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
-import org.voltdb.VoltDB;
-import org.voltdb.VoltSystemProcedure;
-import org.voltdb.VoltTable;
+import org.voltdb.*;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.SnapshotDataTarget;
@@ -113,7 +108,7 @@ public class SnapshotSave extends VoltSystemProcedure
                      + file_path + ", " + file_nonce);
             VoltTable result = constructNodeResultsTable();
 
-            if (ExecutionSite.ExecutionSitesCurrentlySnapshotting.get() != -1) {
+            if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() != -1) {
                 result.addRow(context.getSite().getHost().getTypeName(),
                         "",
                         "FAILURE",
@@ -191,7 +186,7 @@ public class SnapshotSave extends VoltSystemProcedure
             final int numLocalSites = VoltDB.instance().getLocalSites().values().size();
             if (willDoSetup) {
                 try {
-                    assert(ExecutionSite.ExecutionSitesCurrentlySnapshotting.get() == -1);
+                    assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() == -1);
                     final long startTime = (Long)params.toArray()[2];
                     final ArrayDeque<SnapshotTableTask> partitionedSnapshotTasks =
                         new ArrayDeque<SnapshotTableTask>();
@@ -286,7 +281,7 @@ public class SnapshotSave extends VoltSystemProcedure
 
                     synchronized (m_taskListsForSites) {
                         if (!partitionedSnapshotTasks.isEmpty() || !replicatedSnapshotTasks.isEmpty()) {
-                            ExecutionSite.ExecutionSitesCurrentlySnapshotting.set(
+                            SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.set(
                                     VoltDB.instance().getLocalSites().values().size());
                         } else {
                             SnapshotRegistry.discardSnapshot(snapshotRecord);
@@ -347,7 +342,7 @@ public class SnapshotSave extends VoltSystemProcedure
                         assert(m_snapshotCreateSetupPermit.availablePermits() == 1);
                         assert(m_snapshotPermits.availablePermits() == 0);
                     }
-                    assert(ExecutionSite.ExecutionSitesCurrentlySnapshotting.get() > 0);
+                    assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() > 0);
                     context.getExecutionSite().initiateSnapshots(m_taskList);
                 }
             }
