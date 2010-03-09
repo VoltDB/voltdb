@@ -179,7 +179,7 @@ class VoltQueryClient(cmd.Cmd):
 
     def help_snapshotsave(self):
         self.safe_print("Take a snapshot:")
-        self.safe_print("\tsnapshotsave directory nounce blocking")
+        self.safe_print("\tsnapshotsave directory nonce blocking")
 
     def do_snapshotscan(self, command):
         if not command:
@@ -198,19 +198,19 @@ class VoltQueryClient(cmd.Cmd):
         if not command:
             return self.help_snapshotdelete()
 
-        (paths, nounces) = command.split()
+        (paths, nonces) = command.split()
         paths = paths.split(",")
-        nounces = nounces.split(",")
+        nonces = nonces.split(",")
 
         self.safe_print("Deleting snapshots")
-        self.response = self.snapshotdelete.call([paths, nounces],
+        self.response = self.snapshotdelete.call([paths, nonces],
                                                  timeout = self.__timeout)
         self.safe_print(self.response)
 
     def help_snapshotdelete(self):
         self.safe_print("Delete snapshots")
         self.safe_print("\tsnapshotdelete directory,directory,... "
-                        "nounce,nounce,...")
+                        "nonce,nonce,...")
 
     def do_snapshotrestore(self, command):
         if not command:
@@ -228,7 +228,7 @@ class VoltQueryClient(cmd.Cmd):
 
     def help_snapshotrestore(self):
         self.safe_print("Restore a snapshot:")
-        self.safe_print("\tsnapshotrestore directory nounce")
+        self.safe_print("\tsnapshotrestore directory nonce")
 
     def do_snapshotstatus(self, command):
         self.safe_print("Getting snapshot status")
