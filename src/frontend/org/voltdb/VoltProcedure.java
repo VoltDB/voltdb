@@ -826,17 +826,17 @@ public abstract class VoltProcedure {
         /**
          * Shortest amount of time this procedure has executed in
          */
-        protected int minExecutionTime = Integer.MAX_VALUE;
+        protected long minExecutionTime = Long.MAX_VALUE;
 
         /**
          * Longest amount of time this procedure has executed in
          */
-        protected int maxExecutionTime = Integer.MIN_VALUE;
+        protected long maxExecutionTime = Long.MIN_VALUE;
 
         /**
          * Time the procedure was last started
          */
-        protected long currentStartTime;
+        protected long currentStartTime = -1;
 
         /**
          * Constructor requires no args because it has access to the enclosing classes members.
@@ -860,17 +860,14 @@ public abstract class VoltProcedure {
          * the statistics.
          */
         public final void endProcedure() {
-            if (invocations % timeCollectionInterval == 0) {
+            if (currentStartTime > 0) {
                 final long endTime = System.nanoTime();
                 final int delta = (int)(endTime - currentStartTime);
                 totalTimedExecutionTime += delta;
 
-                if (delta < minExecutionTime) {
-                    minExecutionTime = delta;
-                }
-                if (delta > maxExecutionTime) {
-                    maxExecutionTime = delta;
-                }
+                minExecutionTime = Math.min( delta, minExecutionTime);
+                maxExecutionTime = Math.max( delta, minExecutionTime);
+                currentStartTime = -1;
             }
             invocations++;
         }
@@ -886,13 +883,13 @@ public abstract class VoltProcedure {
             rowValues[columnNameToIndex.get("PROCEDURE")] = catProc.getClassname();
             rowValues[columnNameToIndex.get("INVOCATIONS")] = invocations;
             rowValues[columnNameToIndex.get("TIMED_INVOCATIONS")] = timedInvocations;
-            rowValues[columnNameToIndex.get("MIN_EXECUTION_TIME")] = (long)minExecutionTime;
-            rowValues[columnNameToIndex.get("MAX_EXECUTION_TIME")] = (long)maxExecutionTime;
+            rowValues[columnNameToIndex.get("MIN_EXECUTION_TIME")] = minExecutionTime;
+            rowValues[columnNameToIndex.get("MAX_EXECUTION_TIME")] = maxExecutionTime;
             if (invocations != 0) {
                 rowValues[columnNameToIndex.get("AVG_EXECUTION_TIME")] =
-                    (long)(totalTimedExecutionTime / timedInvocations);
+                    (totalTimedExecutionTime / timedInvocations);
             } else {
-                rowValues[columnNameToIndex.get("AVG_EXECUTION_TIME")] = (long)0;
+                rowValues[columnNameToIndex.get("AVG_EXECUTION_TIME")] = 0L;
             }
         }
 

@@ -185,8 +185,8 @@ public class TestVoltProcedure extends TestCase {
         assertEquals(statsRow[0][2], LongProcedure.class.getName());
         assertEquals(statsRow[0][3], 0L); //Starts with 0 invocations
         assertEquals(statsRow[0][4], 0L); //Starts with 0 timed invocations time
-        assertEquals(statsRow[0][5], (long)0); //Starts with 0 min execution time
-        assertEquals(statsRow[0][6], (long)0); //Starts with 0 max execution time
+        assertEquals(statsRow[0][5], Long.MAX_VALUE); //Starts with 0 min execution time
+        assertEquals(statsRow[0][6], Long.MIN_VALUE); //Starts with 0 max execution time
         assertEquals(statsRow[0][7], 0L); //Average invocation length is 0 to start
         for (int ii = 1; ii < 200; ii++) {
             wrapper.call(params.m_params);
