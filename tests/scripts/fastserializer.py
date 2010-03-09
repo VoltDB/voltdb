@@ -731,11 +731,12 @@ class VoltResponse:
     "VoltDB called procedure response (ClientResponse.java)"
     def __init__(self, fser):
         self.fser = fser
-        # serialization order: response-length, status, exception,
+        # serialization order: response-length, status, roundtripTime, exception,
         # tables[], info, id.
         self.fser.bufferForRead()
         self.version = self.fser.readByte()
         self.status = self.fser.readByte()
+        self.roundtripTime = self.fser.readInt32()
         self.exception = VoltException(self.fser)
 
         # tables[]

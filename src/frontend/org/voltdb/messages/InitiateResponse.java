@@ -23,10 +23,8 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.debugstate.MailboxHistory.MessageState;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.Subject;
 import org.voltdb.messaging.VoltMessage;
-import org.voltdb.client.ProcedureCallback;
 import org.voltdb.utils.DBBPool;
 
 /**
@@ -85,7 +83,7 @@ public class InitiateResponse extends VoltMessage {
         return m_commit;
     }
 
-    public FastSerializable getClientResponseData() {
+    public ClientResponseImpl getClientResponseData() {
         return m_response;
     }
 
@@ -96,12 +94,6 @@ public class InitiateResponse extends VoltMessage {
     public void setResults(ClientResponseImpl r, InitiateTask task) {
         m_commit = (r.getStatus() == ClientResponseImpl.SUCCESS);
         m_response = r;
-
-        if (ProcedureCallback.measureLatency) {
-            if (task != null && task.m_invocation.clientQueueTime() != -1) {
-                m_response.setTimingInfo(task.m_invocation, System.currentTimeMillis());
-            }
-        }
     }
 
     @Override

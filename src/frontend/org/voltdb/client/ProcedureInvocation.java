@@ -34,17 +34,11 @@ class ProcedureInvocation implements FastSerializable {
     private final String m_procName;
     private final ParameterSet m_parameters;
 
-    /**
-     * Time the client queued this transaction. Will be -1 latency is not being tracked.
-     */
-    private final long m_queueTime;
-
-    ProcedureInvocation(long handle, String procName, long queueTime, Object... parameters) {
+    ProcedureInvocation(long handle, String procName, Object... parameters) {
         super();
         m_clientHandle = handle;
         m_procName = procName;
         m_parameters = new ParameterSet();
-        m_queueTime = queueTime;
         m_parameters.setParameters(parameters);
     }
 
@@ -67,10 +61,6 @@ class ProcedureInvocation implements FastSerializable {
         out.writeByte(0);//Version
         out.writeString(m_procName);
         out.writeLong(m_clientHandle);
-        if (ProcedureCallback.measureLatency) {
-            out.writeLong(m_queueTime);
-            out.writeLong(-1);//CIAcceptTime
-        }
         out.writeObject(m_parameters);
     }
 }

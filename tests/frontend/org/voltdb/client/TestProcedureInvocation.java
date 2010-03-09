@@ -109,7 +109,6 @@ public class TestProcedureInvocation extends TestCase{
 
 
         pi = new ProcedureInvocation(10, "invocation1",
-                                     -1, //queue time
                                      byteparam, shortparam,
                                      intparam, longparam,
                                      doubleparam, stringparam,

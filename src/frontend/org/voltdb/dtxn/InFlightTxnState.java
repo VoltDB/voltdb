@@ -35,7 +35,9 @@ public class InFlightTxnState implements Serializable {
             boolean isSinglePartition,
             StoredProcedureInvocation invocation,
             Object clientData,
-            int messageSize) {
+            int messageSize,
+            long initiateTime,
+            int connectionId) {
         this.txnId = txnId;
         this.invocation = invocation;
         this.isReadOnly = isReadOnly;
@@ -44,6 +46,8 @@ public class InFlightTxnState implements Serializable {
         this.coordinatorId = coordinatorId;
         this.otherSiteIds = otherSiteIds;
         this.messageSize = messageSize;
+        this.initiateTime = initiateTime;
+        this.connectionId = connectionId;
     }
 
     public String toString()
@@ -82,4 +86,6 @@ public class InFlightTxnState implements Serializable {
     transient public final StoredProcedureInvocation invocation;
     transient public final Object clientData;
     public final int messageSize;
+    public final long initiateTime;
+    public final int connectionId;
 }

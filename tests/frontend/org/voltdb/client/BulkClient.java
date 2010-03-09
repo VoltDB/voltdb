@@ -935,9 +935,6 @@ public abstract class BulkClient {
         public VoltProtocolHandler() {
             m_sequenceId = 0;
             m_connectionId = m_globalConnectionCounter.incrementAndGet();
-            synchronized (m_context) {
-                m_context.totalInvocationCount.put( this, new Long(0));
-            }
         }
 
         public int connectionId() {
@@ -1021,18 +1018,6 @@ public abstract class BulkClient {
             ProcedureCallback cb = null;
             cb = m_callbacks.remove(response.getClientHandle());
             if (cb != null) {
-                if (ProcedureCallback.measureLatency){
-                    // record when proc returned if
-                    // interested in latency
-                    cb.closeTimer(
-                            m_context,
-                            this,
-                            response.clientQueueTime(),
-                            response.CIAcceptTime(),
-                            response.FHReceiveTime(),
-                            response.FHResponseTime(),
-                            response.initiatorReceiveTime());
-                }
                 cb.clientCallback(response);
             }
             else {
@@ -1052,21 +1037,9 @@ public abstract class BulkClient {
          */
         protected void invokeProcedure(Connection connection, ProcedureCallback callback, String procName,
                 Object... parameters) throws IOException {
-            ProcedureInvocation invocation;
             final long handle = m_handle.getAndIncrement();
-            if (ProcedureCallback.measureLatency) {
-                final long now = System.nanoTime();
-                //final long nowMillis = System.currentTimeMillis();
-                invocation = new ProcedureInvocation(
-                        handle, procName, -1,
-                        parameters);
-                // record when this was called if
-                // interested in latency
-                callback.callTimeInNanos = now;
-            } else {
-                invocation = new ProcedureInvocation(
+            ProcedureInvocation invocation = new ProcedureInvocation(
                         handle, procName, -1, parameters);
-            }
             m_callbacks.put(handle, callback);
             FastSerializer fs = new FastSerializer();
             fs.writeObjectForMessaging(invocation);
@@ -1139,8 +1112,6 @@ public abstract class BulkClient {
     private final String m_username;
 
     private final int m_numConnections;
-
-    private static final ProcedureCallback.TimingContext m_context = new ProcedureCallback.TimingContext();
 
     /**
      * Store hostnames that will be connected to in start()

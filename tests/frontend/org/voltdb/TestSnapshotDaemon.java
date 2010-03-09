@@ -113,6 +113,16 @@ public class TestSnapshotDaemon {
                 return ClientResponse.UNEXPECTED_FAILURE;
             }
 
+            @Override
+            public int getClusterRoundtrip() {
+                return 0;
+            }
+
+            @Override
+            public int getClientRoundtrip() {
+                return 0;
+            }
+
         };
     }
 
@@ -139,6 +149,16 @@ public class TestSnapshotDaemon {
             @Override
             public byte getStatus() {
                 return ClientResponse.SUCCESS;
+            }
+
+            @Override
+            public int getClusterRoundtrip() {
+                return 0;
+            }
+
+            @Override
+            public int getClientRoundtrip() {
+                return 0;
             }
 
         };
@@ -200,6 +220,16 @@ public class TestSnapshotDaemon {
                 return ClientResponse.SUCCESS;
             }
 
+            @Override
+            public int getClusterRoundtrip() {
+                return 0;
+            }
+
+            @Override
+            public int getClientRoundtrip() {
+                return 0;
+            }
+
         };
     }
 
@@ -252,6 +282,16 @@ public class TestSnapshotDaemon {
             @Override
             public byte getStatus() {
                 return ClientResponse.SUCCESS;
+            }
+
+            @Override
+            public int getClusterRoundtrip() {
+                return 0;
+            }
+
+            @Override
+            public int getClientRoundtrip() {
+                return 0;
             }
 
         };
@@ -345,6 +385,16 @@ public class TestSnapshotDaemon {
             @Override
             public byte getStatus() {
                 return ClientResponse.SUCCESS;
+            }
+
+            @Override
+            public int getClusterRoundtrip() {
+                return 0;
+            }
+
+            @Override
+            public int getClientRoundtrip() {
+                return 0;
             }
 
         });

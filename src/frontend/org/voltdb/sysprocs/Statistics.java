@@ -36,7 +36,6 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltdb.dtxn.InitiatorStats;
 
 @ProcInfo(
     // partitionInfo = "TABLE.ATTR: 0",
@@ -163,9 +162,7 @@ public class Statistics extends VoltSystemProcedure {
             // initiator stats are registered to VoltDB's statsagent with the initiators index.
             // piece this information together and the stats agent returns a table. pretty sweet.
             ArrayList<Integer> catalogIds = new ArrayList<Integer>();
-            for (int ii = 0; ii < InitiatorStats.initiatorIndex.get(); ii++) {
-                catalogIds.add(ii);
-            }
+            catalogIds.add(0);
             VoltTable result = VoltDB.instance().getStatsAgent().getStats(SysProcSelector.INITIATOR, catalogIds);
             return new DependencyPair(DEP_initiatorData, result);
         }

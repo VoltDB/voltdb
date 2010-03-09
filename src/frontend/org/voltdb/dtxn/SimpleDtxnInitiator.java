@@ -65,6 +65,7 @@ import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.VoltMessage;
 import org.voltdb.messaging.impl.SiteMailbox;
 import org.voltdb.network.Connection;
+import org.voltdb.utils.EstTime;
 import org.voltdb.utils.VoltLoggerFactory;
 
 /** Supports correct execution of multiple partition transactions by executing them one at a time. */
@@ -136,7 +137,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                   int partitions[],
                                   int numPartitions,
                                   Object clientData,
-                                  int messageSize) {
+                                  int messageSize,
+                                  long now) {
 
         assert(invocation != null);
         assert(partitions != null);
@@ -146,7 +148,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         {
             assert(numPartitions == 1);
             createSinglePartitionTxn(connectionId, invocation, isReadOnly,
-                                     partitions[0], clientData, messageSize);
+                                     partitions[0], clientData, messageSize, now);
             return;
         }
         else
@@ -182,9 +184,9 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                                         false,
                                                         invocation,
                                                         clientData,
-                                                        messageSize);
-
-            m_stats.logTransactionCreated(connectionId, invocation);
+                                                        messageSize,
+                                                        now,
+                                                        connectionId);
             dispatchMultiPartitionTxn(txn);
         }
     }
@@ -215,7 +217,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                              boolean isReadOnly,
                              int partition,
                              Object clientData,
-                             int messageSize)
+                             int messageSize,
+                             long now)
     {
         long txnId = m_idManager.getNextUniqueTransactionId();
 
@@ -224,8 +227,6 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         //int coordinatorId = partition_ids.get(0);
 
         ArrayList<InFlightTxnState> txn_states = new ArrayList<InFlightTxnState>();
-
-        m_stats.logTransactionCreated(connectionId, invocation);
 
         m_pendingTxnBytes += messageSize;
         m_pendingTxnCount++;
@@ -251,7 +252,9 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                      true,
                                      invocation.getShallowCopy(),
                                      clientData,
-                                     messageSize);
+                                     messageSize,
+                                     now,
+                                     connectionId);
             txn_states.add(txn);
             m_pendingTxns.addTxn(txn.txnId, txn.coordinatorId, txn);
 
@@ -566,7 +569,12 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                     //Horrible but so much more efficient.
                     final Connection c = (Connection)state.clientData;
                     assert(c != null);
-                    c.writeStream().enqueue(r.getClientResponseData());
+                    final long now = EstTime.currentTimeMillis();
+                    final int delta = (int)(now - state.initiateTime);
+                    final ClientResponseImpl response = r.getClientResponseData();
+                    response.setClusterRoundtrip(delta);
+                    m_initiator.m_stats.logTransactionCompleted(state.connectionId, state.invocation, delta);
+                    c.writeStream().enqueue(response);
                 }
             }
 

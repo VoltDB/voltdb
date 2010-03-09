@@ -111,18 +111,11 @@ final class ClientImpl implements Client {
     public final VoltTable[] callProcedure(String procName, Object... parameters)
         throws ProcCallException, NoConnectionsException
     {
-        ProcedureInvocation invocation;
+
         final SyncCallback cb = new SyncCallback();
-        if (ProcedureCallback.measureLatency){
-            final long now = System.nanoTime();
-            final long nowMillis = System.currentTimeMillis();
-            invocation = new ProcedureInvocation(m_handle.getAndIncrement(), procName, nowMillis, parameters);
-            // record when this was called if
-            // interested in latency
-            cb.callTimeInNanos = now;
-        } else {
-            invocation = new ProcedureInvocation(m_handle.getAndIncrement(), procName, -1, parameters);
-        }
+        final ProcedureInvocation invocation =
+              new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
+
 
         m_distributer.queue(
                 invocation,
@@ -156,7 +149,7 @@ final class ClientImpl implements Client {
     public int calculateInvocationSerializedSize(String procName,
             Object... parameters) {
         final ProcedureInvocation invocation =
-            new ProcedureInvocation(0, procName, 0, parameters);
+            new ProcedureInvocation(0, procName, parameters);
         final FastSerializer fds = new FastSerializer();
         int size = 0;
         try {
@@ -176,17 +169,8 @@ final class ClientImpl implements Client {
             String procName,
             Object... parameters)
             throws NoConnectionsException {
-        ProcedureInvocation invocation;
-        if (ProcedureCallback.measureLatency){
-            final long now = System.nanoTime();
-            final long nowMillis = System.currentTimeMillis();
-            invocation = new ProcedureInvocation(m_handle.getAndIncrement(), procName, nowMillis, parameters);
-         // record when this was called if
-            // interested in latency
-            callback.callTimeInNanos = now;
-        } else {
-            invocation = new ProcedureInvocation(m_handle.getAndIncrement(), procName, -1, parameters);
-        }
+        ProcedureInvocation invocation =
+            new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
 
         return m_distributer.queue(invocation, callback, expectedSerializedSize, false);
     }

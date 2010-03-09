@@ -88,15 +88,20 @@ public abstract class StatsSource {
      * @return Array of Arrays of objects containing the latest values
      */
     public Object[][] getStatsRows() {
-        Iterator<Object> i = getStatsRowKeyIterator();
-        ArrayList<Object[]> rows = new ArrayList<Object[]>();
-        while (i.hasNext()) {
-            Object rowKey = i.next();
-            Object rowValues[] = new Object[columns.size()];
-            updateStatsRow(rowKey, rowValues);
-            rows.add(rowValues);
+        /*
+         * Synchronizing on this allows derived classes to maintain thread safety
+         */
+        synchronized (this) {
+            Iterator<Object> i = getStatsRowKeyIterator();
+            ArrayList<Object[]> rows = new ArrayList<Object[]>();
+            while (i.hasNext()) {
+                Object rowKey = i.next();
+                Object rowValues[] = new Object[columns.size()];
+                updateStatsRow(rowKey, rowValues);
+                rows.add(rowValues);
+            }
+            return rows.toArray(new Object[0][]);
         }
-        return rows.toArray(new Object[0][]);
     }
 
     /**

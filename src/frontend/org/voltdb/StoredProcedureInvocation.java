@@ -21,7 +21,6 @@ import java.io.IOException;
 
 import java.nio.ByteBuffer;
 import org.voltdb.messaging.*;
-import org.voltdb.client.ProcedureCallback;
 
 /**
  * Represents a serializeable bundle of procedure name and parameters. This
@@ -34,22 +33,6 @@ public class StoredProcedureInvocation implements FastSerializable {
     ParameterSet params = null;
     ByteBuffer unserializedParams = null;
 
-    /**
-     * Time the client queued this transaction
-     */
-    long clientQueueTime = -1;
-
-    /**
-     * Time the ClientInterface read the transaction
-     */
-    long CIAcceptTime = -1;
-
-    /**
-     * Time the foreign host that would execute the transaction
-     * received the transaction and delivered it into its local priority queue
-     */
-    long FHReceiveTime = -1;
-
     /** A descriptor provided by the client, opaque to the server,
         returned to the client in the ClientResponse */
     long clientHandle = -1;
@@ -57,10 +40,7 @@ public class StoredProcedureInvocation implements FastSerializable {
     public StoredProcedureInvocation getShallowCopy()
     {
         StoredProcedureInvocation copy = new StoredProcedureInvocation();
-        copy.CIAcceptTime = CIAcceptTime;
         copy.clientHandle = clientHandle;
-        copy.clientQueueTime = clientQueueTime;
-        copy.FHReceiveTime = FHReceiveTime;
         copy.params = params;
         copy.procName = procName;
         if (unserializedParams != null)
@@ -74,10 +54,6 @@ public class StoredProcedureInvocation implements FastSerializable {
 
         return copy;
     }
-
-    public long CIAcceptTime() { return CIAcceptTime; }
-    public long clientQueueTime() { return clientQueueTime; }
-    public long FHReceiveTime() { return FHReceiveTime; }
 
     public void setProcName(String name) {
         procName = name;
@@ -141,17 +117,6 @@ public class StoredProcedureInvocation implements FastSerializable {
         in.readByte();//skip version
         procName = in.readString();
         clientHandle = in.readLong();
-        if (ProcedureCallback.measureLatency){
-            clientQueueTime = in.readLong();
-            CIAcceptTime = in.readLong();
-            if (clientQueueTime != -1){
-                if (CIAcceptTime == -1) {
-                    CIAcceptTime = System.currentTimeMillis();
-                } else {
-                    FHReceiveTime = System.currentTimeMillis();
-                }
-            }
-        }
         // do not deserialize parameters in ClientInterface context
         unserializedParams = in.remainder();
         params = null;
@@ -164,10 +129,6 @@ public class StoredProcedureInvocation implements FastSerializable {
         out.write(0);//version
         out.writeString(procName);
         out.writeLong(clientHandle);
-        if (ProcedureCallback.measureLatency) {
-            out.writeLong(clientQueueTime);
-            out.writeLong(CIAcceptTime);
-        }
         if (params != null)
             out.writeObject(params);
         else if (unserializedParams != null)

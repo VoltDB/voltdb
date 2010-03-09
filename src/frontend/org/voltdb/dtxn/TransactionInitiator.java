@@ -57,7 +57,8 @@ public abstract class TransactionInitiator {
             int partitions[],
             int numPartitions,
             Object clientData,
-            int messageSize);
+            int messageSize,
+            long now);
 
     /**
      * This method should be called every X ms or so, where X is probably

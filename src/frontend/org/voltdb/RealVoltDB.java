@@ -34,7 +34,6 @@ import org.apache.log4j.Logger;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Site;
 import org.voltdb.catalog.SnapshotSchedule;
-import org.voltdb.dtxn.InitiatorStats;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.elt.ELTManager;
 import org.voltdb.fault.FaultDistributor;
@@ -459,9 +458,6 @@ public class RealVoltDB implements VoltDBInterface
         }
 
         m_network = null;
-
-        //For test code that tests initiation stats.
-        InitiatorStats.initiatorIndex.set(0);
 
         //Also for test code that expects a fresh stats agent
         m_statsAgent = new StatsAgent();

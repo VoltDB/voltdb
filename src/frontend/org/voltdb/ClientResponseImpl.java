@@ -21,9 +21,7 @@ import java.nio.ByteBuffer;
 
 import org.voltdb.messaging.*;
 import org.voltdb.exceptions.SerializableException;
-import org.voltdb.client.ProcedureCallback;
 import org.voltdb.VoltTable;
-import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.client.ClientResponse;
 
 /**
@@ -36,52 +34,13 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse {
     private byte status = 0;
     private VoltTable[] results = new VoltTable[0];
     private String extra = null;
-
-    /**
-     * Time the client queued this transaction
-     */
-    private long clientQueueTime = -1;
-
-    /**
-     * Time the ClientInterface on some host read the transaction
-     */
-    private long CIAcceptTime = -1;
-
-    /**
-     * Time the foreign host that would execute the transaction
-     * received the transaction and delivered it into a local priority queue
-     */
-    private long FHReceiveTime = -1;
-
-    /**
-     * Time the foreign host took the transaction out of the local priority queue
-     * executed it, and queued a response for writing back to the initiator
-     */
-    private long FHResponseTime = -1;
-
-    /**
-     * Time the initiator received the response for the client from the
-     * foreign host and queued it for writing back to the client
-     */
-    private long initiatorReceiveTime = -1;
-
+    private int clusterRoundTripTime = 0;
+    private int clientRoundTripTime = 0;
     private SerializableException m_exception = null;
 
 
     /** opaque data optionally provided by and returned to the client */
     private long clientHandle = -1;
-
-    public long clientQueueTime() { return clientQueueTime; }
-    public long CIAcceptTime() { return CIAcceptTime; }
-    public long FHReceiveTime() { return FHReceiveTime; }
-    public long FHResponseTime() { return FHResponseTime; }
-    public long initiatorReceiveTime() { return initiatorReceiveTime; }
-    public void setTimingInfo(StoredProcedureInvocation spi,  long FHResponseTime ) {
-        this.clientQueueTime = spi.clientQueueTime();
-        this.CIAcceptTime = spi.CIAcceptTime();
-        this.FHReceiveTime = spi.FHReceiveTime();
-        this.FHResponseTime = FHResponseTime;
-    }
 
     public ClientResponseImpl() {
 
@@ -151,18 +110,7 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse {
     public void readExternal(FastDeserializer in) throws IOException {
         in.readByte();//Skip version byte
         status = (byte) in.readByte();
-        if (ProcedureCallback.measureLatency){
-            clientQueueTime = in.readLong();
-            CIAcceptTime = in.readLong();
-            FHReceiveTime = in.readLong();
-            FHResponseTime = in.readLong();
-            initiatorReceiveTime = in.readLong();
-            if (clientQueueTime != -1) {
-                if (initiatorReceiveTime == -1) {
-                    initiatorReceiveTime = System.currentTimeMillis();
-                }
-            }
-        }
+        clusterRoundTripTime = in.readInt();
         m_exception = SerializableException.deserializeFromBuffer(in.buffer());
         results = (VoltTable[]) in.readArray(VoltTable.class);
         extra = in.readString();
@@ -175,13 +123,7 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse {
         assert setProperly;
         out.writeByte(0);//version
         out.write(status);
-        if (ProcedureCallback.measureLatency) {
-            out.writeLong(clientQueueTime);
-            out.writeLong(CIAcceptTime);
-            out.writeLong(FHReceiveTime);
-            out.writeLong(FHResponseTime);
-            out.writeLong(initiatorReceiveTime);
-        }
+        out.writeInt(clusterRoundTripTime);
         if (m_exception != null) {
             final ByteBuffer b = ByteBuffer.allocate(m_exception.getSerializedSize());
             m_exception.serializeToBuffer(b);
@@ -192,6 +134,24 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse {
         out.writeArray(results);
         out.writeString(extra);
         out.writeLong(clientHandle);
+    }
+
+    @Override
+    public int getClusterRoundtrip() {
+        return clusterRoundTripTime;
+    }
+
+    public void setClusterRoundtrip(int time) {
+        clusterRoundTripTime = time;
+    }
+
+    @Override
+    public int getClientRoundtrip() {
+        return clientRoundTripTime;
+    }
+
+    public void setClientRoundtrip(int time) {
+        clientRoundTripTime = time;
     }
 
 }

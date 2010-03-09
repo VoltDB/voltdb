@@ -35,6 +35,7 @@ import org.voltdb.network.VoltNetwork;
 import org.voltdb.network.VoltProtocolHandler;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltdb.utils.Pair;
 
 /**
  *   De/multiplexes transactions across a cluster
@@ -43,9 +44,6 @@ import org.voltdb.utils.DBBPool.BBContainer;
  *   to synchronized on the distributer and then an individual connection.
  */
 class Distributer {
-
-    private final ProcedureCallback.TimingContext m_context = new ProcedureCallback.TimingContext();
-
     // collection of connections to the cluster
     private final ArrayList<NodeConnection> m_connections = new ArrayList<NodeConnection>();
 
@@ -64,13 +62,13 @@ class Distributer {
     private final boolean m_useMultipleThreads;
 
     class NodeConnection extends VoltProtocolHandler {
-        private final HashMap<Long, ProcedureCallback> m_callbacks;
+        private final HashMap<Long, Pair<Long, ProcedureCallback>> m_callbacks;
         private Connection m_connection;
         public final String m_address;
         private boolean m_isConnected = true;
 
         public NodeConnection(String address) {
-            m_callbacks = new HashMap<Long, ProcedureCallback>();
+            m_callbacks = new HashMap<Long, Pair<Long, ProcedureCallback>>();
             m_address = address;
         }
 
@@ -84,7 +82,7 @@ class Distributer {
                     c.discard();
                     return;
                 }
-                m_callbacks.put(handle, callback);
+                m_callbacks.put(handle, Pair.of( System.currentTimeMillis(), callback));
             }
             m_connection.writeStream().enqueue(c);
         }
@@ -98,13 +96,14 @@ class Distributer {
                     callback.clientCallback(r);
                     return;
                 }
-                m_callbacks.put(handle, callback);
+                m_callbacks.put(handle, Pair.of( System.currentTimeMillis(), callback));
             }
             m_connection.writeStream().enqueue(f);
         }
 
         @Override
         public void handleMessage(ByteBuffer buf, Connection c) {
+            long now = System.currentTimeMillis();
             ClientResponseImpl response = null;
             FastDeserializer fds = new FastDeserializer(buf);
             try {
@@ -113,26 +112,15 @@ class Distributer {
                 e.printStackTrace();
             }
             ProcedureCallback cb = null;
+            long callTime = 0;
             synchronized (this) {
-                cb = m_callbacks.remove(response.getClientHandle());
+                Pair<Long, ProcedureCallback> pair = m_callbacks.remove(response.getClientHandle());
+                callTime = pair.getFirst();
+                cb = pair.getSecond();
             }
+            final int delta = (int)(now - callTime);
             if (cb != null) {
-
-                // record when proc returned if
-                // interested in latency
-                if (ProcedureCallback.measureLatency){
-                    // record when proc returned if
-                    // interested in latency
-                    cb.closeTimer(
-                            m_context,
-                            Distributer.this,
-                            response.clientQueueTime(),
-                            response.CIAcceptTime(),
-                            response.FHReceiveTime(),
-                            response.FHResponseTime(),
-                            response.initiatorReceiveTime());
-                }
-
+                response.setClientRoundtrip(delta);
                 cb.clientCallback(response);
             }
             else if (m_isConnected) {
@@ -181,8 +169,8 @@ class Distributer {
                     new ClientResponseImpl(
                         ClientResponse.CONNECTION_LOST, new VoltTable[0],
                         "Connection to the database was lost before a response was received");
-                for (final ProcedureCallback pc : m_callbacks.values()) {
-                    pc.clientCallback(r);
+                for (final Pair<Long, ProcedureCallback> pair : m_callbacks.values()) {
+                    pair.getSecond().clientCallback(r);
                 }
             }
         }
@@ -249,12 +237,8 @@ class Distributer {
     Distributer(int expectedOutgoingMessageSize, int arenaSizes[], boolean useMultipleThreads) {
         m_useMultipleThreads = useMultipleThreads;
         m_network = new VoltNetwork( useMultipleThreads, true, new Runnable[0], 3);
-        synchronized (m_context) {
-            m_context.totalInvocationCount.put( this, new Long(0));
-        }
         m_expectedOutgoingMessageSize = expectedOutgoingMessageSize;
         m_network.start();
-        m_context.invocationCount.put( this, new Long(0));
         m_pool = new DBBPool(false, arenaSizes, false);
 
 //        new Thread() {
