@@ -37,7 +37,7 @@ import org.voltdb.client.Client;
  * multi-site VoltDB instances.
  *
  */
-public class TestCatlaogUpdateSuite extends RegressionSuite {
+public class TestCatalogUpdateSuite extends RegressionSuite {
 
     // procedures used by these tests
     static Class<?>[] BASEPROCS =     { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
@@ -52,7 +52,7 @@ public class TestCatlaogUpdateSuite extends RegressionSuite {
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
      * @param name The name of the method to test. This is just passed to the superclass.
      */
-    public TestCatlaogUpdateSuite(String name) {
+    public TestCatalogUpdateSuite(String name) {
         super(name);
     }
 
@@ -87,7 +87,7 @@ public class TestCatlaogUpdateSuite extends RegressionSuite {
      */
     static public Test suite() {
         // the suite made here will all be using the tests from this class
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestCatlaogUpdateSuite.class);
+        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestCatalogUpdateSuite.class);
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 1 Local Site/Partitions running on JNI backend
