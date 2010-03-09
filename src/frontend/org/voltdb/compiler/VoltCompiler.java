@@ -925,7 +925,6 @@ public class VoltCompiler {
             "org.voltdb.sysprocs.StartSampler",
             "org.voltdb.sysprocs.Statistics",
             "org.voltdb.sysprocs.SystemInformation",
-            "org.voltdb.sysprocs.UpdateApplicationCatalog",
             "org.voltdb.sysprocs.UpdateLogging"
         };
 
