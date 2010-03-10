@@ -45,6 +45,7 @@ public class BenchmarkConfig {
     public final boolean localmode;
     public final String useProfile;
     public final float checkTransaction;
+    public final boolean checkTables;
     public final String snapshotPath;
     public final String snapshotPrefix;
     public final String snapshotFrequency;
@@ -70,6 +71,7 @@ public class BenchmarkConfig {
             boolean localmode,
             String useProfile,
             float checkTransaction,
+            boolean checkTables,
             String snapshotPath,
             String snapshotPrefix,
             String snapshotFrequency,
@@ -97,6 +99,7 @@ public class BenchmarkConfig {
         this.localmode = localmode;
         this.useProfile = useProfile;
         this.checkTransaction = checkTransaction;
+        this.checkTables = checkTables;
         this.snapshotPath = snapshotPath;
         this.snapshotPrefix = snapshotPrefix;
         this.snapshotFrequency = snapshotFrequency;

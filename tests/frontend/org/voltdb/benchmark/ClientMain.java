@@ -24,22 +24,32 @@
 package org.voltdb.benchmark;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.lang.reflect.Constructor;
+import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
+import org.voltdb.client.ProcCallException;
+import org.voltdb.processtools.SSHTools;
+import org.voltdb.sysprocs.saverestore.TableSaveFile;
 import org.voltdb.utils.Pair;
 import org.voltdb.utils.VoltSampler;
+import org.voltdb.utils.DBBPool.BBContainer;
 
 /**
  * Base class for clients that will work with the multi-host multi-process
@@ -109,6 +119,7 @@ public abstract class ClientMain {
      * Data verification.
      */
     private final float m_checkTransaction;
+    private final boolean m_checkTables;
     private final Random m_checkGenerator = new Random();
     private final LinkedHashMap<Pair<String, Integer>, Verification.Expression> m_constraints;
     protected VoltSampler m_sampler = null;
@@ -179,6 +190,11 @@ public abstract class ClientMain {
                 }
                 else if (command.equalsIgnoreCase("STOP")) {
                     if (m_controlState == ControlState.RUNNING) {
+                        // First we have to check tables
+                        if (m_checkTables) {
+                            checkTables();
+                        }
+
                         // The shutdown will cause all the DB connections to die
                         // and then the client can return from
                         // the run loop at which point ControlWorker can call
@@ -273,6 +289,7 @@ public abstract class ClientMain {
                 System.err.flush();
                 rateControlledRunLoop();
             }
+
             try {
                 m_voltClient.shutdown();
             }
@@ -393,6 +410,7 @@ public abstract class ClientMain {
         m_counts = null;
         m_countDisplayNames = null;
         m_checkTransaction = 0;
+        m_checkTables = false;
         m_constraints = new LinkedHashMap<Pair<String, Integer>, Verification.Expression>();
     }
 
@@ -420,6 +438,7 @@ public abstract class ClientMain {
         int id = 0;
         boolean exitOnCompletion = true;
         float checkTransaction = 0;
+        boolean checkTables = false;
 
         // scan the inputs once to read everything but host names
         for (final String arg : args) {
@@ -449,6 +468,9 @@ public abstract class ClientMain {
             }
             else if (parts[0].equals("CHECKTRANSACTION")) {
                 checkTransaction = Float.parseFloat(parts[1]);
+            }
+            else if (parts[0].equals("CHECKTABLES")) {
+                checkTables = Boolean.parseBoolean(parts[1]);
             }
         }
 
@@ -488,6 +510,7 @@ public abstract class ClientMain {
         if (!atLeastOneConnection)
             setState(ControlState.ERROR, "No HOSTS specified on command line.");
         m_checkTransaction = checkTransaction;
+        m_checkTables = checkTables;
         m_constraints = new LinkedHashMap<Pair<String, Integer>, Verification.Expression>();
 
         m_countDisplayNames = getTransactionDisplayNames();
@@ -554,7 +577,7 @@ public abstract class ClientMain {
         int orig_position = -1;
 
         // Check if all the tables in the result set satisfy the constraints.
-        for (int i = 0; i < response.getResults().length; i++) {
+        for (int i = 0; isSatisfied && i < response.getResults().length; i++) {
             Pair<String, Integer> key = Pair.of(procName, i);
             if (!m_constraints.containsKey(key))
                 continue;
@@ -565,11 +588,8 @@ public abstract class ClientMain {
 
             // Iterate through all rows and check if they satisfy the
             // constraints.
-            while (table.advanceRow()) {
-                if (!Verification.checkRow(m_constraints.get(key), table)) {
-                    isSatisfied = false;
-                    break;
-                }
+            while (isSatisfied && table.advanceRow()) {
+                isSatisfied = Verification.checkRow(m_constraints.get(key), table);
             }
 
             // Have to reset the position to its original position.
@@ -577,8 +597,6 @@ public abstract class ClientMain {
                 table.resetRowPosition();
             else
                 table.advanceToRow(orig_position);
-            if (!isSatisfied)
-                break;
         }
 
         if (!isSatisfied)
@@ -631,33 +649,250 @@ public abstract class ClientMain {
 
     /**
      * Sets the given constraint for the table identified by the tableId of
-     * procedure procName. If there is already a constraint assigned to the
-     * table, it is updated to the new one.
+     * procedure 'name'. If there is already a constraint assigned to the table,
+     * it is updated to the new one.
      *
-     * @param procName
-     *            The name of the procedure.
+     * @param name
+     *            The name of the constraint. For transaction check, this should
+     *            usually be the procedure name.
      * @param tableId
      *            The index of the table in the result set.
      * @param constraint
      *            The constraint to use.
      */
-    protected void addConstraint(String procName,
+    protected void addConstraint(String name,
                                  int tableId,
                                  Verification.Expression constraint) {
-        m_constraints.put(Pair.of(procName, tableId), constraint);
+        m_constraints.put(Pair.of(name, tableId), constraint);
     }
 
     /**
      * Removes the constraint on the table identified by tableId of procedure
-     * procName. Nothing happens if there is no constraint assigned to this
-     * table.
+     * 'name'. Nothing happens if there is no constraint assigned to this table.
      *
-     * @param procName
-     *            The name of the procedure.
+     * @param name
+     *            The name of the constraint.
      * @param tableId
      *            The index of the table in the result set.
      */
-    protected void removeConstraint(String procName, int tableId) {
-        m_constraints.remove(Pair.of(procName, tableId));
+    protected void removeConstraint(String name, int tableId) {
+        m_constraints.remove(Pair.of(name, tableId));
+    }
+
+    /**
+     * Takes a snapshot of all the tables in the database now and check all the
+     * rows in each table to see if they satisfy the constraints. The
+     * constraints should be added with the table name and table id 0.
+     *
+     * Since the snapshot files reside on the servers, we have to copy them over
+     * to the client in order to check. This might be an overkill, but the
+     * alternative is to ask the user to write stored procedure for each table
+     * and execute them on all nodes. That's not significantly better, either.
+     *
+     * This function blocks. Should only be run at the end.
+     *
+     * @return true if all tables passed the test, false otherwise.
+     */
+    protected boolean checkTables() {
+        String dir = "/tmp";
+        String nonce = "data_verification";
+        // Host ID to IP mappings
+        LinkedHashMap<Integer, String> hostMappings = new LinkedHashMap<Integer, String>();
+        // Table to partition ID mappings
+        LinkedHashMap<String, int[]> partitionMappings = new LinkedHashMap<String, int[]>();
+        // The key is the table name. the first one in the pair is the hostname, the second one is file name
+        LinkedHashMap<String, Pair<String, String>> snapshotMappings = new LinkedHashMap<String, Pair<String, String>>();
+        boolean isSatisfied = true;
+
+        // Load the native library for loading table from snapshot file
+        org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
+
+        try {
+            boolean keepTrying = true;
+            VoltTable[] response = null;
+            while (true) {
+                // Take a snapshot of all the tables. This call is blocking.
+                response = m_voltClient.callProcedure("@SnapshotSave", dir, nonce, 1);
+                if (response.length != 1 || !response[0].advanceRow()
+                    || !response[0].getString("RESULT").equals("SUCCESS")) {
+                    if (keepTrying && response[0].getString("ERR_MSG")
+                                                 .contains("ALREADY EXISTS")) {
+                        m_voltClient.callProcedure("@SnapshotDelete",
+                                                   new String[] { dir },
+                                                   new String[] { nonce });
+                        keepTrying = false;
+                        continue;
+                    }
+
+                    System.err.println("Failed to take snapshot");
+                    return false;
+                }
+
+                break;
+            }
+
+            // Get host ID to hostname mappings
+            response = m_voltClient.callProcedure("@SystemInformation");
+            if (response.length != 1) {
+                System.err.println("Failed to get host ID to IP address mapping");
+                return false;
+            }
+            while (response[0].advanceRow()) {
+                if (!response[0].getString("key").equals("hostname"))
+                    continue;
+                hostMappings.put((Integer) response[0].get("node_id", VoltType.INTEGER),
+                                 response[0].getString("value"));
+            }
+
+            // Do a scan to get all the file names and table names
+            response = m_voltClient.callProcedure("@SnapshotScan", dir);
+            if (response.length != 3) {
+                System.err.println("Failed to get snapshot filenames");
+                return false;
+            }
+
+            // Only copy the snapshot files we just created
+            while (response[0].advanceRow()) {
+                if (!response[0].getString("NONCE").equals(nonce))
+                    continue;
+
+                String[] tables = response[0].getString("TABLES_REQUIRED").split(",");
+                for (String t : tables)
+                    snapshotMappings.put(t, null);
+                break;
+            }
+
+            while (response[2].advanceRow()) {
+                int id = Integer.parseInt(response[2].getString("HOST_ID"));
+                String tableName = response[2].getString("TABLE");
+
+                if (!snapshotMappings.containsKey(tableName) || !hostMappings.containsKey(id))
+                    continue;
+
+                snapshotMappings.put(tableName, Pair.of(hostMappings.get(id),
+                                                        response[2].getString("NAME")));
+                String[] partitionStrings = response[2].getString("PARTITIONS")
+                                                       .split(",");
+                int[] partitions = new int[partitionStrings.length];
+                for (int i = 0; i < partitionStrings.length; i++)
+                    partitions[i] = Integer.parseInt(partitionStrings[i]);
+                partitionMappings.put(tableName, partitions);
+            }
+        } catch (NoConnectionsException e) {
+            e.printStackTrace();
+            return false;
+        } catch (ProcCallException e) {
+            e.printStackTrace();
+            return false;
+        }
+
+        // Iterate through all the tables
+        for (Map.Entry<String, Pair<String, String>> entry : snapshotMappings.entrySet()) {
+            String tableName = entry.getKey();
+            String hostName = entry.getValue().getFirst();
+            int[] partitions = partitionMappings.get(tableName);
+            File file = new File(dir, entry.getValue().getSecond());
+            FileInputStream inputStream = null;
+            TableSaveFile saveFile = null;
+            long rowCount = 0;
+
+            Pair<String, Integer> key = Pair.of(tableName, 0);
+            if (!m_constraints.containsKey(key) || hostName == null)
+                continue;
+
+            System.out.println("Checking table " + tableName);
+
+            // Copy the file over
+            String localhostName = null;
+            try {
+                localhostName = InetAddress.getLocalHost().getHostName();
+            } catch (UnknownHostException e1) {
+                localhostName = "localhost";
+            }
+            if (!hostName.equals("localhost") && !hostName.equals(localhostName)) {
+                if (!SSHTools.copyFromRemote(file, m_username, hostName, file.getPath())) {
+                    System.err.println("Failed to copy the snapshot file " + file.getPath()
+                                       + " from host "
+                                       + hostName);
+                    return false;
+                }
+            }
+
+            if (!file.exists()) {
+                System.err.println("Snapshot file " + file.getPath()
+                                   + " cannot be copied from "
+                                   + hostName
+                                   + " to localhost");
+                return false;
+            }
+
+            try {
+                try {
+                    inputStream = new FileInputStream(file);
+                    saveFile = new TableSaveFile(inputStream.getChannel(), 3, partitions);
+
+                    // Get chunks from table
+                    while (isSatisfied && saveFile.hasMoreChunks()) {
+                        BBContainer chunk = saveFile.getNextChunk();
+                        VoltTable table = null;
+
+                        // This probably should not happen
+                        if (chunk == null)
+                            continue;
+
+                        table = new VoltTable(chunk.b, true);
+                        // Now, check each row
+                        while (isSatisfied && table.advanceRow()) {
+                            isSatisfied = Verification.checkRow(m_constraints.get(key),
+                                                                table);
+                            rowCount++;
+                        }
+                        // Release the memory of the chunk we just examined, be good
+                        chunk.discard();
+                    }
+                } finally {
+                    if (saveFile != null)
+                        saveFile.close();
+                    if (inputStream != null)
+                        inputStream.close();
+                    if (!file.delete()) {
+                        System.err.println("Failed to delete snapshot file " + file.getPath());
+                        return false;
+                    }
+                }
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+                return false;
+            } catch (IOException e) {
+                e.printStackTrace();
+                return false;
+            }
+
+            if (isSatisfied) {
+                System.out.println("Table " + tableName
+                                   + " with "
+                                   + rowCount
+                                   + " rows passed check");
+            } else {
+                System.err.println("Table " + tableName + " failed check");
+                break;
+            }
+        }
+
+        // Clean up the snapshot we made
+        try {
+            m_voltClient.callProcedure("@SnapshotDelete",
+                                       new String[] { dir },
+                                       new String[] { nonce });
+        } catch (NoConnectionsException e) {
+            e.printStackTrace();
+        } catch (ProcCallException e) {
+            e.printStackTrace();
+        }
+
+        System.out.println("Table checking finished "
+                           + (isSatisfied ? "successfully" : "with failures"));
+
+        return isSatisfied;
     }
 }

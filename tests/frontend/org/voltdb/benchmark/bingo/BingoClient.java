@@ -212,6 +212,21 @@ public class BingoClient extends ClientMain {
                                               constraint4,
                                               constraint5);
         addConstraint("PlayRound", 1, constraint);
+
+        // For the tables
+        addConstraint("T", 0, constraint3);
+
+        constraint = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
+                                              constraint3,
+                                              constraint4);
+        addConstraint("B", 0, constraint);
+
+        constraint = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
+                                              constraint1,
+                                              constraint2,
+                                              constraint3,
+                                              constraint5);
+        addConstraint("R", 0, constraint);
     }
 
     @Override

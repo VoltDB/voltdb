@@ -1276,6 +1276,7 @@ BENCHMARKS
         <arg value="LISTENFORDEBUGGER=${debug}" />
         <arg value="USEPROFILE=${useprofile}" />
         <arg value="CHECKTRANSACTION=${checktransaction}" />
+        <arg value="CHECKTABLES=${checktables}" />
         <arg value="CLIENTHEAP=${volt.client.memory}" />
         <arg value="SERVERHEAP=${volt.server.memory}" />
         <arg value="LOCAL=${local}" />

@@ -417,6 +417,13 @@ public class BenchmarkController {
         }
         clArgs.add("-Xmx" + String.valueOf(m_config.clientHeapSize) + "m");
 
+        /*
+         * This is needed to do database verification at the end of the run. In
+         * order load the snapshot tables, we need the checksum stuff in the
+         * native library.
+         */
+        clArgs.add("-Djava.library.path=.");
+
         String classpath = "voltdbfat.jar" + ":" + m_jarFileName;
         if (System.getProperty("java.class.path") != null) {
             classpath = classpath + ":" + System.getProperty("java.class.path");
@@ -430,6 +437,7 @@ public class BenchmarkController {
         }
 
         clArgs.add("CHECKTRANSACTION=" + m_config.checkTransaction);
+        clArgs.add("CHECKTABLES=" + m_config.checkTables);
 
         for (String host : m_config.hosts)
             clArgs.add("HOST=" + host + ":" + String.valueOf(VoltDB.DEFAULT_PORT));
@@ -457,7 +465,6 @@ public class BenchmarkController {
                         client + ":" + String.valueOf(j),
                         fullCommand.toString());
                 benchmarkLog.debug("Client Commnand: " + fullCommand.toString());
-
                 m_clientPSM.startProcess(client + ":" + String.valueOf(j), args);
             }
         }
@@ -638,6 +645,7 @@ public class BenchmarkController {
         String snapshotPrefix = null;
         int snapshotRetain = -1;
         float checkTransaction = 0;
+        boolean checkTables = false;
 
         LinkedHashMap<String, String> clientParams = new LinkedHashMap<String, String>();
         for (String arg : vargs) {
@@ -651,6 +659,11 @@ public class BenchmarkController {
                  * Whether or not to check the result of each transaction.
                  */
                 checkTransaction = Float.parseFloat(parts[1]);
+            } else if (parts[0].equals("CHECKTABLES")) {
+                /*
+                 * Whether or not to check all the tables at the end.
+                 */
+                checkTables = Boolean.parseBoolean(parts[1]);
             } else if (parts[0].equals("USEPROFILE")) {
                 useProfile = parts[1];
             } else if (parts[0].equals("LOCAL")) {
@@ -819,7 +832,7 @@ public class BenchmarkController {
         BenchmarkConfig config = new BenchmarkConfig(clientClassname, backend, hostNames,
                 sitesPerHost, k_factor, clientNames, processesPerClient, interval, duration,
                 remotePath, remoteUser, listenForDebugger, serverHeapSize, clientHeapSize,
-                localmode, useProfile, checkTransaction, snapshotPath, snapshotPrefix,
+                localmode, useProfile, checkTransaction, checkTables, snapshotPath, snapshotPrefix,
                 snapshotFrequency, snapshotRetain);
         config.parameters.putAll(clientParams);
 
