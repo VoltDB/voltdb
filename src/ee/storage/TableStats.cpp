@@ -35,11 +35,18 @@ TableStats::TableStats(voltdb::Table* table) : voltdb::StatsSource(), m_table(ta
  * Configure a StatsSource superclass for a set of statistics. Since this class is only used in the EE it can be assumed that
  * it is part of an Execution Site and that there is a site Id.
  * @parameter name Name of this set of statistics
- * @parameter siteId this stat source is associated with
- * @parameter databaseId database this source is associated with.
+ * @parameter hostId id of the host this partition is on
+ * @parameter hostname name of the host this partition is on
+ * @parameter partitionId this stat source is associated with
+ * @parameter databaseId Database this source is associated with
  */
-void TableStats::configure(std::string name, voltdb::CatalogId siteId, voltdb::CatalogId databaseId) {
-    StatsSource::configure(name, siteId, databaseId);
+void TableStats::configure(
+        std::string name,
+        voltdb::CatalogId hostId,
+        std::string hostname,
+        voltdb::CatalogId partitionId,
+        voltdb::CatalogId databaseId) {
+    StatsSource::configure(name, hostId, hostname, partitionId, databaseId);
     m_tableName = ValueFactory::getStringValue(m_table->name());
     m_tableType = ValueFactory::getStringValue(m_table->tableType());
 }
@@ -76,8 +83,8 @@ void TableStats::updateStatsTuple(voltdb::TableTuple *tuple) {
  */
 void TableStats::populateSchema(std::vector<voltdb::ValueType> &types, std::vector<uint16_t> &columnLengths, std::vector<bool> &allowNull) {
     StatsSource::populateSchema(types, columnLengths, allowNull);
-    types.push_back(voltdb::VALUE_TYPE_VARCHAR); columnLengths.push_back(128); allowNull.push_back(false);
-    types.push_back(voltdb::VALUE_TYPE_VARCHAR); columnLengths.push_back(128); allowNull.push_back(false);
+    types.push_back(voltdb::VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);
+    types.push_back(voltdb::VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);
     types.push_back(voltdb::VALUE_TYPE_BIGINT); columnLengths.push_back(static_cast<uint16_t>(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT))); allowNull.push_back(false);
     types.push_back(voltdb::VALUE_TYPE_BIGINT); columnLengths.push_back(static_cast<uint16_t>(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT))); allowNull.push_back(false);
     types.push_back(voltdb::VALUE_TYPE_BIGINT); columnLengths.push_back(static_cast<uint16_t>(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT))); allowNull.push_back(false);

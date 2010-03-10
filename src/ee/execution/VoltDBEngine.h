@@ -123,7 +123,12 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         }
 
         VoltDBEngine(Topend *topend, LogProxy *logProxy);
-        bool initialize(int32_t clusterIndex, int32_t siteId);
+        bool initialize(
+                int32_t clusterIndex,
+                int32_t siteId,
+                int32_t partitionId,
+                int32_t hostId,
+                std::string hostname);
         virtual ~VoltDBEngine();
 
         inline int32_t getClusterIndex() const { return m_clusterIndex; }

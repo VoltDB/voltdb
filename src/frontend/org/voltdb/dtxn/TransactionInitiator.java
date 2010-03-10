@@ -41,6 +41,7 @@ public abstract class TransactionInitiator {
      *
      * @param connectionId A unique integer identifying which TCP/IP connection
      * spawned this transaction.
+     * @param connectionHostname hostname associated with this connection
      * @param invocation The data describing the work to be done.
      * @param partitions The partitions (from the catalog) involved in this
      * transaction (Errs on the side of too many).
@@ -51,6 +52,7 @@ public abstract class TransactionInitiator {
      */
     public abstract void createTransaction(
             int connectionId,
+            final String connectionHostname,
             StoredProcedureInvocation invocation,
             boolean isReadOnly,
             boolean isSinglePartition,

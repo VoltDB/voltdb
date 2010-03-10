@@ -303,19 +303,28 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         struct ipc_command cmd;
         int clusterId;
         int siteId;
+        int partitionId;
+        int hostId;
         int64_t logLevels;
+        int16_t hostnameLength;
+        char hostname[0];
     };
     struct initialize * cs = (struct initialize*) cmd;
 
     printf("initialize: cluster=%d, site=%d\n",
            ntohl(cs->clusterId), ntohl(cs->siteId));
-
+    cs->clusterId = ntohl(cs->clusterId);
+    cs->siteId = ntohl(cs->siteId);
+    cs->partitionId = ntohl(cs->partitionId);
+    cs->hostId = ntohl(cs->hostId);
+    cs->hostnameLength = ntohs(cs->hostnameLength);
+    std::string hostname(cs->hostname, cs->hostnameLength);
     m_engine = new VoltDBEngine(new voltdb::IPCTopend(this), new voltdb::StdoutLogProxy());
     m_engine->getLogManager()->setLogLevels(cs->logLevels);
     m_reusedResultBuffer = new char[MAX_MSG_SZ];
     m_exceptionBuffer = new char[MAX_MSG_SZ];
     m_engine->setBuffers( NULL, 0, m_reusedResultBuffer, MAX_MSG_SZ, m_exceptionBuffer, MAX_MSG_SZ);
-    if (m_engine->initialize(ntohl(cs->clusterId), ntohl(cs->siteId)) == true) {
+    if (m_engine->initialize( cs->clusterId, cs->siteId, cs->partitionId, cs->hostId, hostname) == true) {
         return kErrorCode_Success;
     }
     return kErrorCode_Error;

@@ -141,7 +141,10 @@ public abstract class VoltProcedure {
         this.m_cluster = cluster;
         numberOfPartitions = site.m_context.cluster.getPartitions().size();
         statsCollector = new ProcedureStatsCollector();
-        VoltDB.instance().getStatsAgent().registerStatsSource(SysProcSelector.PROCEDURE, Integer.parseInt(site.site.getTypeName()), statsCollector);
+        VoltDB.instance().getStatsAgent().registerStatsSource(
+                SysProcSelector.PROCEDURE,
+                Integer.parseInt(site.site.getTypeName()),
+                statsCollector);
 
         // this is a stupid hack to make the EE happy
         for (int i = 0; i < expectedDeps.length; i++)
@@ -277,6 +280,7 @@ public abstract class VoltProcedure {
         byte status = ClientResponseImpl.SUCCESS;
 
         if (paramList.length != paramTypesLength) {
+            statsCollector.endProcedure( false, true);
             String msg = "PROCEDURE " + catProc.getTypeName() + " EXPECTS " + String.valueOf(paramTypesLength) +
                 " PARAMS, BUT RECEIVED " + String.valueOf(paramList.length);
             status = ClientResponseImpl.GRACEFUL_FAILURE;
@@ -287,6 +291,7 @@ public abstract class VoltProcedure {
             try {
                 paramList[i] = tryToMakeCompatible( i, paramList[i]);
             } catch (Exception e) {
+                statsCollector.endProcedure( false, true);
                 String msg = "PROCEDURE " + catProc.getTypeName() + " TYPE ERROR FOR PARAMETER " + i +
                         ": " + e.getMessage();
                 status = ClientResponseImpl.GRACEFUL_FAILURE;
@@ -304,7 +309,8 @@ public abstract class VoltProcedure {
         }
 
         ClientResponseImpl retval = null;
-
+        boolean error = false;
+        boolean abort = false;
         // run a regular java class
         if (catProc.getHasjava()) {
             try {
@@ -331,7 +337,14 @@ public abstract class VoltProcedure {
             catch (InvocationTargetException itex) {
                 //itex.printStackTrace();
                 Throwable ex = itex.getCause();
+                if (ex instanceof VoltAbortException &&
+                        !(ex instanceof EEException)) {
+                    abort = true;
+                } else {
+                    error = true;
+                }
                 if (ex instanceof Error) {
+                    statsCollector.endProcedure( false, true);
                     throw (Error)ex;
                 }
 
@@ -364,7 +377,7 @@ public abstract class VoltProcedure {
 
         if (ProcedureProfiler.profilingLevel != ProcedureProfiler.Level.DISABLED)
             profiler.stopCounter();
-        statsCollector.endProcedure();
+        statsCollector.endProcedure( abort, error);
 
         // Workload Trace - Stop the transaction trace record.
         if ((ProcedureProfiler.profilingLevel == ProcedureProfiler.Level.INTRUSIVE) &&
@@ -473,7 +486,7 @@ public abstract class VoltProcedure {
      * Thrown from a stored procedure to indicate to VoltDB
      * that the procedure should be aborted and rolled back.
      */
-    public class VoltAbortException extends Exception {
+    public static class VoltAbortException extends RuntimeException {
         private static final long serialVersionUID = -1L;
         private String message = "No message specified.";
 
@@ -836,13 +849,24 @@ public abstract class VoltProcedure {
         /**
          * Time the procedure was last started
          */
-        protected long currentStartTime;
+        protected long currentStartTime = -1;
+
+        /**
+         * Count of the number of aborts (user initiated or DB initiated)
+         */
+        protected long abortCount = 0;
+
+        /**
+         * Count of the number of errors that occured during procedure execution
+         */
+        protected long failureCount = 0;
 
         /**
          * Constructor requires no args because it has access to the enclosing classes members.
          */
         public ProcedureStatsCollector() {
             super(m_site.siteId + " " + catProc.getClassname(), m_site.siteId);
+            reset();
         }
 
         /**
@@ -859,14 +883,21 @@ public abstract class VoltProcedure {
          * Called after a procedure is finished executing. Compares the start and end time and calculates
          * the statistics.
          */
-        public final void endProcedure() {
-            if (invocations % timeCollectionInterval == 0) {
+        public final void endProcedure(boolean aborted, boolean failed) {
+            if (currentStartTime > 0) {
                 final long endTime = System.nanoTime();
                 final int delta = (int)(endTime - currentStartTime);
                 totalTimedExecutionTime += delta;
 
                 minExecutionTime = Math.min( delta, minExecutionTime);
                 maxExecutionTime = Math.max( delta, maxExecutionTime);
+                currentStartTime = -1;
+            }
+            if (aborted) {
+                abortCount++;
+            }
+            if (failed) {
+                failureCount++;
             }
             invocations++;
         }
@@ -886,10 +917,12 @@ public abstract class VoltProcedure {
             rowValues[columnNameToIndex.get("MAX_EXECUTION_TIME")] = maxExecutionTime;
             if (invocations != 0) {
                 rowValues[columnNameToIndex.get("AVG_EXECUTION_TIME")] =
-                    (long)(totalTimedExecutionTime / timedInvocations);
+                     (totalTimedExecutionTime / timedInvocations);
             } else {
-                rowValues[columnNameToIndex.get("AVG_EXECUTION_TIME")] = 0;
+                rowValues[columnNameToIndex.get("AVG_EXECUTION_TIME")] = 0L;
             }
+            rowValues[columnNameToIndex.get("ABORTS")] = abortCount;
+            rowValues[columnNameToIndex.get("FAILURES")] = failureCount;
         }
 
         /**
@@ -905,6 +938,8 @@ public abstract class VoltProcedure {
             columns.add(new VoltTable.ColumnInfo("MIN_EXECUTION_TIME", VoltType.BIGINT));
             columns.add(new VoltTable.ColumnInfo("MAX_EXECUTION_TIME", VoltType.BIGINT));
             columns.add(new VoltTable.ColumnInfo("AVG_EXECUTION_TIME", VoltType.BIGINT));
+            columns.add(new VoltTable.ColumnInfo("ABORTS", VoltType.BIGINT));
+            columns.add(new VoltTable.ColumnInfo("FAILURES", VoltType.BIGINT));
         }
 
         @Override
@@ -913,6 +948,9 @@ public abstract class VoltProcedure {
                 boolean givenNext = false;
                 @Override
                 public boolean hasNext() {
+                    if (invocations == 0) {
+                        return false;
+                    }
                     return !givenNext;
                 }
 
@@ -929,6 +967,30 @@ public abstract class VoltProcedure {
                 public void remove() {}
 
             };
+        }
+
+        @Override
+        public void reset() {
+            /*
+             * Statistics calls reset, and it might be in the middle of being
+             * profiled. They can live without reseting counters for statistics
+             */
+            if (catProc.getClassname().toLowerCase().endsWith("statistics")) {
+                return;
+            }
+            invocations = 0;
+            timedInvocations = 0;
+            totalTimedExecutionTime = 0;
+            minExecutionTime = Long.MAX_VALUE;
+            maxExecutionTime = Long.MIN_VALUE;
+            currentStartTime = -1;
+            abortCount = 0;
+            failureCount = 0;
+        }
+
+        @Override
+        public String toString() {
+            return catProc.getTypeName();
         }
     }
 

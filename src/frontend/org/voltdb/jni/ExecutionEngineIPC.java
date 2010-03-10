@@ -593,6 +593,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     /** Local m_data */
     private final int m_clusterIndex;
     private final int m_siteId;
+    private final int m_partitionId;
+    private final int m_hostId;
+    private final String m_hostname;
     // private final FastSerializer m_fser;
     private final Connection m_connection;
     private BBContainer m_dataNetworkOrigin;
@@ -601,11 +604,21 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     // private int m_counter;
 
-    public ExecutionEngineIPC(final ExecutionSite site, final int clusterIndex, final int siteId, final BackendTarget target) {
+    public ExecutionEngineIPC(
+            final ExecutionSite site,
+            final int clusterIndex,
+            final int siteId,
+            final int partitionId,
+            final int hostId,
+            final String hostname,
+            final BackendTarget target) {
         super(site);
         // m_counter = 0;
         m_clusterIndex = clusterIndex;
         m_siteId = siteId;
+        m_partitionId = partitionId;
+        m_hostId = hostId;
+        m_hostname = hostname;
         // m_fser = new FastSerializer(false, false);
         m_connection = new Connection(target);
 
@@ -615,7 +628,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_dataNetwork.position(4);
         m_data = m_dataNetwork.slice();
 
-        initialize(m_clusterIndex, m_siteId);
+        initialize(m_clusterIndex, m_siteId, m_partitionId, m_hostId, m_hostname);
     }
 
     /** Utility method to generate an EEXception that can be overriden by derived classes**/
@@ -638,13 +651,27 @@ public class ExecutionEngineIPC extends ExecutionEngine {
      * the abstract api assumes construction initializes but here initialization
      * is just another command.
      */
-    public void initialize(final int clusterIndex, final int siteId) {
+    public void initialize(
+            final int clusterIndex,
+            final int siteId,
+            final int partitionId,
+            final int hostId,
+            final String hostname
+            ) {
         int result = ExecutionEngine.ERRORCODE_ERROR;
         m_data.clear();
         m_data.putInt(Commands.Initialize.m_id);
         m_data.putInt(clusterIndex);
         m_data.putInt(siteId);
+        m_data.putInt(partitionId);
+        m_data.putInt(hostId);
         m_data.putLong(EELoggers.getLogLevels());
+        m_data.putShort((short)hostname.length());
+        try {
+            m_data.put(hostname.getBytes("UTF-8"));
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
+        }
         try {
             m_data.flip();
             m_connection.write();

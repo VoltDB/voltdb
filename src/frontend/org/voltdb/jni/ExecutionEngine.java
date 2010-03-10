@@ -402,14 +402,24 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @return error code
      */
     protected native int nativeDestroy(long pointer);
+
     /**
      * Initializes the execution engine with given parameter.
      * @param pointer the VoltDBEngine pointer to be initialized
      * @param cluster_id id of the cluster the execution engine belongs to
-     * @param node_id this id will be set to the execution engine
+     * @param siteId this id will be set to the execution engine
+     * @param partitionId id of partitioned assigned to this EE
+     * @param hostId id of the host this EE is running on
+     * @param hostname name of the host this EE is running on
      * @return error code
      */
-    protected native int nativeInitialize(long pointer, int clusterIndex, int siteId);
+    protected native int nativeInitialize(
+            long pointer,
+            int clusterIndex,
+            int siteId,
+            int partitionId,
+            int hostId,
+            String hostname);
 
     /**
      * Sets (or re-sets) all the shared direct byte buffers in the EE.

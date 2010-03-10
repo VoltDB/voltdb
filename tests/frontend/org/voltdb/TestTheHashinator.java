@@ -42,7 +42,7 @@ public class TestTheHashinator extends TestCase {
     }
 
     public void testSameLongHash() {
-        ExecutionEngine ee = new ExecutionEngineJNI(null, 1, 1);
+        ExecutionEngine ee = new ExecutionEngineJNI(null, 1, 1, 0, 0, "");
 
         /**
          *  Run with 100k of random values and make sure C++ and Java hash to
@@ -62,7 +62,7 @@ public class TestTheHashinator extends TestCase {
     }
 
     public void testSameStringHash() {
-        ExecutionEngine ee = new ExecutionEngineJNI(null, 1, 1);
+        ExecutionEngine ee = new ExecutionEngineJNI(null, 1, 1, 0, 0, "");
 
         for (int i = 0; i < 100000; i++) {
             int partitionCount = r.nextInt(1000) + 1;

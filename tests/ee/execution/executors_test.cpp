@@ -189,7 +189,7 @@ public:
          * Initialize the engine
          */
         engine = new voltdb::VoltDBEngine();
-        ASSERT_TRUE(engine->initialize(this->cluster_id, this->site_id));
+        ASSERT_TRUE(engine->initialize(this->cluster_id, this->site_id, 0, 0, ""));
         ASSERT_TRUE(engine->loadCatalog(catalog_string));
 
         /*
@@ -303,7 +303,7 @@ protected:
             }
         }
         voltdb::VoltDBEngine engine;
-        engine.initialize(0,0);
+        engine.initialize(0,0, 0, 0, "");
         this->table =
           voltdb::TableFactory::getPersistentTable(this->database_id,
                                                    1, engine.getExecutorContext(), table_name,

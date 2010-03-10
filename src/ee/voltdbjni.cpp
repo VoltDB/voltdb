@@ -167,7 +167,12 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDestr
 */
 SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeInitialize(
     JNIEnv *env, jobject obj,
-    jlong enginePtr, jint clusterIndex, jint siteId) {
+    jlong enginePtr,
+    jint clusterIndex,
+    jint siteId,
+    jint partitionId,
+    jint hostId,
+    jstring hostname) {
     VOLT_DEBUG("nativeInitialize() start");
     VoltDBEngine *engine = castToEngine(enginePtr);
     if (engine == NULL) {
@@ -176,10 +181,19 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
     }
     updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
 
+    const char *hostChars = env->GetStringUTFChars( hostname, NULL);
+    std::string hostString(hostChars);
+    env->ReleaseStringUTFChars( hostname, hostChars);
     // initialization is separated from constructor so that constructor
     // never fails.
     VOLT_DEBUG("calling initialize...");
-    bool success = engine->initialize(clusterIndex, siteId);
+    bool success =
+            engine->initialize(
+                    clusterIndex,
+                    siteId,
+                    partitionId,
+                    hostId,
+                    hostString);
 
     if (success) {
         VOLT_DEBUG("initialize succeeded");

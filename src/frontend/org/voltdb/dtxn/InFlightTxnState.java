@@ -37,7 +37,8 @@ public class InFlightTxnState implements Serializable {
             Object clientData,
             int messageSize,
             long initiateTime,
-            int connectionId) {
+            int connectionId,
+            String connectionHostname) {
         this.txnId = txnId;
         this.invocation = invocation;
         this.isReadOnly = isReadOnly;
@@ -48,6 +49,7 @@ public class InFlightTxnState implements Serializable {
         this.messageSize = messageSize;
         this.initiateTime = initiateTime;
         this.connectionId = connectionId;
+        this.connectionHostname = connectionHostname;
     }
 
     public String toString()
@@ -88,4 +90,5 @@ public class InFlightTxnState implements Serializable {
     public final int messageSize;
     public final long initiateTime;
     public final int connectionId;
+    public final String connectionHostname;
 }

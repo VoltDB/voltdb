@@ -621,10 +621,14 @@ public abstract class ClientMain {
      */
     protected boolean checkTransaction(String procName,
                                        ClientResponse clientResponse,
+                                       boolean abortExpected,
                                        boolean errorExpected) {
         final byte status = clientResponse.getStatus();
         if (status != ClientResponse.SUCCESS) {
             if (errorExpected)
+                return true;
+
+            if (abortExpected && status == ClientResponse.USER_ABORT)
                 return true;
 
             if (status == ClientResponse.CONNECTION_LOST) {

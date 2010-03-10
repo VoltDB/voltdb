@@ -381,7 +381,7 @@ public class BingoClient extends ClientMain {
                         if (clientResponse.getStatus() == ClientResponse.SUCCESS) {
                             tourney.round++;
                         }
-                        if (checkTransaction("PlayRound", clientResponse, false)) {
+                        if (checkTransaction("PlayRound", clientResponse, false, false)) {
                             super.clientCallback(clientResponse);
                         }
                     }

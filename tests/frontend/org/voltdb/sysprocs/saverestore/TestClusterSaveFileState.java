@@ -211,19 +211,19 @@ public class TestClusterSaveFileState extends TestCase
                                         int originalHostId,
                                         int originalPartitionId, int totalPartitions)
     {
-        m_siteInput.addRow(hostId, originalHostId, CLUSTER_NAME, DATABASE_NAME,
+        m_siteInput.addRow(hostId, "host", originalHostId, "ohost", CLUSTER_NAME, DATABASE_NAME,
                            tableName, "FALSE", originalPartitionId, totalPartitions);
     }
 
     private void addReplicatedTableToTestData(int currentHostId, String tableName)
     {
-        m_siteInput.addRow(currentHostId, currentHostId, CLUSTER_NAME, DATABASE_NAME,
+        m_siteInput.addRow(currentHostId, "host", currentHostId, "ohost", CLUSTER_NAME, DATABASE_NAME,
                            tableName, "TRUE", 0, 1);
     }
 
     private void addBadSiteToTestData(String clusterName, String databaseName)
     {
-        m_siteInput.addRow(10, 10,clusterName, databaseName, "dontcare",
+        m_siteInput.addRow(10, "host", 10, "ohost", clusterName, databaseName, "dontcare",
                            "FALSE", 1, 2);
     }
 

@@ -41,10 +41,17 @@ public:
      * Configure a StatsSource superclass for a set of statistics. Since this class is only used in the EE it can be assumed that
      * it is part of an Execution Site and that there is a site Id.
      * @parameter name Name of this set of statistics
-     * @parameter siteId this stat source is associated with
-     * @parameter databaseId database this source is associated with.
+     * @parameter hostId id of the host this partition is on
+     * @parameter hostname name of the host this partition is on
+     * @parameter partitionId this stat source is associated with
+     * @parameter databaseId Database this source is associated with
      */
-    virtual void configure(std::string name, voltdb::CatalogId siteId, voltdb::CatalogId databaseId);
+    virtual void configure(
+            std::string name,
+            voltdb::CatalogId hostId,
+            std::string hostname,
+            voltdb::CatalogId partitionId,
+            voltdb::CatalogId databaseId);
 
 protected:
 

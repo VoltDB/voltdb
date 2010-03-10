@@ -174,6 +174,7 @@ public class TableSaveFile
         }
         m_createTime = fd.readLong();
         m_hostId = fd.readInt();
+        m_hostname = fd.readString();
         m_clusterName = fd.readString();
         m_databaseName = fd.readString();
         m_tableName = fd.readString();
@@ -195,6 +196,11 @@ public class TableSaveFile
     public int getHostId()
     {
         return m_hostId;
+    }
+
+    public String getHostname()
+    {
+        return m_hostname;
     }
 
     public String getClusterName()
@@ -312,6 +318,7 @@ public class TableSaveFile
     private final boolean m_completed;
     private final int m_versionNum[] = new int[4];
     private final int m_hostId;
+    private final String m_hostname;
     private final String m_clusterName;
     private final String m_databaseName;
     private final String m_tableName;

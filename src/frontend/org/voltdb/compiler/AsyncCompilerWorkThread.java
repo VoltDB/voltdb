@@ -105,25 +105,40 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
      * @param sql
      * @param clientHandle Handle provided by the client application (not ClientInterface)
      * @param connectionId
+     * @param hostname Hostname of the other end of the connection
      * @param sequenceNumber
      * @param clientData Data supplied by ClientInterface (typically a VoltPort) that will be in the PlannedStmt produced later.
      */
-    public void planSQL(String sql, long clientHandle, int connectionId, int sequenceNumber, Object clientData) {
+    public void planSQL(
+            String sql,
+            long clientHandle,
+            int connectionId,
+            String hostname,
+            int sequenceNumber,
+            Object clientData) {
         ensureLoadedHSQL();
 
         AdHocPlannerWork work = new AdHocPlannerWork();
         work.clientHandle = clientHandle;
         work.sql = sql;
         work.connectionId = connectionId;
+        work.hostname = hostname;
         work.sequenceNumber = sequenceNumber;
         work.clientData = clientData;
         m_work.add(work);
     }
 
-    public void prepareCatalogUpdate(String catalogURL, long clientHandle, int connectionId, int sequenceNumber, Object clientData) {
+    public void prepareCatalogUpdate(
+            String catalogURL,
+            long clientHandle,
+            int connectionId,
+            String hostname,
+            int sequenceNumber,
+            Object clientData) {
         CatalogChangeWork work = new CatalogChangeWork();
         work.clientHandle = clientHandle;
         work.connectionId = connectionId;
+        work.hostname = hostname;
         work.sequenceNumber = sequenceNumber;
         work.clientData = clientData;
         work.catalogURL = catalogURL;
@@ -232,6 +247,7 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
         AdHocPlannedStmt plannedStmt = new AdHocPlannedStmt();
         plannedStmt.clientHandle = work.clientHandle;
         plannedStmt.connectionId = work.connectionId;
+        plannedStmt.hostname = work.hostname;
         plannedStmt.clientData = work.clientData;
         String error_msg = null;
         try {
@@ -285,6 +301,7 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
         retval.clientData = work.clientData;
         retval.clientHandle = work.clientHandle;
         retval.connectionId = work.connectionId;
+        retval.hostname = work.hostname;
 
         // catalog change specific boiler plate
         retval.catalogURL = work.catalogURL;

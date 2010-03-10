@@ -71,6 +71,13 @@ public class SnapshotStatus extends VoltSystemProcedure {
     executePlanFragment(HashMap<Integer, List<VoltTable>> dependencies, long fragmentId, ParameterSet params,
                         final SystemProcedureExecutionContext context)
     {
+        String hn = "";
+        try {
+            java.net.InetAddress localMachine = java.net.InetAddress.getLocalHost();
+            hn = localMachine.getHostName();
+        } catch (java.net.UnknownHostException uhe) {
+        }
+        final String hostname = hn;
         final VoltTable results = constructFragmentResultsTable();
         if (fragmentId == SysProcFragmentId.PF_scanSnapshotRegistries)
         {
@@ -81,6 +88,7 @@ public class SnapshotStatus extends VoltSystemProcedure {
                     public void next(Table t) {
                         results.addRow(
                                 context.getSite().getHost().getTypeName(),
+                                hostname,
                                 t.name,
                                 s.path,
                                 s.nonce,
@@ -121,19 +129,19 @@ public class SnapshotStatus extends VoltSystemProcedure {
         public boolean result = true;//true success, false failure
 
         public SnapshotResult(final VoltTableRow r) {
-            path = r.getString(2);
-            nonce = r.getString(3);
-            startTime = r.getLong(4);
-            endTime = r.getLong(5);
-            size = r.getLong(6);
+            path = r.getString("PATH");
+            nonce = r.getString("NONCE");
+            startTime = r.getLong("START_TIME");
+            endTime = r.getLong("END_TIME");
+            size = r.getLong("SIZE");
             if (!r.getString("RESULT").equals("SUCCESS")) {
                 result = false;
             }
         }
 
         public void processRow(final VoltTableRow r) {
-            endTime = Math.max(endTime, r.getLong(5));
-            size += r.getLong(6);
+            endTime = Math.max(endTime, r.getLong("END_TIME"));
+            size += r.getLong("SIZE");
             if (!r.getString("RESULT").equals("SUCCESS")) {
                 result = false;
             }
@@ -141,9 +149,10 @@ public class SnapshotStatus extends VoltSystemProcedure {
     }
     private VoltTable constructFragmentResultsTable() {
 
-        ColumnInfo[] result_columns = new ColumnInfo[9];
+        ColumnInfo[] result_columns = new ColumnInfo[10];
         int ii = 0;
         result_columns[ii++] = new ColumnInfo("HOST_ID", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo("HOSTNAME", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("TABLE", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("PATH", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("NONCE", VoltType.STRING);
@@ -176,9 +185,9 @@ public class SnapshotStatus extends VoltSystemProcedure {
         HashMap<Long, SnapshotResult> aggregate = new HashMap<Long, SnapshotResult>();
         while (scanResults.advanceRow())
         {
-            SnapshotResult snapshotResult = aggregate.get(scanResults.getLong(4));
+            SnapshotResult snapshotResult = aggregate.get(scanResults.getLong("START_TIME"));
             if (snapshotResult == null) {
-                aggregate.put(scanResults.getLong(4), new SnapshotResult(scanResults));
+                aggregate.put(scanResults.getLong("START_TIME"), new SnapshotResult(scanResults));
             } else {
                 snapshotResult.processRow(scanResults);
             }

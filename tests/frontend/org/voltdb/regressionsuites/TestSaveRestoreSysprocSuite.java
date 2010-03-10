@@ -405,7 +405,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                 new String[]{TESTNONCE});
         assertNotNull(deleteResults);
         assertEquals( 1, deleteResults.length);
-        assertEquals( 8, deleteResults[0].getColumnCount());
+        assertEquals( 9, deleteResults[0].getColumnCount());
         assertEquals( 7, deleteResults[0].getRowCount());
         tmp_files = tmp_dir.listFiles(cleaner);
         assertEquals( 0, tmp_files.length);
@@ -481,16 +481,16 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         checkTable(client, "REPLICATED_TESTER", "RT_ID",
                    num_replicated_items_per_chunk * num_replicated_chunks);
 
-        results = client.callProcedure("@Statistics", "table");
+        results = client.callProcedure("@Statistics", "table", 0);
 
         int foundItem = 0;
         while (results[0].advanceRow())
         {
-            if (results[0].getString(2).equals("REPLICATED_TESTER"))
+            if (results[0].getString("TABLE_NAME").equals("REPLICATED_TESTER"))
             {
                 ++foundItem;
                 assertEquals((num_replicated_chunks * num_replicated_items_per_chunk),
-                        results[0].getLong(4));
+                        results[0].getLong("TABLE_ACTIVE_TUPLE_COUNT"));
             }
         }
         // make sure all sites were loaded
@@ -561,16 +561,16 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         checkTable(client, "PARTITION_TESTER", "PT_ID",
                    num_partitioned_items_per_chunk * num_partitioned_chunks);
 
-        results = client.callProcedure("@Statistics", "table");
+        results = client.callProcedure("@Statistics", "table", 0);
 
         int foundItem = 0;
         while (results[0].advanceRow())
         {
-            if (results[0].getString(2).equals("PARTITION_TESTER"))
+            if (results[0].getString("TABLE_NAME").equals("PARTITION_TESTER"))
             {
                 ++foundItem;
                 assertEquals((num_partitioned_items_per_chunk * num_partitioned_chunks) / 3,
-                        results[0].getLong(4));
+                        results[0].getLong("TABLE_ACTIVE_TUPLE_COUNT"));
             }
         }
         // make sure all sites were loaded
@@ -628,16 +628,16 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         checkTable(client, "PARTITION_TESTER", "PT_ID",
                    num_partitioned_items_per_chunk * num_partitioned_chunks);
 
-        results = client.callProcedure("@Statistics", "table");
+        results = client.callProcedure("@Statistics", "table", 0);
 
         foundItem = 0;
         while (results[0].advanceRow())
         {
-            if (results[0].getString(2).equals("PARTITION_TESTER"))
+            if (results[0].getString("TABLE_NAME").equals("PARTITION_TESTER"))
             {
                 ++foundItem;
                 assertEquals((num_partitioned_items_per_chunk * num_partitioned_chunks) / 3,
-                        results[0].getLong(4));
+                        results[0].getLong("TABLE_ACTIVE_TUPLE_COUNT"));
             }
         }
         // make sure all sites were loaded
@@ -842,16 +842,16 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         checkTable(client, "REPLICATED_TESTER", "RT_ID",
                    num_replicated_items_per_chunk * num_replicated_chunks);
 
-        results = client.callProcedure("@Statistics", "table");
+        results = client.callProcedure("@Statistics", "table", 0);
 
         int foundItem = 0;
         while (results[0].advanceRow())
         {
-            if (results[0].getString(2).equals("PARTITION_TESTER"))
+            if (results[0].getString("TABLE_NAME").equals("PARTITION_TESTER"))
             {
                 ++foundItem;
                 assertEquals((num_partitioned_items_per_chunk * num_partitioned_chunks) / 4,
-                        results[0].getLong(4));
+                        results[0].getLong("TABLE_ACTIVE_TUPLE_COUNT"));
             }
         }
         // make sure all sites were loaded
@@ -918,16 +918,16 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
         // XXX consider adding a check that the newly materialized table is
         // not loaded
-        results = client.callProcedure("@Statistics", "table");
+        results = client.callProcedure("@Statistics", "table", 0);
 
         boolean found_gets_created = false;
         while (results[0].advanceRow())
         {
-            if (results[0].getString(2).equals("GETS_REMOVED"))
+            if (results[0].getString("TABLE_NAME").equals("GETS_REMOVED"))
             {
                 fail("Table GETS_REMOVED got reloaded");
             }
-            if (results[0].getString(2).equals("GETS_CREATED"))
+            if (results[0].getString("TABLE_NAME").equals("GETS_CREATED"))
             {
                 found_gets_created = true;
             }
@@ -1000,7 +1000,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             fail("SnapshotRestore exception: " + ex.getMessage());
         }
 
-        client.callProcedure("@Statistics", "table");
+        client.callProcedure("@Statistics", "table", 0);
 
         VoltTable[] change_results =
             client.callProcedure("SaveRestoreSelect", "CHANGE_TYPES");

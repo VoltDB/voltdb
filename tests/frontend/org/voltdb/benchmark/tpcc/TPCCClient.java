@@ -345,7 +345,7 @@ implements TPCCSimulation.ProcCaller {
     class DeliveryCallback extends ProcedureCallback {
         @Override
         public void clientCallback(ClientResponse clientResponse) {
-            boolean status = checkTransaction(Constants.DELIVERY, clientResponse, false);
+            boolean status = checkTransaction(Constants.DELIVERY, clientResponse, false, false);
             assert status;
             if (status && clientResponse.getResults()[0].getRowCount()
                     != m_scaleParams.districtsPerWarehouse) {
@@ -389,7 +389,7 @@ implements TPCCSimulation.ProcCaller {
 
         @Override
         public void clientCallback(ClientResponse clientResponse) {
-            boolean status = checkTransaction(Constants.NEWORDER, clientResponse, cbRollback);
+            boolean status = checkTransaction(Constants.NEWORDER, clientResponse, cbRollback, false);
             assert this.cbRollback || status;
             m_counts[TPCCSimulation.Transaction.NEW_ORDER.ordinal()].incrementAndGet();
         }
@@ -440,13 +440,14 @@ implements TPCCSimulation.ProcCaller {
 
         @Override
         public void clientCallback(ClientResponse clientResponse) {
-            boolean errorExpected = false;
+            boolean abortExpected = false;
             if (m_procedureName != null && (m_procedureName.equals(Constants.ORDER_STATUS_BY_NAME)
                 || m_procedureName.equals(Constants.ORDER_STATUS_BY_ID)))
-                errorExpected = true;
+                abortExpected = true;
             boolean status = checkTransaction(m_procedureName,
                                               clientResponse,
-                                              errorExpected);
+                                              abortExpected,
+                                              false);
             assert status;
             if (m_transactionType != null) {
                 m_counts[m_transactionType.ordinal()].incrementAndGet();
@@ -610,6 +611,7 @@ implements TPCCSimulation.ProcCaller {
         public void clientCallback(ClientResponse clientResponse) {
             boolean status = checkTransaction(Constants.STOCK_LEVEL,
                                               clientResponse,
+                                              false,
                                               false);
             assert status;
             m_counts[TPCCSimulation.Transaction.STOCK_LEVEL.ordinal()].incrementAndGet();
@@ -634,7 +636,7 @@ implements TPCCSimulation.ProcCaller {
     class DumpStatisticsCallback extends ProcedureCallback {
         @Override
         public void clientCallback(ClientResponse clientResponse) {
-            if (checkTransaction(null, clientResponse, false))
+            if (checkTransaction(null, clientResponse, false, false))
                 System.err.println(clientResponse.getResults()[0]);
         }
     }
@@ -647,7 +649,7 @@ implements TPCCSimulation.ProcCaller {
     class ResetWarehouseCallback extends ProcedureCallback {
         @Override
         public void clientCallback(ClientResponse clientResponse) {
-            if (checkTransaction(null, clientResponse, false))
+            if (checkTransaction(null, clientResponse, false, false))
                 m_counts[TPCCSimulation.Transaction.RESET_WAREHOUSE.ordinal()].incrementAndGet();
         }
     }

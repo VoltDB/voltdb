@@ -32,7 +32,7 @@ public class TestPendingTxnList extends TestCase
     {
         return new InFlightTxnState(txnId, coordId, new int[]{}, false, true,
                                     new StoredProcedureInvocation(), new Object(),
-                                    0, 0, 0);
+                                    0, 0, 0, "");
     }
 
     public void testBasicOps()

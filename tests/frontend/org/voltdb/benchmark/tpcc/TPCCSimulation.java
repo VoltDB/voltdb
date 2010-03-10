@@ -157,7 +157,7 @@ public class TPCCSimulation
             String cLast = generator
                     .makeRandomLastName(parameters.customersPerDistrict);
             client.callOrderStatus(Constants.ORDER_STATUS_BY_NAME,
-                                   generateWarehouseId(), generateDistrict(), cLast);
+                                   generateWarehouseId(), generateDistrict(), cLast.getBytes("UTF-8"));
 
         } else {
             // 40%: order status by id

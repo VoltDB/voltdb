@@ -103,7 +103,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     public void testStatistics_Table() throws Exception {
         Client client = getClient();
         VoltTable results[] = null;
-        results = client.callProcedure("@Statistics", "table");
+        results = client.callProcedure("@Statistics", "table", 0);
         // one aggregate table returned
         assertTrue(results.length == 1);
         // with 10 rows per site. Can be two values depending on the test scenario of cluster vs. local.
@@ -115,7 +115,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     public void testStatistics_Procedure() throws Exception {
         Client client  = getClient();
         VoltTable results[] = null;
-        results = client.callProcedure("@Statistics", "procedure");
+        results = client.callProcedure("@Statistics", "procedure", 0);
         // one aggregate table returned
         assertTrue(results.length == 1);
         System.out.println("Test procedures table: " + results[0].toString());
@@ -124,16 +124,16 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     public void testStatistics_Initiator() throws Exception {
         Client client  = getClient();
         VoltTable results[] = null;
-        results = client.callProcedure("@Statistics", "INITIATOR");
-        results = client.callProcedure("@Statistics", "INITIATOR");
+        results = client.callProcedure("@Statistics", "INITIATOR", 0);
+        results = client.callProcedure("@Statistics", "INITIATOR", 0);
         // one aggregate table returned
         assertTrue(results.length == 1);
         System.out.println("Test initiators table: " + results[0].toString());
         assertEquals(1, results[0].getRowCount());
         VoltTableRow resultRow = results[0].fetchRow(0);
         assertNotNull(resultRow);
-        assertEquals("@Statistics", resultRow.getString(3));
-        assertEquals( 1, resultRow.getLong(4));
+        assertEquals("@Statistics", resultRow.getString("PROCEDURE_NAME"));
+        assertEquals( 1, resultRow.getLong("INVOCATIONS"));
     }
 
     public void testStatistics_InvalidSelector() throws IOException {
@@ -152,7 +152,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
 
         // Invalid selector
         try {
-            client.callProcedure("@Statistics", "garbage");
+            client.callProcedure("@Statistics", "garbage", 0);
         }
         catch (Exception ex) {
             exceptionThrown = true;
@@ -163,7 +163,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     public void testStatistics_PartitionCount() throws Exception {
         Client client = getClient();
         final VoltTable results[] =
-            client.callProcedure("@Statistics", SysProcSelector.PARTITIONCOUNT.name());
+            client.callProcedure("@Statistics", SysProcSelector.PARTITIONCOUNT.name(), 0);
         assertEquals( 1, results.length);
         assertTrue( results[0] != null);
         assertEquals( 1, results[0].getRowCount());
@@ -258,7 +258,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                                  partitioned_table, 1);
             client.callProcedure("@LoadMultipartitionTable", "ITEM",
                                  replicated_table, 1);
-            VoltTable results[] = client.callProcedure("@Statistics", "table");
+            VoltTable results[] = client.callProcedure("@Statistics", "table", 0);
 
             int foundItem = 0;
             // to verify, each of the 2 sites should have 5 warehouses.
@@ -268,16 +268,18 @@ public class TestSystemProcedureSuite extends RegressionSuite {
 
             // Check that tables loaded correctly
             while(results[0].advanceRow()) {
-                if (results[0].getString(2).equals("WAREHOUSE")) {
+                if (results[0].getString("TABLE_NAME").equals("WAREHOUSE")) {
                     ++foundWarehouse;
                     //Different values depending on local cluster vs. single process hence ||
-                    assertTrue(5 == results[0].getLong(4) || 10 == results[0].getLong(4));
+                    assertTrue(5 == results[0].getLong("TABLE_ACTIVE_TUPLE_COUNT") ||
+                            10 == results[0].getLong("TABLE_ACTIVE_TUPLE_COUNT"));
                 }
-                if (results[0].getString(2).equals("ITEM"))
+                if (results[0].getString("TABLE_NAME").equals("ITEM"))
                 {
                     ++foundItem;
                     //Different values depending on local cluster vs. single process hence ||
-                    assertTrue(10 == results[0].getLong(4) || 20 == results[0].getLong(4));
+                    assertTrue(10 == results[0].getLong("TABLE_ACTIVE_TUPLE_COUNT") ||
+                            20 == results[0].getLong("TABLE_ACTIVE_TUPLE_COUNT"));
                 }
             }
             // make sure both warehouses were located
@@ -286,7 +288,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             assertTrue(2 == foundItem || 4 == foundItem);
         }
         catch (Exception e) {
-            System.out.println(e.getMessage());
+            e.printStackTrace();
             fail();
         }
     }

@@ -122,7 +122,12 @@ Table* TableFactory::getPersistentTable(
             table->m_indexes[i] = TableIndexFactory::getInstance(indexes[i]);
         }
         initConstraints(table);
-        table->stats_.configure(name + " stats", ctx->m_siteId, databaseId);
+        table->stats_.configure(
+                name + " stats",
+                ctx->m_hostId,
+                ctx->m_hostname,
+                ctx->m_siteId,
+                databaseId);
         return dynamic_cast<Table*>(table);
     }
 }
@@ -162,7 +167,12 @@ Table* TableFactory::getPersistentTable(
             table->m_indexes[i + 1] = TableIndexFactory::getInstance(indexes[i]);
         }
         initConstraints(table);
-        table->stats_.configure(name + " stats", ctx->m_siteId, databaseId);
+        table->stats_.configure(
+                name + " stats",
+                ctx->m_hostId,
+                ctx->m_hostname,
+                ctx->m_siteId,
+                databaseId);
         return dynamic_cast<Table*>(table);
     }
 }

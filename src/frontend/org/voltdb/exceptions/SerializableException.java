@@ -23,6 +23,7 @@ import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 
+import org.voltdb.VoltProcedure;
 import org.voltdb.exceptions.ConstraintFailureException;
 
 /**
@@ -30,7 +31,7 @@ import org.voltdb.exceptions.ConstraintFailureException;
  * serialization mechanism
  *
  */
-public class SerializableException extends RuntimeException {
+public class SerializableException extends VoltProcedure.VoltAbortException {
 
     /**
      *

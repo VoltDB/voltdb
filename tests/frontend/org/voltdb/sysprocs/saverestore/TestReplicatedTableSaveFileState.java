@@ -239,13 +239,13 @@ public class TestReplicatedTableSaveFileState extends TestCase
 
     private void addHostToTestData(int hostId)
     {
-        m_siteInput.addRow(hostId, hostId, "cluster", DATABASE_NAME,
+        m_siteInput.addRow(hostId, "host", hostId, "ohost", "cluster", DATABASE_NAME,
                            TABLE_NAME, "TRUE", 0, 1);
     }
 
     private void addBadHostToTestData(int hostId)
     {
-        m_siteInput.addRow(hostId, hostId, "cluster", DATABASE_NAME,
+        m_siteInput.addRow(hostId, "host", hostId, "ohost", "cluster", DATABASE_NAME,
                            TABLE_NAME, "FALSE", 0, 2);
     }
 

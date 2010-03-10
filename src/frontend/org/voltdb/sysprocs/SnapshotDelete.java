@@ -72,6 +72,12 @@ public class SnapshotDelete extends VoltSystemProcedure {
     executePlanFragment(HashMap<Integer, List<VoltTable>> dependencies, long fragmentId, ParameterSet params,
                         final SystemProcedureExecutionContext context)
     {
+        String hostname = "";
+        try {
+            java.net.InetAddress localMachine = java.net.InetAddress.getLocalHost();
+            hostname = localMachine.getHostName();
+        } catch (java.net.UnknownHostException uhe) {
+        }
         errorString = null;
         VoltTable result = constructFragmentResultsTable();
         if (fragmentId == SysProcFragmentId.PF_snapshotDelete)
@@ -91,6 +97,7 @@ public class SnapshotDelete extends VoltSystemProcedure {
                 if (relevantFiles == null) {
                     result.addRow(
                             context.getSite().getHost().getTypeName(),
+                            hostname,
                             paths[ii],
                             nonces[ii],
                             "",
@@ -104,6 +111,7 @@ public class SnapshotDelete extends VoltSystemProcedure {
                         boolean deleted = f.delete();
                         result.addRow(
                                 context.getSite().getHost().getTypeName(),
+                                hostname,
                                 paths[ii],
                                 nonces[ii],
                                 f.getName(),
@@ -139,9 +147,10 @@ public class SnapshotDelete extends VoltSystemProcedure {
 
     private VoltTable constructFragmentResultsTable() {
 
-        ColumnInfo[] result_columns = new ColumnInfo[8];
+        ColumnInfo[] result_columns = new ColumnInfo[9];
         int ii = 0;
         result_columns[ii++] = new ColumnInfo("HOST_ID", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo("HOSTNAME", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("PATH", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("NONCE", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("NAME", VoltType.STRING);

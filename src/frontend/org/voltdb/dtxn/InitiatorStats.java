@@ -50,8 +50,14 @@ public class InitiatorStats extends SiteStatsSource {
     }
 
     private static class InvocationInfo {
+
         /**
-         * Number of time procedure has been inoked
+         * Hostname of the host this connection is with
+         */
+        private final String connectionHostname;
+
+        /**
+         * Number of time procedure has been invoked
          */
         private long invocationCount = 0;
 
@@ -70,6 +76,10 @@ public class InitiatorStats extends SiteStatsSource {
          */
         private long totalExecutionTime = 0;
 
+        public InvocationInfo (String hostname) {
+            connectionHostname = hostname;
+        }
+
         private void processInvocation(int delta) {
             totalExecutionTime += delta;
             minExecutionTime = Math.min( delta, minExecutionTime);
@@ -83,13 +93,17 @@ public class InitiatorStats extends SiteStatsSource {
      * @param invocation Procedure executed
      * @param delta Time the procedure took to round trip intra cluster
      */
-    public synchronized void logTransactionCompleted(int connectionId, StoredProcedureInvocation invocation, int delta) {
+    public synchronized void logTransactionCompleted(
+            int connectionId,
+            String connectionHostname,
+            StoredProcedureInvocation invocation,
+            int delta) {
         final StringBuffer key = new StringBuffer(2048);
         key.append(invocation.getProcName()).append('$').append(connectionId);
         final String keyString = key.toString();
         InvocationInfo info = m_connectionStats.get(keyString);
         if (info == null) {
-            info = new InvocationInfo();
+            info = new InvocationInfo(connectionHostname);
             m_connectionStats.put(keyString, info);
         }
         info.processInvocation(delta);
@@ -99,6 +113,7 @@ public class InitiatorStats extends SiteStatsSource {
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
         super.populateColumnSchema(columns);
         columns.add(new ColumnInfo("CONNECTION_ID", VoltType.INTEGER));
+        columns.add(new ColumnInfo("CONNECTION_HOSTNAME", VoltType.STRING));
         columns.add(new ColumnInfo("PROCEDURE_NAME", VoltType.STRING));
         columns.add(new ColumnInfo("INVOCATIONS", VoltType.BIGINT));
         columns.add(new ColumnInfo("AVG_EXECUTION_TIME", VoltType.INTEGER));
@@ -115,11 +130,12 @@ public class InitiatorStats extends SiteStatsSource {
         final String procName = statsKeySplit[0];
         final String connectionId = statsKeySplit[1];
         rowValues[columnNameToIndex.get("CONNECTION_ID")] = new Integer(connectionId);
+        rowValues[columnNameToIndex.get("CONNECTION_HOSTNAME")] = info.connectionHostname;
         rowValues[columnNameToIndex.get("PROCEDURE_NAME")] = procName;
         rowValues[columnNameToIndex.get("INVOCATIONS")] = info.invocationCount;
         rowValues[columnNameToIndex.get("AVG_EXECUTION_TIME")] = (int)(info.totalExecutionTime / info.invocationCount);
         rowValues[columnNameToIndex.get("MIN_EXECUTION_TIME")] = info.minExecutionTime;
-        rowValues[columnNameToIndex.get("MAX_EXECUTION_TIME")] = info.minExecutionTime;
+        rowValues[columnNameToIndex.get("MAX_EXECUTION_TIME")] = info.maxExecutionTime;
         rowValues[columnNameToIndex.get("TOTAL_EXECUTION_TIME")] = info.totalExecutionTime;
         super.updateStatsRow(rowKey, rowValues);
     }
@@ -157,6 +173,11 @@ public class InitiatorStats extends SiteStatsSource {
     @Override
     protected Iterator<Object> getStatsRowKeyIterator() {
         return new DummyIterator(m_connectionStats.keySet().iterator());
+    }
+
+    @Override
+    public synchronized void reset() {
+        m_connectionStats.clear();
     }
 
 }

@@ -184,6 +184,12 @@ public class SnapshotRestore extends VoltSystemProcedure
     executePlanFragment(HashMap<Integer, List<VoltTable>> dependencies, long fragmentId, ParameterSet params,
                         SystemProcedureExecutionContext context)
     {
+        String hostname = "";
+        try {
+            java.net.InetAddress localMachine = java.net.InetAddress.getLocalHost();
+            hostname = localMachine.getHostName();
+        } catch (java.net.UnknownHostException uhe) {
+        }
         if (fragmentId == SysProcFragmentId.PF_restoreScan)
         {
             assert(params.toArray()[0] != null);
@@ -215,7 +221,9 @@ public class SnapshotRestore extends VoltSystemProcedure
                         int partitionIds[] = savefile.getPartitionIds();
                         for (int pid : partitionIds) {
                             result.addRow(m_hostId,
+                                             hostname,
                                              savefile.getHostId(),
+                                             savefile.getHostname(),
                                              savefile.getClusterName(),
                                              savefile.getDatabaseName(),
                                              savefile.getTableName(),
@@ -290,7 +298,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             catch (IOException e)
             {
                 VoltTable result = constructResultsTable();
-                result.addRow(m_hostId, m_siteId, table_name, -1, "FAILURE",
+                result.addRow(m_hostId, hostname, m_siteId, table_name, -1, "FAILURE",
                               "Unable to load table: " + table_name +
                               " error: " + e.getMessage());
                 return new DependencyPair(dependency_id, result);
@@ -314,7 +322,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 catch (IOException e)
                 {
                     VoltTable result = constructResultsTable();
-                    result.addRow(m_hostId, m_siteId, table_name, -1, "FAILURE",
+                    result.addRow(m_hostId, hostname, m_siteId, table_name, -1, "FAILURE",
                                   "Unable to load table: " + table_name +
                                   " error: " + e.getMessage());
                     return new DependencyPair(dependency_id, result);
@@ -322,7 +330,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 catch (VoltTypeException e)
                 {
                     VoltTable result = constructResultsTable();
-                    result.addRow(m_hostId, m_siteId, table_name, -1, "FAILURE",
+                    result.addRow(m_hostId, hostname, m_siteId, table_name, -1, "FAILURE",
                                   "Unable to load table: " + table_name +
                                   " error: " + e.getMessage());
                     return new DependencyPair(dependency_id, result);
@@ -341,7 +349,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 }
             }
             VoltTable result = constructResultsTable();
-            result.addRow(m_hostId, m_siteId, table_name, -1, result_str,
+            result.addRow(m_hostId, hostname, m_siteId, table_name, -1, result_str,
                              error_msg);
             try {
                 savefile.close();
@@ -396,7 +404,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 error_msg = e.getMessage();
             }
             VoltTable result = constructResultsTable();
-            result.addRow(m_hostId, m_siteId, table_name, -1,
+            result.addRow(m_hostId, hostname, m_siteId, table_name, -1,
                              result_str, error_msg);
             return new DependencyPair(dependency_id, result);
         }
@@ -514,7 +522,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 error_msg = e.getMessage();
             }
             VoltTable result = constructResultsTable();
-            result.addRow(m_hostId, m_siteId, table_name, partition_id,
+            result.addRow(m_hostId, hostname, m_siteId, table_name, partition_id,
                           result_str, error_msg);
             return new DependencyPair(dependency_id, result);
         }
@@ -646,13 +654,15 @@ public class SnapshotRestore extends VoltSystemProcedure
 
     private VoltTable constructResultsTable()
     {
-        ColumnInfo[] result_columns = new ColumnInfo[6];
-        result_columns[0] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
-        result_columns[1] = new ColumnInfo("SITE_ID", VoltType.INTEGER);
-        result_columns[2] = new ColumnInfo("TABLE", VoltType.STRING);
-        result_columns[3] = new ColumnInfo("PARTITION", VoltType.INTEGER);
-        result_columns[4] = new ColumnInfo("RESULT", VoltType.STRING);
-        result_columns[5] = new ColumnInfo("ERR_MSG", VoltType.STRING);
+        ColumnInfo[] result_columns = new ColumnInfo[7];
+        int ii = 0;
+        result_columns[ii++] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
+        result_columns[ii++] = new ColumnInfo("HOSTNAME", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo("SITE_ID", VoltType.INTEGER);
+        result_columns[ii++] = new ColumnInfo("TABLE", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo("PARTITION", VoltType.INTEGER);
+        result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
         return new VoltTable(result_columns);
     }
 
@@ -812,6 +822,12 @@ public class SnapshotRestore extends VoltSystemProcedure
                                                        int siteId,
                                                        int allowELT)
     {
+        String hostname = "";
+        try {
+            java.net.InetAddress localMachine = java.net.InetAddress.getLocalHost();
+            hostname = localMachine.getHostName();
+        } catch (java.net.UnknownHostException uhe) {
+        }
         TableSaveFile savefile = null;
         try
         {
@@ -822,7 +838,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         catch (IOException e)
         {
             VoltTable result = constructResultsTable();
-            result.addRow(m_hostId, m_siteId, tableName, -1, "FAILURE",
+            result.addRow(m_hostId, hostname, m_siteId, tableName, -1, "FAILURE",
                           "Unable to load table: " + tableName +
                           " error: " + e.getMessage());
             return result;
@@ -861,7 +877,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             {
                 VoltTable result = new VoltTable();
                 result = constructResultsTable();
-                result.addRow(m_hostId, m_siteId, tableName, -1, "FAILURE",
+                result.addRow(m_hostId, hostname, m_siteId, tableName, -1, "FAILURE",
                               "Unable to load table: " + tableName +
                               " error: " + e.getMessage());
                 return result;
@@ -870,7 +886,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             {
                 VoltTable result = new VoltTable();
                 result = constructResultsTable();
-                result.addRow(m_hostId, m_siteId, tableName, -1, "FAILURE",
+                result.addRow(m_hostId, hostname, m_siteId, tableName, -1, "FAILURE",
                               "Unable to load table: " + tableName +
                               " error: " + e.getMessage());
                 return result;
@@ -914,6 +930,12 @@ public class SnapshotRestore extends VoltSystemProcedure
                                                         int relevantPartitionIds[],
                                                         int allowELT)
     {
+        String hostname = "";
+        try {
+            java.net.InetAddress localMachine = java.net.InetAddress.getLocalHost();
+            hostname = localMachine.getHostName();
+        } catch (java.net.UnknownHostException uhe) {
+        }
         // XXX This is all very similar to the splitting code in
         // LoadMultipartitionTable.  Consider ways to consolidate later
         Map<Integer, Integer> sites_to_partitions =
@@ -940,14 +962,14 @@ public class SnapshotRestore extends VoltSystemProcedure
         catch (IOException e)
         {
             VoltTable result = constructResultsTable();
-            result.addRow(m_hostId, m_siteId, tableName, relevantPartitionIds[0], "FAILURE",
+            result.addRow(m_hostId, hostname, m_siteId, tableName, relevantPartitionIds[0], "FAILURE",
                           "Unable to load table: " + tableName +
                           " error: " + e.getMessage());
             return result;
         }
 
         VoltTable[] results = new VoltTable[] { constructResultsTable() };
-        results[0].addRow(m_hostId, m_siteId, tableName, 0,
+        results[0].addRow(m_hostId, hostname, m_siteId, tableName, 0,
                 "NO DATA TO DISTRIBUTE", "");
         final Table new_catalog_table = getCatalogTable(tableName);
         Boolean needsConversion = null;
@@ -980,7 +1002,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             {
                 VoltTable result = new VoltTable();
                 result = constructResultsTable();
-                result.addRow(m_hostId, m_siteId, tableName, relevantPartitionIds[0],
+                result.addRow(m_hostId, hostname, m_siteId, tableName, relevantPartitionIds[0],
                               "FAILURE", "Unable to load table: " + tableName +
                               " error: " + e.getMessage());
                 return result;
@@ -989,7 +1011,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             {
                 VoltTable result = new VoltTable();
                 result = constructResultsTable();
-                result.addRow(m_hostId, m_siteId, tableName, relevantPartitionIds[0],
+                result.addRow(m_hostId, hostname, m_siteId, tableName, relevantPartitionIds[0],
                               "FAILURE", "Unable to load table: " + tableName +
                               " error: " + e.getMessage());
                 return result;

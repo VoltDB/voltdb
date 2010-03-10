@@ -119,4 +119,9 @@ public abstract class StatsSource {
      * @return Iterator of Objects representing keys that identify unique stats rows
      */
     abstract protected Iterator<Object> getStatsRowKeyIterator();
+
+    /**
+     * Reset counters and statistical information
+     */
+    abstract public void reset();
 }

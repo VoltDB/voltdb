@@ -53,6 +53,13 @@ public class StatsAgent {
     }
 
     public synchronized VoltTable getStats(final SysProcSelector selector, final ArrayList<Integer> catalogIds) {
+        return getStats(selector, catalogIds, false);
+    }
+
+    public synchronized VoltTable getStats(
+            final SysProcSelector selector,
+            final ArrayList<Integer> catalogIds,
+            final boolean resetCounters) {
         assert selector != null;
         assert catalogIds != null;
         assert catalogIds.size() > 0;
@@ -73,6 +80,9 @@ public class StatsAgent {
                 Object statsRows[][] = ss.getStatsRows();
                 for (Object[] row : statsRows) {
                     resultTable.addRow(row);
+                }
+                if (resetCounters) {
+                    ss.reset();
                 }
             }
         }

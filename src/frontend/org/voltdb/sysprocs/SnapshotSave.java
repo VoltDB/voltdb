@@ -98,6 +98,12 @@ public class SnapshotSave extends VoltSystemProcedure
     executePlanFragment(HashMap<Integer, List<VoltTable>> dependencies, long fragmentId, ParameterSet params,
                         SystemProcedureExecutionContext context)
     {
+        String hostname = "";
+        try {
+            java.net.InetAddress localMachine = java.net.InetAddress.getLocalHost();
+            hostname = localMachine.getHostName();
+        } catch (java.net.UnknownHostException uhe) {
+        }
         if (fragmentId == SysProcFragmentId.PF_saveTest)
         {
             assert(params.toArray()[0] != null);
@@ -109,7 +115,9 @@ public class SnapshotSave extends VoltSystemProcedure
             VoltTable result = constructNodeResultsTable();
 
             if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() != -1) {
-                result.addRow(context.getSite().getHost().getTypeName(),
+                result.addRow(
+                        context.getSite().getHost().getTypeName(),
+                        hostname,
                         "",
                         "FAILURE",
                         "SNAPSHOT IN PROGRESS");
@@ -150,6 +158,7 @@ public class SnapshotSave extends VoltSystemProcedure
                     }
                 }
                 result.addRow(context.getSite().getHost().getTypeName(),
+                                 hostname,
                                  table.getTypeName(),
                                  file_valid,
                                  err_msg);
@@ -274,6 +283,7 @@ public class SnapshotSave extends VoltSystemProcedure
                         }
 
                         result.addRow(context.getSite().getHost().getTypeName(),
+                                hostname,
                                 table.getTypeName(),
                                 canSnapshot,
                                 err_msg);
@@ -300,7 +310,9 @@ public class SnapshotSave extends VoltSystemProcedure
                         }
                     }
                 } catch (Exception ex) {
-                    result.addRow(context.getSite().getHost().getTypeName(),
+                    result.addRow(
+                            context.getSite().getHost().getTypeName(),
+                            hostname,
                             "",
                             "FAILURE",
                             "SNAPSHOT INITIATION OF " + file_path + file_nonce +
@@ -315,6 +327,7 @@ public class SnapshotSave extends VoltSystemProcedure
                 m_snapshotPermits.acquire();
             } catch (Exception e) {
                 result.addRow(context.getSite().getHost().getTypeName(),
+                        hostname,
                         "",
                         "FAILURE",
                         e.toString());
@@ -362,6 +375,7 @@ public class SnapshotSave extends VoltSystemProcedure
                 if (failures.isEmpty()) {
                     blockingResult.addRow(
                             context.getSite().getHost().getTypeName(),
+                            hostname,
                             context.getSite().getTypeName(),
                             status,
                             err);
@@ -372,6 +386,7 @@ public class SnapshotSave extends VoltSystemProcedure
                     }
                     blockingResult.addRow(
                             context.getSite().getHost().getTypeName(),
+                            hostname,
                             context.getSite().getTypeName(),
                             status,
                             err);
@@ -440,7 +455,7 @@ public class SnapshotSave extends VoltSystemProcedure
         // Test feasibility results for fail
         while (results[0].advanceRow())
         {
-            if (results[0].getString(2).equals("FAILURE"))
+            if (results[0].getString("RESULT").equals("FAILURE"))
             {
                 // Something lost, bomb out and just return the whole
                 // table of results to the client for analysis
@@ -524,6 +539,7 @@ public class SnapshotSave extends VoltSystemProcedure
 
     public static final ColumnInfo nodeResultsColumns[] = new ColumnInfo[] {
         new ColumnInfo("HOST_ID", VoltType.STRING),
+        new ColumnInfo("HOSTNAME", VoltType.STRING),
         new ColumnInfo("TABLE", VoltType.STRING),
         new ColumnInfo("RESULT", VoltType.STRING),
         new ColumnInfo("ERR_MSG", VoltType.STRING)
@@ -531,6 +547,7 @@ public class SnapshotSave extends VoltSystemProcedure
 
     public static final ColumnInfo partitionResultsColumns[] = new ColumnInfo[] {
         new ColumnInfo("HOST_ID", VoltType.STRING),
+        new ColumnInfo("HOSTNAME", VoltType.STRING),
         new ColumnInfo("SITE_ID", VoltType.STRING),
         new ColumnInfo("RESULT", VoltType.STRING),
         new ColumnInfo("ERR_MSG", VoltType.STRING)

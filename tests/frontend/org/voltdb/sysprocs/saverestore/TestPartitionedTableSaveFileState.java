@@ -362,13 +362,13 @@ public class TestPartitionedTableSaveFileState extends TestCase
     private void addSiteToTestData(int hostId, int originalHostId, int partitionId,
                                    int totalPartitions)
     {
-        m_siteInput.addRow(hostId, originalHostId, "cluster", DATABASE_NAME,
+        m_siteInput.addRow(hostId, "host", originalHostId, "ohost", "cluster", DATABASE_NAME,
                            TABLE_NAME, "FALSE", partitionId, totalPartitions);
     }
 
     private void addBadSiteToTestData(int siteId)
     {
-        m_siteInput.addRow(10, siteId, "cluster", DATABASE_NAME,
+        m_siteInput.addRow(10, "host", siteId, "ohost", "cluster", DATABASE_NAME,
                            TABLE_NAME, "TRUE", 0, 1);
     }
 

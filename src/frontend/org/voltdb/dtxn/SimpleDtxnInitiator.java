@@ -130,6 +130,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     @Override
     public synchronized void createTransaction(
                                   int connectionId,
+                                  final String connectionHostname,
                                   StoredProcedureInvocation invocation,
                                   boolean isReadOnly,
                                   boolean isSinglePartition,
@@ -146,7 +147,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         if (isSinglePartition)
         {
             assert(numPartitions == 1);
-            createSinglePartitionTxn(connectionId, invocation, isReadOnly,
+            createSinglePartitionTxn(connectionId, connectionHostname, invocation, isReadOnly,
                                      partitions[0], clientData, messageSize, now);
             return;
         }
@@ -184,7 +185,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                                         clientData,
                                                         messageSize,
                                                         now,
-                                                        connectionId);
+                                                        connectionId,
+                                                        connectionHostname);
             dispatchMultiPartitionTxn(txn);
         }
     }
@@ -210,6 +212,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
 
     private void
     createSinglePartitionTxn(int connectionId,
+                             final String connectionHostname,
                              StoredProcedureInvocation invocation,
                              boolean isReadOnly,
                              int partition,
@@ -249,7 +252,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                      clientData,
                                      messageSize,
                                      now,
-                                     connectionId);
+                                     connectionId,
+                                     connectionHostname);
             txn_states.add(txn);
             m_pendingTxns.addTxn(txn.txnId, txn.coordinatorId, txn);
 
@@ -396,6 +400,15 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                     // Horrible but so much more efficient.
                     final Connection c = (Connection)state.clientData;
                     assert(c != null);
+                    final long now = EstTime.currentTimeMillis();
+                    final int delta = (int)(now - state.initiateTime);
+                    final ClientResponseImpl response = r.getClientResponseData();
+                    response.setClusterRoundtrip(delta);
+                    m_initiator.m_stats.logTransactionCompleted(
+                            state.connectionId,
+                            state.connectionHostname,
+                            state.invocation,
+                            delta);
                     c.writeStream().enqueue(r.getClientResponseData());
                 }
             }
@@ -460,7 +473,11 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                     final int delta = (int)(now - state.initiateTime);
                     final ClientResponseImpl response = r.getClientResponseData();
                     response.setClusterRoundtrip(delta);
-                    m_initiator.m_stats.logTransactionCompleted(state.connectionId, state.invocation, delta);
+                    m_initiator.m_stats.logTransactionCompleted(
+                            state.connectionId,
+                            state.connectionHostname,
+                            state.invocation,
+                            delta);
                     c.writeStream().enqueue(response);
                 }
             }

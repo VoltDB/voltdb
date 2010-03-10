@@ -45,10 +45,13 @@ class ExecutorContext {
                     UndoQuantum *undoQuantum,
                     Topend* topend,
                     bool eltEnabled,
-                    int64_t epoch) :
+                    int64_t epoch,
+                    std::string hostname,
+                    CatalogId hostId) :
         m_topEnd(topend), m_undoQuantum(undoQuantum),
         m_txnId(0),
         m_siteId(siteId), m_partitionId(partitionId),
+        m_hostname(hostname), m_hostId(hostId),
         m_eltEnabled(eltEnabled), m_epoch(epoch)
     {
         m_lastCommittedTxnId = 0;
@@ -131,6 +134,8 @@ class ExecutorContext {
     int64_t m_lastTickTime;
     CatalogId m_siteId;
     CatalogId m_partitionId;
+    std::string m_hostname;
+    CatalogId m_hostId;
     bool m_eltEnabled;
 
     /** local epoch for voltdb, somtime around 2008, pulled from catalog */

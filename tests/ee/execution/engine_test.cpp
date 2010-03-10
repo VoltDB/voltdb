@@ -156,7 +156,7 @@ class ExecutionEngineTest : public Test {
              * Initialize the engine
              */
             engine = new voltdb::VoltDBEngine();
-            ASSERT_TRUE(engine->initialize(this->cluster_id, this->site_id));
+            ASSERT_TRUE(engine->initialize(this->cluster_id, this->site_id, 0, 0, ""));
             ASSERT_TRUE(engine->loadCatalog(catalog_string));
 
             /*

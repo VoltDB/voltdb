@@ -127,9 +127,15 @@ public class Statistics extends VoltSystemProcedure {
         else if (fragmentId == SysProcFragmentId.PF_procedureData) {
             // procedure stats are registered to VoltDB's statsagent with the site's catalog id.
             // piece this information together and the stats agent returns a table. pretty sweet.
+            final boolean resetCounters =
+                ((Byte)params.toArray()[0]).byteValue() == 0 ? false : true;
             ArrayList<Integer> catalogIds = new ArrayList<Integer>();
             catalogIds.add(Integer.parseInt(context.getSite().getTypeName()));
-            VoltTable result = VoltDB.instance().getStatsAgent().getStats(SysProcSelector.PROCEDURE, catalogIds);
+            VoltTable result = VoltDB.instance().
+                    getStatsAgent().getStats(
+                            SysProcSelector.PROCEDURE,
+                            catalogIds,
+                            resetCounters);
             return new DependencyPair(DEP_procedureData, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_procedureAggregator) {
@@ -161,9 +167,15 @@ public class Statistics extends VoltSystemProcedure {
         else if (fragmentId == SysProcFragmentId.PF_initiatorData) {
             // initiator stats are registered to VoltDB's statsagent with the initiators index.
             // piece this information together and the stats agent returns a table. pretty sweet.
+            final boolean resetCounters =
+                ((Byte)params.toArray()[0]).byteValue() == 0 ? false : true;
             ArrayList<Integer> catalogIds = new ArrayList<Integer>();
             catalogIds.add(0);
-            VoltTable result = VoltDB.instance().getStatsAgent().getStats(SysProcSelector.INITIATOR, catalogIds);
+            VoltTable result = VoltDB.instance().
+                    getStatsAgent().getStats(
+                            SysProcSelector.INITIATOR,
+                            catalogIds,
+                            resetCounters);
             return new DependencyPair(DEP_initiatorData, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_initiatorAggregator) {
@@ -199,7 +211,7 @@ public class Statistics extends VoltSystemProcedure {
         return null;
     }
 
-    public VoltTable[] run(String selector) throws VoltAbortException {
+    public VoltTable[] run(String selector, long resetCounters) throws VoltAbortException {
         VoltTable[] results;
 
         if (selector.toUpperCase().equals(SysProcSelector.TABLE.name())) {
@@ -238,6 +250,7 @@ public class Statistics extends VoltSystemProcedure {
             pfs[1].multipartition = true;
             pfs[1].nonExecSites = false;
             pfs[1].parameters = new ParameterSet();
+            pfs[1].parameters.setParameters((byte)resetCounters);
 
             // create a work fragment to aggregate the results.
             // Set the MULTIPARTITION_DEPENDENCY bit to require a dependency from every site.
@@ -264,6 +277,7 @@ public class Statistics extends VoltSystemProcedure {
             pfs[1].multipartition = false;
             pfs[1].nonExecSites = true;
             pfs[1].parameters = new ParameterSet();
+            pfs[1].parameters.setParameters((byte)resetCounters);
 
             // create a work fragment to aggregate the results.
             // Set the MULTIPARTITION_DEPENDENCY bit to require a dependency from every site.

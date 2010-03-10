@@ -181,23 +181,17 @@ public class TestVoltProcedure extends TestCase {
         assertEquals(agent.m_catalogId, Integer.parseInt(site.m_context.cluster.getSites().get(Integer.toString(site.siteId)).getTypeName()));
         Object statsRow[][] = agent.m_source.getStatsRows();
         assertNotNull(statsRow);
-        assertEquals(statsRow[0][1], new Long(site.siteId));
-        assertEquals(statsRow[0][2], LongProcedure.class.getName());
-        assertEquals(statsRow[0][3], 0L); //Starts with 0 invocations
-        assertEquals(statsRow[0][4], 0L); //Starts with 0 timed invocations time
-        assertEquals(statsRow[0][5], Long.MAX_VALUE); //Starts with 0 min execution time
-        assertEquals(statsRow[0][6], Long.MIN_VALUE); //Starts with 0 max execution time
-        assertEquals(statsRow[0][7], 0); //Average invocation length is 0 to start
+        assertEquals( 0, statsRow.length);
         for (int ii = 1; ii < 200; ii++) {
             wrapper.call(params.m_params);
             statsRow = agent.m_source.getStatsRows();
-            assertEquals(statsRow[0][3], new Long(ii));
+            assertEquals(statsRow[0][4], new Long(ii));
         }
-        assertTrue(((Long)statsRow[0][3]).longValue() > 0L);
         assertTrue(((Long)statsRow[0][4]).longValue() > 0L);
-        assertFalse(statsRow[0][5].equals(0));
+        assertTrue(((Long)statsRow[0][5]).longValue() > 0L);
         assertFalse(statsRow[0][6].equals(0));
-        assertTrue(((Long)statsRow[0][7]) > 0L);
+        assertFalse(statsRow[0][7].equals(0));
+        assertTrue(((Long)statsRow[0][8]) > 0L);
     }
 
     private ClientResponse call(Class<? extends NullProcedureWrapper> procedure) {

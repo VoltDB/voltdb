@@ -35,11 +35,20 @@ StatsSource::StatsSource()  : m_statsTable(NULL) {
  * Configure a StatsSource superclass for a set of statistics. Since this class is only used in the EE it can be assumed that
  * it is part of an Execution Site and that there is a site Id.
  * @parameter name Name of this set of statistics
+ * @parameter hostId id of the host this partition is on
+ * @parameter hostname name of the host this partition is on
  * @parameter siteId this stat source is associated with
  * @parameter databaseId database this source is associated with.
  */
-void StatsSource::configure(std::string name, voltdb::CatalogId siteId, voltdb::CatalogId databaseId) {
-    m_siteId = siteId;
+void StatsSource::configure(
+        std::string name,
+        voltdb::CatalogId hostId,
+        std::string hostname,
+        voltdb::CatalogId partitionId,
+        voltdb::CatalogId databaseId) {
+    m_partitionId = partitionId;
+    m_hostId = hostId;
+    m_hostname = ValueFactory::getStringValue(hostname);
     std::vector<std::string> columnNames = generateStatsColumnNames();
 
     std::vector<voltdb::ValueType> columnTypes;
@@ -56,7 +65,9 @@ void StatsSource::configure(std::string name, voltdb::CatalogId siteId, voltdb::
     m_statsTuple = m_statsTable->tempTuple();
 }
 
-StatsSource::~StatsSource() {}
+StatsSource::~StatsSource() {
+    m_hostname.free();
+}
 
 /**
  * Retrieve the name of this set of statistics
@@ -89,8 +100,10 @@ voltdb::TableTuple* StatsSource::getStatsTuple() {
     time_t now;
     time(&now);
     //assert (static_cast<time_t>(-1) != result);
-    m_statsTuple.setNValue(0, ValueFactory::getBigIntValue(m_siteId));
-    m_statsTuple.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(now)));
+    m_statsTuple.setNValue(0, ValueFactory::getBigIntValue(m_hostId));
+    m_statsTuple.setNValue(1, m_hostname);
+    m_statsTuple.setNValue(2, ValueFactory::getBigIntValue(m_partitionId));
+    m_statsTuple.setNValue(3, ValueFactory::getBigIntValue(static_cast<int64_t>(now)));
     updateStatsTuple(&m_statsTuple);
     m_statsTable->insertTuple(m_statsTuple);
     //assert (success);
@@ -104,7 +117,9 @@ voltdb::TableTuple* StatsSource::getStatsTuple() {
  */
 std::vector<std::string> StatsSource::generateStatsColumnNames() {
     std::vector<std::string> columnNames;
-    columnNames.push_back("SITE_ID");
+    columnNames.push_back("HOST_ID");
+    columnNames.push_back("HOSTNAME");
+    columnNames.push_back("PARTITION_ID");
     columnNames.push_back("STAT_TIME");
     return columnNames;
 }
@@ -130,6 +145,8 @@ std::string StatsSource::toString() {
  * end of a list.
  */
 void StatsSource::populateSchema(std::vector<voltdb::ValueType> &types, std::vector<uint16_t> &columnLengths, std::vector<bool> &allowNull) {
+    types.push_back(voltdb::VALUE_TYPE_BIGINT); columnLengths.push_back(static_cast<uint16_t>(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT))); allowNull.push_back(false);
+    types.push_back(voltdb::VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);
     types.push_back(voltdb::VALUE_TYPE_BIGINT); columnLengths.push_back(static_cast<uint16_t>(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT))); allowNull.push_back(false);
     types.push_back(voltdb::VALUE_TYPE_BIGINT); columnLengths.push_back(static_cast<uint16_t>(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT))); allowNull.push_back(false);
 }

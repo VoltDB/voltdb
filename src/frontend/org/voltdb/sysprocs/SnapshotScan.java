@@ -94,7 +94,12 @@ public class SnapshotScan extends VoltSystemProcedure {
                         final SystemProcedureExecutionContext context)
     {
         errorString = null;
-
+        String hostname = "";
+        try {
+            java.net.InetAddress localMachine = java.net.InetAddress.getLocalHost();
+            hostname = localMachine.getHostName();
+        } catch (java.net.UnknownHostException uhe) {
+        }
         if (fragmentId == SysProcFragmentId.PF_snapshotScan)
         {
             final VoltTable results = constructFragmentResultsTable();
@@ -105,6 +110,7 @@ public class SnapshotScan extends VoltSystemProcedure {
             if (relevantFiles == null) {
                 results.addRow(
                         context.getSite().getHost().getTypeName(),
+                        hostname,
                         "",
                         "",
                         0,
@@ -143,6 +149,7 @@ public class SnapshotScan extends VoltSystemProcedure {
 
                                 results.addRow(
                                         context.getSite().getHost().getTypeName(),
+                                        hostname,
                                         f.getParent(),
                                         f.getName(),
                                         savefile.getCreateTime(),
@@ -167,6 +174,7 @@ public class SnapshotScan extends VoltSystemProcedure {
                     } else {
                         results.addRow(
                                 context.getSite().getHost().getTypeName(),
+                                hostname,
                                 f.getParent(),
                                 f.getName(),
                                 f.lastModified(),
@@ -271,6 +279,7 @@ public class SnapshotScan extends VoltSystemProcedure {
                 final long used = total - free;
                 results.addRow(
                         context.getSite().getHost().getTypeName(),
+                        hostname,
                         path,
                         total,
                         free,
@@ -280,6 +289,7 @@ public class SnapshotScan extends VoltSystemProcedure {
             } else {
                 results.addRow(
                         context.getSite().getHost().getTypeName(),
+                        hostname,
                         path,
                         0,
                         0,
@@ -309,9 +319,10 @@ public class SnapshotScan extends VoltSystemProcedure {
     }
 
     private VoltTable constructFragmentResultsTable() {
-        ColumnInfo[] result_columns = new ColumnInfo[13];
+        ColumnInfo[] result_columns = new ColumnInfo[14];
         int ii = 0;
         result_columns[ii++] = new ColumnInfo("HOST_ID", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo("HOSTNAME", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("PATH", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("NAME", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("CREATED", VoltType.BIGINT);
@@ -357,9 +368,10 @@ public class SnapshotScan extends VoltSystemProcedure {
     }
 
     private VoltTable constructDiskFreeResultsTable() {
-        ColumnInfo[] result_columns = new ColumnInfo[7];
+        ColumnInfo[] result_columns = new ColumnInfo[8];
         int ii = 0;
         result_columns[ii++] = new ColumnInfo("HOST_ID", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo("HOSTNAME", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("PATH", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("TOTAL", VoltType.BIGINT);
         result_columns[ii++] = new ColumnInfo("FREE", VoltType.BIGINT);

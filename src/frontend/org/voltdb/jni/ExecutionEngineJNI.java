@@ -78,7 +78,13 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * initialize the native Engine object.
      * @see #nativeCreate()
      */
-    public ExecutionEngineJNI(final ExecutionSite site, final int clusterIndex, final int siteId) {
+    public ExecutionEngineJNI(
+            final ExecutionSite site,
+            final int clusterIndex,
+            final int siteId,
+            final int partitionId,
+            final int hostId,
+            final String hostname) {
         // base class loads the volt shared library
         super(site);
         //exceptionBuffer.order(ByteOrder.nativeOrder());
@@ -86,7 +92,14 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 + ", site_id = " + siteId + "...");
         pointer = nativeCreate();
         nativeSetLogLevels(pointer, EELoggers.getLogLevels());
-        int errorCode = nativeInitialize(pointer, clusterIndex, siteId);
+        int errorCode =
+            nativeInitialize(
+                    pointer,
+                    clusterIndex,
+                    siteId,
+                    partitionId,
+                    hostId,
+                    hostname);
         checkErrorCode(errorCode);
         fsForParameterSet = new FastSerializer(false, new BufferGrowCallback() {
             public void onBufferGrow(final FastSerializer obj) {

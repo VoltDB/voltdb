@@ -105,7 +105,7 @@ public class OverheadClient extends ClientMain {
 
         @Override
         public void clientCallback(ClientResponse clientResponse) {
-            if (checkTransaction(transactionToInvoke.callName, clientResponse, false))
+            if (checkTransaction(transactionToInvoke.callName, clientResponse, false, false))
                 m_counts[transactionToInvoke.ordinal()].incrementAndGet();
         }
 

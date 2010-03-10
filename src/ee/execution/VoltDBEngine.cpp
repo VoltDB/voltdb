@@ -126,13 +126,18 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
     m_executorContext = NULL;
 }
 
-bool VoltDBEngine::initialize(int32_t clusterIndex, int32_t siteId) {
+bool VoltDBEngine::initialize(
+        int32_t clusterIndex,
+        int32_t siteId,
+        int32_t partitionId,
+        int32_t hostId,
+        std::string hostname) {
     // Be explicit about running in the standard C locale for now.
     std::locale::global(std::locale("C"));
 
     m_clusterIndex = clusterIndex;
     m_siteId = siteId;
-    m_partitionId = -1;  // discovered when catalog is loaded
+    m_partitionId = partitionId;
 
     // Instantiate our catalog - it will be populated later on by load()
     m_catalog = boost::shared_ptr<catalog::Catalog>(new catalog::Catalog());
@@ -155,7 +160,9 @@ bool VoltDBEngine::initialize(int32_t clusterIndex, int32_t siteId) {
                                             m_currentUndoQuantum,
                                             getTopend(),
                                             m_isELEnabled,
-                                            0 /* epoch not yet known */);
+                                            0, /* epoch not yet known */
+                                            hostname,
+                                            hostId);
     return true;
 }
 

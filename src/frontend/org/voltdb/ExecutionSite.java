@@ -338,6 +338,13 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
     ExecutionSite(final int siteId, final CatalogContext context, String serializedCatalog) {
         hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_Initializing.name(), new Object[] { String.valueOf(siteId) }, null);
 
+        String hostname = "";
+        try {
+            java.net.InetAddress localMachine = java.net.InetAddress.getLocalHost();
+            hostname = localMachine.getHostName();
+        } catch (java.net.UnknownHostException uhe) {
+        }
+
         if (serializedCatalog == null)
             serializedCatalog = context.catalog.serialize();
 
@@ -394,14 +401,29 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
             }
             else if (target == BackendTarget.NATIVE_EE_JNI) {
                 // set up the EE
-                eeTemp = new ExecutionEngineJNI(this, m_context.cluster.getRelativeIndex(), siteId);
+                eeTemp =
+                    new ExecutionEngineJNI(
+                        this,
+                        m_context.cluster.getRelativeIndex(),
+                        siteId,
+                        Integer.valueOf(site.getPartition().getTypeName()),
+                        Integer.valueOf(site.getHost().getTypeName()),
+                        hostname);
                 eeTemp.loadCatalog(serializedCatalog);
                 lastTickTime = EstTime.currentTimeMillis();
                 eeTemp.tick( lastTickTime, 0);
             }
             else {
                 // set up the EE over IPC
-                eeTemp = new ExecutionEngineIPC(this, m_context.cluster.getRelativeIndex(), siteId, target);
+                eeTemp =
+                    new ExecutionEngineIPC(
+                            this,
+                            m_context.cluster.getRelativeIndex(),
+                            siteId,
+                            Integer.valueOf(site.getPartition().getTypeName()),
+                            Integer.valueOf(site.getHost().getTypeName()),
+                            hostname,
+                            target);
                 eeTemp.loadCatalog(serializedCatalog);
                 lastTickTime = EstTime.currentTimeMillis();
                 eeTemp.tick( lastTickTime, 0);
@@ -434,7 +456,6 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
         final CatalogMap<Procedure> catalogProcedures = m_context.database.getProcedures();
         for (final Procedure proc : catalogProcedures) {
             VoltProcedure wrapper = null;
-
             if (proc.getHasjava()) {
                 final String className = proc.getClassname();
                 Class<?> procClass = null;

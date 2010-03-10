@@ -61,7 +61,8 @@ class VoltQueryClient(cmd.Cmd):
                                    [FastSerializer.VOLTTYPE_STRING])
 
         self.stat = VoltProcedure(self.fs, "@Statistics",
-                                  [FastSerializer.VOLTTYPE_STRING])
+                                  [FastSerializer.VOLTTYPE_STRING,
+                                   FastSerializer.VOLTTYPE_TINYINT])
 
         self.snapshotsave = VoltProcedure(self.fs, "@SnapshotSave",
                                           [FastSerializer.VOLTTYPE_STRING,
@@ -155,14 +156,17 @@ class VoltQueryClient(cmd.Cmd):
     def do_stat(self, command):
         if not command:
             return self.help_stat()
-
+        args = command.split()
+        if len(args) != 2:
+            return self.help_stat()
         self.safe_print("Getting statistics")
-        self.response = self.stat.call([command], timeout = self.__timeout)
+        self.response = self.stat.call([args[0], int(args[1])], timeout = self.__timeout)
         self.safe_print(self.response)
 
     def help_stat(self):
         self.safe_print("Get the statistics:")
         self.safe_print("\tstat procedure")
+        self.safe_print("\treset counters")
 
     def do_snapshotsave(self, command):
         if not command:

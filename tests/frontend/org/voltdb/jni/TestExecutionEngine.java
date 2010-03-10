@@ -117,7 +117,7 @@ public class TestExecutionEngine extends TestCase {
     protected void setUp() throws Exception {
         super.setUp();
         VoltDB.instance().readBuildInfo();
-        engine = new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID);
+        engine = new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID, 0, 0, "");
     }
 
     @Override

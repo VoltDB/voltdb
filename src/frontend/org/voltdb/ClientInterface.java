@@ -279,7 +279,11 @@ public class ClientInterface implements DumpManager.Dumpable {
                                         socket.configureBlocking(false);
                                         socket.socket().setTcpNoDelay(false);
                                         socket.socket().setKeepAlive(true);
-                                        ClientInputHandler handler = new ClientInputHandler(user);
+
+                                        ClientInputHandler handler =
+                                            new ClientInputHandler(
+                                                    user,
+                                                    socket.socket().getInetAddress().getHostName());
                                         synchronized (m_connections){
                                             Connection c = null;
                                             if (m_hasDTXNBackPressure) {
@@ -431,6 +435,7 @@ public class ClientInterface implements DumpManager.Dumpable {
         public static final int MAX_READ = 8192 * 4;
 
         private Connection m_connection;
+        private final String m_hostname;
 
         /**
          * Set of user permissions associated with this connection. Authentication is performed when
@@ -442,8 +447,9 @@ public class ClientInterface implements DumpManager.Dumpable {
          *
          * @param user Set of permissions associated with requests coming from this connection
          */
-        public ClientInputHandler(AuthSystem.AuthUser user) {
+        public ClientInputHandler(AuthSystem.AuthUser user, String hostname) {
             m_user = user;
+            m_hostname = hostname;
         }
 
         @Override
@@ -713,7 +719,13 @@ public class ClientInterface implements DumpManager.Dumpable {
                     return;
                 }
                 String sql = (String) task.params.m_params[0];
-                m_asyncCompilerWorkThread.planSQL(sql, task.clientHandle, handler.connectionId(), handler.sequenceId(), c);
+                m_asyncCompilerWorkThread.planSQL(
+                        sql,
+                        task.clientHandle,
+                        handler.connectionId(),
+                        handler.m_hostname,
+                        handler.sequenceId(),
+                        c);
                 return;
             }
 
@@ -739,7 +751,13 @@ public class ClientInterface implements DumpManager.Dumpable {
                     return;
                 }
                 String catalogURL = (String) task.params.m_params[0];
-                m_asyncCompilerWorkThread.prepareCatalogUpdate(catalogURL, task.clientHandle, handler.connectionId(), handler.sequenceId(), c);
+                m_asyncCompilerWorkThread.prepareCatalogUpdate(
+                        catalogURL,
+                        task.clientHandle,
+                        handler.connectionId(),
+                        handler.m_hostname,
+                        handler.sequenceId(),
+                        c);
                 return;
             }
 
@@ -820,7 +838,7 @@ public class ClientInterface implements DumpManager.Dumpable {
 
             if (involvedPartitions != null) {
                 // initiate the transaction
-                m_initiator.createTransaction(handler.connectionId(), task, isReadOnly,
+                m_initiator.createTransaction(handler.connectionId(), handler.m_hostname, task, isReadOnly,
                                               catProc.getSinglepartition(),
                                               involvedPartitions, involvedPartitions.length, c, buf.capacity(),
                                               now);
@@ -858,7 +876,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                     task.clientHandle = plannedStmt.clientHandle;
 
                     // initiate the transaction
-                    m_initiator.createTransaction(plannedStmt.connectionId,
+                    m_initiator.createTransaction(plannedStmt.connectionId, plannedStmt.hostname,
                                                   task, false, false, m_allPartitions,
                                                   m_allPartitions.length, plannedStmt.clientData, 0, 0);
                 }
@@ -874,7 +892,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                     task.clientHandle = changeResult.clientHandle;
 
                     // initiate the transaction
-                    m_initiator.createTransaction(changeResult.connectionId,
+                    m_initiator.createTransaction(changeResult.connectionId, changeResult.hostname,
                                                   task, false, false, m_allPartitions,
                                                   m_allPartitions.length, changeResult.clientData, 0, 0);
                 }
@@ -1027,7 +1045,7 @@ public class ClientInterface implements DumpManager.Dumpable {
            spi.params = new ParameterSet();
            spi.params.setParameters(invocation.getSecond());
             // initiate the transaction
-           m_initiator.createTransaction(-1, spi, catProc.getReadonly(),
+           m_initiator.createTransaction(-1, "SnapshotDaemon", spi, catProc.getReadonly(),
                                          catProc.getSinglepartition(),
                                          m_allPartitions, m_allPartitions.length, m_snapshotDaemonAdapter, 0, 0);
        }

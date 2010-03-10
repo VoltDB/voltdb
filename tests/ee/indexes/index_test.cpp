@@ -131,7 +131,7 @@ public:
         m_engine = new VoltDBEngine();
         m_exceptionBuffer = new char[4096];
         m_engine->setBuffers( NULL, 0, NULL, 0, m_exceptionBuffer, 4096);
-        m_engine->initialize(0, 0);
+        m_engine->initialize(0, 0, 0, 0, "");
         table =
             dynamic_cast<PersistentTable*>
           (TableFactory::getPersistentTable(database_id, 1, m_engine->getExecutorContext(),

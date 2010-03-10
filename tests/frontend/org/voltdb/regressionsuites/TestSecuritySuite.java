@@ -86,7 +86,7 @@ public class TestSecuritySuite extends RegressionSuite {
         VoltTable modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (1, 1, 1);")[0];
         assertTrue(modCount.getRowCount() == 1);
         assertTrue(modCount.asScalarLong() == 1);
-        VoltTable results[] = client.callProcedure("@Statistics", "INITIATOR");
+        VoltTable results[] = client.callProcedure("@Statistics", "INITIATOR", 0);
         // one aggregate table returned
         assertTrue(results.length == 1);
 
@@ -98,7 +98,7 @@ public class TestSecuritySuite extends RegressionSuite {
         assertTrue(modCount.asScalarLong() == 1);
         boolean exceptionThrown = false;
         try {
-            results = client.callProcedure("@Statistics", "INITIATOR");
+            results = client.callProcedure("@Statistics", "INITIATOR", 0);
         } catch (ProcCallException e) {
             e.printStackTrace();
             exceptionThrown = true;
@@ -111,7 +111,7 @@ public class TestSecuritySuite extends RegressionSuite {
         modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (3, 3, 3);")[0];
         assertTrue(modCount.getRowCount() == 1);
         assertTrue(modCount.asScalarLong() == 1);
-        results = client.callProcedure("@Statistics", "INITIATOR");
+        results = client.callProcedure("@Statistics", "INITIATOR", 0);
         // one aggregate table returned
         assertTrue(results.length == 1);
 
@@ -128,7 +128,7 @@ public class TestSecuritySuite extends RegressionSuite {
         assertTrue(exceptionThrown);
         exceptionThrown = false;
         try {
-            results = client.callProcedure("@Statistics", "INITIATOR");
+            results = client.callProcedure("@Statistics", "INITIATOR", 0);
         } catch (ProcCallException e) {
             e.printStackTrace();
             exceptionThrown = true;
@@ -141,7 +141,7 @@ public class TestSecuritySuite extends RegressionSuite {
         modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (4, 4, 4);")[0];
         assertTrue(modCount.getRowCount() == 1);
         assertTrue(modCount.asScalarLong() == 1);
-        results = client.callProcedure("@Statistics", "INITIATOR");
+        results = client.callProcedure("@Statistics", "INITIATOR", 0);
         // one aggregate table returned
         assertTrue(results.length == 1);
 
@@ -153,7 +153,7 @@ public class TestSecuritySuite extends RegressionSuite {
         assertTrue(modCount.asScalarLong() == 1);
         exceptionThrown = false;
         try {
-            results = client.callProcedure("@Statistics", "INITIATOR");
+            results = client.callProcedure("@Statistics", "INITIATOR", 0);
         } catch (ProcCallException e) {
             e.printStackTrace();
             exceptionThrown = true;
@@ -166,7 +166,7 @@ public class TestSecuritySuite extends RegressionSuite {
         modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (6, 6, 6);")[0];
         assertTrue(modCount.getRowCount() == 1);
         assertTrue(modCount.asScalarLong() == 1);
-        results = client.callProcedure("@Statistics", "INITIATOR");
+        results = client.callProcedure("@Statistics", "INITIATOR", 0);
         // one aggregate table returned
         assertTrue(results.length == 1);
     }

@@ -106,6 +106,12 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             final long createTime,
             int version[]
             ) throws IOException {
+        String hostname = "";
+        try {
+            java.net.InetAddress localMachine = java.net.InetAddress.getLocalHost();
+            hostname = localMachine.getHostName();
+        } catch (java.net.UnknownHostException uhe) {
+        }
         m_tableName = tableName;
         m_fos = new FileOutputStream(file);
         m_channel = m_fos.getChannel();
@@ -129,6 +135,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         }
         fs.writeLong(createTime);
         fs.writeInt(hostId);
+        fs.writeString(hostname);
         fs.writeString(clusterName);
         fs.writeString(databaseName);
         fs.writeString(tableName);

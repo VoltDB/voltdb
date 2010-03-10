@@ -31,16 +31,20 @@ public class ClusterSaveFileState
 {
     public static VoltTable constructEmptySaveFileStateVoltTable()
     {
-        ColumnInfo[] result_columns = new ColumnInfo[8];
-        result_columns[0] = new ColumnInfo("CURRENT_HOST_ID", VoltType.INTEGER);
-        result_columns[1] =
+        ColumnInfo[] result_columns = new ColumnInfo[10];
+        int ii = 0;
+        result_columns[ii++] = new ColumnInfo("CURRENT_HOST_ID", VoltType.INTEGER);
+        result_columns[ii++] = new ColumnInfo("CURRENT_HOSTNAME", VoltType.STRING);
+        result_columns[ii++] =
                 new ColumnInfo("ORIGINAL_HOST_ID", VoltType.INTEGER);
-        result_columns[2] = new ColumnInfo("CLUSTER", VoltType.STRING);
-        result_columns[3] = new ColumnInfo("DATABASE", VoltType.STRING);
-        result_columns[4] = new ColumnInfo("TABLE", VoltType.STRING);
-        result_columns[5] = new ColumnInfo("IS_REPLICATED", VoltType.STRING);
-        result_columns[6] = new ColumnInfo("PARTITION", VoltType.INTEGER);
-        result_columns[7] = new ColumnInfo("TOTAL_PARTITIONS",
+        result_columns[ii++] =
+            new ColumnInfo("ORIGINAL_HOSTNAME", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo("CLUSTER", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo("DATABASE", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo("TABLE", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo("IS_REPLICATED", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo("PARTITION", VoltType.INTEGER);
+        result_columns[ii++] = new ColumnInfo("TOTAL_PARTITIONS",
                                            VoltType.INTEGER);
 
         return new VoltTable(result_columns);
