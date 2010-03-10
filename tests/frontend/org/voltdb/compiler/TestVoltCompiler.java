@@ -604,10 +604,6 @@ public class TestVoltCompiler extends TestCase {
 
         assertTrue(success);
 
-        //Catalog c1 = compiler.getCatalog();
-        //System.out.println("PRINTING Catalog 1");
-        //System.out.println(c1.serialize());
-
         final String catalogContents = JarReader.readFileFromJarfile("testout.jar", "catalog.txt");
 
         final Catalog c2 = new Catalog();
@@ -621,7 +617,70 @@ public class TestVoltCompiler extends TestCase {
         jar.delete();
     }
 
-    public void testMaterializedView() throws IOException {
+    public void testBadStmtProcName() throws IOException {
+        final String simpleSchema =
+            "create table books (cash integer default 23 not null, title varchar default 'foo', PRIMARY KEY(cash));";
+
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+        final String schemaPath = schemaFile.getPath();
+
+        final String simpleProject =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "<database name='database'>" +
+            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
+            "<procedures><procedure class='@Foo'><sql>select * from books;</sql></procedure></procedures>" +
+            "<partitions><partition table='BOOKS' column='CASH' /></partitions>" +
+            "</database>" +
+            "</project>";
+
+        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
+        final String projectPath = projectFile.getPath();
+
+        final VoltCompiler compiler = new VoltCompiler();
+        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
+
+        final boolean success = compiler.compile(projectPath, cluster_config,
+                                                 "testout.jar", System.out,
+                                                 null);
+
+        assertFalse(success);
+    }
+
+    public void testGoodStmtProcName() throws IOException {
+        final String simpleSchema =
+            "create table books (cash integer default 23 not null, title varchar default 'foo', PRIMARY KEY(cash));";
+
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+        final String schemaPath = schemaFile.getPath();
+
+        final String simpleProject =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "<database name='database'>" +
+            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
+            "<procedures><procedure class='Foo'><sql>select * from books;</sql></procedure></procedures>" +
+            "<partitions><partition table='BOOKS' column='CASH' /></partitions>" +
+            "</database>" +
+            "</project>";
+
+        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
+        final String projectPath = projectFile.getPath();
+
+        final VoltCompiler compiler = new VoltCompiler();
+        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
+
+        final boolean success = compiler.compile(projectPath, cluster_config,
+                                                 "testout.jar", System.out,
+                                                 null);
+
+        assertTrue(success);
+
+        final File jar = new File("testout.jar");
+        jar.delete();
+    }
+
+    /*public void testMaterializedView() throws IOException {
         final String simpleSchema =
             "create table books (cash integer default 23, title varchar default 'foo', PRIMARY KEY(cash));\n" +
             "create view matt (title, num, foo) as select title, count(*), sum(cash) from books group by title;";
@@ -650,8 +709,6 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(success);
 
         final Catalog c1 = compiler.getCatalog();
-        //System.out.println("PRINTING Catalog 1");
-        //System.out.println(c1.serialize());
 
         final String catalogContents = JarReader.readFileFromJarfile("testout.jar", "catalog.txt");
 
@@ -660,12 +717,9 @@ public class TestVoltCompiler extends TestCase {
 
         assertTrue(c2.serialize().equals(c1.serialize()));
 
-        //System.out.println(c1.serialize());
-        //System.out.println(c2.serialize());
-
         final File jar = new File("testout.jar");
         jar.delete();
-    }
+    }*/
 
     /*public void testForeignKeys() {
         String schemaPath = "";

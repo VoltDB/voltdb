@@ -60,9 +60,12 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         Client client = getClient();
 
         String newCatalogURL;
+        VoltTable[] results;
+
+        //testStuffThatShouldObviouslyFail(client);
 
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-onesite-expanded.jar");
-        VoltTable[] results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
+        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
         assertTrue(results.length == 0);
 
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-onesite-base.jar");
@@ -74,6 +77,18 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         assertTrue(results.length == 0);
 
         assertTrue(true);
+    }
+
+    public void testStuffThatShouldObviouslyFail(Client client) {
+        String newCatalogURL;
+        VoltTable[] results;
+
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-onesite-addtables.jar");
+        try {
+            results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
+            fail();
+        }
+        catch (Exception e) {}
     }
 
 
@@ -106,6 +121,19 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // add this config to the set of tests to run
         builder.addServerConfig(config);
+
+        /////////////////////////////////////////////////////////////
+        // DELTA CATALOGS FOR TESTING
+        /////////////////////////////////////////////////////////////
+
+        // Build a new catalog
+        config = new LocalSingleProcessServer("catalogupdate-onesite-addtables.jar", 1, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addSchema(TestCatalogUpdateSuite.class.getResource("testorderby-ddl.sql").getPath());
+        project.addDefaultPartitioning();
+        project.addProcedures(BASEPROCS);
+        config.compile(project);
 
         // Build a new catalog
         config = new LocalSingleProcessServer("catalogupdate-onesite-expanded.jar", 1, BackendTarget.NATIVE_EE_JNI);

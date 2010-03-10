@@ -159,7 +159,7 @@ public class RealVoltDB implements VoltDBInterface
         }
 
         final String serializedCatalog = CatalogUtil.loadCatalogFromJar(m_config.m_pathToCatalog, hostLog);
-        if (serializedCatalog == null)
+        if ((serializedCatalog == null) || (serializedCatalog.length() == 0))
             VoltDB.crashVoltDB();
 
         Catalog catalog = new Catalog();

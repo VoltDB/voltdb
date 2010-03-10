@@ -17,16 +17,31 @@
 
 package org.voltdb.compiler;
 
-import java.lang.reflect.*;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+
 import org.hsqldb.HSQLInterface;
-import org.voltdb.*;
-import org.voltdb.catalog.*;
+import org.voltdb.ProcInfo;
+import org.voltdb.ProcInfoData;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
+import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Group;
+import org.voltdb.catalog.GroupRef;
+import org.voltdb.catalog.ProcParameter;
+import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.Statement;
+import org.voltdb.catalog.StmtParameter;
+import org.voltdb.catalog.Table;
+import org.voltdb.catalog.User;
+import org.voltdb.catalog.UserRef;
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
-import org.voltdb.catalog.User;
-import org.voltdb.catalog.Group;
-import org.voltdb.catalog.UserRef;
-import org.voltdb.catalog.GroupRef;
 import org.voltdb.utils.CatalogUtil;
 
 /**
@@ -242,6 +257,9 @@ public abstract class ProcedureCompiler {
     throws VoltCompiler.VoltCompilerException {
 
         final String className = procedureDescriptor.m_className;
+        if (className.indexOf('@') != -1) {
+            throw compiler.new VoltCompilerException("User procedure names can't contain \"@\".");
+        }
 
         // get the short name of the class (no package)
         String[] parts = className.split("\\.");
