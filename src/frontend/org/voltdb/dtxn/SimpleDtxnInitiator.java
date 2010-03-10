@@ -454,9 +454,6 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
 
             boolean first_response = false;
             VoltTable[] first_results = null;
-            // XXX HACK I hacked this up to avoid optimistic return to the client
-            // because then I could avoid cloning a table which was killing performance
-            // Will need to revisit this soon.  --izzy
             if (!m_txnIdResponses.containsKey(r.getTxnId()))
             {
                 ClientResponseImpl curr_response = (ClientResponseImpl) r.getClientResponseData();
