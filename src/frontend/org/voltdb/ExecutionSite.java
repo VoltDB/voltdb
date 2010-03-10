@@ -19,10 +19,7 @@ package org.voltdb;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Level;
@@ -38,8 +35,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.debugstate.ExecutorContext;
-import org.voltdb.dtxn.SimpleDtxnConnection;
-import org.voltdb.dtxn.SiteConnection;
+import org.voltdb.dtxn.*;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.exceptions.SerializableException;
@@ -47,14 +43,11 @@ import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.jni.MockExecutionEngine;
-import org.voltdb.messages.FragmentResponse;
-import org.voltdb.messages.FragmentTask;
-import org.voltdb.messages.InitiateResponse;
-import org.voltdb.messages.InitiateTask;
+import org.voltdb.messages.*;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.VoltMessage;
+import org.voltdb.messaging.impl.SiteMailbox;
 import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.EstTime;
@@ -67,15 +60,24 @@ import org.voltdb.utils.VoltLoggerFactory;
  * fragments. Interacts with the DTXN system to get work to do. The thread might
  * do other things, but this is where the good stuff happens.
  */
-public class ExecutionSite implements Runnable, DumpManager.Dumpable {
+public class ExecutionSite
+extends SiteConnection
+implements Runnable, DumpManager.Dumpable
+{
     private static final Logger log = Logger.getLogger(ExecutionSite.class.getName(), VoltLoggerFactory.instance());
     private static final Logger hostLog = Logger.getLogger("HOST", VoltLoggerFactory.instance());
     private static AtomicInteger siteIndexCounter = new AtomicInteger(0);
 
     private final int siteIndex = siteIndexCounter.getAndIncrement();
-    public int siteId;
+    private final Mailbox m_mailbox;
+    private TransactionState m_current = null;
 
-    SiteConnection dtxnConn;
+    // Two data structures storing all active and known transactions
+    HashMap<Long, TransactionState> m_transactionsById = new HashMap<Long, TransactionState>();
+    private final RestrictedPriorityQueue m_transactionQueue;
+    private long m_lastCompletedTxnId = Long.MIN_VALUE;
+
+    public int siteId;
     final ExecutionEngine ee;
     final HsqlBackend hsql;
 
@@ -320,12 +322,15 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
 
     /** For test MockExecutionSite */
     ExecutionSite() {
+        super(0);
         m_systemProcedureContext = new SystemProcedureContext();
         m_watchdog = null;
         ee = null;
         hsql = null;
         m_dumpId = "MockExecSite";
         m_snapshotter = null;
+        m_mailbox = null;
+        m_transactionQueue = null;
     }
 
     /**
@@ -336,6 +341,7 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
      * newlines that, when executed, reconstruct the complete m_catalog.
      */
     ExecutionSite(final int siteId, final CatalogContext context, String serializedCatalog) {
+        super(siteId);
         hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_Initializing.name(), new Object[] { String.valueOf(siteId) }, null);
 
         String hostname = "";
@@ -369,10 +375,10 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
             if (s.getIsexec() == false)
                 initiatorIds[index++] = Integer.parseInt(s.getTypeName());
 
-        // set up the connection to the dtxn
-        final Messenger messenger = VoltDB.instance().getMessenger();
-        final Mailbox mqueue = messenger.createMailbox(siteId, VoltDB.DTXN_MAILBOX_ID, null);
-        dtxnConn = new SimpleDtxnConnection(this, mqueue, initiatorIds);
+        m_mailbox = VoltDB.instance().getMessenger()
+            .createMailbox(siteId, VoltDB.DTXN_MAILBOX_ID, null);
+
+        m_transactionQueue = new RestrictedPriorityQueue(initiatorIds, siteId);
 
         // An execution site can be backed by HSQLDB, by volt's EE accessed
         // via JNI or by volt's EE accessed via IPC.  When backed by HSQLDB,
@@ -503,10 +509,6 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
         return m_currentInitiatorSiteId;
     }
 
-    public void setConnectionForTest(final SiteConnection connection) {
-        dtxnConn = connection;
-    }
-
     /**
      * Primary run method that is invoked a single time when the thread is started.
      * Has the opportunity to do startup config.
@@ -543,7 +545,7 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
         try {
             // call recurable run and let it know this is the base call,
             // meaning it's allowed/expected to return null
-            Object test = dtxnConn.recursableRun(true);
+            Object test = recursableRun(true);
             assert(test == null);
         }
         catch (final RuntimeException e) {
@@ -751,7 +753,10 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
      * May be called twice if recurssing via recursableRun(). Protected against that..
      */
     private boolean haveShutdownAlready;
+    @Override
+    public
     void shutdown() {
+
         if (haveShutdownAlready) {
             return;
         }
@@ -767,7 +772,8 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
                     m_watchdog.join();
                 }
 
-                dtxnConn.shutdown();
+                requestDebugMessage(false);
+                m_transactionQueue.shutdown();
 
                 ProcedureProfiler.flushProfile();
                 if (hsql != null) {
@@ -803,15 +809,7 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
         // the dtxn conn will create a message for its message queue,
         // which will cause it to ask this object to dump, using a special workunit
         m_currentDumpTimestamp = timestamp;
-        if (dtxnConn instanceof SimpleDtxnConnection)
-            ((SimpleDtxnConnection) dtxnConn).requestDebugMessage(true);
-
-        // do an unsafe dump in case the execution site is hung
-        // unsafe dumps are actually really hard to do
-        // anything with an iterator chokes pretty quick under load
-        //StringBuilder sb = new StringBuilder();
-        //getDumpContents(sb);
-        //DumpManager.putDump(m_dumpId, timestamp, false, sb.toString());
+        requestDebugMessage(true);
     }
 
     /**
@@ -821,10 +819,331 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
     public ExecutorContext getDumpContents() {
         final ExecutorContext context = new ExecutorContext();
         context.siteId = siteId;
-
-        if (dtxnConn instanceof SimpleDtxnConnection)
-            ((SimpleDtxnConnection) dtxnConn).getDumpContents(context);
-
+        getDumpContents(context);
         return context;
     }
+
+
+    //
+    //
+    //  SiteConnection Methods
+    //
+    //
+
+    @Override
+    public void createAllParticipatingWork(FragmentTask task) {
+        assert(task != null);
+        assert(m_current != null);
+        m_current.createAllParticipatingFragmentWork(task);
+    }
+
+    @Override
+    public void createLocalWork(FragmentTask task, boolean nonTransactional) {
+        assert(task != null);
+        assert(m_current != null);
+        m_current.createLocalFragmentWork(task, nonTransactional);
+    }
+
+    @Override
+    public boolean createWork(int[] partitions, FragmentTask task) {
+        assert(task != null);
+        assert(partitions != null);
+        assert(m_current != null);
+        m_current.createFragmentWork(partitions, task);
+        return false;
+    }
+
+    @Override
+    public int getNextDependencyId() {
+        return m_current.getNextDependencyId();
+    }
+
+    @Override
+    public void setupProcedureResume(boolean isFinal, int... dependencies) {
+        assert(m_current != null);
+        assert(dependencies != null);
+        assert(m_current instanceof MultiPartitionParticipantTxnState);
+        m_current.setupProcedureResume(isFinal, dependencies);
+
+    }
+
+    @Override
+    public Map<Integer, List<VoltTable>> recursableRun(boolean shutdownAllowed) {
+        // loop until the system decided to stop this thread
+        // but don't return with null if not the base stack frame for this method
+        while ((!shutdownAllowed) || (m_shouldContinue)) {
+
+            //////////////////////////////////////////////////////
+            // DO ALL READY-TO-RUN WORK WITHOUT MORE MESSAGES
+            //////////////////////////////////////////////////////
+
+            // repeat until:
+            // 1. no current transaction AND no ready transaction, or
+            // 2. the current transaction is blocked (see end of loop)
+
+            boolean moreWork = (m_current != null) ||
+                               ((m_current = m_transactionQueue.poll()) != null);
+
+            while (moreWork)
+            {
+                // assume there's a current txn inside this loop
+                assert(m_current != null);
+
+                // do all runnable work for the current txn
+                if (m_current.doWork())
+                // if doWork returns true, the transaction is over
+                {
+                    completeTransaction(m_current.isReadOnly);
+                    TransactionState ts = m_transactionsById.remove(m_current.txnId);
+                    assert(ts != null);
+                    m_lastCompletedTxnId = m_current.txnId;
+
+                    // try to get the next current in line
+                    // continue if there's a ready txn
+                    moreWork = (m_current = m_transactionQueue.poll()) != null;
+                }
+                else {
+                    // the current transaction is blocked
+                    moreWork = false;
+
+                    // check if we should drop down a stack frame
+                    //  note, calling this resets the internal state so
+                    //  subsequent calls won't return true
+                    if (m_current.shouldResumeProcedure()) {
+                        Map<Integer, List<VoltTable>> retval = m_current.getPreviousStackFrameDropDependendencies();
+                        assert(retval != null);
+                        assert(shutdownAllowed == false);
+                        return retval;
+                    }
+                }
+            }
+
+            //////////////////////////////////////////////////////
+            // PULL ONE MESSAGE OFF OF QUEUE FROM MESSAGING LAYER
+            //////////////////////////////////////////////////////
+            VoltMessage message = m_mailbox.recvBlocking(5);
+            tick();
+            if (message == null)
+                continue;
+
+            //////////////////////////////////////////////////////
+            // UPDATE THE STATE OF THE SET OF KNOWN TRANSACTIONS
+            //////////////////////////////////////////////////////
+
+            if (message instanceof InitiateTask) {
+                messageArrived((InitiateTask) message);
+            }
+            else if (message instanceof FragmentTask) {
+                messageArrived((FragmentTask) message);
+            }
+            else if (message instanceof FragmentResponse) {
+                messageArrived((FragmentResponse) message);
+            }
+            else if (message instanceof MembershipNotice) {
+                processTransactionMembership((MembershipNotice) message);
+            }
+            else if (message instanceof DebugMessage) {
+                DebugMessage dmsg = (DebugMessage) message;
+                if (dmsg.shouldDump)
+                    DumpManager.putDump(m_dumpId, m_currentDumpTimestamp, true, getDumpContents());
+            }
+            else {
+                hostLog.l7dlog(Level.FATAL, LogKeys.org_voltdb_dtxn_SimpleDtxnConnection_UnkownMessageClass.name(), new Object[] { message.getClass().getName() }, null);
+                VoltDB.crashVoltDB();
+            }
+        }
+
+        assert(shutdownAllowed);
+        return null;
+    }
+
+    private void messageArrived(InitiateTask request) {
+        assert (request.getInitiatorSiteId() != getSiteId());
+        processTransactionMembership(request);
+        assert(request.isSinglePartition() || (request.getNonCoordinatorSites() != null));
+    }
+
+    private void messageArrived(FragmentTask request) {
+        assert (request.getInitiatorSiteId() != getSiteId());
+        TransactionState state = processTransactionMembership(request);
+        if (state == null)
+            return;
+        assert(state instanceof MultiPartitionParticipantTxnState);
+        state.createLocalFragmentWork(request, false);
+    }
+
+    /**
+     * A decision arrived for the current transaction
+     */
+    private void messageArrived(FragmentResponse response) {
+        // the following two outs are for rollback
+        // if the response comes in after the transaction is done
+        // then the response should be ignored
+        // this makes me (john) nervous, but it seems better than
+        // trying to keep track of outstanding responses in an
+        // rollback situation.
+        if ((m_current == null) || (response.getTxnId() != m_current.txnId)) {
+            System.out.printf("Site %d got an old response\n", m_siteId);
+            return;
+        }
+        assert (m_current instanceof MultiPartitionParticipantTxnState);
+        m_current.processRemoteWorkResponse(response);
+    }
+
+    /**
+     * When a message arrives that tells this site that it is part of a
+     * multi-partition transaction, create a TxnState object for it. If
+     * a transaction state message exists, return it.
+     *
+     * @param notice The message that contains transaction information.
+     * @return The SimpleTxnState object created or found.
+     */
+    private TransactionState processTransactionMembership(MembershipNotice notice) {
+        // handle out of order messages
+        if (notice.getTxnId() <= m_lastCompletedTxnId) {
+            // because of our rollback implementation, fragment
+            // tasks can come in late and it's not a problem
+            if (notice instanceof FragmentTask) {
+                //System.out.printf("Site %d got an old notice\n", m_siteId);
+                return null;
+            }
+
+            // vanilla membership notices and initiate tasks are
+            // not allowed to come in out of order
+            StringBuilder msg = new StringBuilder();
+            msg.append("Txn ordering deadlock (DTXN) at site ").append(m_siteId).append(":\n");
+            msg.append("   txn ").append(m_lastCompletedTxnId).append(" (");
+            msg.append(TransactionIdManager.toString(m_lastCompletedTxnId)).append(" HB: ?");
+            msg.append(") before\n");
+            msg.append("   txn ").append(notice.getTxnId()).append(" (");
+            msg.append(TransactionIdManager.toString(notice.getTxnId())).append(" HB:");
+            msg.append(notice.isHeartBeat()).append(").\n");
+            throw new RuntimeException(msg.toString());
+        }
+
+        m_transactionQueue.gotTransaction(notice.getInitiatorSiteId(),
+                                          notice.getTxnId(),
+                                          notice.isHeartBeat());
+
+        // ignore heartbeats
+        if (notice.isHeartBeat())
+            return null;
+
+        if ((m_current != null) && (m_current.txnId == notice.getTxnId()))
+            return m_current;
+
+        TransactionState state = m_transactionsById.get(notice.getTxnId());
+        if (state == null) {
+            if (notice instanceof InitiateTask) {
+                InitiateTask it = (InitiateTask) notice;
+                if (it.isSinglePartition())
+                    state = new SinglePartitionTxnState(m_mailbox, this, it);
+                else
+                    state = new MultiPartitionParticipantTxnState(m_mailbox, this, it);
+
+            }
+            else {
+                state = new MultiPartitionParticipantTxnState(m_mailbox, this, notice);
+            }
+
+            m_transactionQueue.add(state);
+            m_transactionsById.put(state.txnId, state);
+        }
+        return state;
+    }
+
+    /**
+     * Try to execute a single partition procedure if one is available in the
+     * priority queue.
+     *
+     * @return true if a procedure was executed, false if none available
+     */
+    public boolean tryToSneakInASinglePartitionProcedure() {
+        // collect up to one message from the network
+        tryFetchNewWork();
+
+        TransactionState nextTxn = m_transactionQueue.peek();
+
+        // nothing is ready to go
+        if (nextTxn == null)
+            return false;
+
+        // only sneak in single partition work
+        if (nextTxn instanceof SinglePartitionTxnState) {
+            nextTxn = m_transactionQueue.peek();
+            boolean success = nextTxn.doWork();
+            assert(success);
+            return true;
+        }
+
+        // multipartition is next
+        return false;
+    }
+
+    public void tryFetchNewWork() {
+        //////////////////////////////////////////////////////
+        // PULL ONE MESSAGE OFF OF QUEUE FROM MESSAGING LAYER
+        //////////////////////////////////////////////////////
+        VoltMessage message = m_mailbox.recv();
+        tick();
+        if (message == null)
+            return;
+
+        //////////////////////////////////////////////////////
+        // UPDATE THE STATE OF THE SET OF KNOWN TRANSACTIONS
+        //////////////////////////////////////////////////////
+
+        if (message instanceof InitiateTask) {
+            messageArrived((InitiateTask) message);
+        }
+        else if (message instanceof FragmentTask) {
+            messageArrived((FragmentTask) message);
+        }
+        else if (message instanceof FragmentResponse) {
+            messageArrived((FragmentResponse) message);
+        }
+        else if (message instanceof MembershipNotice) {
+            processTransactionMembership((MembershipNotice) message);
+        }
+        else if (message instanceof DebugMessage) {
+            DebugMessage dmsg = (DebugMessage) message;
+            if (dmsg.shouldDump)
+                DumpManager.putDump(m_dumpId, m_currentDumpTimestamp, true, getDumpContents());
+        }
+        else {
+            hostLog.l7dlog(Level.FATAL, LogKeys.org_voltdb_dtxn_SimpleDtxnConnection_UnkownMessageClass.name(), new Object[] { message.getClass().getName() }, null);
+            VoltDB.crashVoltDB();
+        }
+    }
+
+    /**
+     * Put a message in the queue so that when the message is pulled out, it
+     * will trigger an atomic boolean that will instruct the getNextWorkUnit()
+     * to return a special workunit which will cause the ExecutionSite to dump
+     * its state in a threadsafe way. I'm sorry for this logic...
+     */
+    public void requestDebugMessage(boolean shouldDump) {
+        DebugMessage dmsg = new DebugMessage();
+        dmsg.shouldDump = shouldDump;
+        try {
+            m_mailbox.send(getSiteId(), 0, dmsg);
+        }
+        catch (org.voltdb.messaging.MessagingException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void getDumpContents(ExecutorContext context) {
+        // get the messaging log
+        if (m_mailbox instanceof SiteMailbox)
+            context.mailboxHistory = ((SiteMailbox) m_mailbox).getHistory();
+
+        // get the current transaction's state (if any)
+        if (m_current != null)
+            context.activeTransaction = m_current.getDumpContents();
+
+        // get the stuff inside the restricted priority queue
+        m_transactionQueue.getDumpContents(context);
+    }
+
 }

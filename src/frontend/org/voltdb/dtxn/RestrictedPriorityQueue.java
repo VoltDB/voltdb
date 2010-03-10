@@ -53,7 +53,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
      * are later referenced that aren't in this list, trip
      * an assertion.
      */
-    RestrictedPriorityQueue(int[] initiatorSiteIds, int siteId) {
+    public RestrictedPriorityQueue(int[] initiatorSiteIds, int siteId) {
         m_siteId = siteId;
         for (int id : initiatorSiteIds)
             m_lastTxnFromEachInitiator.put(id, -1L);
@@ -93,7 +93,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
      * Update the information stored about the latest transaction
      * seen from each initiator. Compute the newest safe transaction id.
      */
-    void gotTransaction(int initiatorId, long txnId, boolean isHeartbeat) {
+    public void gotTransaction(int initiatorId, long txnId, boolean isHeartbeat) {
         assert(m_lastTxnFromEachInitiator.containsKey(initiatorId));
 
         if (m_lastTxnPopped > txnId) {
@@ -127,7 +127,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
         return m_newestSafeTransaction;
     }
 
-    void getDumpContents(ExecutorContext context) {
+    public void getDumpContents(ExecutorContext context) {
         // set misc scalars
         context.transactionsStarted = m_txnsPopped;
 

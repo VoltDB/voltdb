@@ -58,31 +58,31 @@ public class TestRestrictedPriorityQueue extends TestCase{
         m_task = new InitiateTask(0, 0, m_idManager.getNextUniqueTransactionId(),
                 true, true, m_proc);
         m_txnIds.add(m_task.getTxnId());
-        m_state1 = new SinglePartitionTxnState(null, null, null, m_task);
+        m_state1 = new SinglePartitionTxnState(null, null, m_task);
 
         m_task = new InitiateTask(1, 1, m_idManager.getNextUniqueTransactionId(),
                 true, true, m_proc);
         assertTrue(m_txnIds.lastElement() < m_task.getTxnId());
         m_txnIds.add(m_task.getTxnId());
-        m_state2 = new SinglePartitionTxnState(null, null, null, m_task);
+        m_state2 = new SinglePartitionTxnState(null, null, m_task);
 
         m_task = new InitiateTask(0, 0, m_idManager.getNextUniqueTransactionId(),
                 true, true, m_proc);
         assertTrue(m_txnIds.lastElement() < m_task.getTxnId());
         m_txnIds.add(m_task.getTxnId());
-        m_state3 = new SinglePartitionTxnState(null, null, null, m_task);
+        m_state3 = new SinglePartitionTxnState(null, null, m_task);
 
         m_task = new InitiateTask(1, 1, m_idManager.getNextUniqueTransactionId(),
                 true, true, m_proc);
         assertTrue(m_txnIds.lastElement() < m_task.getTxnId());
         m_txnIds.add(m_task.getTxnId());
-        m_state4 = new SinglePartitionTxnState(null, null, null, m_task);
+        m_state4 = new SinglePartitionTxnState(null, null, m_task);
 
         m_task = new InitiateTask(0, 0, m_idManager.getNextUniqueTransactionId(),
                 true, true, m_proc);
         assertTrue(m_txnIds.lastElement() < m_task.getTxnId());
         m_txnIds.add(m_task.getTxnId());
-        m_state5 = new SinglePartitionTxnState(null, null, null, m_task);
+        m_state5 = new SinglePartitionTxnState(null, null, m_task);
 
         // Create an additional transaction to add to the priority queue but
         // don't add it to m_txnIds.  This additional transaction allows us
@@ -90,7 +90,7 @@ public class TestRestrictedPriorityQueue extends TestCase{
         m_task = new InitiateTask(1, 1, m_idManager.getNextUniqueTransactionId(),
                 true, true, m_proc);
         assertTrue(m_txnIds.lastElement() < m_task.getTxnId());
-        m_state6 = new SinglePartitionTxnState(null, null, null, m_task);
+        m_state6 = new SinglePartitionTxnState(null, null, m_task);
         m_queue.shutdown();
     }
 

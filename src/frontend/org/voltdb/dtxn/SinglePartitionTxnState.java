@@ -23,12 +23,15 @@ import org.voltdb.messages.*;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
 
-class SinglePartitionTxnState extends TransactionState {
+public class SinglePartitionTxnState extends TransactionState {
 
     InitiateTask m_task = null;
 
-    public SinglePartitionTxnState(Mailbox mbox, SimpleDtxnConnection conn, ExecutionSite site, InitiateTask task) {
-        super(mbox, conn, site, task);
+    public SinglePartitionTxnState(Mailbox mbox,
+                                   ExecutionSite site,
+                                   InitiateTask task)
+    {
+        super(mbox, site, task);
         m_task = task;
     }
 

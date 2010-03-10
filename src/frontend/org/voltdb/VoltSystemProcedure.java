@@ -75,11 +75,11 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
 
         // the stack frame drop terminates the recursion and resumes
         // execution of the current stored procedure.
-        m_site.dtxnConn.setupProcedureResume(false, aggregatorOutputDependencyId);
+        m_site.setupProcedureResume(false, aggregatorOutputDependencyId);
 
         // execute the tasks that just got queued.
         // recursively call recurableRun and don't allow it to shutdown
-        Map<Integer,List<VoltTable>> mapResults = m_site.dtxnConn.recursableRun(false);
+        Map<Integer,List<VoltTable>> mapResults = m_site.recursableRun(false);
 
         List<VoltTable> matchingTablesForId = mapResults.get(aggregatorOutputDependencyId);
         if (matchingTablesForId == null) {
@@ -143,7 +143,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
 
             if (pf.multipartition) {
                 // create a workunit for every execution site
-                m_site.dtxnConn.createAllParticipatingWork(task);
+                m_site.createAllParticipatingWork(task);
             }
             else if (pf.nonExecSites) {
                 // create a workunit for one arbitrary site on each host.
@@ -160,14 +160,14 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                 for (int i = 0; i < sites.size(); i++)
                     destinations[i] = sites.get(i);
 
-                m_site.dtxnConn.createWork(destinations, task);
+                m_site.createWork(destinations, task);
             }
             else {
                 // create one workunit for the current site
                 if (pf.siteId == -1)
-                    m_site.dtxnConn.createLocalWork(task, false);
+                    m_site.createLocalWork(task, false);
                 else
-                    m_site.dtxnConn.createWork(new int[] { pf.siteId }, task);
+                    m_site.createWork(new int[] { pf.siteId }, task);
             }
         }
     }

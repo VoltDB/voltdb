@@ -37,7 +37,6 @@ import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltdb.dtxn.SiteConnection;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.regressionsuites.multipartitionprocs.MultiSiteSelect;
@@ -60,11 +59,6 @@ public class TestTwoSitePlans extends TestCase {
 
         @Override
         public void run() {
-            assert(false);
-        }
-
-        @Override
-        public void setConnectionForTest(SiteConnection connection) {
             assert(false);
         }
     }

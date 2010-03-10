@@ -37,14 +37,13 @@ import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.VoltMessage;
 
-class MultiPartitionParticipantTxnState extends TransactionState {
+public class MultiPartitionParticipantTxnState extends TransactionState {
 
     private final ArrayDeque<WorkUnit> m_readyWorkUnits = new ArrayDeque<WorkUnit>();
     private boolean m_isCoordinator;
     private int[] m_nonCoordinatingSites;
     private boolean m_shouldResumeProcedure = false;
     private boolean m_hasStartedWork = false;
-    private final SimpleDtxnConnection m_conn;
     private HashMap<Integer, WorkUnit> m_missingDependencies = null;
     private ArrayList<WorkUnit> m_stackFrameDropWUs = null;
     private Map<Integer, List<VoltTable>> m_previousStackFrameDropDependencies = null;
@@ -59,19 +58,18 @@ class MultiPartitionParticipantTxnState extends TransactionState {
         private static final long serialVersionUID = 1L;
     }
 
-    public MultiPartitionParticipantTxnState(Mailbox mbox, SimpleDtxnConnection conn, ExecutionSite site,
+    public MultiPartitionParticipantTxnState(Mailbox mbox, ExecutionSite site,
                                              MembershipNotice notice)
     {
-        super(mbox, conn, site, notice);
+        super(mbox, site, notice);
         m_nonCoordinatingSites = null;
-        m_conn = conn;
         m_isCoordinator = false;
         if (notice instanceof InitiateTask)
         {
             m_isCoordinator = true;
             InitiateTask task = (InitiateTask) notice;
             m_nonCoordinatingSites = task.getNonCoordinatorSites();
-            m_readyWorkUnits.add(new WorkUnit(m_conn.m_site.m_context, task, null, false));
+            m_readyWorkUnits.add(new WorkUnit(site.m_context, task, null, false));
         }
     }
 
@@ -145,7 +143,7 @@ class MultiPartitionParticipantTxnState extends TransactionState {
                     // repeat until no eligible procs or other work is ready
                     boolean success = false;
                     do {
-                        success = m_conn.tryToSneakInASinglePartitionProcedure();
+                        success = m_site.tryToSneakInASinglePartitionProcedure();
                     }
                     while(success && ((wu = m_readyWorkUnits.poll()) == null));
                 }
@@ -262,7 +260,7 @@ class MultiPartitionParticipantTxnState extends TransactionState {
         assert(dependencies != null);
         assert(dependencies.length > 0);
 
-        WorkUnit w = new WorkUnit(m_conn.m_site.m_context, null, dependencies, true);
+        WorkUnit w = new WorkUnit(m_site.m_context, null, dependencies, true);
         if (isFinal)
             w.nonTransactional = true;
         for (int depId : dependencies) {
@@ -324,7 +322,7 @@ class MultiPartitionParticipantTxnState extends TransactionState {
         //    the transaction is clean (and stays clean after this work)
         if ((!m_isCoordinator) && (task.isFinalTask())) {
             // add a workunit that will commit the txn
-            WorkUnit wu = new WorkUnit(m_conn.m_site.m_context, null, null, false);
+            WorkUnit wu = new WorkUnit(m_site.m_context, null, null, false);
             wu.commitEvenIfDirty = task.getFragmentCount() == 0;
             m_readyWorkUnits.add(wu);
         }
@@ -334,7 +332,7 @@ class MultiPartitionParticipantTxnState extends TransactionState {
     {
         if (task.getFragmentCount() <= 0) return;
 
-        WorkUnit w = new WorkUnit(m_conn.m_site.m_context, task, task.getAllUnorderedInputDepIds(), false);
+        WorkUnit w = new WorkUnit(m_site.m_context, task, task.getAllUnorderedInputDepIds(), false);
         w.nonTransactional = nonTransactional;
 
         for (int i = 0; i < task.getFragmentCount(); i++) {

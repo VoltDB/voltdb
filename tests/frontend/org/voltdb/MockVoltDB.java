@@ -32,7 +32,6 @@ import org.voltdb.catalog.Host;
 import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
-import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.fault.FaultDistributor;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.impl.HostMessenger;
@@ -40,7 +39,7 @@ import org.voltdb.network.VoltNetwork;
 
 public class MockVoltDB implements VoltDBInterface
 {
-    private Catalog m_catalog;
+    private final Catalog m_catalog;
     private CatalogContext m_context;
     final String m_clusterName = "cluster";
     final String m_databaseName = "database";

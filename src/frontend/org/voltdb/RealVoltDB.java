@@ -34,7 +34,6 @@ import org.apache.log4j.Logger;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Site;
 import org.voltdb.catalog.SnapshotSchedule;
-import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.elt.ELTManager;
 import org.voltdb.fault.FaultDistributor;
 import org.voltdb.messaging.Messenger;
@@ -106,7 +105,6 @@ public class RealVoltDB implements VoltDBInterface
     private ArrayList<ExecutionSiteRunner> m_runners;
     private ExecutionSite m_currentThreadSite;
     private StatsAgent m_statsAgent = new StatsAgent();
-    private SiteTracker m_siteTracker;
     private FaultDistributor m_faultManager;
 
     // add a random number to the sampler output to make it likely to be unique for this process.
@@ -168,7 +166,6 @@ public class RealVoltDB implements VoltDBInterface
         catalog.execute(serializedCatalog);
         m_catalogContext = new CatalogContext(catalog, m_config.m_pathToCatalog);
         final SnapshotSchedule schedule = m_catalogContext.database.getSnapshotschedule().get("default");
-        m_siteTracker = new SiteTracker(m_catalogContext.sites);
 
         /*
          * The lowest non-exec siteId (ClientInterface) is tasked with

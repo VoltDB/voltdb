@@ -330,9 +330,7 @@ public class SocketJoiner extends Thread {
                     byte[] ipBytes = new byte[ipSize];
                     in.readFully(ipBytes);
                     InetAddress ip = InetAddress.getByAddress(ipBytes);
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Non-Primary Socket:" + ip.toString());
-                    }
+                    LOG.debug("Opening non-primary socket: " + ip.toString());
                     newSock = SocketChannel.open(new InetSocketAddress(ip, BASE_PORT + hostId));
                 }
                 if (command == COMMAND_LISTEN) {
@@ -374,6 +372,7 @@ public class SocketJoiner extends Thread {
             }
         }
         catch (IOException e) {
+            m_hostLog.error("Failed to establish socket mesh.", e);
             throw new RuntimeException(e);
         }
         finally {

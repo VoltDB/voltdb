@@ -50,7 +50,10 @@ public abstract class TransactionState implements Comparable<TransactionState> {
      * @param mbox The mailbox for the site.
      * @param notice The information about the new transaction.
      */
-    protected TransactionState(Mailbox mbox, SimpleDtxnConnection conn, ExecutionSite site, MembershipNotice notice) {
+    protected TransactionState(Mailbox mbox,
+                               ExecutionSite site,
+                               MembershipNotice notice)
+    {
         m_mbox = mbox;
         m_site = site;
         txnId = notice.getTxnId();

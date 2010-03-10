@@ -1044,7 +1044,7 @@ public abstract class VoltProcedure {
             }
 
             // Figure out what is needed to resume the proc
-            int collectorOutputDepId = m_site.dtxnConn.getNextDependencyId();
+            int collectorOutputDepId = m_site.getNextDependencyId();
             depsToResume[i] = collectorOutputDepId;
 
             // Build the set of params for the frags
@@ -1092,7 +1092,7 @@ public abstract class VoltProcedure {
                         localFragIds[i] = CatalogUtil.getUniqueIdForFragment(frag);
                         localParams[i] = params;
                         assert(frag.getHasdependencies());
-                        int outputDepId = m_site.dtxnConn.getNextDependencyId() | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+                        int outputDepId = m_site.getNextDependencyId() | DtxnConstants.MULTIPARTITION_DEPENDENCY;
                         depsForLocalTask[i] = outputDepId;
                         distributedOutputDepIds.add(outputDepId);
 
@@ -1122,7 +1122,7 @@ public abstract class VoltProcedure {
         //int[] expectedBroadDepIds = m_site.dtxnConn.getNextDepenendcyArray(distributedFragIdArray.length);
 
         // instruct the dtxn what's needed to resume the proc
-        m_site.dtxnConn.setupProcedureResume(finalTask, depsToResume);
+        m_site.setupProcedureResume(finalTask, depsToResume);
 
         // create all the local work for the transaction
         FragmentTask localTask = new FragmentTask(m_site.getCurrentInitiatorSiteId(),
@@ -1139,7 +1139,7 @@ public abstract class VoltProcedure {
         }
 
         // note: non-transactional work only helps us if it's final work
-        m_site.dtxnConn.createLocalWork(localTask, localFragsAreNonTransactional && finalTask);
+        m_site.createLocalWork(localTask, localFragsAreNonTransactional && finalTask);
 
         // create and distribute work for all sites in the transaction
         FragmentTask distributedTask = new FragmentTask(m_site.getCurrentInitiatorSiteId(),
@@ -1150,10 +1150,10 @@ public abstract class VoltProcedure {
                                                         distributedOutputDepIdArray,
                                                         distributedParamsArray,
                                                         finalTask);
-        m_site.dtxnConn.createAllParticipatingWork(distributedTask);
+        m_site.createAllParticipatingWork(distributedTask);
 
         // recursively call recurableRun and don't allow it to shutdown
-        Map<Integer,List<VoltTable>> mapResults = m_site.dtxnConn.recursableRun(false);
+        Map<Integer,List<VoltTable>> mapResults = m_site.recursableRun(false);
 
         assert(mapResults != null);
         assert(depsToResume != null);
