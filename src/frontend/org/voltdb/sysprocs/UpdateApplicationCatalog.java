@@ -57,10 +57,11 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
 
         VoltTable t = new VoltTable(new VoltTable.ColumnInfo("", VoltType.BIGINT));
         Object[] paramObj = params.toArray();
+        assert(paramObj.length > 0);
+        String catalogDiffCommands = (String) paramObj[0];
 
         if (fragmentId == SysProcFragmentId.PF_catalogUpdateGlobal) {
             assert(paramObj.length == 2);
-            String catalogDiffCommands = (String) paramObj[0];
             String catalogURL = (String) paramObj[1];
             if (updateVoltDBSingleton(context, catalogDiffCommands, catalogURL))
                 t.addRow(1);
@@ -69,8 +70,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             return new DependencyPair(ROUNDONE_DEP, t);
         }
         else if (fragmentId == SysProcFragmentId.PF_catalogUptateExecSite) {
-            assert(paramObj.length == 0);
-            if (updateExecutionSite(context))
+            assert(paramObj.length == 1);
+            if (updateExecutionSite(context, catalogDiffCommands))
                 t.addRow(1);
             else
                 t.addRow(0);
@@ -90,9 +91,10 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         return true;
     }
 
-    boolean updateExecutionSite(SystemProcedureExecutionContext context) {
+    boolean updateExecutionSite(SystemProcedureExecutionContext context, String encodedCatalogDiffCommands) {
+        String catalogDiffCommands = Encoder.decodeBase64AndDecompress(encodedCatalogDiffCommands);
 
-        context.getExecutionSite().updateCatalog();
+        context.getExecutionSite().updateCatalog(catalogDiffCommands);
 
         System.err.printf("Running update catalog on a site.\n");
 
@@ -127,7 +129,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         pfs[0].multipartition = true;
         pfs[0].nonExecSites = false;
         pfs[0].parameters = new ParameterSet();
-        pfs[0].parameters.setParameters(new Object[] {});
+        pfs[0].parameters.setParameters(new Object[] { catalogDiffCommands });
 
         retval = executeSysProcPlanFragments(pfs, ROUNDTWO_DEP);
         assert(retval != null);

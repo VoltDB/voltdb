@@ -401,7 +401,7 @@ int VoltDBEngine::executePlanFragment(std::string fragmentString, int32_t output
 
     try
     {
-        if (initPlanFragment(AD_HOC_FRAG_ID, hexEncodedFragment, m_database))
+        if (initPlanFragment(AD_HOC_FRAG_ID, hexEncodedFragment))
         {
             voltdb::NValueArray parameterValueArray(0);
             retval = executeQuery(AD_HOC_FRAG_ID, outputDependencyId, inputDependencyId, parameterValueArray,
@@ -494,51 +494,20 @@ bool VoltDBEngine::loadCatalog(const std::string &catalogPayload) {
         m_isELEnabled = true;
     }
 
-    // Loop through all our databases...
-    std::map<std::string, catalog::Database*>::const_iterator db_iterator;
-    for (db_iterator = cluster->databases().begin(); db_iterator != cluster->databases().end(); db_iterator++) {
-        const catalog::Database *catalogDb = db_iterator->second;
-
-        // Now in each database, loop through all the tables...
-        std::map<std::string, catalog::Table*>::const_iterator table_iterator;
-        for (table_iterator = catalogDb->tables().begin(); table_iterator != catalogDb->tables().end(); table_iterator++) {
-            if (!initTable(catalogDb->relativeIndex(), table_iterator->second)) {
-                VOLT_ERROR("Failed to initialize table '%s' from catalogs\n", table_iterator->second->name().c_str());
-                return false;
-            }
+    // Loop through all the tables...
+    std::map<std::string, catalog::Table*>::const_iterator table_iterator;
+    for (table_iterator = m_database->tables().begin(); table_iterator != m_database->tables().end(); table_iterator++) {
+        if (!initTable(m_database->relativeIndex(), table_iterator->second)) {
+            VOLT_ERROR("Failed to initialize table '%s' from catalogs\n", table_iterator->second->name().c_str());
+            return false;
         }
-
-        // And then initialize all the planfragments.
-        std::map<std::string, catalog::Procedure*>::const_iterator proc_iterator;
-        for (proc_iterator = catalogDb->procedures().begin(); proc_iterator != catalogDb->procedures().end(); proc_iterator++) {
-
-            // Procedure
-            const catalog::Procedure *catalog_proc = proc_iterator->second;
-            VOLT_DEBUG("proc: %s", catalog_proc->name().c_str());
-            std::map<std::string, catalog::Statement*>::const_iterator stmt_iterator;
-            for (stmt_iterator = catalog_proc->statements().begin(); stmt_iterator != catalog_proc->statements().end(); stmt_iterator++) {
-
-                // PlanFragment
-                const catalog::Statement *catalogStmt = stmt_iterator->second;
-                VOLT_DEBUG("  stmt: %s : %s", catalogStmt->name().c_str(), catalogStmt->sqltext().c_str());
-
-                std::map<std::string, catalog::PlanFragment*>::const_iterator pf_iterator;
-                for (pf_iterator = catalogStmt->fragments().begin(); pf_iterator!= catalogStmt->fragments().end(); pf_iterator++) {
-                    //int64_t fragId = uniqueIdForFragment(pf_iterator->second);
-                    int64_t fragId = uniqueIdForFragment(pf_iterator->second);
-                    std::string planNodeTree = pf_iterator->second->plannodetree();
-                    if (!initPlanFragment(fragId, planNodeTree, catalogDb)) {
-                        VOLT_ERROR("Failed to initialize plan fragment '%s' from catalogs", pf_iterator->second->name().c_str());
-                        VOLT_ERROR("Failed SQL Statement: %s", catalogStmt->sqltext().c_str());
-                        return false;
-                    }
-                }
-            }
-        }
-
-        // load up all the materialized views
-        initMaterializedViews(catalogDb);
     }
+
+    // load up all the materialized views
+    initMaterializedViews();
+
+    // load the plan fragments from the catalog
+    clearAndLoadAllPlanFragments();
 
     // deal with the epoch
     int64_t epoch = cluster->localepoch() * (int64_t)1000;
@@ -552,8 +521,16 @@ bool VoltDBEngine::updateCatalog(const std::string &catalogPayload) {
     assert(m_catalog != NULL); // the engine must be initialized
     VOLT_DEBUG("Updating catalog...");
 
-    m_catalog->execute(catalogPayload);
+    // apply the diff commands to the existing catalog
+    try {
+        m_catalog->execute(catalogPayload);
+    }
+    catch (std::string s) {
+        VOLT_ERROR("Error updating catalog: %s", s.c_str());
+        return false;
+    }
 
+    // cache the database in m_database
     catalog::Cluster *cluster = m_catalog->clusters().get("cluster");
     if (!cluster) {
         VOLT_ERROR("Unable to find cluster catalog information");
@@ -562,6 +539,12 @@ bool VoltDBEngine::updateCatalog(const std::string &catalogPayload) {
     m_database = cluster->databases().get("database");
     if (!m_database) {
         VOLT_ERROR("Unable to find database catalog information");
+        return false;
+    }
+
+    // this does the actual scary bits of reinitializing plan fragments
+    if (!clearAndLoadAllPlanFragments()) {
+        VOLT_ERROR("Error updating catalog planfragments");
         return false;
     }
 
@@ -593,12 +576,48 @@ bool VoltDBEngine::loadTable(bool allowELT, int32_t tableId,
     return true;
 }
 
+bool VoltDBEngine::clearAndLoadAllPlanFragments() {
+    // clear the existing stuff if this is being called as part of a catalog change
+    for (int ii = 0; ii < m_planFragments.size(); ii++)
+        delete m_planFragments[ii];
+    m_planFragments.clear();
+    m_executorMap.clear();
+
+    // initialize all the planfragments.
+    std::map<std::string, catalog::Procedure*>::const_iterator proc_iterator;
+    for (proc_iterator = m_database->procedures().begin(); proc_iterator != m_database->procedures().end(); proc_iterator++) {
+
+        // Procedure
+        const catalog::Procedure *catalog_proc = proc_iterator->second;
+        VOLT_DEBUG("proc: %s", catalog_proc->name().c_str());
+        std::map<std::string, catalog::Statement*>::const_iterator stmt_iterator;
+        for (stmt_iterator = catalog_proc->statements().begin(); stmt_iterator != catalog_proc->statements().end(); stmt_iterator++) {
+
+            // PlanFragment
+            const catalog::Statement *catalogStmt = stmt_iterator->second;
+            VOLT_DEBUG("  stmt: %s : %s", catalogStmt->name().c_str(), catalogStmt->sqltext().c_str());
+
+            std::map<std::string, catalog::PlanFragment*>::const_iterator pf_iterator;
+            for (pf_iterator = catalogStmt->fragments().begin(); pf_iterator!= catalogStmt->fragments().end(); pf_iterator++) {
+                //int64_t fragId = uniqueIdForFragment(pf_iterator->second);
+                int64_t fragId = uniqueIdForFragment(pf_iterator->second);
+                std::string planNodeTree = pf_iterator->second->plannodetree();
+                if (!initPlanFragment(fragId, planNodeTree)) {
+                    VOLT_ERROR("Failed to initialize plan fragment '%s' from catalogs", pf_iterator->second->name().c_str());
+                    VOLT_ERROR("Failed SQL Statement: %s", catalogStmt->sqltext().c_str());
+                    return false;
+                }
+            }
+        }
+    }
+
+    return true;
+}
+
 // -------------------------------------------------
 // Initialization Functions
 // -------------------------------------------------
-bool VoltDBEngine::initPlanFragment(const int64_t fragId,
-                                    const std::string planNodeTree,
-                                    const catalog::Database *catalogDb) {
+bool VoltDBEngine::initPlanFragment(const int64_t fragId, const std::string planNodeTree) {
 
     // Deserialize the PlanFragment and stick in our local map
 
@@ -609,7 +628,7 @@ bool VoltDBEngine::initPlanFragment(const int64_t fragId,
     }
 
     // catalog method plannodetree returns PlanNodeList.java
-    PlanNodeFragment *pnf = PlanNodeFragment::createFromCatalog(planNodeTree, catalogDb);
+    PlanNodeFragment *pnf = PlanNodeFragment::createFromCatalog(planNodeTree, m_database);
     m_planFragments.push_back(pnf);
     VOLT_TRACE("\n%s\n", pnf->debug().c_str());
     assert(pnf->getRootNode());
@@ -625,7 +644,7 @@ bool VoltDBEngine::initPlanFragment(const int64_t fragId,
 
     // Initialize each node!
     for (int ctr = 0, cnt = (int)pnf->getExecuteList().size(); ctr < cnt; ctr++) {
-        if (!initPlanNode(fragId, catalogDb, pnf->getExecuteList()[ctr], &(ev->tempTableMemoryInBytes))) {
+        if (!initPlanNode(fragId, pnf->getExecuteList()[ctr], &(ev->tempTableMemoryInBytes))) {
             VOLT_ERROR("Failed to initialize PlanNode '%s' at position '%d' for PlanFragment '%jd'",
                      pnf->getExecuteList()[ctr]->debug().c_str(), ctr, (intmax_t)fragId);
             return false;
@@ -641,7 +660,7 @@ bool VoltDBEngine::initPlanFragment(const int64_t fragId,
     return true;
 }
 
-bool VoltDBEngine::initPlanNode(const int64_t fragId, const catalog::Database* catalogDb, AbstractPlanNode* node, int* tempTableMemoryInBytes) {
+bool VoltDBEngine::initPlanNode(const int64_t fragId, AbstractPlanNode* node, int* tempTableMemoryInBytes) {
     assert(node);
     assert(node->getExecutor() == NULL);
 
@@ -657,7 +676,7 @@ bool VoltDBEngine::initPlanNode(const int64_t fragId, const catalog::Database* c
         std::map<PlanNodeType, AbstractPlanNode*>::iterator internal_it;
         for (internal_it = node->getInlinePlanNodes().begin(); internal_it != node->getInlinePlanNodes().end(); internal_it++) {
             AbstractPlanNode* inline_node = internal_it->second;
-            if (!initPlanNode(fragId, catalogDb, inline_node, tempTableMemoryInBytes)) {
+            if (!initPlanNode(fragId, inline_node, tempTableMemoryInBytes)) {
                 VOLT_ERROR("Failed to initialize the internal PlanNode '%s' of PlanNode '%s'", inline_node->debug().c_str(), node->debug().c_str());
                 return false;
             }
@@ -665,7 +684,7 @@ bool VoltDBEngine::initPlanNode(const int64_t fragId, const catalog::Database* c
     }
 
     // Now use the executor to initialize the plannode for execution later on
-    if (!executor->init(this, catalogDb, tempTableMemoryInBytes)) {
+    if (!executor->init(this, m_database, tempTableMemoryInBytes)) {
         VOLT_ERROR("The Executor failed to initialize PlanNode '%s' for PlanFragment '%jd'", node->debug().c_str(), (intmax_t)fragId);
         return false;
     }
@@ -841,14 +860,14 @@ bool VoltDBEngine::initTable(const int32_t databaseId, const catalog::Table *cat
     return true;
 }
 
-bool VoltDBEngine::initMaterializedViews(const catalog::Database *catalogDb) {
+bool VoltDBEngine::initMaterializedViews() {
 
     std::map<PersistentTable*, std::vector<MaterializedViewMetadata*> > allViews;
 
     // build all the materialized view metadata structure
     // start by iterating over all the tables in the catalog
     std::map<std::string, catalog::Table*>::const_iterator tableIterator;
-    for (tableIterator = catalogDb->tables().begin(); tableIterator != catalogDb->tables().end(); tableIterator++) {
+    for (tableIterator = m_database->tables().begin(); tableIterator != m_database->tables().end(); tableIterator++) {
         catalog::Table *srcCatalogTable = tableIterator->second;
         PersistentTable *srcTable = dynamic_cast<PersistentTable*>(m_tables[srcCatalogTable->relativeIndex()]);
 

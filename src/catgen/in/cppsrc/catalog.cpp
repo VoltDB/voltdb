@@ -82,10 +82,11 @@ void Catalog::executeOne(const string &stmt) {
     //cout << "A: " << a << endl;
     //cout << "B: " << b << endl;
 
+    CatalogType *item = itemForRef(ref);
+    assert(item != NULL);
+
     // execute
     if (command.compare("add") == 0) {
-        CatalogType *item = itemForRef(ref);
-        assert(item != NULL);
         CatalogType *type = item->addChild(a, b);
         assert(type != NULL);
         std::string path = type->path();
@@ -105,11 +106,13 @@ void Catalog::executeOne(const string &stmt) {
         }
     }
     else if (command.compare("set") == 0) {
-        CatalogType *item = itemForRef(ref);
         item->set(a, b);
     }
+    else if (command.compare("delete") == 0) {
+        item->removeChild(a, b);
+    }
     else {
-        throw string("command isn't 'set' or 'and'.");
+        throw string("command isn't 'set' or 'add'.");
     }
 }
 

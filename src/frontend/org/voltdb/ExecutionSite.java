@@ -420,9 +420,10 @@ public class ExecutionSite implements Runnable, DumpManager.Dumpable {
         m_snapshotter = new SnapshotSiteProcessor();
     }
 
-    public boolean updateCatalog() {
+    public boolean updateCatalog(String catalogDiffCommands) {
         m_context = VoltDB.instance().getCatalogContext();
         loadProceduresFromCatalog();
+        ee.updateCatalog(catalogDiffCommands);
         return true;
     }
 

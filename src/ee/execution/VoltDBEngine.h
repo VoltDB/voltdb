@@ -347,11 +347,12 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         // Initialization Functions
         // -------------------------------------------------
+        bool clearAndLoadAllPlanFragments();
         bool initTable(const int32_t databaseId, const catalog::Table *catalogTable);
-        bool initPlanFragment(const int64_t fragId, const std::string planNodeTree, const catalog::Database *catalogDb);
-        bool initPlanNode(const int64_t fragId, const catalog::Database *catalogDb, AbstractPlanNode* node, int* tempTableMemoryInBytes);
+        bool initPlanFragment(const int64_t fragId, const std::string planNodeTree);
+        bool initPlanNode(const int64_t fragId, AbstractPlanNode* node, int* tempTableMemoryInBytes);
         bool initCluster(const catalog::Cluster *catalogCluster);
-        bool initMaterializedViews(const catalog::Database *catalogDb);
+        bool initMaterializedViews();
 
         void printReport();
 
