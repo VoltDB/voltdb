@@ -70,17 +70,8 @@ import org.voltdb.utils.VoltLoggerFactory;
 
 public class SimpleDtxnConnection extends SiteConnection {
 
-    /**
-     *  This is thrown by the TransactionState instance when something
-     *  goes wrong mid-fragment, and execution needs to back all the way
-     *  out to the stored procedure call.
-     */
-    public static class FragmentFailureException extends RuntimeException {
-        private static final long serialVersionUID = 1L;
-    }
-
     // Messaging stuff
-    private Mailbox m_mailbox;
+    private final Mailbox m_mailbox;
 
     public ExecutionSite m_site;
 

@@ -50,6 +50,15 @@ class MultiPartitionParticipantTxnState extends TransactionState {
     private Map<Integer, List<VoltTable>> m_previousStackFrameDropDependencies = null;
     private boolean m_dirty = false;
 
+    /**
+     *  This is thrown by the TransactionState instance when something
+     *  goes wrong mid-fragment, and execution needs to back all the way
+     *  out to the stored procedure call.
+     */
+    public static class FragmentFailureException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+    }
+
     public MultiPartitionParticipantTxnState(Mailbox mbox, SimpleDtxnConnection conn, ExecutionSite site,
                                              MembershipNotice notice)
     {
@@ -220,7 +229,7 @@ class MultiPartitionParticipantTxnState extends TransactionState {
                 if (response.getException() != null) {
                     throw response.getException();
                 } else {
-                    throw new SimpleDtxnConnection.FragmentFailureException();
+                    throw new FragmentFailureException();
                 }
             }
             else
@@ -360,7 +369,7 @@ class MultiPartitionParticipantTxnState extends TransactionState {
                     throw response.getException();
                 }
                 else {
-                    throw new SimpleDtxnConnection.FragmentFailureException();
+                    throw new FragmentFailureException();
                 }
             }
             else
@@ -386,7 +395,7 @@ class MultiPartitionParticipantTxnState extends TransactionState {
 
             WorkUnit w = m_missingDependencies.get(dependencyId);
             if (w == null) {
-                throw new SimpleDtxnConnection.FragmentFailureException();
+                throw new FragmentFailureException();
             }
 
             w.putDependency(dependencyId, response.getExecutorSiteId(),
