@@ -50,6 +50,18 @@ class PendingTxnList
         return state;
     }
 
+    void removeSite(int siteId)
+    {
+        for (long key : m_txnIdMap.keySet())
+        {
+            HashMap<Integer, InFlightTxnState> sitemap = m_txnIdMap.get(key);
+            if (sitemap.containsKey(siteId))
+            {
+                sitemap.remove(siteId);
+            }
+        }
+    }
+
     void removeTxnId(long txnId)
     {
         if (m_txnIdMap.containsKey(txnId))

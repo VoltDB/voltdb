@@ -58,4 +58,27 @@ public class TestPendingTxnList extends TestCase
         dut.removeTxnId(1);
         assertEquals(1, dut.size());
     }
+
+    public void testSiteRemoval()
+    {
+        PendingTxnList dut = new PendingTxnList();
+        dut.addTxn(1, 2, createTxnState(1, 2));
+        dut.addTxn(1, 3, createTxnState(1, 3));
+        dut.addTxn(2, 1, createTxnState(2, 1));
+        dut.addTxn(2, 2, createTxnState(2, 2));
+        dut.addTxn(2, 4, createTxnState(2, 4));
+        dut.addTxn(3, 2, createTxnState(3, 2));
+        dut.addTxn(4, 1, createTxnState(4, 1));
+        assertEquals(4, dut.size());
+        assertEquals(2, dut.getTxnIdSize(1));
+        assertEquals(3, dut.getTxnIdSize(2));
+        assertEquals(1, dut.getTxnIdSize(3));
+        assertEquals(1, dut.getTxnIdSize(4));
+        dut.removeSite(2);
+        assertEquals(4, dut.size());
+        assertEquals(1, dut.getTxnIdSize(1));
+        assertEquals(2, dut.getTxnIdSize(2));
+        assertEquals(0, dut.getTxnIdSize(3));
+        assertEquals(1, dut.getTxnIdSize(4));
+    }
 }
