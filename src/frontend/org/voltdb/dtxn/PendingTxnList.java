@@ -19,6 +19,11 @@ package org.voltdb.dtxn;
 import java.util.ArrayList;
 import java.util.HashMap;
 
+/**
+ * PendingTxnList records an initiator's expected transaction responses that are
+ * outstanding.  Expected responsesare hashed by their transaction ID and then
+ * the site ID of the coordinator(s) from which they should arrive.
+ */
 class PendingTxnList
 {
     PendingTxnList()
@@ -28,6 +33,12 @@ class PendingTxnList
                         HashMap<Integer, InFlightTxnState>>();
     }
 
+    /**
+     * Add the InFlightTxnState for an outstanding transaction
+     * @param txnId the transaction ID for the transaction
+     * @param coordinatorSiteId the site ID for the coordinator this transaction was sent to
+     * @param txn the InFlightTxnState object containing the data for this transaction
+     */
     void addTxn(long txnId, int coordinatorSiteId, InFlightTxnState txn)
     {
         HashMap<Integer, InFlightTxnState> site_map = m_txnIdMap.get(txnId);
@@ -39,6 +50,16 @@ class PendingTxnList
         site_map.put(coordinatorSiteId, txn);
     }
 
+    /**
+     * Get the InFlightTxnState object corresponding to a
+     * transaction ID/coordinator site ID pair.  Modifies the storage by removing
+     * the InFlightTxnState returned from the data structure.
+     *
+     * @param txnId
+     * @param coordinatorSiteId
+     * @return the relevant InFlightTxnState object, null if one does not exist
+     *         for the provided args.
+     */
     InFlightTxnState getTxn(long txnId, int coordinatorSiteId)
     {
         HashMap<Integer, InFlightTxnState> site_map = m_txnIdMap.get(txnId);
@@ -50,6 +71,11 @@ class PendingTxnList
         return state;
     }
 
+    /**
+     * Remove all InFlightTxnState object for transactions have been or are
+     * going to be sent to the coordinator at the specified site ID.
+     * @param siteId
+     */
     void removeSite(int siteId)
     {
         for (long key : m_txnIdMap.keySet())
@@ -62,6 +88,14 @@ class PendingTxnList
         }
     }
 
+    /**
+     * Remove the empty hashmap associated with the specified transaction ID.
+     * Requires that txnId exist in the map and that it be empty (no more
+     * outstanding responses expected for this transaction ID).  This method is
+     * a bit of a hacky work-around for an unfortunate logic path in
+     * SimpleDtxnInitiator's handling of responses.
+     * @param txnId
+     */
     void removeTxnId(long txnId)
     {
         if (m_txnIdMap.containsKey(txnId))
@@ -83,11 +117,19 @@ class PendingTxnList
         }
     }
 
+    /**
+     * @return The number of outstanding unique transactions
+     */
     int size()
     {
         return m_txnIdMap.size();
     }
 
+    /**
+     * @param txnId
+     * @return The number of outstanding responses still expected for the
+     *         provided transaction ID
+     */
     int getTxnIdSize(long txnId)
     {
         if (m_txnIdMap.containsKey(txnId))
@@ -99,6 +141,9 @@ class PendingTxnList
         return -1;
     }
 
+    /**
+     * Debugging method used to provide information for a dump request
+     */
     ArrayList<InFlightTxnState> getInFlightTxns()
     {
         ArrayList<InFlightTxnState> retval = new ArrayList<InFlightTxnState>();
