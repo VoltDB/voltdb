@@ -19,6 +19,9 @@ volt_password = ''
 # port on local server to listen for http requests, URL is formatted as http://localhost:9001
 http_server_port = 9001
 
+# since the HTTPHandler does not maintain any state attributes, we have to put
+# the client object here
+client = None
 
 class HTTPHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -111,14 +114,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
             else:
                 reset_counters = 0
             ######################################################################
-            print "Connecting to server at ", volt_server_ip, " on port ", volt_server_port
-
-            try:
-                client = VoltQueryClient(volt_server_ip, volt_server_port, volt_username, volt_password)
-                client.set_quiet(True)
-            except socket.error:
-                print "Error connecting to the server"
-                exit(-1)
 
             self.send_response(200)
             self.send_header('Content-type','text/html')
@@ -258,13 +253,24 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
 
 def main():
+    global client
+
     try:
+        print "Connecting to server at ", volt_server_ip, " on port ", volt_server_port
+        client = VoltQueryClient(volt_server_ip, volt_server_port,
+                                 volt_username, volt_password)
+        client.set_quiet(True)
+
         server = HTTPServer(('', http_server_port), HTTPHandler)
         print 'starting server...'
         server.serve_forever()
+    except socket.error:
+        print "Error connecting to the server"
+        exit(-1)
     except KeyboardInterrupt:
         print 'stopping server...'
         server.socket.close()
+        client.close()
 
 if __name__ == '__main__':
     main()

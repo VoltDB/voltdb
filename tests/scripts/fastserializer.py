@@ -152,6 +152,9 @@ class FastSerializer:
         self.float64Type = lambda length : '%c%dd' % (self.inputBOM, length)
         self.stringType = lambda length : '%c%ds' % (self.inputBOM, length)
 
+    def close(self):
+        self.socket.close()
+
     def authenticate(self, username, password):
         # Requires sending a length preceded username and password even if
         # authentication is turned off.

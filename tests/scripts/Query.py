@@ -87,11 +87,17 @@ class VoltQueryClient(cmd.Cmd):
 
         self.response = None
 
+    def close(self):
+        if self.fs != None:
+            self.fs.close()
+
     def execute(self, command):
         self.onecmd(command)
         return self.response
 
     def precmd(self, command):
+        if self.fs == None:
+            self.safe_print("Not connected to any server, please connect first")
         return command.decode("utf-8")
 
     def prepare_params(self, procedure, command):
@@ -139,6 +145,13 @@ class VoltQueryClient(cmd.Cmd):
         self.safe_print("Connect to a server")
         self.safe_print("\tconnect host port [username] [password]")
 
+    def do_disconnect(self, command):
+        self.close()
+        self.fs = None
+
+    def help_connect(self):
+        self.safe_print("Disconnect from the server")
+
     def do_quit(self, command):
         return True
 
@@ -154,6 +167,8 @@ class VoltQueryClient(cmd.Cmd):
         self.do_help(None)
 
     def do_stat(self, command):
+        if self.fs == None:
+            return
         if not command:
             return self.help_stat()
         args = command.split()
@@ -169,6 +184,8 @@ class VoltQueryClient(cmd.Cmd):
         self.safe_print("\treset counters")
 
     def do_snapshotsave(self, command):
+        if self.fs == None:
+            return
         if not command:
             return self.help_snapshotsave()
 
@@ -186,6 +203,8 @@ class VoltQueryClient(cmd.Cmd):
         self.safe_print("\tsnapshotsave directory nonce blocking")
 
     def do_snapshotscan(self, command):
+        if self.fs == None:
+            return
         if not command:
             return self.help_snapshotscan()
 
@@ -199,6 +218,8 @@ class VoltQueryClient(cmd.Cmd):
         self.safe_print("\tsnapshotsave directory")
 
     def do_snapshotdelete(self, command):
+        if self.fs == None:
+            return
         if not command:
             return self.help_snapshotdelete()
 
@@ -217,6 +238,8 @@ class VoltQueryClient(cmd.Cmd):
                         "nonce,nonce,...")
 
     def do_snapshotrestore(self, command):
+        if self.fs == None:
+            return
         if not command:
             return self.help_snapshotrestore()
 
@@ -235,6 +258,8 @@ class VoltQueryClient(cmd.Cmd):
         self.safe_print("\tsnapshotrestore directory nonce")
 
     def do_snapshotstatus(self, command):
+        if self.fs == None:
+            return
         self.safe_print("Getting snapshot status")
         self.response = self.snapshotstatus.call(timeout = self.__timeout)
         self.safe_print(self.response)
@@ -244,6 +269,8 @@ class VoltQueryClient(cmd.Cmd):
         self.safe_print("\tsnapshotstatus")
 
     def do_sysinfo(self, command):
+        if self.fs == None:
+            return
         self.safe_print("Getting system information")
         self.response = self.systeminformation.call(timeout = self.__timeout)
         self.safe_print(self.response)
@@ -253,6 +280,8 @@ class VoltQueryClient(cmd.Cmd):
         self.safe_print("\tsysinfo")
 
     def do_quiesce(self, command):
+        if self.fs == None:
+            return
         self.safe_print("Quiesce...")
         self.response = self.quiesce.call(timeout = self.__timeout)
         self.safe_print(self.response)
@@ -262,6 +291,8 @@ class VoltQueryClient(cmd.Cmd):
         self.safe_print("\tquiesce")
 
     def do_adhoc(self, command):
+        if self.fs == None:
+            return
         if not command:
             return self.help_adhoc()
 
@@ -274,6 +305,8 @@ class VoltQueryClient(cmd.Cmd):
         self.safe_print("\tadhoc SQL_statement")
 
     def do_shutdown(self, command):
+        if self.fs == None:
+            return
         self.safe_print("Shutting down the server")
         self.shutdown.call(response = False, timeout = self.__timeout)
 
@@ -282,6 +315,8 @@ class VoltQueryClient(cmd.Cmd):
         self.safe_print("\tshutdown")
 
     def do_define(self, command):
+        if self.fs == None:
+            return
         if not command:
             return self.help_define()
 
