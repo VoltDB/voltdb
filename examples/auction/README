@@ -13,6 +13,3 @@ A client is provided that runs various Java stored procedure files to:
 - Provide bids by various users for each auction, using an algorithm for creating a new bid price based on the previous bid for the item adjusted by an increase based on the starting price and a random Gaussian function. Each auction completes within 1 to 2 minutes after the auction starts. 
 - Provide periodic status on each auction.
 - Provide the results of each auction after close.
-
-This content is available at
-https://hzproject.com/svn/repos/build/newtrunk/examples/auction/README.

@@ -14,20 +14,14 @@ satellite
   This example is a simulation of satellite tracking.
 
 
-When appropriate, each example includes a DDL file and a project.xml that lists the DDL file and the stored procedures names.
+Each example includes a DDL file and a project.xml that lists the DDL file and the stored procedures names. The auction and satellite examples also include an ant build file.
 
-ant -p will print a description of the available targets in each example directory. 'client' and 'server' are the targets you can use to run a client and server for each example. 
+The command "ant -p" will print a description of the available targets for each example. The targets "client" and "server" let you  run a client and server for each example. (The satellite example contains the additional target "tracker".)
 
 To run a example project, from within the examples/example_of_choice directory:
-- in a terminal window, run ant (no target) to compile the Java and example catalog
-- then run ant server, to start the VoltDB server
-- then, in a separate terminal window, run ant client, where you will see the results
-- when complete, hit Ctrl C in the server terminal window to exit the VOLT DB
+- In a terminal window, run ant (no target) to compile the Java and example catalog
+- Run ant server, to start the VoltDB server
+- In a separate terminal window, run ant client, where you will see the results
+- When complete, hit Ctrl C in the server terminal window to stop the VoltDB database
 
-Generating a skeleton project
-=============================
-A stripped down skeleton project can be created by running the "generate" python script and passing it the name of the project, the Java package prefix to be used for the generated source files, and the destination directory. The script is not very robust so check args and permissions carefully and don't include a '.' at the end of the package prefix.
-
-This content is available at
-https://hzproject.com/svn/repos/build/newtrunk/examples/README.
-
+See the README file in each example directory for more details.

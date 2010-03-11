@@ -1,0 +1,21 @@
+This directory contains the source files for the Hello, World! tutorial described in Getting Started with VoltDB. 
+
+Please note that there is no ant build file provided with these source files, because the tutorial is designed to familiarize you with the commands to write and compile VoltDB applications. The commands you need to process these files are the following:
+
+  $ export CLASSPATH=.:../../voltdb/*
+
+  $ javac Client.java
+  $ javac Insert.java
+  $ javac Select.java
+
+        (compile application catalog)
+
+  $ java org.voltdb.compiler.VoltCompiler project.xml 1 1 localhost helloworld.jar
+
+        (create database)
+
+  $ java -Djava.library.path=../../voltdb/ org.voltdb.VoltDB catalog helloworld.jar
+
+        (in separate window, run client application)
+
+  $ java Client
