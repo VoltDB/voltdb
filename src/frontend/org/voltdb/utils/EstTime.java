@@ -17,6 +17,8 @@
 
 package org.voltdb.utils;
 
+import java.util.concurrent.atomic.AtomicLong;
+
 /**
  * A class for retrieving an estimated indication of the current time.
  * Very fast since the field is updated less frequently and only updated occasionally.
@@ -28,13 +30,9 @@ package org.voltdb.utils;
  */
 public class EstTime {
 
-    static volatile long m_now = System.currentTimeMillis();
-
-    static {
-        m_now = System.currentTimeMillis();
-    }
+    static final AtomicLong m_now = new AtomicLong(System.currentTimeMillis());
 
     public static long currentTimeMillis() {
-        return m_now;
+        return m_now.get();
     }
 }

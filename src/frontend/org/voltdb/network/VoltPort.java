@@ -23,6 +23,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.ByteBuffer;
 import java.net.SocketException;
 import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
@@ -66,7 +67,10 @@ public class VoltPort implements Callable<VoltPort>, Connection
 
     private NIOReadStream m_readStream;
     private NIOWriteStream m_writeStream;
+    private AtomicLong m_messagesRead = new AtomicLong(0);
+    private long m_lastMessagesRead = 0;
     final int m_expectedOutgoingMessageSize;
+    final String m_remoteHost;
 
     /**
      * Package private so that the thread factory in VoltNetwork can clear the pool when the threads exit.
@@ -80,10 +84,15 @@ public class VoltPort implements Callable<VoltPort>, Connection
     };
 
     /** Wrap a socket with a VoltPort */
-    public VoltPort(VoltNetwork network, InputHandler handler, final int expectedOutgoingMessageSize) {
+    public VoltPort(
+            VoltNetwork network,
+            InputHandler handler,
+            final int expectedOutgoingMessageSize,
+            String remoteHost) {
         m_network = network;
         m_handler = handler;
         m_expectedOutgoingMessageSize = expectedOutgoingMessageSize;
+        m_remoteHost = remoteHost;
     }
 
     void setKey (SelectionKey key) {
@@ -131,6 +140,7 @@ public class VoltPort implements Callable<VoltPort>, Connection
                      */
                     while ((message = m_handler.retrieveNextMessage( this )) != null) {
                         m_handler.handleMessage( message, this);
+                        m_messagesRead.incrementAndGet();
                     }
                 }
             }
@@ -324,7 +334,24 @@ public class VoltPort implements Callable<VoltPort>, Connection
         }
     }
 
+    @Override
     public String toString() {
         return super.toString() + ":" + m_channel.socket().getRemoteSocketAddress().toString();
+    }
+
+    public long getMessagesRead() {
+        return m_messagesRead.get();
+    }
+
+    public synchronized long getMessagesReadInterval() {
+        final long messagesRead = m_messagesRead.get();
+        final long messagesReadThisTime = messagesRead - m_lastMessagesRead;
+        m_lastMessagesRead = messagesRead;
+        return messagesReadThisTime;
+    }
+
+    @Override
+    public String getHostname() {
+        return m_remoteHost;
     }
 }

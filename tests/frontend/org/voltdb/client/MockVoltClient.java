@@ -150,4 +150,16 @@ public class MockVoltClient implements Client {
         // TODO Auto-generated method stub
 
     }
+
+    @Override
+    public VoltTable getIOStats() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public VoltTable getIOStatsInterval() {
+        // TODO Auto-generated method stub
+        return null;
+    }
 }

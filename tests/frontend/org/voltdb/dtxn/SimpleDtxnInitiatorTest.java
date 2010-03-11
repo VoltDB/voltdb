@@ -134,6 +134,11 @@ public class SimpleDtxnInitiatorTest extends TestCase {
             return writeStream;
         }
 
+        @Override
+        public String getHostname() {
+            return "";
+        }
+
     }
 
     private final class DummyWriteStream implements WriteStream {

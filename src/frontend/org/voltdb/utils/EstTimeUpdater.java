@@ -19,10 +19,10 @@ package org.voltdb.utils;
 
 public class EstTimeUpdater {
     public static boolean update(final long now) {
-        if (EstTime.m_now == now) {
+        if (EstTime.m_now.get() == now) {
             return false;
         }
-        EstTime.m_now = now;
+        EstTime.m_now.lazySet(now);
         return true;
     }
 }

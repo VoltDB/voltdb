@@ -74,7 +74,7 @@ public class NIOReadStream {
         int output = 0;
         for (int i = 0; i < intbytes.length; ++i) {
             output <<= 8;
-            output |= ((int)intbytes[i]) & 0xff;
+            output |= (intbytes[i]) & 0xff;
         }
         return output;
     }
@@ -186,6 +186,12 @@ public class NIOReadStream {
     private AtomicInteger m_globalAvailable = new AtomicInteger(0);
     private AtomicInteger m_numReadStreams = new AtomicInteger(0);
     private AtomicLong m_bytesRead = new AtomicLong();
-
+    private long m_lastBytesRead = 0;
     long getBytesRead() { return m_bytesRead.get(); }
+    long getBytesReadInterval() {
+        final long bytesRead = m_bytesRead.get();
+        final long bytesReadThisTime = bytesRead - m_lastBytesRead;
+        m_lastBytesRead = bytesRead;
+        return bytesReadThisTime;
+    }
 }

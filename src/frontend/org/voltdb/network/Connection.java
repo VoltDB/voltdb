@@ -32,4 +32,5 @@ public interface Connection {
 
     void disableReadSelection();
     void enableReadSelection();
+    String getHostname();
 }

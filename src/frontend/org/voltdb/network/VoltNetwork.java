@@ -68,6 +68,8 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Map;
+import java.util.HashMap;
 import java.lang.ref.WeakReference;
 
 import org.apache.log4j.Logger;
@@ -80,7 +82,6 @@ import java.util.ArrayDeque;
 import org.voltdb.utils.VoltLoggerFactory;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.EstTimeUpdater;
-import org.voltdb.utils.Pair;
 
 /** Produces work for registered ports that are selected for read, write */
  public class VoltNetwork implements Runnable
@@ -123,18 +124,6 @@ import org.voltdb.utils.Pair;
         m_periodicWork = new Runnable[0];
         m_useBlockingSelect = true;
         m_useExecutorService = false;
-    }
-
-    public Pair<Long, Long> getCounters() {
-        long totalRead = 0;
-        long totalWritten = 0;
-        synchronized (m_ports) {
-            for (VoltPort p : m_ports) {
-                totalRead += p.readStream().getBytesRead();
-                totalWritten += p.writeStream().getBytesWritten();
-            }
-        }
-        return Pair.of(totalRead, totalWritten);
     }
 
     public VoltNetwork() {
@@ -291,7 +280,12 @@ import org.voltdb.utils.Pair;
         channel.configureBlocking (false);
         channel.socket().setKeepAlive(true);
 
-        VoltPort port = new VoltPort( this, handler, handler.getExpectedOutgoingMessageSize());
+        VoltPort port =
+            new VoltPort(
+                    this,
+                    handler,
+                    handler.getExpectedOutgoingMessageSize(),
+                    channel.socket().getInetAddress().getHostName());
         synchronized (m_ports) {
             m_ports.add(port);
         }
@@ -526,5 +520,51 @@ import org.voltdb.utils.Pair;
                 m_tasks.notifyAll();
             }
         }
+    }
+
+    public Map<String, long[]> getIOStats() {
+        final HashMap<String, long[]> retval =
+            new HashMap<String, long[]>();
+        long totalRead = 0;
+        long totalMessagesRead = 0;
+        long totalWritten = 0;
+        long totalMessagesWritten = 0;
+        synchronized (m_ports) {
+            for (VoltPort p : m_ports) {
+                final long read = p.readStream().getBytesRead();
+                final long writeInfo[] = p.writeStream().getBytesAndMessagesWritten();
+                final long messagesRead = p.getMessagesRead();
+                totalRead += read;
+                totalMessagesRead += messagesRead;
+                totalWritten += writeInfo[0];
+                totalMessagesWritten += writeInfo[1];
+                retval.put(p.m_remoteHost, new long[] { read, messagesRead, writeInfo[0], writeInfo[1] });
+            }
+        }
+        retval.put("GLOBAL", new long[] { totalRead, totalMessagesRead, totalWritten, totalMessagesWritten });
+        return retval;
+    }
+
+    public Map<String, long[]> getIOStatsInterval() {
+        final HashMap<String, long[]> retval =
+            new HashMap<String, long[]>();
+        long totalRead = 0;
+        long totalMessagesRead = 0;
+        long totalWritten = 0;
+        long totalMessagesWritten = 0;
+        synchronized (m_ports) {
+            for (VoltPort p : m_ports) {
+                final long read = p.readStream().getBytesReadInterval();
+                final long writeInfo[] = p.writeStream().getBytesAndMessagesWrittenInterval();
+                final long messagesRead = p.getMessagesReadInterval();
+                totalRead += read;
+                totalMessagesRead += messagesRead;
+                totalWritten += writeInfo[0];
+                totalMessagesWritten += writeInfo[1];
+                retval.put(p.m_remoteHost, new long[] { read, messagesRead, writeInfo[0], writeInfo[1] });
+            }
+        }
+        retval.put("GLOBAL", new long[] { totalRead, totalMessagesRead, totalWritten, totalMessagesWritten });
+        return retval;
     }
 }

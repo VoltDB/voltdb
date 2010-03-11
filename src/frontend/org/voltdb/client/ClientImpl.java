@@ -254,4 +254,14 @@ final class ClientImpl implements Client {
     private String m_lastCallInfo = null;
     private final Object m_backpressureLock = new Object();
     private boolean m_backpressure = false;
+
+    @Override
+    public VoltTable getIOStats() {
+        return m_distributer.getConnectionStats(false);
+    }
+
+    @Override
+    public VoltTable getIOStatsInterval() {
+        return m_distributer.getConnectionStats(true);
+    }
 }

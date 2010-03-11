@@ -83,8 +83,27 @@ public class NIOWriteStream implements WriteStream {
     private final QueueMonitor m_monitor;
 
     private long m_bytesWritten = 0;
+    private long m_messagesWritten = 0;
 
-    synchronized long getBytesWritten() { return m_bytesWritten; }
+    /*
+     * Used to provide incremental reads of the amount of
+     * data written
+     */
+    private long m_lastBytesWritten = 0;
+    private long m_lastMessagesWritten = 0;
+
+    synchronized long[] getBytesAndMessagesWritten() {
+        return new long[] {m_bytesWritten, m_messagesWritten};
+    }
+
+    synchronized long[] getBytesAndMessagesWrittenInterval() {
+        final long bytesWrittenThisTime = m_bytesWritten - m_lastBytesWritten;
+        m_lastBytesWritten = m_bytesWritten;
+
+        final long messagesWrittenThisTime = m_messagesWritten - m_lastMessagesWritten;
+        m_lastMessagesWritten = m_messagesWritten;
+        return new long[] { bytesWrittenThisTime, messagesWrittenThisTime };
+    }
 
     /**
      * Set to -1 when there are no pending writes. If there is a pending write it is set to the time
@@ -229,6 +248,7 @@ public class NIOWriteStream implements WriteStream {
                         peekedBuffer.b.position(peekedBuffer.b.limit() - amountToSplit);
                         final BBContainer splice = DBBPool.wrapBB(peekedBuffer.b.slice());
                         m_queuedBuffers.push(splice);
+                        m_messagesWritten--;//corrects message count
                         peekedBuffer.b.limit(peekedBuffer.b.position());
                         peekedBuffer.b.position(originalPosition);
                     }
@@ -315,6 +335,7 @@ public class NIOWriteStream implements WriteStream {
                 for (final ByteBuffer b : buffers) {
                     if (!b.hasRemaining()) {
                         m_queuedBuffers.poll().discard();
+                        m_messagesWritten++;
                     } else {
                         if (!m_hadBackPressure) {
                             backpressureStarted();
@@ -332,6 +353,7 @@ public class NIOWriteStream implements WriteStream {
                     }
                 } else {
                     m_queuedBuffers.poll().discard();
+                    m_messagesWritten++;
                 }
             }
             bytesWritten += rc;

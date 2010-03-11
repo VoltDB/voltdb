@@ -172,4 +172,17 @@ public interface Client {
      * @throws InterruptedException
      */
     public void backpressureBarrier() throws InterruptedException;
+
+    /**
+     * Get IO stats for each connection as well as globally
+     * @return Table containing IO stats
+     */
+    public VoltTable getIOStats();
+
+    /**
+     * Get IO stats for each connection as well as globally counting since the last
+     * time this method was called
+     * @return Table containing IO states
+     */
+    public VoltTable getIOStatsInterval();
 }

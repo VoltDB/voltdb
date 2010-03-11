@@ -50,7 +50,7 @@ public class VoltPortTest extends TestCase {
     // implement abstract run() method.
     private static class MockVoltPort extends VoltPort {
         MockVoltPort(VoltNetwork vn, Channel channel) {
-            super (vn, null, 2048);
+            super (vn, null, 2048, "");
         }
     }
 

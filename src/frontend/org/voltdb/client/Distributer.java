@@ -23,9 +23,12 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
 
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.network.Connection;
@@ -64,12 +67,18 @@ class Distributer {
     class NodeConnection extends VoltProtocolHandler {
         private final HashMap<Long, Pair<Long, ProcedureCallback>> m_callbacks;
         private Connection m_connection;
-        public final String m_address;
+        private String m_hostname;
         private boolean m_isConnected = true;
 
-        public NodeConnection(String address) {
+        private long m_invocationsCompleted = 0;
+        private long m_lastInvocationsCompleted = 0;
+        private long m_invocationAborts = 0;
+        private long m_lastInvocationAborts = 0;
+        private long m_invocationErrors = 0;
+        private long m_lastInvocationErrors = 0;
+
+        public NodeConnection() {
             m_callbacks = new HashMap<Long, Pair<Long, ProcedureCallback>>();
-            m_address = address;
         }
 
         public void createWork(long handle, BBContainer c, ProcedureCallback callback) {
@@ -117,6 +126,13 @@ class Distributer {
                 Pair<Long, ProcedureCallback> pair = m_callbacks.remove(response.getClientHandle());
                 callTime = pair.getFirst();
                 cb = pair.getSecond();
+                m_invocationsCompleted++;
+                final byte status = response.getStatus();
+                if (status == ClientResponse.USER_ABORT || status == ClientResponse.GRACEFUL_FAILURE) {
+                    m_invocationAborts++;
+                } else if (status != ClientResponse.SUCCESS) {
+                    m_invocationErrors++;
+                }
             }
             final int delta = (int)(now - callTime);
             if (cb != null) {
@@ -159,7 +175,7 @@ class Distributer {
                     m_connections.remove(this);
                     //Notify listeners that a connection has been lost
                     for (ClientStatusListener s : m_listeners) {
-                        s.connectionLost(m_address, m_connections.size());
+                        s.connectionLost(m_hostname, m_connections.size());
                     }
                 }
                 m_isConnected = false;
@@ -207,6 +223,34 @@ class Distributer {
             return null;
         }
 
+        /**
+         * Get counters for invocations completed, aborted, errors. In that order.
+         * @return
+         */
+        public synchronized long[] getCounters() {
+            return new long[] { m_invocationsCompleted, m_invocationAborts, m_invocationErrors };
+        }
+
+        /**
+         * Get counters for invocations completed, aborted, errors. In that order.
+         * Count returns count since this method was last invoked
+         * @return
+         */
+        public synchronized long[] getCountersInterval() {
+            final long invocationsCompletedThisTime = m_invocationsCompleted - m_lastInvocationsCompleted;
+            m_lastInvocationsCompleted = m_invocationsCompleted;
+
+            final long invocationsAbortsThisTime = m_invocationAborts - m_lastInvocationAborts;
+            m_lastInvocationAborts = m_invocationAborts;
+
+            final long invocationErrorsThisTime = m_invocationErrors - m_lastInvocationErrors;
+            m_lastInvocationErrors = m_invocationErrors;
+            return new long[] {
+                    invocationsCompletedThisTime,
+                    invocationsAbortsThisTime,
+                    invocationErrorsThisTime
+            };
+        }
     }
 
     void drain() throws NoConnectionsException {
@@ -284,9 +328,10 @@ class Distributer {
     throws UnknownHostException, IOException
 {
     final SocketChannel aChannel = ConnectionUtil.getAuthenticatedConnection(host, program, password, port);
-    NodeConnection cxn = new NodeConnection( host + ":" + port);
+    NodeConnection cxn = new NodeConnection();
     m_connections.add(cxn);
     Connection c = m_network.registerChannel( aChannel, cxn);
+    cxn.m_hostname = c.getHostname();
     cxn.m_connection = c;
 }
 
@@ -395,5 +440,79 @@ class Distributer {
 
     synchronized boolean removeClientStatusListener(ClientStatusListener listener) {
         return m_listeners.remove(listener);
+    }
+
+    private final ColumnInfo statsColumns[] = new ColumnInfo[] {
+            new ColumnInfo( "TIME", VoltType.BIGINT),
+            new ColumnInfo( "HOSTNAME", VoltType.STRING),
+            new ColumnInfo( "INVOCATIONS_COMPLETED", VoltType.BIGINT),
+            new ColumnInfo( "INVOCATIONS_ABORTED", VoltType.BIGINT),
+            new ColumnInfo( "INVOCATIONS_FAILED", VoltType.BIGINT),
+            new ColumnInfo( "BYTES_READ", VoltType.BIGINT),
+            new ColumnInfo( "MESSAGES_READ", VoltType.BIGINT),
+            new ColumnInfo( "BYTES_WRITTEN", VoltType.BIGINT),
+            new ColumnInfo( "MESSAGES_WRITTEN", VoltType.BIGINT)
+    };
+
+    VoltTable getConnectionStats(final boolean interval) {
+        final Long now = System.currentTimeMillis();
+        VoltTable retval = new VoltTable(statsColumns);
+        Map<String, long[]> m_networkStats;
+        if (interval) {
+            m_networkStats = m_network.getIOStatsInterval();
+        } else {
+            m_networkStats = m_network.getIOStats();
+        }
+        long totalInvocations = 0;
+        long totalAbortedInvocations = 0;
+        long totalFailedInvocations = 0;
+        synchronized (m_connections) {
+            for (NodeConnection cxn : m_connections) {
+                long counters[];
+                if (interval) {
+                    counters = cxn.getCountersInterval();
+                } else {
+                    counters = cxn.getCounters();
+                }
+                totalInvocations += counters[0];
+                totalAbortedInvocations += counters[1];
+                totalFailedInvocations += counters[2];
+                final long networkCounters[] = m_networkStats.get(cxn.m_hostname);
+                long bytesRead = 0;
+                long messagesRead = 0;
+                long bytesWritten = 0;
+                long messagesWritten = 0;
+                if (networkCounters != null) {
+                    bytesRead = networkCounters[0];
+                    messagesRead = networkCounters[1];
+                    bytesWritten = networkCounters[2];
+                    messagesWritten = networkCounters[3];
+                }
+
+                retval.addRow(
+                        now,
+                        cxn.m_hostname,
+                        counters[0],
+                        counters[1],
+                        counters[2],
+                        bytesRead,
+                        messagesRead,
+                        bytesWritten,
+                        messagesWritten);
+            }
+        }
+
+        final long globalIOStats[] = m_networkStats.get("GLOBAL");
+        retval.addRow(
+                now,
+                "GLOBAL",
+                totalInvocations,
+                totalAbortedInvocations,
+                totalFailedInvocations,
+                globalIOStats[0],
+                globalIOStats[1],
+                globalIOStats[2],
+                globalIOStats[3]);
+        return retval;
     }
 }

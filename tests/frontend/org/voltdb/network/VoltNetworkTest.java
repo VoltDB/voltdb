@@ -38,7 +38,7 @@ public class VoltNetworkTest extends TestCase {
 
     private static class MockVoltPort extends VoltPort {
         MockVoltPort(VoltNetwork vn, InputHandler handler) {
-            super (vn, handler, handler.getExpectedOutgoingMessageSize());
+            super (vn, handler, handler.getExpectedOutgoingMessageSize(), "");
         }
 
         @Override

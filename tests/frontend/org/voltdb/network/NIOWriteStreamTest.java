@@ -63,14 +63,16 @@ public class NIOWriteStreamTest extends TestCase {
 
     private static class MockPort extends VoltPort {
 
+        @Override
         public String toString() {
             return null;
         }
 
         public MockPort() {
-            super(null, null, 2048);
+            super(null, null, 2048, "");
         }
 
+        @Override
         public void setInterests(int opsToAdd, int opsToRemove) {
             this.opsToAdd = opsToAdd;
         }

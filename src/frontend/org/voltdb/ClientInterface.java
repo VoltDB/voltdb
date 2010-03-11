@@ -1122,5 +1122,10 @@ public class ClientInterface implements DumpManager.Dumpable {
             throw new UnsupportedOperationException();
         }
 
+        @Override
+        public String getHostname() {
+            return "";
+        }
+
     }
 }
