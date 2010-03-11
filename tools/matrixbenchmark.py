@@ -149,11 +149,9 @@ def main():
 
     try:
         # matrix of values to test with
-        # hostcounts = [1,2,6]
-        hostcounts = [1,2,5]
-        # clientcounts = [1,3]
-        clientcounts = [1,2]
-        processesperclients = [1,2,6]
+        hostcounts = [1,2,6]
+        clientcounts = [1,3]
+        processesperclients = [1]
         sitesperhosts = [9,12]
         drivers = ["org.voltdb.benchmark.tpcc.TPCCClient", 
                    "org.voltdb.benchmark.overhead.OverheadClient"]
