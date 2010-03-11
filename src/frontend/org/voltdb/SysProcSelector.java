@@ -20,5 +20,6 @@ public enum SysProcSelector {
     TABLE,            // invoked as @stat table
     PROCEDURE,        // invoked as @stat procedure
     INITIATOR,         // invoked as @stat initiator
-    PARTITIONCOUNT
+    PARTITIONCOUNT,
+    IOSTATS
 }

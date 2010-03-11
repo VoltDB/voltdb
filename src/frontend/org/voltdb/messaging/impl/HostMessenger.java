@@ -139,6 +139,16 @@ public class HostMessenger implements Messenger {
         return m_localHostId;
     }
 
+    public String getHostname() {
+        String hostname = "";
+        try {
+            java.net.InetAddress localMachine = java.net.InetAddress.getLocalHost();
+            hostname = localMachine.getHostName();
+        } catch (java.net.UnknownHostException uhe) {
+        }
+        return hostname;
+    }
+
     MessengerSite getSite(int siteId) {
         assert m_initialized;
         int hostId = siteId / VoltDB.SITES_TO_HOST_DIVISOR;

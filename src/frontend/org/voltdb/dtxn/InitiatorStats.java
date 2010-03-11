@@ -94,7 +94,7 @@ public class InitiatorStats extends SiteStatsSource {
      * @param delta Time the procedure took to round trip intra cluster
      */
     public synchronized void logTransactionCompleted(
-            int connectionId,
+            long connectionId,
             String connectionHostname,
             StoredProcedureInvocation invocation,
             int delta) {

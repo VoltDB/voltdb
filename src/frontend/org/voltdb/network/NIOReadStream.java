@@ -187,11 +187,14 @@ public class NIOReadStream {
     private AtomicInteger m_numReadStreams = new AtomicInteger(0);
     private AtomicLong m_bytesRead = new AtomicLong();
     private long m_lastBytesRead = 0;
-    long getBytesRead() { return m_bytesRead.get(); }
-    long getBytesReadInterval() {
-        final long bytesRead = m_bytesRead.get();
-        final long bytesReadThisTime = bytesRead - m_lastBytesRead;
-        m_lastBytesRead = bytesRead;
-        return bytesReadThisTime;
+    long getBytesRead(boolean interval) {
+        if (interval) {
+            final long bytesRead = m_bytesRead.get();
+            final long bytesReadThisTime = bytesRead - m_lastBytesRead;
+            m_lastBytesRead = bytesRead;
+            return bytesReadThisTime;
+        } else {
+            return m_bytesRead.get();
+        }
     }
 }

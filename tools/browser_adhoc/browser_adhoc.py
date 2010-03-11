@@ -71,6 +71,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 self.wfile.write('  <input type=submit name="bsubmit" value="Procedures">\n')
                 self.wfile.write('  <input type=submit name="bsubmit" value="Initiators">\n')
                 self.wfile.write('  <input type=submit name="bsubmit" value="SystemInfo">\n')
+                self.wfile.write('  <input type=submit name="bsubmit" value="IO Stats">\n')
                 self.wfile.write('  <input type=submit name="bsubmit" value="Snapshot status" />\n' )
                 self.wfile.write('  <input type=checkbox name="reset_counters">Reset counters</input>\n' )
                 self.wfile.write('  <br/> Snapshot:<br/>\n')
@@ -152,6 +153,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 elif (button_clicked == 'INITIATORS'):
                     self.wfile.write('Initiator Statistics<br>\n');
                     response = client.execute('stat initiator %d' % (reset_counters))
+                elif (button_clicked == 'IO STATS'):
+                    self.wfile.write('IO Statistics<br>\n');
+                    response = client.execute('stat iostats %d' % (reset_counters))
                 elif (button_clicked == 'SYSTEMINFO'):
                     self.wfile.write('System Information<br>\n');
                     response = client.execute('sysinfo %d' % (reset_counters))

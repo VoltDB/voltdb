@@ -20,6 +20,7 @@ package org.voltdb.sysprocs;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.voltdb.HsqlBackend;
 import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
@@ -36,6 +37,8 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.utils.Pair;
 
 @ProcInfo(
     // partitionInfo = "TABLE.ATTR: 0",
@@ -58,6 +61,11 @@ public class Statistics extends VoltSystemProcedure {
     static final int DEP_initiatorAggregator = (int)
         SysProcFragmentId.PF_initiatorAggregator;
 
+    static final int DEP_ioData = (int)
+        SysProcFragmentId.PF_ioData | DtxnConstants.MULTINODE_DEPENDENCY;
+    static final int DEP_ioDataAggregator = (int)
+        SysProcFragmentId.PF_ioDataAggregator;
+
     static final int DEP_partitionCount = (int)
         SysProcFragmentId.PF_partitionCount;
 //    static final int DEP_initiatorAggregator = (int)
@@ -77,6 +85,8 @@ public class Statistics extends VoltSystemProcedure {
                                   this);
         site.registerPlanFragment(SysProcFragmentId.PF_partitionCount,
                 this);
+        site.registerPlanFragment(SysProcFragmentId.PF_ioData, this);
+        site.registerPlanFragment(SysProcFragmentId.PF_ioDataAggregator, this);
     }
 
     @Override
@@ -205,15 +215,63 @@ public class Statistics extends VoltSystemProcedure {
             VoltTable result = new VoltTable(new VoltTable.ColumnInfo("Partition count", VoltType.INTEGER));
             result.addRow(context.getCluster().getPartitions().size());
             return new DependencyPair(DEP_partitionCount, result);
-        }
+        } else if (fragmentId == SysProcFragmentId.PF_ioData) {
+            assert(params.toArray() != null);
+            assert(params.toArray().length == 2);
+            final boolean resetCounters =
+                ((Byte)params.toArray()[0]).byteValue() == 0 ? false : true;
+            final Long now = (Long)params.toArray()[1];
+            final VoltTable result = new VoltTable(ioColumnInfo);
+            final Map<Long, Pair<String,long[]>> stats =
+                 VoltDB.instance().getNetwork().getIOStats(resetCounters);
 
+            final Integer hostId = VoltDB.instance().getHostMessenger().getHostId();
+            final String hostname = VoltDB.instance().getHostMessenger().getHostname();
+            for (Map.Entry<Long, Pair<String, long[]>> e : stats.entrySet()) {
+                final Long connectionId = e.getKey();
+                final String remoteHostname = e.getValue().getFirst();
+                final long counters[] = e.getValue().getSecond();
+                result.addRow(
+                        now,
+                        hostId,
+                        hostname,
+                        connectionId,
+                        remoteHostname,
+                        counters[0],
+                        counters[1],
+                        counters[2],
+                        counters[3]);
+            }
+            return new DependencyPair(DEP_ioData, result);
+        } else if (fragmentId == SysProcFragmentId.PF_ioDataAggregator) {
+            final VoltTable result = new VoltTable(ioColumnInfo);
+
+            List<VoltTable> dep = dependencies.get(DEP_ioData);
+            for (VoltTable t : dep) {
+                while (t.advanceRow()) {
+                    result.add(t);
+                }
+            }
+            return new DependencyPair(DEP_ioDataAggregator, result);
+        }
         assert (false);
         return null;
     }
 
+    private static final ColumnInfo ioColumnInfo[] = new ColumnInfo[] {
+        new ColumnInfo( "TIME", VoltType.BIGINT),
+        new ColumnInfo( "HOSTID", VoltType.INTEGER),
+        new ColumnInfo( "HOSTNAME", VoltType.STRING),
+        new ColumnInfo( "CONNECTION_ID", VoltType.BIGINT),
+        new ColumnInfo( "CONNECTION_HOSTNAME", VoltType.STRING),
+        new ColumnInfo( "BYTES_READ", VoltType.BIGINT),
+        new ColumnInfo( "MESSAGES_READ", VoltType.BIGINT),
+        new ColumnInfo( "BYTES_WRITTEN", VoltType.BIGINT),
+        new ColumnInfo( "MESSAGES_WRITTEN", VoltType.BIGINT)
+    };
+
     public VoltTable[] run(String selector, long resetCounters) throws VoltAbortException {
         VoltTable[] results;
-
         if (selector.toUpperCase().equals(SysProcSelector.TABLE.name())) {
             SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
             // create a work fragment to gather table data from each of the sites.
@@ -306,8 +364,34 @@ public class Statistics extends VoltSystemProcedure {
 
             results =
                 executeSysProcPlanFragments(pfs, DEP_partitionCount);
-        }
-        else {
+        } else if (selector.toUpperCase().equals(SysProcSelector.IOSTATS.name())) {
+            final long now = System.currentTimeMillis();
+            SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
+            // create a work fragment to gather initiator data from each of the sites.
+            pfs[1] = new SynthesizedPlanFragment();
+            pfs[1].fragmentId = SysProcFragmentId.PF_ioData;
+            pfs[1].outputDepId = DEP_ioData;
+            pfs[1].inputDepIds = new int[]{};
+            pfs[1].multipartition = false;
+            pfs[1].nonExecSites = true;
+            pfs[1].parameters = new ParameterSet();
+            pfs[1].parameters.setParameters((byte)resetCounters, now);
+
+            // create a work fragment to aggregate the results.
+            // Set the MULTIPARTITION_DEPENDENCY bit to require a dependency from every site.
+            pfs[0] = new SynthesizedPlanFragment();
+            pfs[0].fragmentId = SysProcFragmentId.PF_ioDataAggregator;
+            pfs[0].outputDepId = DEP_ioDataAggregator;
+            pfs[0].inputDepIds = new int[]{DEP_ioData};
+            pfs[0].multipartition = false;
+            pfs[0].nonExecSites = false;
+            pfs[0].parameters = new ParameterSet();
+
+            // distribute and execute these fragments providing pfs and id of the
+            // aggregator's output dependency table.
+            results =
+                executeSysProcPlanFragments(pfs, DEP_ioDataAggregator);
+        } else {
             throw new VoltAbortException("Invalid Statistics selector.");
         }
 

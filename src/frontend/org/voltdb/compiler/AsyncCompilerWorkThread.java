@@ -112,7 +112,7 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
     public void planSQL(
             String sql,
             long clientHandle,
-            int connectionId,
+            long connectionId,
             String hostname,
             int sequenceNumber,
             Object clientData) {
@@ -131,7 +131,7 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
     public void prepareCatalogUpdate(
             String catalogURL,
             long clientHandle,
-            int connectionId,
+            long connectionId,
             String hostname,
             int sequenceNumber,
             Object clientData) {

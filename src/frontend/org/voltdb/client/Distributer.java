@@ -444,6 +444,7 @@ class Distributer {
 
     private final ColumnInfo statsColumns[] = new ColumnInfo[] {
             new ColumnInfo( "TIME", VoltType.BIGINT),
+            new ColumnInfo( "CONNECTION_ID", VoltType.BIGINT),
             new ColumnInfo( "HOSTNAME", VoltType.STRING),
             new ColumnInfo( "INVOCATIONS_COMPLETED", VoltType.BIGINT),
             new ColumnInfo( "INVOCATIONS_ABORTED", VoltType.BIGINT),
@@ -456,13 +457,9 @@ class Distributer {
 
     VoltTable getConnectionStats(final boolean interval) {
         final Long now = System.currentTimeMillis();
-        VoltTable retval = new VoltTable(statsColumns);
-        Map<String, long[]> m_networkStats;
-        if (interval) {
-            m_networkStats = m_network.getIOStatsInterval();
-        } else {
-            m_networkStats = m_network.getIOStats();
-        }
+        final VoltTable retval = new VoltTable(statsColumns);
+        final Map<Long, Pair<String,long[]>> networkStats =
+                        m_network.getIOStats(interval);
         long totalInvocations = 0;
         long totalAbortedInvocations = 0;
         long totalFailedInvocations = 0;
@@ -477,21 +474,23 @@ class Distributer {
                 totalInvocations += counters[0];
                 totalAbortedInvocations += counters[1];
                 totalFailedInvocations += counters[2];
-                final long networkCounters[] = m_networkStats.get(cxn.m_hostname);
+                final long networkCounters[] = networkStats.get(cxn.connectionId()).getSecond();
+                final String hostname = networkStats.get(cxn.connectionId()).getFirst();
                 long bytesRead = 0;
                 long messagesRead = 0;
                 long bytesWritten = 0;
                 long messagesWritten = 0;
                 if (networkCounters != null) {
-                    bytesRead = networkCounters[0];
-                    messagesRead = networkCounters[1];
-                    bytesWritten = networkCounters[2];
-                    messagesWritten = networkCounters[3];
+                    bytesRead = networkCounters[1];
+                    messagesRead = networkCounters[2];
+                    bytesWritten = networkCounters[3];
+                    messagesWritten = networkCounters[4];
                 }
 
                 retval.addRow(
                         now,
-                        cxn.m_hostname,
+                        cxn.connectionId(),
+                        hostname,
                         counters[0],
                         counters[1],
                         counters[2],
@@ -502,9 +501,10 @@ class Distributer {
             }
         }
 
-        final long globalIOStats[] = m_networkStats.get("GLOBAL");
+        final long globalIOStats[] = networkStats.get(-1L).getSecond();
         retval.addRow(
                 now,
+                -1,
                 "GLOBAL",
                 totalInvocations,
                 totalAbortedInvocations,

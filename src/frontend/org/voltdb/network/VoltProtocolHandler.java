@@ -17,18 +17,18 @@
 
 package org.voltdb.network;
 
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.nio.ByteBuffer;
 import java.io.IOException;
 
 public abstract class VoltProtocolHandler implements InputHandler {
     /** VoltProtocolPorts each have a unique id */
-    private static AtomicInteger m_globalConnectionCounter = new AtomicInteger(0);
+    private static AtomicLong m_globalConnectionCounter = new AtomicLong(0);
 
     /** messages read by this connection */
     private int m_sequenceId;
     /** serial number of this VoltPort */
-    private final int m_connectionId;
+    private final long m_connectionId;
     private int m_nextLength;
 
     public VoltProtocolHandler() {
@@ -87,7 +87,8 @@ public abstract class VoltProtocolHandler implements InputHandler {
     public void stopping(Connection c) {
     }
 
-    public int connectionId() {
+    @Override
+    public long connectionId() {
         return m_connectionId;
     }
 

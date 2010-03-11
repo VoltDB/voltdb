@@ -51,7 +51,7 @@ public abstract class TransactionInitiator {
      * @param messageSize Size in bytes of the message that created this invocation
      */
     public abstract void createTransaction(
-            int connectionId,
+            long connectionId,
             final String connectionHostname,
             StoredProcedureInvocation invocation,
             boolean isReadOnly,

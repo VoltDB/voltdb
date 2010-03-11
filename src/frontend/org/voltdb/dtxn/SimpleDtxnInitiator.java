@@ -129,7 +129,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
 
     @Override
     public synchronized void createTransaction(
-                                  int connectionId,
+                                  long connectionId,
                                   final String connectionHostname,
                                   StoredProcedureInvocation invocation,
                                   boolean isReadOnly,
@@ -211,7 +211,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     }
 
     private void
-    createSinglePartitionTxn(int connectionId,
+    createSinglePartitionTxn(long connectionId,
                              final String connectionHostname,
                              StoredProcedureInvocation invocation,
                              boolean isReadOnly,
@@ -374,7 +374,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
             VoltTable[] first_results = null;
             if (!m_txnIdResponses.containsKey(r.getTxnId()))
             {
-                ClientResponseImpl curr_response = (ClientResponseImpl) r.getClientResponseData();
+                ClientResponseImpl curr_response = r.getClientResponseData();
                 VoltTable[] curr_results = curr_response.getResults();
                 VoltTable[] saved_results = new VoltTable[curr_results.length];
                 // Create shallow copies of all the VoltTables to avoid
@@ -416,7 +416,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
             {
                 assert(first_results != null);
 
-                ClientResponseImpl curr_response = (ClientResponseImpl) r.getClientResponseData();
+                ClientResponseImpl curr_response = r.getClientResponseData();
                 VoltTable[] curr_results = curr_response.getResults();
                 if (first_results.length != curr_results.length)
                 {

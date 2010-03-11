@@ -37,7 +37,7 @@ public class InFlightTxnState implements Serializable {
             Object clientData,
             int messageSize,
             long initiateTime,
-            int connectionId,
+            long connectionId,
             String connectionHostname) {
         this.txnId = txnId;
         this.invocation = invocation;
@@ -52,6 +52,7 @@ public class InFlightTxnState implements Serializable {
         this.connectionHostname = connectionHostname;
     }
 
+    @Override
     public String toString()
     {
         StringBuilder sb = new StringBuilder();
@@ -89,6 +90,6 @@ public class InFlightTxnState implements Serializable {
     transient public final Object clientData;
     public final int messageSize;
     public final long initiateTime;
-    public final int connectionId;
+    public final long connectionId;
     public final String connectionHostname;
 }

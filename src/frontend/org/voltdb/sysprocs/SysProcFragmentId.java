@@ -34,6 +34,8 @@ public class SysProcFragmentId
     public static final long PF_initiatorData = 15;
     public static final long PF_initiatorAggregator = 16;
     public static final long PF_partitionCount = 17;
+    public static final long PF_ioData = 18;
+    public static final long PF_ioDataAggregator = 19;
 
     // @Shutdown
     public static final long PF_shutdownCommand = 21;

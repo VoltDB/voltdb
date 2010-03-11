@@ -339,19 +339,23 @@ public class VoltPort implements Callable<VoltPort>, Connection
         return super.toString() + ":" + m_channel.socket().getRemoteSocketAddress().toString();
     }
 
-    public long getMessagesRead() {
-        return m_messagesRead.get();
-    }
-
-    public synchronized long getMessagesReadInterval() {
-        final long messagesRead = m_messagesRead.get();
-        final long messagesReadThisTime = messagesRead - m_lastMessagesRead;
-        m_lastMessagesRead = messagesRead;
-        return messagesReadThisTime;
+    public synchronized long getMessagesRead(boolean interval) {
+        if (interval) {
+            final long messagesRead = m_messagesRead.get();
+            final long messagesReadThisTime = messagesRead - m_lastMessagesRead;
+            m_lastMessagesRead = messagesRead;
+            return messagesReadThisTime;
+        } else {
+            return m_messagesRead.get();
+        }
     }
 
     @Override
     public String getHostname() {
         return m_remoteHost;
+    }
+
+    public long connectionId() {
+        return m_handler.connectionId();
     }
 }

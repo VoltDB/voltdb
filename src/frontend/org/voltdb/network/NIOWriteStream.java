@@ -92,17 +92,17 @@ public class NIOWriteStream implements WriteStream {
     private long m_lastBytesWritten = 0;
     private long m_lastMessagesWritten = 0;
 
-    synchronized long[] getBytesAndMessagesWritten() {
-        return new long[] {m_bytesWritten, m_messagesWritten};
-    }
+    synchronized long[] getBytesAndMessagesWritten(boolean interval) {
+        if (interval) {
+            final long bytesWrittenThisTime = m_bytesWritten - m_lastBytesWritten;
+            m_lastBytesWritten = m_bytesWritten;
 
-    synchronized long[] getBytesAndMessagesWrittenInterval() {
-        final long bytesWrittenThisTime = m_bytesWritten - m_lastBytesWritten;
-        m_lastBytesWritten = m_bytesWritten;
-
-        final long messagesWrittenThisTime = m_messagesWritten - m_lastMessagesWritten;
-        m_lastMessagesWritten = m_messagesWritten;
-        return new long[] { bytesWrittenThisTime, messagesWrittenThisTime };
+            final long messagesWrittenThisTime = m_messagesWritten - m_lastMessagesWritten;
+            m_lastMessagesWritten = m_messagesWritten;
+            return new long[] { bytesWrittenThisTime, messagesWrittenThisTime };
+        } else {
+            return new long[] {m_bytesWritten, m_messagesWritten};
+        }
     }
 
     /**

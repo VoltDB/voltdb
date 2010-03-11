@@ -89,4 +89,5 @@ public interface InputHandler {
     public Runnable onBackPressure();
     public Runnable offBackPressure();
     public QueueMonitor writestreamMonitor();
+    public long connectionId();
 }

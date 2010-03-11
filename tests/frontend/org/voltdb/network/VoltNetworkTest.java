@@ -118,6 +118,10 @@ public class VoltNetworkTest extends TestCase {
             return null;
         }
 
+        @Override
+        public long connectionId() {
+            return 0;
+        }
     }
 
     public static class MockSelectionKey extends SelectionKey {

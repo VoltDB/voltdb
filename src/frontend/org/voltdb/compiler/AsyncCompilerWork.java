@@ -25,7 +25,7 @@ public class AsyncCompilerWork implements Serializable {
     boolean shouldShutdown = false;
     boolean shouldDump = false;
     long clientHandle = -1;
-    int connectionId = -1;
+    long connectionId = -1;
     String hostname = "";
     int sequenceNumber = -1;
     transient public Object clientData = null;

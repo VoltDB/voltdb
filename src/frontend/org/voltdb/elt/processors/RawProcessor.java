@@ -141,6 +141,11 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
         public QueueMonitor writestreamMonitor() {
             return null;
         }
+
+        @Override
+        public long connectionId() {
+            return 0;
+        }
     }
 
     /**
