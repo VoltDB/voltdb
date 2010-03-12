@@ -44,8 +44,14 @@ void StatsAgent::registerStatsSource(voltdb::StatisticsSelectorType sst, voltdb:
  * Get statistics for the specified resources
  * @param sst StatisticsSelectorType of the resources
  * @param catalogIds CatalogIds of the resources statistics should be retrieved for
+ * @param interval Whether to return counters since the beginning or since the last time this was called
+ * @param Timestamp to embed in each row
  */
-Table* StatsAgent::getStats(voltdb::StatisticsSelectorType sst, std::vector<voltdb::CatalogId> catalogIds) {
+Table* StatsAgent::getStats(
+        voltdb::StatisticsSelectorType sst,
+        std::vector<voltdb::CatalogId> catalogIds,
+        bool interval,
+        int64_t now) {
     assert (catalogIds.size() > 0);
     if (catalogIds.size() < 1) {
         return NULL;
@@ -57,7 +63,7 @@ Table* StatsAgent::getStats(voltdb::StatisticsSelectorType sst, std::vector<volt
          * Initialize the output table the first time.
          */
         voltdb::StatsSource *ss = (*statsSources)[catalogIds[0]];
-        voltdb::Table *table = ss->getStatsTable();
+        voltdb::Table *table = ss->getStatsTable(interval, now);
         statsTable = reinterpret_cast<Table*>(voltdb::TableFactory::getCopiedTempTable(
                 table->databaseId(),
                 "Persistent Table aggregated stats temp table",
@@ -75,7 +81,7 @@ Table* StatsAgent::getStats(voltdb::StatisticsSelectorType sst, std::vector<volt
             continue;
         }
 
-        voltdb::TableTuple *statsTuple = ss->getStatsTuple();
+        voltdb::TableTuple *statsTuple = ss->getStatsTuple(interval, now);
         statsTable->insertTuple(*statsTuple);
     }
     return statsTable;

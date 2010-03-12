@@ -67,16 +67,20 @@ public:
     /**
      * Retrieve table containing the latest statistics available. An updated stat is requested from the derived class by calling
      * StatsSource::updateStatsTuple
+     * @param interval Return counters since the beginning or since this method was last invoked
+     * @param now Timestamp to return with each row
      * @return Pointer to a table containing the statistics.
      */
-    voltdb::Table* getStatsTable();
+    voltdb::Table* getStatsTable(bool interval, int64_t now);
 
     /*
      * Retrieve tuple containing the latest statistics available. An updated stat is requested from the derived class by calling
      * StatsSource::updateStatsTuple
+     * @param interval Whether to return counters since the beginning or since the last time this was called
+     * @param Timestamp to embed in each row
      * @return Pointer to a table tuple containing the latest version of the statistics.
      */
-    voltdb::TableTuple* getStatsTuple();
+    voltdb::TableTuple* getStatsTuple(bool interval, int64_t now);
 
     /**
      * Retrieve the name of this set of statistics
@@ -115,6 +119,7 @@ protected:
      */
     std::map<std::string, int> m_columnName2Index;
 
+    bool interval() { return m_interval; }
 private:
 
     /**
@@ -141,6 +146,8 @@ private:
     voltdb::CatalogId m_hostId;
 
     voltdb::NValue m_hostname;
+
+    bool m_interval;
 
 };
 

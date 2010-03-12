@@ -1021,10 +1021,20 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public VoltTable[] getStats(final SysProcSelector selector, final int[] locators) {
+    public VoltTable[] getStats(
+            final SysProcSelector selector,
+            final int[] locators,
+            final boolean interval,
+            final Long now) {
         m_data.clear();
         m_data.putInt(Commands.GetStats.m_id);
         m_data.putInt(selector.ordinal());
+        if (interval) {
+            m_data.put((byte)1);
+        } else {
+            m_data.put((byte)1);
+        }
+        m_data.putLong(now);
         m_data.putInt(locators.length);
         for (final int locator : locators) {
             m_data.putInt(locator);

@@ -824,58 +824,68 @@ public abstract class VoltProcedure {
         /**
          * Number of times this procedure has been invoked.
          */
-        protected long invocations = 0;
+        private long m_invocations = 0;
+        private long m_lastInvocations = 0;
 
         /**
          * Number of timed invocations
          */
-        protected long timedInvocations = 0;
+        private long m_timedInvocations = 0;
+        private long m_lastTimedInvocations = 0;
 
         /**
          * Total amount of timed execution time
          */
-        protected long totalTimedExecutionTime = 0;
+        private long m_totalTimedExecutionTime = 0;
+        private long m_lastTotalTimedExecutionTime = 0;
 
         /**
          * Shortest amount of time this procedure has executed in
          */
-        protected long minExecutionTime = Long.MAX_VALUE;
+        private long m_minExecutionTime = Long.MAX_VALUE;
+        private long m_lastMinExecutionTime = Long.MAX_VALUE;
 
         /**
          * Longest amount of time this procedure has executed in
          */
-        protected long maxExecutionTime = Long.MIN_VALUE;
+        private long m_maxExecutionTime = Long.MIN_VALUE;
+        private long m_lastMaxExecutionTime = Long.MIN_VALUE;
 
         /**
          * Time the procedure was last started
          */
-        protected long currentStartTime = -1;
+        private long m_currentStartTime = -1;
 
         /**
          * Count of the number of aborts (user initiated or DB initiated)
          */
-        protected long abortCount = 0;
+        private long m_abortCount = 0;
+        private long m_lastAbortCount = 0;
 
         /**
          * Count of the number of errors that occured during procedure execution
          */
-        protected long failureCount = 0;
+        private long m_failureCount = 0;
+        private long m_lastFailureCount = 0;
 
+        /**
+         * Whether to return results in intervals since polling or since the beginning
+         */
+        private boolean m_interval = false;
         /**
          * Constructor requires no args because it has access to the enclosing classes members.
          */
         public ProcedureStatsCollector() {
             super(m_site.siteId + " " + catProc.getClassname(), m_site.siteId);
-            reset();
         }
 
         /**
          * Called when a procedure begins executing. Caches the time the procedure starts.
          */
         public final void beginProcedure() {
-            if (invocations % timeCollectionInterval == 0) {
-                currentStartTime = System.nanoTime();
-                timedInvocations++;
+            if (m_invocations % timeCollectionInterval == 0) {
+                m_currentStartTime = System.nanoTime();
+                m_timedInvocations++;
             }
         }
 
@@ -884,22 +894,24 @@ public abstract class VoltProcedure {
          * the statistics.
          */
         public final void endProcedure(boolean aborted, boolean failed) {
-            if (currentStartTime > 0) {
+            if (m_currentStartTime > 0) {
                 final long endTime = System.nanoTime();
-                final int delta = (int)(endTime - currentStartTime);
-                totalTimedExecutionTime += delta;
+                final int delta = (int)(endTime - m_currentStartTime);
+                m_totalTimedExecutionTime += delta;
 
-                minExecutionTime = Math.min( delta, minExecutionTime);
-                maxExecutionTime = Math.max( delta, maxExecutionTime);
-                currentStartTime = -1;
+                m_minExecutionTime = Math.min( delta, m_minExecutionTime);
+                m_maxExecutionTime = Math.max( delta, m_maxExecutionTime);
+                m_lastMinExecutionTime = Math.min( delta, m_lastMinExecutionTime);
+                m_lastMaxExecutionTime = Math.max( delta, m_lastMaxExecutionTime);
+                m_currentStartTime = -1;
             }
             if (aborted) {
-                abortCount++;
+                m_abortCount++;
             }
             if (failed) {
-                failureCount++;
+                m_failureCount++;
             }
-            invocations++;
+            m_invocations++;
         }
 
         /**
@@ -911,6 +923,36 @@ public abstract class VoltProcedure {
         protected void updateStatsRow(Object rowKey, Object rowValues[]) {
             super.updateStatsRow(rowKey, rowValues);
             rowValues[columnNameToIndex.get("PROCEDURE")] = catProc.getClassname();
+            long invocations = m_invocations;
+            long totalTimedExecutionTime = m_totalTimedExecutionTime;
+            long timedInvocations = m_timedInvocations;
+            long minExecutionTime = m_minExecutionTime;
+            long maxExecutionTime = m_maxExecutionTime;
+            long abortCount = m_abortCount;
+            long failureCount = m_failureCount;
+
+            if (m_interval) {
+                invocations = m_invocations - m_lastInvocations;
+                m_lastInvocations = m_invocations;
+
+                totalTimedExecutionTime = m_totalTimedExecutionTime - m_lastTotalTimedExecutionTime;
+                m_lastTotalTimedExecutionTime = m_totalTimedExecutionTime;
+
+                timedInvocations = m_timedInvocations - m_lastTimedInvocations;
+                m_lastTimedInvocations = m_timedInvocations;
+
+                abortCount = m_abortCount - m_lastAbortCount;
+                m_lastAbortCount = m_abortCount;
+
+                failureCount = m_failureCount - m_lastFailureCount;
+                m_lastFailureCount = m_failureCount;
+
+                minExecutionTime = m_lastMinExecutionTime;
+                maxExecutionTime = m_lastMaxExecutionTime;
+                m_lastMinExecutionTime = Long.MAX_VALUE;
+                m_lastMaxExecutionTime = Long.MIN_VALUE;
+            }
+
             rowValues[columnNameToIndex.get("INVOCATIONS")] = invocations;
             rowValues[columnNameToIndex.get("TIMED_INVOCATIONS")] = timedInvocations;
             rowValues[columnNameToIndex.get("MIN_EXECUTION_TIME")] = minExecutionTime;
@@ -943,12 +985,13 @@ public abstract class VoltProcedure {
         }
 
         @Override
-        protected Iterator<Object> getStatsRowKeyIterator() {
+        protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
+            m_interval = interval;
             return new Iterator<Object>() {
                 boolean givenNext = false;
                 @Override
                 public boolean hasNext() {
-                    if (invocations == 0) {
+                    if (m_invocations == 0) {
                         return false;
                     }
                     return !givenNext;
@@ -967,25 +1010,6 @@ public abstract class VoltProcedure {
                 public void remove() {}
 
             };
-        }
-
-        @Override
-        public void reset() {
-            /*
-             * Statistics calls reset, and it might be in the middle of being
-             * profiled. They can live without reseting counters for statistics
-             */
-            if (catProc.getClassname().toLowerCase().endsWith("statistics")) {
-                return;
-            }
-            invocations = 0;
-            timedInvocations = 0;
-            totalTimedExecutionTime = 0;
-            minExecutionTime = Long.MAX_VALUE;
-            maxExecutionTime = Long.MIN_VALUE;
-            currentStartTime = -1;
-            abortCount = 0;
-            failureCount = 0;
         }
 
         @Override

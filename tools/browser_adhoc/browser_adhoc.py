@@ -74,9 +74,10 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 self.wfile.write('  <input type=submit name="bsubmit" value="Procedures">\n')
                 self.wfile.write('  <input type=submit name="bsubmit" value="Initiators">\n')
                 self.wfile.write('  <input type=submit name="bsubmit" value="SystemInfo">\n')
-                self.wfile.write('  <input type=submit name="bsubmit" value="IO Stats">\n')
+                self.wfile.write('  <input type=submit name="bsubmit" value="IO">\n')
+                self.wfile.write('  <input type=submit name="bsubmit" value="Management">\n')
                 self.wfile.write('  <input type=submit name="bsubmit" value="Snapshot status" />\n' )
-                self.wfile.write('  <input type=checkbox name="reset_counters">Reset counters</input>\n' )
+                self.wfile.write('  <input type=checkbox name="interval_poll">Report counters since last poll</input>\n' )
                 self.wfile.write('  <br/> Snapshot:<br/>\n')
                 self.wfile.write('  <input type=checkbox name="blocking_snapshot">Block VoltDB until snapshot completes</input><br/>\n' )
                 self.wfile.write('  Path: <textarea name="snapshot_path" id="snapshot_path"> </textarea> <br/>\n')
@@ -109,10 +110,10 @@ class HTTPHandler(BaseHTTPRequestHandler):
             else:
                 blocking_snapshot = False
 
-            if query.has_key('reset_counters'):
-                reset_counters = 1
+            if query.has_key('interval_poll'):
+                interval_poll = 1
             else:
-                reset_counters = 0
+                interval_poll = 0
             ######################################################################
 
             self.send_response(200)
@@ -141,19 +142,22 @@ class HTTPHandler(BaseHTTPRequestHandler):
                     response = client.execute('adhoc %s' % (sql_text))
                 elif (button_clicked == 'TABLES'):
                     self.wfile.write('Table Statistics<br>\n');
-                    response = client.execute('stat table %d' % (reset_counters))
+                    response = client.execute('stat table %d' % (interval_poll))
                 elif (button_clicked == 'PROCEDURES'):
                     self.wfile.write('Procedure Statistics<br>\n');
-                    response = client.execute('stat procedure %d' % (reset_counters))
+                    response = client.execute('stat procedure %d' % (interval_poll))
                 elif (button_clicked == 'INITIATORS'):
                     self.wfile.write('Initiator Statistics<br>\n');
-                    response = client.execute('stat initiator %d' % (reset_counters))
-                elif (button_clicked == 'IO STATS'):
+                    response = client.execute('stat initiator %d' % (interval_poll))
+                elif (button_clicked == 'IO'):
                     self.wfile.write('IO Statistics<br>\n');
-                    response = client.execute('stat iostats %d' % (reset_counters))
+                    response = client.execute('stat iostats %d' % (interval_poll))
+                elif (button_clicked == 'MANAGEMENT'):
+                    self.wfile.write('Management statistics<br>\n');
+                    response = client.execute('stat management %d' % (interval_poll))
                 elif (button_clicked == 'SYSTEMINFO'):
                     self.wfile.write('System Information<br>\n');
-                    response = client.execute('sysinfo %d' % (reset_counters))
+                    response = client.execute('sysinfo %d' % (interval_poll))
                 elif (button_clicked == "INITIATE SNAPSHOT"):
                     self.wfile.write("Attempting to initiate snapshot to ")
                     self.wfile.write(snapshot_path)

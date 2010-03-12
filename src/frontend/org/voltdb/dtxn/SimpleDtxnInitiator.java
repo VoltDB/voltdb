@@ -408,7 +408,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                             state.connectionId,
                             state.connectionHostname,
                             state.invocation,
-                            delta);
+                            delta,
+                            response.getStatus());
                     c.writeStream().enqueue(r.getClientResponseData());
                 }
             }
@@ -477,7 +478,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                             state.connectionId,
                             state.connectionHostname,
                             state.invocation,
-                            delta);
+                            delta,
+                            response.getStatus());
                     c.writeStream().enqueue(response);
                 }
             }

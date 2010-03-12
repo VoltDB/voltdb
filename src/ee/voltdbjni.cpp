@@ -670,7 +670,7 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeQuies
  * @return Number of result tables, 0 on no results, -1 on failure.
  */
 SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeGetStats
-  (JNIEnv *env, jobject obj, jlong pointer, jint selector, jintArray locatorsArray) {
+  (JNIEnv *env, jobject obj, jlong pointer, jint selector, jintArray locatorsArray, jboolean jinterval, jlong now) {
     VoltDBEngine *engine = castToEngine(pointer);
     updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
     engine->resetReusedResultOutputBuffer();
@@ -693,8 +693,8 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeGetSt
             return JNI_FALSE;
         }
     }
-
-    int result = engine->getStats(static_cast<int>(selector), locators, numLocators);
+    const bool interval = jinterval == JNI_TRUE ? true : false;
+    int result = engine->getStats(static_cast<int>(selector), locators, numLocators, interval, now);
     env->ReleaseIntArrayElements(locatorsArray, locators, JNI_ABORT);
     return static_cast<jint>(result);
 }

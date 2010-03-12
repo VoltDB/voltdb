@@ -15,7 +15,6 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.voltdb;
-import org.voltdb.utils.EstTime;
 import org.voltdb.VoltTable.ColumnInfo;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -64,7 +63,7 @@ public abstract class StatsSource {
      * @param columns Output list for the column schema.
      */
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
-        columns.add(new ColumnInfo("STAT_TIME", VoltType.BIGINT));
+        columns.add(new ColumnInfo("TIMESTAMP", VoltType.BIGINT));
     }
 
     /**
@@ -85,14 +84,16 @@ public abstract class StatsSource {
 
     /**
      * Get the latest stat values as an array of arrays of objects suitable for insertion into an VoltTable
+     * @param interval Whether to get stats since the beginning or since the last time stats were retrieved
      * @return Array of Arrays of objects containing the latest values
      */
-    public Object[][] getStatsRows() {
+    public Object[][] getStatsRows(boolean interval, final Long now) {
+        this.now = now;
         /*
          * Synchronizing on this allows derived classes to maintain thread safety
          */
         synchronized (this) {
-            Iterator<Object> i = getStatsRowKeyIterator();
+            Iterator<Object> i = getStatsRowKeyIterator(interval);
             ArrayList<Object[]> rows = new ArrayList<Object[]>();
             while (i.hasNext()) {
                 Object rowKey = i.next();
@@ -104,24 +105,24 @@ public abstract class StatsSource {
         }
     }
 
+    private Long now = System.currentTimeMillis();
     /**
-     * Update the parameter array with the latest values. This is similar to populateColumnSchema in that it must be overriden by
+     * Update the parameter array with the latest values. This is similar
+     * to populateColumnSchema in that it must be overriden by
      * derived classes and the derived class implementation must call the super classes implementation.
      * @param rowKey Key identifying the specific row to be populated
      * @param rowValues Output parameter. Array of values to be updated.
      */
     protected void updateStatsRow(Object rowKey, Object rowValues[]) {
-        rowValues[0] = EstTime.currentTimeMillis();
+        rowValues[0] = now;
     }
 
     /**
-     * Retrieve an iterator that iterates over the keys identifying all unique stats rows available for retreival from the stats source
+     * Retrieve an iterator that iterates over the keys identifying all unique stats rows
+     * available for retrieval from the stats source
+     * @param interval Whether return stats that are recorded from the beginning or since
+     *  the last time they were iterated
      * @return Iterator of Objects representing keys that identify unique stats rows
      */
-    abstract protected Iterator<Object> getStatsRowKeyIterator();
-
-    /**
-     * Reset counters and statistical information
-     */
-    abstract public void reset();
+    abstract protected Iterator<Object> getStatsRowKeyIterator(boolean interval);
 }

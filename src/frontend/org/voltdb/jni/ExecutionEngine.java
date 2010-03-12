@@ -357,9 +357,15 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Retrieve a set of statistics using the specified selector from the StatisticsSelector enum.
      * @param selector Selector from StatisticsSelector specifying what statistics to retrieve
      * @param locators CatalogIds specifying what set of items the stats should come from.
-     *  @return Array of results tables. An array of length 0 indicates there are no results. null indicates failure.
+     * @param interval Return counters since the beginning or since this method was last invoked
+     * @param now Timestamp to return with each row
+     * @return Array of results tables. An array of length 0 indicates there are no results. null indicates failure.
      */
-    abstract public VoltTable[] getStats(SysProcSelector selector, int locators[]);
+    abstract public VoltTable[] getStats(
+            SysProcSelector selector,
+            int locators[],
+            boolean interval,
+            Long now);
 
     /**
      * Wrapper for {@link #nativeToggleProfiler(long, int)}.
@@ -517,9 +523,16 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Retrieve a set of statistics using the specified selector ordinal from the StatisticsSelector enum.
      * @param stat_selector Ordinal value of a statistic selector from StatisticsSelector.
      * @param catalog_locators CatalogIds specifying what set of items the stats should come from.
+     * @param interval Return counters since the beginning or since this method was last invoked
+     * @param now Timestamp to return with each row
      * @return Number of result tables, 0 on no results, -1 on failure.
      */
-    protected native int nativeGetStats(long pointer, int stat_selector, int catalog_locators[]);
+    protected native int nativeGetStats(
+            long pointer,
+            int stat_selector,
+            int catalog_locators[],
+            boolean interval,
+            long now);
 
     /**
      * Toggle profile gathering within the execution engine

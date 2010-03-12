@@ -179,12 +179,12 @@ public class TestVoltProcedure extends TestCase {
         assertNotNull(agent.m_source);
         assertEquals(agent.m_selector, SysProcSelector.PROCEDURE);
         assertEquals(agent.m_catalogId, Integer.parseInt(site.m_context.cluster.getSites().get(Integer.toString(site.siteId)).getTypeName()));
-        Object statsRow[][] = agent.m_source.getStatsRows();
+        Object statsRow[][] = agent.m_source.getStatsRows(false, 0L);
         assertNotNull(statsRow);
         assertEquals( 0, statsRow.length);
         for (int ii = 1; ii < 200; ii++) {
             wrapper.call(params.m_params);
-            statsRow = agent.m_source.getStatsRows();
+            statsRow = agent.m_source.getStatsRows(false, 0L);
             assertEquals(statsRow[0][4], new Long(ii));
         }
         assertTrue(((Long)statsRow[0][4]).longValue() > 0L);

@@ -97,7 +97,7 @@ public class TestExecutionEngine extends TestCase {
         final int WAREHOUSE_TABLEID = catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("WAREHOUSE").getRelativeIndex();
         final int STOCK_TABLEID = catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("STOCK").getRelativeIndex();
         final int locators[] = new int[] { WAREHOUSE_TABLEID, STOCK_TABLEID };
-        final VoltTable results[] = engine.getStats(SysProcSelector.TABLE, locators);
+        final VoltTable results[] = engine.getStats(SysProcSelector.TABLE, locators, false, 0L);
         assertNotNull(results);
         assertEquals(1, results.length);
         assertNotNull(results[0]);

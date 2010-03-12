@@ -420,12 +420,18 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * Retrieve a set of statistics using the specified selector from the StatisticsSelector enum.
      * @param selector Selector from StatisticsSelector specifying what statistics to retrieve
      * @param locators CatalogIds specifying what set of items the stats should come from.
-     *  @return Array of results tables. An array of length 0 indicates there are no results. null indicates failure.
+     * @param interval Return counters since the beginning or since this method was last invoked
+     * @param now Timestamp to return with each row
+     * @return Array of results tables. An array of length 0 indicates there are no results. null indicates failure.
      */
     @Override
-    public VoltTable[] getStats(final SysProcSelector selector, final int locators[]) {
+    public VoltTable[] getStats(
+            final SysProcSelector selector,
+            final int locators[],
+            final boolean interval,
+            final Long now) {
         deserializer.clear();
-        final int numResults = nativeGetStats(pointer, selector.ordinal(), locators);
+        final int numResults = nativeGetStats(pointer, selector.ordinal(), locators, interval, now);
         if (numResults == -1) {
             return null;
         }

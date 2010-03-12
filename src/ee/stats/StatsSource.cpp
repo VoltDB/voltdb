@@ -23,7 +23,6 @@
 #include "stats/StatsSource.h"
 #include <vector>
 #include <string>
-#include <ctime>
 #include <cassert>
 
 namespace voltdb {
@@ -80,30 +79,32 @@ std::string StatsSource::getName() {
 /**
  * Retrieve table containing the latest statistics available. An updated stat is requested from the derived class by calling
  * StatsSource::updateStatsTuple
+ * @param interval Return counters since the beginning or since this method was last invoked
+ * @param now Timestamp to return with each row
  * @return Pointer to a table containing the statistics.
  */
-voltdb::Table* StatsSource::getStatsTable() {
-    getStatsTuple();
+voltdb::Table* StatsSource::getStatsTable(bool interval, int64_t now) {
+    getStatsTuple(interval, now);
     return m_statsTable.get();
 }
 
 /*
  * Retrieve tuple containing the latest statistics available. An updated stat is requested from the derived class by calling
  * StatsSource::updateStatsTuple
+ * @param interval Whether to return counters since the beginning or since the last time this was called
+ * @param Timestamp to embed in each row
  * @return Pointer to a table tuple containing the latest version of the statistics.
  */
-voltdb::TableTuple* StatsSource::getStatsTuple() {
+voltdb::TableTuple* StatsSource::getStatsTuple(bool interval, int64_t now) {
+    m_interval = interval;
     assert (m_statsTable != NULL);
     if (m_statsTable == NULL) {
         return NULL;
     }
-    time_t now;
-    time(&now);
-    //assert (static_cast<time_t>(-1) != result);
     m_statsTuple.setNValue(0, ValueFactory::getBigIntValue(m_hostId));
     m_statsTuple.setNValue(1, m_hostname);
     m_statsTuple.setNValue(2, ValueFactory::getBigIntValue(m_partitionId));
-    m_statsTuple.setNValue(3, ValueFactory::getBigIntValue(static_cast<int64_t>(now)));
+    m_statsTuple.setNValue(3, ValueFactory::getBigIntValue(now));
     updateStatsTuple(&m_statsTuple);
     m_statsTable->insertTuple(m_statsTuple);
     //assert (success);
@@ -120,7 +121,7 @@ std::vector<std::string> StatsSource::generateStatsColumnNames() {
     columnNames.push_back("HOST_ID");
     columnNames.push_back("HOSTNAME");
     columnNames.push_back("PARTITION_ID");
-    columnNames.push_back("STAT_TIME");
+    columnNames.push_back("TIMESTAMP");
     return columnNames;
 }
 

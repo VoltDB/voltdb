@@ -51,8 +51,14 @@ public:
      * Get statistics for the specified resources
      * @param sst StatisticsSelectorType of the resources
      * @param catalogIds CatalogIds of the resources statistics should be retrieved for
+     * @param interval Return counters since the beginning or since this method was last invoked
+     * @param now Timestamp to return with each row
      */
-    Table* getStats(voltdb::StatisticsSelectorType sst, std::vector<voltdb::CatalogId> catalogIds);
+    Table* getStats(
+            voltdb::StatisticsSelectorType sst,
+            std::vector<voltdb::CatalogId> catalogIds,
+            bool interval,
+            int64_t now);
 
     ~StatsAgent();
 

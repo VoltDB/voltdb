@@ -52,14 +52,11 @@ public class StatsAgent {
         statsSources.add(source);
     }
 
-    public synchronized VoltTable getStats(final SysProcSelector selector, final ArrayList<Integer> catalogIds) {
-        return getStats(selector, catalogIds, false);
-    }
-
     public synchronized VoltTable getStats(
             final SysProcSelector selector,
             final ArrayList<Integer> catalogIds,
-            final boolean resetCounters) {
+            final boolean interval,
+            final Long now) {
         assert selector != null;
         assert catalogIds != null;
         assert catalogIds.size() > 0;
@@ -77,12 +74,9 @@ public class StatsAgent {
             assert statsSources != null;
             for (final StatsSource ss : statsSources) {
                 assert ss != null;
-                Object statsRows[][] = ss.getStatsRows();
+                Object statsRows[][] = ss.getStatsRows(interval, now);
                 for (Object[] row : statsRows) {
                     resultTable.addRow(row);
-                }
-                if (resetCounters) {
-                    ss.reset();
                 }
             }
         }

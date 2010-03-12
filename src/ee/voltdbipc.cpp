@@ -117,6 +117,8 @@ typedef struct {
     struct ipc_command cmd;
     int32_t selector;
     int32_t num_locators;
+    int8_t  interval;
+    int64_t now;
     int32_t locators[0];
 }__attribute__((packed)) get_stats_cmd;
 
@@ -710,6 +712,11 @@ void VoltDBIPC::getStats(struct ipc_command *cmd) {
 
     const int32_t selector = ntohl(getStatsCommand->selector);
     const int32_t numLocators = ntohl(getStatsCommand->num_locators);
+    bool interval = false;
+    if (getStatsCommand->interval != 0) {
+        interval = true;
+    }
+    const int64_t now = ntohll(getStatsCommand->now);
     int32_t *locators = new int32_t[numLocators];
     for (int ii = 0; ii < numLocators; ii++) {
         locators[ii] = ntohl(getStatsCommand->locators[ii]);
@@ -717,7 +724,12 @@ void VoltDBIPC::getStats(struct ipc_command *cmd) {
 
     m_engine->resetReusedResultOutputBuffer();
 
-    int result = m_engine->getStats(static_cast<int>(selector), locators, numLocators);
+    int result = m_engine->getStats(
+            static_cast<int>(selector),
+            locators,
+            numLocators,
+            interval,
+            now);
 
     delete [] locators;
 

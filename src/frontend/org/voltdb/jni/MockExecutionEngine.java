@@ -54,7 +54,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public VoltTable[] getStats(final SysProcSelector selector, final int[] locators) {
+    public VoltTable[] getStats(final SysProcSelector selector, final int[] locators, boolean interval, Long now) {
         // TODO Auto-generated method stub
         return null;
     }

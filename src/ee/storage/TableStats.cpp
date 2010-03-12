@@ -28,7 +28,8 @@ namespace voltdb {
 /*
  * Constructor caches reference to the table that will be generating the statistics
  */
-TableStats::TableStats(voltdb::Table* table) : voltdb::StatsSource(), m_table(table) {
+TableStats::TableStats(voltdb::Table* table) : voltdb::StatsSource(), m_table(table),
+        m_lastActiveTupleCount(0), m_lastAllocatedTupleCount(0), m_lastDeletedTupleCount(0) {
 }
 
 /**
@@ -72,16 +73,38 @@ std::vector<std::string> TableStats::generateStatsColumnNames() {
 void TableStats::updateStatsTuple(voltdb::TableTuple *tuple) {
     tuple->setNValue( StatsSource::m_columnName2Index["TABLE_NAME"], m_tableName);
     tuple->setNValue( StatsSource::m_columnName2Index["TABLE_TYPE"], m_tableType);
-    tuple->setNValue( StatsSource::m_columnName2Index["TABLE_ACTIVE_TUPLE_COUNT"], ValueFactory::getBigIntValue(m_table->activeTupleCount()));
-    tuple->setNValue( StatsSource::m_columnName2Index["TABLE_ALLOCATED_TUPLE_COUNT"], ValueFactory::getBigIntValue(m_table->allocatedTupleCount()));
-    tuple->setNValue( StatsSource::m_columnName2Index["TABLE_DELETED_TUPLE_COUNT"], ValueFactory::getBigIntValue(m_table->deletedTupleCount()));
+    int64_t activeTupleCount = m_table->activeTupleCount();
+    int64_t allocatedTupleCount = m_table->allocatedTupleCount();
+    int64_t deletedTupleCount = m_table->deletedTupleCount();
+
+    if (interval()) {
+        activeTupleCount = activeTupleCount - m_lastActiveTupleCount;
+        m_lastActiveTupleCount = m_table->activeTupleCount();
+
+        allocatedTupleCount = allocatedTupleCount - m_lastAllocatedTupleCount;
+        m_lastAllocatedTupleCount = m_table->allocatedTupleCount();
+
+        deletedTupleCount = deletedTupleCount - m_lastDeletedTupleCount;
+        m_lastDeletedTupleCount = m_table->deletedTupleCount();
+    }
+
+    tuple->setNValue(
+            StatsSource::m_columnName2Index["TABLE_ACTIVE_TUPLE_COUNT"],
+            ValueFactory::getBigIntValue(activeTupleCount));
+    tuple->setNValue( StatsSource::m_columnName2Index["TABLE_ALLOCATED_TUPLE_COUNT"],
+            ValueFactory::getBigIntValue(allocatedTupleCount));
+    tuple->setNValue( StatsSource::m_columnName2Index["TABLE_DELETED_TUPLE_COUNT"],
+            ValueFactory::getBigIntValue(deletedTupleCount));
 }
 
 /**
  * Same pattern as generateStatsColumnNames except the return value is used as an offset into the tuple schema instead of appending to
  * end of a list.
  */
-void TableStats::populateSchema(std::vector<voltdb::ValueType> &types, std::vector<uint16_t> &columnLengths, std::vector<bool> &allowNull) {
+void TableStats::populateSchema(
+        std::vector<voltdb::ValueType> &types,
+        std::vector<uint16_t> &columnLengths,
+        std::vector<bool> &allowNull) {
     StatsSource::populateSchema(types, columnLengths, allowNull);
     types.push_back(voltdb::VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);
     types.push_back(voltdb::VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);

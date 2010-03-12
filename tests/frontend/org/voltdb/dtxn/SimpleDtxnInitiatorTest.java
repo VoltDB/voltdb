@@ -208,7 +208,7 @@ public class SimpleDtxnInitiatorTest extends TestCase {
 
         final ClientResponse response = c.writeStream.response;
         assertNotNull(response);
-        final Iterator<Object> i = initiator.m_stats.getStatsRowKeyIterator();
+        final Iterator<Object> i = initiator.m_stats.getStatsRowKeyIterator(false);
         assertNotNull(i);
         assertTrue(i.hasNext());
         final Object rowKey = i.next();
@@ -216,7 +216,7 @@ public class SimpleDtxnInitiatorTest extends TestCase {
         assertNotNull(rowKey);
         assertTrue(rowKey instanceof String);
         assertTrue(((String)rowKey).equals("foo$42"));
-        final Object statsRows[][] = initiator.m_stats.getStatsRows();
+        final Object statsRows[][] = initiator.m_stats.getStatsRows(false, 0L);
         assertNotNull(statsRows);
         assertEquals(1, statsRows.length);
         assertNotNull(statsRows[0]);

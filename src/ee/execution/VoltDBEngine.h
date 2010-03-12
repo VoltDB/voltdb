@@ -274,9 +274,16 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * @param locators Integer identifiers specifying what subset of possible statistical sources should be polled. Probably a CatalogId
          *                 Can be NULL in which case all possible sources for the selector should be included.
          * @param numLocators Size of locators array.
+         * @param interval Whether to return counters since the beginning or since the last time this was called
+         * @param Timestamp to embed in each row
          * @return Number of result tables, 0 on no results, -1 on failure.
          */
-        int getStats(int selector, int locators[], int numLocators);
+        int getStats(
+                int selector,
+                int locators[],
+                int numLocators,
+                bool interval,
+                int64_t now);
 
         inline Pool* getStringPool() { return &m_stringPool; }
 
