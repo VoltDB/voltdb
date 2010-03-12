@@ -44,8 +44,12 @@ public abstract class CatalogType implements Comparable<CatalogType> {
     String m_path;
     String m_typename;
     CatalogType m_parent;
+    CatalogMap<? extends CatalogType> m_parentMap;
     Catalog m_catalog;
     int m_relativeIndex;
+    
+    int m_subTreeVersion;
+    int m_nodeVersion;
 
     /**
      * Get the parent of this CatalogType instance
@@ -86,6 +90,14 @@ public abstract class CatalogType implements Comparable<CatalogType> {
      */
     public int getRelativeIndex() {
         return m_relativeIndex;
+    }
+    
+    public int getNodeVersion() {
+        return m_nodeVersion;
+    }
+    
+    public int getSubTreeVersion() {
+        return m_subTreeVersion;
     }
 
     /**
@@ -130,6 +142,8 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         m_parent = parent;
         m_path = path;
         m_typename = name;
+        m_subTreeVersion = m_catalog.m_currentCatalogVersion;
+        m_nodeVersion = m_catalog.m_currentCatalogVersion;
         catalog.registerGlobally(this);
     }
 
@@ -149,7 +163,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         return map.get(childName);
     }
 
-    void set(String field, String value) {
+    void set(String field, String value) {        
         if ((field == null) || (value == null)) {
             throw new CatalogException("Null value where it shouldn't be.");
         }
@@ -206,6 +220,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         }
 
         update();
+        updateVersioning();
     }
 
     void delete(String collectionName, String childName) {
@@ -219,11 +234,27 @@ public abstract class CatalogType implements Comparable<CatalogType> {
 
         collection.delete(childName);
     }
+    
+    void updateVersioning() {
+        m_catalog.m_changesMadePerUpdateCount++;
+        if (m_nodeVersion != m_catalog.m_currentCatalogVersion) {
+            m_nodeVersion = m_catalog.m_currentCatalogVersion;
+            updateSubTreeVersion();
+        }
+    }
+    
+    void updateSubTreeVersion() {
+        if (m_subTreeVersion != m_catalog.m_currentCatalogVersion) {
+            m_subTreeVersion = m_catalog.m_currentCatalogVersion;
+            if (m_parentMap != null)
+                m_parentMap.updateVersioning();
+        }
+    }
 
     void writeCreationCommand(StringBuilder sb) {
         // skip root node command
         if (m_path.equals("/"))
-                return;
+            return;
 
         int lastSlash = m_path.lastIndexOf("/");
         String key = m_path.substring(lastSlash + 1);
@@ -298,6 +329,8 @@ public abstract class CatalogType implements Comparable<CatalogType> {
 
         copy.setBaseValues(catalog, parent, m_path, m_typename);
         copy.m_relativeIndex = m_relativeIndex;
+        copy.m_nodeVersion = m_nodeVersion;
+        copy.m_subTreeVersion = m_subTreeVersion;
 
         for (Entry<String, Object> e : m_fields.entrySet()) {
             Object value = e.getValue();

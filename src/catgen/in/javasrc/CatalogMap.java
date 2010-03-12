@@ -37,16 +37,18 @@ import java.util.Map.Entry;
 public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
 
     TreeMap<String, T> m_items = new TreeMap<String, T>();
-    private Class<T> m_cls;
+    Class<T> m_cls;
     Catalog m_catalog;
     CatalogType m_parent;
     String m_path;
+    int m_subTreeVersion;
 
     CatalogMap(Catalog catalog, CatalogType parent, String path, Class<T> cls) {
         this.m_catalog = catalog;
         this.m_parent = parent;
         this.m_path = path;
         this.m_cls = cls;
+        this.m_subTreeVersion = catalog.m_currentCatalogVersion;
     }
 
     /**
@@ -94,6 +96,10 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
     public Iterator<T> iterator() {
         return m_items.values().iterator();
     }
+    
+    public int getSubTreeVersion() {
+        return m_subTreeVersion;
+    }
 
     /**
      * Create a new instance of a CatalogType as a child of this map with a
@@ -110,8 +116,13 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
             T x = m_cls.newInstance();
             String childPath = m_path + "[" + name + "]";
             x.setBaseValues(m_catalog, m_parent, childPath, name);
+            x.m_parentMap = this;
 
             m_items.put(name, x);
+            
+            // update versioning if needed
+            updateVersioning();
+            m_catalog.m_changesMadePerUpdateCount++;
 
             // assign a relative index to every child item
             int index = 1;
@@ -135,6 +146,10 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
                 throw new CatalogException("Catalog item '" + name + "' doesn't exists in " + m_parent);
 
             m_items.remove(name);
+            
+            // update versioning if needed
+            updateVersioning();
+            m_catalog.m_changesMadePerUpdateCount++;
 
             // assign a relative index to every child item
             int index = 1;
@@ -143,6 +158,13 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
             }
         } catch (Exception ex) {
             throw new RuntimeException(ex);
+        }
+    }
+    
+    void updateVersioning() {
+        if (m_subTreeVersion != m_catalog.m_currentCatalogVersion) {
+            m_subTreeVersion = m_catalog.m_currentCatalogVersion;
+            m_parent.updateSubTreeVersion();
         }
     }
 
@@ -160,6 +182,7 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
         for (Entry<String, T> e : castedMap.m_items.entrySet()) {
             m_items.put(e.getKey(), (T) e.getValue().deepCopy(m_catalog, m_parent));
         }
+        m_subTreeVersion = catalogMap.m_subTreeVersion;
     }
 
     @Override
