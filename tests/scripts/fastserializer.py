@@ -229,6 +229,8 @@ class FastSerializer:
         responseprefix = ""
         while (len(responseprefix) < 4):
             responseprefix += self.socket.recv(4 - len(responseprefix))
+            if responseprefix == "":
+                raise IOError("Connection broken")
         responseLength = struct.unpack(self.int32Type(1), responseprefix)[0]
         while (len(self.rbuf) < responseLength):
             self.rbuf += self.socket.recv(responseLength - len(self.rbuf))

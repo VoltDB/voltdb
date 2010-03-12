@@ -97,6 +97,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
 
     def do_POST(self):
+        global client
+
         try:
             ctype, pdict = cgi.parse_header(self.headers.getheader('content-type'))
             if ctype == 'multipart/form-data':
@@ -135,6 +137,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write('<body>\n')
 
             try:
+                if client == None:
+                    connect_to_server()
+
                 if (button_clicked == 'SUBMIT SQL'):
                     self.wfile.write('SQL<br>\n');
                     self.wfile.write(sql_text + '<br>\n<br>\n');
@@ -237,6 +242,10 @@ class HTTPHandler(BaseHTTPRequestHandler):
                     self.wfile.write('</table>\n');
                     self.wfile.write('<br />' + str(rowsDisplayed) + ' Row(s) Displayed.\n');
 
+            except IOError, e:
+                print e
+                self.wfile.write("Error: %s<br>\n" % (e))
+                client = None
             except Exception, e:
                 print "something really bad just happened"
                 print e
@@ -254,27 +263,32 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
 
 
-
-
-def main():
+def connect_to_server():
     global client
 
     try:
-        print "Connecting to server at ", volt_server_ip, " on port ", volt_server_port
+        if client != None:
+            client.close()
+        print "Connecting to server at ", volt_server_ip, \
+            " on port ", volt_server_port
         client = VoltQueryClient(volt_server_ip, volt_server_port,
                                  volt_username, volt_password)
         client.set_quiet(True)
+    except socket.error:
+        raise IOError("Error connecting to the server")
+
+def main():
+    try:
+        connect_to_server()
 
         server = HTTPServer(('', http_server_port), HTTPHandler)
         print 'starting server...'
         server.serve_forever()
-    except socket.error:
-        print "Error connecting to the server"
-        exit(-1)
     except KeyboardInterrupt:
         print 'stopping server...'
         server.socket.close()
-        client.close()
+        if client != None:
+            client.close()
 
 if __name__ == '__main__':
     main()

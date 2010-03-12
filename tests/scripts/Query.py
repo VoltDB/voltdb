@@ -87,13 +87,31 @@ class VoltQueryClient(cmd.Cmd):
 
         self.response = None
 
+    def __safe_call(self, proc, params = None, response = True, timeout = None):
+        if not proc:
+            return None
+
+        self.response = None
+
+        try:
+            return proc.call(params, response, timeout)
+        except IOError as err:
+            self.safe_print("Error: %s" % (err))
+            if not response:
+                raise
+            else:
+                return None
+
     def close(self):
         if self.fs != None:
             self.fs.close()
 
     def execute(self, command):
         self.onecmd(command)
-        return self.response
+        if self.response != None:
+            return self.response
+        else:
+            raise IOError("Connection down")
 
     def precmd(self, command):
         if self.fs == None:
@@ -117,7 +135,8 @@ class VoltQueryClient(cmd.Cmd):
     def safe_print(self, *var):
         if not self.__quiet:
             for i in var:
-                print i,
+                if i != None:
+                    print i,
             print
 
     def set_quiet(self, quiet):
@@ -175,7 +194,8 @@ class VoltQueryClient(cmd.Cmd):
         if len(args) != 2:
             return self.help_stat()
         self.safe_print("Getting statistics")
-        self.response = self.stat.call([args[0], int(args[1])], timeout = self.__timeout)
+        self.response = self.__safe_call(self.stat, [args[0], int(args[1])],
+                                         timeout = self.__timeout)
         self.safe_print(self.response)
 
     def help_stat(self):
@@ -194,8 +214,9 @@ class VoltQueryClient(cmd.Cmd):
             return self.help_snapshotsave()
 
         self.safe_print("Taking snapshot")
-        self.response = self.snapshotsave.call([args[0], args[1], int(args[2])],
-                                               timeout = self.__timeout)
+        self.response = self.__safe_call(self.snapshotsave,
+                                         [args[0], args[1], int(args[2])],
+                                         timeout = self.__timeout)
         self.safe_print(self.response)
 
     def help_snapshotsave(self):
@@ -209,8 +230,8 @@ class VoltQueryClient(cmd.Cmd):
             return self.help_snapshotscan()
 
         self.safe_print("Scanning snapshots")
-        self.response = self.snapshotscan.call([command],
-                                               timeout = self.__timeout)
+        self.response = self.__safe_call(self.snapshotscan, [command],
+                                         timeout = self.__timeout)
         self.safe_print(self.response)
 
     def help_snapshotscan(self):
@@ -228,8 +249,8 @@ class VoltQueryClient(cmd.Cmd):
         nonces = nonces.split(",")
 
         self.safe_print("Deleting snapshots")
-        self.response = self.snapshotdelete.call([paths, nonces],
-                                                 timeout = self.__timeout)
+        self.response = self.__safe_call(self.snapshotdelete, [paths, nonces],
+                                         timeout = self.__timeout)
         self.safe_print(self.response)
 
     def help_snapshotdelete(self):
@@ -248,9 +269,9 @@ class VoltQueryClient(cmd.Cmd):
             return self.help_snapshotrestore()
 
         self.safe_print("Restoring snapshot")
-        self.response = self.snapshotrestore.call([args[0], args[1],
-                                                   int(args[2])],
-                                                  timeout = self.__timeout)
+        self.response = self.__safe_call(self.snapshotrestore,
+                                         [args[0], args[1], (args[2])],
+                                         timeout = self.__timeout)
         self.safe_print(self.response)
 
     def help_snapshotrestore(self):
@@ -261,7 +282,8 @@ class VoltQueryClient(cmd.Cmd):
         if self.fs == None:
             return
         self.safe_print("Getting snapshot status")
-        self.response = self.snapshotstatus.call(timeout = self.__timeout)
+        self.response = self.__safe_call(self.snapshotstatus,
+                                         timeout = self.__timeout)
         self.safe_print(self.response)
 
     def help_snapshotstatus(self):
@@ -272,7 +294,8 @@ class VoltQueryClient(cmd.Cmd):
         if self.fs == None:
             return
         self.safe_print("Getting system information")
-        self.response = self.systeminformation.call(timeout = self.__timeout)
+        self.response = self.__safe_call(self.systeminformation,
+                                         timeout = self.__timeout)
         self.safe_print(self.response)
 
     def help_sysinfo(self):
@@ -283,7 +306,7 @@ class VoltQueryClient(cmd.Cmd):
         if self.fs == None:
             return
         self.safe_print("Quiesce...")
-        self.response = self.quiesce.call(timeout = self.__timeout)
+        self.response = self.__safe_call(self.quiesce, timeout = self.__timeout)
         self.safe_print(self.response)
 
     def help_quiesce(self):
@@ -297,7 +320,8 @@ class VoltQueryClient(cmd.Cmd):
             return self.help_adhoc()
 
         self.safe_print("Executing adhoc query: %s\n" % (command))
-        self.response = self.adhoc.call([command], timeout = self.__timeout)
+        self.response = self.__safe_call(self.adhoc, [command],
+                                         timeout = self.__timeout)
         self.safe_print(self.response)
 
     def help_adhoc(self):
@@ -308,7 +332,8 @@ class VoltQueryClient(cmd.Cmd):
         if self.fs == None:
             return
         self.safe_print("Shutting down the server")
-        self.shutdown.call(response = False, timeout = self.__timeout)
+        self.__safe_call(self.shutdown, response = False,
+                         timeout = self.__timeout)
 
     def help_shutdown(self):
         self.safe_print("Shutdown the server")
@@ -333,7 +358,7 @@ class VoltQueryClient(cmd.Cmd):
                 def %s(self, command):
                     self.safe_print("Executing stored procedure: %s")
                     try:
-                        self.response = self.%s.call(self.prepare_params(self.%s, command), timeout = self.__timeout)
+                        self.response = self.__safe_call(self.%s, self.prepare_params(self.%s, command), timeout = self.__timeout)
                         self.safe_print(self.response)
                     except SyntaxError, strerr:
                         self.safe_print(strerr)
