@@ -151,7 +151,7 @@ public class TestEELibraryLoader {
         private boolean m_crash = false;
 
         @Override
-        public void catalogUpdate(String diffCommands, String newCatalogURL) {
+        public void catalogUpdate(String diffCommands, String newCatalogURL, int expectedCatalogVersion) {
             // TODO Auto-generated method stub
 
         }

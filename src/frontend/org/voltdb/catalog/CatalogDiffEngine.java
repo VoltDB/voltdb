@@ -108,5 +108,4 @@ public class CatalogDiffEngine {
             newType.writeChildCommands(sb);
         }
     }
-
 }

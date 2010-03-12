@@ -241,7 +241,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void catalogUpdate(String diffCommands, String newCatalogURL)
+    public void catalogUpdate(String diffCommands, String newCatalogURL, int expectedCatalogVersion)
     {
         // TODO Auto-generated method stub
 

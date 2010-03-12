@@ -62,7 +62,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         String newCatalogURL;
         VoltTable[] results;
 
-        //testStuffThatShouldObviouslyFail(client);
+        testStuffThatShouldObviouslyFail(client);
 
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-onesite-expanded.jar");
         results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
@@ -81,11 +81,10 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
     public void testStuffThatShouldObviouslyFail(Client client) {
         String newCatalogURL;
-        VoltTable[] results;
 
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-onesite-addtables.jar");
         try {
-            results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
+            client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
             fail();
         }
         catch (Exception e) {}

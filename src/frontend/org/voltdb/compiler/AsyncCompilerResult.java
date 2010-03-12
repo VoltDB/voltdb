@@ -26,6 +26,7 @@ public class AsyncCompilerResult implements Serializable {
     public String errorMsg = null;
     public long connectionId = -1;
     public String hostname = "";
+    public int expectedCatalogVersion = -1;
     transient public Object clientData = null;
 
     @Override

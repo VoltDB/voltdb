@@ -72,8 +72,9 @@ public interface VoltDBInterface
     *
     * @param newCatalogURL A URL for the new catalog (http: or file:).
     * @param diffCommands The commands to update the current catalog to the new one.
+    * @param expectedCatalogVersion The version of the catalog the commands are targeted for.
     */
-   public void catalogUpdate(String diffCommands, String newCatalogURL);
+   public void catalogUpdate(String diffCommands, String newCatalogURL, int expectedCatalogVersion);
 
     /**
      * Tells if the VoltDB is running. m_isRunning needs to be set to true

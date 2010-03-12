@@ -888,6 +888,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                     task.params = new ParameterSet();
                     task.params.m_params = new Object[] {
                             changeResult.encodedDiffCommands, changeResult.catalogURL,
+                            changeResult.expectedCatalogVersion
                     };
                     task.clientHandle = changeResult.clientHandle;
 

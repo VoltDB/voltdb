@@ -61,9 +61,10 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         String catalogDiffCommands = (String) paramObj[0];
 
         if (fragmentId == SysProcFragmentId.PF_catalogUpdateGlobal) {
-            assert(paramObj.length == 2);
+            assert(paramObj.length == 3);
             String catalogURL = (String) paramObj[1];
-            if (updateVoltDBSingleton(context, catalogDiffCommands, catalogURL))
+            int expectedCatalogVersion = (Integer) paramObj[2];
+            if (updateVoltDBSingleton(context, catalogDiffCommands, catalogURL, expectedCatalogVersion))
                 t.addRow(1);
             else
                 t.addRow(0);
@@ -81,17 +82,21 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         throw new RuntimeException("UpdateApplicationCatalog was given an invalid fragment id: " + String.valueOf(fragmentId));
     }
 
-    boolean updateVoltDBSingleton(SystemProcedureExecutionContext context, String encodedCatalogDiffCommands, String catalogURL) {
+    boolean updateVoltDBSingleton(SystemProcedureExecutionContext context,
+            String encodedCatalogDiffCommands, String catalogURL, int expectedCatalogVersion) {
+
         String catalogDiffCommands = Encoder.decodeBase64AndDecompress(encodedCatalogDiffCommands);
 
-        VoltDB.instance().catalogUpdate(catalogDiffCommands, catalogURL);
+        VoltDB.instance().catalogUpdate(catalogDiffCommands, catalogURL, expectedCatalogVersion);
 
         System.err.printf("Inside frag that updates global catalog.\n");
 
         return true;
     }
 
-    boolean updateExecutionSite(SystemProcedureExecutionContext context, String encodedCatalogDiffCommands) {
+    boolean updateExecutionSite(SystemProcedureExecutionContext context,
+            String encodedCatalogDiffCommands) {
+
         String catalogDiffCommands = Encoder.decodeBase64AndDecompress(encodedCatalogDiffCommands);
 
         context.getExecutionSite().updateCatalog(catalogDiffCommands);
@@ -101,7 +106,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         return true;
     }
 
-    public VoltTable[] run(String catalogDiffCommands, String catalogURL) {
+    public VoltTable[] run(String catalogDiffCommands, String catalogURL, int expectedCatalogVersion) {
         System.err.println("Running update catalog system procedure with url = " + catalogURL);
         SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[1];
 
@@ -113,7 +118,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         pfs[0].multipartition = false;
         pfs[0].nonExecSites = true;
         pfs[0].parameters = new ParameterSet();
-        pfs[0].parameters.setParameters(new Object[] { catalogDiffCommands, catalogURL });
+        pfs[0].parameters.setParameters(new Object[] { catalogDiffCommands, catalogURL, expectedCatalogVersion });
 
         VoltTable[] retval = executeSysProcPlanFragments(pfs, ROUNDONE_DEP);
         assert(retval != null);

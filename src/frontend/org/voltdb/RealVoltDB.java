@@ -468,14 +468,14 @@ public class RealVoltDB implements VoltDBInterface
         m_isRunning = false;
     }
 
-    /**
-     *
-     *
-     * @param newCatalogURL
-     * @param diffCommands
-     */
     @Override
-    public synchronized void catalogUpdate(String diffCommands, String newCatalogURL) {
+    public synchronized void catalogUpdate(String diffCommands,
+            String newCatalogURL, int expectedCatalogVersion) {
+
+        if (m_catalogContext.catalog.getSubTreeVersion() != expectedCatalogVersion)
+            throw new RuntimeException("Trying to update main catalog context with diff " +
+                    "commands generated for an out-of date catalog.");
+
         m_catalogContext = m_catalogContext.update(newCatalogURL, diffCommands);
     }
 
