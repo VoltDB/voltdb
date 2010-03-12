@@ -714,13 +714,14 @@ public abstract class ClientMain {
         try {
             boolean keepTrying = true;
             VoltTable[] response = null;
-            while (true) {
-                // Take a snapshot of all the tables. This call is blocking.
+            // Only initiate the snapshot if it's the first client
+            while (m_id == 0) {
+                // Take a snapshot of the database. This call is blocking.
                 response = m_voltClient.callProcedure("@SnapshotSave", dir, nonce, 1);
                 if (response.length != 1 || !response[0].advanceRow()
                     || !response[0].getString("RESULT").equals("SUCCESS")) {
-                    if (keepTrying && response[0].getString("ERR_MSG")
-                                                 .contains("ALREADY EXISTS")) {
+                    if (keepTrying
+                        && response[0].getString("ERR_MSG").contains("ALREADY EXISTS")) {
                         m_voltClient.callProcedure("@SnapshotDelete",
                                                    new String[] { dir },
                                                    new String[] { nonce });
@@ -733,6 +734,39 @@ public abstract class ClientMain {
                 }
 
                 break;
+            }
+
+            // Clients other than the one that initiated the snapshot
+            // have to check if the snapshot has completed
+            if (m_id > 0) {
+                int maxTry = 10;
+
+                while (maxTry-- > 0) {
+                    boolean found = false;
+                    response = m_voltClient.callProcedure("@SnapshotStatus");
+                    if (response.length != 2) {
+                        System.err.println("Failed to get snapshot status");
+                        return false;
+                    }
+                    while (response[0].advanceRow()) {
+                        if (response[0].getString("NONCE").equals(nonce)) {
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if (found) {
+                        // This probably means the snapshot is done
+                        if (response[0].getLong("END_TIME") > 0)
+                            break;
+                    }
+
+                    try {
+                        Thread.sleep(500);
+                    } catch (InterruptedException e) {
+                        return false;
+                    }
+                }
             }
 
             // Get host ID to hostname mappings
@@ -792,6 +826,9 @@ public abstract class ClientMain {
 
         // Iterate through all the tables
         for (Map.Entry<String, Pair<String, String>> entry : snapshotMappings.entrySet()) {
+            if (entry.getValue() == null)
+                continue;
+
             String tableName = entry.getKey();
             String hostName = entry.getValue().getFirst();
             int[] partitions = partitionMappings.get(tableName);
@@ -859,10 +896,9 @@ public abstract class ClientMain {
                         saveFile.close();
                     if (inputStream != null)
                         inputStream.close();
-                    if (!file.delete()) {
+                    if (!hostName.equals("localhost") && !hostName.equals(localhostName)
+                        && !file.delete())
                         System.err.println("Failed to delete snapshot file " + file.getPath());
-                        return false;
-                    }
                 }
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
@@ -885,9 +921,10 @@ public abstract class ClientMain {
 
         // Clean up the snapshot we made
         try {
-            m_voltClient.callProcedure("@SnapshotDelete",
-                                       new String[] { dir },
-                                       new String[] { nonce });
+            if (m_id == 0)
+                m_voltClient.callProcedure("@SnapshotDelete",
+                                           new String[] { dir },
+                                           new String[] { nonce });
         } catch (NoConnectionsException e) {
             e.printStackTrace();
         } catch (ProcCallException e) {
