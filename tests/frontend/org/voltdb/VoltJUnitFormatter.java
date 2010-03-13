@@ -25,10 +25,13 @@ package org.voltdb;
 
 import java.io.OutputStream;
 import java.io.PrintStream;
+
 import junit.framework.AssertionFailedError;
 import junit.framework.Test;
+
 import org.apache.tools.ant.BuildException;
-import org.apache.tools.ant.taskdefs.optional.junit.*;
+import org.apache.tools.ant.taskdefs.optional.junit.JUnitResultFormatter;
+import org.apache.tools.ant.taskdefs.optional.junit.JUnitTest;
 
 public class VoltJUnitFormatter implements JUnitResultFormatter {
 
@@ -82,8 +85,11 @@ public class VoltJUnitFormatter implements JUnitResultFormatter {
 
     @Override
     public void addError(Test arg0, Throwable arg1) {
-        String testName = arg0.toString();
-        testName = testName.substring(0, testName.indexOf('('));
+        String testName = "unknown";
+        if (arg0 != null) {
+            testName = arg0.toString();
+            testName = testName.substring(0, testName.indexOf('('));
+        }
 
         out.println("    " + testName + " had an error.");
         StackTraceElement[] st = arg1.getStackTrace();

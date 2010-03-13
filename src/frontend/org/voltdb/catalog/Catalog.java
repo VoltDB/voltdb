@@ -37,7 +37,7 @@ public class Catalog extends CatalogType {
     // package private version number
     int m_currentCatalogVersion = 1;
     int m_changesMadePerUpdateCount = 0;
-    
+
     /**
      * Create a new Catalog hierarchy.
      */
@@ -56,7 +56,7 @@ public class Catalog extends CatalogType {
      */
     public void execute(final String commands) {
         m_changesMadePerUpdateCount = 0;
-        
+
         int ctr = 0;
         for (String line : commands.split("\n")) {
             try {
@@ -71,7 +71,7 @@ public class Catalog extends CatalogType {
             }
             ctr++;
         }
-        
+
         if (m_changesMadePerUpdateCount > 0)
             m_currentCatalogVersion++;
     }

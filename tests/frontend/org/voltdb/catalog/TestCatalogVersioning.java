@@ -23,69 +23,67 @@
 
 package org.voltdb.catalog;
 
-import org.voltdb.catalog.Catalog;
-
-import junit.framework.*;
+import junit.framework.TestCase;
 
 public class TestCatalogVersioning extends TestCase {
 
     public void testSimplest() {
         // CREATE A CATALOG AND LOAD FROM SERIALIZATION
         Catalog catalog = new Catalog();
-        System.out.printf("Current catalog version info current/node/subtree: %d/%d/%d\n", 
+        System.out.printf("Current catalog version info current/node/subtree: %d/%d/%d\n",
                 catalog.m_currentCatalogVersion, catalog.m_nodeVersion, catalog.m_subTreeVersion);
         catalog.execute(LoadCatalogToString.THE_CATALOG);
-        System.out.printf("Current catalog version info current/node/subtree: %d/%d/%d\n", 
+        System.out.printf("Current catalog version info current/node/subtree: %d/%d/%d\n",
                 catalog.m_currentCatalogVersion, catalog.m_nodeVersion, catalog.m_subTreeVersion);
-        
-        
+
+
         // ADD A TABLE
-        
+
         catalog.execute("add /clusters[cluster]/databases[database] tables FOO");
-        System.out.printf("Current catalog version info current/node/subtree: %d/%d/%d\n", 
+        System.out.printf("Current catalog version info current/node/subtree: %d/%d/%d\n",
                 catalog.m_currentCatalogVersion, catalog.m_nodeVersion, catalog.m_subTreeVersion);
-        
+
         Database database = catalog.getClusters().get("cluster").getDatabases().get("database");
         CatalogMap<Table> tables = database.getTables();
         CatalogMap<Procedure> procs = database.getProcedures();
-        
+
         int tablesVersion = tables.getSubTreeVersion();
         int procsVersion = procs.getSubTreeVersion();
         int catalogVersion = catalog.getSubTreeVersion();
-        
+
         assertTrue(tablesVersion > procsVersion);
         assertEquals(catalogVersion, tablesVersion);
-        
-        
+
+
         // REMOVE A PROC
-        
+
         catalog.execute("delete /clusters[cluster]/databases[database] procedures MilestoneOneCombined");
-        System.out.printf("Current catalog version info current/node/subtree: %d/%d/%d\n", 
+        System.out.printf("Current catalog version info current/node/subtree: %d/%d/%d\n",
                 catalog.m_currentCatalogVersion, catalog.m_nodeVersion, catalog.m_subTreeVersion);
-        
+
         tablesVersion = tables.getSubTreeVersion();
         procsVersion = procs.getSubTreeVersion();
         catalogVersion = catalog.getSubTreeVersion();
-        
+
         assertTrue(tablesVersion < procsVersion);
         assertEquals(catalogVersion, procsVersion);
-      
-        
+
+
         // CHANGE A FIELD (or two)
-        
+
         catalog.execute("set /clusters[cluster]/databases[database]/procedures[MilestoneOneInsert] readonly true");
-        System.out.printf("Current catalog version info current/node/subtree: %d/%d/%d\n", 
+        System.out.printf("Current catalog version info current/node/subtree: %d/%d/%d\n",
                 catalog.m_currentCatalogVersion, catalog.m_nodeVersion, catalog.m_subTreeVersion);
         catalog.execute("set /clusters[cluster]/databases[database]/procedures[MilestoneOneInsert] partitionparameter 4");
-        System.out.printf("Current catalog version info current/node/subtree: %d/%d/%d\n", 
+        System.out.printf("Current catalog version info current/node/subtree: %d/%d/%d\n",
                 catalog.m_currentCatalogVersion, catalog.m_nodeVersion, catalog.m_subTreeVersion);
-        
+
         tablesVersion = tables.getSubTreeVersion();
         procsVersion = procs.getSubTreeVersion();
         int procNVersion = procs.get("MilestoneOneInsert").getNodeVersion();
         int procSTVersion = procs.get("MilestoneOneInsert").getSubTreeVersion();
         catalogVersion = catalog.getSubTreeVersion();
-        
+
         assertTrue(tablesVersion < procsVersion);
         assertEquals(procNVersion, procSTVersion);
         assertEquals(procNVersion, catalogVersion);

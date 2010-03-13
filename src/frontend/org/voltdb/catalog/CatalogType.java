@@ -47,7 +47,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
     CatalogMap<? extends CatalogType> m_parentMap;
     Catalog m_catalog;
     int m_relativeIndex;
-    
+
     int m_subTreeVersion;
     int m_nodeVersion;
 
@@ -91,11 +91,11 @@ public abstract class CatalogType implements Comparable<CatalogType> {
     public int getRelativeIndex() {
         return m_relativeIndex;
     }
-    
+
     public int getNodeVersion() {
         return m_nodeVersion;
     }
-    
+
     public int getSubTreeVersion() {
         return m_subTreeVersion;
     }
@@ -163,7 +163,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         return map.get(childName);
     }
 
-    void set(String field, String value) {        
+    void set(String field, String value) {
         if ((field == null) || (value == null)) {
             throw new CatalogException("Null value where it shouldn't be.");
         }
@@ -234,7 +234,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
 
         collection.delete(childName);
     }
-    
+
     void updateVersioning() {
         m_catalog.m_changesMadePerUpdateCount++;
         if (m_nodeVersion != m_catalog.m_currentCatalogVersion) {
@@ -242,7 +242,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
             updateSubTreeVersion();
         }
     }
-    
+
     void updateSubTreeVersion() {
         if (m_subTreeVersion != m_catalog.m_currentCatalogVersion) {
             m_subTreeVersion = m_catalog.m_currentCatalogVersion;

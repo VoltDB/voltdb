@@ -23,12 +23,17 @@
 
 package org.voltdb.regressionsuites;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URL;
+import java.net.URLDecoder;
+
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
+import org.voltdb.catalog.LoadCatalogToString;
 import org.voltdb.client.Client;
 
 /**
@@ -41,11 +46,23 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
     // procedures used by these tests
     static Class<?>[] BASEPROCS =     { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
+                                        org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
                                         org.voltdb.benchmark.tpcc.procedures.delivery.class };
     static Class<?>[] EXPANDEDPROCS = { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
+                                        org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
                                         org.voltdb.benchmark.tpcc.procedures.delivery.class,
                                         org.voltdb.benchmark.tpcc.procedures.slev.class };
     static Class<?>[] CONFLICTPROCS = { org.voltdb.catalog.InsertNewOrder.class,
+                                        org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
+                                        org.voltdb.benchmark.tpcc.procedures.delivery.class };
+    static Class<?>[] SOMANYPROCS =   { org.voltdb.catalog.InsertNewOrder.class,
+                                        org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
+                                        org.voltdb.benchmark.tpcc.procedures.neworder.class,
+                                        org.voltdb.benchmark.tpcc.procedures.ostatByCustomerId.class,
+                                        org.voltdb.benchmark.tpcc.procedures.ostatByCustomerName.class,
+                                        org.voltdb.benchmark.tpcc.procedures.paymentByCustomerId.class,
+                                        org.voltdb.benchmark.tpcc.procedures.paymentByCustomerName.class,
+                                        org.voltdb.benchmark.tpcc.procedures.slev.class,
                                         org.voltdb.benchmark.tpcc.procedures.delivery.class };
 
     /**
@@ -68,6 +85,10 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
         assertTrue(results.length == 0);
 
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-onesite-expanded.jar");
+        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
+        assertTrue(results.length == 0);
+
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-onesite-base.jar");
         results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
         assertTrue(results.length == 0);
@@ -79,7 +100,15 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         assertTrue(true);
     }
 
-    public void testStuffThatShouldObviouslyFail(Client client) {
+    public void loadSomeData() {
+
+    }
+
+    public void queryAndVerifySomeData() {
+
+    }
+
+    public void testStuffThatShouldObviouslyFail(Client client) throws UnsupportedEncodingException {
         String newCatalogURL;
 
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-onesite-addtables.jar");
@@ -87,7 +116,28 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
             client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
             fail();
         }
-        catch (Exception e) {}
+        catch (Exception e) {
+            assertTrue(e.getMessage().startsWith("The requested catalog change is not"));
+        }
+
+        URL url = LoadCatalogToString.class.getResource("catalog.txt");
+        newCatalogURL = URLDecoder.decode(url.getPath(), "UTF-8");
+        try {
+            client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
+            fail();
+        }
+        catch (Exception e) {
+            assertTrue(e.getMessage().startsWith("Unable to read from catalog"));
+        }
+
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-onesite-many.jar");
+        try {
+            client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
+            fail();
+        }
+        catch (Exception e) {
+            assertTrue(e.getMessage().startsWith("The requested catalog change is too large"));
+        }
     }
 
 
@@ -149,6 +199,24 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project.addDefaultPartitioning();
         project.addProcedures(CONFLICTPROCS);
         config.compile(project);
+
+        // Build a new catalog
+        config = new LocalSingleProcessServer("catalogupdate-onesite-many.jar", 1, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addProcedures(SOMANYPROCS);
+        config.compile(project);
+
+        // Build a new catalog
+        /*config = new LocalSingleProcessServer("catalogupdate-onesite-expanded.jar", 1, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addProcedures(BASEPROCS);
+        UserInfo[] users;
+        project.addUsers(users)
+        config.compile(project);*/
 
         return builder;
     }

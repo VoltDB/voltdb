@@ -96,7 +96,7 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
     public Iterator<T> iterator() {
         return m_items.values().iterator();
     }
-    
+
     public int getSubTreeVersion() {
         return m_subTreeVersion;
     }
@@ -119,7 +119,7 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
             x.m_parentMap = this;
 
             m_items.put(name, x);
-            
+
             // update versioning if needed
             updateVersioning();
             m_catalog.m_changesMadePerUpdateCount++;
@@ -146,7 +146,7 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
                 throw new CatalogException("Catalog item '" + name + "' doesn't exists in " + m_parent);
 
             m_items.remove(name);
-            
+
             // update versioning if needed
             updateVersioning();
             m_catalog.m_changesMadePerUpdateCount++;
@@ -160,7 +160,7 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
             throw new RuntimeException(ex);
         }
     }
-    
+
     void updateVersioning() {
         if (m_subTreeVersion != m_catalog.m_currentCatalogVersion) {
             m_subTreeVersion = m_catalog.m_currentCatalogVersion;
