@@ -30,6 +30,9 @@ public abstract class StatsSource {
      */
     private final String name;
 
+    private final Integer m_hostId;
+    private final String m_hostname;
+
     /**
      * Column schema for statistical result rows
      */
@@ -53,6 +56,17 @@ public abstract class StatsSource {
             columnNameToIndex.put(columns.get(ii).name, ii);
         }
 
+        String hostname = "";
+        int hostId = 0;
+        if (VoltDB.instance() != null) {
+            if (VoltDB.instance().getHostMessenger() != null) {
+                hostname = VoltDB.instance().getHostMessenger().getHostname();
+                hostId = VoltDB.instance().getHostMessenger().getHostId();
+            }
+        }
+        m_hostname = hostname;
+        m_hostId = hostId;
+
         this.name = name;
     }
 
@@ -64,6 +78,8 @@ public abstract class StatsSource {
      */
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
         columns.add(new ColumnInfo("TIMESTAMP", VoltType.BIGINT));
+        columns.add(new ColumnInfo("HOST_ID", VoltType.INTEGER));
+        columns.add(new ColumnInfo("HOSTNAME", VoltType.STRING));
     }
 
     /**
@@ -115,6 +131,8 @@ public abstract class StatsSource {
      */
     protected void updateStatsRow(Object rowKey, Object rowValues[]) {
         rowValues[0] = now;
+        rowValues[1] = m_hostId;
+        rowValues[2] = m_hostname;
     }
 
     /**

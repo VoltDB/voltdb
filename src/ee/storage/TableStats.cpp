@@ -38,6 +38,7 @@ TableStats::TableStats(voltdb::Table* table) : voltdb::StatsSource(), m_table(ta
  * @parameter name Name of this set of statistics
  * @parameter hostId id of the host this partition is on
  * @parameter hostname name of the host this partition is on
+ * @parameter siteId this stat source is associated with
  * @parameter partitionId this stat source is associated with
  * @parameter databaseId Database this source is associated with
  */
@@ -45,9 +46,10 @@ void TableStats::configure(
         std::string name,
         voltdb::CatalogId hostId,
         std::string hostname,
+        voltdb::CatalogId siteId,
         voltdb::CatalogId partitionId,
         voltdb::CatalogId databaseId) {
-    StatsSource::configure(name, hostId, hostname, partitionId, databaseId);
+    StatsSource::configure(name, hostId, hostname, siteId, partitionId, databaseId);
     m_tableName = ValueFactory::getStringValue(m_table->name());
     m_tableType = ValueFactory::getStringValue(m_table->tableType());
 }

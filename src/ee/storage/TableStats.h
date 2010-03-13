@@ -43,6 +43,7 @@ public:
      * @parameter name Name of this set of statistics
      * @parameter hostId id of the host this partition is on
      * @parameter hostname name of the host this partition is on
+     * @parameter siteId this stat source is associated with
      * @parameter partitionId this stat source is associated with
      * @parameter databaseId Database this source is associated with
      */
@@ -50,6 +51,7 @@ public:
             std::string name,
             voltdb::CatalogId hostId,
             std::string hostname,
+            voltdb::CatalogId siteId,
             voltdb::CatalogId partitionId,
             voltdb::CatalogId databaseId);
 

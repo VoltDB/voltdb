@@ -281,7 +281,7 @@ public class Statistics extends VoltSystemProcedure {
 
     private static final ColumnInfo ioColumnInfo[] = new ColumnInfo[] {
         new ColumnInfo( "TIMESTAMP", VoltType.BIGINT),
-        new ColumnInfo( "HOSTID", VoltType.INTEGER),
+        new ColumnInfo( "HOST_ID", VoltType.INTEGER),
         new ColumnInfo( "HOSTNAME", VoltType.STRING),
         new ColumnInfo( "CONNECTION_ID", VoltType.BIGINT),
         new ColumnInfo( "CONNECTION_HOSTNAME", VoltType.STRING),

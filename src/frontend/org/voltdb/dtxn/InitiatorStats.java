@@ -200,19 +200,44 @@ public class InitiatorStats extends SiteStatsSource {
      */
     private class DummyIterator implements Iterator<Object> {
         private final Iterator<String> i;
-
+        String next = null;
         private DummyIterator(Iterator<String> i) {
             this.i = i;
         }
 
         @Override
         public boolean hasNext() {
-            return i.hasNext();
+            if (!m_interval) {
+                return i.hasNext();
+            }
+            if (!i.hasNext()) {
+                return false;
+            } else {
+                while (next == null && i.hasNext()) {
+                    String potential = i.next();
+                    InvocationInfo info = m_connectionStats.get(potential);
+                    if (info.invocationCount - info.lastInvocationCount == 0) {
+                        continue;
+                    } else {
+                        next = potential;
+                    }
+                }
+                if (next == null) {
+                    return false;
+                }
+            }
+            return true;
         }
 
         @Override
         public Object next() {
-            return i.next();
+            if (!m_interval) {
+                return i.next();
+            } else {
+                String temp = next;
+                next = null;
+                return temp;
+            }
         }
 
         @Override

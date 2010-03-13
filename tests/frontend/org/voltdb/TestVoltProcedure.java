@@ -185,13 +185,13 @@ public class TestVoltProcedure extends TestCase {
         for (int ii = 1; ii < 200; ii++) {
             wrapper.call(params.m_params);
             statsRow = agent.m_source.getStatsRows(false, 0L);
-            assertEquals(statsRow[0][4], new Long(ii));
+            assertEquals(statsRow[0][6], new Long(ii));
         }
-        assertTrue(((Long)statsRow[0][4]).longValue() > 0L);
-        assertTrue(((Long)statsRow[0][5]).longValue() > 0L);
-        assertFalse(statsRow[0][6].equals(0));
-        assertFalse(statsRow[0][7].equals(0));
-        assertTrue(((Long)statsRow[0][8]) > 0L);
+        assertTrue(((Long)statsRow[0][6]).longValue() > 0L);
+        assertTrue(((Long)statsRow[0][7]).longValue() > 0L);
+        assertFalse(statsRow[0][8].equals(0));
+        assertFalse(statsRow[0][9].equals(0));
+        assertTrue(((Long)statsRow[0][9]) > 0L);
     }
 
     private ClientResponse call(Class<? extends NullProcedureWrapper> procedure) {

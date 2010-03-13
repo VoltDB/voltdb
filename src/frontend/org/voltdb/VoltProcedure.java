@@ -885,7 +885,6 @@ public abstract class VoltProcedure {
         public final void beginProcedure() {
             if (m_invocations % timeCollectionInterval == 0) {
                 m_currentStartTime = System.nanoTime();
-                m_timedInvocations++;
             }
         }
 
@@ -898,7 +897,7 @@ public abstract class VoltProcedure {
                 final long endTime = System.nanoTime();
                 final int delta = (int)(endTime - m_currentStartTime);
                 m_totalTimedExecutionTime += delta;
-
+                m_timedInvocations++;
                 m_minExecutionTime = Math.min( delta, m_minExecutionTime);
                 m_maxExecutionTime = Math.max( delta, m_maxExecutionTime);
                 m_lastMinExecutionTime = Math.min( delta, m_lastMinExecutionTime);
@@ -922,6 +921,8 @@ public abstract class VoltProcedure {
         @Override
         protected void updateStatsRow(Object rowKey, Object rowValues[]) {
             super.updateStatsRow(rowKey, rowValues);
+            rowValues[columnNameToIndex.get("PARTITION_ID")] =
+                Integer.valueOf(m_site.site.getPartition().getTypeName());
             rowValues[columnNameToIndex.get("PROCEDURE")] = catProc.getClassname();
             long invocations = m_invocations;
             long totalTimedExecutionTime = m_totalTimedExecutionTime;
@@ -957,7 +958,7 @@ public abstract class VoltProcedure {
             rowValues[columnNameToIndex.get("TIMED_INVOCATIONS")] = timedInvocations;
             rowValues[columnNameToIndex.get("MIN_EXECUTION_TIME")] = minExecutionTime;
             rowValues[columnNameToIndex.get("MAX_EXECUTION_TIME")] = maxExecutionTime;
-            if (invocations != 0) {
+            if (timedInvocations != 0) {
                 rowValues[columnNameToIndex.get("AVG_EXECUTION_TIME")] =
                      (totalTimedExecutionTime / timedInvocations);
             } else {
@@ -974,6 +975,7 @@ public abstract class VoltProcedure {
         @Override
         protected void populateColumnSchema(ArrayList<VoltTable.ColumnInfo> columns) {
             super.populateColumnSchema(columns);
+            columns.add(new VoltTable.ColumnInfo("PARTITION_ID", VoltType.INTEGER));
             columns.add(new VoltTable.ColumnInfo("PROCEDURE", VoltType.STRING));
             columns.add(new VoltTable.ColumnInfo("INVOCATIONS", VoltType.BIGINT));
             columns.add(new VoltTable.ColumnInfo("TIMED_INVOCATIONS", VoltType.BIGINT));
@@ -991,7 +993,11 @@ public abstract class VoltProcedure {
                 boolean givenNext = false;
                 @Override
                 public boolean hasNext() {
-                    if (m_invocations == 0) {
+                    if (!m_interval) {
+                        if (m_invocations == 0) {
+                            return false;
+                        }
+                    } else if (m_invocations - m_lastInvocations == 0){
                         return false;
                     }
                     return !givenNext;

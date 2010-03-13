@@ -28,31 +28,21 @@ public abstract class SiteStatsSource extends StatsSource {
      * CatalogId of the site this source is associated with
      */
     private final int m_siteId;
-    private final String m_hostname;
 
     public SiteStatsSource(String name, int siteId) {
         super(name);
         this.m_siteId = siteId;
-        String hostname = "";
-        try {
-            java.net.InetAddress localMachine = java.net.InetAddress.getLocalHost();
-            hostname = localMachine.getHostName();
-        } catch (java.net.UnknownHostException uhe) {
-        }
-        m_hostname = hostname;
     }
 
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
         super.populateColumnSchema(columns);
         columns.add(new ColumnInfo("SITE_ID", VoltType.BIGINT));
-        columns.add(new ColumnInfo("HOSTNAME", VoltType.STRING));
     }
 
     @Override
     protected void updateStatsRow(Object rowKey, Object rowValues[]) {
         rowValues[columnNameToIndex.get("SITE_ID")] = new Long(m_siteId);
-        rowValues[columnNameToIndex.get("HOSTNAME")] = m_hostname;
         super.updateStatsRow(rowKey, rowValues);
     }
 }

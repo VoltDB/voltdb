@@ -127,6 +127,7 @@ Table* TableFactory::getPersistentTable(
                 ctx->m_hostId,
                 ctx->m_hostname,
                 ctx->m_siteId,
+                ctx->m_partitionId,
                 databaseId);
         return dynamic_cast<Table*>(table);
     }
@@ -172,6 +173,7 @@ Table* TableFactory::getPersistentTable(
                 ctx->m_hostId,
                 ctx->m_hostname,
                 ctx->m_siteId,
+                ctx->m_partitionId,
                 databaseId);
         return dynamic_cast<Table*>(table);
     }
