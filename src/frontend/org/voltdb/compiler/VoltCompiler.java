@@ -913,6 +913,7 @@ public class VoltCompiler {
         // if adding a new procedure, just add class name to this list.
         final String[] procedures = new String[] {
             "org.voltdb.sysprocs.AdHoc",
+            "org.voltdb.sysprocs.InstanceId",
             "org.voltdb.sysprocs.LastCommittedTransaction",
             "org.voltdb.sysprocs.LoadMultipartitionTable",
             "org.voltdb.sysprocs.Quiesce",

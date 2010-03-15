@@ -111,4 +111,10 @@ public class SysProcFragmentId
     // @UpdateApplicationCatalog
     public static final long PF_catalogUpdateGlobal = 140;
     public static final long PF_catalogUptateExecSite = 141;
+
+    // @InstanceId
+    public static final long PF_retrieveInstanceId = 160;
+    public static final long PF_retrieveInstanceIdAggregator = 161;
+    public static final long PF_setInstanceId = 162;
+    public static final long PF_setInstanceIdAggregator = 163;
 }

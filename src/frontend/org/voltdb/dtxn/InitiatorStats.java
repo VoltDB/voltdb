@@ -141,7 +141,6 @@ public class InitiatorStats extends SiteStatsSource {
         columns.add(new ColumnInfo("AVG_EXECUTION_TIME", VoltType.INTEGER));
         columns.add(new ColumnInfo("MIN_EXECUTION_TIME", VoltType.INTEGER));
         columns.add(new ColumnInfo("MAX_EXECUTION_TIME", VoltType.INTEGER));
-        columns.add(new ColumnInfo("TOTAL_EXECUTION_TIME", VoltType.BIGINT));
         columns.add(new ColumnInfo("ABORTS", VoltType.BIGINT));
         columns.add(new ColumnInfo("FAILURES", VoltType.BIGINT));
     }
@@ -187,7 +186,6 @@ public class InitiatorStats extends SiteStatsSource {
         rowValues[columnNameToIndex.get("AVG_EXECUTION_TIME")] = (int)(totalExecutionTime / invocationCount);
         rowValues[columnNameToIndex.get("MIN_EXECUTION_TIME")] = minExecutionTime;
         rowValues[columnNameToIndex.get("MAX_EXECUTION_TIME")] = maxExecutionTime;
-        rowValues[columnNameToIndex.get("TOTAL_EXECUTION_TIME")] = totalExecutionTime;
         rowValues[columnNameToIndex.get("ABORTS")] = abortCount;
         rowValues[columnNameToIndex.get("FAILURES")] = failureCount;
         super.updateStatsRow(rowKey, rowValues);

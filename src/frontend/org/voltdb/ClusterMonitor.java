@@ -38,15 +38,24 @@ public class ClusterMonitor {
             "values ( ?, ?, ?, ?, ?, ?, ?);");
 
     private static final String insertInitiatorStatement = new String("insert into " + initiatorsTable +
-            " values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+            " ( instanceId, tsEvent, hostId, hostName, siteId, connectionId, connectionHostname, " +
+            " procedureName, numInvocations, avgExecutionTime, minExecutionTime, maxExecutionTime, " +
+            " numAborts, numFailures )" +
+            " values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
     private static final String insertIOStatsStatement = new String("insert into " + iostatsTable +
+            " ( instanceId, tsEvent, hostId, hostName, connectionId, connectionHostname, " +
+            " numBytesRead, numMessagesRead, numBytesWritten, numMessagesWritten )" +
             " values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
     private static final String insertProceduresStatement = new String("insert into " + proceduresTable +
+            " (instanceId, tsEvent, hostId, hostName, siteId, procedureName, numInvocations, " +
+            " numTimedInvocations, avgExecutionTime, minExecutionTime, maxExecutionTime, numAborts, numFailures )" +
             " values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
     private static final String insertTableStatsStatement = new String("insert into " + tablestatsTable +
+            " (instanceId, tsEvent, hostId, hostName, siteId, partitionId, " +
+            " tableName, tableType, numActiveTuples, numAllocatedTuples, numDeletedTuples )" +
             " values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
     public static void main(String args[]) throws Exception {
@@ -200,63 +209,99 @@ public class ClusterMonitor {
             System.exit(-1);
         }
 
+        Integer instanceId = -1;
+        try {
+            VoltTable results[] = m_client.callProcedure("@InstanceId", (byte)0, -1);
+            while (results[0].advanceRow()) {
+                if (results[0].getString("RESULT").equals("FAILURE")) {
+                    System.err.println(results[0].getString("ERR_MSG"));
+                } else {
+                    instanceId = (int)results[0].getLong("INSTANCE_ID");
+                }
+            }
+        } catch (NoConnectionsException e) {
+            e.printStackTrace();
+        } catch (ProcCallException e) {
+            e.printStackTrace();
+        }
+
         m_conn =  DriverManager.getConnection(databaseURL);
         // safest thing possible
         m_conn.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
         // commit everything or nothing
         m_conn.setAutoCommit(false);
-        final PreparedStatement statement =
-            m_conn.prepareStatement( createInstanceStatement, Statement.RETURN_GENERATED_KEYS);
         insertInitiator =
             m_conn.prepareStatement( insertInitiatorStatement);
         insertIOStats = m_conn.prepareStatement( insertIOStatsStatement);
         insertProcedures = m_conn.prepareStatement( insertProceduresStatement);
         insertTableStats = m_conn.prepareStatement( insertTableStatsStatement);
-        boolean success = false;
-        Integer instanceId = -1;
-        try {
-            int index = 1;
-            statement.setString( index++, application);
-            if (subApplication != null) {
-                statement.setString( index++, subApplication);
-            }  else {
-                statement.setNull( index++, Types.VARCHAR);
-            }
-            if (hosts > 0) {
-                statement.setInt( index++, hosts);
-            } else {
-                statement.setNull( index++, Types.INTEGER);
-            }
-            if (partitionsPerHost > 0) {
-                statement.setInt( index++, partitionsPerHost);
-            } else {
-                statement.setNull( index++, Types.INTEGER);
-            }
-            if (totalPartitions > 0) {
-                statement.setInt( index++, totalPartitions);
-            } else {
-                statement.setNull( index++, Types.INTEGER);
-            }
-            if (kFactor >= 0) {
-                statement.setInt( index++, kFactor);
-            } else {
-                statement.setNull( index++, Types.INTEGER);
-            }
-            statement.setTimestamp( index++, new Timestamp(System.currentTimeMillis()));
-            statement.execute();
-            final ResultSet generatedKeys = statement.getGeneratedKeys();
-            if (generatedKeys.first()) {
-                instanceId = generatedKeys.getInt(1);
-                success = true;
-            } else {
-                throw new SQLException("Create instance statement didn't return an instance key");
-            }
-        } finally {
-            statement.close();
-            if (success) {
-                m_conn.commit();
-            } else {
-                m_conn.close();
+
+        if (instanceId < 0) {
+            boolean success = false;
+            final PreparedStatement statement =
+                m_conn.prepareStatement( createInstanceStatement, Statement.RETURN_GENERATED_KEYS);
+            try {
+                int index = 1;
+                statement.setString( index++, application);
+                if (subApplication != null) {
+                    statement.setString( index++, subApplication);
+                }  else {
+                    statement.setNull( index++, Types.VARCHAR);
+                }
+                if (hosts > 0) {
+                    statement.setInt( index++, hosts);
+                } else {
+                    statement.setNull( index++, Types.INTEGER);
+                }
+                if (partitionsPerHost > 0) {
+                    statement.setInt( index++, partitionsPerHost);
+                } else {
+                    statement.setNull( index++, Types.INTEGER);
+                }
+                if (totalPartitions > 0) {
+                    statement.setInt( index++, totalPartitions);
+                } else {
+                    statement.setNull( index++, Types.INTEGER);
+                }
+                if (kFactor >= 0) {
+                    statement.setInt( index++, kFactor);
+                } else {
+                    statement.setNull( index++, Types.INTEGER);
+                }
+                statement.setTimestamp( index++, new Timestamp(System.currentTimeMillis()));
+                statement.execute();
+                final ResultSet generatedKeys = statement.getGeneratedKeys();
+                if (generatedKeys.first()) {
+                    instanceId = generatedKeys.getInt(1);
+                    success = true;
+                } else {
+                    throw new SQLException("Create instance statement didn't return an instance key");
+                }
+
+                try {
+                    VoltTable results[] = m_client.callProcedure("@InstanceId", (byte)1, instanceId);
+                    boolean worked = true;
+                    while (results[0].advanceRow()) {
+                        if (results[0].getString("RESULT").equals("FAILURE")) {
+                            System.err.println(results[0].getString("ERR_MSG"));
+                            worked = false;
+                        }
+                    }
+                    if (!worked) {
+                        throw new SQLException();
+                    }
+                } catch (NoConnectionsException e) {
+                    e.printStackTrace();
+                } catch (ProcCallException e) {
+                    e.printStackTrace();
+                }
+            } finally {
+                statement.close();
+                if (success) {
+                    m_conn.commit();
+                } else {
+                    m_conn.close();
+                }
             }
         }
         m_instanceId = instanceId;
@@ -305,7 +350,6 @@ public class ClusterMonitor {
                 insertInitiator.setLong( index++, initiatorResults.getLong("AVG_EXECUTION_TIME"));
                 insertInitiator.setLong( index++, initiatorResults.getLong("MIN_EXECUTION_TIME"));
                 insertInitiator.setLong( index++, initiatorResults.getLong("MAX_EXECUTION_TIME"));
-                insertInitiator.setLong( index++, initiatorResults.getLong("TOTAL_EXECUTION_TIME"));
                 insertInitiator.setLong( index++, initiatorResults.getLong("ABORTS"));
                 insertInitiator.setLong( index++, initiatorResults.getLong("FAILURES"));
                 insertInitiator.addBatch();
