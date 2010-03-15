@@ -170,62 +170,33 @@ public class BingoClient extends ClientMain {
 
     protected void buildConstraints() {
         Expression constraint = null;
-        Expression constraint1 = null;
-        Expression constraint2 = null;
-        Expression constraint3 = null;
-        Expression constraint4 = null;
-        Expression constraint5 = null;
 
         // PlayRound table 0: 0 <= C4 < 100 (max round is 100)
-        constraint1 = Verification.compareWithConstant(ExpressionType.COMPARE_GREATERTHANOREQUALTO,
-                                                       "C4",
-                                                       0L);
-        constraint2 = Verification.compareWithConstant(ExpressionType.COMPARE_LESSTHAN,
-                                                       "C4",
-                                                       100L);
-        constraint1 = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
-                                               constraint1,
-                                               constraint2);
-        addConstraint("PlayRound", 0, constraint1);
+        constraint = Verification.inRange("C4", 0L, 99L);
+        addConstraint("PlayRound", 0, constraint);
 
         // PlayRound table 1: 0 <= R_POT < 900 (because the max round is 100, we
         // only add at most 9 each time)
-        constraint1 = Verification.compareWithConstant(ExpressionType.COMPARE_GREATERTHANOREQUALTO,
-                                                       "R_POT",
-                                                       0);
-        constraint2 = Verification.compareWithConstant(ExpressionType.COMPARE_LESSTHAN,
-                                                       "R_POT",
-                                                       900);
-        constraint3 = Verification.compareWithConstant(ExpressionType.COMPARE_GREATERTHANOREQUALTO,
-                                                       "T_ID",
-                                                       0);
-        constraint4 = Verification.compareWithConstant(ExpressionType.COMPARE_GREATERTHANOREQUALTO,
-                                                       "B_ID",
-                                                       0);
-        constraint5 = Verification.compareWithConstant(ExpressionType.COMPARE_GREATERTHANOREQUALTO,
-                                                       "R_ID",
-                                                       0);
+        Expression r_pot = Verification.inRange("R_POT", 0, 899);
+        Expression t_id = Verification.compareWithConstant(ExpressionType.COMPARE_GREATERTHANOREQUALTO,
+                                                           "T_ID", 0);
+        Expression b_id = Verification.compareWithConstant(ExpressionType.COMPARE_GREATERTHANOREQUALTO,
+                                                           "B_ID", 0);
+        Expression r_id = Verification.compareWithConstant(ExpressionType.COMPARE_GREATERTHANOREQUALTO,
+                                                           "R_ID", 0);
         constraint = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
-                                              constraint1,
-                                              constraint2,
-                                              constraint3,
-                                              constraint4,
-                                              constraint5);
+                                              r_pot, t_id, b_id, r_id);
         addConstraint("PlayRound", 1, constraint);
 
         // For the tables
-        addConstraint("T", 0, constraint3);
+        addConstraint("T", 0, t_id);
 
         constraint = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
-                                              constraint3,
-                                              constraint4);
+                                              t_id, b_id);
         addConstraint("B", 0, constraint);
 
         constraint = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
-                                              constraint1,
-                                              constraint2,
-                                              constraint3,
-                                              constraint5);
+                                              r_pot, t_id, r_id);
         addConstraint("R", 0, constraint);
     }
 

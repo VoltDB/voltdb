@@ -349,4 +349,22 @@ public class Verification {
 
         return prev;
     }
+
+    /**
+     * Handy method for creating a expression testing if a tuple value is in
+     * the range [low, high].
+     *
+     * @param <T> The type of the constants.
+     * @param columnName The name of the column.
+     * @param low The lower bound constant.
+     * @param high The upper bound constant.
+     * @return The expression representing the range check.
+     */
+    public static <T> Expression inRange(String columnName, T low, T high) {
+        return conjunction(ExpressionType.CONJUNCTION_AND,
+                           compareWithConstant(ExpressionType.COMPARE_GREATERTHANOREQUALTO,
+                                               columnName, low),
+                           compareWithConstant(ExpressionType.COMPARE_LESSTHANOREQUALTO,
+                                               columnName, high));
+    }
 }

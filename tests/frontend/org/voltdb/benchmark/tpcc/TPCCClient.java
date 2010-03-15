@@ -140,129 +140,173 @@ implements TPCCSimulation.ProcCaller {
 
     protected void buildConstraints() {
         Expression constraint = null;
-        Expression constraint1 = null;
-        Expression constraint2 = null;
-        Expression constraint3 = null;
-        Expression constraint4 = null;
-        Expression constraint5 = null;
+
+        // WAREHOUSE table
+        Expression w_id = Verification.inRange("W_ID", (short) 1,
+                                               (short) (m_scaleParams.warehouses * 2));
+        Expression w_tax = Verification.inRange("W_TAX", Constants.MIN_TAX,
+                                                Constants.MAX_TAX);
+        Expression warehouse = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
+                                                        w_id, w_tax);
+
+        // DISTRICT table
+        Expression d_id = Verification.inRange("D_ID", (byte) 1,
+                                               (byte) m_scaleParams.districtsPerWarehouse);
+        Expression d_w_id = Verification.inRange("D_W_ID", (short) 1,
+                                                 (short) (m_scaleParams.warehouses * 2));
+        Expression d_next_o_id = Verification.inRange("D_NEXT_O_ID", 1, 10000000);
+        Expression d_tax = Verification.inRange("D_TAX", Constants.MIN_TAX,
+                                                Constants.MAX_TAX);
+        Expression district = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
+                                                       d_id, d_w_id, d_next_o_id, d_tax);
+
+        // CUSTOMER table
+        Expression c_id = Verification.inRange("C_ID", 1,
+                                               m_scaleParams.customersPerDistrict);
+        Expression c_d_id = Verification.inRange("C_D_ID", (byte) 1,
+                                                 (byte) m_scaleParams.districtsPerWarehouse);
+        Expression c_w_id = Verification.inRange("C_W_ID", (short) 1,
+                                                 (short) (m_scaleParams.warehouses * 2));
+        Expression c_discount = Verification.inRange("C_DISCOUNT", Constants.MIN_DISCOUNT,
+                                                     Constants.MAX_DISCOUNT);
+        Expression c_credit =
+            Verification.conjunction(ExpressionType.CONJUNCTION_OR,
+                                     Verification.compareWithConstant(ExpressionType.COMPARE_EQUAL,
+                                                                      "C_CREDIT",
+                                                                      Constants.GOOD_CREDIT),
+                                     Verification.compareWithConstant(ExpressionType.COMPARE_EQUAL,
+                                                                      "C_CREDIT",
+                                                                      Constants.BAD_CREDIT));
+        Expression customer = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
+                                                       c_id, c_d_id, c_w_id, c_discount, c_credit);
+
+        // CUSTOMER_NAME table
+        Expression customer_name = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
+                                                            c_id, c_d_id, c_w_id);
+
+        // HISTORY table
+        Expression h_c_id = Verification.inRange("H_C_ID", 1,
+                                                 m_scaleParams.customersPerDistrict);
+        Expression h_c_d_id = Verification.inRange("H_C_D_ID", (byte) 1,
+                                                   (byte) m_scaleParams.districtsPerWarehouse);
+        Expression h_c_w_id = Verification.inRange("H_C_W_ID", (short) 1,
+                                                   (short) (m_scaleParams.warehouses * 2));
+        Expression h_d_id = Verification.inRange("H_D_ID", (byte) 1,
+                                                 (byte) m_scaleParams.districtsPerWarehouse);
+        Expression h_w_id = Verification.inRange("H_W_ID", (short) 1,
+                                                 (short) (m_scaleParams.warehouses * 2));
+        Expression history = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
+                                                      h_c_id, h_c_d_id, h_c_w_id, h_d_id, h_w_id);
+
+        // NEW_ORDER table
+        Expression no_o_id = Verification.inRange("NO_O_ID", 1, 10000000);
+        Expression no_d_id = Verification.inRange("NO_D_ID", (byte) 1,
+                                                  (byte) m_scaleParams.districtsPerWarehouse);
+        Expression no_w_id = Verification.inRange("NO_W_ID", (short) 1,
+                                                  (short) (m_scaleParams.warehouses * 2));
+        Expression new_order = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
+                                                        no_o_id, no_d_id, no_w_id);
+
+        // ORDERS table
+        Expression o_id = Verification.inRange("O_ID", 1, 10000000);
+        Expression o_c_id = Verification.inRange("O_C_ID", 1,
+                                                 m_scaleParams.customersPerDistrict);
+        Expression o_d_id = Verification.inRange("O_D_ID", (byte) 1,
+                                                 (byte) m_scaleParams.districtsPerWarehouse);
+        Expression o_w_id = Verification.inRange("O_W_ID", (short) 1,
+                                                 (short) (m_scaleParams.warehouses * 2));
+        Expression o_carrier_id =
+            Verification.conjunction(ExpressionType.CONJUNCTION_OR,
+                                     Verification.inRange("O_CARRIER_ID",
+                                                          Constants.MIN_CARRIER_ID,
+                                                          Constants.MAX_CARRIER_ID),
+                                     Verification.compareWithConstant(ExpressionType.COMPARE_EQUAL,
+                                                                      "O_CARRIER_ID",
+                                                                      (int) Constants.NULL_CARRIER_ID));
+        Expression orders = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
+                                                     o_id, o_c_id, o_d_id, o_w_id, o_carrier_id);
+
+        // ORDER_LINE table
+        Expression ol_o_id = Verification.inRange("OL_O_ID", 1, 10000000);
+        Expression ol_d_id = Verification.inRange("OL_D_ID", (byte) 1,
+                                                  (byte) m_scaleParams.districtsPerWarehouse);
+        Expression ol_w_id = Verification.inRange("OL_W_ID", (short) 1,
+                                                  (short) (m_scaleParams.warehouses * 2));
+        Expression ol_number = Verification.inRange("OL_NUMBER", 1,
+                                                    Constants.MAX_OL_CNT);
+        Expression ol_i_id = Verification.inRange("OL_I_ID", 1, m_scaleParams.items);
+        Expression ol_supply_w_id = Verification.inRange("OL_SUPPLY_W_ID", (short) 1,
+                                                         (short) (m_scaleParams.warehouses * 2));
+        Expression ol_quantity = Verification.inRange("OL_QUANTITY", 0,
+                                                      Constants.MAX_OL_QUANTITY);
+        Expression ol_amount = Verification.inRange("OL_AMOUNT",
+                                                    0,
+                                                    Constants.MAX_PRICE * Constants.MAX_OL_QUANTITY);
+        Expression order_line = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
+                                                         ol_o_id, ol_d_id, ol_w_id, ol_number,
+                                                         ol_i_id, ol_supply_w_id, ol_quantity,
+                                                         ol_amount);
+
+        // ITEM table
+        Expression i_id = Verification.inRange("I_ID", 1, m_scaleParams.items);
+        Expression i_im_id = Verification.inRange("I_IM_ID", Constants.MIN_IM,
+                                                  Constants.MAX_IM);
+        Expression i_price = Verification.inRange("I_PRICE", Constants.MIN_PRICE,
+                                                  Constants.MAX_PRICE);
+        Expression item = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
+                                                   i_id, i_im_id, i_price);
+
+        // STOCK table
+        Expression s_i_id = Verification.inRange("S_I_ID", 1, m_scaleParams.items);
+        Expression s_w_id = Verification.inRange("S_W_ID", (short) 1,
+                                                 (short) (m_scaleParams.warehouses * 2));
+        Expression s_quantity = Verification.inRange("S_QUANTITY", Constants.MIN_QUANTITY,
+                                                     Constants.MAX_QUANTITY);
+        Expression stock = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
+                                                    s_i_id, s_w_id, s_quantity);
 
         // Delivery (no need to check 'd_id', it's systematically generated)
-        constraint = Verification.compareWithConstant(ExpressionType.COMPARE_GREATERTHANOREQUALTO,
-                                                      "o_id",
-                                                      0);
+        constraint = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
+                                              d_id, o_id);
         addConstraint(Constants.DELIVERY, 0, constraint);
 
         // New Order table 0
-        constraint1 = Verification.compareWithConstant(ExpressionType.COMPARE_GREATERTHANOREQUALTO,
-                                                       "C_DISCOUNT",
-                                                       0.0);
-        constraint2 = Verification.compareWithConstant(ExpressionType.COMPARE_LESSTHANOREQUALTO,
-                                                       "C_DISCOUNT",
-                                                       1.0);
         constraint = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
-                                              constraint1,
-                                              constraint2);
+                                              c_discount, c_credit);
         addConstraint(Constants.NEWORDER, 0, constraint);
         // New Order table 1
-        constraint1 = Verification.compareWithConstant(ExpressionType.COMPARE_GREATERTHANOREQUALTO,
-                                                       "w_tax",
-                                                       0.0);
-        constraint2 = Verification.compareWithConstant(ExpressionType.COMPARE_LESSTHANOREQUALTO,
-                                                       "w_tax",
-                                                       1.0);
-        constraint3 = Verification.compareWithConstant(ExpressionType.COMPARE_GREATERTHANOREQUALTO,
-                                                       "d_tax",
-                                                       0.0);
-        constraint4 = Verification.compareWithConstant(ExpressionType.COMPARE_LESSTHANOREQUALTO,
-                                                       "d_tax",
-                                                       1.0);
-        constraint5 = Verification.compareWithConstant(ExpressionType.COMPARE_GREATERTHAN,
-                                                       "total",
-                                                       0.0);
-        constraint = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
-                                              constraint1,
-                                              constraint2,
-                                              constraint3,
-                                              constraint4,
-                                              constraint5);
+        constraint =
+            Verification.conjunction(ExpressionType.CONJUNCTION_AND,
+                                     d_next_o_id,
+                                     w_tax, d_tax,
+                                     Verification.compareWithConstant(ExpressionType.COMPARE_GREATERTHAN,
+                                                                      "total", 0.0));
         addConstraint(Constants.NEWORDER, 1, constraint);
         // New Order table 2
-        constraint1 = Verification.compareWithConstant(ExpressionType.COMPARE_GREATERTHANOREQUALTO,
-                                                       "s_quantity",
-                                                       0);
-        constraint2 = Verification.compareWithConstant(ExpressionType.COMPARE_GREATERTHANOREQUALTO,
-                                                       "i_price",
-                                                       0.0);
-        constraint3 = Verification.compareWithConstant(ExpressionType.COMPARE_GREATERTHAN,
-                                                       "ol_amount",
-                                                       0.0);
         constraint = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
-                                              constraint1,
-                                              constraint2,
-                                              constraint3);
+                                              s_quantity,
+                                              i_price,
+                                              ol_amount);
         addConstraint(Constants.NEWORDER, 2, constraint);
 
         // Order Status table 0
-        constraint = Verification.compareWithConstant(ExpressionType.COMPARE_GREATERTHANOREQUALTO,
-                                                      "C_ID",
-                                                      0);
-        addConstraint(Constants.ORDER_STATUS_BY_ID, 0, constraint);
-        addConstraint(Constants.ORDER_STATUS_BY_NAME, 0, constraint);
+        addConstraint(Constants.ORDER_STATUS_BY_ID, 0, c_id);
+        addConstraint(Constants.ORDER_STATUS_BY_NAME, 0, c_id);
         // Order Status table 1
-        constraint1 = Verification.compareWithConstant(ExpressionType.COMPARE_GREATERTHANOREQUALTO,
-                                                       "O_ID",
-                                                       0);
-        constraint2 = Verification.compareWithConstant(ExpressionType.COMPARE_GREATERTHANOREQUALTO,
-                                                       "O_CARRIER_ID",
-                                                       0);
         constraint = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
-                                              constraint1,
-                                              constraint2);
+                                              o_id, o_carrier_id);
         addConstraint(Constants.ORDER_STATUS_BY_ID, 1, constraint);
         addConstraint(Constants.ORDER_STATUS_BY_NAME, 1, constraint);
         // Order Status table 2
-        constraint1 = Verification.compareWithConstant(ExpressionType.COMPARE_GREATERTHAN,
-                                                       "OL_SUPPLY_W_ID",
-                                                       (short) 0);
-        constraint2 = Verification.compareWithConstant(ExpressionType.COMPARE_LESSTHANOREQUALTO,
-                                                       "OL_SUPPLY_W_ID",
-                                                       (short) m_scaleParams.warehouses);
-        constraint3 = Verification.compareWithConstant(ExpressionType.COMPARE_GREATERTHANOREQUALTO,
-                                                       "OL_I_ID",
-                                                       0);
-        constraint4 = Verification.compareWithConstant(ExpressionType.COMPARE_GREATERTHANOREQUALTO,
-                                                       "OL_QUANTITY",
-                                                       0);
-        constraint5 = Verification.compareWithConstant(ExpressionType.COMPARE_GREATERTHANOREQUALTO,
-                                                       "OL_AMOUNT",
-                                                       0.0);
         constraint = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
-                                              constraint1,
-                                              constraint2,
-                                              constraint3,
-                                              constraint4,
-                                              constraint5);
+                                              ol_supply_w_id, ol_i_id,
+                                              ol_quantity, ol_amount);
         addConstraint(Constants.ORDER_STATUS_BY_ID, 2, constraint);
-        addConstraint(Constants.ORDER_STATUS_BY_NAME, 1, constraint);
+        addConstraint(Constants.ORDER_STATUS_BY_NAME, 2, constraint);
 
         // Payment
-        constraint1 = Verification.compareWithConstant(ExpressionType.COMPARE_GREATERTHANOREQUALTO,
-                                                       "c_id",
-                                                       0);
-        constraint2 = Verification.compareWithConstant(ExpressionType.COMPARE_GREATERTHANOREQUALTO,
-                                                       "c_credit_lim",
-                                                       0.0);
-        constraint3 = Verification.compareWithConstant(ExpressionType.COMPARE_GREATERTHANOREQUALTO,
-                                                       "c_discount",
-                                                       0.0);
-        constraint4 = Verification.compareWithConstant(ExpressionType.COMPARE_LESSTHANOREQUALTO,
-                                                       "c_discount",
-                                                       1.0);
         constraint = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
-                                              constraint1,
-                                              constraint2,
-                                              constraint3,
-                                              constraint4);
+                                              c_id, c_discount);
         addConstraint(Constants.PAYMENT_BY_ID, 2, constraint);
         addConstraint(Constants.PAYMENT_BY_ID_C, 0, constraint);
         addConstraint(Constants.PAYMENT_BY_NAME, 2, constraint);
@@ -273,6 +317,20 @@ implements TPCCSimulation.ProcCaller {
                                                       "C1",
                                                       0L);
         addConstraint(Constants.STOCK_LEVEL, 0, constraint);
+
+        // Full table checks
+        addConstraint("WAREHOUSE", 0, warehouse);
+        addConstraint("DISTRICT", 0, district);
+        addConstraint("CUSTOMER", 0, customer);
+        addConstraint("CUSTOMER_NAME", 0, customer_name);
+        addConstraint("HISTORY", 0, history);
+        addConstraint("NEW_ORDER", 0, new_order);
+        addConstraint("ORDERS", 0, orders);
+        addConstraint("ORDER_LINE", 0, order_line);
+        addConstraint("ITEM", 0, item);
+        addConstraint("STOCK", 0, stock);
+
+        // TODO Foreign key constraints
     }
 
     /**
