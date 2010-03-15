@@ -59,7 +59,7 @@ PRIMARY ENTRY POINTS
     <java fork="yes" classname="org.voltdb.compiler.VoltCompiler" >
         <arg value="project.xml"/> <!-- project file -->
         <arg value="1"/>           <!-- hosts -->
-        <arg value="1"/>           <!-- sites -->
+        <arg value="2"/>           <!-- sites -->
         <arg value="localhost"/>   <!-- leader -->
         <arg value="catalog.jar"/> <!-- output -->
         <classpath refid='project.classpath' />
