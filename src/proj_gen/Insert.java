@@ -26,12 +26,12 @@ public class Insert extends VoltProcedure {
     public final SQLStmt insertItem = new SQLStmt("INSERT INTO ##project_name## VALUES (?, ?);");
 
     public long run( long ##upper_project_name##_ID, long ##upper_project_name##_ITEM ) throws VoltAbortException {
-        // Add a SQL statement to the execution queue. Queries
-        // and DMLs may not be mixed in one batch.
+        // Add a SQL statement to the execution queue.
         voltQueueSQL( insertItem, ##upper_project_name##_ID, ##upper_project_name##_ITEM );
 
         // Run all queued queries.
-        VoltTable[] retval = voltExecuteSQL();
+        // Passing true parameter since this is the last voltExecuteSQL for this procedure.
+        VoltTable[] retval = voltExecuteSQL(true);
 
         // Ensure there is one table as expected
         assert(retval.length == 1);

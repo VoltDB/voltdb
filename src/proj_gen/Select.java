@@ -28,11 +28,11 @@ public class Select extends VoltProcedure {
                   "FROM ##upper_project_name## WHERE  ##upper_project_name##_ID = ?");
 
     public VoltTable[] run( long ##upper_project_name##_ID ) throws VoltAbortException {
-        // Add a SQL statement to the current execution queue. Queries
-        // and DMLs may not be mixed in one batch.
+        // Add a SQL statement to the current execution queue
         voltQueueSQL( selectItem, ##upper_project_name##_ID );
 
         // Run all queued queries.
-        return voltExecuteSQL();
+        // Passing true parameter since this is the last voltExecuteSQL for this procedure.
+        return voltExecuteSQL(true);
     }
 }

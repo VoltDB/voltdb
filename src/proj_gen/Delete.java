@@ -28,12 +28,12 @@ public class Delete extends VoltProcedure {
                   "WHERE ##upper_project_name##_ID = ?");
 
     public long run( long ##upper_project_name##_ID ) throws VoltAbortException {
-        // Add a SQL statement to the execution queue. Queries
-        // and DMLs may not be mixed in one batch.
+        // Add a SQL statement to the execution queue.
         voltQueueSQL( insertItem, ##upper_project_name##_ID );
 
         // Run all queued queries.
-        VoltTable[] retval = voltExecuteSQL();
+        // Passing true parameter since this is the last voltExecuteSQL for this procedure.
+        VoltTable[] retval = voltExecuteSQL(true);
 
         // Ensure there is one table as expected
         assert(retval.length == 1);
