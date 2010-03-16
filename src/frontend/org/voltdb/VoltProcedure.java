@@ -314,7 +314,6 @@ public abstract class VoltProcedure {
         // run a regular java class
         if (catProc.getHasjava()) {
             try {
-                m_site.currentProc = this;
                 if (log.isEnabledFor(Level.TRACE)) {
                     log.trace("invoking... procMethod=" + procMethod.getName() + ", class=" + getClass().getName());
                 }
@@ -906,7 +905,8 @@ public abstract class VoltProcedure {
         }
 
         /**
-         * Update the rowValues array with the latest statistical information. This method is overrides the super class version
+         * Update the rowValues array with the latest statistical information.
+         * This method is overrides the super class version
          * which must also be called so that it can update its columns.
          * @param values Values of each column of the row of stats. Used as output.
          */
@@ -914,7 +914,7 @@ public abstract class VoltProcedure {
         protected void updateStatsRow(Object rowKey, Object rowValues[]) {
             super.updateStatsRow(rowKey, rowValues);
             rowValues[columnNameToIndex.get("PARTITION_ID")] =
-                Integer.valueOf(m_site.site.getPartition().getTypeName());
+                Integer.valueOf(m_site.getCatalogSite().getPartition().getTypeName());
             rowValues[columnNameToIndex.get("PROCEDURE")] = catProc.getClassname();
             long invocations = m_invocations;
             long totalTimedExecutionTime = m_totalTimedExecutionTime;

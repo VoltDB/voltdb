@@ -84,7 +84,6 @@ implements Runnable, DumpManager.Dumpable
     final HashMap<String, VoltProcedure> procs = new HashMap<String, VoltProcedure>(16, (float) .1);
 
     // Data about current transactions
-    VoltProcedure currentProc = null;
     private TransactionState m_current = null;
 
     public long getCurrentTxnId() {
@@ -93,8 +92,6 @@ implements Runnable, DumpManager.Dumpable
 
     HashMap<Long, TransactionState> m_transactionsById = new HashMap<Long, TransactionState>();
     private final RestrictedPriorityQueue m_transactionQueue;
-    private long m_lastCompletedTxnId = Long.MIN_VALUE;
-
     private InitiateTask m_currentSPTask = null;
 
     boolean isCurrentTaskReadOnly() {
@@ -866,7 +863,6 @@ implements Runnable, DumpManager.Dumpable
                     completeTransaction(m_current.isReadOnly);
                     TransactionState ts = m_transactionsById.remove(m_current.txnId);
                     assert(ts != null);
-                    m_lastCompletedTxnId = m_current.txnId;
 
                     // try to get the next current in line
                     // continue if there's a ready txn
@@ -970,11 +966,11 @@ implements Runnable, DumpManager.Dumpable
      */
     private TransactionState processTransactionMembership(MembershipNotice notice) {
         // handle out of order messages
-        if (notice.getTxnId() <= m_lastCompletedTxnId) {
-            // because of our rollback implementation, fragment
-            // tasks can come in late and it's not a problem
+        long latestTxnId = m_current == null ? lastCommittedTxnId : getCurrentTxnId();
+        if (notice.getTxnId() < latestTxnId) {
+            // Because of our rollback implementation, fragment
+            // tasks can arrive late. This is acceptable.
             if (notice instanceof FragmentTask) {
-                //System.out.printf("Site %d got an old notice\n", m_siteId);
                 return null;
             }
 
@@ -982,8 +978,8 @@ implements Runnable, DumpManager.Dumpable
             // not allowed to come in out of order
             StringBuilder msg = new StringBuilder();
             msg.append("Txn ordering deadlock (DTXN) at site ").append(m_siteId).append(":\n");
-            msg.append("   txn ").append(m_lastCompletedTxnId).append(" (");
-            msg.append(TransactionIdManager.toString(m_lastCompletedTxnId)).append(" HB: ?");
+            msg.append("   txn ").append(latestTxnId).append(" (");
+            msg.append(TransactionIdManager.toString(latestTxnId)).append(" HB: ?");
             msg.append(") before\n");
             msg.append("   txn ").append(notice.getTxnId()).append(" (");
             msg.append(TransactionIdManager.toString(notice.getTxnId())).append(" HB:");
