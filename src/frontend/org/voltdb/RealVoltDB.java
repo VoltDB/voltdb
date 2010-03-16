@@ -357,7 +357,7 @@ public class RealVoltDB implements VoltDBInterface
                 sb.append((char)b);
             }
             sb.append("\n");
-            String parts[] = sb.toString().split(" ");
+            String parts[] = sb.toString().split(" ", 2);
             if (parts.length != 2) {
                 throw new RuntimeException("Invalid buildstring.txt file.");
             }
