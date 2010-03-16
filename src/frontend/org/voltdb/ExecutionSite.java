@@ -67,19 +67,17 @@ implements Runnable, DumpManager.Dumpable
     private static final Logger log = Logger.getLogger(ExecutionSite.class.getName(), VoltLoggerFactory.instance());
     private static final Logger hostLog = Logger.getLogger("HOST", VoltLoggerFactory.instance());
     private static AtomicInteger siteIndexCounter = new AtomicInteger(0);
-
     private final int siteIndex = siteIndexCounter.getAndIncrement();
     private final Mailbox m_mailbox;
-    private TransactionState m_current = null;
-
-    // Two data structures storing all active and known transactions
-    HashMap<Long, TransactionState> m_transactionsById = new HashMap<Long, TransactionState>();
-    private final RestrictedPriorityQueue m_transactionQueue;
-    private long m_lastCompletedTxnId = Long.MIN_VALUE;
-
     public int siteId;
     final ExecutionEngine ee;
     final HsqlBackend hsql;
+
+    // Two data structures storing all active and known transactions
+    private TransactionState m_current = null;
+    HashMap<Long, TransactionState> m_transactionsById = new HashMap<Long, TransactionState>();
+    private final RestrictedPriorityQueue m_transactionQueue;
+    private long m_lastCompletedTxnId = Long.MIN_VALUE;
 
     // Catalog objects
     Catalog catalog;
@@ -90,7 +88,13 @@ implements Runnable, DumpManager.Dumpable
     final HashMap<String, VoltProcedure> procs = new HashMap<String, VoltProcedure>(16, (float) .1);
     VoltProcedure currentProc = null;
     public volatile boolean m_shouldContinue = true;
+
     private InitiateTask m_currentSPTask = null;
+
+    public InitiateTask getCurrentSPTask() {
+        return m_currentSPTask;
+    }
+
 
     // store the id used by the DumpManager to identify this execution site
     public final String m_dumpId;
@@ -102,11 +106,30 @@ implements Runnable, DumpManager.Dumpable
      */
     private volatile boolean m_haveToUpdateLogLevels = false;
 
+    /**
+     * Log settings changed. Signal EE to update log level.
+     */
+    public void updateBackendLogLevels() {
+        m_haveToUpdateLogLevels = true;
+    }
+
+
     // The time in ms since epoch of the last call to ExecutionEngine.tick(...)
     long lastTickTime = 0;
     long lastCommittedTxnId = 0;
+
     private long m_currentTxnId = 0;
+
+    public long getCurrentTxnId() {
+        return m_currentTxnId;
+    }
+
     int m_currentInitiatorSiteId;
+
+    public int getCurrentInitiatorSiteId() {
+        return m_currentInitiatorSiteId;
+    }
+
 
     // Each execution site manages snapshot using a SnapshotSiteProcessor
     private final SnapshotSiteProcessor m_snapshotter;
@@ -191,6 +214,10 @@ implements Runnable, DumpManager.Dumpable
     private long txnBeginUndoToken = kInvalidUndoToken;
     private long batchBeginUndoToken = kInvalidUndoToken;
     private long latestUndoToken = 0L;
+
+    public long getNextUndoToken() {
+        return ++latestUndoToken;
+    }
 
 
     public void tick() {
@@ -284,9 +311,6 @@ implements Runnable, DumpManager.Dumpable
         }
     }
 
-    public long getNextUndoToken() {
-        return ++latestUndoToken;
-    }
 
     /**
      * SystemProcedures are "friends" with ExecutionSites and granted
@@ -313,7 +337,7 @@ implements Runnable, DumpManager.Dumpable
         public ExecutionEngine getExecutionEngine() { return ee; }
         public long getLastCommittedTxnId()         { return lastCommittedTxnId; }
         public long getNextUndo()                   { return getNextUndoToken(); }
-        public long getTxnId()                      { return getCurrentTxnId(); }
+        public long getTxnId()                      { return m_currentTxnId; }
         public String getOperStatus()               { return VoltDB.getOperStatus(); }
         public ExecutionSite getExecutionSite()     { return ExecutionSite.this; }
     }
@@ -495,27 +519,13 @@ implements Runnable, DumpManager.Dumpable
         }
     }
 
-    public long getCurrentTxnId() {
-        return m_currentTxnId;
-    }
-
-    public InitiateTask getCurrentSPTask()
-    {
-        return m_currentSPTask;
-    }
-
-    public int getCurrentInitiatorSiteId()
-    {
-        return m_currentInitiatorSiteId;
-    }
-
     /**
      * Primary run method that is invoked a single time when the thread is started.
      * Has the opportunity to do startup config.
      */
     @Override
     public void run() {
-        // pick a name with four places for siteid so it can be sorted later
+        // pick a name with four places for site id so it can be sorted later
         // bit hackish, sorry
         String name = "ExecutionSite:";
         if (siteId < 10) name += "0";
@@ -772,7 +782,6 @@ implements Runnable, DumpManager.Dumpable
                     m_watchdog.join();
                 }
 
-                requestDebugMessage(false);
                 m_transactionQueue.shutdown();
 
                 ProcedureProfiler.flushProfile();
@@ -791,25 +800,21 @@ implements Runnable, DumpManager.Dumpable
         m_snapshotter.shutdown();
     }
 
-    /**
-     * Signal that the log settings have changed and that the EE should update
-     * it's backend's log levels.
-     */
-    public void updateBackendLogLevels() {
-        m_haveToUpdateLogLevels = true;
-    }
-
     public void initiateSnapshots(Deque<SnapshotTableTask> tasks) {
         m_snapshotter.initiateSnapshots(ee, tasks);
     }
 
     @Override
     public void goDumpYourself(final long timestamp) {
-        // queue a threadsafe dump in the most horrible way
-        // the dtxn conn will create a message for its message queue,
-        // which will cause it to ask this object to dump, using a special workunit
         m_currentDumpTimestamp = timestamp;
-        requestDebugMessage(true);
+        DebugMessage dmsg = new DebugMessage();
+        dmsg.shouldDump = true;
+        try {
+            m_mailbox.send(getSiteId(), 0, dmsg);
+        }
+        catch (org.voltdb.messaging.MessagingException e) {
+            e.printStackTrace();
+        }
     }
 
     /**
@@ -819,15 +824,24 @@ implements Runnable, DumpManager.Dumpable
     public ExecutorContext getDumpContents() {
         final ExecutorContext context = new ExecutorContext();
         context.siteId = siteId;
-        getDumpContents(context);
+
+        // messaging log window stored in mailbox history
+        if (m_mailbox instanceof SiteMailbox)
+            context.mailboxHistory = ((SiteMailbox) m_mailbox).getHistory();
+
+        // current transaction's state (if any)
+        if (m_current != null)
+            context.activeTransaction = m_current.getDumpContents();
+
+        // restricted priority queue content
+        m_transactionQueue.getDumpContents(context);
+
         return context;
     }
 
 
     //
-    //
-    //  SiteConnection Methods
-    //
+    // SiteConnection interface
     //
 
     @Override
@@ -1114,36 +1128,6 @@ implements Runnable, DumpManager.Dumpable
             hostLog.l7dlog(Level.FATAL, LogKeys.org_voltdb_dtxn_SimpleDtxnConnection_UnkownMessageClass.name(), new Object[] { message.getClass().getName() }, null);
             VoltDB.crashVoltDB();
         }
-    }
-
-    /**
-     * Put a message in the queue so that when the message is pulled out, it
-     * will trigger an atomic boolean that will instruct the getNextWorkUnit()
-     * to return a special workunit which will cause the ExecutionSite to dump
-     * its state in a threadsafe way. I'm sorry for this logic...
-     */
-    public void requestDebugMessage(boolean shouldDump) {
-        DebugMessage dmsg = new DebugMessage();
-        dmsg.shouldDump = shouldDump;
-        try {
-            m_mailbox.send(getSiteId(), 0, dmsg);
-        }
-        catch (org.voltdb.messaging.MessagingException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public void getDumpContents(ExecutorContext context) {
-        // get the messaging log
-        if (m_mailbox instanceof SiteMailbox)
-            context.mailboxHistory = ((SiteMailbox) m_mailbox).getHistory();
-
-        // get the current transaction's state (if any)
-        if (m_current != null)
-            context.activeTransaction = m_current.getDumpContents();
-
-        // get the stuff inside the restricted priority queue
-        m_transactionQueue.getDumpContents(context);
     }
 
 }
