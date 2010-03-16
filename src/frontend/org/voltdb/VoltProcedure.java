@@ -713,11 +713,6 @@ public abstract class VoltProcedure {
         }
         else ProcedureProfiler.startStatementCounter(-1);
 
-        /*if (lastBatchNeedsRollback) {
-            lastBatchNeedsRollback = false;
-            m_site.ee.undoUndoToken(m_site.undoWindowEnd);
-        }*/
-
         final int batchSize = stmtCount;
         int fragmentIdIndex = 0;
         int parameterSetIndex = 0;
@@ -748,11 +743,10 @@ public abstract class VoltProcedure {
             }
         }
 
-        //m_site.beginNewBatch(isReadOnly);
-
         // BEGIN ADDITIONS FOR DTXN CODE (2/25/08)
-        if (slowPath)
+        if (slowPath) {
             return slowPath(batchSize, batchStmts, batchArgs, finalTask);
+        }
         // END ADDITIONS FOR DTXN CODE
 
         VoltTable[] results = null;
@@ -1148,9 +1142,6 @@ public abstract class VoltProcedure {
             distributedParamsArray[i] = distributedParams.get(i);
         }
 
-        //int[] expectedFinalDepIds = m_site.dtxnConn.getNextDepenendcyArray(localFragIds.length);
-        //int[] expectedBroadDepIds = m_site.dtxnConn.getNextDepenendcyArray(distributedFragIdArray.length);
-
         // instruct the dtxn what's needed to resume the proc
         m_site.setupProcedureResume(finalTask, depsToResume);
 
@@ -1202,9 +1193,6 @@ public abstract class VoltProcedure {
                 results[i].addRow(newVal);
             }
         }
-
-        // important not to forget
-        //ProcedureProfiler.stopStatementCounter();
 
         return results;
     }
