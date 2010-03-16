@@ -101,16 +101,10 @@ implements Runnable, DumpManager.Dumpable
     public long m_currentDumpTimestamp = 0;
 
     /**
-     * When the system procedure @UpdateLogging runs and updates the log levels for loggers it will
-     * call updateBackendLogLevels to indicate that the log levels have changed.
-     */
-    private volatile boolean m_haveToUpdateLogLevels = false;
-
-    /**
      * Log settings changed. Signal EE to update log level.
      */
     public void updateBackendLogLevels() {
-        m_haveToUpdateLogLevels = true;
+        ee.setLogLevels(org.voltdb.jni.EELoggers.getLogLevels());
     }
 
 
@@ -244,12 +238,6 @@ implements Runnable, DumpManager.Dumpable
      * when the transaction ID changes.
      */
     public final void beginNewTxn(long txnId, boolean readOnly) {
-        // push log level changes to the ee.
-        if (ee != null && m_haveToUpdateLogLevels) {
-            m_haveToUpdateLogLevels = false;
-            ee.setLogLevels(org.voltdb.jni.EELoggers.getLogLevels());
-        }
-
         m_currentTxnId = txnId;
 
         if (!readOnly) {

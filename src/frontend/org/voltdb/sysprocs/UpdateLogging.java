@@ -59,36 +59,41 @@ public class UpdateLogging extends VoltSystemProcedure {
         assert(fragmentId == SysProcFragmentId.PF_updateLoggers) :
             "UpdateLogging system procedure should only ever be asked to execute plan fragment " + SysProcFragmentId.PF_updateLoggers +
             " and was asked to run " + fragmentId;
-        System.err.println("Updating loggers with XML:\n" + (String)params.toArray()[0]);
+
         DOMConfigurator configurator = new DOMConfigurator();
         StringReader sr = new StringReader((String)params.toArray()[0]);
         configurator.doConfigure( sr, LogManager.getLoggerRepository());
         long allHostsLong = ((Long)params.toArray()[1]).longValue();
         boolean allHosts = allHostsLong != 0 ? true : false;
+
         /**
-         * Ensure that changes to log levels are propagated down into each ExecutionSite's backend
+         * Propagate to each ExecutionSite's engine.
          */
         for (ExecutionSite site : VoltDB.instance().getLocalSites().values()) {
+            // Non-final, not-read-only multi-partition procedure fragment
+            // has everything blocked. This is safe even on other sites' EE.
             site.updateBackendLogLevels();
         }
+
         VoltTable t = new VoltTable(new VoltTable.ColumnInfo("TxnId", VoltType.BIGINT));
         t.addRow(0);
         return new DependencyPair(allHosts ? DEP_loggersUpdated | DtxnConstants.MULTINODE_DEPENDENCY : DEP_loggersUpdated, t);
     }
 
     public VoltTable[] run(String xmlConfig, long allHostsLong) {
-        boolean allHosts = allHostsLong != 0 ? true : false;
-        System.err.println("Running update logging system procedure. allHosts == " + allHosts);
         SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[1];
 
-        int depId = allHosts ? DEP_loggersUpdated | DtxnConstants.MULTINODE_DEPENDENCY : DEP_loggersUpdated;
+        int depId = DEP_loggersUpdated;
+        if (allHostsLong != 0) {
+            depId |= DtxnConstants.MULTINODE_DEPENDENCY;
+        }
 
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_updateLoggers;
         pfs[0].outputDepId = depId;
         pfs[0].inputDepIds = new int[]{};
         pfs[0].multipartition = false;
-        pfs[0].nonExecSites = allHosts;
+        pfs[0].nonExecSites = (allHostsLong != 0);
         pfs[0].parameters = new ParameterSet();
         pfs[0].parameters.setParameters(new Object[] { xmlConfig, allHostsLong });
 
