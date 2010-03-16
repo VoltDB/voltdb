@@ -9,6 +9,10 @@ my $revision = "";
 
 my @svninfo = `svn info`;
 
+if ($? != 0) {
+    @svninfo = `git svn info`;
+}
+
 foreach (@svninfo) {
     if (/^URL:\s*(.*?)$/) {
         $urlbase = $1;

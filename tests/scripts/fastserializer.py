@@ -181,11 +181,17 @@ class FastSerializer:
         self.flush()
 
         # A length, version number, and status code is returned
-        self.rbuf = self.socket.recv(6)
-        self.readInt32()
+        self.rbuf = self.socket.recv(4)
+        self.rbuf = self.socket.recv(self.readInt32())
         self.readByte()
+
         if self.readByte() != 0:
             raise SystemExit("Authentication failed.")
+
+        self.readInt32()
+        self.readInt64()
+        self.readInt64()
+        self.readInt32()
 
     def setInputByteOrder(self, bom):
         # assuming bom is high bit set?
