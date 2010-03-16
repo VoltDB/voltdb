@@ -75,21 +75,14 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
 
     @Override
     public boolean doWork() {
-        if (m_done)
+        if (m_done) {
             return true;
+        }
 
         if (!m_hasStartedWork) {
             m_site.beginNewTxn(txnId, isReadOnly);
             m_hasStartedWork = true;
         }
-
-        /*if (!m_isCoordinator)
-            try {
-                Thread.sleep(10000);
-            } catch (InterruptedException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }*/
 
         WorkUnit wu = m_readyWorkUnits.poll();
         while (wu != null) {
@@ -107,39 +100,41 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                     }
                 }
 
-                // returning false means there is more work to do
-                return false;
+                // return false if there is more work to do
+                return m_done;
             }
 
             VoltMessage payload = wu.getPayload();
 
-            // null payload implies this is a commit message
+            // commit messages have null payloads
             if (payload == null) {
-                if ((m_dirty == false) || (wu.commitEvenIfDirty))
-                    m_done = true;
+                m_done = ((m_dirty == false) || (wu.commitEvenIfDirty));
             }
-            else if (payload instanceof InitiateTask)
+            else if (payload instanceof InitiateTask) {
                 initiateProcedure((InitiateTask) payload);
-            else if (payload instanceof FragmentTask)
+            }
+            else if (payload instanceof FragmentTask) {
                 processFragmentWork((FragmentTask) payload, wu.getDependencies());
+            }
 
             // get the next workunit from the ready list
             wu = m_readyWorkUnits.poll();
 
-            // if this proc is blocked...
-            // check if it's safe to try to run another proc while waiting
+            // if this procedure is blocked...
+            // check if it's safe to try to run another procedure while waiting
             if ((!m_done) && (m_isCoordinator) && (wu == null) && (isReadOnly == true)) {
                 assert(m_missingDependencies != null);
 
                 boolean hasTransactionalWork = false;
                 for (WorkUnit pendingWu : m_missingDependencies.values()) {
-                    if (pendingWu.nonTransactional == false)
+                    if (pendingWu.nonTransactional == false) {
                         hasTransactionalWork = true;
+                        break;
+                    }
                 }
 
                 // if no transactional work, we can interleave
                 if (!hasTransactionalWork) {
-
                     // repeat until no eligible procs or other work is ready
                     boolean success = false;
                     do {
@@ -254,9 +249,6 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
 
     @Override
     public void setupProcedureResume(boolean isFinal, int[] dependencies) {
-        //System.out.printf("Setting up procedure resume with dependency %d\n", dependencies[0]);
-        //System.out.flush();
-
         assert(dependencies != null);
         assert(dependencies.length > 0);
 
@@ -427,7 +419,6 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     @Override
     public void getDumpContents(StringBuilder sb) {
         sb.append("  Multi Partition Txn State with id ").append(txnId);
-        //sb.append("")
     }
 
     @Override
