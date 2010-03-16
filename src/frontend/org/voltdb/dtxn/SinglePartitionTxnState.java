@@ -18,6 +18,7 @@
 package org.voltdb.dtxn;
 
 import org.voltdb.ExecutionSite;
+import org.voltdb.TransactionIdManager;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
 import org.voltdb.messages.*;
 import org.voltdb.messaging.Mailbox;
@@ -71,5 +72,11 @@ public class SinglePartitionTxnState extends TransactionState {
         retval.nonCoordinatingSites = null;
         retval.procedureIsAborting = false;
         return retval;
+    }
+
+    @Override
+    public String toString() {
+        return "SinglePartitionTxnState initiator: " + initiatorSiteId +
+            " txnId: " + TransactionIdManager.toString(txnId);
     }
 }

@@ -870,6 +870,11 @@ implements Runnable, DumpManager.Dumpable
             // Because of our rollback implementation, fragment tasks can arrive late.
             // This participant can have aborted, causing the coordinator to abort and
             // send this task, for example.
+
+            // Additionally, commit messages for read-only MP transactions can
+            // arrive after sneaked-in SP transactions have advanced the last committed
+            // transaction point.  A commit message is a fragment task with a null
+            // payload.
             if (notice instanceof FragmentTask) {
                 return null;
             }
@@ -884,6 +889,17 @@ implements Runnable, DumpManager.Dumpable
             msg.append("   txn ").append(notice.getTxnId()).append(" (");
             msg.append(TransactionIdManager.toString(notice.getTxnId())).append(" HB:");
             msg.append(notice.isHeartBeat()).append(").\n");
+
+            TransactionState txn = m_transactionsById.get(notice.getTxnId());
+            if (txn != null) {
+                msg.append("New notice transaction already known: " + txn.toString() + "\n");
+            }
+            else {
+                msg.append("New notice is for new or completed transaction.\n");
+            }
+            msg.append("New notice of type: " + notice.getClass().getName());
+
+            // TODO: VoltDB.crashVoltDB();
             throw new RuntimeException(msg.toString());
         }
 

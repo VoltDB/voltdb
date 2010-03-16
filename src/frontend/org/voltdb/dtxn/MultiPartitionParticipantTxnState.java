@@ -24,8 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.voltdb.ExecutionSite;
-import org.voltdb.VoltTable;
+import org.voltdb.*;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState.WorkUnitState;
 import org.voltdb.messages.FragmentResponse;
@@ -71,6 +70,14 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
             m_nonCoordinatingSites = task.getNonCoordinatorSites();
             m_readyWorkUnits.add(new WorkUnit(site.m_context, task, null, false));
         }
+    }
+
+    @Override
+    public String toString() {
+        return "MultiPartitionParticipantTxnState initiator: " + initiatorSiteId +
+            " coordinator: " + m_isCoordinator +
+            " in-progress: " + m_hasStartedWork +
+            " txnId: " + TransactionIdManager.toString(txnId);
     }
 
     @Override

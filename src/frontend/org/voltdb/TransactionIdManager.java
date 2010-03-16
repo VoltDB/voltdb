@@ -103,6 +103,10 @@ public class TransactionIdManager {
         }
         else {
             // reset the counter and lastUsedTime for the new millisecond
+            if (currentTime < lastUsedTime) {
+                System.err.println("Initiator time moved backwards from: " + lastUsedTime + " to " + currentTime);
+                VoltDB.crashVoltDB();
+            }
             lastUsedTime = currentTime;
             counterValue = 0;
         }
