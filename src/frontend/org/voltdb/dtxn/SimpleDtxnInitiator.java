@@ -45,33 +45,27 @@
 package org.voltdb.dtxn;
 
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Queue;
+import java.util.List;
 
 import org.apache.log4j.Logger;
-import org.voltdb.ClientResponseImpl;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
 import org.voltdb.debugstate.InitiatorContext;
-import org.voltdb.messages.InitiateResponse;
 import org.voltdb.messages.InitiateTask;
 import org.voltdb.messages.MembershipNotice;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
-import org.voltdb.messaging.VoltMessage;
+import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.impl.SiteMailbox;
-import org.voltdb.network.Connection;
-import org.voltdb.utils.EstTime;
 import org.voltdb.utils.VoltLoggerFactory;
 
 /** Supports correct execution of multiple partition transactions by executing them one at a time. */
 public class SimpleDtxnInitiator extends TransactionInitiator {
     final TransactionIdManager m_idManager;
     final SiteTracker m_siteTracker;
+
+    private final DtxnInitiatorQueue m_queue;
 
     private static final Logger transactionLog =
         Logger.getLogger("TRANSACTION", VoltLoggerFactory.instance());
@@ -91,11 +85,6 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
      */
     private boolean m_hadBackPressure = false;
 
-    /**
-     * Storage for initiator statistics
-     */
-    final InitiatorStats m_stats;
-
     // If an initiator handles a full node, it processes approximately 50,000 txns/sec.
     // That's about 50 txns/ms. Try not to keep more than 5 ms of work? Seems like a really
     // small number. On the other hand, backPressure() is just a hint to the ClientInterface.
@@ -109,19 +98,21 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     private final int m_siteId;
 
 
-    public SimpleDtxnInitiator(Mailbox mailbox, int hostId, int siteId,
+    public SimpleDtxnInitiator(Messenger messenger, int hostId, int siteId,
                                int initiatorId,
                                Runnable onBackPressure,
                                Runnable offBackPressure)
     {
-        assert(mailbox != null);
+        assert(messenger != null);
         System.out.printf("INITIALIZING INITIATOR ID: %d, SITEID: %d\n", initiatorId, siteId);
         System.out.flush();
 
-        m_stats = new InitiatorStats("Initiator " + siteId + " stats", siteId);
         m_idManager = new TransactionIdManager(initiatorId);
-        m_mailbox = mailbox;
         m_siteId = siteId;
+        m_queue = new DtxnInitiatorQueue(siteId);
+        m_mailbox = messenger.createMailbox(siteId, VoltDB.DTXN_MAILBOX_ID,
+                                            m_queue);
+        m_queue.setInitiator(this);
         m_siteTracker = VoltDB.instance().getCatalogContext().siteTracker;
         m_onBackPressure = onBackPressure;
         m_offBackPressure = offBackPressure;
@@ -226,15 +217,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         ArrayList<Integer> site_ids = m_siteTracker.getAllSitesForPartition(partition);
         ArrayList<InFlightTxnState> txn_states = new ArrayList<InFlightTxnState>();
 
-        m_pendingTxnBytes += messageSize;
-        m_pendingTxnCount++;
-        if (m_pendingTxnCount > MAX_DESIRED_PENDING_TXNS || m_pendingTxnBytes > MAX_DESIRED_PENDING_BYTES) {
-            if (!m_hadBackPressure) {
-                transactionLog.trace("DTXN back pressure began");
-                m_hadBackPressure = true;
-                m_onBackPressure.run();
-            }
-        }
+        increaseBackpressure(messageSize);
 
         // create and register each replicated transaction with the pending
         // transaction structure.  do this before transmitting them to avoid
@@ -255,8 +238,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                      connectionId,
                                      connectionHostname);
             txn_states.add(txn);
-            m_pendingTxns.addTxn(txn.txnId, txn.coordinatorId, txn);
-
+            m_queue.addPendingTxn(txn);
         }
 
         for (InFlightTxnState txn_state : txn_states)
@@ -275,16 +257,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
      */
     private void dispatchMultiPartitionTxn(InFlightTxnState txn)
     {
-        m_pendingTxns.addTxn(txn.txnId, txn.coordinatorId, txn);
-        m_pendingTxnBytes += txn.messageSize;
-        m_pendingTxnCount++;
-        if (m_pendingTxnBytes > MAX_DESIRED_PENDING_BYTES || m_pendingTxnCount > MAX_DESIRED_PENDING_TXNS) {
-            if (!m_hadBackPressure) {
-                transactionLog.trace("DTXN back pressure began");
-                m_hadBackPressure = true;
-                m_onBackPressure.run();
-            }
-        }
+        m_queue.addPendingTxn(txn);
+        increaseBackpressure(txn.messageSize);
 
         MembershipNotice notice = new MembershipNotice(m_siteId,
                                                        txn.coordinatorId,
@@ -325,249 +299,39 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         }
     }
 
-    /** Map of transaction ids to transaction information */
-    private final PendingTxnList m_pendingTxns = new PendingTxnList();
+    void increaseBackpressure(int messageSize)
+    {
+        m_pendingTxnBytes += messageSize;
+        m_pendingTxnCount++;
+        if (m_pendingTxnBytes > MAX_DESIRED_PENDING_BYTES || m_pendingTxnCount > MAX_DESIRED_PENDING_TXNS) {
+            if (!m_hadBackPressure) {
+                transactionLog.trace("DTXN back pressure began");
+                m_hadBackPressure = true;
+                m_onBackPressure.run();
+            }
+        }
+    }
 
-    public static class DummyQueue implements Queue<VoltMessage> {
-
-        private SimpleDtxnInitiator m_initiator;
-        private final HashMap<Long, VoltTable[]> m_txnIdResponses;
-
-        public DummyQueue()
+    void reduceBackpressure(int messageSize)
+    {
+        m_pendingTxnBytes -= messageSize;
+        m_pendingTxnCount--;
+        if (m_pendingTxnBytes < (MAX_DESIRED_PENDING_BYTES * .8) &&
+            m_pendingTxnCount < (MAX_DESIRED_PENDING_TXNS * .8))
         {
-            m_txnIdResponses =
-                new HashMap<Long, VoltTable[]>();
-        }
-
-        public void setInitiator(SimpleDtxnInitiator initiator) {
-            m_initiator = initiator;
-        }
-
-        @Override
-        public boolean add(VoltMessage arg0) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public boolean contains(Object arg0) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public synchronized boolean offer(VoltMessage message) {
-            assert(message instanceof InitiateResponse);
-            final InitiateResponse r = (InitiateResponse) message;
-
-            InFlightTxnState state;
-            int sites_left = -1;
-            synchronized (m_initiator)
+            if (m_hadBackPressure)
             {
-                state =
-                    m_initiator.m_pendingTxns.getTxn(r.getTxnId(), r.getCoordinatorSiteId());
-                sites_left = m_initiator.m_pendingTxns.getTxnIdSize(r.getTxnId());
+                transactionLog.trace("DTXN backpressure ended");
+                m_hadBackPressure = false;
+                m_offBackPressure.run();
             }
-
-            assert(state.coordinatorId == r.getCoordinatorSiteId());
-            assert(m_initiator.m_siteId == r.getInitiatorSiteId());
-
-            boolean first_response = false;
-            VoltTable[] first_results = null;
-            if (!m_txnIdResponses.containsKey(r.getTxnId()))
-            {
-                ClientResponseImpl curr_response = r.getClientResponseData();
-                VoltTable[] curr_results = curr_response.getResults();
-                VoltTable[] saved_results = new VoltTable[curr_results.length];
-                // Create shallow copies of all the VoltTables to avoid
-                // race conditions with the ByteBuffer metadata
-                for (int i = 0; i < curr_results.length; ++i)
-                {
-                    saved_results[i] = new VoltTable(curr_results[i].getTableDataReference(), true);
-                }
-                m_txnIdResponses.put(r.getTxnId(), saved_results);
-                first_response = true;
-            }
-            else
-            {
-                first_results = m_txnIdResponses.get(r.getTxnId());
-            }
-            if (first_response)
-            {
-                // If this is a read-only transaction then we'll return
-                // the first response to the client
-                if (state.isReadOnly)
-                {
-                    r.setClientHandle(state.invocation.getClientHandle());
-                    // Horrible but so much more efficient.
-                    final Connection c = (Connection)state.clientData;
-                    assert(c != null);
-                    final long now = EstTime.currentTimeMillis();
-                    final int delta = (int)(now - state.initiateTime);
-                    final ClientResponseImpl response = r.getClientResponseData();
-                    response.setClusterRoundtrip(delta);
-                    m_initiator.m_stats.logTransactionCompleted(
-                            state.connectionId,
-                            state.connectionHostname,
-                            state.invocation,
-                            delta,
-                            response.getStatus());
-                    c.writeStream().enqueue(r.getClientResponseData());
-                }
-            }
-            else
-            {
-                assert(first_results != null);
-
-                ClientResponseImpl curr_response = r.getClientResponseData();
-                VoltTable[] curr_results = curr_response.getResults();
-                if (first_results.length != curr_results.length)
-                {
-                    String msg = "Mismatched result count received for transaction: " + r.getTxnId();
-                    msg += "\n  from execution site: " + r.getCoordinatorSiteId();
-                    msg += "\n  Expected number of results: " + first_results.length;
-                    msg += "\n  Mismatched number of results: " + curr_results.length;
-                    throw new RuntimeException(msg);
-                }
-                for (int i = 0; i < first_results.length; ++i)
-                {
-                    if (!curr_results[i].hasSameContents(first_results[i]))
-                    {
-                        String msg = "Mismatched results received for transaction: " + r.getTxnId();
-                        msg += "\n  from execution site: " + r.getCoordinatorSiteId();
-                        msg += "\n  Expected results: " + first_results[i].toString();
-                        msg += "\n  Mismatched results: " + curr_results[i].toString();
-                        throw new RuntimeException(msg);
-                    }
-                }
-            }
-
-            // XXX_K-SAFE if we never receive a response from a site,
-            // this data structure is going to leak memory.  Need to ponder
-            // where to jam a timeout.  Maybe just wait for failure detection
-            // to tell us to clean up
-            if (sites_left == 0)
-            {
-                synchronized (m_initiator)
-                {
-                    m_initiator.m_pendingTxns.removeTxnId(r.getTxnId());
-                    m_initiator.m_pendingTxnBytes -= state.messageSize;
-                    m_initiator.m_pendingTxnCount--;
-                    if (m_initiator.m_pendingTxnBytes < (MAX_DESIRED_PENDING_BYTES * .8) &&
-                            m_initiator.m_pendingTxnCount < (MAX_DESIRED_PENDING_TXNS * .8))
-                    {
-                        if (m_initiator.m_hadBackPressure)
-                        {
-                            transactionLog.trace("DTXN backpressure ended");
-                            m_initiator.m_hadBackPressure = false;
-                            m_initiator.m_offBackPressure.run();
-                        }
-                    }
-                }
-                m_txnIdResponses.remove(r.getTxnId());
-                if (!state.isReadOnly)
-                {
-                    r.setClientHandle(state.invocation.getClientHandle());
-                    //Horrible but so much more efficient.
-                    final Connection c = (Connection)state.clientData;
-
-                    assert(c != null) : "NULL connection in connection state client data.";
-                    final long now = EstTime.currentTimeMillis();
-                    final int delta = (int)(now - state.initiateTime);
-                    final ClientResponseImpl response = r.getClientResponseData();
-                    response.setClusterRoundtrip(delta);
-                    m_initiator.m_stats.logTransactionCompleted(
-                            state.connectionId,
-                            state.connectionHostname,
-                            state.invocation,
-                            delta,
-                            response.getStatus());
-                    c.writeStream().enqueue(response);
-                }
-            }
-
-            return true;
         }
-
-
-        @Override
-        public boolean remove(Object arg0) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public VoltMessage element() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public VoltMessage peek() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public VoltMessage poll() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public VoltMessage remove() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public boolean addAll(Collection<? extends VoltMessage> arg0) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void clear() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public boolean containsAll(Collection<?> arg0) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public boolean isEmpty() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public Iterator<VoltMessage> iterator() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public boolean removeAll(Collection<?> arg0) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public boolean retainAll(Collection<?> arg0) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public int size() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public Object[] toArray() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public <T> T[] toArray(T[] arg0) {
-            throw new UnsupportedOperationException();
-        }
-
     }
 
     public void getDumpContents(StringBuilder sb) {
-        sb.append("Transactions in Flight (").append(m_pendingTxns.size()).append("):\n");
-        for (InFlightTxnState state : m_pendingTxns.getInFlightTxns())
+        List<InFlightTxnState> in_flight_txns = m_queue.getInFlightTxns();
+        sb.append("Transactions in Flight (").append(in_flight_txns.size()).append("):\n");
+        for (InFlightTxnState state : in_flight_txns)
         {
             if (state != null)
             {
@@ -576,22 +340,18 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         }
     }
 
-    public void getDumpContents(InitiatorContext context) {
+    public void getDumpContents(InitiatorContext context)
+    {
         // add mailbox history
         if (m_mailbox instanceof SiteMailbox)
             context.mailboxHistory = ((SiteMailbox) m_mailbox).getHistory();
 
         // list transactions in flight
-        ArrayList<InFlightTxnState> inFlightTxnList = new ArrayList<InFlightTxnState>();
-        try {
-            for (InFlightTxnState txn : m_pendingTxns.getInFlightTxns())
-                inFlightTxnList.add(txn);
-        }
-        catch (Exception e) {
-            // not much we can hope to do to fix an exception here
-        }
+        List<InFlightTxnState> inFlightTxnList = m_queue.getInFlightTxns();
         context.inFlightTxns = new InFlightTxnState[inFlightTxnList.size()];
         for (int i = 0; i < inFlightTxnList.size(); i++)
+        {
             context.inFlightTxns[i] = inFlightTxnList.get(i);
+        }
     }
 }

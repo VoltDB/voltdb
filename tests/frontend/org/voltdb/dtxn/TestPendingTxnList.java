@@ -22,6 +22,8 @@
  */
 package org.voltdb.dtxn;
 
+import java.util.List;
+
 import org.voltdb.StoredProcedureInvocation;
 
 import junit.framework.TestCase;
@@ -74,11 +76,18 @@ public class TestPendingTxnList extends TestCase
         assertEquals(3, dut.getTxnIdSize(2));
         assertEquals(1, dut.getTxnIdSize(3));
         assertEquals(1, dut.getTxnIdSize(4));
-        dut.removeSite(2);
+        List<Long> affected_txns = dut.removeSite(2);
         assertEquals(4, dut.size());
         assertEquals(1, dut.getTxnIdSize(1));
         assertEquals(2, dut.getTxnIdSize(2));
         assertEquals(0, dut.getTxnIdSize(3));
         assertEquals(1, dut.getTxnIdSize(4));
+        assertEquals(3, affected_txns.size());
+        assertTrue(affected_txns.contains(1L));
+        assertTrue(affected_txns.contains(2L));
+        assertTrue(affected_txns.contains(3L));
+        // test empty return list for site removal that doesn't affect anything
+        affected_txns = dut.removeSite(10);
+        assertEquals(0, affected_txns.size());
     }
 }

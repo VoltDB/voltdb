@@ -18,6 +18,7 @@ package org.voltdb.dtxn;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 /**
  * PendingTxnList records an initiator's expected transaction responses that are
@@ -75,17 +76,23 @@ class PendingTxnList
      * Remove all InFlightTxnState object for transactions have been or are
      * going to be sent to the coordinator at the specified site ID.
      * @param siteId
+     * @return a list of the transaction IDs that were affected by this removal.
+     *         The list will be empty if nothing was removed.
      */
-    void removeSite(int siteId)
+    List<Long> removeSite(int siteId)
     {
+        ArrayList<Long> txn_ids_affected = new ArrayList<Long>();
         for (long key : m_txnIdMap.keySet())
         {
             HashMap<Integer, InFlightTxnState> sitemap = m_txnIdMap.get(key);
             if (sitemap.containsKey(siteId))
             {
                 sitemap.remove(siteId);
+                System.out.println("Adding TXN ID: " + key);
+                txn_ids_affected.add(key);
             }
         }
+        return txn_ids_affected;
     }
 
     /**

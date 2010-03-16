@@ -623,10 +623,6 @@ public class ClientInterface implements DumpManager.Dumpable {
         assert(index == context.numberOfPartitions);
 
         // create the dtxn initiator
-        SimpleDtxnInitiator.DummyQueue queue =
-            new SimpleDtxnInitiator.DummyQueue();
-        Mailbox mqueue = messenger.createMailbox(siteId, VoltDB.DTXN_MAILBOX_ID, queue);
-
         /*
          * Construct the runnables so they have access to the list of connections
          */
@@ -635,10 +631,9 @@ public class ClientInterface implements DumpManager.Dumpable {
 
         SimpleDtxnInitiator initiator =
             new SimpleDtxnInitiator(
-                    mqueue, myHostId,
+                    messenger, myHostId,
                     siteId, initiatorId,
                     onBackPressure, offBackPressure);
-        queue.setInitiator(initiator);
 
         // create the adhoc planner thread
         AsyncCompilerWorkThread plannerThread = new AsyncCompilerWorkThread(context, siteId);

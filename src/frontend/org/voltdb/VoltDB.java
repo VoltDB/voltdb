@@ -33,7 +33,7 @@ public class VoltDB {
     /** Global constants */
     public static final int DEFAULT_PORT = 21212;
     static final int INITIATOR_SITE_ID = 0;
-    static final int DTXN_MAILBOX_ID = 0;
+    public static final int DTXN_MAILBOX_ID = 0;
 
     // temporary for single partition testing
     static final int FIRST_SITE_ID = 1;

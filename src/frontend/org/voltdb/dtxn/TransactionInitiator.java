@@ -80,4 +80,7 @@ public abstract class TransactionInitiator {
      */
     @Deprecated
     public abstract long getMostRecentTxnId();
+
+    abstract void increaseBackpressure(int messageSize);
+    abstract void reduceBackpressure(int messageSize);
 }

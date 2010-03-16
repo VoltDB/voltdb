@@ -51,6 +51,7 @@
 package org.voltdb.messaging;
 
 import java.util.ArrayDeque;
+import java.util.Queue;
 
 import org.voltdb.dtxn.SimpleDtxnInitiator;
 import org.voltdb.messaging.Mailbox;
@@ -58,7 +59,7 @@ import org.voltdb.messaging.MessagingException;
 
 public class MockMailbox implements Mailbox {
 
-    public MockMailbox(SimpleDtxnInitiator.DummyQueue queue) {
+    public MockMailbox(Queue<VoltMessage> queue) {
         incomingMessages = queue;
     }
     public void send(int siteId, int mailboxId, VoltMessage message) throws MessagingException {
@@ -132,6 +133,6 @@ public class MockMailbox implements Mailbox {
         public final VoltMessage contents;
     }
 
-    private final SimpleDtxnInitiator.DummyQueue incomingMessages;
+    private final Queue<VoltMessage> incomingMessages;
     private final ArrayDeque<Message> outgoingMessages = new ArrayDeque<Message>();
 }
