@@ -110,7 +110,6 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
     public void testStuffThatShouldObviouslyFail(Client client) throws UnsupportedEncodingException {
         String newCatalogURL;
-
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-onesite-addtables.jar");
         try {
             client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
