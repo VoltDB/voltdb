@@ -16,11 +16,11 @@ if (scalar(@svnstatus) != 0) {
 }
 
 if ($? != 0) {
-    my @gitinfo = `git status`;
+    @gitinfo = `git status`;
     if (@gitinfo[0] eq "# On branch master\n" &&
         @gitinfo[1] eq "nothing to commit (working directory clean)\n") {
         @svninfo = `git svn info`;
-        $githash 
+        $githash = `git log -1 --format=%H`;
     }
 }
 
@@ -41,6 +41,10 @@ if (($#ARGV + 1) > 0) {
 
 # create a file, buildstring.txt, and print a reasonable URL. Sadly,
 # real svn urls aren't this reasonable.
-open(BUILDSTRING, ">buildstring.txt") or die "Can create buildstring.txt";
-print BUILDSTRING "$version $urlbase?revision=$revision\n";
+open(BUILDSTRING, ">buildstring.txt") or die "Can't create buildstring.txt";
+if (defined $githash) {
+    print BUILDSTRING "$version $urlbase?revision=$revision $githash\n"
+} else {
+    print BUILDSTRING "$version $urlbase?revision=$revision\n";
+}
 close BUILDSTRING;
