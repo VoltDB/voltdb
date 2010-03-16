@@ -37,25 +37,23 @@ public class SinglePartitionTxnState extends TransactionState {
 
     @Override
     public boolean doWork() {
-        if (m_done)
-            return true;
-
-        m_site.beginNewTxn(m_task.getTxnId(), isReadOnly);
-        InitiateResponse response = m_site.processInitiateTask(m_task);
-        if (response.shouldCommit() == false) {
-            // check if we need to undo
-            if (!isReadOnly) {
-                m_site.rollbackTransaction(isReadOnly);
+        if (!m_done) {
+            m_site.beginNewTxn(m_task.getTxnId(), isReadOnly);
+            InitiateResponse response = m_site.processInitiateTask(m_task);
+            if (response.shouldCommit() == false) {
+                if (!isReadOnly) {
+                    m_site.rollbackTransaction(isReadOnly);
+                }
             }
-        }
 
-        try {
-            m_mbox.send(initiatorSiteId, 0, response);
-        } catch (MessagingException e) {
-            throw new RuntimeException(e);
+            try {
+                m_mbox.send(initiatorSiteId, 0, response);
+            } catch (MessagingException e) {
+                throw new RuntimeException(e);
+            }
+            m_done = true;
         }
-        m_done = true;
-        return true;
+        return m_done;
     }
 
     @Override
