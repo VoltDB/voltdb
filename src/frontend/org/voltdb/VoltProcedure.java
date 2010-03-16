@@ -143,7 +143,7 @@ public abstract class VoltProcedure {
         statsCollector = new ProcedureStatsCollector();
         VoltDB.instance().getStatsAgent().registerStatsSource(
                 SysProcSelector.PROCEDURE,
-                Integer.parseInt(site.site.getTypeName()),
+                Integer.parseInt(site.getCatalogSite().getTypeName()),
                 statsCollector);
 
         // this is a stupid hack to make the EE happy
@@ -532,7 +532,7 @@ public abstract class VoltProcedure {
     {
         if (data == null || data.getRowCount() == 0) return;
 
-        Cluster cluster = m_site.catalog.getClusters().get(clusterName);
+        Cluster cluster = m_site.m_context.catalog.getClusters().get(clusterName);
         if (cluster == null) {
             throw new VoltAbortException("cluster '" + clusterName + "' does not exist");
         }

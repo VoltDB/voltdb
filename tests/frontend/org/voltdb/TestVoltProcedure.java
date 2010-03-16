@@ -215,12 +215,9 @@ public class TestVoltProcedure extends TestCase {
             this.siteId = siteId;
 
             // get some catalog shortcuts ready
-            catalog = new Catalog();
+            Catalog catalog = new Catalog();
             catalog.execute(serializedCatalog);
             m_context = new CatalogContext(catalog, CatalogContext.NO_PATH);
-            site = m_context.cluster.getSites().get(Integer.toString(siteId));
-            //host = cluster.getHosts().get("host");
-            //site = host.getSites().get(String.valueOf(siteId));
         }
     }
 

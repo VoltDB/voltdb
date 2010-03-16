@@ -26,33 +26,18 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.NDC;
 import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
-import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Host;
-import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.Site;
+import org.voltdb.catalog.*;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.debugstate.ExecutorContext;
 import org.voltdb.dtxn.*;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.exceptions.SerializableException;
-import org.voltdb.jni.ExecutionEngine;
-import org.voltdb.jni.ExecutionEngineIPC;
-import org.voltdb.jni.ExecutionEngineJNI;
-import org.voltdb.jni.MockExecutionEngine;
+import org.voltdb.jni.*;
 import org.voltdb.messages.*;
-import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.VoltMessage;
+import org.voltdb.messaging.*;
 import org.voltdb.messaging.impl.SiteMailbox;
-import org.voltdb.utils.DumpManager;
-import org.voltdb.utils.Encoder;
-import org.voltdb.utils.EstTime;
-import org.voltdb.utils.LogKeys;
-import org.voltdb.utils.VoltLoggerFactory;
+import org.voltdb.utils.*;
 
 /**
  * The main executor of transactional work in the system. Controls running
@@ -70,16 +55,16 @@ implements Runnable, DumpManager.Dumpable
 
     private final int siteIndex = siteIndexCounter.getAndIncrement();
     private final Mailbox m_mailbox;
-    public int siteId;
     final ExecutionEngine ee;
     final HsqlBackend hsql;
     public volatile boolean m_shouldContinue = true;
 
-    // Catalog objects
-    Catalog catalog;
+    // Catalog
     public CatalogContext m_context;
-    Host host;
-    Site site;
+    public int siteId;
+    Site getCatalogSite() {
+        return m_context.cluster.getSites().get(Integer.toString(siteId));
+    }
 
     final HashMap<String, VoltProcedure> procs = new HashMap<String, VoltProcedure>(16, (float) .1);
 
@@ -108,15 +93,6 @@ implements Runnable, DumpManager.Dumpable
     long lastTickTime = 0;
     long lastCommittedTxnId = 0;
 
-    /*
-     * undoWindowBegin is the first token of a stored procedure invocation.
-     * Undoing it will always undo all the work done in the transaction.
-     * undoWindowEnd is the counter for the next undo token to be generated.
-     * It might be incremented in the ExecutionSite or in the VoltProcedure
-     * every time a batch is executed. To release all the undo data associated
-     * with the last transaction undoWindowEnd needs to be used instead of
-     * undoWindowBegin (which is the first undo token of the transaction).
-     */
     private final static long kInvalidUndoToken = -1L;
     private long txnBeginUndoToken = kInvalidUndoToken;
     private long batchBeginUndoToken = kInvalidUndoToken;
@@ -281,7 +257,6 @@ implements Runnable, DumpManager.Dumpable
      * access to internal state via m_systemProcedureContext.
      */
     public interface SystemProcedureExecutionContext {
-        public Catalog getCatalog();
         public Database getDatabase();
         public Cluster getCluster();
         public Site getSite();
@@ -294,10 +269,9 @@ implements Runnable, DumpManager.Dumpable
     }
 
     protected class SystemProcedureContext implements SystemProcedureExecutionContext {
-        public Catalog getCatalog()                 { return catalog; }
         public Database getDatabase()               { return m_context.database; }
         public Cluster getCluster()                 { return m_context.cluster; }
-        public Site getSite()                       { return site; }
+        public Site getSite()                       { return getCatalogSite(); }
         public ExecutionEngine getExecutionEngine() { return ee; }
         public long getLastCommittedTxnId()         { return lastCommittedTxnId; }
         public long getNextUndo()                   { return getNextUndoToken(); }
@@ -345,8 +319,6 @@ implements Runnable, DumpManager.Dumpable
         m_watchdog = new Watchdog(siteId, siteIndex);
         this.siteId = siteId;
         m_context = context;
-        catalog = context.catalog;
-        site = m_context.cluster.getSites().get(Integer.toString(siteId));
         m_systemProcedureContext = new SystemProcedureContext();
 
         m_dumpId = "ExecutionSite." + String.valueOf(siteId);
@@ -394,7 +366,7 @@ implements Runnable, DumpManager.Dumpable
                 eeTemp = new MockExecutionEngine();
             }
             else if (target == BackendTarget.NATIVE_EE_JNI) {
-                // set up the EE
+                Site site = getCatalogSite();
                 eeTemp =
                     new ExecutionEngineJNI(
                         this,
@@ -409,6 +381,7 @@ implements Runnable, DumpManager.Dumpable
             }
             else {
                 // set up the EE over IPC
+                Site site = getCatalogSite();
                 eeTemp =
                     new ExecutionEngineIPC(
                             this,
