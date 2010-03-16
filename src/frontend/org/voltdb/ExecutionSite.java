@@ -72,12 +72,7 @@ implements Runnable, DumpManager.Dumpable
     public int siteId;
     final ExecutionEngine ee;
     final HsqlBackend hsql;
-
-    // Two data structures storing all active and known transactions
-    private TransactionState m_current = null;
-    HashMap<Long, TransactionState> m_transactionsById = new HashMap<Long, TransactionState>();
-    private final RestrictedPriorityQueue m_transactionQueue;
-    private long m_lastCompletedTxnId = Long.MIN_VALUE;
+    public volatile boolean m_shouldContinue = true;
 
     // Catalog objects
     Catalog catalog;
@@ -86,8 +81,13 @@ implements Runnable, DumpManager.Dumpable
     Site site;
 
     final HashMap<String, VoltProcedure> procs = new HashMap<String, VoltProcedure>(16, (float) .1);
+
+    // Data about current transactions
     VoltProcedure currentProc = null;
-    public volatile boolean m_shouldContinue = true;
+    private TransactionState m_current = null;
+    HashMap<Long, TransactionState> m_transactionsById = new HashMap<Long, TransactionState>();
+    private final RestrictedPriorityQueue m_transactionQueue;
+    private long m_lastCompletedTxnId = Long.MIN_VALUE;
 
     private InitiateTask m_currentSPTask = null;
 
@@ -95,35 +95,43 @@ implements Runnable, DumpManager.Dumpable
         return m_currentSPTask.isReadOnly();
     }
 
+    private int m_currentInitiatorSiteId;
 
-    // store the id used by the DumpManager to identify this execution site
-    public final String m_dumpId;
-    public long m_currentDumpTimestamp = 0;
-
-    /**
-     * Log settings changed. Signal EE to update log level.
-     */
-    public void updateBackendLogLevels() {
-        ee.setLogLevels(org.voltdb.jni.EELoggers.getLogLevels());
+    public int getCurrentInitiatorSiteId() {
+        return m_currentInitiatorSiteId;
     }
 
-
-    // The time in ms since epoch of the last call to ExecutionEngine.tick(...)
+    // The time in ms since epoch of the last call to tick()
     long lastTickTime = 0;
     long lastCommittedTxnId = 0;
-
     private long m_currentTxnId = 0;
 
     public long getCurrentTxnId() {
         return m_currentTxnId;
     }
 
-    int m_currentInitiatorSiteId;
+    /*
+     * undoWindowBegin is the first token of a stored procedure invocation.
+     * Undoing it will always undo all the work done in the transaction.
+     * undoWindowEnd is the counter for the next undo token to be generated.
+     * It might be incremented in the ExecutionSite or in the VoltProcedure
+     * every time a batch is executed. To release all the undo data associated
+     * with the last transaction undoWindowEnd needs to be used instead of
+     * undoWindowBegin (which is the first undo token of the transaction).
+     */
+    private final static long kInvalidUndoToken = -1L;
+    //public boolean undoWindowActive = false;
+    private long txnBeginUndoToken = kInvalidUndoToken;
+    private long batchBeginUndoToken = kInvalidUndoToken;
+    private long latestUndoToken = 0L;
 
-    public int getCurrentInitiatorSiteId() {
-        return m_currentInitiatorSiteId;
+    public long getNextUndoToken() {
+        return ++latestUndoToken;
     }
 
+    // store the id used by the DumpManager to identify this execution site
+    public final String m_dumpId;
+    public long m_currentDumpTimestamp = 0;
 
     // Each execution site manages snapshot using a SnapshotSiteProcessor
     private final SnapshotSiteProcessor m_snapshotter;
@@ -194,23 +202,11 @@ implements Runnable, DumpManager.Dumpable
         }
     }
 
-    /*
-     * undoWindowBegin is the first token of a stored procedure invocation.
-     * Undoing it will always undo all the work done in the transaction.
-     * undoWindowEnd is the counter for the next undo token to be generated.
-     * It might be incremented in the ExecutionSite or in the VoltProcedure
-     * every time a batch is executed. To release all the undo data associated
-     * with the last transaction undoWindowEnd needs to be used instead of
-     * undoWindowBegin (which is the first undo token of the transaction).
+    /**
+     * Log settings changed. Signal EE to update log level.
      */
-    private final static long kInvalidUndoToken = -1L;
-    //public boolean undoWindowActive = false;
-    private long txnBeginUndoToken = kInvalidUndoToken;
-    private long batchBeginUndoToken = kInvalidUndoToken;
-    private long latestUndoToken = 0L;
-
-    public long getNextUndoToken() {
-        return ++latestUndoToken;
+    public void updateBackendLogLevels() {
+        ee.setLogLevels(org.voltdb.jni.EELoggers.getLogLevels());
     }
 
 
@@ -223,10 +219,8 @@ implements Runnable, DumpManager.Dumpable
             }
             lastTickTime = time;
         }
-
+        // do other periodic work
         m_snapshotter.doSnapshotWork(ee);
-
-        // sing it: stay'n alive..
         m_watchdog.pet();
     }
 
@@ -866,10 +860,8 @@ implements Runnable, DumpManager.Dumpable
         // but don't return with null if not the base stack frame for this method
         while ((!shutdownAllowed) || (m_shouldContinue)) {
 
-            //////////////////////////////////////////////////////
-            // DO ALL READY-TO-RUN WORK WITHOUT MORE MESSAGES
-            //////////////////////////////////////////////////////
 
+            // DO ALL READY-TO-RUN WORK WITHOUT MORE MESSAGES
             // repeat until:
             // 1. no current transaction AND no ready transaction, or
             // 2. the current transaction is blocked (see end of loop)
@@ -883,8 +875,8 @@ implements Runnable, DumpManager.Dumpable
                 assert(m_current != null);
 
                 // do all runnable work for the current txn
-                if (m_current.doWork())
                 // if doWork returns true, the transaction is over
+                if (m_current.doWork())
                 {
                     completeTransaction(m_current.isReadOnly);
                     TransactionState ts = m_transactionsById.remove(m_current.txnId);
@@ -911,43 +903,43 @@ implements Runnable, DumpManager.Dumpable
                 }
             }
 
-            //////////////////////////////////////////////////////
-            // PULL ONE MESSAGE OFF OF QUEUE FROM MESSAGING LAYER
-            //////////////////////////////////////////////////////
+            // Poll messaging layer, possibly blocking for awhile if idle.
             VoltMessage message = m_mailbox.recvBlocking(5);
             tick();
-            if (message == null)
-                continue;
-
-            //////////////////////////////////////////////////////
-            // UPDATE THE STATE OF THE SET OF KNOWN TRANSACTIONS
-            //////////////////////////////////////////////////////
-
-            if (message instanceof InitiateTask) {
-                messageArrived((InitiateTask) message);
-            }
-            else if (message instanceof FragmentTask) {
-                messageArrived((FragmentTask) message);
-            }
-            else if (message instanceof FragmentResponse) {
-                messageArrived((FragmentResponse) message);
-            }
-            else if (message instanceof MembershipNotice) {
-                processTransactionMembership((MembershipNotice) message);
-            }
-            else if (message instanceof DebugMessage) {
-                DebugMessage dmsg = (DebugMessage) message;
-                if (dmsg.shouldDump)
-                    DumpManager.putDump(m_dumpId, m_currentDumpTimestamp, true, getDumpContents());
-            }
-            else {
-                hostLog.l7dlog(Level.FATAL, LogKeys.org_voltdb_dtxn_SimpleDtxnConnection_UnkownMessageClass.name(), new Object[] { message.getClass().getName() }, null);
-                VoltDB.crashVoltDB();
+            if (message != null) {
+                handleMailboxMessage(message);
             }
         }
 
         assert(shutdownAllowed);
         return null;
+    }
+
+    private void handleMailboxMessage(VoltMessage message) {
+        if (message instanceof InitiateTask) {
+            // just wraps processTransactionMembership
+            messageArrived((InitiateTask) message);
+        }
+        else if (message instanceof FragmentTask) {
+            // processTransactionMembership, createLocalFragmentWork
+            messageArrived((FragmentTask) message);
+        }
+        else if (message instanceof FragmentResponse) {
+            // process remote work response
+            messageArrived((FragmentResponse) message);
+        }
+        else if (message instanceof MembershipNotice) {
+            processTransactionMembership((MembershipNotice) message);
+        }
+        else if (message instanceof DebugMessage) {
+            DebugMessage dmsg = (DebugMessage) message;
+            if (dmsg.shouldDump)
+                DumpManager.putDump(m_dumpId, m_currentDumpTimestamp, true, getDumpContents());
+        }
+        else {
+            hostLog.l7dlog(Level.FATAL, LogKeys.org_voltdb_dtxn_SimpleDtxnConnection_UnkownMessageClass.name(), new Object[] { message.getClass().getName() }, null);
+            VoltDB.crashVoltDB();
+        }
     }
 
     private void messageArrived(InitiateTask request) {
@@ -1052,14 +1044,16 @@ implements Runnable, DumpManager.Dumpable
      * @return true if a procedure was executed, false if none available
      */
     public boolean tryToSneakInASinglePartitionProcedure() {
-        // collect up to one message from the network
-        tryFetchNewWork();
+        // poll for an available message. don't block
+        {
+            VoltMessage message = m_mailbox.recv();
+            tick(); // unclear if this necessary (rtb)
+            if (message != null) {
+                handleMailboxMessage(message);
+            }
+        }
 
         TransactionState nextTxn = m_transactionQueue.peek();
-
-        // nothing is ready to go
-        if (nextTxn == null)
-            return false;
 
         // only sneak in single partition work
         if (nextTxn instanceof SinglePartitionTxnState) {
@@ -1068,45 +1062,9 @@ implements Runnable, DumpManager.Dumpable
             assert(success);
             return true;
         }
-
-        // multipartition is next
-        return false;
-    }
-
-    public void tryFetchNewWork() {
-        //////////////////////////////////////////////////////
-        // PULL ONE MESSAGE OFF OF QUEUE FROM MESSAGING LAYER
-        //////////////////////////////////////////////////////
-        VoltMessage message = m_mailbox.recv();
-        tick();
-        if (message == null)
-            return;
-
-        //////////////////////////////////////////////////////
-        // UPDATE THE STATE OF THE SET OF KNOWN TRANSACTIONS
-        //////////////////////////////////////////////////////
-
-        if (message instanceof InitiateTask) {
-            messageArrived((InitiateTask) message);
-        }
-        else if (message instanceof FragmentTask) {
-            messageArrived((FragmentTask) message);
-        }
-        else if (message instanceof FragmentResponse) {
-            messageArrived((FragmentResponse) message);
-        }
-        else if (message instanceof MembershipNotice) {
-            processTransactionMembership((MembershipNotice) message);
-        }
-        else if (message instanceof DebugMessage) {
-            DebugMessage dmsg = (DebugMessage) message;
-            if (dmsg.shouldDump)
-                DumpManager.putDump(m_dumpId, m_currentDumpTimestamp, true, getDumpContents());
-        }
         else {
-            hostLog.l7dlog(Level.FATAL, LogKeys.org_voltdb_dtxn_SimpleDtxnConnection_UnkownMessageClass.name(), new Object[] { message.getClass().getName() }, null);
-            VoltDB.crashVoltDB();
+            // multipartition is next or no work
+            return false;
         }
     }
-
 }
