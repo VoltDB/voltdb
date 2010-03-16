@@ -7,13 +7,20 @@ my $revision = "";
 # of lines. Then iterate those looking for lines that match URL
 # or Revision regular expressions.
 
+my @svnstatus = `svn status`;
 my @svninfo = `svn info`;
+
+if (scalar(@svnstatus) != 0) {
+    print "This is a dirty svn working copy or not an svn working copy\n";
+    @svninfo = ();
+}
 
 if ($? != 0) {
     my @gitinfo = `git status`;
     if (@gitinfo[0] eq "# On branch master\n" &&
         @gitinfo[1] eq "nothing to commit (working directory clean)\n") {
         @svninfo = `git svn info`;
+        $githash 
     }
 }
 
