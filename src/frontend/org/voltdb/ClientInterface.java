@@ -340,9 +340,10 @@ public class ClientInterface implements DumpManager.Dumpable {
          */
         private ClientInputHandler
                 authenticate(final SocketChannel socket) throws IOException {
-            ByteBuffer responseBuffer = ByteBuffer.allocate(30);
-            responseBuffer.putInt(26);//message length
-            responseBuffer.put((byte)0);//version
+            ByteBuffer responseBuffer = ByteBuffer.allocate(6);
+            byte version = (byte)0;
+            responseBuffer.putInt(2);//message length
+            responseBuffer.put(version);//version
 
             /*
              * The login message is a length preceded name string followed by a length preceded
@@ -423,12 +424,19 @@ public class ClientInterface implements DumpManager.Dumpable {
                     new ClientInputHandler(
                             user,
                             socket.socket().getInetAddress().getHostName());
+                byte buildString[] = VoltDB.instance().getBuildString().getBytes("UTF-8");
+                responseBuffer = ByteBuffer.allocate(34 + buildString.length);
+                responseBuffer.putInt(30 + buildString.length);//message length
+                responseBuffer.put((byte)0);//version
+
                 //Send positive response
                 responseBuffer.put((byte)0);
                 responseBuffer.putInt(VoltDB.instance().getHostMessenger().getHostId());
                 responseBuffer.putLong(handler.connectionId());
                 responseBuffer.putLong((Long)VoltDB.instance().getInstanceId()[0]);
-                responseBuffer.putInt((Integer)VoltDB.instance().getInstanceId()[1]).flip();
+                responseBuffer.putInt((Integer)VoltDB.instance().getInstanceId()[1]);
+                responseBuffer.putInt(buildString.length);
+                responseBuffer.put(buildString).flip();
                 socket.write(responseBuffer);
             }
             return handler;

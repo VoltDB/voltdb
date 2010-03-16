@@ -73,6 +73,7 @@ class Distributer {
     private Object m_clusterInstanceId[];
 
     private final ClientStatsLoader m_statsLoader;
+    private String m_buildString;
 
     private static class ProcedureStats {
         private final String m_name;
@@ -434,12 +435,13 @@ class Distributer {
     synchronized void createConnection(String host, String program, String password, int port)
     throws UnknownHostException, IOException
 {
-    final Pair<SocketChannel, long[]> p =
+    final Object connectionStuff[] =
         ConnectionUtil.getAuthenticatedConnection(host, program, password, port);
-    final SocketChannel aChannel = p.getFirst();
+    final SocketChannel aChannel = (SocketChannel)connectionStuff[0];
+    final long numbers[] = (long[])connectionStuff[1];
     if (m_clusterInstanceId == null) {
-        long timestamp = p.getSecond()[2];
-        int addr = (int)p.getSecond()[3];
+        long timestamp = numbers[2];
+        int addr = (int)numbers[3];
         m_clusterInstanceId = new Object[] { timestamp, addr };
         if (m_statsLoader != null) {
             try {
@@ -450,15 +452,16 @@ class Distributer {
         }
     } else {
         if (
-                !(((Long)m_clusterInstanceId[0]).longValue() == p.getSecond()[2]) ||
-                !(((Integer)m_clusterInstanceId[1]).longValue() == p.getSecond()[3])) {
-            p.getFirst().close();
+                !(((Long)m_clusterInstanceId[0]).longValue() == numbers[2]) ||
+                !(((Integer)m_clusterInstanceId[1]).longValue() == numbers[3])) {
+            aChannel.close();
             throw new IOException(
                     "Cluster instance id mismatch. Current is " + m_clusterInstanceId[0] + "," + m_clusterInstanceId[1]
-                    + " and server's was " + p.getSecond()[2] + "," + p.getSecond()[3]);
+                    + " and server's was " + numbers[2] + "," + numbers[3]);
         }
     }
-    NodeConnection cxn = new NodeConnection(p.getSecond());
+    m_buildString = (String)connectionStuff[2];
+    NodeConnection cxn = new NodeConnection(numbers);
     m_connections.add(cxn);
     Connection c = m_network.registerChannel( aChannel, cxn);
     cxn.m_hostname = c.getHostname();
@@ -774,5 +777,9 @@ class Distributer {
 
     public Object[] getInstanceId() {
         return m_clusterInstanceId;
+    }
+
+    public String getBuildString() {
+        return m_buildString;
     }
 }

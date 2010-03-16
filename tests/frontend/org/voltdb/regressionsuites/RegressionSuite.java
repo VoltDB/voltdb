@@ -161,10 +161,10 @@ public class RegressionSuite extends TestCase {
         final List<String> listeners = m_config.getListenerAddresses();
         final Random r = new Random();
         final String listener = listeners.get(r.nextInt(listeners.size()));
-        final SocketChannel channel =
+        final SocketChannel channel = (SocketChannel)
             ConnectionUtil.getAuthenticatedConnection(
                     listener,
-                    m_username, m_password, Client.VOLTDB_SERVER_PORT).getFirst();
+                    m_username, m_password, Client.VOLTDB_SERVER_PORT)[0];
         channel.configureBlocking(true);
         if (!noTearDown) {
             synchronized (m_clientChannels) {

@@ -180,4 +180,10 @@ public class MockVoltClient implements Client {
         // TODO Auto-generated method stub
         return null;
     }
+
+    @Override
+    public String getBuildString() {
+        // TODO Auto-generated method stub
+        return null;
+    }
 }

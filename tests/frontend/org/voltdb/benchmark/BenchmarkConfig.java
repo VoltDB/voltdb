@@ -51,6 +51,9 @@ public class BenchmarkConfig {
     public final String snapshotFrequency;
     public final int snapshotRetain;
     public final String databaseURL;
+    public final String statsTag;//Identifies the result set
+    public final String applicationName;
+    public final String subApplicationName;
 
     public final Map<String, String> parameters = new HashMap<String, String>();
 
@@ -77,7 +80,10 @@ public class BenchmarkConfig {
             String snapshotPrefix,
             String snapshotFrequency,
             int snapshotRetain,
-            String databaseURL
+            String databaseURL,
+            String statsTag,
+            String applicationName,
+            String subApplicationName
         ) {
 
         this.benchmarkClient = benchmarkClient;
@@ -107,6 +113,9 @@ public class BenchmarkConfig {
         this.snapshotFrequency = snapshotFrequency;
         this.snapshotRetain = snapshotRetain;
         this.databaseURL = databaseURL;
+        this.statsTag = statsTag;
+        this.applicationName = applicationName;
+        this.subApplicationName = subApplicationName;
     }
 
     @Override

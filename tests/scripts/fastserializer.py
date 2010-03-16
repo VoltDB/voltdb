@@ -192,6 +192,8 @@ class FastSerializer:
         self.readInt64()
         self.readInt64()
         self.readInt32()
+        for x in range(self.readInt32()):
+            self.readByte()
 
     def setInputByteOrder(self, bom):
         # assuming bom is high bit set?

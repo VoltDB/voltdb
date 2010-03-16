@@ -310,4 +310,9 @@ final class ClientImpl implements Client {
     public VoltTable getProcedureStatsInterval() {
         return m_distributer.getProcedureStats(false);
     }
+
+    @Override
+    public String getBuildString() {
+        return m_distributer.getBuildString();
+    }
 }

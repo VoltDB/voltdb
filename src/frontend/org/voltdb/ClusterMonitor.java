@@ -41,9 +41,9 @@ public class ClusterMonitor {
             " where startTime = ? and leaderAddress = ?;");
 
     private static final String createInstanceStatement = new String("insert into " + instancesTable +
-            " ( startTime, leaderAddress, applicationName, subApplicationName, numHosts, " +
+            " ( startTime, leaderAddress, applicationName, subApplicationName, versionString, tag, numHosts, " +
             "numPartitionsPerHost, numTotalPartitions, numKSafety) " +
-            "values ( ?, ?, ?, ?, ?, ?, ?, ?);");
+            "values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
     private static final String insertInitiatorStatement = new String("insert into " + initiatorsTable +
             " ( instanceId, tsEvent, hostId, hostName, siteId, connectionId, connectionHostname, " +
@@ -79,6 +79,7 @@ public class ClusterMonitor {
         String voltUsername = "";
         String voltPassword = "";
         long pollInterval = 10000;
+        String tag = null;
 
         ArrayList<String> voltHosts = new ArrayList<String>();
         for (String arg : args) {
@@ -135,6 +136,8 @@ public class ClusterMonitor {
                 if (pollInterval < 1000) {
                     System.err.println("Warning, an excessively frequent poll interval incurs overhead");
                 }
+            } else if (parts[1].equals("tag")) {
+                tag = parts[1];
             }
         }
 
@@ -168,6 +171,7 @@ public class ClusterMonitor {
         final ClusterMonitor cm = new ClusterMonitor(
                 application,
                 subApplication,
+                tag,
                 hosts,
                 partitionsPerHost,
                 totalPartitions,
@@ -194,6 +198,7 @@ public class ClusterMonitor {
     public ClusterMonitor(
             String application,
             String subApplication,
+            String tag,
             int hosts,
             int partitionsPerHost,
             int totalPartitions,
@@ -217,6 +222,10 @@ public class ClusterMonitor {
 
         if (successfulConnections == 0) {
             throw new RuntimeException("Unable to open any connections to the cluster");
+        }
+        String versionString = m_client.getBuildString();
+        if (versionString.equals("?revision=")) {
+            versionString = null;
         }
 
         m_conn =  DriverManager.getConnection(databaseURL);
@@ -254,6 +263,16 @@ public class ClusterMonitor {
                 statement.setString( index++, application);
                 if (subApplication != null) {
                     statement.setString( index++, subApplication);
+                }  else {
+                    statement.setNull( index++, Types.VARCHAR);
+                }
+                if (versionString != null) {
+                    statement.setString( index++, versionString);
+                }  else {
+                    statement.setNull( index++, Types.VARCHAR);
+                }
+                if (tag != null) {
+                    statement.setString( index++, tag);
                 }  else {
                     statement.setNull( index++, Types.VARCHAR);
                 }

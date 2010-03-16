@@ -28,7 +28,6 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.utils.Pair;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -80,19 +79,27 @@ public class ConnectionUtil {
      * @param password
      * @param port
      * @throws IOException
+     * @returns An array of objects. The first is an
+     * authenticated socket channel, the second. is an array of 4 longs -
+     * Integer hostId, Long connectionId, Long timestamp (part of instanceId), Int leaderAddress (part of instanceId).
+     * The last object is the build string
+     *
      */
-    public static Pair<SocketChannel, long[]> getAuthenticatedConnection(
+    public static Object[] getAuthenticatedConnection(
             String host, String program, String password, int port)
     throws IOException {
+        Object returnArray[] = new Object[3];
         boolean success = false;
         InetSocketAddress addr = new InetSocketAddress(host, port);
         SocketChannel aChannel = SocketChannel.open(addr);
+        returnArray[0] = aChannel;
         assert(aChannel.isConnected());
         if (!aChannel.isConnected()) {
             // TODO Can open() be asynchronous if configureBlocking(true)?
             throw new IOException("Failed to open host " + host);
         }
         final long retvals[] = new long[4];
+        returnArray[1] = retvals;
         try {
             /*
              * Send login info
@@ -133,8 +140,22 @@ public class ConnectionUtil {
                 writeException = e;
             }
 
-            ByteBuffer loginResponse = ByteBuffer.allocate(30);//Read version and length etc.
-            int read = aChannel.read(loginResponse);
+            ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
+            int read = aChannel.read(lengthBuffer);
+            if (read == -1) {
+                if (writeException != null) {
+                    throw writeException;
+                }
+                if (!successfulWrite) {
+                    throw new IOException("Unable to write authentication info to serer");
+                }
+                throw new IOException("Authentication rejected");
+            } else {
+                lengthBuffer.flip();
+            }
+
+            ByteBuffer loginResponse = ByteBuffer.allocate(lengthBuffer.getInt());//Read version and length etc.
+            read = aChannel.read(loginResponse);
             byte loginResponseCode = 0;
             if (read == -1) {
                 if (writeException != null) {
@@ -146,7 +167,7 @@ public class ConnectionUtil {
                 throw new IOException("Authentication rejected");
             } else {
                 loginResponse.flip();
-                loginResponse.position(5);
+                loginResponse.position(1);
                 loginResponseCode = loginResponse.get();
             }
 
@@ -166,6 +187,10 @@ public class ConnectionUtil {
             retvals[1] = loginResponse.getLong();
             retvals[2] = loginResponse.getLong();
             retvals[3] = loginResponse.getInt();
+            int buildStringLength = loginResponse.getInt();
+            byte buildStringBytes[] = new byte[buildStringLength];
+            loginResponse.get(buildStringBytes);
+            returnArray[2] = new String(buildStringBytes, "UTF-8");
 
             aChannel.configureBlocking(false);
             aChannel.socket().setTcpNoDelay(false);
@@ -176,7 +201,7 @@ public class ConnectionUtil {
                 aChannel.close();
             }
         }
-        return Pair.of(aChannel, retvals);
+        return returnArray;
     }
 
     public static void closeConnection(SocketChannel connection) throws InterruptedException, IOException {

@@ -352,8 +352,9 @@ public class BenchmarkController {
 
         try {
             m_clusterMonitor = new ClusterMonitor(
-                    m_config.benchmarkClient,
-                    null,
+                    m_config.applicationName == null ? m_config.benchmarkClient : m_config.applicationName,
+                    m_config.subApplicationName,
+                    m_config.statsTag,
                     m_config.hosts.length,
                     m_config.sitesPerHost,
                     m_config.hosts.length * m_config.sitesPerHost,
@@ -688,6 +689,9 @@ public class BenchmarkController {
         boolean checkTables = false;
         String databaseURL = "jdbc:mysql://hzproject.com/monitoring_agent?" +
             "user=monitoring_agent\\&password=n7s4JTchAhcMjPM7";
+        String statsTag = null;
+        String applicationName = null;
+        String subApplicationName = null;
 
         LinkedHashMap<String, String> clientParams = new LinkedHashMap<String, String>();
         for (String arg : vargs) {
@@ -799,6 +803,12 @@ public class BenchmarkController {
                 clientParams.put(parts[0], parts[1]);
             } else if (parts[0].equals("STATSDATABASEURL")) {
                 databaseURL = parts[1];
+            } else if (parts[0].equals("STATSTAG")) {
+                statsTag = parts[1];
+            } else if (parts[0].equals("APPLICATIONNAME")) {
+                applicationName = parts[1];
+            } else if (parts[0].equals("SUBAPPLICATIONNAME")) {
+                subApplicationName = parts[1];
             } else {
                 clientParams.put(parts[0].toLowerCase(), parts[1]);
             }
@@ -877,7 +887,8 @@ public class BenchmarkController {
                 sitesPerHost, k_factor, clientNames, processesPerClient, interval, duration,
                 remotePath, remoteUser, listenForDebugger, serverHeapSize, clientHeapSize,
                 localmode, useProfile, checkTransaction, checkTables, snapshotPath, snapshotPrefix,
-                snapshotFrequency, snapshotRetain, databaseURL);
+                snapshotFrequency, snapshotRetain, databaseURL, statsTag, applicationName,
+                subApplicationName);
         config.parameters.putAll(clientParams);
 
         // ACTUALLY RUN THE BENCHMARK

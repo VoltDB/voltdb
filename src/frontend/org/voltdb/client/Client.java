@@ -207,4 +207,10 @@ public interface Client {
      * @return
      */
     public Object[] getInstanceId();
+
+    /**
+     * Retrieve the build string that was provided by the server on logon
+     * @return Volt server build string
+     */
+    public String getBuildString();
 }
