@@ -67,6 +67,7 @@ implements Runnable, DumpManager.Dumpable
     private static final Logger log = Logger.getLogger(ExecutionSite.class.getName(), VoltLoggerFactory.instance());
     private static final Logger hostLog = Logger.getLogger("HOST", VoltLoggerFactory.instance());
     private static AtomicInteger siteIndexCounter = new AtomicInteger(0);
+
     private final int siteIndex = siteIndexCounter.getAndIncrement();
     private final Mailbox m_mailbox;
     public int siteId;
@@ -85,6 +86,11 @@ implements Runnable, DumpManager.Dumpable
     // Data about current transactions
     VoltProcedure currentProc = null;
     private TransactionState m_current = null;
+
+    public long getCurrentTxnId() {
+        return m_current.txnId;
+    }
+
     HashMap<Long, TransactionState> m_transactionsById = new HashMap<Long, TransactionState>();
     private final RestrictedPriorityQueue m_transactionQueue;
     private long m_lastCompletedTxnId = Long.MIN_VALUE;
@@ -104,11 +110,6 @@ implements Runnable, DumpManager.Dumpable
     // The time in ms since epoch of the last call to tick()
     long lastTickTime = 0;
     long lastCommittedTxnId = 0;
-    private long m_currentTxnId = 0;
-
-    public long getCurrentTxnId() {
-        return m_currentTxnId;
-    }
 
     /*
      * undoWindowBegin is the first token of a stored procedure invocation.
@@ -120,7 +121,6 @@ implements Runnable, DumpManager.Dumpable
      * undoWindowBegin (which is the first undo token of the transaction).
      */
     private final static long kInvalidUndoToken = -1L;
-    //public boolean undoWindowActive = false;
     private long txnBeginUndoToken = kInvalidUndoToken;
     private long batchBeginUndoToken = kInvalidUndoToken;
     private long latestUndoToken = 0L;
@@ -232,12 +232,9 @@ implements Runnable, DumpManager.Dumpable
      * when the transaction ID changes.
      */
     public final void beginNewTxn(long txnId, boolean readOnly) {
-        m_currentTxnId = txnId;
-
         if (!readOnly) {
             assert(txnBeginUndoToken == kInvalidUndoToken);
             assert(batchBeginUndoToken == kInvalidUndoToken);
-
             txnBeginUndoToken = latestUndoToken;
         }
     }
@@ -247,7 +244,6 @@ implements Runnable, DumpManager.Dumpable
             assert(latestUndoToken != kInvalidUndoToken);
             assert(txnBeginUndoToken != kInvalidUndoToken);
             assert(latestUndoToken >= txnBeginUndoToken);
-
             batchBeginUndoToken = latestUndoToken;
         }
     }
@@ -258,21 +254,11 @@ implements Runnable, DumpManager.Dumpable
             assert(txnBeginUndoToken != kInvalidUndoToken);
             assert(latestUndoToken >= txnBeginUndoToken);
 
-            // return if no work was done
-            if (latestUndoToken == txnBeginUndoToken) {
-                return;
+            // don't go to the EE of no work was done
+            if (latestUndoToken > txnBeginUndoToken) {
+                ee.undoUndoToken(txnBeginUndoToken);
             }
-
-            // make sure this is sensical
-            assert(latestUndoToken > txnBeginUndoToken);
-
-            // actually do the undo work
-            ee.undoUndoToken(txnBeginUndoToken);
         }
-    }
-
-    public final void rollbackBatch(boolean readOnly) {
-        assert(false);
     }
 
     public final void completeTransaction(boolean readOnly) {
@@ -280,14 +266,13 @@ implements Runnable, DumpManager.Dumpable
             assert(latestUndoToken != kInvalidUndoToken);
             assert(txnBeginUndoToken != kInvalidUndoToken);
             assert(latestUndoToken >= txnBeginUndoToken);
-            //assert((batchBeginUndoToken != kInvalidUndoToken) || (latestUndoToken == txnBeginUndoToken));
-            //assert((latestUndoToken == txnBeginUndoToken) || (batchBeginUndoToken != kInvalidUndoToken));
 
             // release everything through the end of the current window.
-            if (latestUndoToken > txnBeginUndoToken)
+            if (latestUndoToken > txnBeginUndoToken) {
                 ee.releaseUndoToken(latestUndoToken);
+            }
 
-            // these only really need to be reset for error checking purposes
+            // reset for error checking purposes
             txnBeginUndoToken = kInvalidUndoToken;
             batchBeginUndoToken = kInvalidUndoToken;
         }
@@ -319,7 +304,7 @@ implements Runnable, DumpManager.Dumpable
         public ExecutionEngine getExecutionEngine() { return ee; }
         public long getLastCommittedTxnId()         { return lastCommittedTxnId; }
         public long getNextUndo()                   { return getNextUndoToken(); }
-        public long getTxnId()                      { return m_currentTxnId; }
+        public long getTxnId()                      { return getCurrentTxnId(); }
         public String getOperStatus()               { return VoltDB.getOperStatus(); }
         public ExecutionSite getExecutionSite()     { return ExecutionSite.this; }
     }
@@ -603,7 +588,7 @@ implements Runnable, DumpManager.Dumpable
                                                                   outputDepId,
                                                                   inputDepId,
                                                                   params,
-                                                                  m_currentTxnId,
+                                                                  getCurrentTxnId(),
                                                                   lastCommittedTxnId,
                                                                   getNextUndoToken());
 
@@ -710,8 +695,8 @@ implements Runnable, DumpManager.Dumpable
         }
 
         log.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
-        if (m_currentTxnId > lastCommittedTxnId) {
-            lastCommittedTxnId = m_currentTxnId;
+        if (getCurrentTxnId() > lastCommittedTxnId) {
+            lastCommittedTxnId = getCurrentTxnId();
         }
 
         m_currentSPTask = null;
