@@ -81,6 +81,11 @@ public abstract class TransactionInitiator {
     @Deprecated
     public abstract long getMostRecentTxnId();
 
+    /**
+     * Increase or reduce the amount of backpressure from this initiator.
+     *
+     * @param messageSize
+     */
     abstract void increaseBackpressure(int messageSize);
     abstract void reduceBackpressure(int messageSize);
 }
