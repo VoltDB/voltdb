@@ -91,8 +91,8 @@ implements Runnable, DumpManager.Dumpable
 
     private InitiateTask m_currentSPTask = null;
 
-    public InitiateTask getCurrentSPTask() {
-        return m_currentSPTask;
+    boolean isCurrentTaskReadOnly() {
+        return m_currentSPTask.isReadOnly();
     }
 
 
@@ -541,8 +541,7 @@ implements Runnable, DumpManager.Dumpable
             }
         }
         try {
-            // call recurable run and let it know this is the base call,
-            // meaning it's allowed/expected to return null
+            // true indicates starting new stack; allow recursableRun to return.
             Object test = recursableRun(true);
             assert(test == null);
         }
@@ -554,91 +553,86 @@ implements Runnable, DumpManager.Dumpable
     }
 
     public FragmentResponse processFragmentTask(
-            final HashMap<Integer,List<VoltTable>> dependencies, final VoltMessage task) {
-        // change to true of release dependencies is required.
-        {
-            final FragmentTask ftask = (FragmentTask) task;
-            m_currentInitiatorSiteId = ftask.getInitiatorSiteId();
+            final HashMap<Integer,List<VoltTable>> dependencies, final VoltMessage task)
+    {
+        ParameterSet params = null;
+        final FragmentTask ftask = (FragmentTask) task;
+        m_currentInitiatorSiteId = ftask.getInitiatorSiteId();
 
-            assert(ftask.getFragmentCount() == 1);
-            final long fragmentId = ftask.getFragmentId(0);
-            final int outputDepId = ftask.getOutputDepId(0);
+        assert(ftask.getFragmentCount() == 1);
+        final long fragmentId = ftask.getFragmentId(0);
+        final int outputDepId = ftask.getOutputDepId(0);
 
-            final FragmentResponse currentFragResponse = new FragmentResponse(ftask, siteId);
+        final FragmentResponse currentFragResponse = new FragmentResponse(ftask, siteId);
 
-            // this is a horrible performance hack, and can be removed with small changes
-            // to the ee interface layer.. (rtb: not sure what 'this' encompasses...)
-            final ByteBuffer paramData = ftask.getParameterDataForFragment(0);
-            ParameterSet params = null;
-
-            if (paramData != null) {
-                final FastDeserializer fds = new FastDeserializer(paramData);
-                try {
-                    params = fds.readObject(ParameterSet.class);
-                }
-                catch (final IOException e) {
-                    hostLog.l7dlog( Level.FATAL,
-                            LogKeys.host_ExecutionSite_FailedDeserializingParamsForFragmentTask.name(), e);
-                    VoltDB.crashVoltDB();
-                }
+        // this is a horrible performance hack, and can be removed with small changes
+        // to the ee interface layer.. (rtb: not sure what 'this' encompasses...)
+        final ByteBuffer paramData = ftask.getParameterDataForFragment(0);
+        if (paramData != null) {
+            final FastDeserializer fds = new FastDeserializer(paramData);
+            try {
+                params = fds.readObject(ParameterSet.class);
             }
-            else {
-                params = new ParameterSet();
+            catch (final IOException e) {
+                hostLog.l7dlog( Level.FATAL,
+                                LogKeys.host_ExecutionSite_FailedDeserializingParamsForFragmentTask.name(), e);
+                VoltDB.crashVoltDB();
+            }
+        }
+        else {
+            params = new ParameterSet();
+        }
+
+        if (ftask.isSysProcTask()) {
+            return processSysprocFragmentTask(dependencies, fragmentId,
+                                              currentFragResponse, params);
+        }
+        else {
+            // start the clock on this statement
+            ProcedureProfiler.startStatementCounter(fragmentId);
+
+            if (dependencies != null) {
+                ee.stashWorkUnitDependencies(dependencies);
+            }
+            final int inputDepId = ftask.getOnlyInputDepId(0);
+
+            /*
+             * Currently the error path when executing plan fragments
+             * does not adequately distinguish between fatal errors and
+             * abort type errors that should result in a roll back.
+             * Assume that it is ninja: succeeds or doesn't return.
+             * No roll back support.
+             */
+            currentFragResponse.setStatus(FragmentResponse.SUCCESS, null);
+            try {
+                final DependencyPair dep = ee.executePlanFragment(fragmentId,
+                                                                  outputDepId,
+                                                                  inputDepId,
+                                                                  params,
+                                                                  m_currentTxnId,
+                                                                  lastCommittedTxnId,
+                                                                  getNextUndoToken());
+
+                sendDependency(currentFragResponse, dep.depId, dep.dependency);
+
+            } catch (final EEException e) {
+                hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
+                currentFragResponse.setStatus(FragmentResponse.UNEXPECTED_ERROR, e);
+            } catch (final SQLException e) {
+                hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
+                currentFragResponse.setStatus(FragmentResponse.UNEXPECTED_ERROR, e);
             }
 
-            if (ftask.isSysProcTask()) {
-                return processSysprocFragmentTask(dependencies, fragmentId,
-                                           currentFragResponse, params);
-            }
-            else {
-
-                // pass attached dependencies to the EE (for non-sysproc work).
-                if (dependencies != null)
-                    ee.stashWorkUnitDependencies(dependencies);
-
-                // start the clock on this statement
-                ProcedureProfiler.startStatementCounter(fragmentId);
-
-                final int inputDepId = ftask.getOnlyInputDepId(0);
-
-                /*
-                 * Currently the error path when executing plan fragments
-                 * does not adequately distinguish between fatal errors and
-                 * abort type errors that should result in a roll back.
-                 * Assume that it is ninja: succeeds or doesn't return.
-                 * No roll back support.
-                 */
-                currentFragResponse.setStatus(FragmentResponse.SUCCESS, null);
-                try {
-                    final DependencyPair dep = ee.executePlanFragment(fragmentId,
-                                                                      outputDepId,
-                                                                      inputDepId,
-                                                                      params,
-                                                                      m_currentTxnId,
-                                                                      lastCommittedTxnId,
-                                                                      getNextUndoToken());
-
-                    sendDependency(currentFragResponse, dep.depId, dep.dependency);
-
-                } catch (final EEException e) {
-                    hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
-                    currentFragResponse.setStatus(FragmentResponse.UNEXPECTED_ERROR, e);
-                } catch (final SQLException e) {
-                    hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
-                    currentFragResponse.setStatus(FragmentResponse.UNEXPECTED_ERROR, e);
-                }
-
-                ProcedureProfiler.stopStatementCounter();
-                return currentFragResponse;
-            }
+            ProcedureProfiler.stopStatementCounter();
+            return currentFragResponse;
         }
     }
 
-
     public FragmentResponse processSysprocFragmentTask(final HashMap<Integer,List<VoltTable>> dependencies,
             final long fragmentId, final FragmentResponse currentFragResponse,
-            final ParameterSet params) {
-        // assume success. errors correct this assumption as they occurr
+            final ParameterSet params)
+    {
+        // assume success. errors correct this assumption as they occur
         currentFragResponse.setStatus(FragmentResponse.SUCCESS, null);
 
         VoltSystemProcedure proc = null;
@@ -706,7 +700,6 @@ implements Runnable, DumpManager.Dumpable
         try {
             final ClientResponseImpl cr = wrapper.call(itask.getParameters());
             response.setResults( cr, itask);
-            //response.setClientHandle(task.getClientHandle());
         }
         catch (final ExpectedProcedureException e) {
             log.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_ExpectedProcedureException.name(), e);
@@ -727,9 +720,7 @@ implements Runnable, DumpManager.Dumpable
             lastCommittedTxnId = m_currentTxnId;
         }
 
-        // note whether this plan fragment was successful
         m_currentSPTask = null;
-
         return response;
     }
 

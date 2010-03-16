@@ -743,11 +743,9 @@ public abstract class VoltProcedure {
             }
         }
 
-        // BEGIN ADDITIONS FOR DTXN CODE (2/25/08)
         if (slowPath) {
             return slowPath(batchSize, batchStmts, batchArgs, finalTask);
         }
-        // END ADDITIONS FOR DTXN CODE
 
         VoltTable[] results = null;
         try {
@@ -1149,7 +1147,7 @@ public abstract class VoltProcedure {
         FragmentTask localTask = new FragmentTask(m_site.getCurrentInitiatorSiteId(),
                                                   m_site.siteId,
                                                   m_site.getCurrentTxnId(),
-                                                  m_site.getCurrentSPTask().isReadOnly(),
+                                                  m_site.isCurrentTaskReadOnly(),
                                                   localFragIds,
                                                   depsToResume,
                                                   localParams,
@@ -1166,7 +1164,7 @@ public abstract class VoltProcedure {
         FragmentTask distributedTask = new FragmentTask(m_site.getCurrentInitiatorSiteId(),
                                                         m_site.siteId,
                                                         m_site.getCurrentTxnId(),
-                                                        m_site.getCurrentSPTask().isReadOnly(),
+                                                        m_site.isCurrentTaskReadOnly(),
                                                         distributedFragIdArray,
                                                         distributedOutputDepIdArray,
                                                         distributedParamsArray,
