@@ -96,7 +96,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     private int m_pendingTxnCount = 0;
     private final Mailbox m_mailbox;
     private final int m_siteId;
-
+    private final int m_hostId;
 
     public SimpleDtxnInitiator(Messenger messenger, int hostId, int siteId,
                                int initiatorId,
@@ -108,6 +108,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         System.out.flush();
 
         m_idManager = new TransactionIdManager(initiatorId);
+        m_hostId = hostId;
         m_siteId = siteId;
         m_queue = new DtxnInitiatorQueue(siteId);
         m_mailbox = messenger.createMailbox(siteId, VoltDB.DTXN_MAILBOX_ID,
@@ -154,12 +155,12 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
 
             for (int i = 1; i < allSiteIds.length; i++)
             {
-                // if this site is in the list of sites for this partition
+                // if this site is on the same host as the initiator
                 // then take over as the coordinator
-                if (allSiteIds[i] == m_siteId)
+                if (m_hostId == allSiteIds[i] / VoltDB.SITES_TO_HOST_DIVISOR)
                 {
                     otherSiteIds[i - 1] = coordinatorId;
-                    coordinatorId = m_siteId;
+                    coordinatorId = allSiteIds[i];
                 }
                 else
                 {
