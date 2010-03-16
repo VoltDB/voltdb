@@ -82,6 +82,14 @@ public abstract class VoltProcedure {
     ExecutionSite m_site;
     TransactionState m_currentTxnState;  // assigned in call()
 
+    /**
+     * Allow VoltProcedures access to their transaction id.
+     * @return transaction id
+     */
+    public long getTransactionId() {
+        return m_currentTxnState.txnId;
+    }
+
     private boolean m_initialized;
 
     // private members reserved exclusively to VoltProcedure
@@ -533,7 +541,7 @@ public abstract class VoltProcedure {
     {
         if (data == null || data.getRowCount() == 0) return;
 
-        Cluster cluster = m_site.m_context.catalog.getClusters().get(clusterName);
+        Cluster cluster = m_site.m_context.cluster;
         if (cluster == null) {
             throw new VoltAbortException("cluster '" + clusterName + "' does not exist");
         }
@@ -548,7 +556,7 @@ public abstract class VoltProcedure {
         try
         {
             m_site.ee.loadTable(table.getRelativeIndex(), data,
-                                m_site.getCurrentTxnId(),
+                                m_currentTxnState.txnId,
                                 m_site.lastCommittedTxnId,
                                 m_site.getNextUndoToken(),
                                 allowELT != 0);
@@ -754,7 +762,7 @@ public abstract class VoltProcedure {
                 fragmentIdIndex,
                 parameterSets,
                 parameterSetIndex,
-                m_site.getCurrentTxnId(),
+                m_currentTxnState.txnId,
                 m_site.lastCommittedTxnId,
                 catProc.getReadonly() ? Long.MAX_VALUE : m_site.getNextUndoToken());
         }
@@ -1067,7 +1075,7 @@ public abstract class VoltProcedure {
             }
 
             // Figure out what is needed to resume the proc
-            int collectorOutputDepId = m_site.getNextDependencyId();
+            int collectorOutputDepId = m_currentTxnState.getNextDependencyId();
             depsToResume[i] = collectorOutputDepId;
 
             // Build the set of params for the frags
@@ -1115,7 +1123,8 @@ public abstract class VoltProcedure {
                         localFragIds[i] = CatalogUtil.getUniqueIdForFragment(frag);
                         localParams[i] = params;
                         assert(frag.getHasdependencies());
-                        int outputDepId = m_site.getNextDependencyId() | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+                        int outputDepId =
+                            m_currentTxnState.getNextDependencyId() | DtxnConstants.MULTIPARTITION_DEPENDENCY;
                         depsForLocalTask[i] = outputDepId;
                         distributedOutputDepIds.add(outputDepId);
 
@@ -1142,7 +1151,7 @@ public abstract class VoltProcedure {
         }
 
         // instruct the dtxn what's needed to resume the proc
-        m_site.setupProcedureResume(finalTask, depsToResume);
+        m_currentTxnState.setupProcedureResume(finalTask, depsToResume);
 
         // create all the local work for the transaction
         FragmentTask localTask = new FragmentTask(m_currentTxnState.initiatorSiteId,
@@ -1159,7 +1168,7 @@ public abstract class VoltProcedure {
         }
 
         // note: non-transactional work only helps us if it's final work
-        m_site.createLocalWork(localTask, localFragsAreNonTransactional && finalTask);
+        m_currentTxnState.createLocalFragmentWork(localTask, localFragsAreNonTransactional && finalTask);
 
         // create and distribute work for all sites in the transaction
         FragmentTask distributedTask = new FragmentTask(m_currentTxnState.initiatorSiteId,
@@ -1170,10 +1179,12 @@ public abstract class VoltProcedure {
                                                         distributedOutputDepIdArray,
                                                         distributedParamsArray,
                                                         finalTask);
-        m_site.createAllParticipatingWork(distributedTask);
+
+        m_currentTxnState.createAllParticipatingFragmentWork(distributedTask);
 
         // recursively call recurableRun and don't allow it to shutdown
-        Map<Integer,List<VoltTable>> mapResults = m_site.recursableRun(false);
+        Map<Integer,List<VoltTable>> mapResults =
+            m_site.recursableRun(m_currentTxnState, false);
 
         assert(mapResults != null);
         assert(depsToResume != null);

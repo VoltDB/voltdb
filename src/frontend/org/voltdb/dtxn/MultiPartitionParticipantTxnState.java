@@ -297,16 +297,18 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     public void createLocalFragmentWork(FragmentTask task, boolean nonTransactional) {
         // handle the undo case
         if (task.shouldUndo()) {
-            if (m_missingDependencies != null)
+            if (m_missingDependencies != null) {
                 m_missingDependencies.clear();
+            }
             m_readyWorkUnits.clear();
             m_site.rollbackTransaction(isReadOnly);
             m_done = true;
             return;
         }
 
-        if (task.getFragmentCount() > 0)
+        if (task.getFragmentCount() > 0) {
             createLocalFragmentWorkDependencies(task, nonTransactional);
+        }
 
         // if this txn is a participant and this is a final task...
         // if it's empty, then it's always a commit message

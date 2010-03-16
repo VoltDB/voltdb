@@ -20,16 +20,7 @@ package org.voltdb.sysprocs;
 import java.util.HashMap;
 import java.util.List;
 
-import org.voltdb.BackendTarget;
-import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite;
-import org.voltdb.HsqlBackend;
-import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
-import org.voltdb.VoltDB;
-import org.voltdb.VoltSystemProcedure;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
+import org.voltdb.*;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
@@ -84,10 +75,9 @@ public class AdHoc extends VoltSystemProcedure {
         else
         {
             assert(plan != null);
-            // call our EE
             table =
                 context.getExecutionEngine().
-                executeCustomPlanFragment(plan, outputDepId, inputDepId, context.getTxnId(),
+                executeCustomPlanFragment(plan, outputDepId, inputDepId, getTransactionId(),
                                           context.getLastCommittedTxnId(),
                                           context.getNextUndo());
         }

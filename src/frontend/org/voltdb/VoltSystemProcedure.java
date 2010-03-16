@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import org.voltdb.catalog.Host;
 import org.voltdb.catalog.Site;
+import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messages.FragmentTask;
 import org.voltdb.messaging.FastSerializer;
@@ -85,11 +86,14 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
 
         // the stack frame drop terminates the recursion and resumes
         // execution of the current stored procedure.
-        m_site.setupProcedureResume(false, aggregatorOutputDependencyId);
+        assert(m_currentTxnState != null);
+        assert(m_currentTxnState instanceof MultiPartitionParticipantTxnState);
+        m_currentTxnState.setupProcedureResume(false, new int[] {aggregatorOutputDependencyId});
 
         // execute the tasks that just got queued.
         // recursively call recurableRun and don't allow it to shutdown
-        Map<Integer,List<VoltTable>> mapResults = m_site.recursableRun(false);
+        Map<Integer,List<VoltTable>> mapResults =
+            m_site.recursableRun(m_currentTxnState, false);
 
         List<VoltTable> matchingTablesForId = mapResults.get(aggregatorOutputDependencyId);
         if (matchingTablesForId == null) {
@@ -132,7 +136,6 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                 parambytes = fs.getBuffer();
             }
 
-
             FragmentTask task = new FragmentTask(
                     m_currentTxnState.initiatorSiteId,
                     m_site.siteId,
@@ -142,9 +145,11 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                     new int[] { pf.outputDepId },
                     new ByteBuffer[] { parambytes },
                     false);
-            if (pf.inputDepIds != null)
-                for (int depId : pf.inputDepIds)
+            if (pf.inputDepIds != null) {
+                for (int depId : pf.inputDepIds) {
                     task.addInputDepId(0, depId);
+                }
+            }
             task.setFragmentTaskType(FragmentTask.SYS_PROC_PER_SITE);
             if (pf.suppressDuplicates)
             {
@@ -153,7 +158,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
 
             if (pf.multipartition) {
                 // create a workunit for every execution site
-                m_site.createAllParticipatingWork(task);
+                m_currentTxnState.createAllParticipatingFragmentWork(task);
             }
             else if (pf.nonExecSites) {
                 // create a workunit for one arbitrary site on each host.
@@ -170,14 +175,14 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                 for (int i = 0; i < sites.size(); i++)
                     destinations[i] = sites.get(i);
 
-                m_site.createWork(destinations, task);
+                m_currentTxnState.createFragmentWork(destinations, task);
             }
             else {
                 // create one workunit for the current site
                 if (pf.siteId == -1)
-                    m_site.createLocalWork(task, false);
+                    m_currentTxnState.createLocalFragmentWork(task, false);
                 else
-                    m_site.createWork(new int[] { pf.siteId }, task);
+                    m_currentTxnState.createFragmentWork(new int[] { pf.siteId }, task);
             }
         }
     }

@@ -52,8 +52,9 @@ implements Runnable, DumpManager.Dumpable
     private static final Logger log = Logger.getLogger(ExecutionSite.class.getName(), VoltLoggerFactory.instance());
     private static final Logger hostLog = Logger.getLogger("HOST", VoltLoggerFactory.instance());
     private static AtomicInteger siteIndexCounter = new AtomicInteger(0);
-
     private final int siteIndex = siteIndexCounter.getAndIncrement();
+
+    final HashMap<String, VoltProcedure> procs = new HashMap<String, VoltProcedure>(16, (float) .1);
     private final Mailbox m_mailbox;
     final ExecutionEngine ee;
     final HsqlBackend hsql;
@@ -64,15 +65,6 @@ implements Runnable, DumpManager.Dumpable
     public int siteId;
     Site getCatalogSite() {
         return m_context.cluster.getSites().get(Integer.toString(siteId));
-    }
-
-    final HashMap<String, VoltProcedure> procs = new HashMap<String, VoltProcedure>(16, (float) .1);
-
-    // Data about current transactions
-    private TransactionState m_currentTransactionState = null;
-
-    public long getCurrentTxnId() {
-        return m_currentTransactionState.txnId;
     }
 
     HashMap<Long, TransactionState> m_transactionsById = new HashMap<Long, TransactionState>();
@@ -252,7 +244,6 @@ implements Runnable, DumpManager.Dumpable
         public ExecutionEngine getExecutionEngine();
         public long getLastCommittedTxnId();
         public long getNextUndo();
-        public long getTxnId();
         public Object getOperStatus();
         public ExecutionSite getExecutionSite();
     }
@@ -264,7 +255,6 @@ implements Runnable, DumpManager.Dumpable
         public ExecutionEngine getExecutionEngine() { return ee; }
         public long getLastCommittedTxnId()         { return lastCommittedTxnId; }
         public long getNextUndo()                   { return getNextUndoToken(); }
-        public long getTxnId()                      { return getCurrentTxnId(); }
         public String getOperStatus()               { return VoltDB.getOperStatus(); }
         public ExecutionSite getExecutionSite()     { return ExecutionSite.this; }
     }
@@ -480,7 +470,7 @@ implements Runnable, DumpManager.Dumpable
         }
         try {
             // true indicates starting new stack; allow recursableRun to return.
-            Object test = recursableRun(true);
+            Object test = recursableRun(null, true);
             assert(test == null);
         }
         catch (final RuntimeException e) {
@@ -545,7 +535,7 @@ implements Runnable, DumpManager.Dumpable
                                                                   outputDepId,
                                                                   inputDepId,
                                                                   params,
-                                                                  getCurrentTxnId(),
+                                                                  txnState.txnId,
                                                                   lastCommittedTxnId,
                                                                   getNextUndoToken());
 
@@ -649,8 +639,8 @@ implements Runnable, DumpManager.Dumpable
         }
 
         log.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
-        if (getCurrentTxnId() > lastCommittedTxnId) {
-            lastCommittedTxnId = getCurrentTxnId();
+        if (txnState.txnId > lastCommittedTxnId) {
+            lastCommittedTxnId = txnState.txnId;
         }
 
         return response;
@@ -740,60 +730,20 @@ implements Runnable, DumpManager.Dumpable
         if (m_mailbox instanceof SiteMailbox)
             context.mailboxHistory = ((SiteMailbox) m_mailbox).getHistory();
 
-        // current transaction's state (if any)
-        if (m_currentTransactionState != null)
-            context.activeTransaction = m_currentTransactionState.getDumpContents();
-
         // restricted priority queue content
         m_transactionQueue.getDumpContents(context);
+
+        // TODO:
+        // m_transactionsById.getDumpContents(context);
 
         return context;
     }
 
 
-    //
-    // SiteConnection interface
-    //
-
     @Override
-    public void createAllParticipatingWork(FragmentTask task) {
-        assert(task != null);
-        assert(m_currentTransactionState != null);
-        m_currentTransactionState.createAllParticipatingFragmentWork(task);
-    }
-
-    @Override
-    public void createLocalWork(FragmentTask task, boolean nonTransactional) {
-        assert(task != null);
-        assert(m_currentTransactionState != null);
-        m_currentTransactionState.createLocalFragmentWork(task, nonTransactional);
-    }
-
-    @Override
-    public boolean createWork(int[] partitions, FragmentTask task) {
-        assert(task != null);
-        assert(partitions != null);
-        assert(m_currentTransactionState != null);
-        m_currentTransactionState.createFragmentWork(partitions, task);
-        return false;
-    }
-
-    @Override
-    public int getNextDependencyId() {
-        return m_currentTransactionState.getNextDependencyId();
-    }
-
-    @Override
-    public void setupProcedureResume(boolean isFinal, int... dependencies) {
-        assert(m_currentTransactionState != null);
-        assert(dependencies != null);
-        assert(m_currentTransactionState instanceof MultiPartitionParticipantTxnState);
-        m_currentTransactionState.setupProcedureResume(isFinal, dependencies);
-
-    }
-
-    @Override
-    public Map<Integer, List<VoltTable>> recursableRun(boolean shutdownAllowed) {
+    public Map<Integer, List<VoltTable>> recursableRun(TransactionState currentTxnState,
+                                                       boolean shutdownAllowed)
+    {
         // loop until the system decided to stop this thread
         // but don't return with null if not the base stack frame for this method
         while ((!shutdownAllowed) || (m_shouldContinue)) {
@@ -804,25 +754,25 @@ implements Runnable, DumpManager.Dumpable
             // 1. no current transaction AND no ready transaction, or
             // 2. the current transaction is blocked (see end of loop)
 
-            boolean moreWork = (m_currentTransactionState != null) ||
-                               ((m_currentTransactionState = m_transactionQueue.poll()) != null);
+            boolean moreWork = (currentTxnState != null) ||
+                               ((currentTxnState = m_transactionQueue.poll()) != null);
 
             while (moreWork)
             {
                 // assume there's a current txn inside this loop
-                assert(m_currentTransactionState != null);
+                assert(currentTxnState != null);
 
                 // do all runnable work for the current txn
                 // if doWork returns true, the transaction is over
-                if (m_currentTransactionState.doWork())
+                if (currentTxnState.doWork())
                 {
-                    completeTransaction(m_currentTransactionState.isReadOnly);
-                    TransactionState ts = m_transactionsById.remove(m_currentTransactionState.txnId);
+                    completeTransaction(currentTxnState.isReadOnly);
+                    TransactionState ts = m_transactionsById.remove(currentTxnState.txnId);
                     assert(ts != null);
 
                     // try to get the next current in line
                     // continue if there's a ready txn
-                    moreWork = (m_currentTransactionState = m_transactionQueue.poll()) != null;
+                    moreWork = (currentTxnState = m_transactionQueue.poll()) != null;
                 }
                 else {
                     // the current transaction is blocked
@@ -831,8 +781,8 @@ implements Runnable, DumpManager.Dumpable
                     // check if we should drop down a stack frame
                     //  note, calling this resets the internal state so
                     //  subsequent calls won't return true
-                    if (m_currentTransactionState.shouldResumeProcedure()) {
-                        Map<Integer, List<VoltTable>> retval = m_currentTransactionState.getPreviousStackFrameDropDependendencies();
+                    if (currentTxnState.shouldResumeProcedure()) {
+                        Map<Integer, List<VoltTable>> retval = currentTxnState.getPreviousStackFrameDropDependendencies();
                         assert(retval != null);
                         assert(shutdownAllowed == false);
                         return retval;
@@ -854,15 +804,12 @@ implements Runnable, DumpManager.Dumpable
 
     private void handleMailboxMessage(VoltMessage message) {
         if (message instanceof InitiateTask) {
-            // just wraps processTransactionMembership
             messageArrived((InitiateTask) message);
         }
         else if (message instanceof FragmentTask) {
-            // processTransactionMembership, createLocalFragmentWork
             messageArrived((FragmentTask) message);
         }
         else if (message instanceof FragmentResponse) {
-            // process remote work response
             messageArrived((FragmentResponse) message);
         }
         else if (message instanceof MembershipNotice) {
@@ -895,21 +842,19 @@ implements Runnable, DumpManager.Dumpable
     }
 
     /**
-     * A decision arrived for the current transaction
+     * A decision arrived for an open transaction
      */
     private void messageArrived(FragmentResponse response) {
-        // the following two outs are for rollback
-        // if the response comes in after the transaction is done
-        // then the response should be ignored
-        // this makes me (john) nervous, but it seems better than
-        // trying to keep track of outstanding responses in an
-        // rollback situation.
-        if ((m_currentTransactionState == null) || (response.getTxnId() != m_currentTransactionState.txnId)) {
+        TransactionState txnState = m_transactionsById.get(response.getTxnId());
+
+        // possible in rollback to receive an unnecessary response
+        // this makes me (john) nervous.
+        if (txnState == null) {
             System.out.printf("Site %d got an old response\n", m_siteId);
             return;
         }
-        assert (m_currentTransactionState instanceof MultiPartitionParticipantTxnState);
-        m_currentTransactionState.processRemoteWorkResponse(response);
+        assert (txnState instanceof MultiPartitionParticipantTxnState);
+        txnState.processRemoteWorkResponse(response);
     }
 
     /**
@@ -921,21 +866,20 @@ implements Runnable, DumpManager.Dumpable
      * @return The SimpleTxnState object created or found.
      */
     private TransactionState processTransactionMembership(MembershipNotice notice) {
-        // handle out of order messages
-        long latestTxnId = m_currentTransactionState == null ? lastCommittedTxnId : getCurrentTxnId();
-        if (notice.getTxnId() < latestTxnId) {
-            // Because of our rollback implementation, fragment
-            // tasks can arrive late. This is acceptable.
+        if (notice.getTxnId() < lastCommittedTxnId) {
+            // Because of our rollback implementation, fragment tasks can arrive late.
+            // This participant can have aborted, causing the coordinator to abort and
+            // send this task, for example.
             if (notice instanceof FragmentTask) {
                 return null;
             }
 
-            // vanilla membership notices and initiate tasks are
-            // not allowed to come in out of order
+            // vanilla membership notices and initiate tasks must not
+            // arrive out of order
             StringBuilder msg = new StringBuilder();
             msg.append("Txn ordering deadlock (DTXN) at site ").append(m_siteId).append(":\n");
-            msg.append("   txn ").append(latestTxnId).append(" (");
-            msg.append(TransactionIdManager.toString(latestTxnId)).append(" HB: ?");
+            msg.append("   txn ").append(lastCommittedTxnId).append(" (");
+            msg.append(TransactionIdManager.toString(lastCommittedTxnId)).append(" HB: ?");
             msg.append(") before\n");
             msg.append("   txn ").append(notice.getTxnId()).append(" (");
             msg.append(TransactionIdManager.toString(notice.getTxnId())).append(" HB:");
@@ -947,21 +891,21 @@ implements Runnable, DumpManager.Dumpable
                                           notice.getTxnId(),
                                           notice.isHeartBeat());
 
-        // ignore heartbeats
-        if (notice.isHeartBeat())
+        // ignore HeartBeats
+        if (notice.isHeartBeat()) {
             return null;
-
-        if ((m_currentTransactionState != null) && (m_currentTransactionState.txnId == notice.getTxnId()))
-            return m_currentTransactionState;
+        }
 
         TransactionState state = m_transactionsById.get(notice.getTxnId());
         if (state == null) {
             if (notice instanceof InitiateTask) {
                 InitiateTask it = (InitiateTask) notice;
-                if (it.isSinglePartition())
+                if (it.isSinglePartition()) {
                     state = new SinglePartitionTxnState(m_mailbox, this, it);
-                else
+                }
+                else {
                     state = new MultiPartitionParticipantTxnState(m_mailbox, this, it);
+                }
 
             }
             else {

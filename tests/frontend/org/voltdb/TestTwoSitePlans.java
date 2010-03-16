@@ -52,12 +52,6 @@ public class TestTwoSitePlans extends TestCase {
         public MockSite() {}
 
         @Override
-        public long getCurrentTxnId() {
-            assert(false);
-            return 0;
-        }
-
-        @Override
         public void run() {
             assert(false);
         }

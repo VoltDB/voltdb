@@ -20,7 +20,6 @@ package org.voltdb.dtxn;
 import java.util.List;
 import java.util.Map;
 import org.voltdb.VoltTable;
-import org.voltdb.messages.FragmentTask;
 
 /**
  * <p>Created by a worker site to interact with the Transaction System.
@@ -51,62 +50,8 @@ public abstract class SiteConnection {
         this.m_siteId = siteId;
     }
 
-    /**
-     * Instruct the DTXN to send a FragmentTask to all partitions participating
-     * in the transaction.
-     *
-     * @param task Fragment work to be sent to all participating partitions.
-     */
-    public abstract void createAllParticipatingWork(FragmentTask task);
-
-    /**
-     * Instruct the DTXN to have the local site/partition do work described
-     * by a FragmentTask message.
-     *
-     * @param task The FragmentTask describing the work to do.
-     */
-    public abstract void createLocalWork(FragmentTask task, boolean nonTransactional);
-
-    /**
-     * Instruct the DTXN to send a FragmentTask to a specific list of
-     * partitions and ensure they do the work requested of them.
-     *
-     * @param partitions A list of partition ids to send the work to.
-     * @param task The FragmentTask describing the work to do.
-     */
-    public abstract boolean createWork(int[] partitions, FragmentTask task);
-
-    /**
-     * Instruct the DTXN that when the following dependencies have been met,
-     * the procedure that was interrupted to do fragment work may resume. This
-     * is done via a stack frame drop (the "return" statement) from the core
-     * loop in the <code>ExecutionSite</code>
-     *
-     * @param dependencies The list of ids of dependencies that must be
-     * satisfied before the procedure can resume.
-     */
-    public abstract void setupProcedureResume(boolean isFinal, int... dependencies);
-
     public abstract void shutdown() throws InterruptedException;
 
-    public abstract Map<Integer,List<VoltTable>> recursableRun(boolean shutdownAllowed);
-
-    /**
-     * Get an unused dependency id for this transaction.
-     * @return An unused dependency id
-     */
-    public abstract int getNextDependencyId();
-
-    /**
-     * Get an array of unused dependency ids of a specific length
-     * @param len Length of the array desired
-     * @return An array of unused dependency ids.
-     */
-    public int[] getNextDepenendcyArray(int len) {
-        assert(len > 0);
-        int[] retval = new int[len];
-        for (int i = 0; i < len; i++)
-            retval[i] = getNextDependencyId();
-        return retval;
-    }
+    public abstract Map<Integer,List<VoltTable>>
+    recursableRun(TransactionState txnState, boolean shutdownAllowed);
 }
