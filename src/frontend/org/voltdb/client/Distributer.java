@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -64,8 +65,74 @@ class Distributer {
 
     private final boolean m_useMultipleThreads;
 
+    private final String m_hostname;
+
+    /**
+     * Server's instances id. Unique for the cluster
+     */
+    private Object m_clusterInstanceId[];
+
+    private final ClientStatsLoader m_statsLoader;
+
+    private static class ProcedureStats {
+        private final String m_name;
+
+        private long m_invocationsCompleted = 0;
+        private long m_lastInvocationsCompleted = 0;
+        private long m_invocationAborts = 0;
+        private long m_lastInvocationAborts = 0;
+        private long m_invocationErrors = 0;
+        private long m_lastInvocationErrors = 0;
+
+        private long m_roundTripTime = 0;
+        private long m_lastRoundTripTime = 0;
+
+        private int m_maxRoundTripTime = Integer.MIN_VALUE;
+        private int m_lastMaxRoundTripTime = Integer.MIN_VALUE;
+        private int m_minRoundTripTime = Integer.MAX_VALUE;
+        private int m_lastMinRoundTripTime = Integer.MAX_VALUE;
+
+        private long m_clusterRoundTripTime = 0;
+        private long m_lastClusterRoundTripTime = 0;
+
+        private int m_maxClusterRoundTripTime = Integer.MIN_VALUE;
+        private int m_lastMaxClusterRoundTripTime = Integer.MIN_VALUE;
+        private int m_minClusterRoundTripTime = Integer.MAX_VALUE;
+        private int m_lastMinClusterRoundTripTime = Integer.MAX_VALUE;
+
+        public ProcedureStats(String name) {
+            m_name = name;
+        }
+
+        public void update(int roundTripTime, int clusterRoundTripTime, boolean abort, boolean error) {
+            m_maxRoundTripTime = Math.max(roundTripTime, m_maxRoundTripTime);
+            m_lastMaxRoundTripTime = Math.max( roundTripTime, m_lastMaxRoundTripTime);
+            m_minRoundTripTime = Math.min( roundTripTime, m_minRoundTripTime);
+            m_lastMinRoundTripTime = Math.max( roundTripTime, m_lastMinRoundTripTime);
+
+            m_maxClusterRoundTripTime = Math.max( clusterRoundTripTime, m_maxClusterRoundTripTime);
+            m_lastMaxClusterRoundTripTime = Math.max( clusterRoundTripTime, m_lastMaxClusterRoundTripTime);
+            m_minClusterRoundTripTime = Math.min( clusterRoundTripTime, m_minClusterRoundTripTime);
+            m_lastMinClusterRoundTripTime = Math.min( clusterRoundTripTime, m_lastMinClusterRoundTripTime);
+
+            m_invocationsCompleted++;
+            if (abort) {
+                m_invocationAborts++;
+            }
+            if (error) {
+                m_invocationErrors++;
+            }
+            m_roundTripTime += roundTripTime;
+            m_clusterRoundTripTime += clusterRoundTripTime;
+        }
+    }
+
     class NodeConnection extends VoltProtocolHandler {
-        private final HashMap<Long, Pair<Long, ProcedureCallback>> m_callbacks;
+        private final HashMap<Long, Object[]> m_callbacks;
+        private final HashMap<String, ProcedureStats> m_stats
+            = new HashMap<String, ProcedureStats>();
+        private final int m_hostId;
+        private final long m_connectionId;
         private Connection m_connection;
         private String m_hostname;
         private boolean m_isConnected = true;
@@ -77,11 +144,13 @@ class Distributer {
         private long m_invocationErrors = 0;
         private long m_lastInvocationErrors = 0;
 
-        public NodeConnection() {
-            m_callbacks = new HashMap<Long, Pair<Long, ProcedureCallback>>();
+        public NodeConnection(long ids[]) {
+            m_callbacks = new HashMap<Long, Object[]>();
+            m_hostId = (int)ids[0];
+            m_connectionId = ids[1];
         }
 
-        public void createWork(long handle, BBContainer c, ProcedureCallback callback) {
+        public void createWork(long handle, String name, BBContainer c, ProcedureCallback callback) {
             synchronized (this) {
                 if (!m_isConnected) {
                     final ClientResponse r = new ClientResponseImpl(
@@ -91,12 +160,12 @@ class Distributer {
                     c.discard();
                     return;
                 }
-                m_callbacks.put(handle, Pair.of( System.currentTimeMillis(), callback));
+                m_callbacks.put(handle, new Object[] { System.currentTimeMillis(), callback, name });
             }
             m_connection.writeStream().enqueue(c);
         }
 
-        public void createWork(long handle, FastSerializable f, ProcedureCallback callback) {
+        public void createWork(long handle, String name, FastSerializable f, ProcedureCallback callback) {
             synchronized (this) {
                 if (!m_isConnected) {
                     final ClientResponse r = new ClientResponseImpl(
@@ -105,9 +174,23 @@ class Distributer {
                     callback.clientCallback(r);
                     return;
                 }
-                m_callbacks.put(handle, Pair.of( System.currentTimeMillis(), callback));
+                m_callbacks.put(handle, new Object[]{ System.currentTimeMillis(), callback, name });
             }
             m_connection.writeStream().enqueue(f);
+        }
+
+        private void updateStats(
+                String name,
+                int roundTrip,
+                int clusterRoundTrip,
+                boolean abort,
+                boolean failure) {
+            ProcedureStats stats = m_stats.get(name);
+            if (stats == null) {
+                stats = new ProcedureStats(name);
+                m_stats.put( name, stats);
+            }
+            stats.update(roundTrip, clusterRoundTrip, abort, failure);
         }
 
         @Override
@@ -122,19 +205,27 @@ class Distributer {
             }
             ProcedureCallback cb = null;
             long callTime = 0;
+            int delta = 0;
             synchronized (this) {
-                Pair<Long, ProcedureCallback> pair = m_callbacks.remove(response.getClientHandle());
-                callTime = pair.getFirst();
-                cb = pair.getSecond();
+                Object stuff[] = m_callbacks.remove(response.getClientHandle());
+
+                callTime = (Long)stuff[0];
+                delta = (int)(now - callTime);
+                cb = (ProcedureCallback)stuff[1];
                 m_invocationsCompleted++;
                 final byte status = response.getStatus();
+                boolean abort = false;
+                boolean error = false;
                 if (status == ClientResponse.USER_ABORT || status == ClientResponse.GRACEFUL_FAILURE) {
                     m_invocationAborts++;
+                    abort = true;
                 } else if (status != ClientResponse.SUCCESS) {
                     m_invocationErrors++;
+                    error = true;
                 }
+                updateStats((String)stuff[2], delta, response.getClusterRoundtrip(), abort, error);
             }
-            final int delta = (int)(now - callTime);
+
             if (cb != null) {
                 response.setClientRoundtrip(delta);
                 cb.clientCallback(response);
@@ -185,8 +276,8 @@ class Distributer {
                     new ClientResponseImpl(
                         ClientResponse.CONNECTION_LOST, new VoltTable[0],
                         "Connection to the database was lost before a response was received");
-                for (final Pair<Long, ProcedureCallback> pair : m_callbacks.values()) {
-                    pair.getSecond().clientCallback(r);
+                for (final Object stuff[] : m_callbacks.values()) {
+                    ((ProcedureCallback)stuff[1]).clientCallback(r);
                 }
             }
         }
@@ -275,15 +366,31 @@ class Distributer {
     }
 
     Distributer() {
-        this( 128, null, false);
+        this( 128, null, false, null);
     }
 
-    Distributer(int expectedOutgoingMessageSize, int arenaSizes[], boolean useMultipleThreads) {
+    Distributer(
+            int expectedOutgoingMessageSize,
+            int arenaSizes[],
+            boolean useMultipleThreads,
+            ClientFactory.StatsUploaderSettings statsSettings) {
+        if (statsSettings != null) {
+            m_statsLoader = new ClientStatsLoader(statsSettings, this);
+        } else {
+            m_statsLoader = null;
+        }
         m_useMultipleThreads = useMultipleThreads;
         m_network = new VoltNetwork( useMultipleThreads, true, new Runnable[0], 3);
         m_expectedOutgoingMessageSize = expectedOutgoingMessageSize;
         m_network.start();
         m_pool = new DBBPool(false, arenaSizes, false);
+        String hostname = "";
+        try {
+            java.net.InetAddress localMachine = java.net.InetAddress.getLocalHost();
+            hostname = localMachine.getHostName();
+        } catch (java.net.UnknownHostException uhe) {
+        }
+        m_hostname = hostname;
 
 //        new Thread() {
 //            @Override
@@ -327,8 +434,31 @@ class Distributer {
     synchronized void createConnection(String host, String program, String password, int port)
     throws UnknownHostException, IOException
 {
-    final SocketChannel aChannel = ConnectionUtil.getAuthenticatedConnection(host, program, password, port);
-    NodeConnection cxn = new NodeConnection();
+    final Pair<SocketChannel, long[]> p =
+        ConnectionUtil.getAuthenticatedConnection(host, program, password, port);
+    final SocketChannel aChannel = p.getFirst();
+    if (m_clusterInstanceId == null) {
+        long timestamp = p.getSecond()[2];
+        int addr = (int)p.getSecond()[3];
+        m_clusterInstanceId = new Object[] { timestamp, addr };
+        if (m_statsLoader != null) {
+            try {
+                m_statsLoader.start( timestamp, addr);
+            } catch (SQLException e) {
+                throw new IOException(e);
+            }
+        }
+    } else {
+        if (
+                !(((Long)m_clusterInstanceId[0]).longValue() == p.getSecond()[2]) ||
+                !(((Integer)m_clusterInstanceId[1]).longValue() == p.getSecond()[3])) {
+            p.getFirst().close();
+            throw new IOException(
+                    "Cluster instance id mismatch. Current is " + m_clusterInstanceId[0] + "," + m_clusterInstanceId[1]
+                    + " and server's was " + p.getSecond()[2] + "," + p.getSecond()[3]);
+        }
+    }
+    NodeConnection cxn = new NodeConnection(p.getSecond());
     m_connections.add(cxn);
     Connection c = m_network.registerChannel( aChannel, cxn);
     cxn.m_hostname = c.getHostname();
@@ -391,7 +521,7 @@ class Distributer {
          */
         if (cxn != null) {
             if (m_useMultipleThreads) {
-                cxn.createWork(invocation.getHandle(), invocation, cb);
+                cxn.createWork(invocation.getHandle(), invocation.getProcName(), invocation, cb);
             } else {
                 final FastSerializer fs = new FastSerializer(m_pool, expectedSerializedSize);
                 BBContainer c = null;
@@ -401,7 +531,7 @@ class Distributer {
                     fs.getBBContainer().discard();
                     throw new RuntimeException(e);
                 }
-                cxn.createWork(invocation.getHandle(), c, cb);
+                cxn.createWork(invocation.getHandle(), invocation.getProcName(), c, cb);
             }
 //            final String invocationName = invocation.getProcName();
 //            if (reportedSizes.containsKey(invocationName)) {
@@ -426,6 +556,9 @@ class Distributer {
      * @throws InterruptedException
      */
     final void shutdown() throws InterruptedException {
+        if (m_statsLoader != null) {
+            m_statsLoader.stop();
+        }
         m_network.shutdown();
         synchronized (this) {
             m_pool.clear();
@@ -442,10 +575,13 @@ class Distributer {
         return m_listeners.remove(listener);
     }
 
-    private final ColumnInfo statsColumns[] = new ColumnInfo[] {
-            new ColumnInfo( "TIME", VoltType.BIGINT),
-            new ColumnInfo( "CONNECTION_ID", VoltType.BIGINT),
+    private final ColumnInfo connectionStatsColumns[] = new ColumnInfo[] {
+            new ColumnInfo( "TIMESTAMP", VoltType.BIGINT),
             new ColumnInfo( "HOSTNAME", VoltType.STRING),
+            new ColumnInfo( "CONNECTION_ID", VoltType.BIGINT),
+            new ColumnInfo( "SERVER_HOST_ID", VoltType.BIGINT),
+            new ColumnInfo( "SERVER_HOSTNAME", VoltType.STRING),
+            new ColumnInfo( "SERVER_CONNECTION_ID", VoltType.BIGINT),
             new ColumnInfo( "INVOCATIONS_COMPLETED", VoltType.BIGINT),
             new ColumnInfo( "INVOCATIONS_ABORTED", VoltType.BIGINT),
             new ColumnInfo( "INVOCATIONS_FAILED", VoltType.BIGINT),
@@ -455,9 +591,121 @@ class Distributer {
             new ColumnInfo( "MESSAGES_WRITTEN", VoltType.BIGINT)
     };
 
+    private final ColumnInfo procedureStatsColumns[] = new ColumnInfo[] {
+            new ColumnInfo( "TIMESTAMP", VoltType.BIGINT),
+            new ColumnInfo( "HOSTNAME", VoltType.STRING),
+            new ColumnInfo( "CONNECTION_ID", VoltType.BIGINT),
+            new ColumnInfo( "SERVER_HOST_ID", VoltType.BIGINT),
+            new ColumnInfo( "SERVER_HOSTNAME", VoltType.STRING),
+            new ColumnInfo( "SERVER_CONNECTION_ID", VoltType.BIGINT),
+            new ColumnInfo( "PROCEDURE_NAME", VoltType.STRING),
+            new ColumnInfo( "ROUNDTRIPTIME_AVG", VoltType.INTEGER),
+            new ColumnInfo( "ROUNDTRIPTIME_MIN", VoltType.INTEGER),
+            new ColumnInfo( "ROUNDTRIPTIME_MAX", VoltType.INTEGER),
+            new ColumnInfo( "CLUSTER_ROUNDTRIPTIME_AVG", VoltType.INTEGER),
+            new ColumnInfo( "CLUSTER_ROUNDTRIPTIME_MIN", VoltType.INTEGER),
+            new ColumnInfo( "CLUSTER_ROUNDTRIPTIME_MAX", VoltType.INTEGER),
+            new ColumnInfo( "INVOCATIONS_COMPLETED", VoltType.BIGINT),
+            new ColumnInfo( "INVOCATIONS_ABORTED", VoltType.BIGINT),
+            new ColumnInfo( "INVOCATIONS_FAILED", VoltType.BIGINT),
+    };
+
+    VoltTable getProcedureStats(final boolean interval) {
+        final Long now = System.currentTimeMillis();
+        final VoltTable retval = new VoltTable(procedureStatsColumns);
+
+        long totalInvocations = 0;
+        long totalAbortedInvocations = 0;
+        long totalFailedInvocations = 0;
+        long totalRoundTripTime = 0;
+        int totalRoundTripMax = Integer.MIN_VALUE;
+        int totalRoundTripMin = Integer.MAX_VALUE;
+        long totalClusterRoundTripTime = 0;
+        int totalClusterRoundTripMax = Integer.MIN_VALUE;
+        int totalClusterRoundTripMin = Integer.MAX_VALUE;
+        synchronized (m_connections) {
+            for (NodeConnection cxn : m_connections) {
+                synchronized (cxn) {
+                    for (ProcedureStats stats : cxn.m_stats.values()) {
+                        long invocationsCompleted = stats.m_invocationsCompleted;
+                        long invocationAborts = stats.m_invocationAborts;
+                        long invocationErrors = stats.m_invocationErrors;
+                        long roundTripTime = stats.m_roundTripTime;
+                        int maxRoundTripTime = stats.m_maxRoundTripTime;
+                        int minRoundTripTime = stats.m_minRoundTripTime;
+                        long clusterRoundTripTime = stats.m_clusterRoundTripTime;
+                        int clusterMinRoundTripTime = stats.m_minClusterRoundTripTime;
+                        int clusterMaxRoundTripTime = stats.m_maxClusterRoundTripTime;
+
+                        if (interval) {
+                            invocationsCompleted = stats.m_invocationsCompleted - stats.m_lastInvocationsCompleted;
+                            if (invocationsCompleted == 0) {
+                                //No invocations since last interval
+                                continue;
+                            }
+                            stats.m_lastInvocationsCompleted = stats.m_invocationsCompleted;
+
+                            invocationAborts = stats.m_invocationAborts - stats.m_lastInvocationAborts;
+                            stats.m_lastInvocationAborts = stats.m_invocationAborts;
+
+                            invocationErrors = stats.m_invocationErrors - stats.m_lastInvocationErrors;
+                            stats.m_lastInvocationErrors = stats.m_invocationErrors;
+
+                            roundTripTime = stats.m_roundTripTime - stats.m_lastRoundTripTime;
+                            stats.m_lastRoundTripTime = stats.m_roundTripTime;
+
+                            maxRoundTripTime = stats.m_lastMaxRoundTripTime;
+                            minRoundTripTime = stats.m_lastMinRoundTripTime;
+
+                            stats.m_lastMaxRoundTripTime = Integer.MIN_VALUE;
+                            stats.m_lastMinRoundTripTime = Integer.MAX_VALUE;
+
+                            clusterRoundTripTime = stats.m_clusterRoundTripTime - stats.m_lastClusterRoundTripTime;
+                            stats.m_lastClusterRoundTripTime = stats.m_clusterRoundTripTime;
+
+                            clusterMaxRoundTripTime = stats.m_lastMaxClusterRoundTripTime;
+                            clusterMinRoundTripTime = stats.m_lastMinClusterRoundTripTime;
+
+                            stats.m_lastMaxClusterRoundTripTime = Integer.MIN_VALUE;
+                            stats.m_lastMinClusterRoundTripTime = Integer.MAX_VALUE;
+                        }
+                        totalInvocations += invocationsCompleted;
+                        totalAbortedInvocations += invocationAborts;
+                        totalFailedInvocations += invocationErrors;
+                        totalRoundTripTime += roundTripTime;
+                        totalRoundTripMax = Math.max(maxRoundTripTime, totalRoundTripMax);
+                        totalRoundTripMin = Math.min(minRoundTripTime, totalRoundTripMin);
+                        totalClusterRoundTripTime += clusterRoundTripTime;
+                        totalClusterRoundTripMax = Math.max(clusterMaxRoundTripTime, totalClusterRoundTripMax);
+                        totalClusterRoundTripMin = Math.min(clusterMinRoundTripTime, totalClusterRoundTripMin);
+                        retval.addRow(
+                                now,
+                                m_hostname,
+                                cxn.connectionId(),
+                                cxn.m_hostId,
+                                cxn.m_hostname,
+                                cxn.m_connectionId,
+                                stats.m_name,
+                                (int)(roundTripTime / invocationsCompleted),
+                                minRoundTripTime,
+                                maxRoundTripTime,
+                                (int)(clusterRoundTripTime / invocationsCompleted),
+                                clusterMinRoundTripTime,
+                                clusterMaxRoundTripTime,
+                                invocationsCompleted,
+                                invocationAborts,
+                                invocationErrors
+                                );
+                    }
+                }
+            }
+        }
+        return retval;
+    }
+
     VoltTable getConnectionStats(final boolean interval) {
         final Long now = System.currentTimeMillis();
-        final VoltTable retval = new VoltTable(statsColumns);
+        final VoltTable retval = new VoltTable(connectionStatsColumns);
         final Map<Long, Pair<String,long[]>> networkStats =
                         m_network.getIOStats(interval);
         long totalInvocations = 0;
@@ -465,47 +713,55 @@ class Distributer {
         long totalFailedInvocations = 0;
         synchronized (m_connections) {
             for (NodeConnection cxn : m_connections) {
-                long counters[];
-                if (interval) {
-                    counters = cxn.getCountersInterval();
-                } else {
-                    counters = cxn.getCounters();
-                }
-                totalInvocations += counters[0];
-                totalAbortedInvocations += counters[1];
-                totalFailedInvocations += counters[2];
-                final long networkCounters[] = networkStats.get(cxn.connectionId()).getSecond();
-                final String hostname = networkStats.get(cxn.connectionId()).getFirst();
-                long bytesRead = 0;
-                long messagesRead = 0;
-                long bytesWritten = 0;
-                long messagesWritten = 0;
-                if (networkCounters != null) {
-                    bytesRead = networkCounters[1];
-                    messagesRead = networkCounters[2];
-                    bytesWritten = networkCounters[3];
-                    messagesWritten = networkCounters[4];
-                }
+                synchronized (cxn) {
+                    long counters[];
+                    if (interval) {
+                        counters = cxn.getCountersInterval();
+                    } else {
+                        counters = cxn.getCounters();
+                    }
+                    totalInvocations += counters[0];
+                    totalAbortedInvocations += counters[1];
+                    totalFailedInvocations += counters[2];
+                    final long networkCounters[] = networkStats.get(cxn.connectionId()).getSecond();
+                    final String hostname = networkStats.get(cxn.connectionId()).getFirst();
+                    long bytesRead = 0;
+                    long messagesRead = 0;
+                    long bytesWritten = 0;
+                    long messagesWritten = 0;
+                    if (networkCounters != null) {
+                        bytesRead = networkCounters[0];
+                        messagesRead = networkCounters[1];
+                        bytesWritten = networkCounters[2];
+                        messagesWritten = networkCounters[3];
+                    }
 
-                retval.addRow(
-                        now,
-                        cxn.connectionId(),
-                        hostname,
-                        counters[0],
-                        counters[1],
-                        counters[2],
-                        bytesRead,
-                        messagesRead,
-                        bytesWritten,
-                        messagesWritten);
+                    retval.addRow(
+                            now,
+                            m_hostname,
+                            cxn.connectionId(),
+                            cxn.m_hostId,
+                            hostname,
+                            cxn.m_connectionId,
+                            counters[0],
+                            counters[1],
+                            counters[2],
+                            bytesRead,
+                            messagesRead,
+                            bytesWritten,
+                            messagesWritten);
+                }
             }
         }
 
         final long globalIOStats[] = networkStats.get(-1L).getSecond();
         retval.addRow(
                 now,
+                m_hostname,
+                -1,
                 -1,
                 "GLOBAL",
+                -1,
                 totalInvocations,
                 totalAbortedInvocations,
                 totalFailedInvocations,
@@ -514,5 +770,9 @@ class Distributer {
                 globalIOStats[2],
                 globalIOStats[3]);
         return retval;
+    }
+
+    public Object[] getInstanceId() {
+        return m_clusterInstanceId;
     }
 }

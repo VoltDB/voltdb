@@ -17,6 +17,8 @@
 
 package org.voltdb.client;
 
+import java.sql.*;
+
 /**
  * Factory for constructing instances of the {@link Client} interface
  *
@@ -33,13 +35,21 @@ public abstract class ClientFactory {
      * to saturate bonded gigabit connections. Only set to true if you have at least 2 bonded links
      * and intend to saturate them using this client instance. When set to false it can still saturate a gigabit
      * connection. Arena sizes are ignored when heavyweight is set. This is ignored on systems with < 4 cores.
+     * @param statsSettings Settings for uploading statistical information via JDBC
      * @return Newly constructed {@link Client}
      * @see Client
      */
     public static Client createClient(
-            int expectedOutgoingMessageSize, int maxArenaSizes[], boolean heavyweight) {
+            int expectedOutgoingMessageSize,
+            int maxArenaSizes[],
+            boolean heavyweight,
+            StatsUploaderSettings statsSettings) {
         final int cores = Runtime.getRuntime().availableProcessors();
-        return new ClientImpl(expectedOutgoingMessageSize, maxArenaSizes, cores > 4 ? heavyweight : false);
+        return new ClientImpl(
+                expectedOutgoingMessageSize,
+                maxArenaSizes,
+                cores > 4 ? heavyweight : false,
+                statsSettings);
     }
 
     /**
@@ -49,5 +59,38 @@ public abstract class ClientFactory {
      */
     public static Client createClient() {
         return new ClientImpl();
+    }
+
+    public static class StatsUploaderSettings {
+        final String databaseURL;
+        final String applicationName;
+        final String subApplicationName;
+        final int pollInterval;
+        final Connection conn;
+        public StatsUploaderSettings(
+                String databaseURL,
+                String applicationName,
+                String subApplicationName,
+                int pollInterval) throws SQLException {
+            this.databaseURL = databaseURL;
+            this.applicationName = applicationName;
+            this.subApplicationName = subApplicationName;
+            this.pollInterval = pollInterval;
+
+            if (databaseURL == null || databaseURL.isEmpty()) {
+                throw new IllegalArgumentException("Database URL is null or empty");
+            }
+
+            if (applicationName == null || applicationName.isEmpty()) {
+                throw new IllegalArgumentException("Application name is null or empty");
+            }
+
+            if (pollInterval < 1000) {
+                throw new IllegalArgumentException("Polling more then once per second is excessive");
+            }
+            conn = DriverManager.getConnection(databaseURL);
+            conn.setAutoCommit(false);
+            conn.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
+        }
     }
 }

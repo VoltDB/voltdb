@@ -247,4 +247,10 @@ public class MockVoltDB implements VoltDBInterface
 
     }
 
+    @Override
+    public Object[] getInstanceId() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
 }

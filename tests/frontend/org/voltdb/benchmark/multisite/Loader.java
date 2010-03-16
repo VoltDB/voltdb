@@ -108,18 +108,21 @@ public class Loader extends ClientMain {
     @Override
     protected void runLoop() throws NoConnectionsException {
         Thread C = new Thread() {
+            @Override
             public void run() {
                 generateCustomers();
             }
         };
 
         Thread F = new Thread() {
+            @Override
             public void run() {
                 generateFlights();
             }
         };
 
         Thread R = new Thread() {
+            @Override
             public void run() {
                 generateReservations();
             }
@@ -441,6 +444,16 @@ public class Loader extends ClientMain {
         } catch (InterruptedException e) {
             e.printStackTrace();
         };
+    }
+
+    @Override
+    protected String getApplicationName() {
+        return "Multisite Benchmark";
+    }
+
+    @Override
+    protected String getSubApplicationName() {
+        return "Loader";
     }
 }
 

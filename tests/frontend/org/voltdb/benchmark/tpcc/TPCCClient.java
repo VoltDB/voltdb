@@ -744,4 +744,14 @@ implements TPCCSimulation.ProcCaller {
      * Retrieved via reflection by BenchmarkController
      */
     public static final String m_jarFileName = "tpcc.jar";
+
+    @Override
+    protected String getApplicationName() {
+        return "TPC-C";
+    }
+
+    @Override
+    protected String getSubApplicationName() {
+        return "Client";
+    }
 }

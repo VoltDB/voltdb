@@ -274,16 +274,12 @@ public class ClientInterface implements DumpManager.Dumpable {
                             if (socket != null) {
                                 boolean success = false;
                                 try {
-                                    final AuthSystem.AuthUser user = authenticate(socket);
-                                    if (user != null) {
+                                    final ClientInputHandler handler = authenticate(socket);
+                                    if (handler != null) {
                                         socket.configureBlocking(false);
                                         socket.socket().setTcpNoDelay(false);
                                         socket.socket().setKeepAlive(true);
 
-                                        ClientInputHandler handler =
-                                            new ClientInputHandler(
-                                                    user,
-                                                    socket.socket().getInetAddress().getHostName());
                                         synchronized (m_connections){
                                             Connection c = null;
                                             if (m_hasDTXNBackPressure) {
@@ -342,9 +338,10 @@ public class ClientInterface implements DumpManager.Dumpable {
          * @return AuthUser a set of user permissions or null if authentication fails
          * @throws IOException
          */
-        private AuthSystem.AuthUser authenticate(final SocketChannel socket) throws IOException {
-            ByteBuffer responseBuffer = ByteBuffer.allocate(6);
-            responseBuffer.putInt(2);//message length
+        private ClientInputHandler
+                authenticate(final SocketChannel socket) throws IOException {
+            ByteBuffer responseBuffer = ByteBuffer.allocate(30);
+            responseBuffer.putInt(26);//message length
             responseBuffer.put((byte)0);//version
 
             /*
@@ -412,7 +409,7 @@ public class ClientInterface implements DumpManager.Dumpable {
             message.get(password);
 
             final AuthSystem.AuthUser user = m_catalogContext.get().authSystem.authenticate(username, password);
-
+            ClientInputHandler handler = null;
             if (user == null) {
                 //Send negative response
                 responseBuffer.put((byte)-1).flip();
@@ -422,11 +419,19 @@ public class ClientInterface implements DumpManager.Dumpable {
                              "): user " + username + " failed authentication.");
                 return null;
             } else {
+                handler =
+                    new ClientInputHandler(
+                            user,
+                            socket.socket().getInetAddress().getHostName());
                 //Send positive response
-                responseBuffer.put((byte)0).flip();
+                responseBuffer.put((byte)0);
+                responseBuffer.putInt(VoltDB.instance().getHostMessenger().getHostId());
+                responseBuffer.putLong(handler.connectionId());
+                responseBuffer.putLong((Long)VoltDB.instance().getInstanceId()[0]);
+                responseBuffer.putInt((Integer)VoltDB.instance().getInstanceId()[1]).flip();
                 socket.write(responseBuffer);
             }
-            return user;
+            return handler;
         }
     }
 

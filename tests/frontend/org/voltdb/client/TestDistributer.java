@@ -166,10 +166,14 @@ public class TestDistributer extends TestCase {
                         @SuppressWarnings("unused")
                         final String username = new String(usernameBytes);
 
-                        final ByteBuffer responseBuffer = ByteBuffer.allocate(6);
+                        final ByteBuffer responseBuffer = ByteBuffer.allocate(30);
                         responseBuffer.putInt(2);
                         responseBuffer.put((byte)0);//version
                         responseBuffer.put((byte)0);//success response
+                        responseBuffer.putInt(0);//hostId
+                        responseBuffer.putLong(0);//connectionId
+                        responseBuffer.putLong(0);//instanceId
+                        responseBuffer.putInt(0);//instanceId pt 2
                         responseBuffer.flip();
                         handler = new MockInputHandler();
                         client.write(responseBuffer);

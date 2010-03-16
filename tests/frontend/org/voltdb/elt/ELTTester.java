@@ -354,4 +354,14 @@ public class ELTTester extends ClientMain {
         // TODO Auto-generated method stub
 
     }
+
+    @Override
+    protected String getApplicationName() {
+        return "ELTTester";
+    }
+
+    @Override
+    protected String getSubApplicationName() {
+        return "";
+    }
 }

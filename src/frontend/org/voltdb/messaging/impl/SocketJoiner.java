@@ -18,6 +18,7 @@ package org.voltdb.messaging.impl;
 
 import java.io.*;
 import java.net.*;
+import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.*;
@@ -58,6 +59,8 @@ public class SocketJoiner extends Thread {
     ServerSocketChannel m_listenerSocket = null;
     int m_expectedHosts;
     Logger m_hostLog;
+    Long m_timestamp;//Part of instanceId
+    Integer m_addr;
 
     // helper so all streams in inputs are wrapped uniformly
     private DataInputStream addToInputs(Integer hostId, InputStream s) {
@@ -160,6 +163,11 @@ public class SocketJoiner extends Thread {
     }
 
     private void runPrimary() {
+        m_timestamp = System.currentTimeMillis();
+        m_addr = ByteBuffer.wrap(m_coordIp.getAddress()).getInt();
+        ByteBuffer instanceIdBuffer = ByteBuffer.allocate(12);
+        instanceIdBuffer.putLong(m_timestamp);
+        instanceIdBuffer.put(m_coordIp.getAddress()).flip();
         SocketChannel socket = null;
         DataInputStream in = null;
         DataOutputStream out = null;
@@ -177,6 +185,7 @@ public class SocketJoiner extends Thread {
 
                 out = getOutputForHost(nextHostId);
                 out.writeInt(nextHostId);
+                out.write(instanceIdBuffer.array());
                 out.flush();
                 in = getInputForHost(nextHostId);
                 int response = in.readInt();
@@ -298,6 +307,11 @@ public class SocketJoiner extends Thread {
             // send the local hostid out
             LOG.debug("Non-Primary Reading its Host ID");
             m_localHostId = in.readInt();
+            byte instanceIdBytes[] = new byte[12];
+            in.read(instanceIdBytes);
+            ByteBuffer instanceId = ByteBuffer.wrap(instanceIdBytes);
+            m_timestamp = instanceId.getLong();
+            m_addr = instanceId.getInt();
             m_sockets.put(COORD_HOSTID, socket);
 
             // start the server socket on the main

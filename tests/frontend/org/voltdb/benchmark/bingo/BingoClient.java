@@ -375,4 +375,14 @@ public class BingoClient extends ClientMain {
 
         return queued;
     }
+
+    @Override
+    protected String getApplicationName() {
+        return "Bingo Benchmark";
+    }
+
+    @Override
+    protected String getSubApplicationName() {
+        return "Client";
+    }
 }

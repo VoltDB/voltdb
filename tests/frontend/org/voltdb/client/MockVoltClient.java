@@ -162,4 +162,22 @@ public class MockVoltClient implements Client {
         // TODO Auto-generated method stub
         return null;
     }
+
+    @Override
+    public Object[] getInstanceId() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public VoltTable getProcedureStats() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public VoltTable getProcedureStatsInterval() {
+        // TODO Auto-generated method stub
+        return null;
+    }
 }

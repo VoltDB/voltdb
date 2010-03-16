@@ -155,6 +155,12 @@ public class TestEELibraryLoader {
             // TODO Auto-generated method stub
 
         }
+
+        @Override
+        public Object[] getInstanceId() {
+            // TODO Auto-generated method stub
+            return null;
+        }
     }
 
     @Test

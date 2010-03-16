@@ -230,4 +230,14 @@ public class MultisiteClient extends ClientMain {
                                    FindOpenSeats.class.getSimpleName(),
                                    fid);
     }
+
+    @Override
+    protected String getApplicationName() {
+        return "Multisite Benchmark";
+    }
+
+    @Override
+    protected String getSubApplicationName() {
+        return "Client";
+    }
 }

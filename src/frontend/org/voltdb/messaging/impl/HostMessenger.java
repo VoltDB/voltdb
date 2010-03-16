@@ -100,9 +100,9 @@ public class HostMessenger implements Messenger {
         return m_network;
     }
 
-    public synchronized void waitForGroupJoin() {
+    public synchronized Object[] waitForGroupJoin() {
         // no-op if called from another thread after the first init
-        if (m_initialized) return;
+        if (m_initialized) return new Object[] { m_joiner.m_timestamp, m_joiner.m_addr };
 
         try {
             m_joiner.join();
@@ -132,6 +132,8 @@ public class HostMessenger implements Messenger {
             m_foreignHosts[hostId] = fhost;
         }
         m_initialized = true;
+
+        return new Object[] { m_joiner.m_timestamp, m_joiner.m_addr };
     }
 
     public int getHostId() {

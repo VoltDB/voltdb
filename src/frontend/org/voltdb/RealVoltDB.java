@@ -106,6 +106,7 @@ public class RealVoltDB implements VoltDBInterface
     private ExecutionSite m_currentThreadSite;
     private StatsAgent m_statsAgent = new StatsAgent();
     private FaultDistributor m_faultManager;
+    private Object m_instanceId[];
 
     // add a random number to the sampler output to make it likely to be unique for this process.
     private final VoltSampler m_sampler = new VoltSampler(10, "sample" + String.valueOf(new Random().nextInt() % 10000) + ".txt");
@@ -219,7 +220,7 @@ public class RealVoltDB implements VoltDBInterface
 
         hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_CreatingVoltDB.name(), new Object[] { m_catalogContext.numberOfNodes, leader }, null);
         m_messenger = new HostMessenger(m_network, leader, m_catalogContext.numberOfNodes, hostLog);
-        m_messenger.waitForGroupJoin();
+        m_instanceId = m_messenger.waitForGroupJoin();
 
         // Use the host messenger's hostId.
         int myHostId = m_messenger.getHostId();
@@ -561,5 +562,10 @@ public class RealVoltDB implements VoltDBInterface
     @Override
     public boolean ignoreCrash() {
         return false;
+    }
+
+    @Override
+    public Object[] getInstanceId() {
+        return m_instanceId;
     }
 }

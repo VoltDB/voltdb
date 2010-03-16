@@ -58,6 +58,7 @@ public interface VoltDBInterface
     public CatalogContext getCatalogContext();
     public String getBuildString();
     public String getVersionString();
+    public Object[] getInstanceId();
     public Messenger getMessenger();
     public HostMessenger getHostMessenger();
     public ArrayList<ClientInterface> getClientInterfaces();

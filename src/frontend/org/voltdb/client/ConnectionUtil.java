@@ -28,6 +28,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltdb.utils.Pair;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -80,7 +81,7 @@ public class ConnectionUtil {
      * @param port
      * @throws IOException
      */
-    public static SocketChannel getAuthenticatedConnection(
+    public static Pair<SocketChannel, long[]> getAuthenticatedConnection(
             String host, String program, String password, int port)
     throws IOException {
         boolean success = false;
@@ -91,7 +92,7 @@ public class ConnectionUtil {
             // TODO Can open() be asynchronous if configureBlocking(true)?
             throw new IOException("Failed to open host " + host);
         }
-
+        final long retvals[] = new long[4];
         try {
             /*
              * Send login info
@@ -132,7 +133,7 @@ public class ConnectionUtil {
                 writeException = e;
             }
 
-            ByteBuffer loginResponse = ByteBuffer.allocate(6);//Read version and length
+            ByteBuffer loginResponse = ByteBuffer.allocate(30);//Read version and length etc.
             int read = aChannel.read(loginResponse);
             byte loginResponseCode = 0;
             if (read == -1) {
@@ -161,6 +162,10 @@ public class ConnectionUtil {
                     throw new IOException("Authentication rejected");
                 }
             }
+            retvals[0] = loginResponse.getInt();
+            retvals[1] = loginResponse.getLong();
+            retvals[2] = loginResponse.getLong();
+            retvals[3] = loginResponse.getInt();
 
             aChannel.configureBlocking(false);
             aChannel.socket().setTcpNoDelay(false);
@@ -171,7 +176,7 @@ public class ConnectionUtil {
                 aChannel.close();
             }
         }
-        return aChannel;
+        return Pair.of(aChannel, retvals);
     }
 
     public static void closeConnection(SocketChannel connection) throws InterruptedException, IOException {

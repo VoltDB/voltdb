@@ -41,6 +41,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
+import org.voltdb.ClusterMonitor;
 import org.voltdb.benchmark.BenchmarkResults.Result;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -80,6 +81,7 @@ public class BenchmarkController {
     VoltProjectBuilder m_projectBuilder;
     String m_jarFileName = null;
     ServerThread m_localserver = null;
+    private ClusterMonitor m_clusterMonitor;
     @SuppressWarnings("unused")
     private static final Logger log = Logger.getLogger(BenchmarkController.class.getName(), VoltLoggerFactory.instance());
     private static final Logger benchmarkLog = Logger.getLogger("BENCHMARK", VoltLoggerFactory.instance());
@@ -188,7 +190,7 @@ public class BenchmarkController {
             System.exit(-1);
         }
 
-        uploader = new ResultsUploader(m_config.benchmarkClient, config);
+        //uploader = new ResultsUploader(m_config.benchmarkClient, config);
 
         try {
             m_projectBuilder = m_builderClass.newInstance();
@@ -325,7 +327,7 @@ public class BenchmarkController {
                 StringBuilder fullCommand = new StringBuilder();
                 for (String s : command)
                     fullCommand.append(s).append(" ");
-                uploader.setCommandLineForHost(host, fullCommand.toString());
+                //uploader.setCommandLineForHost(host, fullCommand.toString());
 
                 benchmarkLog.debug(fullCommand.toString());
 
@@ -348,6 +350,24 @@ public class BenchmarkController {
             m_localserver.waitForInitialization();
         }
 
+        try {
+            m_clusterMonitor = new ClusterMonitor(
+                    m_config.benchmarkClient,
+                    null,
+                    m_config.hosts.length,
+                    m_config.sitesPerHost,
+                    m_config.hosts.length * m_config.sitesPerHost,
+                    m_config.k_factor,
+                    new ArrayList<String>(java.util.Arrays.asList(m_config.hosts)),
+                    "",
+                    "",
+                    m_config.databaseURL,
+                    m_config.interval);
+            m_clusterMonitor.start();
+        } catch (java.sql.SQLException e) {
+            e.printStackTrace();
+        }
+
         if (m_loaderClass != null) {
             ArrayList<String> localArgs = new ArrayList<String>();
 
@@ -366,14 +386,24 @@ public class BenchmarkController {
                 debugString = " -agentlib:jdwp=transport=dt_socket,address=8002,server=y,suspend=n ";
             }
             StringBuilder loaderCommand = new StringBuilder(4096);
-            loaderCommand.append("java -Xmx" + loaderheap + "m " + debugString +
-                    "-cp \"voltdbfat.jar:" + m_jarFileName +"\" " );
+
+            loaderCommand.append("java -Xmx" + loaderheap + "m " + debugString);
+            String classpath = "voltdbfat.jar" + ":" + m_jarFileName;
+            if (System.getProperty("java.class.path") != null) {
+                classpath = classpath + ":" + System.getProperty("java.class.path");
+            }
+            loaderCommand.append(" -cp \"" + classpath + "\" ");
             loaderCommand.append(m_loaderClass.getCanonicalName());
             for (String host : m_config.hosts) {
                 String port = String.valueOf(VoltDB.DEFAULT_PORT);
                 loaderCommand.append(" HOST=" + host + ":" + port);
                 localArgs.add("HOST=" + host + ":" + port);
             }
+
+            loaderCommand.append(" STATSDATABASEURL=" + m_config.databaseURL + " ");
+            loaderCommand.append(" STATSPOLLINTERVAL=" + m_config.interval + " ");
+            localArgs.add(" STATSDATABASEURL=" + m_config.databaseURL + " ");
+            localArgs.add(" STATSPOLLINTERVAL=" + m_config.interval + " ");
 
             StringBuffer userParams = new StringBuffer(4096);
             for (Entry<String,String> userParam : m_config.parameters.entrySet()) {
@@ -438,6 +468,8 @@ public class BenchmarkController {
 
         clArgs.add("CHECKTRANSACTION=" + m_config.checkTransaction);
         clArgs.add("CHECKTABLES=" + m_config.checkTables);
+        clArgs.add("STATSDATABASEURL=" + m_config.databaseURL);
+        clArgs.add("STATSPOLLINTERVAL=" + m_config.interval);
 
         for (String host : m_config.hosts)
             clArgs.add("HOST=" + host + ":" + String.valueOf(VoltDB.DEFAULT_PORT));
@@ -448,7 +480,7 @@ public class BenchmarkController {
                 if (m_config.listenForDebugger) {
                     clArgs.remove(1);
                     String arg = "-agentlib:jdwp=transport=dt_socket,address="
-                        + (8003 + j) + ",server=y,suspend=n";
+                        + (8003 + j) + ",server=y,suspend=n ";
                     clArgs.add(1, arg);
                 }
                 ArrayList<String> tempCLArgs = new ArrayList<String>(clArgs);
@@ -461,9 +493,9 @@ public class BenchmarkController {
                 for (String s : args)
                     fullCommand.append(s).append(" ");
 
-                uploader.setCommandLineForClient(
-                        client + ":" + String.valueOf(j),
-                        fullCommand.toString());
+                //uploader.setCommandLineForClient(
+                //        client + ":" + String.valueOf(j),
+                //        fullCommand.toString());
                 benchmarkLog.debug("Client Commnand: " + fullCommand.toString());
                 m_clientPSM.startProcess(client + ":" + String.valueOf(j), args);
             }
@@ -477,7 +509,7 @@ public class BenchmarkController {
 
 
         registerInterest(new ResultsPrinter());
-        registerInterest(uploader);
+        //registerInterest(uploader);
     }
 
     public void cleanUpBenchmark() {
@@ -536,6 +568,14 @@ public class BenchmarkController {
             m_clientPSM.writeToProcess(clientName, "STOP\n");
         for (String clientName : m_clients)
             m_clientPSM.joinProcess(clientName);
+
+        try {
+            if (m_clusterMonitor != null) {
+                m_clusterMonitor.stop();
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
 
         try {
             m_statusThread.join(1000);
@@ -646,6 +686,8 @@ public class BenchmarkController {
         int snapshotRetain = -1;
         float checkTransaction = 0;
         boolean checkTables = false;
+        String databaseURL = "jdbc:mysql://hzproject.com/monitoring_agent?" +
+            "user=monitoring_agent\\&password=n7s4JTchAhcMjPM7";
 
         LinkedHashMap<String, String> clientParams = new LinkedHashMap<String, String>();
         for (String arg : vargs) {
@@ -755,6 +797,8 @@ public class BenchmarkController {
                 clientParams.put(parts[0], parts[1]);
             } else if (parts[0].equals("NUMCONNECTIONS")) {
                 clientParams.put(parts[0], parts[1]);
+            } else if (parts[0].equals("STATSDATABASEURL")) {
+                databaseURL = parts[1];
             } else {
                 clientParams.put(parts[0].toLowerCase(), parts[1]);
             }
@@ -833,7 +877,7 @@ public class BenchmarkController {
                 sitesPerHost, k_factor, clientNames, processesPerClient, interval, duration,
                 remotePath, remoteUser, listenForDebugger, serverHeapSize, clientHeapSize,
                 localmode, useProfile, checkTransaction, checkTables, snapshotPath, snapshotPrefix,
-                snapshotFrequency, snapshotRetain);
+                snapshotFrequency, snapshotRetain, databaseURL);
         config.parameters.putAll(clientParams);
 
         // ACTUALLY RUN THE BENCHMARK

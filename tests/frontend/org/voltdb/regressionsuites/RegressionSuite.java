@@ -164,7 +164,7 @@ public class RegressionSuite extends TestCase {
         final SocketChannel channel =
             ConnectionUtil.getAuthenticatedConnection(
                     listener,
-                    m_username, m_password, Client.VOLTDB_SERVER_PORT);
+                    m_username, m_password, Client.VOLTDB_SERVER_PORT).getFirst();
         channel.configureBlocking(true);
         if (!noTearDown) {
             synchronized (m_clientChannels) {

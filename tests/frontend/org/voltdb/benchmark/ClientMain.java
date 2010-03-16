@@ -32,6 +32,7 @@ import java.io.InputStreamReader;
 import java.lang.reflect.Constructor;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.sql.SQLException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Random;
@@ -43,7 +44,6 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
-import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.processtools.SSHTools;
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
@@ -143,7 +143,6 @@ public abstract class ClientMain {
      */
     class ControlPipe implements Runnable {
 
-        @SuppressWarnings("finally")
         public void run() {
             String command = "";
             final InputStreamReader reader = new InputStreamReader(System.in);
@@ -194,40 +193,18 @@ public abstract class ClientMain {
                         if (m_checkTables) {
                             checkTables();
                         }
-
-                        // The shutdown will cause all the DB connections to die
-                        // and then the client can return from
-                        // the run loop at which point ControlWorker can call
-                        // System.exit()
                         try {
                             if (m_sampler != null) {
                                 m_sampler.setShouldStop();
                                 m_sampler.join();
                             }
-                            NullCallback cb = new NullCallback();
-                            while(!m_voltClient.callProcedure(cb, "@Shutdown")) {
-                                m_voltClient.backpressureBarrier();
-                            }
+                            m_voltClient.shutdown();
+                        } catch (InterruptedException e) {
+                            System.exit(0);
                         }
-                        catch (final IOException e) {
-                            /*
-                             * Client has no clean mechanism for terminating
-                             * with the DB so the connection may already be dead
-                             */
-                        }
-                        finally {
-                            return;
-                        }
-                    }
-                    System.err.println("Error: STOP when not RUNNING");
-                    System.exit(-1);
-                }
-                else if (command.equalsIgnoreCase("STOP_IMMEDIATELY")) {
-                    if (m_controlState == ControlState.RUNNING) {
                         System.exit(0);
                     }
-                    System.err
-                        .println("Error: STOP_IMMEDIATELY when not running");
+                    System.err.println("Error: STOP when not RUNNING");
                     System.exit(-1);
                 }
                 else {
@@ -414,6 +391,9 @@ public abstract class ClientMain {
         m_constraints = new LinkedHashMap<Pair<String, Integer>, Verification.Expression>();
     }
 
+    abstract protected String getApplicationName();
+    abstract protected String getSubApplicationName();
+
     /**
      * Constructor that initializes the framework portions of the client.
      * Creates a Volt client and connects it to all the hosts provided on the
@@ -422,8 +402,6 @@ public abstract class ClientMain {
      * @param args
      */
     public ClientMain(String args[]) {
-        m_voltClient = ClientFactory.createClient(getExpectedOutgoingMessageSize(), null, useHeavyweightClient());
-
         /*
          * Input parameters: HOST=host:port (may occur multiple times)
          * USER=username PASSWORD=password
@@ -439,6 +417,8 @@ public abstract class ClientMain {
         boolean exitOnCompletion = true;
         float checkTransaction = 0;
         boolean checkTables = false;
+        String statsDatabaseURL = null;
+        int statsPollInterval = 10000;
 
         // scan the inputs once to read everything but host names
         for (final String arg : args) {
@@ -471,8 +451,33 @@ public abstract class ClientMain {
             }
             else if (parts[0].equals("CHECKTABLES")) {
                 checkTables = Boolean.parseBoolean(parts[1]);
+            } else if (parts[0].equals("STATSDATABASEURL")) {
+                statsDatabaseURL = parts[1];
+            } else if (parts[0].equals("STATSPOLLINTERVAL")) {
+                statsPollInterval = Integer.parseInt(parts[1]);
             }
         }
+        ClientFactory.StatsUploaderSettings statsSettings = null;
+        if (statsDatabaseURL != null) {
+            try {
+                statsSettings =
+                    new
+                        ClientFactory.StatsUploaderSettings(
+                            statsDatabaseURL,
+                            getApplicationName(),
+                            getSubApplicationName(),
+                            statsPollInterval);
+            } catch (SQLException e) {
+                e.printStackTrace();
+                statsSettings = null;
+            }
+        }
+        m_voltClient =
+            ClientFactory.createClient(
+                getExpectedOutgoingMessageSize(),
+                null,
+                useHeavyweightClient(),
+                statsSettings);
 
         m_id = id;
         m_exitOnCompletion = exitOnCompletion;

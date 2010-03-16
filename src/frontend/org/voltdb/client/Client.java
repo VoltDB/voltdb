@@ -181,8 +181,30 @@ public interface Client {
 
     /**
      * Get IO stats for each connection as well as globally counting since the last
-     * time this method was called
+     * time this method was called. Don't call this interval version
+     * if the client API is uploading stats via JDBC, it messes up the counters
      * @return Table containing IO states
      */
     public VoltTable getIOStatsInterval();
+
+    /**
+     * Get procedure invocation counts and round trip time stats for each connection
+     * @return Table containing procedure stats
+     */
+    public VoltTable getProcedureStats();
+
+    /**
+     * Get procedure invocation counts and round trip time stats for each connection
+     * since the last time this method was called. Don't call this interval version
+     * if the client API is uploading stats via JDBC, it messes up the counters
+     * @return Table containing procedure stats
+     */
+    public VoltTable getProcedureStatsInterval();
+
+    /**
+     * Get an identifier for the cluster that this client is currently connected to.
+     * Will be null if the client has not been connected
+     * @return
+     */
+    public Object[] getInstanceId();
 }

@@ -872,4 +872,14 @@ public class MultiLoader extends ClientMain {
         }
         m_voltClient.drain();
     }
+
+    @Override
+    protected String getApplicationName() {
+        return "TPC-C";
+    }
+
+    @Override
+    protected String getSubApplicationName() {
+        return "Loader";
+    }
 }
