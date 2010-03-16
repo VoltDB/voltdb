@@ -10,7 +10,11 @@ my $revision = "";
 my @svninfo = `svn info`;
 
 if ($? != 0) {
-    @svninfo = `git svn info`;
+    my @gitinfo = `git status`;
+    if (@gitinfo[0] eq "# On branch master\n" &&
+        @gitinfo[1] eq "nothing to commit (working directory clean)\n") {
+        @svninfo = `git svn info`;
+    }
 }
 
 foreach (@svninfo) {
