@@ -183,7 +183,7 @@ public class TestVoltProcedure extends TestCase {
         assertNotNull(statsRow);
         assertEquals( 0, statsRow.length);
         for (int ii = 1; ii < 200; ii++) {
-            wrapper.call(params.m_params);
+            wrapper.call(null, params.m_params);
             statsRow = agent.m_source.getStatsRows(false, 0L);
             assertEquals(statsRow[0][6], new Long(ii));
         }
@@ -207,7 +207,7 @@ public class TestVoltProcedure extends TestCase {
         }
 
         wrapper.init(site, site.m_context.database.getProcedures().get(procedure.getName()), BackendTarget.NATIVE_EE_JNI, null, null);
-        return wrapper.call((Object) null);
+        return wrapper.call(null, (Object) null);
     }
 
     private class MockExecutionSite extends ExecutionSite {

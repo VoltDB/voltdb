@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import org.voltdb.catalog.Host;
 import org.voltdb.catalog.Site;
+import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messages.FragmentTask;
 import org.voltdb.messaging.FastSerializer;
 
@@ -34,6 +35,15 @@ import org.voltdb.messaging.FastSerializer;
  *  available to standard user procedures (which extend VoltProcedure).
  */
 public abstract class VoltSystemProcedure extends VoltProcedure {
+
+    /**
+     * Allow sysprocs to update m_currentTxnState manually. User procedures
+     * are passed this state in call(); sysprocs have other entry points
+     * on non-coordinator sites.
+     */
+    public void setTransactionState(TransactionState txnState) {
+        m_currentTxnState = txnState;
+    }
 
     /** Bundles the data needed to describe a plan fragment. */
     public static class SynthesizedPlanFragment {
@@ -124,9 +134,9 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
 
 
             FragmentTask task = new FragmentTask(
-                    m_site.getCurrentInitiatorSiteId(),
+                    m_currentTxnState.initiatorSiteId,
                     m_site.siteId,
-                    m_site.getCurrentTxnId(),
+                    m_currentTxnState.txnId,
                     false,
                     new long[] { pf.fragmentId },
                     new int[] { pf.outputDepId },

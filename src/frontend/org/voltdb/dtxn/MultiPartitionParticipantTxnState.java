@@ -160,7 +160,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     void initiateProcedure(InitiateTask itask) {
         assert(m_isCoordinator);
 
-        InitiateResponse response = m_site.processInitiateTask(itask);
+        InitiateResponse response = m_site.processInitiateTask(this, itask);
 
         // send commit notices to everyone
         FragmentTask ftask = new FragmentTask(
@@ -202,7 +202,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     void processFragmentWork(FragmentTask ftask, HashMap<Integer, List<VoltTable>> dependencies) {
         assert(ftask.getFragmentCount() > 0);
 
-        FragmentResponse response = m_site.processFragmentTask(dependencies, ftask);
+        FragmentResponse response = m_site.processFragmentTask(this, dependencies, ftask);
         // mark this transaction as dirty
         if (response.getDirtyFlag())
             m_dirty = true;

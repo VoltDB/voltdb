@@ -42,6 +42,7 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.messages.FragmentTask;
@@ -79,6 +80,7 @@ public abstract class VoltProcedure {
     // package scoped members used by VoltSystemProcedure
     Cluster m_cluster;
     ExecutionSite m_site;
+    TransactionState m_currentTxnState;  // assigned in call()
 
     private boolean m_initialized;
 
@@ -92,7 +94,7 @@ public abstract class VoltProcedure {
     private Procedure catProc;
     private boolean isNative = true;
     private int numberOfPartitions;
-    //final HashMap<Object, Statement> stmts = new HashMap<Object, Statement>( 16, (float).1);
+
 
     // cached fake SQLStmt array for single statement non-java procs
     SQLStmt[] m_cachedSingleStmt = { null };
@@ -113,8 +115,6 @@ public abstract class VoltProcedure {
 
     // data from hsql wrapper
     private final ArrayList<VoltTable> queryResults = new ArrayList<VoltTable>();
-
-    //private boolean lastBatchNeedsRollback = false;
 
     /**
      * End users should not instantiate VoltProcedure instances.
@@ -265,16 +265,17 @@ public abstract class VoltProcedure {
         }
     }
 
-    final ClientResponseImpl call(Object... paramList) {
-        if (ProcedureProfiler.profilingLevel != ProcedureProfiler.Level.DISABLED)
+    final ClientResponseImpl call(TransactionState txnState, Object... paramList) {
+        m_currentTxnState = txnState;
+
+        if (ProcedureProfiler.profilingLevel != ProcedureProfiler.Level.DISABLED) {
             profiler.startCounter(catProc);
+        }
         statsCollector.beginProcedure();
 
-        // in case someone queues sql but never calls execute,
-        //  clear the queue here.
+        // in case sql was queued but executed
         batchQueryStmtIndex = 0;
         batchQueryArgsIndex = 0;
-        //lastBatchNeedsRollback = false;
 
         VoltTable[] results = new VoltTable[0];
         byte status = ClientResponseImpl.SUCCESS;
@@ -1144,10 +1145,10 @@ public abstract class VoltProcedure {
         m_site.setupProcedureResume(finalTask, depsToResume);
 
         // create all the local work for the transaction
-        FragmentTask localTask = new FragmentTask(m_site.getCurrentInitiatorSiteId(),
+        FragmentTask localTask = new FragmentTask(m_currentTxnState.initiatorSiteId,
                                                   m_site.siteId,
-                                                  m_site.getCurrentTxnId(),
-                                                  m_site.isCurrentTaskReadOnly(),
+                                                  m_currentTxnState.txnId,
+                                                  m_currentTxnState.isReadOnly,
                                                   localFragIds,
                                                   depsToResume,
                                                   localParams,
@@ -1161,10 +1162,10 @@ public abstract class VoltProcedure {
         m_site.createLocalWork(localTask, localFragsAreNonTransactional && finalTask);
 
         // create and distribute work for all sites in the transaction
-        FragmentTask distributedTask = new FragmentTask(m_site.getCurrentInitiatorSiteId(),
+        FragmentTask distributedTask = new FragmentTask(m_currentTxnState.initiatorSiteId,
                                                         m_site.siteId,
-                                                        m_site.getCurrentTxnId(),
-                                                        m_site.isCurrentTaskReadOnly(),
+                                                        m_currentTxnState.txnId,
+                                                        m_currentTxnState.isReadOnly,
                                                         distributedFragIdArray,
                                                         distributedOutputDepIdArray,
                                                         distributedParamsArray,
