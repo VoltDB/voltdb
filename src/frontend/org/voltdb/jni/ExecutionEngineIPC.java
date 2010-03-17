@@ -1137,6 +1137,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     @Override
     public boolean setLogLevels(final long logLevels) throws EEException {
         m_data.clear();
+        m_data.putInt(Commands.SetLogLevels.m_id);
         m_data.putLong(logLevels);
 
         try {

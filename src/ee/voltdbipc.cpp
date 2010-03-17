@@ -116,9 +116,9 @@ typedef struct {
 typedef struct {
     struct ipc_command cmd;
     int32_t selector;
-    int32_t num_locators;
     int8_t  interval;
     int64_t now;
+    int32_t num_locators;
     int32_t locators[0];
 }__attribute__((packed)) get_stats_cmd;
 
@@ -817,7 +817,7 @@ void VoltDBIPC::cowSerializeMore(struct ipc_command *cmd) {
 
     /*
      * Already put the -1 code into the message.
-     * Set it 0 so toWrite has the correct number of bytesh
+     * Set it 0 so toWrite has the correct number of bytes
      */
     if (serialized == -1) {
         serialized = 0;
