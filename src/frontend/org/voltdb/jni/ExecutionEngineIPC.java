@@ -598,8 +598,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     private final String m_hostname;
     // private final FastSerializer m_fser;
     private final Connection m_connection;
-    private BBContainer m_dataNetworkOrigin;
-    private ByteBuffer m_dataNetwork;
+    private final BBContainer m_dataNetworkOrigin;
+    private final ByteBuffer m_dataNetwork;
     private ByteBuffer m_data;
 
     // private int m_counter;
@@ -694,7 +694,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             if (m_data.capacity() < catalogBytes.length + 100) {
                 m_data = ByteBuffer.allocate(catalogBytes.length + 100);
             }
-            m_data.putInt(Commands.UpdateCatalog.m_id);
+            m_data.putInt(Commands.LoadCatalog.m_id);
             m_data.put(catalogBytes);
             m_data.put((byte)'\0');
         } catch (final UnsupportedEncodingException ex) {
@@ -724,7 +724,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             if (m_data.capacity() < catalogBytes.length + 100) {
                 m_data = ByteBuffer.allocate(catalogBytes.length + 100);
             }
-            m_data.putInt(Commands.LoadCatalog.m_id);
+            m_data.putInt(Commands.UpdateCatalog.m_id);
             m_data.put(catalogBytes);
             m_data.put((byte)'\0');
         } catch (final UnsupportedEncodingException ex) {

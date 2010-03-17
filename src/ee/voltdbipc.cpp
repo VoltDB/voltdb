@@ -234,7 +234,7 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
         result = kErrorCode_None;
         break;
       case 19:
-        result = loadCatalog(cmd);
+        result = updateCatalog(cmd);
         break;
       default:
         result = stub(cmd);
