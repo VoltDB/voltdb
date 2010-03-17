@@ -270,7 +270,7 @@ class VoltQueryClient(cmd.Cmd):
 
         self.safe_print("Restoring snapshot")
         self.response = self.__safe_call(self.snapshotrestore,
-                                         [args[0], args[1], (args[2])],
+                                         [args[0], args[1], int(args[2])],
                                          timeout = self.__timeout)
         self.safe_print(self.response)
 

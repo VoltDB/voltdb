@@ -415,11 +415,14 @@ public class TableSaveFile
                     }
 
                     /*
-                     * Skip irrelevant chunks after CRC is calculated
+                     * Skip irrelevant chunks after CRC is calculated. Always calulate the CRC
+                     * in case it is the partition id that is corrupted
                      */
                     if (m_relevantPartitionIds != null) {
                         if (!m_relevantPartitionIds.contains(nextChunkPartitionId)) {
-                            m_saveFile.position(m_saveFile.position() + (nextChunkLength - 8));
+                            c.discard();
+                            m_chunkReads.release();
+                            continue;
                         }
                     }
 

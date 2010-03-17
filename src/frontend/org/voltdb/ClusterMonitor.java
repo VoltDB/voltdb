@@ -41,9 +41,10 @@ public class ClusterMonitor {
             " where startTime = ? and leaderAddress = ?;");
 
     private static final String createInstanceStatement = new String("insert into " + instancesTable +
-            " ( startTime, leaderAddress, applicationName, subApplicationName, versionString, tag, numHosts, " +
+            " ( startTime, leaderAddress, applicationName, subApplicationName, username, " +
+            " versionString, tag, numHosts, " +
             "numPartitionsPerHost, numTotalPartitions, numKSafety) " +
-            "values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+            "values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
     private static final String insertInitiatorStatement = new String("insert into " + initiatorsTable +
             " ( instanceId, tsEvent, hostId, hostName, siteId, connectionId, connectionHostname, " +
@@ -251,7 +252,7 @@ public class ClusterMonitor {
         insertIOStats = m_conn.prepareStatement( insertIOStatsStatement);
         insertProcedures = m_conn.prepareStatement( insertProceduresStatement);
         insertTableStats = m_conn.prepareStatement( insertTableStatsStatement);
-
+        final String username = System.getProperty("user.name");
         if (instanceId < 0) {
             boolean success = false;
             final PreparedStatement statement =
@@ -266,6 +267,7 @@ public class ClusterMonitor {
                 }  else {
                     statement.setNull( index++, Types.VARCHAR);
                 }
+                statement.setString( index++, username);
                 if (versionString != null) {
                     statement.setString( index++, versionString);
                 }  else {

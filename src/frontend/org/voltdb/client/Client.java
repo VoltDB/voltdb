@@ -28,7 +28,8 @@ import org.voltdb.VoltTable;
  *  and provides methods for invoking stored procedures and receiving
  *  responses. Client applications that are resource constrained (memory, CPU) or high performance
  *  (process hundreds of thousands of transactions per second) will want to pay attention to the hints that
- *  can be provided via {@link ClientFactory#createClient(int, int[], boolean)} and
+ *  can be provided via
+ *  {@link ClientFactory#createClient(int, int[], boolean, ClientFactory.StatsUploaderSettings)} and
  *  {@link #callProcedure(ProcedureCallback, int, String, Object...)}.
  *  Most Client applications will not need to generate enough load for these optimizations to matter.
  *  </p>
@@ -43,7 +44,8 @@ import org.voltdb.VoltTable;
  *  </p>
  *
  *  <p>
- *  The expected serialized message size parameter provided to {@link ClientFactory#createClient(int, int[], boolean) createClient}
+ *  The expected serialized message size parameter provided to
+ *  {@link ClientFactory#createClient(int, int[], boolean, ClientFactory.StatsUploaderSettings) createClient}
  *  determines the default size of the initial memory allocation used when serializing stored procedure invocations.
  *  If the initial allocation is insufficient then the allocation is doubled necessitating an extra allocation and copy
  *  If the allocation is excessively small it may be doubled and copied several times when serializing large
@@ -60,7 +62,8 @@ import org.voltdb.VoltTable;
  *  The <code>Client</code> performs aggressive memory pooling of {@link java.nio.DirectByteBuffer DirectByteBuffer's}. The pool
  *  contains arenas with buffers that are sized to the powers of 2 from 2^4 to 2^18. Java does not reliably
  *  garbage collect {@link java.nio.DirectByteBuffer DirectByteBuffers} so the pool never returns a buffer to the
- *  heap. The <code>maxArenaSizes</code> array passed to {@link ClientFactory#createClient(int, int[], boolean)} can be used
+ *  heap. The <code>maxArenaSizes</code> array passed to
+ *  {@link ClientFactory#createClient(int, int[], boolean, ClientFactory.StatsUploaderSettings)} can be used
  *  to specify the maximum size each arena will be allowed to grow to. The client will continue to function even
  *  if the an arena is no longer able to grow. It will fall back to using slower
  *  {@link java.nio.HeapByteBuffer HeapByteBuffers} for serializing invocations.
@@ -204,7 +207,8 @@ public interface Client {
     /**
      * Get an identifier for the cluster that this client is currently connected to.
      * Will be null if the client has not been connected
-     * @return
+     * @return An array of a Long and Integer containing the millisecond timestamp when the cluster was
+     * started and the leader address
      */
     public Object[] getInstanceId();
 
