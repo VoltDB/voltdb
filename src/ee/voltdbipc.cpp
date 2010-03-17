@@ -253,12 +253,6 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
         } else {
             bytes = write(m_fd, &result, sizeof(int8_t));
         }
-
-        if (bytes != sizeof(int8_t)) {
-            printf("Error - blocking write failed. %ld", bytes);
-            assert(false);
-            exit(-1);
-        }
     }
     return m_terminate;
 }
