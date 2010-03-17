@@ -903,9 +903,15 @@ implements Runnable, DumpManager.Dumpable
             throw new RuntimeException(msg.toString());
         }
 
-        m_transactionQueue.gotTransaction(notice.getInitiatorSiteId(),
-                                          notice.getTxnId(),
-                                          notice.isHeartBeat());
+        // Raw MembershipNotice is sent by initiator for MP transactions.
+        // MembershipNotice : InitiateNotice is sent by initiator for SP transactions.
+        // MembershipNotice : FragmentTask is NOT sent by an initiator. Don't
+        // count FragmentTasks as news from an initiator.
+        if (!(notice instanceof FragmentTask)) {
+            m_transactionQueue.gotTransaction(notice.getInitiatorSiteId(),
+                                              notice.getTxnId(),
+                                              notice.isHeartBeat());
+        }
 
         // ignore HeartBeats
         if (notice.isHeartBeat()) {
