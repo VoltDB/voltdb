@@ -37,6 +37,7 @@ public class Verification {
      */
     public interface Expression {
         public <T> Object evaluate(T tuple);
+        public <T> String toString(T tuple);
     }
 
     /**
@@ -56,6 +57,16 @@ public class Verification {
         public <T1> T evaluate(T1 tuple) {
             return m_value;
         }
+
+        @Override
+        public String toString() {
+            return m_value.toString();
+        }
+
+        @Override
+        public <T1> String toString(T1 tuple) {
+            return toString();
+        }
     }
 
     /**
@@ -73,6 +84,10 @@ public class Verification {
             VoltTable row = (VoltTable) tuple;
             VoltType type = row.getColumnType(row.getColumnIndex(m_name));
             return row.get(m_name, type);
+        }
+
+        public <T> String toString(T tuple) {
+            return (m_name + "(" + evaluate(tuple) + ")");
         }
     }
 
@@ -101,6 +116,12 @@ public class Verification {
             else
                 return m_right.evaluate(tuple);
         }
+
+        @Override
+        public <T> String toString(T tuple) {
+            return ("(" + m_left.toString(tuple) + ") || ("
+                    + m_right.toString(tuple) + ")");
+        }
     }
 
     /**
@@ -114,6 +135,12 @@ public class Verification {
         @Override
         public <T> Object evaluate(T tuple) {
             return (Boolean) m_left.evaluate(tuple) && (Boolean) m_right.evaluate(tuple);
+        }
+
+        @Override
+        public <T> String toString(T tuple) {
+            return ("(" + m_left.toString(tuple) + ") && ("
+                    + m_right.toString(tuple) + ")");
         }
     }
 
@@ -140,6 +167,12 @@ public class Verification {
         public <T> Object evaluate(T tuple) {
             return compare(tuple) == 0;
         }
+
+        @Override
+        public <T> String toString(T tuple) {
+            return ("(" + m_left.toString(tuple) + ") == ("
+                    + m_right.toString(tuple) + ")");
+        }
     }
 
     /**
@@ -153,6 +186,12 @@ public class Verification {
         @Override
         public <T> Object evaluate(T tuple) {
             return compare(tuple) != 0;
+        }
+
+        @Override
+        public <T> String toString(T tuple) {
+            return ("(" + m_left.toString(tuple) + ") != ("
+                    + m_right.toString(tuple) + ")");
         }
     }
 
@@ -168,6 +207,12 @@ public class Verification {
         public <T> Object evaluate(T tuple) {
             return compare(tuple) > 0;
         }
+
+        @Override
+        public <T> String toString(T tuple) {
+            return ("(" + m_left.toString(tuple) + ") > ("
+                    + m_right.toString(tuple) + ")");
+        }
     }
 
     /**
@@ -181,6 +226,12 @@ public class Verification {
         @Override
         public <T> Object evaluate(T tuple) {
             return compare(tuple) >= 0;
+        }
+
+        @Override
+        public <T> String toString(T tuple) {
+            return ("(" + m_left.toString(tuple) + ") >= ("
+                    + m_right.toString(tuple) + ")");
         }
     }
 
@@ -196,6 +247,12 @@ public class Verification {
         public <T> Object evaluate(T tuple) {
             return compare(tuple) < 0;
         }
+
+        @Override
+        public <T> String toString(T tuple) {
+            return ("(" + m_left.toString(tuple) + ") < ("
+                    + m_right.toString(tuple) + ")");
+        }
     }
 
     /**
@@ -209,6 +266,12 @@ public class Verification {
         @Override
         public <T> Object evaluate(T tuple) {
             return compare(tuple) <= 0;
+        }
+
+        @Override
+        public <T> String toString(T tuple) {
+            return ("(" + m_left.toString(tuple) + ") <= ("
+                    + m_right.toString(tuple) + ")");
         }
     }
 
@@ -225,6 +288,8 @@ public class Verification {
         Object result = exp.evaluate(row);
         if (!(result instanceof Boolean))
             return false;
+        if (!((Boolean) result))
+            System.err.println("Failed check on: " + exp.toString(row));
         return (Boolean) result;
     }
 

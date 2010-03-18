@@ -110,7 +110,7 @@ public class ResetTestMain {
                         b_ol_amount[batch_cnt] = 0.00;
                     } else {
                         b_ol_amount[batch_cnt] = generator.fixedPoint(Constants.MONEY_DECIMALS, Constants.MIN_AMOUNT,
-                                Constants.MAX_AMOUNT);
+                                Constants.MAX_PRICE * Constants.MAX_OL_QUANTITY);
                         b_ol_delivery_d[batch_cnt] = null;
                     }
                     b_ol_dist_info[batch_cnt] = generator.astring(Constants.DIST, Constants.DIST);

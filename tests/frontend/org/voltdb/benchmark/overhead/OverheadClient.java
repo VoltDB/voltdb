@@ -99,6 +99,11 @@ public class OverheadClient extends ClientMain {
             return false;
         }
 
+        @Override
+        public <T> String toString(T tuple) {
+            return "";
+        }
+
     }
 
     class MeasureOverheadCallback extends ProcedureCallback {

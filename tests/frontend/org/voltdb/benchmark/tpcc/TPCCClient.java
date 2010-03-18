@@ -23,6 +23,8 @@
 
 package org.voltdb.benchmark.tpcc;
 
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.benchmark.ClientMain;
@@ -36,12 +38,166 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.types.ExpressionType;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 public class TPCCClient extends org.voltdb.benchmark.ClientMain
 implements TPCCSimulation.ProcCaller {
     final TPCCSimulation m_tpccSim;
     final TPCCSimulation m_tpccSim2;
     private final ScaleParameters m_scaleParams;
+
+    private static class ForeignKeyConstraints implements Expression {
+        private final String m_table;
+
+        private static final Set<Short> m_warehouse = new HashSet<Short>();
+        private static final Set<List<Number>> m_district = new HashSet<List<Number>>();
+        private static final Set<List<Number>> m_customer = new HashSet<List<Number>>();
+        private static final Set<List<Number>> m_orders = new HashSet<List<Number>>();
+        private static final Set<List<Number>> m_stock = new HashSet<List<Number>>();
+        private static final Set<Integer> m_item = new HashSet<Integer>();
+
+        public ForeignKeyConstraints(String table) {
+            m_table = table;
+        }
+
+        @Override
+        public <T> Object evaluate(T tuple) {
+            VoltTable row = (VoltTable) tuple;
+
+            if (m_table.equalsIgnoreCase("warehouse")) {
+                getKey(row, "W_ID", m_warehouse);
+            } else if (m_table.equalsIgnoreCase("district")) {
+                getKeys(row, new String[] {"D_W_ID", "D_ID"},
+                        m_district);
+
+                short d_w_id = (short) row.getLong("D_W_ID");
+                return m_warehouse.contains(d_w_id);
+            } else if (m_table.equalsIgnoreCase("customer")) {
+                getKeys(row, new String[] {"C_W_ID", "C_D_ID", "C_ID"},
+                        m_customer);
+
+                short c_w_id = (short) row.getLong("C_W_ID");
+                byte c_d_id = (byte) row.getLong("C_D_ID");
+                List<Number> key = new ArrayList<Number>(2);
+                key.add(c_w_id);
+                key.add(c_d_id);
+                return m_district.contains(key);
+            } else if (m_table.equalsIgnoreCase("history")) {
+                short h_w_id = (short) row.getLong("H_W_ID");
+                byte h_d_id = (byte) row.getLong("H_D_ID");
+                if (row.wasNull()) {
+                    System.err.println("row was null 1");
+                    return false;
+                }
+                List<Number> districtKey = new ArrayList<Number>(2);
+                districtKey.add(h_w_id);
+                districtKey.add(h_d_id);
+
+                short h_c_w_id = (short) row.getLong("H_C_W_ID");
+                if (row.wasNull()) {
+                    System.err.println("row was null 2");
+                    return false;
+                }
+                byte h_c_d_id = (byte) row.getLong("H_C_D_ID");
+                if (row.wasNull()) {
+                    System.err.println("row was null 3");
+                    return false;
+                }
+                int h_c_id = (int) row.getLong("H_C_ID");
+                if (row.wasNull()) {
+                    System.err.println("row was null 4");
+                    return false;
+                }
+                List<Number> customerKey = new ArrayList<Number>(3);
+                customerKey.add(h_c_w_id);
+                customerKey.add(h_c_d_id);
+                customerKey.add(h_c_id);
+                return (m_district.contains(districtKey)
+                        && m_customer.contains(customerKey));
+            } else if (m_table.equalsIgnoreCase("new_order")) {
+                short no_w_id = (short) row.getLong("NO_W_ID");
+                byte no_d_id = (byte) row.getLong("NO_D_ID");
+                int no_o_id = (int) row.getLong("NO_O_ID");
+                List<Number> key = new ArrayList<Number>(3);
+                key.add(no_w_id);
+                key.add(no_d_id);
+                key.add(no_o_id);
+                return m_orders.contains(key);
+            } else if (m_table.equalsIgnoreCase("orders")) {
+                getKeys(row, new String[] {"O_W_ID", "O_D_ID", "O_ID"},
+                        m_orders);
+
+                short o_w_id = (short) row.getLong("O_W_ID");
+                byte o_d_id = (byte) row.getLong("O_D_ID");
+                int o_c_id = (int) row.getLong("O_C_ID");
+                if (row.wasNull())
+                    return false;
+                List<Number> key = new ArrayList<Number>(3);
+                key.add(o_w_id);
+                key.add(o_d_id);
+                key.add(o_c_id);
+                return m_customer.contains(key);
+            } else if (m_table.equalsIgnoreCase("order_line")) {
+                short ol_supply_w_id = (short) row.getLong("OL_SUPPLY_W_ID");
+                if (row.wasNull())
+                    return false;
+                int ol_i_id = (int) row.getLong("OL_I_ID");
+                if (row.wasNull())
+                    return false;
+                List<Number> stockKey = new ArrayList<Number>(2);
+                stockKey.add(ol_supply_w_id);
+                stockKey.add(ol_i_id);
+
+                short ol_w_id = (short) row.getLong("OL_W_ID");
+                byte ol_d_id = (byte) row.getLong("OL_D_ID");
+                int ol_o_id = (int) row.getLong("OL_O_ID");
+                List<Number> ordersKey = new ArrayList<Number>(3);
+                ordersKey.add(ol_w_id);
+                ordersKey.add(ol_d_id);
+                ordersKey.add(ol_o_id);
+                return (m_stock.contains(stockKey)
+                        && m_orders.contains(ordersKey));
+            } else if (m_table.equalsIgnoreCase("item")) {
+                getKey(row, "I_ID", m_item);
+            } else if (m_table.equalsIgnoreCase("stock")) {
+                getKeys(row, new String[] {"S_W_ID", "S_I_ID"}, m_stock);
+
+                short s_w_id = (short) row.getLong("S_W_ID");
+                int s_i_id = (int) row.getLong("S_I_ID");
+                return (m_warehouse.contains(s_w_id)
+                        && m_item.contains(s_i_id));
+            }
+
+            return true;
+        }
+
+        @SuppressWarnings("unchecked")
+        private static <T> void getKey(VoltTable tuple, String columnName,
+                                       Set<T> keySet) {
+            final int index = tuple.getColumnIndex(columnName);
+            final VoltType type = tuple.getColumnType(index);
+            keySet.add((T) tuple.get(index, type));
+        }
+
+        private static <T> void getKeys(VoltTable tuple, String[] columnNames,
+                                        Set<List<Number>> keySet) {
+            final List<Number> key = new ArrayList<Number>(columnNames.length);
+            for (String name : columnNames) {
+                final int index = tuple.getColumnIndex(name);
+                final VoltType type = tuple.getColumnType(index);
+                key.add((Number) tuple.get(index, type));
+            }
+            keySet.add(key);
+        }
+
+        @Override
+        public <T> String toString(T tuple) {
+            return ("foreight key check on " + m_table);
+        }
+    }
 
     /** Complies with our benchmark client remote controller scheme */
     public static void main(String args[]) {
@@ -146,8 +302,9 @@ implements TPCCSimulation.ProcCaller {
                                                (short) (m_scaleParams.warehouses * 2));
         Expression w_tax = Verification.inRange("W_TAX", Constants.MIN_TAX,
                                                 Constants.MAX_TAX);
+        Expression w_fk = new ForeignKeyConstraints("WAREHOUSE");
         Expression warehouse = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
-                                                        w_id, w_tax);
+                                                        w_id, w_tax, w_fk);
 
         // DISTRICT table
         Expression d_id = Verification.inRange("D_ID", (byte) 1,
@@ -157,8 +314,10 @@ implements TPCCSimulation.ProcCaller {
         Expression d_next_o_id = Verification.inRange("D_NEXT_O_ID", 1, 10000000);
         Expression d_tax = Verification.inRange("D_TAX", Constants.MIN_TAX,
                                                 Constants.MAX_TAX);
+        Expression d_fk = new ForeignKeyConstraints("DISTRICT");
         Expression district = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
-                                                       d_id, d_w_id, d_next_o_id, d_tax);
+                                                       d_id, d_w_id, d_next_o_id, d_tax,
+                                                       d_fk);
 
         // CUSTOMER table
         Expression c_id = Verification.inRange("C_ID", 1,
@@ -177,8 +336,10 @@ implements TPCCSimulation.ProcCaller {
                                      Verification.compareWithConstant(ExpressionType.COMPARE_EQUAL,
                                                                       "C_CREDIT",
                                                                       Constants.BAD_CREDIT));
+        Expression c_fk = new ForeignKeyConstraints("CUSTOMER");
         Expression customer = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
-                                                       c_id, c_d_id, c_w_id, c_discount, c_credit);
+                                                       c_id, c_d_id, c_w_id, c_discount, c_credit,
+                                                       c_fk);
 
         // CUSTOMER_NAME table
         Expression customer_name = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
@@ -195,8 +356,10 @@ implements TPCCSimulation.ProcCaller {
                                                  (byte) m_scaleParams.districtsPerWarehouse);
         Expression h_w_id = Verification.inRange("H_W_ID", (short) 1,
                                                  (short) (m_scaleParams.warehouses * 2));
+        Expression h_fk = new ForeignKeyConstraints("HISTORY");
         Expression history = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
-                                                      h_c_id, h_c_d_id, h_c_w_id, h_d_id, h_w_id);
+                                                      h_c_id, h_c_d_id, h_c_w_id, h_d_id, h_w_id,
+                                                      h_fk);
 
         // NEW_ORDER table
         Expression no_o_id = Verification.inRange("NO_O_ID", 1, 10000000);
@@ -204,8 +367,9 @@ implements TPCCSimulation.ProcCaller {
                                                   (byte) m_scaleParams.districtsPerWarehouse);
         Expression no_w_id = Verification.inRange("NO_W_ID", (short) 1,
                                                   (short) (m_scaleParams.warehouses * 2));
+        Expression no_fk = new ForeignKeyConstraints("NEW_ORDER");
         Expression new_order = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
-                                                        no_o_id, no_d_id, no_w_id);
+                                                        no_o_id, no_d_id, no_w_id, no_fk);
 
         // ORDERS table
         Expression o_id = Verification.inRange("O_ID", 1, 10000000);
@@ -217,14 +381,16 @@ implements TPCCSimulation.ProcCaller {
                                                  (short) (m_scaleParams.warehouses * 2));
         Expression o_carrier_id =
             Verification.conjunction(ExpressionType.CONJUNCTION_OR,
-                                     Verification.inRange("O_CARRIER_ID",
-                                                          Constants.MIN_CARRIER_ID,
-                                                          Constants.MAX_CARRIER_ID),
                                      Verification.compareWithConstant(ExpressionType.COMPARE_EQUAL,
                                                                       "O_CARRIER_ID",
-                                                                      (int) Constants.NULL_CARRIER_ID));
+                                                                      (int) Constants.NULL_CARRIER_ID),
+                                     Verification.inRange("O_CARRIER_ID",
+                                                          Constants.MIN_CARRIER_ID,
+                                                          Constants.MAX_CARRIER_ID));
+        Expression o_fk = new ForeignKeyConstraints("ORDERS");
         Expression orders = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
-                                                     o_id, o_c_id, o_d_id, o_w_id, o_carrier_id);
+                                                     o_id, o_c_id, o_d_id, o_w_id, o_carrier_id,
+                                                     o_fk);
 
         // ORDER_LINE table
         Expression ol_o_id = Verification.inRange("OL_O_ID", 1, 10000000);
@@ -240,12 +406,13 @@ implements TPCCSimulation.ProcCaller {
         Expression ol_quantity = Verification.inRange("OL_QUANTITY", 0,
                                                       Constants.MAX_OL_QUANTITY);
         Expression ol_amount = Verification.inRange("OL_AMOUNT",
-                                                    0,
+                                                    0.0,
                                                     Constants.MAX_PRICE * Constants.MAX_OL_QUANTITY);
+        Expression ol_fk = new ForeignKeyConstraints("ORDER_LINE");
         Expression order_line = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
                                                          ol_o_id, ol_d_id, ol_w_id, ol_number,
                                                          ol_i_id, ol_supply_w_id, ol_quantity,
-                                                         ol_amount);
+                                                         ol_amount, ol_fk);
 
         // ITEM table
         Expression i_id = Verification.inRange("I_ID", 1, m_scaleParams.items);
@@ -253,8 +420,9 @@ implements TPCCSimulation.ProcCaller {
                                                   Constants.MAX_IM);
         Expression i_price = Verification.inRange("I_PRICE", Constants.MIN_PRICE,
                                                   Constants.MAX_PRICE);
+        Expression i_fk = new ForeignKeyConstraints("ITEM");
         Expression item = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
-                                                   i_id, i_im_id, i_price);
+                                                   i_id, i_im_id, i_price, i_fk);
 
         // STOCK table
         Expression s_i_id = Verification.inRange("S_I_ID", 1, m_scaleParams.items);
@@ -262,8 +430,9 @@ implements TPCCSimulation.ProcCaller {
                                                  (short) (m_scaleParams.warehouses * 2));
         Expression s_quantity = Verification.inRange("S_QUANTITY", Constants.MIN_QUANTITY,
                                                      Constants.MAX_QUANTITY);
+        Expression s_fk = new ForeignKeyConstraints("STOCK");
         Expression stock = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
-                                                    s_i_id, s_w_id, s_quantity);
+                                                    s_i_id, s_w_id, s_quantity, s_fk);
 
         // Delivery (no need to check 'd_id', it's systematically generated)
         constraint = Verification.conjunction(ExpressionType.CONJUNCTION_AND,
@@ -318,19 +487,17 @@ implements TPCCSimulation.ProcCaller {
                                                       0L);
         addConstraint(Constants.STOCK_LEVEL, 0, constraint);
 
-        // Full table checks
-        addConstraint("WAREHOUSE", 0, warehouse);
-        addConstraint("DISTRICT", 0, district);
-        addConstraint("CUSTOMER", 0, customer);
-        addConstraint("CUSTOMER_NAME", 0, customer_name);
-        addConstraint("HISTORY", 0, history);
-        addConstraint("NEW_ORDER", 0, new_order);
-        addConstraint("ORDERS", 0, orders);
-        addConstraint("ORDER_LINE", 0, order_line);
-        addConstraint("ITEM", 0, item);
-        addConstraint("STOCK", 0, stock);
-
-        // TODO Foreign key constraints
+        // Full table checks (The order of adding them MATTERS!)
+        addTableConstraint("WAREHOUSE", warehouse);
+        addTableConstraint("DISTRICT", district);
+        addTableConstraint("CUSTOMER", customer);
+        addTableConstraint("CUSTOMER_NAME", customer_name);
+        addTableConstraint("HISTORY", history);
+        addTableConstraint("ORDERS", orders);
+        addTableConstraint("NEW_ORDER", new_order);
+        addTableConstraint("ITEM", item);
+        addTableConstraint("STOCK", stock);
+        addTableConstraint("ORDER_LINE", order_line);
     }
 
     /**
