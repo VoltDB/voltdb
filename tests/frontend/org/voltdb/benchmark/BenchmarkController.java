@@ -390,7 +390,7 @@ public class BenchmarkController {
             }
             StringBuilder loaderCommand = new StringBuilder(4096);
 
-            loaderCommand.append("java -Xmx" + loaderheap + "m " + debugString);
+            loaderCommand.append("java -XX:-ReduceInitialCardMarks -Xmx" + loaderheap + "m " + debugString);
             String classpath = "voltdbfat.jar" + ":" + m_jarFileName;
             if (System.getProperty("java.class.path") != null) {
                 classpath = classpath + ":" + System.getProperty("java.class.path");
@@ -448,7 +448,7 @@ public class BenchmarkController {
         if (m_config.listenForDebugger) {
             clArgs.add(""); //placeholder for agent lib
         }
-        clArgs.add("-Xmx" + String.valueOf(m_config.clientHeapSize) + "m");
+        clArgs.add("-XX:-ReduceInitialCardMarks -Xmx" + String.valueOf(m_config.clientHeapSize) + "m");
 
         /*
          * This is needed to do database verification at the end of the run. In
