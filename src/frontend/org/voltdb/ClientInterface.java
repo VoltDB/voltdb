@@ -50,7 +50,6 @@ import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.network.Connection;
 import org.voltdb.network.NIOReadStream;
@@ -770,7 +769,7 @@ public class ClientInterface implements DumpManager.Dumpable {
             }
 
             // dump requests are pretty direct and to the point, but only affect the local machine
-            if (task.procName.equals("@dump")) {
+            /*if (task.procName.equals("@dump")) {
                 // currently you don't need permissions to do a dump
                 // https://hzproject.com/trac/ticket/269
                 DumpManager.requestGlobalDump(System.currentTimeMillis());
@@ -784,7 +783,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                             task.clientHandle);
                 c.writeStream().enqueue(dumpResponse);
                 return;
-            }
+            }*/
 
             // CONTINUE WITH STANDARD SYSPROCS FROM HERE
             if (!handler.m_user.hasSystemProcPermission()) {
