@@ -101,7 +101,6 @@ public enum LogKeys {
     org_voltdb_ExecutionSite_GotDtxnWU,
     org_voltdb_ExecutionSite_StackFrameDrop,
     org_voltdb_ExecutionSite_SendingCompletedWUToDtxn,
-    org_voltdb_ExecutionSite_SysprocReturnedNoDependencies,
     org_voltdb_ExecutionSite_SendingDependency,
 
     org_voltdb_VoltDB_CreatingThreadForSite,
