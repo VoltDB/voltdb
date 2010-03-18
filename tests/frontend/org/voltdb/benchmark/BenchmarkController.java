@@ -45,6 +45,8 @@ import org.voltdb.ClusterMonitor;
 import org.voltdb.benchmark.BenchmarkResults.Result;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.processtools.ProcessSetManager;
@@ -515,6 +517,18 @@ public class BenchmarkController {
 
     public void cleanUpBenchmark() {
         m_clientPSM.killAll();
+        Client client = ClientFactory.createClient();
+        try {
+            client.createConnection(m_config.hosts[0], "", "");
+            NullCallback cb = new NullCallback();
+            client.callProcedure(cb, "@Shutdown");
+        } catch (NoConnectionsException e) {
+            e.printStackTrace();
+        } catch (UnknownHostException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         m_serverPSM.killAll();
     }
 
