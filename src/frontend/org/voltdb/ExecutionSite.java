@@ -580,9 +580,9 @@ implements Runnable, DumpManager.Dumpable
                 log.l7dlog(Level.TRACE,
                            LogKeys.org_voltdb_ExecutionSite_SysprocReturnedNoDependencies.name(),
                            null);
+            } else {
+                sendDependency(currentFragResponse, dep.depId, dep.dependency);
             }
-
-            sendDependency(currentFragResponse, dep.depId, dep.dependency);
 
         }
         catch (final EEException e)
