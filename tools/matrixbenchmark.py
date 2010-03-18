@@ -30,8 +30,7 @@ class LocalPool(HostPool):
     """Manages the local VoltDB.com cluster"""
     def __init__(self):
         HostPool.__init__(self)
-        # self.hostList =  ['volt3a', 'volt3b', 'volt3c', 'volt3d', 'volt3e', 'volt3f']
-        self.hostList =  ['volt3a', 'volt3b', 'volt3c', 'volt3d', 'volt3e']
+        self.hostList =  ['volt3a', 'volt3b', 'volt3c', 'volt3d', 'volt3e', 'volt3f']
         self.clientList =  ['volt4a', 'volt4b', 'volt4c']
 
     def cleanup(self):
