@@ -306,6 +306,7 @@ public class BenchmarkController {
                 // file=" + host + "_hprof_tpcc.txt"
                 String[] command = {
                         "java",
+                        "-XX:-ReduceInitialCardMarks",
                         "-Djava.library.path=.",
                         "-Dlog4j.configuration=log.xml",
                         debugString,
