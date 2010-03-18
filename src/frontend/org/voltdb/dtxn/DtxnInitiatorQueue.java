@@ -21,9 +21,11 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.messages.InitiateResponse;
 import org.voltdb.messaging.VoltMessage;
@@ -48,7 +50,10 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
     private final int m_siteId;
     private final PendingTxnList m_pendingTxns = new PendingTxnList();
     private TransactionInitiator m_initiator;
-    private final HashMap<Long, VoltTable[]> m_txnIdResponses;
+    private final HashMap<Long, InitiateResponse> m_txnIdResponses;
+    // need a separate copy of the VoltTables so that we can have
+    // thread-safe meta-data
+    private final HashMap<Long, VoltTable[]> m_txnIdResults;
 
     /**
      * Storage for initiator statistics
@@ -63,8 +68,9 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
     {
         m_siteId = siteId;
         m_stats = new InitiatorStats("Initiator " + siteId + " stats", siteId);
-        m_txnIdResponses =
+        m_txnIdResults =
             new HashMap<Long, VoltTable[]>();
+        m_txnIdResponses = new HashMap<Long, InitiateResponse>();
     }
 
     public void setInitiator(TransactionInitiator initiator) {
@@ -74,6 +80,35 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
     public void addPendingTxn(InFlightTxnState txn)
     {
         m_pendingTxns.addTxn(txn.txnId, txn.coordinatorId, txn);
+    }
+
+    public synchronized void removeSite(int siteId)
+    {
+        synchronized (m_initiator)
+        {
+            Map<Long, InFlightTxnState> txn_ids_affected =
+                m_pendingTxns.removeSite(siteId);
+            for (Long txn_id : txn_ids_affected.keySet())
+            {
+                if (m_pendingTxns.getTxnIdSize(txn_id) == 0)
+                {
+                    InFlightTxnState state = txn_ids_affected.get(txn_id);
+                    if (!m_txnIdResponses.containsKey(txn_id))
+                    {
+                        // XXX-FAILURE don't like this crashing long-term
+                        VoltDB.crashVoltDB();
+                    }
+                    InitiateResponse r = m_txnIdResponses.get(txn_id);
+                    m_pendingTxns.removeTxnId(r.getTxnId());
+                    m_initiator.reduceBackpressure(state.messageSize);
+                    m_txnIdResponses.remove(r.getTxnId());
+                    if (!state.isReadOnly)
+                    {
+                        enqueueResponse(r, state);
+                    }
+                }
+            }
+        }
     }
 
     @Override
@@ -105,7 +140,7 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
 
         boolean first_response = false;
         VoltTable[] first_results = null;
-        if (!m_txnIdResponses.containsKey(r.getTxnId()))
+        if (!m_txnIdResults.containsKey(r.getTxnId()))
         {
             ClientResponseImpl curr_response = r.getClientResponseData();
             VoltTable[] curr_results = curr_response.getResults();
@@ -116,12 +151,13 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
             {
                 saved_results[i] = new VoltTable(curr_results[i].getTableDataReference(), true);
             }
-            m_txnIdResponses.put(r.getTxnId(), saved_results);
+            m_txnIdResults.put(r.getTxnId(), saved_results);
+            m_txnIdResponses.put(r.getTxnId(), r);
             first_response = true;
         }
         else
         {
-            first_results = m_txnIdResponses.get(r.getTxnId());
+            first_results = m_txnIdResults.get(r.getTxnId());
         }
         if (first_response)
         {
@@ -171,6 +207,7 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
                 m_pendingTxns.removeTxnId(r.getTxnId());
                 m_initiator.reduceBackpressure(state.messageSize);
             }
+            m_txnIdResults.remove(r.getTxnId());
             m_txnIdResponses.remove(r.getTxnId());
             if (!state.isReadOnly)
             {

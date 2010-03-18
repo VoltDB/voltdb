@@ -43,6 +43,7 @@ import junit.framework.TestCase;
 public class TestDtxnInitiatorQueue extends TestCase
 {
     static int SITE_ID = 5;
+    static int MESSAGE_SIZE = 13;
 
     class MockWriteStream implements WriteStream
     {
@@ -154,6 +155,15 @@ public class TestDtxnInitiatorQueue extends TestCase
 
     class MockInitiator extends TransactionInitiator
     {
+        int m_reduceSize;
+        int m_reduceCount;
+
+        MockInitiator()
+        {
+            m_reduceSize = 0;
+            m_reduceCount = 0;
+        }
+
         @Override
         public void createTransaction(long connectionId,
                                       String connectionHostname,
@@ -180,6 +190,8 @@ public class TestDtxnInitiatorQueue extends TestCase
         @Override
         void reduceBackpressure(int messageSize)
         {
+            m_reduceCount++;
+            m_reduceSize += messageSize;
         }
 
         @Override
@@ -195,7 +207,7 @@ public class TestDtxnInitiatorQueue extends TestCase
         return new InFlightTxnState(txnId, coordId, new int[]{}, readOnly,
                                     isSinglePart,
                                     new StoredProcedureInvocation(),
-                                    m_testConnect, 0, 0, 0, "");
+                                    m_testConnect, MESSAGE_SIZE, 0, 0, "");
     }
 
     VoltTable[] createResultSet(String thing)
@@ -230,20 +242,28 @@ public class TestDtxnInitiatorQueue extends TestCase
         dut.addPendingTxn(createTxnState(0, 0, true, true));
         dut.offer(createInitiateResponse(0, 0, true, true, createResultSet("dude")));
         assertTrue(m_testStream.gotResponse());
+        assertEquals(1, initiator.m_reduceCount);
+        assertEquals(MESSAGE_SIZE, initiator.m_reduceSize);
         m_testStream.reset();
         // multi-partition read-only txn
         dut.addPendingTxn(createTxnState(1, 0, true, false));
         dut.offer(createInitiateResponse(1, 0, true, false, createResultSet("dude")));
         assertTrue(m_testStream.gotResponse());
+        assertEquals(2, initiator.m_reduceCount);
+        assertEquals(MESSAGE_SIZE * 2, initiator.m_reduceSize);
         m_testStream.reset();
         // Single-partition read-write txn
         dut.addPendingTxn(createTxnState(2, 0, false, true));
         dut.offer(createInitiateResponse(2, 0, false, true, createResultSet("dude")));
         assertTrue(m_testStream.gotResponse());
+        assertEquals(3, initiator.m_reduceCount);
+        assertEquals(MESSAGE_SIZE * 3, initiator.m_reduceSize);
         m_testStream.reset();
         // multi-partition read-write txn
         dut.addPendingTxn(createTxnState(3, 0, false, false));
         dut.offer(createInitiateResponse(3, 0, false, false, createResultSet("dude")));
+        assertEquals(4, initiator.m_reduceCount);
+        assertEquals(MESSAGE_SIZE * 4, initiator.m_reduceSize);
         assertTrue(m_testStream.gotResponse());
     }
 
@@ -260,17 +280,25 @@ public class TestDtxnInitiatorQueue extends TestCase
         dut.addPendingTxn(createTxnState(0, 1, true, true));
         dut.offer(createInitiateResponse(0, 0, true, true, createResultSet("dude")));
         assertTrue(m_testStream.gotResponse());
+        assertEquals(0, initiator.m_reduceCount);
+        assertEquals(0, initiator.m_reduceSize);
         m_testStream.reset();
         dut.offer(createInitiateResponse(0, 1, true, true, createResultSet("dude")));
         assertFalse(m_testStream.gotResponse());
+        assertEquals(1, initiator.m_reduceCount);
+        assertEquals(MESSAGE_SIZE, initiator.m_reduceSize);
         m_testStream.reset();
         // Single-partition read-write txn
         dut.addPendingTxn(createTxnState(2, 0, false, true));
         dut.addPendingTxn(createTxnState(2, 1, false, true));
         dut.offer(createInitiateResponse(2, 0, false, true, createResultSet("dude")));
         assertFalse(m_testStream.gotResponse());
+        assertEquals(1, initiator.m_reduceCount);
+        assertEquals(MESSAGE_SIZE, initiator.m_reduceSize);
         dut.offer(createInitiateResponse(2, 1, false, true, createResultSet("dude")));
         assertTrue(m_testStream.gotResponse());
+        assertEquals(2, initiator.m_reduceCount);
+        assertEquals(MESSAGE_SIZE * 2, initiator.m_reduceSize);
     }
 
     public void testInconsistentResults()
@@ -318,6 +346,82 @@ public class TestDtxnInitiatorQueue extends TestCase
         }
         assertTrue(caught);
     }
+
+    // Failure cases to test:
+    // for read/write:
+    // add two pending txns
+    // -- receive one, fail the second site, verify that we get enqueue
+    // -- fail the second site, receive one, verify that we get enqueue
+    // -- fail both, verify ?? (exception/crash of some sort?)
+    // -- receive both, fail one, verify ??
+    // replace two with three or for for tricksier cases?
+    // have two or three different outstanding txn IDs
+    // read-only harder since stuff lingers and there's no way to look at it
+    //
+
+    public void testEarlyReadWriteFailure()
+    {
+        MockInitiator initiator = new MockInitiator();
+        DtxnInitiatorQueue dut = new DtxnInitiatorQueue(SITE_ID);
+        dut.setInitiator(initiator);
+        m_testStream.reset();
+        // Single-partition read-only txn
+        dut.addPendingTxn(createTxnState(0, 0, false, true));
+        dut.addPendingTxn(createTxnState(0, 1, false, true));
+        dut.removeSite(0);
+        dut.offer(createInitiateResponse(0, 1, true, true, createResultSet("dude")));
+        assertTrue(m_testStream.gotResponse());
+        assertEquals(1, initiator.m_reduceCount);
+        assertEquals(MESSAGE_SIZE, initiator.m_reduceSize);
+    }
+
+    public void testMidReadWriteFailure()
+    {
+        MockInitiator initiator = new MockInitiator();
+        DtxnInitiatorQueue dut = new DtxnInitiatorQueue(SITE_ID);
+        dut.setInitiator(initiator);
+        m_testStream.reset();
+        // Single-partition read-only txn
+        dut.addPendingTxn(createTxnState(0, 0, false, true));
+        dut.addPendingTxn(createTxnState(0, 1, false, true));
+        dut.offer(createInitiateResponse(0, 1, true, true, createResultSet("dude")));
+        dut.removeSite(0);
+        assertTrue(m_testStream.gotResponse());
+        assertEquals(1, initiator.m_reduceCount);
+        assertEquals(MESSAGE_SIZE, initiator.m_reduceSize);
+    }
+
+    public void testMultipleTxnIdMidFailure()
+    {
+        MockInitiator initiator = new MockInitiator();
+        DtxnInitiatorQueue dut = new DtxnInitiatorQueue(SITE_ID);
+        dut.setInitiator(initiator);
+        m_testStream.reset();
+        // Single-partition read-only txn
+        dut.addPendingTxn(createTxnState(0, 0, false, true));
+        dut.addPendingTxn(createTxnState(0, 1, false, true));
+        dut.addPendingTxn(createTxnState(1, 0, false, true));
+        dut.addPendingTxn(createTxnState(1, 1, false, true));
+        dut.offer(createInitiateResponse(0, 1, true, true, createResultSet("dude")));
+        dut.offer(createInitiateResponse(1, 1, true, true, createResultSet("sweet")));
+        dut.removeSite(0);
+        assertTrue(m_testStream.gotResponse());
+        assertEquals(2, initiator.m_reduceCount);
+        assertEquals(MESSAGE_SIZE * 2, initiator.m_reduceSize);
+    }
+
+//    public void testTotalFailure()
+//    {
+//        MockInitiator initiator = new MockInitiator();
+//        DtxnInitiatorQueue dut = new DtxnInitiatorQueue(SITE_ID);
+//        dut.setInitiator(initiator);
+//        m_testStream.reset();
+//        // Single-partition read-only txn
+//        dut.addPendingTxn(createTxnState(0, 0, false, true));
+//        dut.addPendingTxn(createTxnState(0, 1, false, true));
+//        dut.removeSite(0);
+//        dut.removeSite(1);
+//    }
 
     MockWriteStream m_testStream = new MockWriteStream();
     MockConnection m_testConnect = new MockConnection(m_testStream);
