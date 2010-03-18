@@ -474,7 +474,7 @@ public class MultiLoader extends ClientMain {
                 ol_amount = 0.00;
             } else {
                 ol_amount = m_generator.fixedPoint(Constants.MONEY_DECIMALS, Constants.MIN_AMOUNT,
-                        Constants.MAX_AMOUNT);
+                        Constants.MAX_PRICE * Constants.MAX_OL_QUANTITY);
                 ol_delivery_d = null;
             }
             String ol_dist_info = m_generator.astring(Constants.DIST, Constants.DIST);

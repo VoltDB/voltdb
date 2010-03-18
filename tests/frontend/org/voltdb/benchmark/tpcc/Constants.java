@@ -133,7 +133,6 @@ public final class Constants {
     // Order line constants
     public static final int INITIAL_QUANTITY = 5;
     public static final double MIN_AMOUNT = 0.01;
-    public static final double MAX_AMOUNT = 9999.99;
 
     // History constants
     public static final int MIN_DATA = 12;
