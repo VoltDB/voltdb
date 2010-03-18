@@ -95,7 +95,7 @@ class VoltQueryClient(cmd.Cmd):
 
         try:
             return proc.call(params, response, timeout)
-        except IOError as err:
+        except IOError, err:
             self.safe_print("Error: %s" % (err))
             if not response:
                 raise
