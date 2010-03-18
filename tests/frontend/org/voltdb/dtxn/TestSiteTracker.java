@@ -23,20 +23,16 @@
 
 package org.voltdb.dtxn;
 
-import org.voltdb.catalog.Catalog;
-import org.voltdb.sysprocs.saverestore.CatalogCreatorTestHelper;
-
 import junit.framework.TestCase;
+
+import org.voltdb.MockVoltDB;
 
 public class TestSiteTracker extends TestCase
 {
     public void testNoReplication()
     {
-        // TODO: move the test helper somewhere more common perhaps.  Or, reuse
-        // or combine with MockVoltDB-esque think like in TestSimpleWorkUnit.
-        // Create a pretty stupid topology.  2 hosts, 2 sites per host, no rep.
-        CatalogCreatorTestHelper helper =
-            new CatalogCreatorTestHelper("cluster", "database");
+        MockVoltDB helper = new MockVoltDB();
+
         helper.addHost(0);
         helper.addHost(1);
         helper.addPartition(0);
@@ -47,9 +43,8 @@ public class TestSiteTracker extends TestCase
         helper.addSite(2, 0, 1, true);
         helper.addSite(101, 1, 2, true);
         helper.addSite(102, 1, 3, true);
-        Catalog catalog = helper.getCatalog();
 
-        SiteTracker tracker = new SiteTracker(catalog.getClusters().get("cluster").getSites());
+        SiteTracker tracker = helper.getCatalogContext().siteTracker;
         assertEquals(1, tracker.getOneSiteForPartition(0));
         assertEquals(2, tracker.getOneSiteForPartition(1));
         assertEquals(101, tracker.getOneSiteForPartition(2));
@@ -76,8 +71,8 @@ public class TestSiteTracker extends TestCase
 
     public void testEasyReplication()
     {
-        CatalogCreatorTestHelper helper =
-            new CatalogCreatorTestHelper("cluster", "database");
+        MockVoltDB helper = new MockVoltDB();
+
         helper.addHost(0);
         helper.addHost(1);
         helper.addPartition(0);
@@ -86,9 +81,8 @@ public class TestSiteTracker extends TestCase
         helper.addSite(2, 0, 1, true);
         helper.addSite(101, 1, 0, true);
         helper.addSite(102, 1, 1, true);
-        Catalog catalog = helper.getCatalog();
 
-        SiteTracker tracker = new SiteTracker(catalog.getClusters().get("cluster").getSites());
+        SiteTracker tracker = helper.getCatalogContext().siteTracker;
         assertTrue(tracker.getAllSitesForPartition(0).contains(1));
         assertTrue(tracker.getAllSitesForPartition(0).contains(101));
         assertTrue(tracker.getAllSitesForPartition(1).contains(2));
