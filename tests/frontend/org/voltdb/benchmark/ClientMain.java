@@ -34,12 +34,14 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.sql.SQLException;
 import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.benchmark.Verification.Expression;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
@@ -71,6 +73,12 @@ public abstract class ClientMain {
      * State of this client
      */
     private volatile ControlState m_controlState = ControlState.PREPARING;
+
+    /**
+     * A host, can be any one. This is only used by data verification
+     * at the end of run.
+     */
+    private String m_host;
 
     /**
      * Username supplied to the Volt client
@@ -121,7 +129,8 @@ public abstract class ClientMain {
     private final float m_checkTransaction;
     private final boolean m_checkTables;
     private final Random m_checkGenerator = new Random();
-    private final LinkedHashMap<Pair<String, Integer>, Verification.Expression> m_constraints;
+    private final LinkedHashMap<Pair<String, Integer>, Expression> m_constraints;
+    private final List<String> m_tableCheckOrder = new LinkedList<String>();
     protected VoltSampler m_sampler = null;
 
     /** The states important to the remote controller */
@@ -189,16 +198,15 @@ public abstract class ClientMain {
                 }
                 else if (command.equalsIgnoreCase("STOP")) {
                     if (m_controlState == ControlState.RUNNING) {
-                        // First we have to check tables
-                        if (m_checkTables) {
-                            checkTables();
-                        }
                         try {
                             if (m_sampler != null) {
                                 m_sampler.setShouldStop();
                                 m_sampler.join();
                             }
                             m_voltClient.shutdown();
+                            if (m_checkTables) {
+                                checkTables();
+                            }
                         } catch (InterruptedException e) {
                             System.exit(0);
                         }
@@ -267,12 +275,6 @@ public abstract class ClientMain {
                 rateControlledRunLoop();
             }
 
-            try {
-                m_voltClient.shutdown();
-            }
-            catch (final InterruptedException e) {
-                e.printStackTrace();
-            }
             if (m_exitOnCompletion) {
                 System.exit(0);
             }
@@ -379,6 +381,7 @@ public abstract class ClientMain {
     public ClientMain(final Client client) {
         m_voltClient = client;
         m_exitOnCompletion = false;
+        m_host = "localhost";
         m_password = "";
         m_username = "";
         m_txnRate = -1;
@@ -388,7 +391,7 @@ public abstract class ClientMain {
         m_countDisplayNames = null;
         m_checkTransaction = 0;
         m_checkTables = false;
-        m_constraints = new LinkedHashMap<Pair<String, Integer>, Verification.Expression>();
+        m_constraints = new LinkedHashMap<Pair<String, Integer>, Expression>();
     }
 
     abstract protected String getApplicationName();
@@ -499,6 +502,7 @@ public abstract class ClientMain {
             }
             else if (parts[0].equals("HOST")) {
                 final String hostnport[] = parts[1].split("\\:", 2);
+                m_host = hostnport[0];
                 try {
                     System.err.println("Creating connection to  "
                         + hostnport[0]);
@@ -516,7 +520,7 @@ public abstract class ClientMain {
             setState(ControlState.ERROR, "No HOSTS specified on command line.");
         m_checkTransaction = checkTransaction;
         m_checkTables = checkTables;
-        m_constraints = new LinkedHashMap<Pair<String, Integer>, Verification.Expression>();
+        m_constraints = new LinkedHashMap<Pair<String, Integer>, Expression>();
 
         m_countDisplayNames = getTransactionDisplayNames();
         m_counts = new AtomicLong[m_countDisplayNames.length];
@@ -671,8 +675,14 @@ public abstract class ClientMain {
      */
     protected void addConstraint(String name,
                                  int tableId,
-                                 Verification.Expression constraint) {
+                                 Expression constraint) {
         m_constraints.put(Pair.of(name, tableId), constraint);
+    }
+
+    protected void addTableConstraint(String name,
+                                      Expression constraint) {
+        addConstraint(name, 0, constraint);
+        m_tableCheckOrder.add(name);
     }
 
     /**
@@ -705,12 +715,16 @@ public abstract class ClientMain {
     protected boolean checkTables() {
         String dir = "/tmp";
         String nonce = "data_verification";
+        Client client = ClientFactory.createClient(getExpectedOutgoingMessageSize(), null,
+                                                   false, null);
         // Host ID to IP mappings
         LinkedHashMap<Integer, String> hostMappings = new LinkedHashMap<Integer, String>();
-        // Table to partition ID mappings
-        LinkedHashMap<String, int[]> partitionMappings = new LinkedHashMap<String, int[]>();
-        // The key is the table name. the first one in the pair is the hostname, the second one is file name
-        LinkedHashMap<String, Pair<String, String>> snapshotMappings = new LinkedHashMap<String, Pair<String, String>>();
+        /*
+         *  The key is the table name. the first one in the pair is the hostname,
+         *  the second one is file name
+         */
+        LinkedHashMap<String, Pair<String, String>> snapshotMappings =
+            new LinkedHashMap<String, Pair<String, String>>();
         boolean isSatisfied = true;
 
         // Load the native library for loading table from snapshot file
@@ -719,17 +733,19 @@ public abstract class ClientMain {
         try {
             boolean keepTrying = true;
             VoltTable[] response = null;
+
+            client.createConnection(m_host, m_username, m_password);
             // Only initiate the snapshot if it's the first client
             while (m_id == 0) {
                 // Take a snapshot of the database. This call is blocking.
-                response = m_voltClient.callProcedure("@SnapshotSave", dir, nonce, 1);
+                response = client.callProcedure("@SnapshotSave", dir, nonce, 1);
                 if (response.length != 1 || !response[0].advanceRow()
                     || !response[0].getString("RESULT").equals("SUCCESS")) {
                     if (keepTrying
                         && response[0].getString("ERR_MSG").contains("ALREADY EXISTS")) {
-                        m_voltClient.callProcedure("@SnapshotDelete",
-                                                   new String[] { dir },
-                                                   new String[] { nonce });
+                        client.callProcedure("@SnapshotDelete",
+                                             new String[] { dir },
+                                             new String[] { nonce });
                         keepTrying = false;
                         continue;
                     }
@@ -748,7 +764,7 @@ public abstract class ClientMain {
 
                 while (maxTry-- > 0) {
                     boolean found = false;
-                    response = m_voltClient.callProcedure("@SnapshotStatus");
+                    response = client.callProcedure("@SnapshotStatus");
                     if (response.length != 2) {
                         System.err.println("Failed to get snapshot status");
                         return false;
@@ -775,7 +791,7 @@ public abstract class ClientMain {
             }
 
             // Get host ID to hostname mappings
-            response = m_voltClient.callProcedure("@SystemInformation");
+            response = client.callProcedure("@SystemInformation");
             if (response.length != 1) {
                 System.err.println("Failed to get host ID to IP address mapping");
                 return false;
@@ -788,7 +804,7 @@ public abstract class ClientMain {
             }
 
             // Do a scan to get all the file names and table names
-            response = m_voltClient.callProcedure("@SnapshotScan", dir);
+            response = client.callProcedure("@SnapshotScan", dir);
             if (response.length != 3) {
                 System.err.println("Failed to get snapshot filenames");
                 return false;
@@ -814,12 +830,6 @@ public abstract class ClientMain {
 
                 snapshotMappings.put(tableName, Pair.of(hostMappings.get(id),
                                                         response[2].getString("NAME")));
-                String[] partitionStrings = response[2].getString("PARTITIONS")
-                                                       .split(",");
-                int[] partitions = new int[partitionStrings.length];
-                for (int i = 0; i < partitionStrings.length; i++)
-                    partitions[i] = Integer.parseInt(partitionStrings[i]);
-                partitionMappings.put(tableName, partitions);
             }
         } catch (NoConnectionsException e) {
             e.printStackTrace();
@@ -827,17 +837,22 @@ public abstract class ClientMain {
         } catch (ProcCallException e) {
             e.printStackTrace();
             return false;
+        } catch (UnknownHostException e) {
+            e.printStackTrace();
+            return false;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
         }
 
         // Iterate through all the tables
-        for (Map.Entry<String, Pair<String, String>> entry : snapshotMappings.entrySet()) {
-            if (entry.getValue() == null)
+        for (String tableName : m_tableCheckOrder) {
+            Pair<String, String> value = snapshotMappings.get(tableName);
+            if (value == null)
                 continue;
 
-            String tableName = entry.getKey();
-            String hostName = entry.getValue().getFirst();
-            int[] partitions = partitionMappings.get(tableName);
-            File file = new File(dir, entry.getValue().getSecond());
+            String hostName = value.getFirst();
+            File file = new File(dir, value.getSecond());
             FileInputStream inputStream = null;
             TableSaveFile saveFile = null;
             long rowCount = 0;
@@ -846,7 +861,7 @@ public abstract class ClientMain {
             if (!m_constraints.containsKey(key) || hostName == null)
                 continue;
 
-            System.out.println("Checking table " + tableName);
+            System.err.println("Checking table " + tableName);
 
             // Copy the file over
             String localhostName = null;
@@ -875,7 +890,7 @@ public abstract class ClientMain {
             try {
                 try {
                     inputStream = new FileInputStream(file);
-                    saveFile = new TableSaveFile(inputStream.getChannel(), 3, partitions);
+                    saveFile = new TableSaveFile(inputStream.getChannel(), 3, null);
 
                     // Get chunks from table
                     while (isSatisfied && saveFile.hasMoreChunks()) {
@@ -914,7 +929,7 @@ public abstract class ClientMain {
             }
 
             if (isSatisfied) {
-                System.out.println("Table " + tableName
+                System.err.println("Table " + tableName
                                    + " with "
                                    + rowCount
                                    + " rows passed check");
@@ -926,17 +941,18 @@ public abstract class ClientMain {
 
         // Clean up the snapshot we made
         try {
-            if (m_id == 0)
-                m_voltClient.callProcedure("@SnapshotDelete",
-                                           new String[] { dir },
-                                           new String[] { nonce });
+            if (m_id == 0) {
+                client.callProcedure("@SnapshotDelete",
+                                     new String[] { dir },
+                                     new String[] { nonce });
+            }
         } catch (NoConnectionsException e) {
             e.printStackTrace();
         } catch (ProcCallException e) {
             e.printStackTrace();
         }
 
-        System.out.println("Table checking finished "
+        System.err.println("Table checking finished "
                            + (isSatisfied ? "successfully" : "with failures"));
 
         return isSatisfied;
