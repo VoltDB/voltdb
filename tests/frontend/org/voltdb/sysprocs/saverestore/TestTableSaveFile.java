@@ -161,7 +161,7 @@ public class TestTableSaveFile extends TestCase
 
         /*
          * Table header should be
-         * 2 bytes metadata length
+         * 4 bytes metadata length
          * 2 bytes column count
          * 1 byte column type
          * 4 byte column name length
@@ -171,8 +171,8 @@ public class TestTableSaveFile extends TestCase
         // tuple lengths
         ByteBuffer tableHeader = savefile.getTableHeader();
         tableHeader.position(0);
-        assertEquals(2 + 2 + 1 + 4 + 3, tableHeader.remaining());
-        assertEquals(tableHeader.getShort(), 10);
+        assertEquals(4 + 2 + 1 + 4 + 3, tableHeader.remaining());
+        assertEquals(tableHeader.getInt(), 10);
         assertEquals(tableHeader.getShort(), 1);
         assertEquals(tableHeader.get(), VoltType.STRING.getValue());
         assertEquals(tableHeader.getInt(), 3);

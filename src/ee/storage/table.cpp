@@ -271,7 +271,7 @@ std::string Table::debug() {
 // ------------------------------------------------------------------
 int Table::getApproximateSizeToSerialize() const {
     // HACK to get this over quick
-    // just max table serialization to 1MB
+    // just max table serialization to 10MB
     return 1024 * 1024 * 10;
 }
 
@@ -298,7 +298,7 @@ bool Table::serializeColumnHeaderTo(SerializeOutput &serialize_io) {
         start = serialize_io.position();
 
         // skip header position
-        serialize_io.writeShort(-1);
+        serialize_io.writeInt(-1);
 
         // column counts as a short
         serialize_io.writeShort(static_cast<int16_t>(m_columnCount));
@@ -324,11 +324,11 @@ bool Table::serializeColumnHeaderTo(SerializeOutput &serialize_io) {
         }
 
 
-        // write the header size which is a non-inclusive short
+        // write the header size which is a non-inclusive int
         size_t position = serialize_io.position();
-        m_columnHeaderSize = static_cast<int16_t>(position - start);
-        short nonInclusiveHeaderSize = static_cast<int16_t>(m_columnHeaderSize - sizeof(int16_t));
-        serialize_io.writeShortAt(start, nonInclusiveHeaderSize);
+        m_columnHeaderSize = static_cast<int32_t>(position - start);
+        int32_t nonInclusiveHeaderSize = static_cast<int32_t>(m_columnHeaderSize - sizeof(int32_t));
+        serialize_io.writeIntAt(start, nonInclusiveHeaderSize);
     }
     catch(...) {
         VOLT_ERROR("Failed while serializing table header.");
@@ -346,7 +346,7 @@ bool Table::serializeColumnHeaderTo(SerializeOutput &serialize_io) {
 bool Table::serializeTo(SerializeOutput &serialize_io) {
     // The table is serialized as:
     // [(int) total size]
-    // [(short) header size] [num columns] [column types] [column names]
+    // [(int) header size] [num columns] [column types] [column names]
     // [(int) num tuples] [tuple data]
 
     /* NOTE:
@@ -425,7 +425,7 @@ bool Table::deserializeFrom(SerializeInput &serialize_io, Pool *stringPool) {
         /*int32_t fullSize =*/ serialize_io.readInt();
         //VOLT_DEBUG("FULL SIZE IS %d BYTES", fullSize);
 
-        /*int16_t headerSize =*/ serialize_io.readShort();
+        /*int16_t headerSize =*/ serialize_io.readInt();
         //VOLT_DEBUG("HEADER IS %d BYTES", headerSize);
 
         //column

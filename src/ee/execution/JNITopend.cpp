@@ -90,7 +90,7 @@ void JNITopend::releaseManagedBuffer(char* bufferPtr) {
 }
 
 int JNITopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool, Table* destination) {
-    VOLT_DEBUG("iterating java dependency for id %d\n", dependencyId);
+    VOLT_DEBUG("iterating java dependency for id %d", dependencyId);
 
     JNILocalFrameBarrier jni_frame = JNILocalFrameBarrier(m_jniEnv, 10);
     if (jni_frame.checkResult() < 0) {

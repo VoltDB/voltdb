@@ -103,7 +103,7 @@ void TempTable::loadTuplesFrom(bool, SerializeInput &serialize_io, Pool *stringP
      */
 
     // todo: just skip ahead to this position
-    serialize_io.readShort(); // rowstart
+    serialize_io.readInt(); // rowstart
 
     int16_t colcount = serialize_io.readShort();
     assert(colcount >= 0);

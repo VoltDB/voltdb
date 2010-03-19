@@ -649,8 +649,8 @@ void PersistentTable::loadTuplesFrom(bool allowELT,
                                      SerializeInput &serialize_io,
                                      Pool *stringPool)
 {
-    serialize_io.readInt();
-    serialize_io.readShort();
+    serialize_io.readInt(); // table size
+    serialize_io.readInt(); // rowstart
 
     //column
     int columnCount = serialize_io.readShort(); // column num

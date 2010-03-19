@@ -416,7 +416,7 @@ class FastSerializer:
 
     def readString(self):
         # length preceeded (2 byte value) string
-        length = self.readInt16()
+        length = self.readInt32()
         if length == self.NULL_STRING_INDICATOR:
             return None
         return self.readStringContent(length)
@@ -432,11 +432,11 @@ class FastSerializer:
 
     def writeString(self, value):
         if value is None:
-            self.writeInt16(self.NULL_STRING_INDICATOR)
+            self.writeInt32(self.NULL_STRING_INDICATOR)
             return
 
         encoded_value = value.encode("utf-8")
-        self.writeInt16(len(encoded_value))
+        self.writeInt32(len(encoded_value))
         self.wbuf.extend(encoded_value)
 
     # date
@@ -637,7 +637,7 @@ class VoltTable:
         tablesize = self.fser.readInt32()
 
         # 2.
-        headersize = self.fser.readInt16()
+        headersize = self.fser.readInt32()
         columncount = self.fser.readInt16()
         for i in xrange(columncount):
             column = VoltColumn(fser = self.fser)
@@ -667,7 +667,7 @@ class VoltTable:
         map(lambda x: x.writeType(header_fser), self.columns)
         map(lambda x: x.writeName(header_fser), self.columns)
 
-        table_fser.writeInt16(header_fser.size() + 2)
+        table_fser.writeInt32(header_fser.size() - 4)
         table_fser.writeRawBytes(header_fser.getRawBytes())
 
         table_fser.writeInt32(len(self.tuples))

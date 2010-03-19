@@ -146,13 +146,13 @@ bool VoltDBEngine::initialize(
     assert (m_templateSingleLongTable == NULL);
     m_templateSingleLongTable = new char[m_templateSingleLongTableSize];
     memset(m_templateSingleLongTable, 0, m_templateSingleLongTableSize);
-    m_templateSingleLongTable[7] = 23; // table size
-    m_templateSingleLongTable[9] = 7; // size of header
-    m_templateSingleLongTable[11] = 1; // number of columns
-    m_templateSingleLongTable[12] = VALUE_TYPE_BIGINT; // column type
-    m_templateSingleLongTable[13] = 0; // column name length
-    m_templateSingleLongTable[20] = 1; // row count
-    m_templateSingleLongTable[22] = 10; // row size
+    m_templateSingleLongTable[7] = 25; // table size
+    m_templateSingleLongTable[11] = 7; // size of header
+    m_templateSingleLongTable[13] = 1; // number of columns
+    m_templateSingleLongTable[14] = VALUE_TYPE_BIGINT; // column type
+    m_templateSingleLongTable[15] = 0; // column name length
+    m_templateSingleLongTable[22] = 1; // row count
+    m_templateSingleLongTable[24] = 10; // row size
 
     // required for catalog loading.
     m_executorContext = new ExecutorContext(siteId,

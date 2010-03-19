@@ -166,10 +166,10 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
 
         // rowstart represents and offset to the start of row data,
         //  but the serialization is the non-inclusive length of the header,
-        //  so add two bytes.
-        m_rowStart = m_buffer.getShort(0) + 2;
+        //  so add 4 bytes.
+        m_rowStart = m_buffer.getInt(0) + 4;
 
-        m_colCount = m_buffer.getShort(2);
+        m_colCount = m_buffer.getShort(4);
         m_rowCount = m_buffer.getInt(m_rowStart);
         m_buffer.position(m_buffer.limit());
         m_readOnly = readOnly;
@@ -197,7 +197,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
         assert(columns.length >= columnCount);
 
         // put a dummy value in for header size for now
-        m_buffer.putShort((short) 0);
+        m_buffer.putInt(0);
 
         m_buffer.putShort((short) columnCount);
 
@@ -210,9 +210,9 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
             }
             writeStringToBuffer(columns[i].name, METADATA_ENCODING, m_buffer);
         }
-        // write the header size to the first two bytes (length-prefixed non-inclusive)
+        // write the header size to the first 4 bytes (length-prefixed non-inclusive)
         m_rowStart = m_buffer.position();
-        m_buffer.putShort(0, (short) (m_rowStart - 2));
+        m_buffer.putInt(0, m_rowStart - 4);
         // write the row count to the next 4 bytes after the header
         m_buffer.putInt(0);
 
@@ -347,7 +347,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
         // move to the start of the list of column names
         // (this could be done faster by just reading the string lengths
         //  and skipping ahead)
-        int pos = 2 + 2 + m_colCount;
+        int pos = 4 + 2 + m_colCount;
         String name = null;
         for (int i = 0; i < index; i++)
             pos += m_buffer.getInt(pos) + 4;
@@ -363,7 +363,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
         assert(verifyTableInvariants());
         assert(index < m_colCount);
         // move to the right place
-        VoltType retval = VoltType.get(m_buffer.get(2 + 2 + index));
+        VoltType retval = VoltType.get(m_buffer.get(4 + 2 + index));
         assert(verifyTableInvariants());
         return retval;
     }
@@ -452,7 +452,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
 
             // where does the type bytes start
             // skip rowstart + colcount
-            int typePos = 2 + 2;
+            int typePos = 4 + 2;
 
             for (int col = 0; col < m_colCount; col++) {
                 Object value = values[col];
@@ -715,9 +715,9 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
         // rowstart represents and offset to the start of row data,
         //  but the serialization is the non-inclusive length of the header,
         //  so add two bytes.
-        m_rowStart = m_buffer.getShort(0) + 2;
+        m_rowStart = m_buffer.getInt(0) + 4;
 
-        m_colCount = m_buffer.getShort(2);
+        m_colCount = m_buffer.getShort(4);
         m_rowCount = m_buffer.getInt(m_rowStart);
 
         assert(verifyTableInvariants());
@@ -764,9 +764,9 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
         }
         buffer.append("\n");*/
 
-        buffer.append(" header size: ").append(m_buffer.getShort(0)).append("\n");
+        buffer.append(" header size: ").append(m_buffer.getInt(0)).append("\n");
 
-        short colCount = m_buffer.getShort(2);
+        short colCount = m_buffer.getShort(4);
         buffer.append(" column count: ").append(colCount).append("\n");
         assert(colCount == m_colCount);
 
@@ -981,7 +981,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
         assert(m_colCount > 0);
         assert(m_rowStart > 0);
         // minimum reasonable table size
-        final int minsize = 2 + 2 + 1 + 4 + 4;
+        final int minsize = 4 + 2 + 1 + 4 + 4;
         assert(m_buffer.capacity() >= minsize);
         assert(m_buffer.limit() >= minsize);
         if (m_buffer.position() < minsize) {
@@ -989,14 +989,14 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
             return false;
         }
 
-        int rowStart = m_buffer.getShort(0) + 2;
-        if (rowStart < (2 + 2 + 1 + 4)) {
+        int rowStart = m_buffer.getInt(0) + 4;
+        if (rowStart < (4 + 2 + 1 + 4)) {
             System.err.printf("rowStart with value %d is smaller than it should be.\n", rowStart);
             return false;
         }
         assert(m_buffer.position() > m_rowStart);
 
-        int colCount = m_buffer.getShort(2);
+        int colCount = m_buffer.getShort(4);
         assert(colCount > 0);
 
         return true;
