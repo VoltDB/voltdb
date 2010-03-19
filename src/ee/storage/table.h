@@ -243,7 +243,7 @@ protected:
     std::vector<char*> m_data;
 
     char *m_columnHeaderData;
-    int16_t m_columnHeaderSize;
+    int32_t m_columnHeaderSize;
 
 #ifdef MEMCHECK_NOFREELIST
     int64_t m_deletedTupleCount;

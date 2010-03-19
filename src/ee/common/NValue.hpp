@@ -1718,7 +1718,7 @@ inline void NValue::deserializeFrom(SerializeInput &input, const ValueType type,
           const int32_t length = input.readInt();
           // the NULL SQL string is a NULL C pointer
           if (isInlined) {
-              *reinterpret_cast<int16_t*>(storage) = length;
+              *reinterpret_cast<int16_t*>(storage) = static_cast<int16_t>(length);
               if (length == OBJECTLENGTH_NULL) {
                   break;
               }
