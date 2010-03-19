@@ -28,10 +28,13 @@ import java.util.Hashtable;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Host;
 import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
+import org.voltdb.catalog.Table;
 import org.voltdb.fault.FaultDistributor;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.impl.HostMessenger;
@@ -43,7 +46,6 @@ public class MockVoltDB implements VoltDBInterface
     private CatalogContext m_context;
     final String m_clusterName = "cluster";
     final String m_databaseName = "database";
-    int m_execSiteCount = 0;
     StatsAgent m_statsAgent = null;
 
     public MockVoltDB()
@@ -63,35 +65,61 @@ public class MockVoltDB implements VoltDBInterface
 
     public void addHost(int hostId)
     {
-        m_catalog.execute("add " + getCluster().getPath() + " hosts " + hostId);
+        getCluster().getHosts().add(Integer.toString(hostId));
     }
 
     public void addPartition(int partitionId)
     {
-        m_catalog.execute("add " + getCluster().getPath() + " partitions " +
-                          partitionId);
+        getCluster().getPartitions().add(Integer.toString(partitionId));
     }
 
     public void addSite(int siteId, int hostId, int partitionId, boolean isExec)
     {
-        m_catalog.execute("add " + getCluster().getPath() + " sites " + siteId);
-        m_catalog.execute("set " + getSite(siteId).getPath() + " host " +
-                          getHost(hostId).getPath());
-        m_catalog.execute("set " + getSite(siteId).getPath() + " isexec " +
-                          isExec);
-        String partition_path = "null";
-        if (isExec)
-        {
-            partition_path = getPartition(partitionId).getPath();
-            m_execSiteCount++;
-        }
-        m_catalog.execute("set " + getSite(siteId).getPath() + " partition " +
-                partition_path);
+        getCluster().getSites().add(Integer.toString(siteId));
+        getSite(siteId).setHost(getHost(hostId));
+        getSite(siteId).setIsexec(isExec);
+        getSite(siteId).setPartition(getPartition(partitionId));
     }
 
-    Cluster getCluster()
+    public void addTable(String tableName, boolean isReplicated)
+    {
+        getDatabase().getTables().add(tableName);
+        getTable(tableName).setIsreplicated(isReplicated);
+    }
+
+    public void addColumnToTable(String tableName, String columnName,
+                                    VoltType columnType,
+                                    boolean isNullable, String defaultValue,
+                                    VoltType defaultType)
+    {
+        int index = getTable(tableName).getColumns().size();
+        getTable(tableName).getColumns().add(columnName);
+        getColumnFromTable(tableName, columnName).setIndex(index);
+        getColumnFromTable(tableName, columnName).setType(columnType.getValue());
+        getColumnFromTable(tableName, columnName).setNullable(isNullable);
+        getColumnFromTable(tableName, columnName).setName(columnName);
+        getColumnFromTable(tableName, columnName).setDefaultvalue(defaultValue);
+        getColumnFromTable(tableName, columnName).setDefaulttype(defaultType.getValue());
+    }
+
+    public Cluster getCluster()
     {
         return m_catalog.getClusters().get(m_clusterName);
+    }
+
+    Database getDatabase()
+    {
+        return getCluster().getDatabases().get(m_databaseName);
+    }
+
+    public Table getTable(String tableName)
+    {
+        return getDatabase().getTables().get(tableName);
+    }
+
+    Column getColumnFromTable(String tableName, String columnName)
+    {
+        return getTable(tableName).getColumns().get(columnName);
     }
 
     Host getHost(int hostId)

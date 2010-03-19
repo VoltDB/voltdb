@@ -23,6 +23,7 @@
 
 package org.voltdb.sysprocs.saverestore;
 
+import org.voltdb.MockVoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -39,7 +40,7 @@ public class TestSavedTableConverter extends TestCase
 
     public TestSavedTableConverter()
     {
-        m_catalogCreator = new CatalogCreatorTestHelper("cluster", "database");
+        m_catalogCreator = new MockVoltDB();
     }
 
     public void setUp()
@@ -250,5 +251,5 @@ public class TestSavedTableConverter extends TestCase
         fail("SavedTableConverter should have thrown an exception");
     }
 
-    private CatalogCreatorTestHelper m_catalogCreator;
+    private MockVoltDB m_catalogCreator;
 }

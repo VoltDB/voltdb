@@ -29,6 +29,7 @@ import java.util.Set;
 
 import junit.framework.TestCase;
 
+import org.voltdb.MockVoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
 import org.voltdb.catalog.Table;
@@ -39,8 +40,7 @@ import org.voltdb.utils.Pair;
 public class TestPartitionedTableSaveFileState extends TestCase
 {
     private static final String TABLE_NAME = "test_table";
-    private static final String DATABASE_NAME = "test_database";
-    private static final String CLUSTER_NAME = "test_cluster";
+    private static final String DATABASE_NAME = "database";
 
     @Override
     public void setUp()
@@ -48,9 +48,8 @@ public class TestPartitionedTableSaveFileState extends TestCase
         m_state = new PartitionedTableSaveFileState(TABLE_NAME, m_allowELT);
         m_siteInput =
             ClusterSaveFileState.constructEmptySaveFileStateVoltTable();
-        m_catalogCreator =
-            new CatalogCreatorTestHelper(CLUSTER_NAME, DATABASE_NAME);
-        m_catalogCreator.addTable(TABLE_NAME, false);
+        m_voltDB = new MockVoltDB();
+        m_voltDB.addTable(TABLE_NAME, false);
     }
 
     public void testLoadOperation()
@@ -204,8 +203,8 @@ public class TestPartitionedTableSaveFileState extends TestCase
         }
 
         // Add some non-exec sites for more test coverage
-        m_catalogCreator.addSite(number_of_partitions, 0, 0, false);
-        m_catalogCreator.addSite(number_of_partitions + 1, 1, 0, false);
+        m_voltDB.addSite(number_of_partitions, 0, 0, false);
+        m_voltDB.addSite(number_of_partitions + 1, 1, 0, false);
         m_siteInput.resetRowPosition();
         while (m_siteInput.advanceRow())
         {
@@ -221,12 +220,12 @@ public class TestPartitionedTableSaveFileState extends TestCase
             }
         }
 
-        Table test_table = m_catalogCreator.getTable(TABLE_NAME);
+        Table test_table = m_voltDB.getTable(TABLE_NAME);
 
         SynthesizedPlanFragment[] test_plan =
             m_state.
             generateRestorePlan(test_table,
-                                m_catalogCreator.getCluster().getSites());
+                                m_voltDB.getCluster().getSites());
         checkPlanFragments(test_plan, partitionsToDistribute);
         for (int i = 0; i < number_of_partitions; i++)
         {
@@ -246,8 +245,8 @@ public class TestPartitionedTableSaveFileState extends TestCase
         }
 
         // Add some non-exec sites for more test coverage
-        m_catalogCreator.addSite(original_partitions, 0, 0, false);
-        m_catalogCreator.addSite(original_partitions + 1, 1, 0, false);
+        m_voltDB.addSite(original_partitions, 0, 0, false);
+        m_voltDB.addSite(original_partitions + 1, 1, 0, false);
         m_siteInput.resetRowPosition();
         while (m_siteInput.advanceRow())
         {
@@ -263,12 +262,12 @@ public class TestPartitionedTableSaveFileState extends TestCase
             }
         }
 
-        Table test_table = m_catalogCreator.getTable(TABLE_NAME);
+        Table test_table = m_voltDB.getTable(TABLE_NAME);
 
         SynthesizedPlanFragment[] test_plan =
             m_state.
             generateRestorePlan(test_table,
-                                m_catalogCreator.getCluster().getSites());
+                                m_voltDB.getCluster().getSites());
         checkPlanFragments(test_plan, partitionsToDistribute);
     }
 
@@ -294,8 +293,8 @@ public class TestPartitionedTableSaveFileState extends TestCase
                              original_partitions + 1,
                              true);
         // Add some non-exec sites for more test coverage
-        m_catalogCreator.addSite(original_partitions + 2, 0, 0, false);
-        m_catalogCreator.addSite(original_partitions + 3, 1, 0, false);
+        m_voltDB.addSite(original_partitions + 2, 0, 0, false);
+        m_voltDB.addSite(original_partitions + 3, 1, 0, false);
         m_siteInput.resetRowPosition();
         while (m_siteInput.advanceRow())
         {
@@ -311,12 +310,12 @@ public class TestPartitionedTableSaveFileState extends TestCase
             }
         }
 
-        Table test_table = m_catalogCreator.getTable(TABLE_NAME);
+        Table test_table = m_voltDB.getTable(TABLE_NAME);
 
         SynthesizedPlanFragment[] test_plan =
             m_state.
             generateRestorePlan(test_table,
-                                m_catalogCreator.getCluster().getSites());
+                                m_voltDB.getCluster().getSites());
         checkPlanFragments(test_plan, partitionsToDistribute);
     }
 
@@ -333,8 +332,8 @@ public class TestPartitionedTableSaveFileState extends TestCase
             addSiteInfoToCatalog(i, i, i, true);
         }
         // Add some non-exec sites for more test coverage
-        m_catalogCreator.addSite(number_of_partitions, 0, 0, false);
-        m_catalogCreator.addSite(number_of_partitions + 1, 1, 0, false);
+        m_voltDB.addSite(number_of_partitions, 0, 0, false);
+        m_voltDB.addSite(number_of_partitions + 1, 1, 0, false);
         m_siteInput.resetRowPosition();
         while (m_siteInput.advanceRow())
         {
@@ -350,12 +349,12 @@ public class TestPartitionedTableSaveFileState extends TestCase
             }
         }
 
-        Table test_table = m_catalogCreator.getTable(TABLE_NAME);
+        Table test_table = m_voltDB.getTable(TABLE_NAME);
 
         SynthesizedPlanFragment[] test_plan =
             m_state.
             generateRestorePlan(test_table,
-                                m_catalogCreator.getCluster().getSites());
+                                m_voltDB.getCluster().getSites());
         checkPlanFragments(test_plan, partitionsToDistribute);
     }
 
@@ -375,9 +374,9 @@ public class TestPartitionedTableSaveFileState extends TestCase
     private void addSiteInfoToCatalog(int siteId, int hostId, int partitionId,
                                       boolean isExec)
     {
-        m_catalogCreator.addPartition(partitionId);
-        m_catalogCreator.addHost(hostId);
-        m_catalogCreator.addSite(siteId, hostId, partitionId, isExec);
+        m_voltDB.addPartition(partitionId);
+        m_voltDB.addHost(hostId);
+        m_voltDB.addSite(siteId, hostId, partitionId, isExec);
     }
 
     /*
@@ -432,6 +431,6 @@ public class TestPartitionedTableSaveFileState extends TestCase
 
     private PartitionedTableSaveFileState m_state;
     private VoltTable m_siteInput;
-    private CatalogCreatorTestHelper m_catalogCreator;
+    private MockVoltDB m_voltDB;
     private int m_allowELT = 0;
 }
