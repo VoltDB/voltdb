@@ -272,7 +272,6 @@ CTX.INPUT['storage'] = """
  PersistentTableUndoUpdateAction.cpp
  streamedtable.cpp
  table.cpp
- TableDiskHeader.cpp
  tablefactory.cpp
  TableStats.cpp
  tableutil.cpp
@@ -346,7 +345,6 @@ CTX.TESTS['storage'] = """
  StreamedTable_test
  table_and_indexes_test
  table_test
- TableDiskHeader_test
  tabletuple_elt_test
  TupleStreamWrapper_test
 """
