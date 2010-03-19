@@ -150,3 +150,5 @@ copyAndSubstituteTemplates(projectFileContent, dest_fn, package_prefix, project_
 # ddl.sql
 dest_fn = "%s/%s-ddl.sql"%(destination, project_name)
 copyAndSubstituteTemplates(ddlFileContent, dest_fn, package_prefix, project_name, voltpath)
+
+print "Generated skeleton Volt project in %s" % (destination)
