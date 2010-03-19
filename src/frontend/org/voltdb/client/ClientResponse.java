@@ -84,7 +84,7 @@ public interface ClientResponse {
     /**
      * Get an estimate of the amount of time it took for the database
      * to process the transaction from the time it was received at the initiating node to the time
-     * the time the initiating node got the response and queued it for transmission to the client.
+     * the initiating node got the response and queued it for transmission to the client.
      * This time is an ESTIMATE
      * @return Time in milliseconds the procedure spent in the cluster
      */
@@ -93,7 +93,7 @@ public interface ClientResponse {
     /**
      * Get the amount of time it took to run the transaction through the Client API, database, and back to the
      * callback.
-     * @return Time in milliseconds
+     * @return Time in milliseconds the procedure took to roundtrip from the client to the server
      */
     public int getClientRoundtrip();
 }

@@ -47,6 +47,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.client.StatsUploaderSettings;
 import org.voltdb.processtools.SSHTools;
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
 import org.voltdb.utils.Pair;
@@ -460,12 +461,12 @@ public abstract class ClientMain {
                 statsPollInterval = Integer.parseInt(parts[1]);
             }
         }
-        ClientFactory.StatsUploaderSettings statsSettings = null;
+        StatsUploaderSettings statsSettings = null;
         if (statsDatabaseURL != null) {
             try {
                 statsSettings =
                     new
-                        ClientFactory.StatsUploaderSettings(
+                        StatsUploaderSettings(
                             statsDatabaseURL,
                             getApplicationName(),
                             getSubApplicationName(),

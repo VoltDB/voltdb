@@ -374,7 +374,7 @@ class Distributer {
             int expectedOutgoingMessageSize,
             int arenaSizes[],
             boolean useMultipleThreads,
-            ClientFactory.StatsUploaderSettings statsSettings) {
+            StatsUploaderSettings statsSettings) {
         if (statsSettings != null) {
             m_statsLoader = new ClientStatsLoader(statsSettings, this);
         } else {

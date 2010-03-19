@@ -60,7 +60,7 @@ public class ClientStatsLoader {
     private PreparedStatement insertProcedureStatsStmt;
 
     public ClientStatsLoader(
-            ClientFactory.StatsUploaderSettings settings,
+            StatsUploaderSettings settings,
             Distributer distributer) {
         m_conn = settings.conn;
         m_applicationName = settings.applicationName;

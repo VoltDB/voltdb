@@ -84,7 +84,7 @@ final class ClientImpl implements Client {
             int expectedOutgoingMessageSize,
             int maxArenaSizes[],
             boolean heavyweight,
-            ClientFactory.StatsUploaderSettings statsSettings) {
+            StatsUploaderSettings statsSettings) {
         m_expectedOutgoingMessageSize = expectedOutgoingMessageSize;
         m_distributer = new Distributer(
                 expectedOutgoingMessageSize,
