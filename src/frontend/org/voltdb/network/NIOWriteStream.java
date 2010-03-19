@@ -218,7 +218,7 @@ public class NIOWriteStream implements WriteStream {
                     backpressureEnded();
                 }
                 m_lastPendingWriteTime = -1;
-                updateQueued(-bytesWritten);
+                updateQueued(-bytesWritten, false);
                 m_bytesWritten += bytesWritten;
                 return bytesWritten;
             }
@@ -375,7 +375,7 @@ public class NIOWriteStream implements WriteStream {
         } else {
             m_lastPendingWriteTime = -1;
         }
-        updateQueued(-bytesWritten);
+        updateQueued(-bytesWritten, false);
         m_bytesWritten += bytesWritten;
         return bytesWritten;
     }
@@ -413,7 +413,7 @@ public class NIOWriteStream implements WriteStream {
                 return false;
             }
             updateLastPendingWriteTimeAndQueueBackpressure();
-            updateQueued(c.b.remaining());
+            updateQueued(c.b.remaining(), true);
             m_queuedBuffers.offer(c);
             m_port.setInterests( SelectionKey.OP_WRITE, 0);
         }
@@ -512,7 +512,7 @@ public class NIOWriteStream implements WriteStream {
     @Override
     public boolean enqueue(final ByteBuffer b) {
         assert(b != null);
-        assert(!b.isDirect());//Dont' queue direct buffers, they leak memory without a container
+        assert(!b.isDirect());//Don't queue direct buffers, they leak memory without a container
         if (b.remaining() == 0) {
             return false;
         }
@@ -544,7 +544,7 @@ public class NIOWriteStream implements WriteStream {
                     public void cancel() {}
                 });
             } else {
-                updateQueued(b.remaining());
+                updateQueued(b.remaining(), true);
                 m_queuedBuffers.offer(DBBPool.wrapBB(b));
             }
             m_port.setInterests( SelectionKey.OP_WRITE, 0);
@@ -585,7 +585,7 @@ public class NIOWriteStream implements WriteStream {
             assert(results[ii].b != null);
             ii++;
         }
-        updateQueued(bytesQueued);
+        updateQueued(bytesQueued, true);
         return results;
     }
 
@@ -601,7 +601,7 @@ public class NIOWriteStream implements WriteStream {
             bytesReleased += c.b.remaining();
             c.discard();
         }
-        updateQueued(-bytesReleased);
+        updateQueued(-bytesReleased, false);
         DeferredSerialization ds = null;
         while ((ds = m_queuedWrites.poll()) != null) {
             ds.cancel();
@@ -625,9 +625,12 @@ public class NIOWriteStream implements WriteStream {
         }
     }
 
-    private void updateQueued(int queued) {
+    private void updateQueued(int queued, boolean noBackpressureSignal) {
         if (m_monitor != null) {
-            m_monitor.queue(queued);
+            boolean shouldSignalBackpressure = m_monitor.queue(queued);
+            if (!noBackpressureSignal && shouldSignalBackpressure) {
+                backpressureStarted();
+            }
         }
     }
 }

@@ -22,5 +22,10 @@ package org.voltdb.network;
  * if necessary
  */
 public interface QueueMonitor {
-    public void queue(int bytes);
+    /**
+     * Indicates whether the write stream should signal backpressure
+     * @param bytes
+     * @return True if the write stream should signal backpressure and false otherwise.
+     */
+    public boolean queue(int bytes);
 }

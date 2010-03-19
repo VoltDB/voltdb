@@ -107,14 +107,14 @@ public class ClientInterface implements DumpManager.Dumpable {
         private int m_queued = 0;
 
         @Override
-        public void queue(int queued) {
+        public boolean queue(int queued) {
             synchronized (m_connections) {
                 m_queued += queued;
                 if (m_queued > MAX_QUEABLE) {
                     if (m_hasGlobalClientBackPressure || m_hasDTXNBackPressure) {
                         m_hasGlobalClientBackPressure = true;
                         //Guaranteed to already have reads disabled
-                        return;
+                        return false;
                     }
 
                     m_hasGlobalClientBackPressure = true;
@@ -123,7 +123,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                     }
                 } else {
                     if (!m_hasGlobalClientBackPressure) {
-                        return;
+                        return false;
                     }
 
                     if (m_hasGlobalClientBackPressure && !m_hasDTXNBackPressure) {
@@ -148,6 +148,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                     m_hasGlobalClientBackPressure = false;
                 }
             }
+            return false;
         }
     };
 

@@ -128,7 +128,7 @@ class Distributer {
         }
     }
 
-    class NodeConnection extends VoltProtocolHandler {
+    class NodeConnection extends VoltProtocolHandler implements org.voltdb.network.QueueMonitor {
         private final HashMap<Long, Object[]> m_callbacks;
         private final HashMap<String, ProcedureStats> m_stats
             = new HashMap<String, ProcedureStats>();
@@ -304,15 +304,12 @@ class Distributer {
 
         @Override
         public Runnable onBackPressure() {
-            return new Runnable() {
-                @Override
-                public void run() {}
-            };
+            return null;
         }
 
         @Override
         public QueueMonitor writestreamMonitor() {
-            return null;
+            return this;
         }
 
         /**
@@ -342,6 +339,18 @@ class Distributer {
                     invocationsAbortsThisTime,
                     invocationErrorsThisTime
             };
+        }
+
+        private int m_queuedBytes = 0;
+        private final int m_maxQueuedBytes = 2097152;
+
+        @Override
+        public boolean queue(int bytes) {
+            m_queuedBytes += bytes;
+            if (m_queuedBytes > m_maxQueuedBytes) {
+                return true;
+            }
+            return false;
         }
     }
 
