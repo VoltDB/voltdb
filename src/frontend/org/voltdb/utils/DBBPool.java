@@ -84,25 +84,25 @@ public final class DBBPool {
                     }
                 }
 
-                /**
-                 * It is possible to detect buffers not discarded by checking
-                 * to see of the buffer is not null as dicarded would have nulled
-                 * out the field.
-                 */
-                @Override
-                public void finalize() {
-                    if (traceAllocations && b != null) {
-                        System.err.println("DBBContainer was finalized without being released. Probable resource leak");
-//                        if (allocatedForException != null) {
-//                            System.err.println("Allocated at");
-//                            allocatedForException.printStackTrace();
-//                        }
-                        System.err.println("From pool " + m_arena.m_pool);
-                        m_arena.m_pool.poolLocation.printStackTrace();
-                        System.err.flush();
-                        VoltDB.crashVoltDB();
-                    }
-                }
+//                /**
+//                 * It is possible to detect buffers not discarded by checking
+//                 * to see of the buffer is not null as dicarded would have nulled
+//                 * out the field.
+//                 */
+//                @Override
+//                public void finalize() {
+//                    if (traceAllocations && b != null) {
+//                        System.err.println("DBBContainer was finalized without being released. Probable resource leak");
+////                        if (allocatedForException != null) {
+////                            System.err.println("Allocated at");
+////                            allocatedForException.printStackTrace();
+////                        }
+//                        System.err.println("From pool " + m_arena.m_pool);
+//                        m_arena.m_pool.poolLocation.printStackTrace();
+//                        System.err.flush();
+//                        VoltDB.crashVoltDB();
+//                    }
+//                }
             }
 
             /**
@@ -180,8 +180,7 @@ public final class DBBPool {
                             " while some portions were loaned out");
                 }
                 for (int ii = 0; ii < m_slices.length; ii++) {
-                    m_slices[ii].b = null;
-                    m_slices[ii].address = 0;
+                    m_slices[ii] = null;
                 }
                 m_b.discard();
             }
@@ -411,12 +410,12 @@ public final class DBBPool {
          * Pointer to the location in memory where this buffer is located. Useful if you
          * want to pass it to the native side so it doesn't have to call GetDirectBufferAddress.
          */
-        public long address;
+        final public long address;
 
         /**
          * The buffer
          */
-        public ByteBuffer b;
+        final public ByteBuffer b;
 
         public BBContainer(ByteBuffer b, long address) {
             this.b = b;
