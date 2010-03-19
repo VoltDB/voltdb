@@ -32,6 +32,11 @@
 #endif
 namespace voltdb {
 
+// Created this simple comparitor to compare addresses of BlockPairs for sorting
+bool simplePairAddressToPairAddressComparator(const BlockPair a, const BlockPair b) {
+        return a.first < b.first;
+}
+// These next two methods here do some Ariel-foo that probably merits a comment.
 #ifdef MEMCHECK
 bool pairAddressToPairAddressComparator(const BlockPair a, const BlockPair b) {
     return a.pair.first + a.tupleLength < b.pair.first;
@@ -60,7 +65,7 @@ CopyOnWriteContext::CopyOnWriteContext(Table *table, TupleSerializer *serializer
 #endif
         m_blocks[ii] = p;
     }
-    std::sort( m_blocks.begin(), m_blocks.end(), pairAddressToPairAddressComparator);
+    std::sort( m_blocks.begin(), m_blocks.end(), simplePairAddressToPairAddressComparator);
 #ifdef DEBUG
 #ifndef MEMCHECK
     for (int ii = 0; ii < m_blocks.size() - 1; ii++) {

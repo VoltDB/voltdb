@@ -145,9 +145,9 @@ public class FastDeserializer implements DataInput {
      * @throws IOException Rethrows any IOExceptions.
      */
     public String readString() throws IOException {
-        final short NULL_STRING_INDICATOR = -1;
+        final int NULL_STRING_INDICATOR = -1;
 
-        final int len = readShort();
+        final int len = readInt();
 
         // check for null string
         if (len == NULL_STRING_INDICATOR)

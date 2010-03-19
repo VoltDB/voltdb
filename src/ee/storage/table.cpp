@@ -315,11 +315,11 @@ bool Table::serializeColumnHeaderTo(SerializeOutput &serialize_io) {
             // column name: write (offset, length) for column definition, and string to string table
             const string& name = columnName(i);
             // column names can't be null, so length must be >= 0
-            int16_t length = static_cast<int16_t>(name.size());
+            int32_t length = static_cast<int32_t>(name.size());
             assert(length >= 0);
 
             // this is standard string serialization for voltdb
-            serialize_io.writeShort(length);
+            serialize_io.writeInt(length);
             serialize_io.writeBytes(name.data(), length);
         }
 

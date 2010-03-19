@@ -164,18 +164,18 @@ public class TestTableSaveFile extends TestCase
          * 2 bytes metadata length
          * 2 bytes column count
          * 1 byte column type
-         * 2 byte column name length
+         * 4 byte column name length
          * 3 byte column name
          */
         // Subtract off the fake table column header and the header and
         // tuple lengths
         ByteBuffer tableHeader = savefile.getTableHeader();
         tableHeader.position(0);
-        assertEquals(2 + 2 + 1 + 2 + 3, tableHeader.remaining());
-        assertEquals(tableHeader.getShort(), 8);
+        assertEquals(2 + 2 + 1 + 4 + 3, tableHeader.remaining());
+        assertEquals(tableHeader.getShort(), 10);
         assertEquals(tableHeader.getShort(), 1);
         assertEquals(tableHeader.get(), VoltType.STRING.getValue());
-        assertEquals(tableHeader.getShort(), 3);
+        assertEquals(tableHeader.getInt(), 3);
         byte columnNameBytes[] = new byte[3];
         tableHeader.get(columnNameBytes);
         String columnName = new String(columnNameBytes, "UTF-8");

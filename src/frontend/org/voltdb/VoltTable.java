@@ -49,7 +49,7 @@ TABLE BODY DATA:
 
 Strings are represented as:
 
-[short: offset][bytes: stringdata]
+[int: length-prefix][bytes: stringdata]
 
 where offset is the starting byte in the raw string bytes buffer, and length is the number of bytes
 in the string.
@@ -105,7 +105,7 @@ rely on the garbage collector.
  */
 public final class VoltTable extends VoltTableRow implements FastSerializable {
 
-    static final short NULL_STRING_INDICATOR = -1;
+    static final int NULL_STRING_INDICATOR = -1;
     static final String METADATA_ENCODING = "US-ASCII";
     static final String ROWDATA_ENCODING = "UTF-8";
 
@@ -350,7 +350,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
         int pos = 2 + 2 + m_colCount;
         String name = null;
         for (int i = 0; i < index; i++)
-            pos += m_buffer.getShort(pos) + 2;
+            pos += m_buffer.getInt(pos) + 4;
         name = readString(pos, METADATA_ENCODING);
         assert(name != null);
 
@@ -482,7 +482,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
                             m_buffer.putDouble(VoltType.NULL_FLOAT);
                             break;
                         case STRING:
-                            m_buffer.putShort(NULL_STRING_INDICATOR);
+                            m_buffer.putInt(NULL_STRING_INDICATOR);
                             break;
                         case DECIMAL:
                             VoltDecimalHelper.serializeNull(m_buffer);
@@ -932,31 +932,31 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
 
     private final void writeStringToBuffer(String s, String encoding, ByteBuffer b) {
         if (s == null) {
-            b.putShort(NULL_STRING_INDICATOR);
+            b.putInt(NULL_STRING_INDICATOR);
             return;
         }
 
-        short len = 0;
+        int len = 0;
         byte[] strbytes = null;
         try {
             strbytes = s.getBytes(encoding);
-            len = (short) strbytes.length;
+            len = strbytes.length;
         } catch (UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }
         assert (strbytes != null);
-        b.putShort(len);
+        b.putInt(len);
         b.put(strbytes);
     }
 
     private final void writeStringToBuffer(byte[] s, ByteBuffer b) {
         if (s == null) {
-            b.putShort(NULL_STRING_INDICATOR);
+            b.putInt(NULL_STRING_INDICATOR);
             return;
         }
 
-        short len = (short) s.length;
-        b.putShort(len);
+        int len = s.length;
+        b.putInt(len);
         b.put(s);
     }
 
@@ -981,7 +981,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
         assert(m_colCount > 0);
         assert(m_rowStart > 0);
         // minimum reasonable table size
-        final int minsize = 2 + 2 + 1 + 2 + 4;
+        final int minsize = 2 + 2 + 1 + 4 + 4;
         assert(m_buffer.capacity() >= minsize);
         assert(m_buffer.limit() >= minsize);
         if (m_buffer.position() < minsize) {
@@ -990,7 +990,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
         }
 
         int rowStart = m_buffer.getShort(0) + 2;
-        if (rowStart < (2 + 2 + 1 + 2)) {
+        if (rowStart < (2 + 2 + 1 + 4)) {
             System.err.printf("rowStart with value %d is smaller than it should be.\n", rowStart);
             return false;
         }

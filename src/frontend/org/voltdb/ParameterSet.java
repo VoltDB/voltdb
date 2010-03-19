@@ -109,7 +109,7 @@ import org.voltdb.types.VoltDecimalHelper;
                 if (m_serializingToEE && obj instanceof byte[]) {
                     byte[] b = (byte[]) obj;
                     out.writeByte(VoltType.STRING.getValue());
-                    out.writeShort(b.length);
+                    out.writeInt(b.length);
                     out.write(b);
                     continue;
                 }
@@ -160,7 +160,7 @@ import org.voltdb.types.VoltDecimalHelper;
             }
             else if (obj == VoltType.NULL_STRING) {
                 out.writeByte(VoltType.STRING.getValue());
-                out.writeShort(VoltType.NULL_STRING_LENGTH);
+                out.writeInt(VoltType.NULL_STRING_LENGTH);
                 continue;
             }
             else if (obj == VoltType.NULL_DECIMAL) {

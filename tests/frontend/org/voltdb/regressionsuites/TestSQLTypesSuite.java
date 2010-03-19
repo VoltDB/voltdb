@@ -352,7 +352,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
     }
 
     /** A 100k blob (as part of tpc-e) crashed. Regression test this. */
-    public void testWayTooBigString() throws IOException, ProcCallException {
+    /*public void testWayTooBigString() throws IOException, ProcCallException {
         final Client client = getClient();
         boolean caught = false;
         final Object params[] = new Object[COLS + 2];
@@ -390,7 +390,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
             }
             assertTrue(caught);
         }
-    }
+    }*/
 
     /**
      * Test that the max serializable string length is correctly handled.
@@ -944,10 +944,6 @@ public class TestSQLTypesSuite extends RegressionSuite {
     //
     public TestSQLTypesSuite(final String name) {
         super(name);
-    }
-
-    public static void main(final String args[]) {
-        org.junit.runner.JUnitCore.runClasses(TestSQLTypesSuite.class);
     }
 
     static public junit.framework.Test suite() {

@@ -156,17 +156,9 @@ public:
         return result;
     }
 
-    /** copy a string from the buffer, given a length */
-    inline std::string readTextString(int16_t stringLength) {
-        assert(stringLength >= 0);
-        return std::string(reinterpret_cast<const char*>(getRawPointer(stringLength)),
-                stringLength);
-    };
-
-
     /** Copy a string from the buffer. */
     inline std::string readTextString() {
-        int16_t stringLength = readShort();
+        int32_t stringLength = readInt();
         assert(stringLength >= 0);
         return std::string(reinterpret_cast<const char*>(getRawPointer(stringLength)),
                 stringLength);
@@ -174,7 +166,7 @@ public:
 
     /** Copy a ByteArray from the buffer. */
     inline ByteArray readBinaryString() {
-        int16_t stringLength = readShort();
+        int32_t stringLength = readInt();
         assert(stringLength >= 0);
         return ByteArray(reinterpret_cast<const char*>(getRawPointer(stringLength)),
                 stringLength);
@@ -317,12 +309,11 @@ public:
     // this explicitly accepts char* and length (or ByteArray)
     // as std::string's implicit construction is unsafe!
     inline void writeBinaryString(const void* value, size_t length) {
-        assert(length <= static_cast<size_t>(std::numeric_limits<int16_t>::max()));
-        int16_t stringLength = static_cast<int16_t>(length);
+        int32_t stringLength = static_cast<int32_t>(length);
         assureExpand(length + sizeof(stringLength));
 
         // do a newtork order conversion
-        int16_t networkOrderLen = htons(stringLength);
+        int32_t networkOrderLen = htonl(stringLength);
 
         char* current = buffer_ + position_;
         memcpy(current, &networkOrderLen, sizeof(networkOrderLen));

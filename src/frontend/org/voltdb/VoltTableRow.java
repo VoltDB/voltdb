@@ -60,7 +60,7 @@ public abstract class VoltTableRow {
 
     static final int ROW_HEADER_SIZE = Short.SIZE/8;
     static final int ROW_COUNT_SIZE = Integer.SIZE/8;
-    static final int STRING_LEN_SIZE = Short.SIZE/8;
+    static final int STRING_LEN_SIZE = Integer.SIZE/8;
     static final int INVALID_ROW_INDEX = -1;
 
     /** Stores the row data (and possibly much more) */
@@ -122,7 +122,7 @@ public abstract class VoltTableRow {
             final VoltType type = getColumnType(i - 1);
             // handle variable length types specially
             if (type == VoltType.STRING) {
-                final short strlen = m_buffer.getShort(m_offsets[i - 1]);
+                final int strlen = m_buffer.getInt(m_offsets[i - 1]);
                 if (strlen == VoltTable.NULL_STRING_INDICATOR)
                     m_offsets[i] = m_offsets[i - 1] + STRING_LEN_SIZE;
                 else if (strlen < 0)
@@ -442,7 +442,7 @@ public abstract class VoltTableRow {
         validateColumnType(columnIndex, VoltType.STRING);
         int pos = m_buffer.position();
         m_buffer.position(getOffset(columnIndex));
-        short len = m_buffer.getShort();
+        int len = m_buffer.getInt();
         if (len == VoltTable.NULL_STRING_INDICATOR) {
             m_wasNull = true;
             m_buffer.position(pos);
@@ -591,14 +591,14 @@ public abstract class VoltTableRow {
 
     /** Reads a string from a buffer with a specific encoding. */
     protected final String readString(int position, String encoding) {
-        final int len = m_buffer.getShort(position);
+        final int len = m_buffer.getInt(position);
         //System.out.println(len);
 
         // check for null string
         if (len == VoltTable.NULL_STRING_INDICATOR)
             return null;
 
-        if (len < 0 || len > Short.MAX_VALUE) {
+        if (len < 0) {
             throw new RuntimeException("Invalid object length.");
         }
 

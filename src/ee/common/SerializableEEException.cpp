@@ -30,7 +30,7 @@ void SerializableEEException::serialize(ReferenceSerializeOutput *output) {
     output->writeByte(static_cast<int8_t>(m_exceptionType));
     const char *messageBytes = m_message.c_str();
     const std::size_t messageLength = m_message.length();
-    output->writeShort(static_cast<int16_t>(messageLength));
+    output->writeShort(static_cast<int32_t>(messageLength));
     output->writeBytes(messageBytes, messageLength);
     p_serialize(output);
     const int16_t length = static_cast<int16_t>(output->position() - (lengthPosition + sizeof(int16_t)));

@@ -32,19 +32,18 @@ import java.nio.channels.SocketChannel;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import junit.framework.TestCase;
+
 import org.junit.Test;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltdb.client.ProcCallException;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.network.Connection;
 import org.voltdb.network.QueueMonitor;
-import org.voltdb.network.VoltProtocolHandler;
 import org.voltdb.network.VoltNetwork;
-
-import junit.framework.*;
+import org.voltdb.network.VoltProtocolHandler;
 
 public class TestDistributer extends TestCase {
 
@@ -150,9 +149,9 @@ public class TestDistributer extends TestCase {
                         final ByteBuffer lengthBuffer = ByteBuffer.allocate(5);//Extra byte for version also
                         client.read(lengthBuffer);
 
-                        final ByteBuffer usernameLengthBuffer = ByteBuffer.allocate(2);
+                        final ByteBuffer usernameLengthBuffer = ByteBuffer.allocate(4);
                         client.read(usernameLengthBuffer); usernameLengthBuffer.flip();
-                        final int usernameLength = usernameLengthBuffer.getShort();
+                        final int usernameLength = usernameLengthBuffer.getInt();
                         final ByteBuffer usernameBuffer = ByteBuffer.allocate(usernameLength);
                         client.read(usernameBuffer); usernameBuffer.flip();
 

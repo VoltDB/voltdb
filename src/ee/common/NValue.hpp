@@ -1715,7 +1715,7 @@ inline void NValue::deserializeFrom(SerializeInput &input, const ValueType type,
         *reinterpret_cast<double* >(storage) = input.readDouble();
         break;
       case VALUE_TYPE_VARCHAR: {
-          const int16_t length = input.readShort();
+          const int32_t length = input.readInt();
           // the NULL SQL string is a NULL C pointer
           if (isInlined) {
               *reinterpret_cast<int16_t*>(storage) = length;
@@ -1788,7 +1788,7 @@ inline const NValue NValue::deserializeFromAllocateForStorage(SerializeInput &in
         retval.getDouble() = input.readDouble();
         break;
       case VALUE_TYPE_VARCHAR: {
-          const int16_t length = input.readShort();
+          const int32_t length = input.readInt();
           // the NULL SQL string is a NULL C pointer
           if (length == OBJECTLENGTH_NULL) {
               retval.setNull();
@@ -1830,14 +1830,14 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
     switch (type) {
       case VALUE_TYPE_VARCHAR: {
           if (isNull()) {
-              output.writeShort(OBJECTLENGTH_NULL);
+              output.writeInt(OBJECTLENGTH_NULL);
               break;
           }
-          const int16_t length = getObjectLength();
+          const int32_t length = getObjectLength();
           if (length < OBJECTLENGTH_NULL) {
               throw std::exception();
           }
-          output.writeShort(static_cast<int16_t>(length));
+          output.writeInt(static_cast<int32_t>(length));
           if (length != OBJECTLENGTH_NULL) {
               // Not a null string: write it out
               const char * str = reinterpret_cast<const char*>(getObjectValue());
