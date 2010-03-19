@@ -35,7 +35,6 @@ PRIMARY ENTRY POINTS
     <java fork="yes" classname="##package_prefix##.Client" >
         <jvmarg value="-server" />
         <jvmarg value="-Xmx512m" />
-        <jvmarg value="-XX:+AggressiveOpts" />
         <classpath refid='project.classpath' />
         <assertions><disable /></assertions>
     </java>
@@ -48,7 +47,6 @@ PRIMARY ENTRY POINTS
         <jvmarg value="-Djava.library.path=##voltdb_lib_path##" />
         <jvmarg value="-server" />
         <jvmarg value="-Xmx512m" />
-        <jvmarg value="-XX:+AggressiveOpts" />
         <classpath refid='project.classpath' />
         <assertions><disable /></assertions>
     </java>
