@@ -132,7 +132,7 @@ public class TableSaveFile
          *  and is supplied by the chunk
          */
         lengthBuffer.clear();
-        lengthBuffer.limit(2);
+        lengthBuffer.limit(4);
         /*
          * Why this stupidity and no while loop?
          * Because java is broken and complains about a random final
@@ -144,23 +144,23 @@ public class TableSaveFile
                 throw new EOFException();
             }
         }
-        crc.update(lengthBuffer.array(), 0, 2);
+        crc.update(lengthBuffer.array(), 0, 4);
         lengthBuffer.flip();
-        length = lengthBuffer.getShort();
+        length = lengthBuffer.getInt();
 
-        if (length < 2) {
+        if (length < 4) {
             throw new IOException("Corrupted save file has negative length or too small length for VoltTable header");
         }
 
-        m_tableHeader = ByteBuffer.allocate(length + 2);
-        m_tableHeader.putShort((short)length);
+        m_tableHeader = ByteBuffer.allocate(length + 4);
+        m_tableHeader.putInt(length);
         while (m_tableHeader.hasRemaining()) {
             final int read = m_saveFile.read(m_tableHeader);
             if (read == -1) {
                 throw new EOFException();
             }
         }
-        crc.update(m_tableHeader.array(), 2, length);
+        crc.update(m_tableHeader.array(), 4, length);
 
         final int actualCRC = (int)crc.getValue();
         if (originalCRC != actualCRC) {

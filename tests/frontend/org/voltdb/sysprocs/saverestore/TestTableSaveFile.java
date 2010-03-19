@@ -42,9 +42,8 @@ import org.voltdb.utils.DBBPool.BBContainer;
  * This test also provides pretty good coverage of DefaultSnapshotTarget
  *
  */
-public class TestTableSaveFile extends TestCase
-{
-    private static int[] VERSION = {0, 1, 2, 3};
+public class TestTableSaveFile extends TestCase {
+    private static int[] VERSION = { 0, 1, 2, 3 };
     private static int HOST_ID = 3;
     private static long CREATE_TIME = 2315243;
     private static String CLUSTER_NAME = "TEST_CLUSTER";
@@ -56,17 +55,19 @@ public class TestTableSaveFile extends TestCase
         org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
     }
 
-    private void serializeChunk(VoltTable chunk, DefaultSnapshotDataTarget target) throws Exception {
+    private void serializeChunk(VoltTable chunk,
+            DefaultSnapshotDataTarget target) throws Exception {
         FastSerializer fs = new FastSerializer();
 
         chunk.writeExternal(fs);
         BBContainer c = fs.getBBContainer();
         ByteBuffer b = c.b;
         b.getInt();
-        int headerLength = b.getShort();
+        int headerLength = b.getInt();
         b.position(b.position() + headerLength);// at row count
         final int rowCount = b.getInt();
-        ByteBuffer chunkBuffer = ByteBuffer.allocate(b.remaining() + 12 + target.getHeaderSize());
+        ByteBuffer chunkBuffer = ByteBuffer.allocate(b.remaining() + 12
+                + target.getHeaderSize());
         final CRC32 crc = new CRC32();
         chunkBuffer.position(target.getHeaderSize());
         final int crcPosition = chunkBuffer.position();
@@ -75,11 +76,12 @@ public class TestTableSaveFile extends TestCase
         chunkBuffer.put(b);
         chunkBuffer.putInt(rowCount);
         chunkBuffer.position(crcPosition + 4);
-        crc.update(chunkBuffer.array(), chunkBuffer.position(), chunkBuffer.remaining());
+        crc.update(chunkBuffer.array(), chunkBuffer.position(), chunkBuffer
+                .remaining());
         chunkBuffer.position(crcPosition);
-        chunkBuffer.putInt((int)crc.getValue());
+        chunkBuffer.putInt((int) crc.getValue());
         chunkBuffer.position(0);
-        target.write(new BBContainer( chunkBuffer, 0) {
+        target.write(new BBContainer(chunkBuffer, 0) {
 
             @Override
             public void discard() {
@@ -89,42 +91,30 @@ public class TestTableSaveFile extends TestCase
 
         });
     }
-    private Pair<VoltTable, File> generateTestTable(int numberOfItems) throws Exception
-    {
+
+    private Pair<VoltTable, File> generateTestTable(int numberOfItems)
+            throws Exception {
         VoltTable.ColumnInfo columnInfo[] = new VoltTable.ColumnInfo[] {
                 new ColumnInfo("RT_ID", VoltType.INTEGER),
                 new ColumnInfo("RT_NAME", VoltType.STRING),
                 new ColumnInfo("RT_INTVAL", VoltType.INTEGER),
-                new ColumnInfo("RT_FLOATVAL", VoltType.FLOAT)
-        };
-        VoltTable table =
-            new VoltTable(columnInfo, columnInfo.length);
+                new ColumnInfo("RT_FLOATVAL", VoltType.FLOAT) };
+        VoltTable table = new VoltTable(columnInfo, columnInfo.length);
         final File f = File.createTempFile("foo", "bar");
         f.deleteOnExit();
-        DefaultSnapshotDataTarget dsdt =
-            new DefaultSnapshotDataTarget(
-                    f,
-                    HOST_ID,
-                    CLUSTER_NAME,
-                    DATABASE_NAME,
-                    TABLE_NAME,
-                    TOTAL_PARTITIONS,
-                    false,
-                    new int[] { 0, 1, 2, 3, 4 },
-                    table,
-                    CREATE_TIME,
-                    VERSION);
+        DefaultSnapshotDataTarget dsdt = new DefaultSnapshotDataTarget(f,
+                HOST_ID, CLUSTER_NAME, DATABASE_NAME, TABLE_NAME,
+                TOTAL_PARTITIONS, false, new int[] { 0, 1, 2, 3, 4 }, table,
+                CREATE_TIME, VERSION);
 
-        VoltTable currentChunkTable = new VoltTable(columnInfo, columnInfo.length);
+        VoltTable currentChunkTable = new VoltTable(columnInfo,
+                columnInfo.length);
         for (int i = 0; i < numberOfItems; i++) {
             if (i % 1000 == 0 && i > 0) {
                 serializeChunk(currentChunkTable, dsdt);
                 currentChunkTable = new VoltTable(columnInfo, columnInfo.length);
             }
-            Object[] row = new Object[] {i,
-                                         "name_" + i,
-                                         i,
-                                         new Double(i)};
+            Object[] row = new Object[] { i, "name_" + i, i, new Double(i) };
             currentChunkTable.addRow(row);
             table.addRow(row);
         }
@@ -134,38 +124,24 @@ public class TestTableSaveFile extends TestCase
         return new Pair<VoltTable, File>(table, f, false);
     }
 
-    public void testHeaderAccessors() throws Exception
-    {
+    public void testHeaderAccessors() throws Exception {
         final File f = File.createTempFile("foo", "bar");
         f.deleteOnExit();
-        VoltTable.ColumnInfo columns[] =
-            new VoltTable.ColumnInfo[] { new VoltTable.ColumnInfo("Foo", VoltType.STRING)};
+        VoltTable.ColumnInfo columns[] = new VoltTable.ColumnInfo[] { new VoltTable.ColumnInfo(
+                "Foo", VoltType.STRING) };
         VoltTable vt = new VoltTable(columns, 1);
-        DefaultSnapshotDataTarget dsdt =
-            new DefaultSnapshotDataTarget(
-                    f,
-                    HOST_ID,
-                    CLUSTER_NAME,
-                    DATABASE_NAME,
-                    TABLE_NAME,
-                    TOTAL_PARTITIONS,
-                    false,
-                    new int[] { 0, 1, 2, 3, 4 },
-                    vt,
-                    CREATE_TIME,
-                    VERSION);
+        DefaultSnapshotDataTarget dsdt = new DefaultSnapshotDataTarget(f,
+                HOST_ID, CLUSTER_NAME, DATABASE_NAME, TABLE_NAME,
+                TOTAL_PARTITIONS, false, new int[] { 0, 1, 2, 3, 4 }, vt,
+                CREATE_TIME, VERSION);
         dsdt.close();
 
         FileInputStream fis = new FileInputStream(f);
         TableSaveFile savefile = new TableSaveFile(fis.getChannel(), 3, null);
 
         /*
-         * Table header should be
-         * 4 bytes metadata length
-         * 2 bytes column count
-         * 1 byte column type
-         * 4 byte column name length
-         * 3 byte column name
+         * Table header should be 4 bytes metadata length 2 bytes column count 1
+         * byte column type 4 byte column name length 3 byte column name
          */
         // Subtract off the fake table column header and the header and
         // tuple lengths
@@ -181,8 +157,7 @@ public class TestTableSaveFile extends TestCase
         String columnName = new String(columnNameBytes, "UTF-8");
         assertEquals("Foo", columnName);
 
-        for (int i = 0; i < 4; i++)
-        {
+        for (int i = 0; i < 4; i++) {
             assertEquals(VERSION[i], savefile.getVersionNumber()[i]);
         }
         assertEquals(CREATE_TIME, savefile.getCreateTime());
@@ -198,8 +173,7 @@ public class TestTableSaveFile extends TestCase
         assertEquals(TOTAL_PARTITIONS, savefile.getTotalPartitions());
     }
 
-    public void testFullTable() throws Exception
-    {
+    public void testFullTable() throws Exception {
         Pair<VoltTable, File> generated = generateTestTable(1000);
         VoltTable table = generated.getFirst();
         File f = generated.getSecond();
@@ -217,8 +191,7 @@ public class TestTableSaveFile extends TestCase
         }
     }
 
-    public void testChunkTable() throws Exception
-    {
+    public void testChunkTable() throws Exception {
         Pair<VoltTable, File> generated = generateTestTable(100000);
         VoltTable table = generated.getFirst();
         File f = generated.getSecond();
@@ -228,17 +201,14 @@ public class TestTableSaveFile extends TestCase
 
         VoltTable test_table = null;
         VoltTable reaggregate_table = null;
-        while (savefile.hasMoreChunks())
-        {
+        while (savefile.hasMoreChunks()) {
             BBContainer c = savefile.getNextChunk();
             try {
                 test_table = new VoltTable(c.b, false);
-                if (reaggregate_table == null)
-                {
+                if (reaggregate_table == null) {
                     reaggregate_table = test_table.clone(10000);
                 }
-                while (test_table.advanceRow())
-                {
+                while (test_table.advanceRow()) {
                     // this will add the active row from test_table
                     reaggregate_table.add(test_table);
                 }
