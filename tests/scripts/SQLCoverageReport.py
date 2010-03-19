@@ -185,8 +185,10 @@ def is_different(x):
             return True
         for i in xrange(len(x["jni"]["Result"])):
             x["highlight"].append([])
-            if x["jni"]["Result"][i].columns != x["hsqldb"]["Result"][i].columns:
-                x["highlight"][i].append(2) # Column names and types
+            # Disable column type checking for now because Volt and HSQL don't
+            # promote int types in the same way.
+            # if x["jni"]["Result"][i].columns != x["hsqldb"]["Result"][i].columns:
+            #     x["highlight"][i].append(2) # Column names and types
             if len(x["jni"]["Result"][i].tuples) != \
                     len(x["hsqldb"]["Result"][i].tuples):
                 x["highlight"][i].append(1) # Tuple count

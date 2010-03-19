@@ -61,16 +61,6 @@ def normalize_value(v, type):
     else:
         return v
 
-def normalize_type(v, type):
-    if type == VOLTTYPE_TINYINT or type == VOLTTYPE_SMALLINT \
-            or type == VOLTTYPE_INTEGER:
-        # promote all integer types to bigint to normalize away hsql/volt
-        # casting differences in expression evaluation.
-        return VOLTTYPE_BIGINT
-    else:
-        return type
-
-
 def normalize_values(tuples, columns):
     # 'c' here is a fastserializer.VoltColumn and
     # I assume t is a fastserializer.VoltTable.
@@ -80,7 +70,6 @@ def normalize_values(tuples, columns):
                 normalize_values(tuples[i], columns)
             else:
                 tuples[i] = normalize_value(tuples[i], columns[i].type)
-                columns[i].type = normalize_type(tuples[i], columns[i].type)
 
 def filter_sorted(row, sorted_cols):
     """Extract the values in the ORDER BY columns from a row.
