@@ -28,7 +28,6 @@ public interface VoltDBInterface
 {
     /**
      * Whether calls to crashVoltDB should result in a crash or be ignored
-     * @return
      */
     public boolean ignoreCrash();
 

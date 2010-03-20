@@ -51,15 +51,12 @@
 package org.voltdb.dtxn;
 
 import java.nio.ByteBuffer;
-import java.util.Iterator;
 import java.util.Queue;
 
 import junit.framework.TestCase;
 
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.messages.InitiateResponse;
-import org.voltdb.messages.InitiateTask;
 import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.Messenger;
@@ -127,6 +124,7 @@ public class SimpleDtxnInitiatorTest extends TestCase {
         work.setProcName("foo");
     }
 
+    @SuppressWarnings("unused")
     private final class DummyConnection implements Connection {
         private final DummyWriteStream writeStream = new DummyWriteStream();
         @Override
@@ -160,6 +158,7 @@ public class SimpleDtxnInitiatorTest extends TestCase {
 
     private final class DummyWriteStream implements WriteStream {
 
+        @SuppressWarnings("unused")
         private ClientResponse response;
 
         @Override

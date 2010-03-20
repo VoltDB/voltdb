@@ -70,8 +70,6 @@ public class DDLCompiler {
 
     /**
      * Compile a DDL schema from a file on disk
-     * @param catalog
-     * @param db
      * @param path
      * @throws VoltCompiler.VoltCompilerException
      */
@@ -92,8 +90,6 @@ public class DDLCompiler {
 
     /**
      * Compile a file from an open input stream
-     * @param catalog
-     * @param db
      * @param path
      * @param reader
      * @throws VoltCompiler.VoltCompilerException

@@ -72,7 +72,7 @@ public class TransactionIdManager {
 
     /**
      * Initialize the TransactionIdManager for this site
-     * @param siteId The siteId of the current site.
+     * @param initiatorId The siteId of the current site.
      */
     public TransactionIdManager(int initiatorId) {
         this.initiatorId = initiatorId;

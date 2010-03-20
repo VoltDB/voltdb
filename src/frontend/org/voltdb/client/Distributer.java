@@ -314,7 +314,6 @@ class Distributer {
 
         /**
          * Get counters for invocations completed, aborted, errors. In that order.
-         * @return
          */
         public synchronized long[] getCounters() {
             return new long[] { m_invocationsCompleted, m_invocationAborts, m_invocationErrors };
@@ -323,7 +322,6 @@ class Distributer {
         /**
          * Get counters for invocations completed, aborted, errors. In that order.
          * Count returns count since this method was last invoked
-         * @return
          */
         public synchronized long[] getCountersInterval() {
             final long invocationsCompletedThisTime = m_invocationsCompleted - m_lastInvocationsCompleted;

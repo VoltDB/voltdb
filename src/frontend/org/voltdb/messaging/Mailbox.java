@@ -79,7 +79,7 @@ public interface Mailbox {
     /**
      * Get the next Object from this messaging queue from the default subject.. Blocks if no messages
      * are available.
-     * @param  Timeout Number of milliseconds to wait for work
+     * @param  timeout Number of milliseconds to wait for work
      * @return A message object on success or null if interrupted
      */
     public VoltMessage recvBlocking(long timeout);
@@ -102,7 +102,7 @@ public interface Mailbox {
     /**
      * Get the next Object from this messaging queue from the default subject.. Blocks if no messages
      * are available.
-     * @param  Timeout Number of milliseconds to wait for work
+     * @param  timeout Number of milliseconds to wait for work
      * @return A message object on success or null if interrupted
      */
     public VoltMessage recvBlocking(Subject s, long timeout);

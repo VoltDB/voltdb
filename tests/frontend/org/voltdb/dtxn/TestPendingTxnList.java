@@ -22,7 +22,6 @@
  */
 package org.voltdb.dtxn;
 
-import java.util.List;
 import java.util.Map;
 
 import org.voltdb.StoredProcedureInvocation;

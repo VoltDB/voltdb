@@ -372,7 +372,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     /**
-     * Wrapper for {@link #nativeLoadTable(long, int, byte[], long, long, long)}.
+     * Wrapper for {@link #nativeLoadTable(long, int, byte[], long, long, long, boolean)}.
      */
     @Override
     public void loadTable(final int tableId, final VoltTable table,

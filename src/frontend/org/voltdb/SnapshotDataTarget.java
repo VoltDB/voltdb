@@ -48,8 +48,7 @@ public interface SnapshotDataTarget {
     public void setOnCloseHandler(Runnable onClose);
 
     /**
-     * Get last cached exception that occured during writes
-     * @return
+     * Get last cached exception that occurred during writes
      */
     public IOException getLastWriteException();
 }

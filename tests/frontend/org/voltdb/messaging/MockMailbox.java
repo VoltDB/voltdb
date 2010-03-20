@@ -53,7 +53,6 @@ package org.voltdb.messaging;
 import java.util.ArrayDeque;
 import java.util.Queue;
 
-import org.voltdb.dtxn.SimpleDtxnInitiator;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
 
