@@ -647,7 +647,7 @@ class VoltTable:
         # 3.
         rowcount = self.fser.readInt32()
         for i in xrange(rowcount):
-            rowsize = self.fser.readInt16()
+            rowsize = self.fser.readInt32()
             # list comprehension: build list by calling read for each column in
             # row/tuple
             row = [self.fser.read(self.columns[j].type)
@@ -677,7 +677,7 @@ class VoltTable:
             map(lambda x: row_fser.write(self.columns[x].type, i[x]),
                 xrange(len(i)))
 
-            table_fser.writeInt16(row_fser.size())
+            table_fser.writeInt32(row_fser.size())
             table_fser.writeRawBytes(row_fser.getRawBytes())
 
         table_fser.prependLength()
