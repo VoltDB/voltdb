@@ -17,14 +17,13 @@
 
 package org.voltdb.exceptions;
 
-import java.io.StringWriter;
 import java.io.PrintStream;
 import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 
 import org.voltdb.VoltProcedure;
-import org.voltdb.exceptions.ConstraintFailureException;
 
 /**
  * Base class for runtime exceptions that can be serialized to ByteBuffers without involving Java's
@@ -123,7 +122,7 @@ public class SerializableException extends VoltProcedure.VoltAbortException {
         if (m_message == null) {
             return (short)(3 + 4 + p_getSerializedSize());
         }
-        return (short)(3 + 4 + m_message.getBytes().length + p_getSerializedSize());//one byte ordinal and 2 byte length
+        return (short)(3 + 4 + m_message.getBytes().length + p_getSerializedSize());//one byte ordinal and 4 byte length
     }
 
     /**
@@ -145,10 +144,10 @@ public class SerializableException extends VoltProcedure.VoltAbortException {
         b.put((byte)getExceptionType().ordinal());
         if (m_message != null) {
             final byte messageBytes[] = m_message.getBytes();
-            b.putInt((int)messageBytes.length);
+            b.putInt(messageBytes.length);
             b.put(messageBytes);
         } else {
-            b.putInt((int)0);
+            b.putInt(0);
         }
         p_serializeToBuffer(b);
     }
@@ -184,10 +183,12 @@ public class SerializableException extends VoltProcedure.VoltAbortException {
         return SerializableExceptions.values()[ordinal].deserializeException(b);
     }
 
+    @Override
     public void printStackTrace(PrintStream s) {
         s.print(getMessage());
     }
 
+    @Override
     public void printStackTrace(PrintWriter p) {
         p.print(getMessage());
     }

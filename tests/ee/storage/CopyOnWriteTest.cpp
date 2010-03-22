@@ -299,7 +299,7 @@ TEST_F(CopyOnWriteTest, BigTest) {
             if (out.position() == 0) {
                 break;
             }
-            int ii = 10;//skip partition id and row count and first tuple length
+            int ii = 12;//skip partition id and row count and first tuple length
             while (ii < (serialized - 4)) {
                 int values[2];
                 values[0] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
@@ -311,7 +311,7 @@ TEST_F(CopyOnWriteTest, BigTest) {
                 }
                 ASSERT_TRUE(inserted);
                 totalInserted++;
-                ii += 10;
+                ii += 12;
             }
             for (int jj = 0; jj < 10; jj++) {
                 doRandomTableMutation(m_table);
@@ -384,7 +384,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
             if (out.position() == 0) {
                 break;
             }
-            int ii = 10;//skip partition id and row count and first tuple length
+            int ii = 12;//skip partition id and row count and first tuple length
             while (ii < (serialized - 4)) {
                 int values[2];
                 values[0] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
@@ -396,7 +396,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
                 }
                 ASSERT_TRUE(inserted);
                 totalInserted++;
-                ii += 10;
+                ii += 12;
             }
             for (int jj = 0; jj < 10; jj++) {
                 doRandomTableMutation(m_table);
@@ -473,7 +473,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
             if (out.position() == 0) {
                 break;
             }
-            int ii = 10;//skip partition id and row count and first tuple length
+            int ii = 12;//skip partition id and row count and first tuple length
             while (ii < (serialized - 4)) {
                 int values[2];
                 values[0] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
@@ -485,7 +485,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
                 }
                 ASSERT_TRUE(inserted);
                 totalInserted++;
-                ii += 10;
+                ii += 12;
             }
             for (int jj = 0; jj < 10; jj++) {
                 doRandomTableMutation(m_table);

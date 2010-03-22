@@ -183,8 +183,8 @@ public class HsqlBackend {
                 if (e.getMessage().contains("constraint")) {
                     sqlLog.l7dlog( Level.TRACE, LogKeys.sql_Backend_ConvertingHSQLExtoCFEx.name(), e);
                     final byte messageBytes[] = e.getMessage().getBytes();
-                    ByteBuffer b = ByteBuffer.allocate(19 + messageBytes.length);
-                    b.putShort((short)messageBytes.length);
+                    ByteBuffer b = ByteBuffer.allocate(21 + messageBytes.length);
+                    b.putInt(messageBytes.length);
                     b.put(messageBytes);
                     b.put(e.getSQLState().getBytes());
                     b.putLong(0);//Move forward 8 bytes to provide header info for CFE, ConstraintType, TableId

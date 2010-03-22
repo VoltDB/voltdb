@@ -30,12 +30,12 @@ void DefaultTupleSerializer::serializeTo(TableTuple tuple, ReferenceSerializeOut
  * Calculate the maximum size of a serialized tuple based upon the schema of the table/tuple
  */
 int DefaultTupleSerializer::getMaxSerializedTupleSize(const TupleSchema *schema) {
-    size_t size = 2;
+    size_t size = 4;
     size += static_cast<size_t>(schema->tupleLength());
     for (int ii = 0; ii < schema->columnCount(); ii++) {
         if (!schema->columnIsInlined(ii)) {
             size -= sizeof(void*);
-            size += 2 + schema->columnLength(ii);
+            size += 4 + schema->columnLength(ii);
         }
     }
     return static_cast<int>(size);

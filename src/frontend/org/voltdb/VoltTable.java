@@ -39,13 +39,13 @@ import org.voltdb.types.VoltDecimalHelper;
 A brief overview of the serialized format:
 
 COLUMN HEADER:
-[short: column header size in bytes (non-inclusive)]
+[int: column header size in bytes (non-inclusive)]
 [short: num columns]
 [byte: column type] * num columns
 [string: column name] * num columns
 TABLE BODY DATA:
 [int: num tuples]
-[short: row size (non inclusive), blob row data] * num tuples
+[int: row size (non inclusive), blob row data] * num tuples
 
 Strings are represented as:
 
@@ -396,10 +396,10 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
 
         int pos = m_rowStart + 4;
         for (int i = 0; i < index; i++) {
-            // add two bytes as the row size is non-inclusive
-            pos += m_buffer.getShort(pos) + 2;
+            // add 4 bytes as the row size is non-inclusive
+            pos += m_buffer.getInt(pos) + 4;
         }
-        Row retval = new Row(pos + 2);
+        Row retval = new Row(pos + 4);
         retval.m_activeRowIndex = index;
         return retval;
     }
@@ -448,7 +448,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
             // Allow the buffer to grow to max capacity
             m_buffer.limit(m_buffer.capacity());
             // advance the row size value
-            m_buffer.position(pos + 2);
+            m_buffer.position(pos + 4);
 
             // where does the type bytes start
             // skip rowstart + colcount
@@ -627,12 +627,12 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
 
             m_rowCount++;
             m_buffer.putInt(m_rowStart, m_rowCount);
-            final short rowsize = (short) (m_buffer.position() - pos - 2);
+            final int rowsize = m_buffer.position() - pos - 4;
             // constrain buffer limit back to the new position
             m_buffer.limit(m_buffer.position());
             assert(rowsize >= 0);
             // buffer overflow is caught and handled below.
-            m_buffer.putShort(pos, rowsize);
+            m_buffer.putInt(pos, rowsize);
         }
         catch (BufferOverflowException e) {
             m_buffer.position(pos);
@@ -683,13 +683,13 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
         final VoltType colType = getColumnType(0);
         switch (colType) {
         case TINYINT:
-            return m_buffer.get(m_rowStart + 6);
+            return m_buffer.get(m_rowStart + 8);
         case SMALLINT:
-            return m_buffer.getShort(m_rowStart + 6);
+            return m_buffer.getShort(m_rowStart + 8);
         case INTEGER:
-            return m_buffer.getInt(m_rowStart + 6);
+            return m_buffer.getInt(m_rowStart + 8);
         case BIGINT:
-            return m_buffer.getLong(m_rowStart + 6);
+            return m_buffer.getLong(m_rowStart + 8);
         default:
             throw new IllegalStateException(
                     "table must contain exactly 1 integral value; column 1 is type = " + colType.name());

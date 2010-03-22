@@ -59,11 +59,11 @@ public class SQLException extends SerializableException {
     }
 
     /**
-     * Serialize the five character SQLState, 2 byte string length, and detail message to the
-     * provided ByteBuffer
+     * Serialize the five character SQLState to the provided ByteBuffer
      */
     @Override
     protected void p_serializeToBuffer(ByteBuffer b) {
+        assert (m_sqlState.getBytes().length == 5);
         b.put(m_sqlState.getBytes());
     }
 

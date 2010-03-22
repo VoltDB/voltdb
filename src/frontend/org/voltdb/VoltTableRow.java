@@ -58,7 +58,7 @@ import org.voltdb.types.VoltDecimalHelper;
  */
 public abstract class VoltTableRow {
 
-    static final int ROW_HEADER_SIZE = Short.SIZE/8;
+    static final int ROW_HEADER_SIZE = Integer.SIZE/8;
     static final int ROW_COUNT_SIZE = Integer.SIZE/8;
     static final int STRING_LEN_SIZE = Integer.SIZE/8;
     static final int INVALID_ROW_INDEX = -1;
@@ -198,11 +198,11 @@ public abstract class VoltTableRow {
         if (m_activeRowIndex == 0)
             m_position = getRowStart() + ROW_COUNT_SIZE + ROW_HEADER_SIZE;
         else {
-            short rowlength = m_buffer.getShort(m_position - ROW_HEADER_SIZE);
+            int rowlength = m_buffer.getInt(m_position - ROW_HEADER_SIZE);
             if (rowlength <= 0) {
                 throw new RuntimeException("Invalid row length.");
             }
-            m_position += rowlength + 2;
+            m_position += rowlength + ROW_HEADER_SIZE;
             if (m_position >= m_buffer.limit())
                 throw new RuntimeException("Row length exceeds table boundary.");
         }

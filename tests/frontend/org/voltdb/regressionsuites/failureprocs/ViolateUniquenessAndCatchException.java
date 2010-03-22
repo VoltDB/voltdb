@@ -23,7 +23,9 @@
 
 package org.voltdb.regressionsuites.failureprocs;
 
-import org.voltdb.*;
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
 
 @ProcInfo (
     partitionInfo = "NEW_ORDER.NO_W_ID: 2",
@@ -45,6 +47,9 @@ public class ViolateUniquenessAndCatchException extends VoltProcedure {
             String description = e.toString();
             System.out.println(description);
         }
+        /*catch (Exception e) {
+            e.printStackTrace();
+        }*/
 
         return retval;
     }

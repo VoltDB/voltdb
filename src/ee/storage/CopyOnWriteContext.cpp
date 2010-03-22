@@ -88,7 +88,7 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
     int rowsSerialized = 0;
 
     TableTuple tuple(m_table->schema());
-    if (out->remaining() < m_maxTupleLength) {
+    if (out->remaining() < (m_maxTupleLength + sizeof(int32_t))) {
         throw std::runtime_error("Serialize more should never be called "
                 "a 2nd time after return indicating there is no more data");
 //        out->writeInt(0);
@@ -96,7 +96,7 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
 //        return false;
     }
 
-    while (out->remaining() >= m_maxTupleLength) {
+    while (out->remaining() >= (m_maxTupleLength + sizeof(int32_t))) {
         const bool hadMore = m_iterator->next(tuple);
 
         /**

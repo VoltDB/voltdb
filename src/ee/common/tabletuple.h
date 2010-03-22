@@ -501,7 +501,7 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInput &tupleIn, Pool *d
     assert(m_schema);
     assert(m_data);
 
-    tupleIn.readShort();
+    tupleIn.readInt();
     for (int j = 0; j < m_schema->columnCount(); ++j) {
         const ValueType type = m_schema->columnType(j);
         /**
@@ -523,7 +523,7 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInput &tupleIn, Pool *d
 }
 
 inline void TableTuple::serializeTo(voltdb::SerializeOutput &output) {
-    size_t start = output.reserveBytes(2);
+    size_t start = output.reserveBytes(4);
 
     for (int j = 0; j < m_schema->columnCount(); ++j) {
         //int fieldStart = output.position();
@@ -532,7 +532,7 @@ inline void TableTuple::serializeTo(voltdb::SerializeOutput &output) {
     }
 
     // write the length of the tuple
-    output.writeShortAt(start, static_cast<int16_t>(output.position() - start - 2));
+    output.writeIntAt(start, static_cast<int32_t>(output.position() - start - sizeof(int32_t)));
 }
 
 inline
