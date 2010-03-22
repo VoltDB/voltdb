@@ -152,6 +152,10 @@ public class TableSaveFile
             throw new IOException("Corrupted save file has negative length or too small length for VoltTable header");
         }
 
+        if (length > 2097152) {
+            throw new IOException("Corrupted save file has unreasonable VoltTable header length > 2 megs");
+        }
+
         m_tableHeader = ByteBuffer.allocate(length + 4);
         m_tableHeader.putInt(length);
         while (m_tableHeader.hasRemaining()) {
