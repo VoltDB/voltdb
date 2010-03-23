@@ -211,12 +211,13 @@ bool PersistentTable::insertTuple(TableTuple &source) {
  * Insert a tuple but don't allocate a new copy of the uninlineable
  * strings or create an UndoAction or update a materialized view.
  */
-bool PersistentTable::insertTupleForUndo(TableTuple &source, size_t wrapperOffset) {
+void PersistentTable::insertTupleForUndo(TableTuple &source, size_t wrapperOffset) {
 
     // not null checks at first
     if (!checkNulls(source)) {
-        // ENG-369 - should this terminate the EE?
-        return false;
+        throwFatalException("Failed to insert tuple into table %d for undo:"
+                            " null constraint violation\n%s\n", m_id,
+                            source.debugNoHeader().c_str());
     }
 
     // rollback ELT
@@ -251,14 +252,14 @@ bool PersistentTable::insertTupleForUndo(TableTuple &source, size_t wrapperOffse
 
     if (!tryInsertOnAllIndexes(&m_tmpTarget1)) {
         deleteTupleStorage(m_tmpTarget1);
-        return false;
+        throwFatalException("Failed to insert tuple into table %d for undo:"
+                            " unique constraint violation\n%s\n", m_id,
+                            m_tmpTarget1.debugNoHeader().c_str());
     }
 
     if (m_exportEnabled) {
         m_wrapper->rollbackTo(wrapperOffset);
     }
-
-    return true;
 }
 
 /*
@@ -350,7 +351,7 @@ bool PersistentTable::updateTuple(TableTuple &source, TableTuple &target, bool u
  * changed). The backup is necessary because the indexes expect the
  * data ptr that will be used as the value in the index.
  */
-bool PersistentTable::updateTupleForUndo(TableTuple &source, TableTuple &target,
+void PersistentTable::updateTupleForUndo(TableTuple &source, TableTuple &target,
                                          bool revertIndexes, size_t wrapperOffset) {
     //Need to back up the updated version of the tuple to provide to
     //the indexes when updating The indexes expect source's data Ptr
@@ -376,8 +377,10 @@ bool PersistentTable::updateTupleForUndo(TableTuple &source, TableTuple &target,
     if (revertIndexes) {
         if (!tryUpdateOnAllIndexes(targetBackup, target)) {
             // TODO: this might be too strict. see insertTuple()
-            // ENG-369 - should this terminate the EE?
-            return false;
+            throwFatalException("Failed to update tuple in table %d for undo:"
+                                " unique constraint violation\n%s\n%s\n", m_id,
+                                targetBackup.debugNoHeader().c_str(),
+                                target.debugNoHeader().c_str());
         }
         updateFromAllIndexes(targetBackup, target);
     }
@@ -385,8 +388,6 @@ bool PersistentTable::updateTupleForUndo(TableTuple &source, TableTuple &target,
     if (m_exportEnabled) {
         m_wrapper->rollbackTo(wrapperOffset);
     }
-
-    return true;
 }
 
 bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedStrings) {
@@ -442,11 +443,12 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
  * correct dirty setting when the tuple was originally inserted.
  * TODO remove duplication with regular delete. Also no view updates.
  */
-bool PersistentTable::deleteTupleForUndo(voltdb::TableTuple &tupleCopy, size_t wrapperOffset) {
+void PersistentTable::deleteTupleForUndo(voltdb::TableTuple &tupleCopy, size_t wrapperOffset) {
     TableTuple target = lookupTuple(tupleCopy);
     if (target.isNullTuple()) {
-        // ENG-369 - should this terminate the EE?
-        return false;
+        throwFatalException("Failed to delete tuple from table %d:"
+                            " tuple does not exist\n%s\n", m_id,
+                            tupleCopy.debugNoHeader().c_str());
     }
     else {
         // Make sure that they are not trying to delete the same tuple twice
@@ -470,7 +472,6 @@ bool PersistentTable::deleteTupleForUndo(voltdb::TableTuple &tupleCopy, size_t w
         }
 
         deleteTupleStorage(target);
-        return true;
     }
 }
 

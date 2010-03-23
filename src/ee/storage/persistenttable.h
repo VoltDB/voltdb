@@ -131,7 +131,7 @@ class PersistentTable : public Table {
      * Inserts a Tuple without performing an allocation for the
      * uninlined strings.
      */
-    bool insertTupleForUndo(TableTuple &source, size_t elMark);
+    void insertTupleForUndo(TableTuple &source, size_t elMark);
 
     /*
      * Note that inside update tuple the order of sourceTuple and
@@ -146,7 +146,7 @@ class PersistentTable : public Table {
      * for unlined columns is performed because that will be handled
      * by the UndoAction.
      */
-    bool updateTupleForUndo(TableTuple &sourceTuple, TableTuple &targetTuple,
+    void updateTupleForUndo(TableTuple &sourceTuple, TableTuple &targetTuple,
                             bool revertIndexes, size_t elMark);
 
     /*
@@ -154,7 +154,7 @@ class PersistentTable : public Table {
      * index lookup.
      */
     bool deleteTuple(TableTuple &tuple, bool freeAllocatedStrings);
-    bool deleteTupleForUndo(voltdb::TableTuple &tupleCopy, size_t elMark);
+    void deleteTupleForUndo(voltdb::TableTuple &tupleCopy, size_t elMark);
 
     /*
      * Lookup the address of the tuple that is identical to the specified tuple.
