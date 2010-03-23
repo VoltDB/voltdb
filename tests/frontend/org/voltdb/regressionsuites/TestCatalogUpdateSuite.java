@@ -97,6 +97,10 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
         assertTrue(results.length == 0);
 
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-onesite-many.jar");
+        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
+        assertTrue(results.length == 0);
+
         assertTrue(true);
     }
 
@@ -127,15 +131,6 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         }
         catch (Exception e) {
             assertTrue(e.getMessage().startsWith("Unable to read from catalog"));
-        }
-
-        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-onesite-many.jar");
-        try {
-            client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
-            fail();
-        }
-        catch (Exception e) {
-            assertTrue(e.getMessage().startsWith("The requested catalog change is too large"));
         }
     }
 

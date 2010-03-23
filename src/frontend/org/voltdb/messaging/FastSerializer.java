@@ -93,7 +93,7 @@ public class FastSerializer implements DataOutput {
 
     /**
      * Caveat. A pool won't always give back a direct byte buffer. If a direct byte buffer
-     * is absoltely necessary for the serialized result then use isDirect and a null pool
+     * is absolutely necessary for the serialized result then use isDirect and a null pool
      */
     /** constructor that sets callback object. */
     public FastSerializer(boolean bigEndian, boolean isDirect, BufferGrowCallback callback, DBBPool pool, int initialAllocation) {
@@ -484,5 +484,12 @@ public class FastSerializer implements DataOutput {
     @Override
     public void writeUTF(String str) throws IOException {
         throw new UnsupportedOperationException("FastSerializer.writeChars() not supported.");
+    }
+
+    /**
+     * return Current position within the underlying buffer, for self-comparison only.
+     */
+    public int getPosition() {
+        return buffer.b.position();
     }
 }

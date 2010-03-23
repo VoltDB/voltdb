@@ -58,6 +58,13 @@ import org.voltdb.types.VoltDecimalHelper;
  */
 public abstract class VoltTableRow {
 
+    /**
+     * Size in bytes of the maximum length for a VoltDB tuple.
+     * This is inclusive of the 4-byte row length prefix.
+     */
+    public static final int MAX_TUPLE_LENGTH = 512 * 1024;
+    public static final String MAX_TUPLE_LENGTH_STR = String.valueOf(MAX_TUPLE_LENGTH / 1024) + "k";
+
     static final int ROW_HEADER_SIZE = Integer.SIZE/8;
     static final int ROW_COUNT_SIZE = Integer.SIZE/8;
     static final int STRING_LEN_SIZE = Integer.SIZE/8;

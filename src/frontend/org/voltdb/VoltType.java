@@ -115,6 +115,12 @@ public enum VoltType {
     DECIMAL_STRING  ((byte)23, 9, "decimal", new Class[] {});
 
     /**
+     * Size in bytes of the maximum length for a VoltDB field value, presumably a string
+     */
+    public static final int MAX_VALUE_LENGTH = 256 * 1024;
+    public static final String MAX_VALUE_LENGTH_STR = String.valueOf(MAX_VALUE_LENGTH / 1024) + "k";
+
+    /**
      * Fixed precision 8-byte value with 4 decimal places of precision.
      * Stored as an 8-byte long value representing 10,000x the actual value.
      */

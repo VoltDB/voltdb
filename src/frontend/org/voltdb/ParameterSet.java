@@ -14,6 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 package org.voltdb;
 
 import java.io.IOException;
@@ -32,6 +33,14 @@ import org.voltdb.types.VoltDecimalHelper;
  *
  */
  public class ParameterSet implements FastSerializable {
+
+    /**
+     * Size in bytes of the maximum length for a VoltDB parameter set.
+     * This value is counted from byte 0 of the param count to the end of values.
+     */
+    public static final int MAX_SERIALIZED_PARAMETERSET_LENGTH = 2 * 1024 * 1024;
+    public static final String MAX_SERIALIZED_PARAMETERSET_LENGTH_STR
+        = String.valueOf(MAX_SERIALIZED_PARAMETERSET_LENGTH / 1024) + "k";
 
     static final byte ARRAY = -99;
 
@@ -57,6 +66,11 @@ import org.voltdb.types.VoltDecimalHelper;
 
     /** Sets the internal array to params. Note: this does *not* copy the argument. */
     public void setParameters(Object... params) {
+        for (Object param : params)
+            if (param instanceof String)
+                if (((String)param).length() > VoltType.MAX_VALUE_LENGTH)
+                    throw new VoltOverflowException(
+                            "Parameter set value larger than allowed max " + VoltType.MAX_VALUE_LENGTH_STR);
         this.m_params = params;
     }
 
@@ -86,12 +100,19 @@ import org.voltdb.types.VoltDecimalHelper;
 
         for (int i = 0; i < paramLen; i++) {
             m_params[i] = readOneParameter(in);
-        }
 
+            // check if any values are bigger than the maximum value
+            if (m_params[i] instanceof String)
+                if (((String)m_params[i]).length() > VoltType.MAX_VALUE_LENGTH)
+                    throw new VoltOverflowException(
+                            "Parameter set value larger than allowed max " + VoltType.MAX_VALUE_LENGTH_STR);
+        }
     }
 
     @Override
     public void writeExternal(FastSerializer out) throws IOException {
+        int initialPosition = out.getPosition();
+
         out.writeShort(m_params.length);
 
         for (Object obj : m_params) {
@@ -201,6 +222,11 @@ import org.voltdb.types.VoltDecimalHelper;
                     break;
                 default:
                     throw new RuntimeException("FIXME: Unsupported type " + type);
+            }
+
+            if ((out.getPosition() - initialPosition) > MAX_SERIALIZED_PARAMETERSET_LENGTH) {
+                throw new VoltOverflowException(
+                        "Parameter set total length larger than allowed max " + MAX_SERIALIZED_PARAMETERSET_LENGTH_STR);
             }
         }
     }

@@ -154,9 +154,9 @@ public class FastDeserializer implements DataInput {
             return null;
         assert len >= 0;
 
-        if (len > Short.MAX_VALUE - 2) {
+        /*if (len > Short.MAX_VALUE - 2) {
             throw new IOException("Serializable strings cannot be longer then (2 ^ 15) - 2");
-        }
+        }*/
 
         // now assume not null
         final byte[] strbytes = new byte[len];
@@ -347,5 +347,12 @@ public class FastDeserializer implements DataInput {
         for (int i=0; i < n; i++)
             readByte();
         return n;
+    }
+
+    /**
+     * return Current position within the underlying buffer, for self-comparison only.
+     */
+    public int getPosition() {
+        return buffer.position();
     }
 }

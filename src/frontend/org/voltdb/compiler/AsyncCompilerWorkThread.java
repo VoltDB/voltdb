@@ -330,8 +330,8 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
 
             // since diff commands can be stupidly big, compress them here
             retval.encodedDiffCommands = Encoder.compressAndBase64Encode(diffCommands);
-            // check if the resulting string is small enough to fit in our parameter sets
-            if (retval.encodedDiffCommands.length() > 32000) {
+            // check if the resulting string is small enough to fit in our parameter sets (about 2mb)
+            if (retval.encodedDiffCommands.length() > (2 * 1000 * 1000)) {
                 throw new Exception("The requested catalog change is too large for this version of VoltDB. " +
                                     "Try a series of smaller updates.");
             }

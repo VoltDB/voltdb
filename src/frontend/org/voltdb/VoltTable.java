@@ -105,6 +105,13 @@ rely on the garbage collector.
  */
 public final class VoltTable extends VoltTableRow implements FastSerializable {
 
+    /**
+     * Size in bytes of the maximum length for a VoltDB tuple.
+     * This value is counted from byte 0 of the header size to the end of row data.
+     */
+    public static final int MAX_SERIALIZED_TABLE_LENGTH = 10 * 1024 * 1024;
+    public static final String MAX_SERIALIZED_TABLE_LENGTH_STR = String.valueOf(MAX_SERIALIZED_TABLE_LENGTH / 1024) + "k";
+
     static final int NULL_STRING_INDICATOR = -1;
     static final String METADATA_ENCODING = "US-ASCII";
     static final String ROWDATA_ENCODING = "UTF-8";
@@ -573,11 +580,19 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
                         case STRING: {
                             // Accept byte[] and String
                             if (value instanceof byte[]){
+                                if (((byte[]) value).length > VoltType.MAX_VALUE_LENGTH)
+                                    throw new VoltOverflowException(
+                                            "Value in VoltTable.addRow(...) larger than allowed max " + VoltType.MAX_VALUE_LENGTH_STR);
+
                                 // bytes MUST be a UTF-8 encoded string.
                                 assert(testForUTF8Encoding((byte[]) value));
                                 writeStringToBuffer((byte[]) value, m_buffer);
                             }
                             else {
+                                if (((String) value).length() > VoltType.MAX_VALUE_LENGTH)
+                                    throw new VoltOverflowException(
+                                            "Value in VoltTable.addRow(...) larger than allowed max " + VoltType.MAX_VALUE_LENGTH_STR);
+
                                 writeStringToBuffer((String) value, ROWDATA_ENCODING, m_buffer);
                             }
                             break;
@@ -628,6 +643,13 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
             m_rowCount++;
             m_buffer.putInt(m_rowStart, m_rowCount);
             final int rowsize = m_buffer.position() - pos - 4;
+
+            // check for too big rows
+            if ((rowsize + 4) > VoltTableRow.MAX_TUPLE_LENGTH) {
+                throw new VoltOverflowException(
+                        "Table row total length larger than allowed max " + VoltTableRow.MAX_TUPLE_LENGTH_STR);
+            }
+
             // constrain buffer limit back to the new position
             m_buffer.limit(m_buffer.position());
             assert(rowsize >= 0);
