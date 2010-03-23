@@ -46,8 +46,7 @@ class SerializableEEException {
 public:
     /*
      * Constructor that performs the serialization to the engines
-     * exception buffer. If sqlStateCode is NULL it will not be
-     * serialized.
+     * exception buffer.
      */
     SerializableEEException(VoltEEExceptionType exceptionType, std::string message);
     virtual ~SerializableEEException();
