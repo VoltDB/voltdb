@@ -629,7 +629,9 @@ public class NIOWriteStream implements WriteStream {
         if (m_monitor != null) {
             boolean shouldSignalBackpressure = m_monitor.queue(queued);
             if (!noBackpressureSignal && shouldSignalBackpressure) {
-                backpressureStarted();
+                if (!m_hadBackPressure) {
+                    backpressureStarted();
+                }
             }
         }
     }
