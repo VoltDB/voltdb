@@ -17,6 +17,7 @@
 
 package org.voltdb.exceptions;
 
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 
 /**
@@ -35,7 +36,12 @@ public class SQLException extends SerializableException {
     public SQLException(ByteBuffer buffer) {
         super(buffer);
         final byte sqlStateBytes[] = new byte[5];
-        buffer.get(sqlStateBytes);
+        try {
+            buffer.get(sqlStateBytes);
+        } catch (BufferUnderflowException e) {
+            m_sqlState = "";
+            return;
+        }
         m_sqlState = new String(sqlStateBytes);
     }
 

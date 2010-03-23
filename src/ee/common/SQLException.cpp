@@ -43,7 +43,7 @@ SQLException::SQLException(const char* sqlState, std::string message, VoltEEExce
     m_sqlState(sqlState) {}
 
 void SQLException::p_serialize(ReferenceSerializeOutput *output) {
-    for (int ii = 0; ii < 5; ii++) {
+    for (int ii = 0; m_sqlState != NULL && ii < 5; ii++) {
         output->writeByte(m_sqlState[ii]);
     }
 }
