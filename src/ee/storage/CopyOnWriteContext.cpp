@@ -33,18 +33,22 @@
 #endif
 namespace voltdb {
 
-// Created this simple comparitor to compare addresses of BlockPairs for sorting
-bool simplePairAddressToPairAddressComparator(const BlockPair a, const BlockPair b) {
-        return a.first < b.first;
-}
 // These next two methods here do some Ariel-foo that probably merits a comment.
 #ifdef MEMCHECK
 bool pairAddressToPairAddressComparator(const BlockPair a, const BlockPair b) {
     return a.pair.first + a.tupleLength < b.pair.first;
 }
+// Created this simple comparitor to compare addresses of BlockPairs for sorting
+bool simplePairAddressToPairAddressComparator(const BlockPair a, const BlockPair b) {
+        return a.pair.first < b.pair.first;
+}
 #else
 bool pairAddressToPairAddressComparator(const BlockPair a, const BlockPair b) {
     return a.first + TABLE_BLOCKSIZE < b.first;
+}
+// Created this simple comparitor to compare addresses of BlockPairs for sorting
+bool simplePairAddressToPairAddressComparator(const BlockPair a, const BlockPair b) {
+        return a.first < b.first;
 }
 #endif
 
