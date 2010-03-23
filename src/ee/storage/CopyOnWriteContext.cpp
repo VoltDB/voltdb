@@ -19,6 +19,7 @@
 #include "storage/tablefactory.h"
 #include "storage/CopyOnWriteIterator.h"
 #include "storage/tableiterator.h"
+#include "common/FatalException.hpp"
 #include <algorithm>
 #include <cassert>
 #include <boost/crc.hpp>
@@ -89,7 +90,7 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
 
     TableTuple tuple(m_table->schema());
     if (out->remaining() < (m_maxTupleLength + sizeof(int32_t))) {
-        throw std::runtime_error("Serialize more should never be called "
+        throwFatalException("Serialize more should never be called "
                 "a 2nd time after return indicating there is no more data");
 //        out->writeInt(0);
 //        assert(false);
@@ -123,6 +124,11 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
         m_tuplesSerialized++;
         rowsSerialized++;
     }
+    /*
+     * Number of rows serialized is not known until the end. Written at the end so it
+     * can be included in the CRC. It will be moved back to the front
+     * to match the table serialization format when chunk is read later.
+     */
     out->writeInt(rowsSerialized);
     crc.process_bytes(out->data() + out->position() - 4, 4);
     out->writeIntAt(crcPosition, crc.checksum());

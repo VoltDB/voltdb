@@ -47,6 +47,7 @@
 #include "catalog/database.h"
 #include "common/debuglog.h"
 #include "common/common.h"
+#include "common/FatalException.hpp"
 #include "execution/VoltDBEngine.h"
 #include "plannodes/abstractplannode.h"
 #include "plannodes/abstractscannode.h"
@@ -68,9 +69,8 @@ bool AbstractExecutor::init(VoltDBEngine *engine, const catalog::Database* catal
     for (int ctr = 0, cnt = (int)abstract_node->getChildren().size(); ctr < cnt; ctr++) {
         Table* table = abstract_node->getChildren()[ctr]->getOutputTable();
         if (table == NULL) {
-            VOLT_ERROR("Output table from PlanNode '%s' is NULL",
-                       abstract_node->getChildren()[ctr]->debug().c_str());
-            return (false);
+            throwFatalException( "Output table from PlanNode '%s' is NULL",
+                    abstract_node->getChildren()[ctr]->debug().c_str());
         }
         input_tables.push_back(table);
     }
@@ -103,10 +103,9 @@ bool AbstractExecutor::init(VoltDBEngine *engine, const catalog::Database* catal
         if (target_table == NULL) {
             target_table = engine->getTable(targetTableName);
             if (target_table == NULL) {
-                VOLT_ERROR("Failed to retreive target table '%s' "
-                           "from execution engine for PlanNode '%s'",
-                           targetTableName.c_str(), abstract_node->debug().c_str());
-                return false;
+                throwFatalException( "Failed to retrieve target table '%s' "
+                        "from execution engine for PlanNode '%s'",
+                        targetTableName.c_str(), abstract_node->debug().c_str());
             }
             if (scan_node) {
                 scan_node->setTargetTable(target_table);
@@ -121,8 +120,7 @@ bool AbstractExecutor::init(VoltDBEngine *engine, const catalog::Database* catal
     try {
         this->p_init(abstract_node, catalog_db, tempTableMemoryInBytes);
     } catch (std::exception& err) {
-        VOLT_ERROR("The Executor failed to initialize PlanNode '%s'", abstract_node->debug().c_str());
-        return (false);
+        throwFatalException( "The Executor failed to initialize PlanNode '%s'", abstract_node->debug().c_str());
     }
     Table *tmp_output_table_base = abstract_node->getOutputTable();
     this->tmp_output_table = dynamic_cast<TempTable*>(tmp_output_table_base);

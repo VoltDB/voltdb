@@ -18,6 +18,7 @@
 #include "types.h"
 #include "common/debuglog.h"
 #include "common/ValueFactory.hpp"
+#include "common/FatalException.hpp"
 #include <string>
 
 namespace voltdb {
@@ -70,9 +71,9 @@ NValue getRandomValue(ValueType type) {
             return ValueFactory::getStringValue(string(characters));
         }
             break;
-        default:
-            // TODO: DEBUG
-            assert (false);
+        default: {
+            throwFatalException("Attempted to get a random value of unsupported value type %d", type);
+        }
     }
     throw exception();
 }
@@ -183,7 +184,7 @@ ValueType stringToValue(string str )
         return VALUE_TYPE_DECIMAL;
     }
     else {
-        VOLT_ERROR("No conversion from string %s.", str.c_str());
+        throwFatalException( "No conversion from string %s.", str.c_str());
     }
     return VALUE_TYPE_INVALID;
 }

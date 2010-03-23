@@ -173,7 +173,6 @@ public class TestEELibraryLoader {
 
         assertFalse(EELibraryLoader.loadExecutionEngineLibrary(false));
         assertFalse(intf.m_crash);
-        EELibraryLoader.reset();
         assertFalse(EELibraryLoader.loadExecutionEngineLibrary(true));
         assertTrue(intf.m_crash);
         VoltDB.initialize(configuration);

@@ -49,6 +49,7 @@
 #include "common/debuglog.h"
 #include "common/serializeio.h"
 #include "common/types.h"
+#include "common/FatalException.hpp"
 #include "expressions/abstractexpression.h"
 #include "catalog/table.h"
 #include "catalog/index.h"
@@ -99,7 +100,7 @@ void IndexScanPlanNode::setEndExpression(AbstractExpression* val) {
     // only expect this to be initialized once
     if (end_expression && end_expression != val)
     {
-        assert(!"end_expression initialized twice in IndexScanPlanNode?");
+        throwFatalException("end_expression initialized twice in IndexScanPlanNode?");
         delete end_expression;
     }
     this->end_expression = val;
@@ -152,27 +153,27 @@ void IndexScanPlanNode::loadFromJSONObject(json_spirit::Object &obj, const catal
 
     json_spirit::Value keyIterateValue = json_spirit::find_value( obj, "KEY_ITERATE");
     if (keyIterateValue == json_spirit::Value::null) {
-        throw std::runtime_error("IndexScanPlanNode::loadFromJSONObject: Can't find KEY_ITERATE value");
+        throwFatalException("IndexScanPlanNode::loadFromJSONObject: Can't find KEY_ITERATE value");
     }
     key_iterate = keyIterateValue.get_bool();
 
     json_spirit::Value lookupTypeValue = json_spirit::find_value( obj, "LOOKUP_TYPE");
     if (lookupTypeValue == json_spirit::Value::null) {
-        throw std::runtime_error("IndexScanPlanNode::loadFromJSONObject: Can't find LOOKUP_TYPE");
+        throwFatalException("IndexScanPlanNode::loadFromJSONObject: Can't find LOOKUP_TYPE");
     }
     std::string lookupTypeString = lookupTypeValue.get_str();
     lookup_type = stringToIndexLookup(lookupTypeString);
 
     json_spirit::Value sortDirectionValue = json_spirit::find_value( obj, "SORT_DIRECTION");
     if (sortDirectionValue == json_spirit::Value::null) {
-        throw std::runtime_error("IndexScanPlanNode::loadFromJSONObject: Can't find SORT_DIRECTION");
+        throwFatalException("IndexScanPlanNode::loadFromJSONObject: Can't find SORT_DIRECTION");
     }
     std::string sortDirectionString = sortDirectionValue.get_str();
     sort_direction = stringToSortDirection(sortDirectionString);
 
     json_spirit::Value targetIndexNameValue = json_spirit::find_value( obj, "TARGET_INDEX_NAME");
     if (targetIndexNameValue == json_spirit::Value::null) {
-        throw std::runtime_error("IndexScanPlanNode::loadFromJSONObject: Can't find TARGET_INDEX_NAME");
+        throwFatalException("IndexScanPlanNode::loadFromJSONObject: Can't find TARGET_INDEX_NAME");
     }
     target_index_name = targetIndexNameValue.get_str();
 
@@ -185,7 +186,7 @@ void IndexScanPlanNode::loadFromJSONObject(json_spirit::Object &obj, const catal
 
     json_spirit::Value searchKeyExpressionsValue = json_spirit::find_value( obj, "SEARCHKEY_EXPRESSIONS");
     if (searchKeyExpressionsValue == json_spirit::Value::null) {
-        throw std::runtime_error("IndexScanPlanNode::loadFromJSONObject: Can't find SEARCHKEY_EXPRESSIONS");
+        throwFatalException("IndexScanPlanNode::loadFromJSONObject: Can't find SEARCHKEY_EXPRESSIONS");
     }
     json_spirit::Array searchKeyExpressionsArray = searchKeyExpressionsValue.get_array();
 

@@ -73,7 +73,7 @@ bool TempTable::updateTuple(TableTuple &source, TableTuple &target, bool updates
 }
 
 bool TempTable::deleteTuple(TableTuple &target, bool deleteAllocatedStrings) {
-    assert (false); // deleting tuple from temp table is not supported. use deleteAllTuples instead
+    throwFatalException("TempTable does not support deleting individual tuples")
     return false;
 }
 

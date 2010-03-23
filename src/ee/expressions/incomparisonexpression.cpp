@@ -48,6 +48,7 @@
 #include "common/serializeio.h"
 #include "common/debuglog.h"
 #include "common/common.h"
+#include "common/FatalException.hpp"
 #include "expressions/expressionutil.h"
 
 #include <stdint.h>
@@ -90,9 +91,8 @@ InComparisonExpression::eval(const TableTuple *tuple1,
                              const TableTuple *tuple2) const
 {
     if (this->m_type != EXPRESSION_TYPE_COMPARE_IN) {
-        VOLT_ERROR("Invalid ExpressionType '%s' called for InComparisonExpression",
+        throwFatalException("Invalid ExpressionType '%s' called for InComparisonExpression",
                  expressionutil::getTypeName(this->m_type).c_str());
-        throw std::exception();
     }
 
     // First get the left value

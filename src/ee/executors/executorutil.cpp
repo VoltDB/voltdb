@@ -46,6 +46,7 @@
 #include "executorutil.h"
 
 #include "common/debuglog.h"
+#include "common/FatalException.hpp"
 #include "executors/executors.h"
 #include <cassert>
 
@@ -72,8 +73,7 @@ AbstractExecutor* getNewExecutor(VoltDBEngine *engine, AbstractPlanNode* abstrac
         case PLAN_NODE_TYPE_UNION: return new UnionExecutor(engine, abstract_node);
         case PLAN_NODE_TYPE_UPDATE: return new UpdateExecutor(engine, abstract_node);
         default: {
-            VOLT_ERROR("Invalid PlannodeType %d", (int) type);
-            assert (false);
+            throwFatalException( "Invalid PlannodeType %d", (int) type);
         }
     }
     return NULL;

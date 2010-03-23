@@ -48,6 +48,7 @@
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/tabletuple.h"
+#include "common/FatalException.hpp"
 #include "expressions/abstractexpression.h"
 #include "plannodes/seqscannode.h"
 #include "plannodes/projectionnode.h"
@@ -164,8 +165,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     if (limit_node != NULL) {
         limit_node->getLimitAndOffsetByReference(params, limit, offset);
         if (offset > 0) {
-            VOLT_ERROR("Nested Limit Offset is not yet supported for PlanNode '%s'", node->debug().c_str());
-            return (false);
+            throwFatalException( "Nested Limit Offset is not yet supported for PlanNode '%s'", node->debug().c_str());
         }
     }
 
@@ -225,10 +225,10 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                     }
                     if (!output_table->insertTuple(temp_tuple))
                     {
-                        VOLT_ERROR("Failed to insert tuple from table '%s' into output table '%s'",
-                                   target_table->name().c_str(),
-                                   output_table->name().c_str());
-                        return false;
+                        throwFatalException(
+                                "Failed to insert tuple from table '%s' into output table '%s'",
+                                target_table->name().c_str(),
+                                output_table->name().c_str());
                     }
                 }
                 else
@@ -237,10 +237,9 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                     // Insert the tuple into our output table
                     //
                     if (!output_table->insertTuple(tuple)) {
-                        VOLT_ERROR("Failed to insert tuple from table '%s' into output table '%s'",
-                                   target_table->name().c_str(),
-                                   output_table->name().c_str());
-                        return false;
+                        throwFatalException("Failed to insert tuple from table '%s' into output table '%s'",
+                                target_table->name().c_str(),
+                                output_table->name().c_str());
                     }
                 }
                 ++tuple_ctr;

@@ -51,6 +51,7 @@
 #include "common/ValuePeeker.hpp"
 #include "common/types.h"
 #include "common/tabletuple.h"
+#include "common/FatalException.hpp"
 #include "plannodes/updatenode.h"
 #include "plannodes/projectionnode.h"
 #include "storage/table.h"
@@ -88,7 +89,7 @@ bool UpdateExecutor::p_init(AbstractPlanNode *abstract_node, const catalog::Data
     AbstractPlanNode *child = node->getChildren()[0];
     ProjectionPlanNode *proj_node = NULL;
     if (NULL == child) {
-        assert(false);
+        throwFatalException("Attempted to initialize update executor with NULL child");
     }
 
     PlanNodeType pnt = child->getPlanNodeType();
@@ -190,8 +191,9 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
 
             // if it doesn't map to this site
             if (!isLocal) {
-                VOLT_ERROR("Mispartitioned tuple in single-partition plan for table '%s'", m_targetTable->name().c_str());
-                return false;
+                throwFatalException(
+                        "Mispartitioned tuple in single-partition plan for table '%s'",
+                        m_targetTable->name().c_str());
             }
         }
 

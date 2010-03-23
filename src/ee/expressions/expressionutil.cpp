@@ -47,6 +47,7 @@
 
 #include "common/debuglog.h"
 #include "common/ValueFactory.hpp"
+#include "common/FatalException.hpp"
 #include "expressions/abstractexpression.h"
 #include "expressions/expressions.h"
 
@@ -81,11 +82,10 @@ getGeneral(ExpressionType c,
             return new ComparisonExpression<CmpLte>(c, l, r);
         case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
             return new ComparisonExpression<CmpGte>(c, l, r);
-        default:
-          VOLT_ERROR("Invalid ExpressionType '%s' called for ComparisonExpression",
-                   expressionutil::getTypeName(c).c_str());
-          assert (false);
-          throw std::exception();
+        default: {
+            throwFatalException( "Invalid ExpressionType '%s' called for ComparisonExpression",
+                    expressionutil::getTypeName(c).c_str());
+        }
     }
 }
 
@@ -109,11 +109,10 @@ getMoreSpecialized(ExpressionType c, L* l, R* r)
         return new InlinedComparisonExpression<CmpLte, L, R>(c, l, r);
       case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
         return new InlinedComparisonExpression<CmpGte, L, R>(c, l, r);
-      default:
-            VOLT_ERROR("Invalid ExpressionType '%s' called for ComparisonExpression",
-                     expressionutil::getTypeName(c).c_str());
-            assert (false);
-            throw std::exception();
+      default: {
+          throwFatalException( "Invalid ExpressionType '%s' called for ComparisonExpression",
+                  expressionutil::getTypeName(c).c_str());
+      }
     }
 }
 
@@ -184,7 +183,7 @@ inComparisonExpressionFactory(json_spirit::Object &obj,
     // # of Value Expressions
     json_spirit::Value valueExpressionsValue = json_spirit::find_value( obj, "VALUES");
     if (valueExpressionsValue == json_spirit::Value::null) {
-        throw std::runtime_error("inComparisonExpressionFactory: can't find VALUES value");
+        throwFatalException("inComparisonExpressionFactory: can't find VALUES value");
     }
     json_spirit::Array valueExpressionsArray = valueExpressionsValue.get_array();
     for (int ii = 0; ii < valueExpressionsArray.size(); ii++) {
@@ -228,23 +227,19 @@ operatorFactory(ExpressionType et,
        break;
 
      case (EXPRESSION_TYPE_OPERATOR_MOD):
-       assert(!"Mod operator is not yet supported.");
-       throw std::exception();
+        throwFatalException("Mod operator is not yet supported.");
        break;
 
      case (EXPRESSION_TYPE_OPERATOR_CONCAT):
-       assert(!"Concat operator not yet supported.");
-       throw std::exception();
+        throwFatalException("Concat operator not yet supported.");
        break;
 
      case (EXPRESSION_TYPE_OPERATOR_CAST):
-       assert(!"Cast operator not yet supported.");
-       throw std::exception();
+        throwFatalException("Cast operator not yet supported.");
        break;
 
      default:
-       assert(!"operator ctor helper out of sync");
-       throw std::exception();
+         throwFatalException("operator ctor helper out of sync");
        break;
    }
    return ret;
@@ -261,15 +256,15 @@ constantValueFactory(json_spirit::Object &obj,
     NValue newvalue;
     json_spirit::Value valueValue = json_spirit::find_value( obj, "VALUE");
     if (valueValue == json_spirit::Value::null) {
-        throw std::runtime_error("constantValueFactory: Could not find VALUE value");
+        throwFatalException("constantValueFactory: Could not find VALUE value");
     }
 
     switch (vt) {
     case VALUE_TYPE_INVALID:
-        throw std::runtime_error("constantValueFactory: Value type should never be VALUE_TYPE_INVALID");
+        throwFatalException("constantValueFactory: Value type should never be VALUE_TYPE_INVALID");
         break;
     case VALUE_TYPE_NULL:
-        throw std::runtime_error("constantValueFactory: And they should be never be this either! VALUE_TYPE_NULL");
+        throwFatalException("constantValueFactory: And they should be never be this either! VALUE_TYPE_NULL");
         break;
     case VALUE_TYPE_TINYINT:
         newvalue = ValueFactory::getTinyIntValue(static_cast<int8_t>(valueValue.get_int64()));
@@ -296,7 +291,7 @@ constantValueFactory(json_spirit::Object &obj,
         newvalue = ValueFactory::getDecimalValueFromString(valueValue.get_str());
         break;
      default:
-        throw std::runtime_error("constantValueFactory: Unrecognized value type");
+         throwFatalException("constantValueFactory: Unrecognized value type");
         break;
     }
 
@@ -339,7 +334,7 @@ parameterValueFactory(json_spirit::Object &obj,
     // read before ctor - can then instantiate fully init'd obj.
     json_spirit::Value paramIdxValue = json_spirit::find_value( obj, "PARAM_IDX");
     if (paramIdxValue == json_spirit::Value::null) {
-        throw std::runtime_error("parameterValueFactory: Could not find PARAM_IDX value");
+        throwFatalException("parameterValueFactory: Could not find PARAM_IDX value");
     }
     int param_idx = paramIdxValue.get_int();
     assert (param_idx >= 0);
@@ -368,18 +363,18 @@ tupleValueFactory(json_spirit::Object &obj, ExpressionType et,
 
     // verify input
     if (valueIdxValue == json_spirit::Value::null) {
-        throw std::runtime_error("tupleValueFactory: Could not find COLUMN_IDX value");
+        throwFatalException("tupleValueFactory: Could not find COLUMN_IDX value");
     }
     if (valueIdxValue.get_int() < 0) {
-        throw std::runtime_error("tupleValueFactory: invalid column_idx.");
+        throwFatalException("tupleValueFactory: invalid column_idx.");
     }
 
     if (tableName == json_spirit::Value::null) {
-        throw std::runtime_error("tupleValueFactory: no table name in TVE");
+        throwFatalException("tupleValueFactory: no table name in TVE");
     }
 
     if (columnName == json_spirit::Value::null) {
-        throw std::runtime_error("tupleValueFactory: no column name in TVE");
+        throwFatalException("tupleValueFactory: no column name in TVE");
     }
 
 
@@ -477,9 +472,8 @@ expressionFactory(json_spirit::Object &obj,
 
       // must handle all known expressions in this factory
       default: {
-          VOLT_ERROR("Invalid ExpressionType '%s' requested from factory",
-                   expressionutil::getTypeName(et).c_str());
-          throw std::exception();
+          throwFatalException( "Invalid ExpressionType '%s' requested from factory",
+                  expressionutil::getTypeName(et).c_str());
       }
     }
 

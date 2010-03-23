@@ -22,11 +22,6 @@ import org.voltdb.utils.VoltLoggerFactory;
 
 public class EELibraryLoader {
 
-    /**
-     * Public because DBBPool might also load the shared library and needs to check this value.
-     */
-    private static boolean voltSharedLibraryLoadAttempted = false;
-
     private static boolean voltSharedLibraryLoaded = false;
 
     private static final Logger hostLog = Logger.getLogger(
@@ -36,8 +31,7 @@ public class EELibraryLoader {
      * Load the shared native library if not yet loaded. Returns true if the library was loaded
      **/
     public synchronized static boolean loadExecutionEngineLibrary(boolean mustSuccede) {
-        if (!voltSharedLibraryLoadAttempted) {
-            voltSharedLibraryLoadAttempted = true;
+        if (!voltSharedLibraryLoaded) {
             if (VoltDB.getLoadLibVOLTDB()) {
                 try {
                     final Logger hostLog = Logger.getLogger("HOST", VoltLoggerFactory.instance());
@@ -65,9 +59,5 @@ public class EELibraryLoader {
             }
         }
         return voltSharedLibraryLoaded;
-    }
-
-    public static void reset() {
-        voltSharedLibraryLoadAttempted = false;
     }
 }

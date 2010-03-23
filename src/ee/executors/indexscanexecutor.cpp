@@ -48,6 +48,7 @@
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/tabletuple.h"
+#include "common/FatalException.hpp"
 #include "expressions/abstractexpression.h"
 #include "expressions/expressions.h"
 #include "expressions/expressionutil.h"
@@ -186,8 +187,9 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
             (m_distinctColumnType != VALUE_TYPE_SMALLINT) &&
             (m_distinctColumnType != VALUE_TYPE_INTEGER) &&
             (m_distinctColumnType != VALUE_TYPE_BIGINT)) {
-            VOLT_ERROR("The Distinct operation is not supported for '%s' columns", getTypeName(m_distinctColumnType).c_str());
-            return false;
+            throwFatalException(
+                    "The Distinct operation is not supported for '%s' columns",
+                    getTypeName(m_distinctColumnType).c_str());
         }
     }
 
@@ -226,9 +228,8 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     {
         if (m_node->getSearchKeyExpressions()[ctr] == NULL)
         {
-            VOLT_ERROR("The search key expression at position '%d' is NULL for PlanNode '%s'",
-                       ctr, m_node->debug().c_str());
-            return false;
+            throwFatalException( "The search key expression at position '%d' is NULL for PlanNode '%s'",
+                    ctr, m_node->debug().c_str());
         }
         m_needsSubstituteSearchKeyPtr[ctr] =
             m_node->getSearchKeyExpressions()[ctr]->hasParameter();
@@ -256,11 +257,10 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     m_searchKey.moveNoHeader(m_searchKeyBackingStore);
     if (m_index == NULL)
     {
-        VOLT_ERROR("Failed to retreive index '%s' from table '%s' for PlanNode '%s'",
-                 m_node->getTargetIndexName().c_str(),
-                 m_targetTable->name().c_str(),
-                 m_node->debug().c_str());
-        return false;
+        throwFatalException( "Failed to retreive index '%s' from table '%s' for PlanNode '%s'",
+                m_node->getTargetIndexName().c_str(),
+                m_targetTable->name().c_str(),
+                m_node->debug().c_str());
     }
     m_tuple = TableTuple(m_targetTable->schema());
 
@@ -290,10 +290,9 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
         if ((aggregateType != EXPRESSION_TYPE_AGGREGATE_MIN) &&
             (aggregateType != EXPRESSION_TYPE_AGGREGATE_MAX))
         {
-            VOLT_ERROR("Unsupported inline Aggregate type '%s' in PlanNode '%s'",
-                       expressionutil::getTypeName(aggregateType).c_str(),
-                       m_node->debug().c_str());
-            return false;
+            throwFatalException( "Unsupported inline Aggregate type '%s' in PlanNode '%s'",
+                    expressionutil::getTypeName(aggregateType).c_str(),
+                    m_node->debug().c_str());
         }
 
         //
@@ -376,8 +375,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         m_limitNode->getLimitAndOffsetByReference(params, m_limitSize, m_limitOffset);
         if (m_limitOffset > 0)
         {
-            VOLT_ERROR("The limit offset operation is not supported for IndexScans yet");
-            return false;
+            throwFatalException("The limit offset operation is not supported for IndexScans yet");
         }
     }
 

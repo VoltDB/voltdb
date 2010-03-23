@@ -52,6 +52,7 @@
 #include "common/TupleSchema.h"
 #include "common/tabletuple.h"
 #include "common/Pool.hpp"
+#include "common/FatalException.hpp"
 #include "indexes/tableindex.h"
 #include "storage/tableiterator.h"
 
@@ -331,7 +332,7 @@ bool Table::serializeColumnHeaderTo(SerializeOutput &serialize_io) {
         serialize_io.writeIntAt(start, nonInclusiveHeaderSize);
     }
     catch(...) {
-        VOLT_ERROR("Failed while serializing table header.");
+        throwFatalException("Failed while serializing table header.");
         return false;
     }
 
@@ -412,7 +413,7 @@ bool Table::serializeTupleTo(SerializeOutput &serialize_io, voltdb::TableTuple *
         serialize_io.writeIntAt(pos, static_cast<int32_t>(serialize_io.position() - pos - sizeof(int32_t)));
     }
     catch(...) {
-        VOLT_ERROR("Failed while serializing table with specific tuples.");
+        throwFatalException("Failed while serializing table with specific tuples.");
         return false;
     }
 
@@ -468,7 +469,7 @@ bool Table::deserializeFrom(SerializeInput &serialize_io, Pool *stringPool) {
         }
     }
     catch(...) {
-        VOLT_ERROR("Failed while deserializing table.");
+        throwFatalException("Failed while deserializing table.");
         return false;
     }
 

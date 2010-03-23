@@ -48,6 +48,7 @@
 #include <stdexcept>
 #include "updatenode.h"
 #include "common/serializeio.h"
+#include "common/FatalException.hpp"
 
 namespace voltdb {
 
@@ -55,7 +56,7 @@ void UpdatePlanNode::loadFromJSONObject(json_spirit::Object &obj, const catalog:
     AbstractOperationPlanNode::loadFromJSONObject(obj, catalog_db);
     json_spirit::Value updatesIndexesValue = json_spirit::find_value( obj, "UPDATES_INDEXES");
     if (updatesIndexesValue == json_spirit::Value::null) {
-        throw std::runtime_error("InsertPlanNode::loadFromJSONObject: Can't find UPDATES_INDEXES value");
+        throwFatalException("InsertPlanNode::loadFromJSONObject: Can't find UPDATES_INDEXES value");
     }
     m_updatesIndexes = updatesIndexesValue.get_bool();
 }

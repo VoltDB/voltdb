@@ -550,7 +550,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             VoltTable[] results = client.callProcedure("@AdHoc", query);
             assertEquals(6, results[0].getRowCount());
             for (double f=50.0; results[0].advanceRow(); f+=50.0) {
-                double num = ((Double)results[0].getDouble(0));
+                double num = (results[0].getDouble(0));
                 assertEquals(f, num);
             }
             query = String.format("select * from %s where %s.RATIO >= 400.0",

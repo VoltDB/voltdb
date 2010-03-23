@@ -19,6 +19,7 @@
 #include <cstdio>
 #include "boost/shared_array.hpp"
 #include "common/types.h"
+#include "common/FatalException.hpp"
 #include "catalog/catalog.h"
 #include "catalog/columnref.h"
 #include "catalog/column.h"
@@ -163,8 +164,8 @@ void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple) {
             m_updatedTuple.setNValue(i, existingValue.op_increment());
         }
         else {
-            VOLT_ERROR("Error in materialized view table update for col %d. Expression type %d", i, m_outputColumnAggTypes[i]);
-            throw std::exception();
+            throwFatalException( "Error in materialized view table update for col %d. Expression type %d",
+                    i, m_outputColumnAggTypes[i]);
         }
     }
 
@@ -240,8 +241,7 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple) {
             m_updatedTuple.setNValue(i, existingValue.op_decrement());
         }
         else {
-            VOLT_ERROR("Error in materialized view table update.");
-            throw std::exception();
+            throwFatalException("Error in materialized view table update.");
         }
     }
 
@@ -262,7 +262,10 @@ bool MaterializedViewMetadata::findExistingTuple(TableTuple &oldTuple, bool expe
     m_index->moveToKey(&m_searchKey);
     m_existingTuple = m_index->nextValueAtKey();
     if (m_existingTuple.isNullTuple()) {
-        assert(!expected);
+        if (expected) {
+            throwFatalException("MaterializedViewMetadata went looking for"
+                    "a tuple in the view and expected to find it but didn't");
+        }
         return false;
     }
     else {

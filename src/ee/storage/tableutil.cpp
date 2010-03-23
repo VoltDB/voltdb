@@ -51,6 +51,7 @@
 #include "common/ValueFactory.hpp"
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
+#include "common/FatalException.hpp"
 #include "storage/table.h"
 #include "storage/tableiterator.h"
 
@@ -67,7 +68,8 @@ bool getRandomTuple(const voltdb::Table* table, voltdb::TableTuple &out) {
                 return true;
             }
         }
-        assert(false);
+        throwFatalException("Unable to retrieve a random tuple."
+                "Iterated entire table below active tuple count but ran out of tuples");
     }
     return false;
 }

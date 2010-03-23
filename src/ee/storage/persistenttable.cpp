@@ -55,6 +55,7 @@
 #include "common/tabletuple.h"
 #include "common/UndoQuantum.h"
 #include "common/executorcontext.hpp"
+#include "common/FatalException.hpp"
 #include "indexes/tableindex.h"
 #include "storage/table.h"
 #include "storage/tableiterator.h"
@@ -616,15 +617,13 @@ TableIndex *PersistentTable::index(std::string name) {
             return index;
         }
     }
-    VOLT_ERROR("Could not find Index with name %s", name.c_str());
+    std::stringstream errorString;
+    errorString << "Could not find Index with name " << name << std::endl;
     for (int i = 0; i < m_indexCount; ++i) {
         TableIndex *index = m_indexes[i];
-        printf("  %s\n", index->getName().c_str());
+        errorString << index->getName() << std::endl;
     }
-
-
-    assert (false);
-    abort();
+    throwFatalException( "%s", errorString.str().c_str());
 }
 
 std::vector<TableIndex*> PersistentTable::allIndexes() const {

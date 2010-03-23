@@ -18,7 +18,8 @@
 #ifndef TOPEND_H_
 #define TOPEND_H_
 #include "common/ids.h"
-
+#include <string>
+#include "common/FatalException.hpp"
 namespace voltdb {
 class Table;
 class Pool;
@@ -39,6 +40,8 @@ class Topend {
 
     virtual int loadNextDependency(
         int32_t dependencyId, voltdb::Pool *pool, Table* destination) = 0;
+
+    virtual void crashVoltDB(voltdb::FatalException e) = 0;
 
     virtual ~Topend()
     {

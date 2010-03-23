@@ -19,6 +19,7 @@
 #define IPCTOPEND_H_
 #include "common/Topend.h"
 #include "common/Pool.hpp"
+#include "common/FatalException.hpp"
 
 class VoltDBIPC;
 
@@ -35,6 +36,8 @@ public:
     void releaseManagedBuffer(char* bufferPtr);
 
     int loadNextDependency(int32_t dependencyId, Pool *stringPool, Table* destination);
+
+    void crashVoltDB(FatalException e);
 
 private:
     ::VoltDBIPC *m_vdbipc;

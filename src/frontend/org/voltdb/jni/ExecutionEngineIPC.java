@@ -21,6 +21,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
+import java.io.EOFException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
@@ -400,6 +401,11 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         static final int kErrorCode_HandoffReadyELBuffer = 103;
 
         /**
+         * Invoke crash VoltDB
+         */
+        static final int kErrorCode_CrashVoltDB = 104;
+
+        /**
          * Read a single byte indicating a return code. This method has evolved
          * to include providing dependency tables necessary for the completion of previous
          * request. The method loops ready status bytes instead of recursing to avoid
@@ -426,10 +432,49 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     dependencyIdBuffer.rewind();
                     sendDependencyTable(dependencyIdBuffer.getInt());
                     continue;
-                }
-                if (status == kErrorCode_HandoffReadyELBuffer) {
+                } else if (status == kErrorCode_HandoffReadyELBuffer) {
                     handoffReadELBuffer();
                     continue;
+                } if (status == kErrorCode_CrashVoltDB) {
+                    ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
+                    while (lengthBuffer.hasRemaining()) {
+                        final int read = m_socket.getChannel().read(lengthBuffer);
+                        if (read == -1) {
+                            throw new EOFException();
+                        }
+                    }
+                    lengthBuffer.flip();
+                    ByteBuffer messageBuffer = ByteBuffer.allocate(lengthBuffer.getInt());
+                    while (messageBuffer.hasRemaining()) {
+                        final int read = m_socket.getChannel().read(messageBuffer);
+                        if (read == -1) {
+                            throw new EOFException();
+                        }
+                    }
+
+                    final int reasonLength = messageBuffer.getInt();
+                    final byte reasonBytes[] = new byte[reasonLength];
+                    messageBuffer.get(reasonBytes);
+                    final String message = new String(reasonBytes, "UTF-8");
+
+                    final int filenameLength = messageBuffer.getInt();
+                    final byte filenameBytes[] = new byte[filenameLength];
+                    messageBuffer.get(filenameBytes);
+                    final String filename = new String(filenameBytes, "UTF-8");
+
+                    final int lineno = messageBuffer.getInt();
+
+
+                    final int numTraces = messageBuffer.getInt();
+                    final String traces[] = new String[numTraces];
+
+                    for (int ii = 0; ii < numTraces; ii++) {
+                        final int traceLength = messageBuffer.getInt();
+                        final byte traceBytes[] = new byte[traceLength];
+                        traces[ii] = new String(traceBytes, "UTF-8");
+                    }
+
+                    ExecutionEngine.crashVoltDB(message, traces, filename, lineno);
                 }
 
                 try {

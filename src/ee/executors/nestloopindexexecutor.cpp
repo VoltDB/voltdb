@@ -48,6 +48,7 @@
 #include "nestloopindexexecutor.h"
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
+#include "common/FatalException.hpp"
 #include "execution/VoltDBEngine.h"
 #include "expressions/abstractexpression.h"
 #include "plannodes/nestloopindexnode.h"
@@ -133,16 +134,14 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstract_node,
     //
     int num_of_searchkeys = (int)inline_node->getSearchKeyExpressions().size();
     if (num_of_searchkeys == 0) {
-        VOLT_ERROR("There are no search key expressions for the internal PlanNode '%s' "
-                   "of PlanNode '%s'", inline_node->debug().c_str(), node->debug().c_str());
-        return (false);
+        throwFatalException( "There are no search key expressions for the internal PlanNode '%s' "
+                "of PlanNode '%s'", inline_node->debug().c_str(), node->debug().c_str());
     }
     for (int ctr = 0; ctr < num_of_searchkeys; ctr++) {
         if (inline_node->getSearchKeyExpressions()[ctr] == NULL) {
-            VOLT_ERROR("The search key expression at position '%d' is NULL for internal "
-                       "PlanNode '%s' of PlanNode '%s'", ctr, inline_node->debug().c_str(),
-                       node->debug().c_str());
-            return (false);
+            throwFatalException( "The search key expression at position '%d' is NULL for internal "
+                    "PlanNode '%s' of PlanNode '%s'", ctr, inline_node->debug().c_str(),
+                    node->debug().c_str());
         }
     }
 
@@ -163,10 +162,10 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstract_node,
     //
     index = inner_table->index(inline_node->getTargetIndexName());
     if (index == NULL) {
-        VOLT_ERROR("Failed to retreive index '%s' from inner table '%s' for internal PlanNode '%s'",
-                 inline_node->getTargetIndexName().c_str(),
-                 inner_table->name().c_str(),
-                 inline_node->debug().c_str());
+        throwFatalException( "Failed to retreive index '%s' from inner table '%s' for internal PlanNode '%s'",
+                inline_node->getTargetIndexName().c_str(),
+                inner_table->name().c_str(),
+                inline_node->debug().c_str());
         return (false);
     }
 

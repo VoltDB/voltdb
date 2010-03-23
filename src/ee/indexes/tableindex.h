@@ -196,7 +196,7 @@ public:
      */
     virtual bool advanceToNextKey()
     {
-        assert(false); throw std::exception(); return false;
+        throwFatalException("Invoked TableIndex virtual method advanceToNextKey which has no implementation");
     };
 
     /**
@@ -211,7 +211,7 @@ public:
      */
     virtual void moveToKeyOrGreater(const TableTuple *searchKey)
     {
-        assert(false); throw std::exception();
+        throwFatalException("Invoked TableIndex virtual method moveToKeyOrGreater which has no implementation");
     };
 
     /**
@@ -224,7 +224,7 @@ public:
      */
     virtual void moveToGreaterThanKey(const TableTuple *searchKey)
     {
-        assert(false); throw std::exception();
+        throwFatalException("Invoked TableIndex virtual method moveToGreaterThanKey which has no implementation");
     };
 
     /**
@@ -235,7 +235,7 @@ public:
      */
     virtual void moveToEnd(bool begin)
     {
-        assert(false); throw std::exception();
+        throwFatalException("Invoked TableIndex virtual method moveToEnd which has no implementation");
     }
 
     /**
@@ -248,7 +248,7 @@ public:
      */
     virtual TableTuple nextValue()
     {
-        assert(false); throw std::exception(); return TableTuple();
+        throwFatalException("Invoked TableIndex virtual method nextValue which has no implementation");
     };
 
     /**

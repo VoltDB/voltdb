@@ -117,8 +117,7 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
 
         // Delete from target table
         if (!m_targetTable->deleteTuple(m_targetTuple, true)) {
-            VOLT_ERROR("Failed to delete tuple from table '%s'", m_targetTable->name().c_str());
-            return (false);
+            throwFatalException("Failed to delete tuple from table '%s'", m_targetTable->name().c_str());
         }
     }
 

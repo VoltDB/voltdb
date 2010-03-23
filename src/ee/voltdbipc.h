@@ -23,6 +23,7 @@
 #include "logging/LogDefs.h"
 #include "logging/LogProxy.h"
 #include "execution/VoltDBEngine.h"
+#include "common/FatalException.hpp"
 
 class VoltDBIPC {
 public:
@@ -38,7 +39,8 @@ public:
         kErrorCode_RetrieveDependency = 100, //Request for dependency
         kErrorCode_DependencyFound = 101,    //Response to 100
         kErrorCode_DependencyNotFound = 102, //Also response to 100
-        kErrorCode_HandoffReadELBuffer = 103 //Indication that el buffer is next
+        kErrorCode_HandoffReadELBuffer = 103, //Indication that el buffer is next
+        kErrorCode_CrashVoltDB = 104 //Crash with reason string
     };
 
     VoltDBIPC(int fd);
@@ -70,6 +72,8 @@ public:
      * @param statement null terminated UTF-8 string containing the statement to log
      */
     void log(voltdb::LoggerId loggerId, voltdb::LogLevel level, const char *statement) const;
+
+    void crashVoltDB(voltdb::FatalException e);
 
     /*
      * Cause the engine to terminate gracefully after finishing execution of the current command.

@@ -24,6 +24,7 @@
 #include "common/serializeio.h"
 #include "common/types.h"
 #include "common/value_defs.h"
+#include "common/FatalException.hpp"
 
 #include <cassert>
 #include <cfloat>
@@ -350,14 +351,12 @@ class NValue {
             // length 0. In practice, this code path is often a defect
             // in code not correctly handling null. May favor a more
             // defensive "return 0" in the future? (rtb)
-            assert(!"Must not ask  for object length on sql null object.");
-            throw std::exception();
+            throwFatalException("Must not ask  for object length on sql null object.");
         }
         if (getValueType() != VALUE_TYPE_VARCHAR) {
             // probably want getTupleStorageSize() for non-object types.
             // at the moment, only varchars are using getObjectLength().
-            assert(!"Must not ask for object length for non-object types");
-            throw std::exception();
+            throwFatalException("Must not ask for object length for non-object types");
         }
         // now safe to read and return the length preceding value.
         return **(reinterpret_cast<int16_t * const*>(m_data));
@@ -863,10 +862,9 @@ class NValue {
             lhsValue = castAsBigIntAndGetValue(); break;
         case VALUE_TYPE_BIGINT:
             lhsValue = getBigInt(); break;
-        default:
-            VOLT_ERROR("non comparable types lhs '%d' rhs '%d'", getValueType(), rhs.getValueType());
-            assert (false);
-            throw std::exception();
+        default: {
+            throwFatalException("non comparable types lhs '%d' rhs '%d'", getValueType(), rhs.getValueType());
+        }
         }
 
         // do the comparison
@@ -917,17 +915,13 @@ class NValue {
           }
 
           default:
-            VOLT_ERROR("non comparable types lhs '%d' rhs '%d'", getValueType(), rhs.getValueType());
-            assert (false);
-            throw std::exception();
+              throwFatalException("non comparable types lhs '%d' rhs '%d'", getValueType(), rhs.getValueType());
         }
     }
 
     int compareStringValue (const NValue rhs) const {
         if (rhs.getValueType() != VALUE_TYPE_VARCHAR) {
-            VOLT_ERROR("non comparable types lhs '%d' rhs '%d'", getValueType(), rhs.getValueType());
-            assert (false);
-            throw std::exception();
+            throwFatalException( "non comparable types lhs '%d' rhs '%d'", getValueType(), rhs.getValueType());
         }
         const char* left = *reinterpret_cast<char* const*>(m_data);
         const char* right = *reinterpret_cast<char* const*>(rhs.m_data);
@@ -991,9 +985,7 @@ class NValue {
           }
           default:
           {
-            VOLT_ERROR("non comparable types lhs '%d' rhs '%d'", getValueType(), rhs.getValueType());
-            assert (false);
-            throw std::exception();
+              throwFatalException( "non comparable types lhs '%d' rhs '%d'", getValueType(), rhs.getValueType());
           }
         }
     }
@@ -1158,8 +1150,7 @@ class NValue {
         if ((lhs.getValueType() != VALUE_TYPE_DECIMAL) ||
             (rhs.getValueType() != VALUE_TYPE_DECIMAL))
         {
-            VOLT_ERROR("Non-decimal NValue in decimal adder.");
-            throw std::exception();
+            throwFatalException("Non-decimal NValue in decimal adder.");
         }
 
         if (lhs.isNull() || rhs.isNull()) {
@@ -1184,8 +1175,7 @@ class NValue {
         if ((lhs.getValueType() != VALUE_TYPE_DECIMAL) ||
             (rhs.getValueType() != VALUE_TYPE_DECIMAL))
         {
-            VOLT_ERROR("Non-decimal NValue in decimal subtract.");
-            throw std::exception();
+            throwFatalException("Non-decimal NValue in decimal subtract.");
         }
 
         if (lhs.isNull() || rhs.isNull()) {
@@ -1355,9 +1345,9 @@ inline bool NValue::isNegative() const {
             return getDouble() < 0;
         case VALUE_TYPE_DECIMAL:
             return getDecimal().IsSign();
-        default:
-            VOLT_ERROR("Invalid value type '%s' for checking negativity", getTypeName(type).c_str());
-            throw std::exception();
+        default: {
+            throwFatalException( "Invalid value type '%s' for checking negativity", getTypeName(type).c_str());
+        }
         }
     }
 
@@ -1416,10 +1406,9 @@ inline uint16_t NValue::getTupleStorageSize(const ValueType type) {
         return sizeof(char*);
       case VALUE_TYPE_DECIMAL:
         return sizeof(TTInt);
-      default:
-        VOLT_ERROR("NValue::getTupleStorageSize() unrecognized type '%d'", type);
-        assert (false);
-        throw std::exception();
+      default: {
+          throwFatalException( "NValue::getTupleStorageSize() unrecognized type '%d'", type);
+      }
     }
 }
 
@@ -1453,10 +1442,9 @@ inline int NValue::compare(const NValue rhs) const {
         return compareStringValue(rhs);
       case VALUE_TYPE_DECIMAL:
         return compareDecimalValue(rhs);
-      default:
-        VOLT_ERROR("non comparable type '%d'", rhs.getValueType());
-        assert (false);
-        throw std::exception();
+      default: {
+          throwFatalException( "non comparable type '%d'", rhs.getValueType());
+      }
     }
 }
 
@@ -1492,9 +1480,9 @@ inline void NValue::setNull() {
       case VALUE_TYPE_DECIMAL:
         getDecimal().SetMin();
         break;
-      default:
-        VOLT_ERROR("NValue::setNull() called with ValueType '%d'", getValueType());
-        throw std::exception();
+      default: {
+          throwFatalException( "NValue::setNull() called with ValueType '%d'", getValueType());
+      }
     }
 }
 
@@ -1545,9 +1533,7 @@ inline const NValue NValue::deserializeFromTupleStorage(const void *storage,
             }
             break;
           default:
-            VOLT_ERROR("NValue::getLength() unrecognized type '%d'", type);
-            assert (false);
-            throw std::exception();
+              throwFatalException( "NValue::getLength() unrecognized type '%d'", type);
         }
         return retval;
 }
@@ -1619,10 +1605,9 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
             }
         }
         break;
-      default:
-        VOLT_ERROR("NValue::getLength() unrecognized type '%d'", type);
-        assert (false);
-        throw std::exception();
+      default: {
+          throwFatalException("NValue::getLength() unrecognized type '%d'", type);
+      }
     }
 }
 
@@ -1680,10 +1665,9 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
             }
         }
         break;
-      default:
-        VOLT_ERROR("NValue::getLength() unrecognized type '%d'", type);
-        assert (false);
-        throw std::exception();
+      default: {
+          throwFatalException( "NValue::getLength() unrecognized type '%d'", type);
+      }
     }
 }
 
@@ -1752,10 +1736,9 @@ inline void NValue::deserializeFrom(SerializeInput &input, const ValueType type,
           longStorage[0] = input.readLong();
           break;
       }
-      default:
-        VOLT_ERROR("NValue::deserializeFrom() unrecognized type '%d'", type);
-        assert (false);
-        throw std::exception();
+      default: {
+          throwFatalException( "NValue::deserializeFrom() unrecognized type '%d'", type);
+      }
     }
     return;
 }
@@ -1815,9 +1798,7 @@ inline const NValue NValue::deserializeFromAllocateForStorage(SerializeInput &in
 
       }
       default:
-        VOLT_ERROR("NValue::getTupleStorageSize() unrecognized type '%d'", type);
-        assert (false);
-        throw std::exception();
+          throwFatalException("NValue::getTupleStorageSize() unrecognized type '%d'", type);
     }
     return retval;
 }
@@ -1835,7 +1816,7 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
           }
           const int32_t length = getObjectLength();
           if (length < OBJECTLENGTH_NULL) {
-              throw std::exception();
+              throwFatalException("Attempted to serialize an NValue with a negaitve length");
           }
           output.writeInt(static_cast<int32_t>(length));
           if (length != OBJECTLENGTH_NULL) {
@@ -1879,9 +1860,8 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
           break;
       }
       default:
-        VOLT_ERROR("NValue::serializeTo() found a column "
+          throwFatalException("NValue::serializeTo() found a column "
                    "with ValueType '%d' that is not handled", type);
-        throw std::exception();
     }
 }
 
@@ -1925,10 +1905,10 @@ inline size_t NValue::serializeToELT(char *dataPtr) const
       case VALUE_TYPE_NULL:
       case VALUE_TYPE_BOOLEAN:
       case VALUE_TYPE_ADDRESS:
-        VOLT_ERROR("Invalid type in serializeToELT: %d", getValueType());
+          throwFatalException("Invalid type in serializeToELT: %d", getValueType());
         break;
     }
-    assert(!"Invalid type in serializeToELT");
+    throwFatalException("Invalid type in serializeToELT");
     return 0;
 }
 
@@ -1959,8 +1939,7 @@ inline bool NValue::isNull() const {
           return getDecimal() == min;
       }
       default:
-        VOLT_ERROR("NValue::isNull() called with ValueType '%d'", getValueType());
-        throw std::exception();
+          throwFatalException("NValue::isNull() called with ValueType '%d'", getValueType());
     }
     return false;
 }
@@ -2022,8 +2001,7 @@ inline NValue NValue::getMinValue(ValueType type) {
       case VALUE_TYPE_DOUBLE:
         retval.getDouble() = std::numeric_limits<double>::min(); break;
       default:
-        VOLT_ERROR ("No configured min value for type %d", (int) type);
-        throw std::exception();
+          throwFatalException ("No configured min value for type %d", (int) type);
     }
     return retval;
 }
@@ -2043,8 +2021,7 @@ inline NValue NValue::getMaxValue(ValueType type) {
       case VALUE_TYPE_DOUBLE:
         retval.getDouble() = std::numeric_limits<double>::max(); break;
       default:
-        VOLT_ERROR ("No configured max value for type %d", (int) type);
-        throw std::exception();
+          throwFatalException ("No configured max value for type %d", (int) type);
     }
     return retval;
 }
@@ -2074,8 +2051,7 @@ inline void NValue::hashCombine(std::size_t &seed) const {
       case VALUE_TYPE_DECIMAL:
         getDecimal().hash(seed); break;
       default:
-        VOLT_ERROR ("unknown type %d", (int) type);
-        throw std::exception();
+          throwFatalException ("unknown type %d", (int) type);
     }
 }
 
@@ -2106,8 +2082,7 @@ inline NValue NValue::castAs(ValueType type) const {
       case VALUE_TYPE_DECIMAL:
         return castAsDecimal();
       default:
-        VOLT_ERROR ("Type %d not a recognized type for casting", (int) type);
-        throw std::exception();
+          throwFatalException ("Type %d not a recognized type for casting", (int) type);
     }
 }
 
@@ -2118,8 +2093,7 @@ inline void* NValue::castAsAddress() const {
       case VALUE_TYPE_ADDRESS:
         return *reinterpret_cast<void* const*>(m_data);
       default:
-        VOLT_ERROR ("Type %d not a recognized type for casting as an address", (int) type);
-        throw std::exception();
+          throwFatalException ("Type %d not a recognized type for casting as an address", (int) type);
     }
 }
 
@@ -2155,8 +2129,7 @@ inline NValue NValue::op_increment() const {
         case VALUE_TYPE_DOUBLE:
             retval.getDouble() = getDouble() + 1; break;
         default:
-            VOLT_ERROR ("type %d is not incrementable", (int) type);
-            throw std::exception();
+            throwFatalException ("type %d is not incrementable", (int) type);
             break;
         }
         return retval;
@@ -2194,8 +2167,7 @@ inline NValue NValue::op_decrement() const {
         case VALUE_TYPE_DOUBLE:
             retval.getDouble() = getDouble() - 1; break;
         default:
-            VOLT_ERROR ("type %d is not decrementable", (int) type);
-            throw std::exception();
+            throwFatalException ("type %d is not decrementable", (int) type);
             break;
         }
         return retval;
@@ -2216,8 +2188,7 @@ inline bool NValue::isZero() const {
       case VALUE_TYPE_DECIMAL:
         return getDecimal().IsZero();
       default:
-        VOLT_ERROR ("type %d is not a numeric type that implements isZero()", (int) type);
-        throw std::exception();
+          throwFatalException ("type %d is not a numeric type that implements isZero()", (int) type);
     }
 }
 
@@ -2243,10 +2214,9 @@ inline NValue NValue::op_subtract(const NValue rhs) const {
       default:
         break;
     }
-    VOLT_ERROR("Promotion of %s and %s failed in op_subtract.",
+    throwFatalException("Promotion of %s and %s failed in op_subtract.",
                getTypeName(getValueType()).c_str(),
                getTypeName(rhs.getValueType()).c_str());
-    throw std::exception();
 }
 
 inline NValue NValue::op_add(const NValue rhs) const {
@@ -2271,10 +2241,9 @@ inline NValue NValue::op_add(const NValue rhs) const {
       default:
         break;
     }
-    VOLT_ERROR("Promotion of %s and %s failed in op_add.",
+    throwFatalException("Promotion of %s and %s failed in op_add.",
                getTypeName(getValueType()).c_str(),
                getTypeName(rhs.getValueType()).c_str());
-    throw std::exception();
 }
 
 inline NValue NValue::op_multiply(const NValue rhs) const {
@@ -2298,10 +2267,9 @@ inline NValue NValue::op_multiply(const NValue rhs) const {
       default:
         break;
     }
-    VOLT_ERROR("Promotion of %s and %s failed in op_multiply.",
+    throwFatalException("Promotion of %s and %s failed in op_multiply.",
                getTypeName(getValueType()).c_str(),
                getTypeName(rhs.getValueType()).c_str());
-    throw std::exception();
 }
 
 inline NValue NValue::op_divide(const NValue rhs) const {
@@ -2326,11 +2294,9 @@ inline NValue NValue::op_divide(const NValue rhs) const {
       default:
         break;
     }
-    VOLT_ERROR("Promotion of %s and %s failed in op_divide.",
+    throwFatalException("Promotion of %s and %s failed in op_divide.",
                getTypeName(getValueType()).c_str(),
                getTypeName(rhs.getValueType()).c_str());
-
-    throw std::exception();
 }
 
 }

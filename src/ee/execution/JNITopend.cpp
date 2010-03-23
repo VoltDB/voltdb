@@ -63,6 +63,20 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     assert(m_releaseManagedBufferMID != 0);
     m_nextDependencyMID = m_jniEnv->GetMethodID(jniClass, "nextDependencyAsBytes", "(I)[B");
     assert(m_nextDependencyMID != 0);
+    m_crashVoltDBMID =
+        m_jniEnv->GetStaticMethodID(
+            jniClass,
+            "crashVoltDB",
+            "(Ljava/lang/String;[Ljava/lang/String;Ljava/lang/String;I)V");
+    assert(m_crashVoltDBMID != 0);
+
+    if (m_handoffReadyELBufferMID == 0 ||
+            m_claimManagedBufferMID == 0 ||
+            m_releaseManagedBufferMID == 0 ||
+            m_nextDependencyMID == 0 ||
+            m_crashVoltDBMID == 0) {
+        throw std::exception();
+    }
 }
 
 void JNITopend::handoffReadyELBuffer(char* bufferPtr, int32_t bytesUsed, CatalogId tableId) {
@@ -95,8 +109,7 @@ int JNITopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
     JNILocalFrameBarrier jni_frame = JNILocalFrameBarrier(m_jniEnv, 10);
     if (jni_frame.checkResult() < 0) {
         VOLT_ERROR("Unable to load dependency: jni frame error.");
-        assert(false);
-        return 0;
+        throw std::exception();
     }
 
     jbyteArray jbuf = (jbyteArray)(m_jniEnv->CallObjectMethod(m_javaExecutionEngine,
@@ -117,6 +130,53 @@ int JNITopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
     else {
         return 0;
     }
+}
+
+void JNITopend::crashVoltDB(FatalException e) {
+    //Enough references for the reason string, traces array, and traces strings
+    JNILocalFrameBarrier jni_frame =
+            JNILocalFrameBarrier(
+                    m_jniEnv,
+                    static_cast<int32_t>(e.m_traces.size()) + 4);
+    if (jni_frame.checkResult() < 0) {
+        VOLT_ERROR("Unable to load dependency: jni frame error.");
+        throw std::exception();
+    }
+    jstring jReason = m_jniEnv->NewStringUTF(e.m_reason.c_str());
+    if (m_jniEnv->ExceptionCheck()) {
+        m_jniEnv->ExceptionDescribe();
+        throw std::exception();
+    }
+    jstring jFilename = m_jniEnv->NewStringUTF(e.m_filename);
+    if (m_jniEnv->ExceptionCheck()) {
+        m_jniEnv->ExceptionDescribe();
+        throw std::exception();
+    }
+    jobjectArray jTracesArray =
+            m_jniEnv->NewObjectArray(
+                    static_cast<jsize>(e.m_traces.size()),
+                    m_jniEnv->FindClass("java/lang/String"),
+                    NULL);
+    if (m_jniEnv->ExceptionCheck()) {
+        m_jniEnv->ExceptionDescribe();
+        throw std::exception();
+    }
+    for (int ii = 0; ii < e.m_traces.size(); ii++) {
+        jstring traceString = m_jniEnv->NewStringUTF(e.m_traces[ii].c_str());
+        m_jniEnv->SetObjectArrayElement( jTracesArray, ii, traceString);
+    }
+    m_jniEnv->CallStaticVoidMethod(
+            m_jniEnv->GetObjectClass(m_javaExecutionEngine),
+            m_crashVoltDBMID,
+            jReason,
+            jTracesArray,
+            jFilename,
+            static_cast<int32_t>(e.m_lineno));
+    throw std::exception();
+}
+
+JNITopend::~JNITopend() {
+    m_jniEnv->DeleteGlobalRef(m_javaExecutionEngine);
 }
 
 }

@@ -171,8 +171,7 @@ void TupleStreamWrapper::commit(int64_t txnId)
 void TupleStreamWrapper::rollbackTo(size_t mark)
 {
     if (mark > m_uso) {
-        VOLT_ERROR("Truncating the future.");
-        throw std::exception();
+        throwFatalException("Truncating the future.");
     }
 
     // back up the universal stream counter
@@ -230,8 +229,7 @@ void TupleStreamWrapper::extendBufferChain(size_t minLength)
 {
     if (m_defaultCapacity < minLength) {
         // eltxxx: rollback instead?
-        VOLT_ERROR("Default capacity is less than required buffer size.");
-        throw std::exception();
+        throwFatalException("Default capacity is less than required buffer size.");
     }
 
     if (m_currBlock) {
@@ -257,8 +255,7 @@ void TupleStreamWrapper::extendBufferChain(size_t minLength)
 
     char *buffer = m_topend->claimManagedBuffer((int32_t)m_defaultCapacity);
     if (!buffer) {
-        VOLT_ERROR("Failed to claim managed buffer for ELT.");
-        throw std::exception();
+        throwFatalException("Failed to claim managed buffer for ELT.");
     }
 
     m_currBlock = new StreamBlock(buffer, m_defaultCapacity, m_uso);
@@ -390,8 +387,7 @@ TupleStreamWrapper::computeOffsets(TableTuple &tuple,
     // returns 0 if corrupt tuple detected
     size_t dataSz = tuple.maxELTSerializationSize();
     if (dataSz == 0) {
-        VOLT_ERROR("Invalid tuple passed to computeTupleMaxLength. Crashing System.");
-        throw std::exception();  // ENG-322.
+        throwFatalException("Invalid tuple passed to computeTupleMaxLength. Crashing System.");
     }
 
     return *rowHeaderSz + metadataSz + dataSz;

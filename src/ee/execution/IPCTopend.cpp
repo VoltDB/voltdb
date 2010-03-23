@@ -65,5 +65,8 @@ int IPCTopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
     }
 }
 
+void IPCTopend::crashVoltDB(FatalException e) {
+    m_vdbipc->crashVoltDB(e);
+}
 }
 

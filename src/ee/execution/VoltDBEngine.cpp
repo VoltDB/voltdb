@@ -64,6 +64,7 @@
 #include "common/tabletuple.h"
 #include "common/executorcontext.hpp"
 #include "common/CatalogUtil.h"
+#include "common/FatalException.hpp"
 #include "catalog/catalogmap.h"
 #include "catalog/catalog.h"
 #include "catalog/cluster.h"
@@ -134,7 +135,6 @@ bool VoltDBEngine::initialize(
         std::string hostname) {
     // Be explicit about running in the standard C locale for now.
     std::locale::global(std::locale("C"));
-
     m_clusterIndex = clusterIndex;
     m_siteId = siteId;
     m_partitionId = partitionId;
@@ -246,8 +246,7 @@ bool VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput* out) const {
         table->serializeTo(*out);
         return true;
     } else {
-        VOLT_ERROR("Unable to find table for TableId '%d'", (int) tableId);
-        return false;
+        throwFatalException( "Unable to find table for TableId '%d'", (int) tableId);
     }
 }
 
@@ -416,7 +415,7 @@ int VoltDBEngine::executePlanFragment(std::string fragmentString, int32_t output
         }
         else
         {
-            VOLT_ERROR("Unable to load ad-hoc plan fragment.");
+            throwFatalException("Unable to load ad-hoc plan fragment.");
         }
     }
     catch (SerializableEEException &e)
@@ -476,20 +475,17 @@ bool VoltDBEngine::loadCatalog(const std::string &catalogPayload) {
     // get a reference to the database and cluster
     catalog::Cluster *cluster = m_catalog->clusters().get("cluster");
     if (!cluster) {
-        VOLT_ERROR("Unable to find cluster catalog information");
-        return false;
+        throwFatalException("Unable to find cluster catalog information");
     }
     m_database = cluster->databases().get("database");
     if (!m_database) {
-        VOLT_ERROR("Unable to find database catalog information");
-        return false;
+        throwFatalException("Unable to find database catalog information");
     }
 
      // initialize the list of partition ids
     bool success = initCluster(cluster);
     if (success == false) {
-        VOLT_ERROR("Unable to load partition list for cluster");
-        return false;
+        throwFatalException("Unable to load partition list for cluster");
     }
 
     // Tables care about EL state.
@@ -505,8 +501,7 @@ bool VoltDBEngine::loadCatalog(const std::string &catalogPayload) {
     std::map<std::string, catalog::Table*>::const_iterator table_iterator;
     for (table_iterator = m_database->tables().begin(); table_iterator != m_database->tables().end(); table_iterator++) {
         if (!initTable(m_database->relativeIndex(), table_iterator->second)) {
-            VOLT_ERROR("Failed to initialize table '%s' from catalogs\n", table_iterator->second->name().c_str());
-            return false;
+            throwFatalException( "Failed to initialize table '%s' from catalogs\n", table_iterator->second->name().c_str());
         }
     }
 
@@ -533,26 +528,22 @@ bool VoltDBEngine::updateCatalog(const std::string &catalogPayload) {
         m_catalog->execute(catalogPayload);
     }
     catch (std::string s) {
-        VOLT_ERROR("Error updating catalog: %s", s.c_str());
-        return false;
+        throwFatalException( "Error updating catalog: %s", s.c_str());
     }
 
     // cache the database in m_database
     catalog::Cluster *cluster = m_catalog->clusters().get("cluster");
     if (!cluster) {
-        VOLT_ERROR("Unable to find cluster catalog information");
-        return false;
+        throwFatalException("Unable to find cluster catalog information");
     }
     m_database = cluster->databases().get("database");
     if (!m_database) {
-        VOLT_ERROR("Unable to find database catalog information");
-        return false;
+        throwFatalException("Unable to find database catalog information");
     }
 
     // this does the actual scary bits of reinitializing plan fragments
     if (!clearAndLoadAllPlanFragments()) {
-        VOLT_ERROR("Error updating catalog planfragments");
-        return false;
+        throwFatalException("Error updating catalog planfragments");
     }
 
     VOLT_DEBUG("Updated catalog...");
@@ -569,14 +560,12 @@ bool VoltDBEngine::loadTable(bool allowELT, int32_t tableId,
 
     Table* ret = getTable(tableId);
     if (ret == NULL) {
-        VOLT_ERROR("Table ID %d doesn't exist. Could not load data", (int) tableId);
-        return false;
+        throwFatalException( "Table ID %d doesn't exist. Could not load data", (int) tableId);
     }
     PersistentTable* table = dynamic_cast<PersistentTable*>(ret);
     if (table == NULL) {
-        VOLT_ERROR("Table ID %d(name '%s') is not a persistent table. Could not load data",
-                   (int) tableId, ret->name().c_str());
-        return false;
+        throwFatalException( "Table ID %d(name '%s') is not a persistent table. Could not load data",
+                (int) tableId, ret->name().c_str());
     }
 
     table->loadTuplesFrom(allowELT, serializeIn);
@@ -610,9 +599,11 @@ bool VoltDBEngine::clearAndLoadAllPlanFragments() {
                 int64_t fragId = uniqueIdForFragment(pf_iterator->second);
                 std::string planNodeTree = pf_iterator->second->plannodetree();
                 if (!initPlanFragment(fragId, planNodeTree)) {
-                    VOLT_ERROR("Failed to initialize plan fragment '%s' from catalogs", pf_iterator->second->name().c_str());
-                    VOLT_ERROR("Failed SQL Statement: %s", catalogStmt->sqltext().c_str());
-                    return false;
+                    throwFatalException(
+                            "Failed to initialize plan fragment '%s' from catalogs\n"
+                            "Failed SQL Statement: %s",
+                            pf_iterator->second->name().c_str(),
+                            catalogStmt->sqltext().c_str());
                 }
             }
         }
@@ -630,8 +621,7 @@ bool VoltDBEngine::initPlanFragment(const int64_t fragId, const std::string plan
 
     std::map<int64_t, boost::shared_ptr<ExecutorVector> >::const_iterator iter = m_executorMap.find(fragId);
     if (iter != m_executorMap.end()) {
-        VOLT_ERROR("Duplicate PlanNodeList entry for PlanFragment '%jd' during initialization", (intmax_t)fragId);
-        return false;
+        throwFatalException( "Duplicate PlanNodeList entry for PlanFragment '%jd' during initialization", (intmax_t)fragId);
     }
 
     // catalog method plannodetree returns PlanNodeList.java
@@ -641,9 +631,8 @@ bool VoltDBEngine::initPlanFragment(const int64_t fragId, const std::string plan
     assert(pnf->getRootNode());
 
     if (!pnf->getRootNode()) {
-        VOLT_ERROR("Deserialized PlanNodeFragment for PlanFragment '%jd' "
-                 "does not have a root PlanNode", (intmax_t)fragId);
-        return false;
+        throwFatalException( "Deserialized PlanNodeFragment for PlanFragment '%jd' "
+                "does not have a root PlanNode", (intmax_t)fragId);
     }
 
     boost::shared_ptr<ExecutorVector> ev = boost::shared_ptr<ExecutorVector>(new ExecutorVector());
@@ -652,9 +641,8 @@ bool VoltDBEngine::initPlanFragment(const int64_t fragId, const std::string plan
     // Initialize each node!
     for (int ctr = 0, cnt = (int)pnf->getExecuteList().size(); ctr < cnt; ctr++) {
         if (!initPlanNode(fragId, pnf->getExecuteList()[ctr], &(ev->tempTableMemoryInBytes))) {
-            VOLT_ERROR("Failed to initialize PlanNode '%s' at position '%d' for PlanFragment '%jd'",
-                     pnf->getExecuteList()[ctr]->debug().c_str(), ctr, (intmax_t)fragId);
-            return false;
+            throwFatalException( "Failed to initialize PlanNode '%s' at position '%d' for PlanFragment '%jd'",
+                    pnf->getExecuteList()[ctr]->debug().c_str(), ctr, (intmax_t)fragId);
         }
     }
 
@@ -684,16 +672,18 @@ bool VoltDBEngine::initPlanNode(const int64_t fragId, AbstractPlanNode* node, in
         for (internal_it = node->getInlinePlanNodes().begin(); internal_it != node->getInlinePlanNodes().end(); internal_it++) {
             AbstractPlanNode* inline_node = internal_it->second;
             if (!initPlanNode(fragId, inline_node, tempTableMemoryInBytes)) {
-                VOLT_ERROR("Failed to initialize the internal PlanNode '%s' of PlanNode '%s'", inline_node->debug().c_str(), node->debug().c_str());
-                return false;
+                throwFatalException(
+                        "Failed to initialize the internal PlanNode '%s' of PlanNode '%s'",
+                        inline_node->debug().c_str(), node->debug().c_str());
             }
         }
     }
 
     // Now use the executor to initialize the plannode for execution later on
     if (!executor->init(this, m_database, tempTableMemoryInBytes)) {
-        VOLT_ERROR("The Executor failed to initialize PlanNode '%s' for PlanFragment '%jd'", node->debug().c_str(), (intmax_t)fragId);
-        return false;
+        throwFatalException(
+                "The Executor failed to initialize PlanNode '%s' for PlanFragment '%jd'",
+                node->debug().c_str(), (intmax_t)fragId);
     }
 
     return true;
@@ -705,12 +695,10 @@ bool VoltDBEngine::initTable(const int32_t databaseId, const catalog::Table *cat
     // Create a persistent table for this table in our catalog
     int32_t table_id = catalogTable->relativeIndex();
     if (m_tables.find(table_id) != m_tables.end()) {
-        VOLT_ERROR("Duplicate table '%d' during initialization", table_id);
-        return false;
+        throwFatalException( "Duplicate table '%d' during initialization", table_id);
     }
     if (m_tablesByName.find(catalogTable->name()) != m_tablesByName.end()) {
-        VOLT_ERROR("Duplicate table '%s' during initialization", catalogTable->name().c_str());
-        return false;
+        throwFatalException( "Duplicate table '%s' during initialization", catalogTable->name().c_str());
     }
 
     // Columns:
@@ -746,8 +734,9 @@ bool VoltDBEngine::initTable(const int32_t databaseId, const catalog::Table *cat
 
         // The catalog::Index object now has a list of columns that are to be used
         if (catalog_index->columns().size() == (size_t)0) {
-            VOLT_ERROR("Index '%s' in table '%s' does not declare any columns to use", catalog_index->name().c_str(), catalogTable->name().c_str());
-            return false;
+            throwFatalException(
+                    "Index '%s' in table '%s' does not declare any columns to use",
+                    catalog_index->name().c_str(), catalogTable->name().c_str());
         }
 
         // Since the columns are not going to come back in the proper order from the catalogs, we'll use
@@ -759,8 +748,9 @@ bool VoltDBEngine::initTable(const int32_t databaseId, const catalog::Table *cat
         for (colref_iterator = catalog_index->columns().begin(); colref_iterator != catalog_index->columns().end(); colref_iterator++) {
             catalog::ColumnRef *catalog_colref = colref_iterator->second;
             if (catalog_colref->index() < 0) {
-                VOLT_ERROR("Invalid column '%d' for index '%s' in table '%s'", catalog_colref->index(), catalog_index->name().c_str(), catalogTable->name().c_str());
-                return false;
+                throwFatalException(
+                        "Invalid column '%d' for index '%s' in table '%s'",
+                        catalog_colref->index(), catalog_index->name().c_str(), catalogTable->name().c_str());
             }
             // check if the column does not have an int type
             if ((catalog_colref->column()->type() != VALUE_TYPE_TINYINT) &&
@@ -788,15 +778,20 @@ bool VoltDBEngine::initTable(const int32_t databaseId, const catalog::Table *cat
             case CONSTRAINT_TYPE_PRIMARY_KEY:
                 // Make sure we have an index to use
                 if (catalog_constraint->index() == NULL) {
-                    VOLT_ERROR("The '%s' constraint '%s' on table '%s' does not specify an index", constraintutil::getTypeName(type).c_str(), catalog_constraint->name().c_str(), catalogTable->name().c_str());
-                    return false;
+                    throwFatalException(
+                            "The '%s' constraint '%s' on table '%s' does not specify an index",
+                            constraintutil::getTypeName(type).c_str(), catalog_constraint->name().c_str(),
+                            catalogTable->name().c_str());
 
                 }
                 // Make sure they didn't declare more than one primary key index
                 else if (pkey_index_id.size() > 0) {
-                    VOLT_ERROR("Trying to declare a primary key on table '%s' using index '%s' but '%s' was already set as the primary key",
-                               catalogTable->name().c_str(), catalog_constraint->index()->name().c_str(), pkey_index_id.c_str());
-                    return false;
+                    throwFatalException(
+                            "Trying to declare a primary key on table '%s'"
+                            "using index '%s' but '%s' was already set as the primary key",
+                            catalogTable->name().c_str(),
+                            catalog_constraint->index()->name().c_str(),
+                            pkey_index_id.c_str());
                 }
                 pkey_index_id = catalog_constraint->index()->name();
                 break;
@@ -805,8 +800,11 @@ bool VoltDBEngine::initTable(const int32_t databaseId, const catalog::Table *cat
                 // TODO: In the future I would like bring back my Constraint object so that we can keep
                 //       track of everything that a table has...
                 if (catalog_constraint->index() == NULL) {
-                    VOLT_ERROR("The '%s' constraint '%s' on table '%s' does not specify an index", constraintutil::getTypeName(type).c_str(), catalog_constraint->name().c_str(), catalogTable->name().c_str());
-                    return false;
+                    throwFatalException(
+                            "The '%s' constraint '%s' on table '%s' does not specify an index",
+                            constraintutil::getTypeName(type).c_str(),
+                            catalog_constraint->name().c_str(),
+                            catalogTable->name().c_str());
                 }
                 break;
             // Unsupported
@@ -816,9 +814,12 @@ bool VoltDBEngine::initTable(const int32_t databaseId, const catalog::Table *cat
                 VOLT_WARN("Unsupported type '%s' for constraint '%s'", constraintutil::getTypeName(type).c_str(), catalog_constraint->name().c_str());
                 break;
             // Unknown
-            default:
-                VOLT_ERROR("Invalid constraint type '%s' for '%s'", constraintutil::getTypeName(type).c_str(), catalog_constraint->name().c_str());
-                return false;
+            default: {
+                throwFatalException(
+                        "Invalid constraint type '%s' for '%s'",
+                        constraintutil::getTypeName(type).c_str(),
+                        catalog_constraint->name().c_str());
+            }
         }
     }
 
@@ -1045,9 +1046,8 @@ int VoltDBEngine::getStats(
         for (int ii = 0; ii < numLocators; ii++) {
             voltdb::CatalogId locator = static_cast<voltdb::CatalogId>(locators[ii]);
             if (m_tables[locator] == NULL) {
-                VOLT_ERROR("getStats() called with selector %d, and an invalid locator"
+                throwFatalException( "getStats() called with selector %d, and an invalid locator"
                         " %d that does not correspond to a table", selector, locator);
-                return -1;
             }
         }
         resultTable = m_statsManager.getStats(
@@ -1057,9 +1057,9 @@ int VoltDBEngine::getStats(
                 now);
         break;
     }
-    default:
-        VOLT_ERROR("getStats() called with an unrecognized selector %d", selector );
-        return -1;
+    default: {
+        throwFatalException( "getStats() called with an unrecognized selector %d", selector );
+    }
     }
     if (resultTable != NULL) {
         resultTable->serializeTo(m_resultOutput);

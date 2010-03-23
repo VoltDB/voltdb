@@ -46,7 +46,7 @@
 
 #include <stdexcept>
 #include <sstream>
-
+#include "common/FatalException.hpp"
 #include "plannodefragment.h"
 #include "catalog/catalog.h"
 #include "abstractplannode.h"
@@ -64,7 +64,7 @@ PlanNodeFragment::PlanNodeFragment(AbstractPlanNode *root_node)
 {
     m_serializedType = "org.voltdb.plannodes.PlanNodeList";
     if (constructTree(root_node) != true) {
-        throw std::exception();
+        throwFatalException("Failed to construct plan fragment");
     }
 }
 
@@ -110,7 +110,7 @@ PlanNodeFragment::fromJSONObject(json_spirit::Object &obj,
 {
     json_spirit::Value planNodesValue = json_spirit::find_value( obj, "PLAN_NODES");
     if (planNodesValue == json_spirit::Value::null) {
-        throw std::runtime_error("Failure attempting to load plan a plan node fragment from a "
+        throwFatalException("Failure attempting to load plan a plan node fragment from a "
                                  "json_spirit::Object. There was no value \"PLAN_NODES\"");
     }
 
@@ -161,7 +161,7 @@ PlanNodeFragment::loadFromJSONObject(json_spirit::Object &obj)
     json_spirit::Value executeListValue = json_spirit::find_value( obj, "EXECUTE_LIST");
     if (executeListValue == json_spirit::Value::null) {
             // throw if list arrived without an execution ordering
-            throw std::runtime_error("Failure while loading a PlanNodeList. "
+        throwFatalException("Failure while loading a PlanNodeList. "
                                          "Couldn't find value \"EXECUTE_LIST\"");
     }
     else {
@@ -174,7 +174,7 @@ PlanNodeFragment::loadFromJSONObject(json_spirit::Object &obj)
     json_spirit::Value parametersArrayValue = json_spirit::find_value( obj, "PARAMETERS");
     if (parametersArrayValue == json_spirit::Value::null) {
         //throw if list arrived without a parameter mapping
-        throw std::runtime_error("Failure while loading a PlanNodeList. "
+        throwFatalException("Failure while loading a PlanNodeList. "
                                      "Couldn't find value \"PARAMETERS\"");
     }
     else {

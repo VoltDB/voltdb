@@ -21,6 +21,7 @@
 #include "common/ids.h"
 #include "common/tabletuple.h"
 #include "common/executorcontext.hpp"
+#include "common/FatalException.hpp"
 
 #include <deque>
 
@@ -124,11 +125,9 @@ private:
                 m_offset = mark - m_uso;
             }
             else {
-                VOLT_ERROR("Attempted ELT block truncation past start of block.");
-                std::cout << "m_uso(" << m_uso <<
-                  ") m_offset(" << m_offset <<
-                  ") mark(" << mark << ")" << std::endl;
-                throw std::exception();
+                throwFatalException( "Attempted ELT block truncation past start of block."
+                        "\n m_uso(%jd), m_offset(%jd), mark(%jd)\n",
+                        (intmax_t)m_uso, (intmax_t)m_offset, (intmax_t)mark);
             }
         }
 

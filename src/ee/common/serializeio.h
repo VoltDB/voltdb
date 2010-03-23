@@ -53,6 +53,7 @@
 #include <arpa/inet.h>
 #include "bytearray.h"
 #include "debuglog.h"
+#include "common/FatalException.hpp"
 
 namespace voltdb {
 
@@ -466,10 +467,7 @@ public:
 protected:
     /** Reference output can't resize the buffer: Frowny-Face. */
     virtual void expand(size_t minimum_desired) {
-        // this exception should be caught by code smart enough
-        // to realize this will happen. The system will crash in other cases
-        //VOLT_ERROR("Trying to expand the reference serializing output buffer (a general no-no).");
-        throw std::exception();
+        throwFatalException("Attempted to expand a ReferenceSerializeOutput");
     }
 };
 

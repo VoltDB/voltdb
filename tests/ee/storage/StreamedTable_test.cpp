@@ -29,6 +29,7 @@
 #include "common/Pool.hpp"
 #include "common/UndoQuantum.h"
 #include "common/Topend.h"
+#include "common/FatalException.hpp"
 
 #include "common/types.h"
 #include "common/NValue.hpp"
@@ -72,6 +73,10 @@ class MockTopend : public Topend {
         int32_t dependencyId, Pool *pool, Table* destination)
     {
         return 0;
+    }
+
+    virtual void crashVoltDB(FatalException e) {
+
     }
 
     int m_handoffcount;

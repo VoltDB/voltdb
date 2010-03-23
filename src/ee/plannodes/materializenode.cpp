@@ -48,6 +48,7 @@
 #include "materializenode.h"
 #include "common/common.h"
 #include "common/serializeio.h"
+#include "common/FatalException.hpp"
 #include "expressions/abstractexpression.h"
 #include "storage/table.h"
 
@@ -69,7 +70,7 @@ void MaterializePlanNode::loadFromJSONObject(json_spirit::Object &obj, const cat
     ProjectionPlanNode::loadFromJSONObject( obj, catalog_db);
     json_spirit::Value batchedValue = json_spirit::find_value( obj, "BATCHED");
     if (batchedValue == json_spirit::Value::null) {
-        throw std::runtime_error("MaterializePlanNode::loadFromJSONObject: Can't find BATCHED value");
+        throwFatalException("MaterializePlanNode::loadFromJSONObject: Can't find BATCHED value");
     }
     batched = batchedValue.get_bool();
 }

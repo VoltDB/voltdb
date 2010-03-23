@@ -209,8 +209,7 @@ public:
                 break;
             }
             default:
-                std::cerr << "We currently only support a specific set of column index sizes..." << std::endl;
-                throw std::exception();
+                throwFatalException("We currently only support a specific set of column index sizes...")
                 break;
             }
         }
@@ -251,8 +250,7 @@ public:
                 break;
             }
             default:
-                std::cerr << "We currently only support a specific set of column index sizes..." << std::endl;
-                throw std::exception();
+                throwFatalException("We currently only support a specific set of column index sizes...");
                 break;
             }
         }
@@ -290,8 +288,7 @@ public:
                 break;
             }
             default:
-                std::cerr << "We currently only support a specific set of column index sizes..." << std::endl;
-                throw std::exception();
+                throwFatalException( "We currently only support a specific set of column index sizes..." );
                 break;
             }
         }

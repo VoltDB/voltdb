@@ -48,6 +48,7 @@
 #include "limitnode.h"
 #include "common/serializeio.h"
 #include "common/ValuePeeker.hpp"
+#include "common/FatalException.hpp"
 #include "storage/table.h"
 
 namespace voltdb {
@@ -114,13 +115,13 @@ std::string LimitPlanNode::debugInfo(const std::string &spacer) const {
 void LimitPlanNode::loadFromJSONObject(json_spirit::Object &obj, const catalog::Database *catalog_db) {
     json_spirit::Value limitValue = json_spirit::find_value( obj, "LIMIT");
     if (limitValue == json_spirit::Value::null) {
-        throw std::runtime_error("LimitPlanNode::loadFromJSONObject: can't find LIMIT value");
+        throwFatalException("LimitPlanNode::loadFromJSONObject: can't find LIMIT value");
     }
     limit = limitValue.get_int();
 
     json_spirit::Value offsetValue = json_spirit::find_value( obj, "OFFSET");
     if (offsetValue == json_spirit::Value::null) {
-        throw std::runtime_error("LimitPlanNode::loadFromJSONObject: can't find OFFSET value");
+        throwFatalException("LimitPlanNode::loadFromJSONObject: can't find OFFSET value");
     }
     offset = offsetValue.get_int();
 

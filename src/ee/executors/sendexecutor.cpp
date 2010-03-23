@@ -48,6 +48,7 @@
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/tabletuple.h"
+#include "common/FatalException.hpp"
 #include "plannodes/sendnode.h"
 
 #include "execution/VoltDBEngine.h"
@@ -85,7 +86,7 @@ bool SendExecutor::p_execute(const NValueArray &params) {
     //m_inputTable->setDependencyId(m_dependencyId);//Multiple send executors sharing the same input table apparently.
     // Just blast the input table on through VoltDBEngine!
     if (!m_engine->send(m_inputTable)) {
-        VOLT_ERROR("Failed to send table '%s'", m_inputTable->name().c_str());
+        throwFatalException( "Failed to send table '%s'", m_inputTable->name().c_str());
         return false;
     }
     VOLT_DEBUG("SEND TABLE: %s", m_inputTable->debug().c_str());

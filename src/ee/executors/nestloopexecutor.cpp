@@ -49,6 +49,7 @@
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/tabletuple.h"
+#include "common/FatalException.hpp"
 #include "expressions/abstractexpression.h"
 #include "expressions/tuplevalueexpression.h"
 #include "storage/table.h"
@@ -81,8 +82,7 @@ assignTupleValueIndex(AbstractExpression *ae,
     std::string tname = tve->getTableName();
 
     if (oname == "temp" && iname == "temp") {
-        VOLT_ERROR("Unsuported join on two temp tables.");
-        throw std::exception();
+        throwFatalException("Unsuported join on two temp tables.");
     }
 
     if (tname == oname)
@@ -94,8 +94,7 @@ assignTupleValueIndex(AbstractExpression *ae,
     else if (iname == "temp")
         tve->setTupleIndex(1);
     else {
-        VOLT_ERROR("TableTupleValue in join with unknown table name.");
-        throw std::exception();
+        throwFatalException("TableTupleValue in join with unknown table name.");
     }
 }
 

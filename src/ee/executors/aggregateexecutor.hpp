@@ -58,6 +58,7 @@
 #include "common/debuglog.h"
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
+#include "common/FatalException.hpp"
 #include "executors/abstractexecutor.h"
 #include "expressions/abstractexpression.h"
 #include "plannodes/aggregatenode.h"
@@ -320,8 +321,9 @@ inline Agg* getAggInstance(Pool* memoryPool, ExpressionType agg_type)
     case EXPRESSION_TYPE_AGGREGATE_MAX  :
         agg = new (memoryPool->allocate(sizeof(MaxAgg))) MaxAgg();
         break;
-    default:
-        throw std::exception();
+    default: {
+        throwFatalException("Unknown aggregate type %d", agg_type);
+    }
     }
     return agg;
 }
@@ -439,10 +441,8 @@ helper(AggregatePlanNode* node, Agg** aggs,
     }
 
     if (!output_table->insertTuple(tmptup)) {
-        VOLT_ERROR(
-            "Failed to insert order-by tuple from input table '%s' into output table '%s'",
-            input_table->name().c_str(), output_table->name().c_str());
-        return false;
+        throwFatalException( "Failed to insert order-by tuple from input table '%s' into output table '%s'",
+                input_table->name().c_str(), output_table->name().c_str());
     }
     return true;
 }

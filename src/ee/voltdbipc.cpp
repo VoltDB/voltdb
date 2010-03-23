@@ -28,6 +28,7 @@
 #include "common/debuglog.h"
 #include "common/serializeio.h"
 #include "common/Pool.hpp"
+#include "common/FatalException.hpp"
 #include "execution/IPCTopend.h"
 #include "execution/VoltDBEngine.h"
 
@@ -269,8 +270,12 @@ int8_t VoltDBIPC::loadCatalog(struct ipc_command *cmd) {
     if (!m_engine)
         return kErrorCode_Error;
 
-    if (m_engine->loadCatalog(std::string(cmd->data)) == true) {
-        return kErrorCode_Success;
+    try {
+        if (m_engine->loadCatalog(std::string(cmd->data)) == true) {
+            return kErrorCode_Success;
+        }
+    } catch (FatalException e) {
+        crashVoltDB(e);
     }
     return kErrorCode_Error;
 }
@@ -281,8 +286,12 @@ int8_t VoltDBIPC::updateCatalog(struct ipc_command *cmd) {
     if (!m_engine)
         return kErrorCode_Error;
 
-    if (m_engine->updateCatalog(std::string(cmd->data)) == true) {
-        return kErrorCode_Success;
+    try {
+        if (m_engine->updateCatalog(std::string(cmd->data)) == true) {
+            return kErrorCode_Success;
+        }
+    } catch (FatalException e) {
+        crashVoltDB(e);
     }
     return kErrorCode_Error;
 }
@@ -315,13 +324,17 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
     cs->hostId = ntohl(cs->hostId);
     cs->hostnameLength = ntohs(cs->hostnameLength);
     std::string hostname(cs->hostname, cs->hostnameLength);
-    m_engine = new VoltDBEngine(new voltdb::IPCTopend(this), new voltdb::StdoutLogProxy());
-    m_engine->getLogManager()->setLogLevels(cs->logLevels);
-    m_reusedResultBuffer = new char[MAX_MSG_SZ];
-    m_exceptionBuffer = new char[MAX_MSG_SZ];
-    m_engine->setBuffers( NULL, 0, m_reusedResultBuffer, MAX_MSG_SZ, m_exceptionBuffer, MAX_MSG_SZ);
-    if (m_engine->initialize( cs->clusterId, cs->siteId, cs->partitionId, cs->hostId, hostname) == true) {
-        return kErrorCode_Success;
+    try {
+        m_engine = new VoltDBEngine(new voltdb::IPCTopend(this), new voltdb::StdoutLogProxy());
+        m_engine->getLogManager()->setLogLevels(cs->logLevels);
+        m_reusedResultBuffer = new char[MAX_MSG_SZ];
+        m_exceptionBuffer = new char[MAX_MSG_SZ];
+        m_engine->setBuffers( NULL, 0, m_reusedResultBuffer, MAX_MSG_SZ, m_exceptionBuffer, MAX_MSG_SZ);
+        if (m_engine->initialize( cs->clusterId, cs->siteId, cs->partitionId, cs->hostId, hostname) == true) {
+            return kErrorCode_Success;
+        }
+    } catch (FatalException e) {
+        crashVoltDB(e);
     }
     return kErrorCode_Error;
 }
@@ -352,7 +365,11 @@ int8_t VoltDBIPC::releaseUndoToken(struct ipc_command *cmd) {
 
     struct undo_token * cs = (struct undo_token*) cmd;
 
-    m_engine->releaseUndoToken(ntohll(cs->token));
+    try {
+        m_engine->releaseUndoToken(ntohll(cs->token));
+    } catch (FatalException e) {
+        crashVoltDB(e);
+    }
 
     return kErrorCode_Success;
 }
@@ -365,7 +382,11 @@ int8_t VoltDBIPC::undoUndoToken(struct ipc_command *cmd) {
 
     struct undo_token * cs = (struct undo_token*) cmd;
 
-    m_engine->undoUndoToken(ntohll(cs->token));
+    try {
+        m_engine->undoUndoToken(ntohll(cs->token));
+    } catch (FatalException e) {
+        crashVoltDB(e);
+    }
 
     return kErrorCode_Success;
 }
@@ -384,8 +405,13 @@ int8_t VoltDBIPC::tick(struct ipc_command *cmd) {
     struct tick * cs = (struct tick*) cmd;
     //std::cout << "tick: time=" << cs->time << " txn=" << cs->lastTxnId << std::endl;
 
-    // no return code. can't fail!
-    m_engine->tick(ntohll(cs->time), ntohll(cs->lastTxnId));
+    try {
+        // no return code. can't fail!
+        m_engine->tick(ntohll(cs->time), ntohll(cs->lastTxnId));
+    } catch (FatalException e) {
+        crashVoltDB(e);
+    }
+
     return kErrorCode_Success;
 }
 
@@ -396,7 +422,13 @@ int8_t VoltDBIPC::quiesce(struct ipc_command *cmd) {
     }__attribute__((packed));
 
     struct quiesce *cs = (struct quiesce*)cmd;
-    m_engine->quiesce(ntohll(cs->lastTxnId));
+
+    try {
+        m_engine->quiesce(ntohll(cs->lastTxnId));
+    } catch (FatalException e) {
+        crashVoltDB(e);
+    }
+
     return kErrorCode_Success;
 }
 
@@ -421,24 +453,28 @@ void VoltDBIPC::executeQueryPlanFragmentsAndGetResults(struct ipc_command *cmd) 
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(querypfs) - sizeof(int32_t) * ntohl(queryCommand->numFragmentIds));
     ReferenceSerializeInput serialize_in(offset, sz);
 
-    // and reset to space for the results output
-    m_engine->resetReusedResultOutputBuffer(1);//1 byte to add status code
-    m_engine->setUndoToken(ntohll(queryCommand->undoToken));
-    int numFrags = ntohl(queryCommand->numFragmentIds);
-    for (int i = 0; i < numFrags; ++i) {
-        int cnt = serialize_in.readShort();
-        assert(cnt> -1);
-        Pool *pool = m_engine->getStringPool();
-        deserializeParameterSetCommon(cnt, serialize_in, params, pool);
-        m_engine->setUsedParamcnt(cnt);
-        if (m_engine->executeQuery(ntohll(fragmentId[i]), 1, -1,
-                                   params, ntohll(queryCommand->txnId),
-                                   ntohll(queryCommand->lastCommittedTxnId),
-                                   i == 0 ? true : false, //first
-                                   i == numFrags - 1 ? true : false)) { //last
-            ++errors;
+    try {
+        // and reset to space for the results output
+        m_engine->resetReusedResultOutputBuffer(1);//1 byte to add status code
+        m_engine->setUndoToken(ntohll(queryCommand->undoToken));
+        int numFrags = ntohl(queryCommand->numFragmentIds);
+        for (int i = 0; i < numFrags; ++i) {
+            int cnt = serialize_in.readShort();
+            assert(cnt> -1);
+            Pool *pool = m_engine->getStringPool();
+            deserializeParameterSetCommon(cnt, serialize_in, params, pool);
+            m_engine->setUsedParamcnt(cnt);
+            if (m_engine->executeQuery(ntohll(fragmentId[i]), 1, -1,
+                                       params, ntohll(queryCommand->txnId),
+                                       ntohll(queryCommand->lastCommittedTxnId),
+                                       i == 0 ? true : false, //first
+                                       i == numFrags - 1 ? true : false)) { //last
+                ++errors;
+            }
+            pool->purge();
         }
-        pool->purge();
+    } catch (FatalException e) {
+        crashVoltDB(e);
     }
 
     // write the results array back across the wire
@@ -479,23 +515,28 @@ void VoltDBIPC::executePlanFragmentAndGetResults(struct ipc_command *cmd) {
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(planfrag));
     ReferenceSerializeInput serialize_in(offset, sz);
 
-    // and reset to space for the results output
-    m_engine->resetReusedResultOutputBuffer(1);
+    try {
+        // and reset to space for the results output
+        m_engine->resetReusedResultOutputBuffer(1);
 
-    int cnt = serialize_in.readShort();
-    assert(cnt> -1);
-    Pool *pool = m_engine->getStringPool();
-    deserializeParameterSetCommon(cnt, serialize_in, params, pool);
-    m_engine->setUsedParamcnt(cnt);
-    m_engine->setUndoToken(ntohll(planfragCommand->undoToken));
-    if (m_engine->executeQuery(fragmentId, outputDepId, inputDepId, params,
-                               ntohll(planfragCommand->txnId),
-                               ntohll(planfragCommand->lastCommittedTxnId),
-                               true, true)) {
-//        assert(!"Do not expect errors executing Query");
-        ++errors;
+        int cnt = serialize_in.readShort();
+        assert(cnt> -1);
+        Pool *pool = m_engine->getStringPool();
+        deserializeParameterSetCommon(cnt, serialize_in, params, pool);
+        m_engine->setUsedParamcnt(cnt);
+        m_engine->setUndoToken(ntohll(planfragCommand->undoToken));
+        if (m_engine->executeQuery(fragmentId, outputDepId, inputDepId, params,
+                                   ntohll(planfragCommand->txnId),
+                                   ntohll(planfragCommand->lastCommittedTxnId),
+                                   true, true)) {
+    //        assert(!"Do not expect errors executing Query");
+            ++errors;
+        }
+        pool->purge();
+    } catch (FatalException e) {
+        crashVoltDB(e);
     }
-    pool->purge();
+
     // write the results array back across the wire
     if (errors == 0) {
         // write the dependency tables back across the wire
@@ -545,24 +586,28 @@ void VoltDBIPC::executeCustomPlanFragmentAndGetResults(struct ipc_command *cmd) 
 
     customplanfrag *plan = (customplanfrag*)cmd;
 
-    // setup
-    m_engine->resetReusedResultOutputBuffer();
-    m_engine->setUsedParamcnt(0);
-    m_engine->setUndoToken(ntohll(plan->undoToken));
+    try {
+        // setup
+        m_engine->resetReusedResultOutputBuffer();
+        m_engine->setUsedParamcnt(0);
+        m_engine->setUndoToken(ntohll(plan->undoToken));
 
-    // data as fast serialized string
-    int16_t len = ntohs(plan->length);
-    string plan_str = string(plan->data, len);
+        // data as fast serialized string
+        int16_t len = ntohs(plan->length);
+        string plan_str = string(plan->data, len);
 
-    // deps info
-    int32_t outputDepId = ntohl(plan->outputDepId);
-    int32_t inputDepId = ntohl(plan->inputDepId);
+        // deps info
+        int32_t outputDepId = ntohl(plan->outputDepId);
+        int32_t inputDepId = ntohl(plan->inputDepId);
 
-    // execute
-    if (m_engine->executePlanFragment(plan_str, outputDepId, inputDepId,
-                                      ntohll(plan->txnId),
-                                      ntohll(plan->lastCommittedTxnId))) {
-        ++errors;
+        // execute
+        if (m_engine->executePlanFragment(plan_str, outputDepId, inputDepId,
+                                          ntohll(plan->txnId),
+                                          ntohll(plan->lastCommittedTxnId))) {
+            ++errors;
+        }
+    } catch (FatalException e) {
+        crashVoltDB(e);
     }
 
     // write the results array back across the wire
@@ -597,19 +642,29 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
     // ...and fast serialized table last.
     void* offset = loadTableCommand->data;
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(load_table_cmd));
-    ReferenceSerializeInput serialize_in(offset, sz);
-    m_engine->setUndoToken(undoToken);
-    bool success = m_engine->loadTable(allowELT, tableId, serialize_in, txnId, lastCommittedTxnId);
-    if (success) {
-        return kErrorCode_Success;
-    } else {
-        return kErrorCode_Error;
+    try {
+        ReferenceSerializeInput serialize_in(offset, sz);
+
+        m_engine->setUndoToken(undoToken);
+        bool success = m_engine->loadTable(allowELT, tableId, serialize_in, txnId, lastCommittedTxnId);
+        if (success) {
+            return kErrorCode_Success;
+        } else {
+            return kErrorCode_Error;
+        }
+    } catch (FatalException e) {
+        crashVoltDB(e);
     }
+    return kErrorCode_Error;
 }
 
 int8_t VoltDBIPC::setLogLevels(struct ipc_command *cmd) {
     int64_t logLevels = *((int64_t*)&cmd->data[0]);
-    m_engine->getLogManager()->setLogLevels(logLevels);
+    try {
+        m_engine->getLogManager()->setLogLevels(logLevels);
+    } catch (FatalException e) {
+        crashVoltDB(e);
+    }
     return kErrorCode_Success;
 }
 
@@ -701,6 +756,77 @@ char *VoltDBIPC::retrieveDependency(int32_t dependencyId, size_t *dependencySz) 
     return dependencyData;
 }
 
+void VoltDBIPC::crashVoltDB(voltdb::FatalException e) {
+    const char *reasonBytes = e.m_reason.c_str();
+    int32_t reasonLength = static_cast<int32_t>(strlen(reasonBytes));
+    int32_t lineno = static_cast<int32_t>(e.m_lineno);
+    int32_t filenameLength = static_cast<int32_t>(strlen(e.m_filename));
+    int32_t numTraces = static_cast<int32_t>(e.m_traces.size());
+    int32_t totalTracesLength = 0;
+    for (int ii = 0; ii < static_cast<int>(e.m_traces.size()); ii++) {
+        totalTracesLength += static_cast<int32_t>(strlen(e.m_traces[ii].c_str()));
+    }
+    //sizeof traces text + length prefix per trace, length prefix of reason string, number of traces count,
+    //filename length, lineno
+    int32_t messageLength =
+            static_cast<int32_t>(
+                    totalTracesLength +
+                    (sizeof(int32_t) * numTraces) +
+                    (sizeof(int32_t) * 4) +
+                    reasonLength +
+                    filenameLength);
+
+    //status code
+    m_reusedResultBuffer[0] = static_cast<char>(kErrorCode_CrashVoltDB);
+    size_t position = 1;
+
+    //overall message length, not included in messageLength
+    *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[position]) = htonl(messageLength);
+    position += sizeof(int32_t);
+
+    //reason string
+    *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[position]) = htonl(reasonLength);
+    position += sizeof(int32_t);
+    memcpy( &m_reusedResultBuffer[position], reasonBytes, reasonLength);
+    position += reasonLength;
+
+    //filename string
+    *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[position]) = htonl(filenameLength);
+    position += sizeof(int32_t);
+    memcpy( &m_reusedResultBuffer[position], e.m_filename, filenameLength);
+    position += filenameLength;
+
+    //lineno
+    *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[position]) = htonl(lineno);
+    position += sizeof(int32_t);
+
+    //number of traces
+    *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[position]) = htonl(numTraces);
+    position += sizeof(int32_t);
+
+    for (int ii = 0; ii < static_cast<int>(e.m_traces.size()); ii++) {
+        int32_t traceLength = static_cast<int32_t>(strlen(e.m_traces[ii].c_str()));
+        *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[position]) = htonl(traceLength);
+        position += sizeof(int32_t);
+        memcpy( &m_reusedResultBuffer[position], e.m_traces[ii].c_str(), traceLength);
+        position += traceLength;
+    }
+
+    ssize_t toWrite = 5 + messageLength;
+    ssize_t written = 0;
+    while (written < toWrite) {
+        ssize_t bytes = write(m_fd,  m_reusedResultBuffer + written, toWrite - written);
+        if (bytes == -1) {
+            printf("Error - blocking write failed. %jd read %jd attempted",
+                    (intmax_t)bytes, (intmax_t)(toWrite - written));
+            fflush(stdout);
+            assert(false);
+            exit(-1);
+        }
+    }
+    exit(-1);
+}
+
 void VoltDBIPC::getStats(struct ipc_command *cmd) {
     get_stats_cmd *getStatsCommand = (get_stats_cmd*) cmd;
 
@@ -718,28 +844,32 @@ void VoltDBIPC::getStats(struct ipc_command *cmd) {
 
     m_engine->resetReusedResultOutputBuffer();
 
-    int result = m_engine->getStats(
-            static_cast<int>(selector),
-            locators,
-            numLocators,
-            interval,
-            now);
+    try {
+        int result = m_engine->getStats(
+                static_cast<int>(selector),
+                locators,
+                numLocators,
+                interval,
+                now);
 
-    delete [] locators;
+        delete [] locators;
 
-    // write the results array back across the wire
-    const int8_t successResult = kErrorCode_Success;
-    if (result == 1) {
-        size_t bytes = write(m_fd, &successResult, sizeof(int8_t));
-        assert(bytes == sizeof(int8_t));
+        // write the results array back across the wire
+        const int8_t successResult = kErrorCode_Success;
+        if (result == 1) {
+            size_t bytes = write(m_fd, &successResult, sizeof(int8_t));
+            assert(bytes == sizeof(int8_t));
 
-        // write the dependency tables back across the wire
-        // the result set includes the total serialization size
-        const int32_t size = m_engine->getResultsSize();
-        bytes = write(m_fd, m_engine->getReusedResultBuffer(), size);
-        assert(bytes == size);
-    } else {
-        sendException(kErrorCode_Error);
+            // write the dependency tables back across the wire
+            // the result set includes the total serialization size
+            const int32_t size = m_engine->getResultsSize();
+            bytes = write(m_fd, m_engine->getReusedResultBuffer(), size);
+            assert(bytes == size);
+        } else {
+            sendException(kErrorCode_Error);
+        }
+    } catch (FatalException e) {
+        crashVoltDB(e);
     }
 }
 
@@ -777,11 +907,16 @@ VoltDBIPC::handoffReadyELBuffer(char* bufferPtr, int32_t bytesUsed, int32_t tabl
 int8_t VoltDBIPC::activateCopyOnWrite(struct ipc_command *cmd) {
     activate_copy_on_write *activateCopyOnWriteCommand = (activate_copy_on_write*) cmd;
     const voltdb::CatalogId tableId = ntohl(activateCopyOnWriteCommand->tableId);
-    if (m_engine->activateCopyOnWrite(tableId)) {
-        return kErrorCode_Success;
-    } else {
-        return kErrorCode_Error;
+    try {
+        if (m_engine->activateCopyOnWrite(tableId)) {
+            return kErrorCode_Success;
+        } else {
+            return kErrorCode_Error;
+        }
+    } catch (FatalException e) {
+        crashVoltDB(e);
     }
+    return kErrorCode_Error;
 }
 
 void VoltDBIPC::cowSerializeMore(struct ipc_command *cmd) {
@@ -803,28 +938,32 @@ void VoltDBIPC::cowSerializeMore(struct ipc_command *cmd) {
         }
     }
 
-    ReferenceSerializeOutput out(m_reusedResultBuffer + 5, bufferLength);
-    int serialized = m_engine->cowSerializeMore( &out, tableId);
-    m_reusedResultBuffer[0] = kErrorCode_Success;
-    *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[1]) = htonl(serialized);
-    ssize_t bytesWritten = 0;
+    try {
+        ReferenceSerializeOutput out(m_reusedResultBuffer + 5, bufferLength);
+        int serialized = m_engine->cowSerializeMore( &out, tableId);
+        m_reusedResultBuffer[0] = kErrorCode_Success;
+        *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[1]) = htonl(serialized);
+        ssize_t bytesWritten = 0;
 
-    /*
-     * Already put the -1 code into the message.
-     * Set it 0 so toWrite has the correct number of bytes
-     */
-    if (serialized == -1) {
-        serialized = 0;
-    }
-    const ssize_t toWrite = serialized + 5;
-    while (bytesWritten < toWrite) {
-        ssize_t thisTime = write(m_fd, m_reusedResultBuffer + bytesWritten, toWrite - bytesWritten);
-        if (thisTime == -1) {
-            printf("Error - blocking write failed. %ld", toWrite);
-            assert(false);
-            exit(-1);
+        /*
+         * Already put the -1 code into the message.
+         * Set it 0 so toWrite has the correct number of bytes
+         */
+        if (serialized == -1) {
+            serialized = 0;
         }
-        bytesWritten += thisTime;
+        const ssize_t toWrite = serialized + 5;
+        while (bytesWritten < toWrite) {
+            ssize_t thisTime = write(m_fd, m_reusedResultBuffer + bytesWritten, toWrite - bytesWritten);
+            if (thisTime == -1) {
+                printf("Error - blocking write failed. %ld", toWrite);
+                assert(false);
+                exit(-1);
+            }
+            bytesWritten += thisTime;
+        }
+    } catch (FatalException e) {
+        crashVoltDB(e);
     }
 }
 

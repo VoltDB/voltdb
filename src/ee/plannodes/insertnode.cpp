@@ -46,6 +46,7 @@
 #include <sstream>
 #include "insertnode.h"
 #include "common/common.h"
+#include "common/FatalException.hpp"
 #include "expressions/abstractexpression.h"
 #include "storage/table.h"
 
@@ -55,7 +56,7 @@ void InsertPlanNode::loadFromJSONObject(json_spirit::Object &obj, const catalog:
     AbstractOperationPlanNode::loadFromJSONObject(obj, catalog_db);
     json_spirit::Value multiPartitionValue = json_spirit::find_value(obj, "MULTI_PARTITION");
     if (multiPartitionValue == json_spirit::Value::null) {
-        throw std::runtime_error("InsertPlanNode::loadFromJSONObject: Can't find MULTI_PARTITION value");
+        throwFatalException("InsertPlanNode::loadFromJSONObject: Can't find MULTI_PARTITION value");
     }
     m_multiPartition = multiPartitionValue.get_bool();
 }

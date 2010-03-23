@@ -49,6 +49,7 @@
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/tabletuple.h"
+#include "common/FatalException.hpp"
 #include "plannodes/orderbynode.h"
 #include "plannodes/limitnode.h"
 #include "storage/table.h"
@@ -86,15 +87,13 @@ OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
         assert(index != -1);
         if (index == -1)
         {
-            VOLT_ERROR("Can not find index for sort col guid %d",
-                       node->getSortColumnGuids()[ii]);
-            return false;
+            throwFatalException( "Can not find index for sort col guid %d",
+                    node->getSortColumnGuids()[ii]);
         }
         else if (!(index < input_column_count)) {
-            VOLT_ERROR("Sorting column guid %d calculated index %d for input "
-                       " with %d columns", node->getSortColumnGuids()[ii],
-                       index, input_column_count);
-            return false;
+            throwFatalException( "Sorting column guid %d calculated index %d for input "
+                    " with %d columns", node->getSortColumnGuids()[ii],
+                    index, input_column_count);
         }
 
         sortColumns.push_back(index);
@@ -148,8 +147,7 @@ public:
             }
             else
             {
-                // XXX what behavior does SORT_DIRECTION_TYPE_INVALID imply?
-                assert(false);
+                throwFatalException("Attempted to sort using SORT_DIRECTION_TYPE_INVALID");
             }
         }
         return false; // ta == tb on these keys
@@ -182,9 +180,8 @@ OrderByExecutor::p_execute(const NValueArray &params)
         limit_node->getLimitAndOffsetByReference(params, limit, offset);
         if (offset > 0)
         {
-            VOLT_ERROR("Nested Limit Offset is not yet supported for PlanNode '%s'",
-                       node->debug().c_str());
-            return (false);
+            throwFatalException( "Nested Limit Offset is not yet supported for PlanNode '%s'",
+                    node->debug().c_str());
         }
     }
 
@@ -210,10 +207,9 @@ OrderByExecutor::p_execute(const NValueArray &params)
                    input_table->debug().c_str());
         if (!output_table->insertTuple(*it))
         {
-            VOLT_ERROR("Failed to insert order-by tuple from input table '%s' into output table '%s'",
-                       input_table->name().c_str(),
-                       output_table->name().c_str());
-            return false;
+            throwFatalException( "Failed to insert order-by tuple from input table '%s' into output table '%s'",
+                    input_table->name().c_str(),
+                    output_table->name().c_str());
         }
         //
         // Check whether we have gone past our limit

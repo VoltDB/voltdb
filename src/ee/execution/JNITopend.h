@@ -18,6 +18,7 @@
 #ifndef JNITOPEND_H_
 #define JNITOPEND_H_
 #include "common/Topend.h"
+#include "common/FatalException.hpp"
 #include "common/Pool.hpp"
 #include <jni.h>
 
@@ -27,7 +28,7 @@ class JNITopend : public Topend {
 public:
     JNITopend(JNIEnv *env, jobject caller);
 
-    inline void updateJNIEnv(JNIEnv *env) { m_jniEnv = env; }
+    inline JNITopend* updateJNIEnv(JNIEnv *env) { m_jniEnv = env; return this; }
 
     void handoffReadyELBuffer(char* bufferPtr, int32_t bytesUsed, CatalogId tableId);
 
@@ -36,6 +37,10 @@ public:
     void releaseManagedBuffer(char* bufferPtr);
 
     int loadNextDependency(int32_t dependencyId, Pool *stringPool, Table* destination);
+
+    void crashVoltDB(FatalException e);
+
+    ~JNITopend();
 private:
     JNIEnv *m_jniEnv;
 
@@ -49,6 +54,7 @@ private:
     jmethodID m_claimManagedBufferMID;
     jmethodID m_releaseManagedBufferMID;
     jmethodID m_nextDependencyMID;
+    jmethodID m_crashVoltDBMID;
 };
 
 }

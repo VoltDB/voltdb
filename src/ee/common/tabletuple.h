@@ -50,6 +50,8 @@
 #include "common/TupleSchema.h"
 #include "common/Pool.hpp"
 #include "common/ValuePeeker.hpp"
+#include "common/FatalException.hpp"
+#include <ostream>
 
 #include <iostream>
 
@@ -162,7 +164,7 @@ public:
                 break;
               default:
                 // let caller handle this error
-                VOLT_ERROR("Unknown ValueType found during ELT serialization.");
+                throwFatalException("Unknown ValueType found during ELT serialization.");
                 return (size_t)0;
             }
         }
@@ -368,10 +370,11 @@ inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source
 
 #ifndef NDEBUG
     if(!compatibleForCopy(source)) {
-        VOLT_ERROR("src  tuple: %s\n", source.debug("").c_str());
-        VOLT_ERROR("src schema: %s\n", source.m_schema->debug().c_str());
-        VOLT_ERROR("dest schema: %s\n", m_schema->debug().c_str());
-        assert("false");
+        std::ostringstream message;
+        message << "src  tuple: " << source.debug("") << std::endl;
+        message << "src schema: " << source.m_schema->debug() << std::endl;
+        message << "dest schema: " << m_schema->debug() << std::endl;
+        throwFatalException( "%s", message.str().c_str());
     }
 #endif
 
@@ -476,10 +479,11 @@ inline void TableTuple::copy(const TableTuple &source) {
 
 #ifndef NDEBUG
     if(!compatibleForCopy(source)) {
-        VOLT_ERROR("src  tuple: %s\n", source.debug("").c_str());
-        VOLT_ERROR("src schema: %s\n", source.m_schema->debug().c_str());
-        VOLT_ERROR("dest schema: %s\n", m_schema->debug().c_str());
-        assert("false");
+        std::ostringstream message;
+        message << "src  tuple: " << source.debug("") << std::endl;
+        message << "src schema: " << source.m_schema->debug() << std::endl;
+        message << "dest schema: " << m_schema->debug() << std::endl;
+        throwFatalException("%s", message.str().c_str());
     }
 #endif
 

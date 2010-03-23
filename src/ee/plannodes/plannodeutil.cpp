@@ -47,6 +47,7 @@
 #include "plannodes/plannodeutil.h"
 #include "common/debuglog.h"
 #include "common/common.h"
+#include "common/FatalException.hpp"
 #include "plannodes/nodes.h"
 
 namespace plannodeutil {
@@ -156,9 +157,9 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
         // ------------------------------------------------------------------
         // UNKNOWN
         // ------------------------------------------------------------------
-        default:
-            VOLT_ERROR("Invalid PlanNode type '%d'", type);
-            throw std::exception();
+        default: {
+            throwFatalException("Invalid PlanNode type '%d'", type);
+        }
     }
     //VOLT_TRACE("created plannode : %s ", typeid(*ret).name());
     return (ret);
@@ -272,9 +273,9 @@ std::string getTypeName(voltdb::PlanNodeType type) {
         // ------------------------------------------------------------------
         // UNKNOWN
         // ------------------------------------------------------------------
-        default:
-            VOLT_ERROR("Invalid PlanNode type '%d'", type);
-            throw std::exception();
+        default: {
+            throwFatalException( "Invalid PlanNode type '%d'", type);
+        }
     }
     return (ret);
 }

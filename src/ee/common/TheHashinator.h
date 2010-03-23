@@ -24,6 +24,7 @@
 #include <vector>
 #include <stdlib.h>
 #include <boost/foreach.hpp>
+#include "common/FatalException.hpp"
 
 namespace voltdb {
 
@@ -63,7 +64,7 @@ class TheHashinator {
         int32_t hashCode = 0;
         int32_t offset = 0;
         if (length < 0) {
-            throw std::exception();
+            throwFatalException("Attempted to hashinate a 0 length or less string %d", length);
         }
         for (int32_t ii = 0; ii < length; ii++) {
            hashCode = 31 * hashCode + string[offset++];

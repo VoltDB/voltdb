@@ -96,8 +96,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
         } else if (keySize <= sizeof(int64_t) * 4) {
             return new BinaryTreeUniqueIndex<IntsKey<4>, IntsComparator<4>, IntsEqualityChecker<4> >(schemeCopy);
         } else {
-            std::cerr << "We currently only support a specific set of column index sizes..." << std::endl;
-            throw std::exception();
+            throwFatalException("We currently only support a specific set of column index sizes...");
         }
     }
 
@@ -111,8 +110,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
         } else if (keySize <= sizeof(int64_t) * 4) {
             return new BinaryTreeMultiMapIndex<IntsKey<4>, IntsComparator<4>, IntsEqualityChecker<4> >(schemeCopy);
         } else {
-            std::cerr << "We currently only support a specific set of column index sizes..." << std::endl;
-            throw std::exception();
+            throwFatalException( "We currently only support a specific set of column index sizes..." );
         }
     }
 
@@ -126,8 +124,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
         } else if (keySize <= sizeof(int64_t) * 4) {
             return new HashTableUniqueIndex<IntsKey<4>, IntsHasher<4>, IntsEqualityChecker<4> >(schemeCopy);
         } else {
-            std::cerr << "We currently only support a specific set of column index sizes..." << std::endl;
-            throw std::exception();
+            throwFatalException( "We currently only support a specific set of column index sizes..." );
         }
     }
 
@@ -141,8 +138,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
         } else if (keySize <= sizeof(int64_t) * 4) {
             return new HashTableMultiMapIndex<IntsKey<4>, IntsHasher<4>, IntsEqualityChecker<4> >(schemeCopy);
         } else {
-            std::cerr << "We currently only support a specific set of column index sizes..." << std::endl;
-            throw std::exception();
+            throwFatalException( "We currently only support a specific set of column index sizes..." );
         }
     }
 
@@ -172,8 +168,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
         } else if (keySize < 300) {
             return new BinaryTreeUniqueIndex<GenericKey<128>, GenericComparator<128>, GenericEqualityChecker<128> >(schemeCopy);
         } else {
-            std::cerr << "We currently only support generic column indexes with keys 32 bits or less..." << std::endl;
-            throw std::exception();
+            throwFatalException( "We currently only support generic column indexes with keys 32 bits or less..." );
         }
     }
     /*if ((type == BTREE_INDEX) && (!unique)) {
@@ -233,8 +228,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
         } else if (keySize < 128) {
             return new BinaryTreeMultiMapIndex<GenericKey<128>, GenericComparator<128>, GenericEqualityChecker<128> >(schemeCopy);
         } else {
-            std::cerr << "We currently only support generic column indexes with keys 32 bits or less..." << std::endl;
-            throw std::exception();
+            throwFatalException( "We currently only support generic column indexes with keys 32 bits or less..." );
         }
     }
 
@@ -261,8 +255,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
                 throw std::exception();
         }
     }*/
-    std::cerr << "Unsupported index scheme..." << std::endl;
-    throw std::exception();
+    throwFatalException("Unsupported index scheme..." );
     return NULL;
 }
 

@@ -79,12 +79,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         throw new EEException(errorCode);
     }
 
-    /* Fast serialize interface implementation */
-    @Override
-    protected void finalize() throws Throwable {
-        release();
-    }
-
     @Override
     public void deserializedBytes(final int numBytes) {
     }
@@ -261,6 +255,21 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     public void releaseManagedBuffer(final long bufferPtr) {
         ELTManager.instance().releaseManagedBuffer(bufferPtr);
+    }
+
+    /**
+     * Call VoltDB.crashVoltDB on behalf of the EE
+     * @param reason Reason the EE crashed
+     */
+    public static void crashVoltDB(String reason, String traces[], String filename, int lineno) {
+        if (reason != null) {
+            System.err.println(reason);
+            System.err.println("In " + filename + ":" + lineno);
+            for ( String trace : traces) {
+                System.err.println(trace);
+            }
+        }
+        VoltDB.crashVoltDB();
     }
 
     /**

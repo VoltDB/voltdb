@@ -189,7 +189,7 @@ AbstractExpression::buildExpressionTree_recurse(json_spirit::Object &obj)
     // read the expression type
     json_spirit::Value expressionTypeValue = json_spirit::find_value( obj, "TYPE");
     if (expressionTypeValue == json_spirit::Value::null) {
-        throw std::runtime_error("AbstractExpression::buildExpressionTree_recurse: Couldn't find TYPE value");
+        throwFatalException("AbstractExpression::buildExpressionTree_recurse: Couldn't find TYPE value");
     }
     assert(stringToExpression(expressionTypeValue.get_str()) != EXPRESSION_TYPE_INVALID);
     peek_type = stringToExpression(expressionTypeValue.get_str());
@@ -197,7 +197,7 @@ AbstractExpression::buildExpressionTree_recurse(json_spirit::Object &obj)
     // and the value type
     json_spirit::Value valueTypeValue = json_spirit::find_value( obj, "VALUE_TYPE");
     if (valueTypeValue == json_spirit::Value::null) {
-        throw std::runtime_error("AbstractExpression::buildExpressionTree_recurse: Couldn't find VALUE_TYPE value");
+        throwFatalException("AbstractExpression::buildExpressionTree_recurse: Couldn't find VALUE_TYPE value");
     }
     std::string valueTypeString = valueTypeValue.get_str();
     value_type = stringToValue(valueTypeString);
@@ -215,7 +215,7 @@ AbstractExpression::buildExpressionTree_recurse(json_spirit::Object &obj)
     // add the value size
     json_spirit::Value valueSizeValue = json_spirit::find_value( obj, "VALUE_SIZE");
     if (valueSizeValue == json_spirit::Value::null) {
-        throw std::runtime_error("AbstractExpression::buildExpressionTree_recurse: Couldn't find VALUE_SIZE value");
+        throwFatalException("AbstractExpression::buildExpressionTree_recurse: Couldn't find VALUE_SIZE value");
     }
     int valueSize = valueSizeValue.get_int();
 

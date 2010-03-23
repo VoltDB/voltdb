@@ -136,8 +136,7 @@ std::string NValue::debug() const {
         buffer << createStringFromDecimal();
         break;
       default:
-        VOLT_ERROR ("unknown type %d", (int) type);
-        throw std::exception();
+          throwFatalException ("unknown type %d", (int) type);
     }
     std::string ret(buffer.str());
     return (ret);
@@ -317,8 +316,7 @@ NValue NValue::opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const {
     if ((lhs.getValueType() != VALUE_TYPE_DECIMAL) &&
         (rhs.getValueType() != VALUE_TYPE_DECIMAL))
     {
-        VOLT_ERROR("No decimal NValue in decimal multiply.");
-        throw std::exception();
+        throwFatalException("No decimal NValue in decimal multiply.");
     }
 
     if (lhs.isNull() || rhs.isNull()) {
@@ -399,8 +397,7 @@ NValue NValue::opDivideDecimals(const NValue lhs, const NValue rhs) const {
     if ((lhs.getValueType() != VALUE_TYPE_DECIMAL) ||
         (rhs.getValueType() != VALUE_TYPE_DECIMAL))
     {
-        VOLT_ERROR("Non-decimal NValue in decimal subtract.");
-        throw std::exception();
+        throwFatalException("Non-decimal NValue in decimal subtract.");
     }
 
     if (lhs.isNull() || rhs.isNull()) {

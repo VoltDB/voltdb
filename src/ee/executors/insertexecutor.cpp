@@ -47,6 +47,7 @@
 #include "common/debuglog.h"
 #include "common/ValuePeeker.hpp"
 #include "common/tabletuple.h"
+#include "common/FatalException.hpp"
 #include "plannodes/insertnode.h"
 #include "execution/VoltDBEngine.h"
 #include "storage/persistenttable.h"
@@ -113,8 +114,7 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     // running in a distributed cluster
     //
     if (m_inputTable->activeTupleCount() == 0) {
-        VOLT_ERROR("No tuples were found in our input table '%s'", m_inputTable->name().c_str());
-        return false;
+        throwFatalException( "No tuples were found in our input table '%s'", m_inputTable->name().c_str());
     }
 #endif
     assert (m_inputTable->activeTupleCount() > 0);
@@ -153,8 +153,7 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
             // if it doesn't map to this site
             if (!isLocal) {
                 if (!m_multiPartition) {
-                    VOLT_ERROR("Mispartitioned Tuple in single-partition plan.");
-                    return false;
+                    throwFatalException("Mispartitioned Tuple in single-partition plan.");
                 }
 
                 // don't insert
@@ -164,16 +163,14 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
 
         // try to put the tuple into the target table
         if (!m_targetTable->insertTuple(m_tuple)) {
-            VOLT_TRACE("Failed to insert tuple from input table '%s' into target table '%s'",
-                       m_inputTable->name().c_str(), m_targetTable->name().c_str());
-            return false;
+            throwFatalException( "Failed to insert tuple from input table '%s' into target table '%s'",
+                    m_inputTable->name().c_str(), m_targetTable->name().c_str());
         }
 
         // try to put the tuple into the output table
         if (!outputTable->insertTuple(m_tuple)) {
-            VOLT_ERROR("Failed to insert tuple from input table '%s' into output table '%s'",
-                     m_inputTable->name().c_str(), outputTable->name().c_str());
-            return (false);
+            throwFatalException( "Failed to insert tuple from input table '%s' into output table '%s'",
+                    m_inputTable->name().c_str(), outputTable->name().c_str());
         }
 
         // successfully inserted

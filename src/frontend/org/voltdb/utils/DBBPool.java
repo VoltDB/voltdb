@@ -21,7 +21,6 @@ import org.apache.log4j.Logger;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.VoltLoggerFactory;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.nio.ByteBuffer;
@@ -455,11 +454,6 @@ public final class DBBPool {
     private static final Logger m_logger = Logger.getLogger(DBBPool.class.getName(), VoltLoggerFactory.instance());
 
     /**
-     * Global list of all DBBPools that is used by the shrinker to maintain pool size
-     */
-    private static final ArrayList<DBBPool> m_pools = new ArrayList<DBBPool>();
-
-    /**
      * Boolean that determines whether code that traces and tracks allocations will be run
      * A lot of this code is commented out anyways because of the extra storage required
      * even if the code is compiled out.
@@ -595,9 +589,6 @@ public final class DBBPool {
             m_maxArenaSizes = maxArenaSizes;
         }
         m_arenas = initDBBPool();
-        synchronized (m_pools) {
-            m_pools.add(this);
-        }
     }
 
     /**
@@ -737,13 +728,6 @@ public final class DBBPool {
             sb.append(a.toString()).append("\n");
         }
         return sb.toString();
-    }
-
-    @Override
-    public final void finalize() {
-        synchronized(m_pools) {
-            m_pools.remove(this);
-        }
     }
 
     private static final HashMap<Integer, ArrayDeque<ByteBuffer>> m_availableBufferStock =

@@ -47,6 +47,7 @@
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/tabletuple.h"
+#include "common/FatalException.hpp"
 #include "plannodes/unionnode.h"
 #include "storage/table.h"
 #include "storage/temptable.h"
@@ -67,13 +68,12 @@ bool UnionExecutor::p_init(AbstractPlanNode *abstract_node, const catalog::Datab
     assert(node->getInputTables().size() > 0);
     for (int table_ctr = 1, table_cnt = (int)node->getInputTables().size(); table_ctr < table_cnt; table_ctr++) {
         if (node->getInputTables()[0]->columnCount() != node->getInputTables()[table_ctr]->columnCount()) {
-            // TODO: DEBUG
-            VOLT_ERROR("Table '%s' has %d columns, but table '%s' has %d columns",
-                            node->getInputTables()[0]->name().c_str(),
-                            node->getInputTables()[0]->columnCount(),
-                            node->getInputTables()[table_ctr]->name().c_str(),
-                            node->getInputTables()[table_ctr]->columnCount());
-            return false;
+            throwFatalException(
+                    "Table '%s' has %d columns, but table '%s' has %d columns",
+                    node->getInputTables()[0]->name().c_str(),
+                    node->getInputTables()[0]->columnCount(),
+                    node->getInputTables()[table_ctr]->name().c_str(),
+                    node->getInputTables()[table_ctr]->columnCount());
         }
     }
 
@@ -96,13 +96,13 @@ bool UnionExecutor::p_init(AbstractPlanNode *abstract_node, const catalog::Datab
             ValueType type1 = table1Schema->columnType(col_ctr);
             if (type0 != type1) {
                 // TODO: DEBUG
-                VOLT_ERROR("Table '%s' has value type '%s' for column '%d', table '%s' has value type '%s' for column '%d'",
-                                node->getInputTables()[0]->name().c_str(),
-                                getTypeName(type0).c_str(),
-                                col_ctr,
-                                node->getInputTables()[table_ctr]->name().c_str(),
-                                getTypeName(type1).c_str(), col_ctr);
-                return false;
+                throwFatalException(
+                        "Table '%s' has value type '%s' for column '%d', table '%s' has value type '%s' for column '%d'",
+                        node->getInputTables()[0]->name().c_str(),
+                        getTypeName(type0).c_str(),
+                        col_ctr,
+                        node->getInputTables()[table_ctr]->name().c_str(),
+                        getTypeName(type1).c_str(), col_ctr);
             }
         }
     }
@@ -135,9 +135,8 @@ bool UnionExecutor::p_execute(const NValueArray &params) {
         TableTuple tuple(input_table->schema());
         while (iterator.next(tuple)) {
             if (!output_table->insertTuple(tuple)) {
-                VOLT_ERROR("Failed to insert tuple from input table '%s' into output table '%s'",
-                         input_table->name().c_str(), output_table->name().c_str());
-                return (false);
+                throwFatalException("Failed to insert tuple from input table '%s' into output table '%s'",
+                        input_table->name().c_str(), output_table->name().c_str());
             }
         }
         // FIXME: node->tables[ctr]->onTableRead(undo);

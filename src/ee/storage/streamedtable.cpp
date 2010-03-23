@@ -39,8 +39,7 @@ StreamedTable::StreamedTable(int tableAllocationTargetSize)
     : Table(tableAllocationTargetSize), m_executorContext(NULL),
       m_wrapper(NULL), m_id(0), m_sequenceNo(0)
 {
-    VOLT_ERROR("Must provide executor context to streamed table constructor.");
-    throw std::exception();
+    throwFatalException("Must provide executor context to streamed table constructor.");
 }
 
 StreamedTable *
@@ -65,8 +64,7 @@ void StreamedTable::cleanupManagedBuffers(Topend *topend)
 
 void StreamedTable::deleteAllTuples(bool freeAllocatedStrings)
 {
-    VOLT_ERROR("May not delete all tuples of a streamed table.");
-    throw std::exception();
+    throwFatalException("May not delete all tuples of a streamed table.");
 }
 
 bool StreamedTable::insertTuple(TableTuple &source)
@@ -91,8 +89,7 @@ bool StreamedTable::insertTuple(TableTuple &source)
 
 bool StreamedTable::updateTuple(TableTuple &source, TableTuple &target, bool updatesIndexes)
 {
-    VOLT_ERROR("May not update a streamed table.");
-    throw std::exception();
+    throwFatalException("May not update a streamed table.");
 }
 
 bool StreamedTable::deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings)
@@ -117,8 +114,7 @@ bool StreamedTable::deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings)
 
 void StreamedTable::loadTuplesFrom(bool, SerializeInput&, Pool*)
 {
-    VOLT_ERROR("May not update a streamed table.");
-    throw std::exception();
+    throwFatalException("May not update a streamed table.");
 }
 
 void StreamedTable::flushOldTuples(int64_t timeInMillis)

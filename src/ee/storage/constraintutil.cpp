@@ -47,6 +47,7 @@
 
 #include "common/debuglog.h"
 #include "common/common.h"
+#include "common/FatalException.hpp"
 
 #include <sstream>
 
@@ -94,9 +95,9 @@ std::string getTypeName(voltdb::ConstraintType type) {
         // ------------------------------------------------------------------
         // UNKNOWN
         // ------------------------------------------------------------------
-        default:
-            VOLT_ERROR("Invalid Constraint type '%d'", type);
-            throw std::exception();
+        default: {
+            throwFatalException ( "Invalid Constraint type '%d'", type);
+        }
     }
     return (ret);
 }

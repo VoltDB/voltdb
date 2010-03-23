@@ -69,6 +69,10 @@ class MockTopend : public Topend {
         return 0;
     }
 
+    virtual void crashVoltDB(FatalException e) {
+
+    }
+
     int m_handoffcount;
     int m_bytesHandedOff;
 };
