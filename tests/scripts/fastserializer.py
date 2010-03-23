@@ -164,12 +164,10 @@ class FastSerializer:
 
         if username:
             # utf8 encode supplied username
-            encoded_value = username.encode("utf-8")
-            self.writeInt16(len(encoded_value))
-            self.wbuf.extend(encoded_value)
+            self.writeString(username)
         else:
             # no username, just output length of 0
-            self.writeInt16(0)
+            self.writeString("")
 
         # password supplied, sha-1 hash it
         m = sha()
