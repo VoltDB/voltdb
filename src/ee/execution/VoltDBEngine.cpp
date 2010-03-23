@@ -258,6 +258,7 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId, int32_t outputDependencyI
                                int64_t txnId, int64_t lastCommittedTxnId,
                                bool first, bool last)
 {
+    Table *cleanUpTable = NULL;
     m_currentOutputDepId = outputDependencyId;
     m_currentInputDepId = inputDependencyId;
 
@@ -308,6 +309,10 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId, int32_t outputDependencyI
         AbstractExecutor *executor = execsForFrag->list[ctr];
         assert (executor);
 
+        if (executor->needsPostExecuteClear())
+            cleanUpTable =
+                dynamic_cast<Table*>(executor->getPlanNode()->getOutputTable());
+
         try {
             // Now call the execute method to actually perform whatever action it is that
             // the node is supposed to do...
@@ -315,6 +320,8 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId, int32_t outputDependencyI
                 VOLT_TRACE("The Executor's execution at position '%d'"
                          " failed for PlanFragment '%d'",
                          ctr, planfragmentId);
+                if (cleanUpTable != NULL)
+                    cleanUpTable->deleteAllTuples(false);
                 // set these back to -1 for error handling
                 m_currentOutputDepId = -1;
                 m_currentInputDepId = -1;
@@ -324,6 +331,8 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId, int32_t outputDependencyI
             VOLT_TRACE("The Executor's execution at position '%d'"
                      " failed for PlanFragment '%d'",
                      ctr, planfragmentId);
+            if (cleanUpTable != NULL)
+                cleanUpTable->deleteAllTuples(false);
             resetReusedResultOutputBuffer();
             e.serialize(getExceptionOutputSerializer());
 
@@ -333,23 +342,8 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId, int32_t outputDependencyI
             return ENGINE_ERRORCODE_ERROR;
         }
     }
-    for (int ctr = 0; ctr < ttl; ++ctr) {
-        try {
-            // Now call the postExecute so the executors can clean up if necessary
-            execsForFrag->list[ctr]->postExecute();
-        } catch (SerializableEEException &e) {
-            VOLT_TRACE("The Executor's execution at position '%d'"
-                       " failed for PlanFragment '%d' while running postExecute",
-                       ctr, planfragmentId);
-            resetReusedResultOutputBuffer();
-            e.serialize(getExceptionOutputSerializer());
-
-            // set these back to -1 for error handling
-            m_currentOutputDepId = -1;
-            m_currentInputDepId = -1;
-            return ENGINE_ERRORCODE_ERROR;
-        }
-    }
+    if (cleanUpTable != NULL)
+        cleanUpTable->deleteAllTuples(false);
 
     // assume this is sendless dml
     if (m_numResultDependencies == 0) {
@@ -595,7 +589,6 @@ bool VoltDBEngine::clearAndLoadAllPlanFragments() {
 
             std::map<std::string, catalog::PlanFragment*>::const_iterator pf_iterator;
             for (pf_iterator = catalogStmt->fragments().begin(); pf_iterator!= catalogStmt->fragments().end(); pf_iterator++) {
-                //int64_t fragId = uniqueIdForFragment(pf_iterator->second);
                 int64_t fragId = uniqueIdForFragment(pf_iterator->second);
                 std::string planNodeTree = pf_iterator->second->plannodetree();
                 if (!initPlanFragment(fragId, planNodeTree)) {
@@ -648,7 +641,7 @@ bool VoltDBEngine::initPlanFragment(const int64_t fragId, const std::string plan
 
     // Initialize the vector of executors for this planfragment, used at runtime.
     for (int ctr = 0, cnt = (int)pnf->getExecuteList().size(); ctr < cnt; ctr++) {
-        ev->list.push_back(pnf->getExecuteList()[ctr]->getExecutorRaw());
+        ev->list.push_back(pnf->getExecuteList()[ctr]->getExecutor());
     }
     m_executorMap[fragId] = ev;
 

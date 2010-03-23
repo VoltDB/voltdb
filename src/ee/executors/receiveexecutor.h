@@ -67,18 +67,10 @@ class ReceiveExecutor : public AbstractExecutor {
         this->engine = engine;
     }
         ~ReceiveExecutor();
+        bool needsPostExecuteClear() { return true; }
     protected:
         bool p_init(AbstractPlanNode*, const catalog::Database* catalog_db, int* tempTableMemoryInBytes);
         bool p_execute(const NValueArray &params);
-        /*
-         * The receive executor has to free the strings allocated on the heap while deserializing depencies.
-         * This can be done after the PF has finished executing because all strings that need to persist
-         * must be copied into a PersistentTable or some other storage.
-         */
-        void p_postExecute() {
-            Table* output_table = dynamic_cast<Table*>(abstract_node->getOutputTable());
-            output_table->deleteAllTuples(false);
-        }
     private:
         VoltDBEngine *engine;
 };

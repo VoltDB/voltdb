@@ -99,7 +99,6 @@ public:
 
     void setExecutor(AbstractExecutor* executor);
     inline AbstractExecutor* getExecutor() const { return m_executor; }
-    inline AbstractExecutor* getExecutorRaw() const { return m_executor; }
 
     void setInputTables(const std::vector<Table*> &val);
     std::vector<Table*>& getInputTables();

@@ -72,9 +72,18 @@ class AbstractExecutor {
     /** Invoke a plannode's associated executor */
     bool execute(const NValueArray &params);
 
-    /** Invoked after all executors in a PF have finished.**/
-    void postExecute();
+    /**
+     * Returns true if the output table for the plannode must be cleaned up
+     * after p_execute().  <b>Default is false</b>. This should be overriden in
+     * the receive executor since this is the only place we need to clean up the
+     * output table.
+     */
+    virtual bool needsPostExecuteClear() { return false; }
 
+    /**
+     * Returns the plannode that generated this executor.
+     */
+    inline AbstractPlanNode* getPlanNode() { return abstract_node; }
   protected:
     AbstractExecutor(VoltDBEngine *engine, AbstractPlanNode *abstract_node) {
         this->abstract_node = abstract_node;
@@ -86,9 +95,6 @@ class AbstractExecutor {
 
     /** Concrete executor classes impelmenet execution in p_execute() */
     virtual bool p_execute(const NValueArray &params) = 0;
-
-    /** Concrete executor classes impelmenet execution in p_postExecute() */
-    virtual void p_postExecute() {};
 
     /**
      * Returns true if the output table for the plannode must be
@@ -138,10 +144,6 @@ inline bool AbstractExecutor::execute(const NValueArray &params) {
 
     // run the executor
     return this->p_execute(params);
-}
-
-inline void AbstractExecutor::postExecute() {
-    p_postExecute();
 }
 
 }
