@@ -43,6 +43,7 @@ def isNaN(d):
     # work-around for Python 2.4
     s = array.array("d", [d])
     return (s.tostring() == "\x00\x00\x00\x00\x00\x00\xf8\x7f" or
+            s.tostring() == "\x00\x00\x00\x00\x00\x00\xf8\xff" or
             s.tostring() == "\x00\x00\x00\x00\x00\x00\xf0\x7f")
 
 class FastSerializer:
