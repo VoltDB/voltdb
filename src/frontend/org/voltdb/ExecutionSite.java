@@ -173,6 +173,7 @@ implements Runnable, DumpManager.Dumpable
             }
             lastTickTime = time;
         }
+
         // do other periodic work
         m_snapshotter.doSnapshotWork(ee);
         m_watchdog.pet();
@@ -796,18 +797,52 @@ implements Runnable, DumpManager.Dumpable
         return null;
     }
 
-    private void handleMailboxMessage(VoltMessage message) {
-        if (message instanceof InitiateTask) {
-            messageArrived((InitiateTask) message);
-        }
-        else if (message instanceof FragmentTask) {
-            messageArrived((FragmentTask) message);
+    private void handleMailboxMessage(VoltMessage message)
+    {
+        if (message instanceof MembershipNotice) {
+            MembershipNotice mn = (MembershipNotice)message;
+            assertTxnIdOrdering(mn);
+
+            // Special case heartbeats which only update RPQ
+            if (mn.isHeartBeat()) {
+                m_transactionQueue.gotTransaction(mn.getInitiatorSiteId(),
+                                                  mn.getTxnId(),
+                                                  true);
+                return;
+            }
+            // FragmentTasks aren't sent by initiators and shouldn't update
+            // transaction queue initiator states.
+            else if (!(mn instanceof FragmentTask)) {
+                m_transactionQueue.gotTransaction(mn.getInitiatorSiteId(),
+                                                  mn.getTxnId(),
+                                                  false);
+            }
+
+            // Every non-heartbeat notice requires a transaction state.
+            TransactionState ts = m_transactionsById.get(mn.getTxnId());
+            if (ts == null) {
+                if (mn.isSinglePartition()) {
+                    ts = new SinglePartitionTxnState(m_mailbox, this, mn);
+                }
+                else {
+                    ts = new MultiPartitionParticipantTxnState(m_mailbox, this, mn);
+                }
+                m_transactionQueue.add(ts);
+                m_transactionsById.put(ts.txnId, ts);
+            }
+
+            if (message instanceof FragmentTask) {
+                ts.createLocalFragmentWork((FragmentTask)message, false);
+            }
         }
         else if (message instanceof FragmentResponse) {
-            messageArrived((FragmentResponse) message);
-        }
-        else if (message instanceof MembershipNotice) {
-            processTransactionMembership((MembershipNotice) message);
+            FragmentResponse response = (FragmentResponse)message;
+            TransactionState txnState = m_transactionsById.get(response.getTxnId());
+            // possible in rollback to receive an unnecessary response
+            if (txnState != null) {
+                assert (txnState instanceof MultiPartitionParticipantTxnState);
+                txnState.processRemoteWorkResponse(response);
+            }
         }
         else if (message instanceof DebugMessage) {
             DebugMessage dmsg = (DebugMessage) message;
@@ -815,66 +850,26 @@ implements Runnable, DumpManager.Dumpable
                 DumpManager.putDump(m_dumpId, m_currentDumpTimestamp, true, getDumpContents());
         }
         else {
-            hostLog.l7dlog(Level.FATAL, LogKeys.org_voltdb_dtxn_SimpleDtxnConnection_UnkownMessageClass.name(), new Object[] { message.getClass().getName() }, null);
+            hostLog.l7dlog(Level.FATAL, LogKeys.org_voltdb_dtxn_SimpleDtxnConnection_UnkownMessageClass.name(),
+                           new Object[] { message.getClass().getName() }, null);
             VoltDB.crashVoltDB();
         }
     }
 
-    private void messageArrived(InitiateTask request) {
-        assert (request.getInitiatorSiteId() != getSiteId());
-        processTransactionMembership(request);
-        assert(request.isSinglePartition() || (request.getNonCoordinatorSites() != null));
-    }
-
-    private void messageArrived(FragmentTask request) {
-        assert (request.getInitiatorSiteId() != getSiteId());
-        TransactionState state = processTransactionMembership(request);
-        if (state == null)
-            return;
-        assert(state instanceof MultiPartitionParticipantTxnState);
-        state.createLocalFragmentWork(request, false);
-    }
-
-    /**
-     * A decision arrived for an open transaction
-     */
-    private void messageArrived(FragmentResponse response) {
-        TransactionState txnState = m_transactionsById.get(response.getTxnId());
-
-        // possible in rollback to receive an unnecessary response
-        // this makes me (john) nervous.
-        if (txnState == null) {
-            System.out.printf("Site %d got an old response\n", m_siteId);
+    private void assertTxnIdOrdering(final MembershipNotice notice) {
+        // Because of our rollback implementation, fragment tasks can arrive
+        // late. This participant can have aborted and rolled back already,
+        // for example.
+        //
+        // Additionally, commit messages for read-only MP transactions can
+        // arrive after sneaked-in SP transactions have advanced the last
+        // committed transaction point. A commit message is a fragment task
+        // with a null payload.
+        if (notice instanceof FragmentTask) {
             return;
         }
-        assert (txnState instanceof MultiPartitionParticipantTxnState);
-        txnState.processRemoteWorkResponse(response);
-    }
 
-    /**
-     * When a message arrives that tells this site that it is part of a
-     * multi-partition transaction, create a TxnState object for it. If
-     * a transaction state message exists, return it.
-     *
-     * @param notice The message that contains transaction information.
-     * @return The SimpleTxnState object created or found.
-     */
-    private TransactionState processTransactionMembership(MembershipNotice notice) {
         if (notice.getTxnId() < lastCommittedTxnId) {
-            // Because of our rollback implementation, fragment tasks can arrive late.
-            // This participant can have aborted, causing the coordinator to abort and
-            // send this task, for example.
-
-            // Additionally, commit messages for read-only MP transactions can
-            // arrive after sneaked-in SP transactions have advanced the last committed
-            // transaction point.  A commit message is a fragment task with a null
-            // payload.
-            if (notice instanceof FragmentTask) {
-                return null;
-            }
-
-            // vanilla membership notices and initiate tasks must not
-            // arrive out of order
             StringBuilder msg = new StringBuilder();
             msg.append("Txn ordering deadlock (DTXN) at site ").append(m_siteId).append(":\n");
             msg.append("   txn ").append(lastCommittedTxnId).append(" (");
@@ -892,46 +887,15 @@ implements Runnable, DumpManager.Dumpable
                 msg.append("New notice is for new or completed transaction.\n");
             }
             msg.append("New notice of type: " + notice.getClass().getName());
-
-            // TODO: VoltDB.crashVoltDB();
-            throw new RuntimeException(msg.toString());
+            log.fatal(msg);
+            VoltDB.crashVoltDB();
         }
 
-        // Raw MembershipNotice is sent by initiator for MP transactions.
-        // MembershipNotice : InitiateNotice is sent by initiator for SP transactions.
-        // MembershipNotice : FragmentTask is NOT sent by an initiator. Don't
-        // count FragmentTasks as news from an initiator.
-        if (!(notice instanceof FragmentTask)) {
-            m_transactionQueue.gotTransaction(notice.getInitiatorSiteId(),
-                                              notice.getTxnId(),
-                                              notice.isHeartBeat());
+        if (notice instanceof InitiateTask) {
+            InitiateTask task = (InitiateTask)notice;
+            assert (task.getInitiatorSiteId() != getSiteId());
+            assert(task.isSinglePartition() || (task.getNonCoordinatorSites() != null));
         }
-
-        // ignore HeartBeats
-        if (notice.isHeartBeat()) {
-            return null;
-        }
-
-        TransactionState state = m_transactionsById.get(notice.getTxnId());
-        if (state == null) {
-            if (notice instanceof InitiateTask) {
-                InitiateTask it = (InitiateTask) notice;
-                if (it.isSinglePartition()) {
-                    state = new SinglePartitionTxnState(m_mailbox, this, it);
-                }
-                else {
-                    state = new MultiPartitionParticipantTxnState(m_mailbox, this, it);
-                }
-
-            }
-            else {
-                state = new MultiPartitionParticipantTxnState(m_mailbox, this, notice);
-            }
-
-            m_transactionQueue.add(state);
-            m_transactionsById.put(state.txnId, state);
-        }
-        return state;
     }
 
     /**

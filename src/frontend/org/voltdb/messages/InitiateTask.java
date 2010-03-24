@@ -56,6 +56,7 @@ public class InitiateTask extends MembershipNotice {
         return m_isReadOnly;
     }
 
+    @Override
     public boolean isSinglePartition() {
         return m_isSinglePartition;
     }

@@ -30,10 +30,12 @@ public class SinglePartitionTxnState extends TransactionState {
 
     public SinglePartitionTxnState(Mailbox mbox,
                                    ExecutionSite site,
-                                   InitiateTask task)
+                                   MembershipNotice task)
     {
         super(mbox, site, task);
-        m_task = task;
+        assert(task instanceof InitiateTask) :
+            "Creating single partition txn from invalid membership notice.";
+        m_task = (InitiateTask)task;
     }
 
     @Override

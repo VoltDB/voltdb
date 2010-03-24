@@ -78,6 +78,10 @@ public class MembershipNotice extends VoltMessage {
         return m_isReadOnly;
     }
 
+    public boolean isSinglePartition() {
+        return false;
+    }
+
     @Override
     protected void flattenToBuffer(final DBBPool pool) {
         int msgsize = 4 + 4 + 8 + 1 + 1;
