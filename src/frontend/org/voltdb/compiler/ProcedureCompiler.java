@@ -245,6 +245,24 @@ public abstract class ProcedureCompiler {
                 String msg = "PartitionInfo parameter not a valid parameter for procedure: " + procedure.getClassname();
                 throw compiler.new VoltCompilerException(msg);
             }
+
+            // check the type of partition parameter meets our high standards
+            Class<?> partitionType = paramTypes[procedure.getPartitionparameter()];
+            Class<?>[] validPartitionClzzes = {
+                    Long.class, Integer.class, Short.class, Byte.class,
+                    long.class, int.class, short.class, byte.class,
+                    String.class
+            };
+            boolean found = false;
+            for (Class<?> candidate : validPartitionClzzes) {
+                if (partitionType == candidate)
+                    found = true;
+            }
+            // assume on of the two tests above passes and one fails
+            if (!found) {
+                String msg = "PartitionInfo parameter must be a String or Number for procedure: " + procedure.getClassname();
+                throw compiler.new VoltCompilerException(msg);
+            }
         }
 
         // put the compiled code for this procedure into the jarfile
