@@ -153,7 +153,8 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
             // if it doesn't map to this site
             if (!isLocal) {
                 if (!m_multiPartition) {
-                    throwFatalException("Mispartitioned Tuple in single-partition plan.");
+                    VOLT_ERROR("Mispartitioned Tuple in single-partition plan.");
+                    return false;
                 }
 
                 // don't insert
