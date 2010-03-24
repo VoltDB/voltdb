@@ -26,6 +26,7 @@ package org.voltdb.regressionsuites;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.Test;
 
@@ -33,8 +34,15 @@ import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
+import org.voltdb.benchmark.tpcc.procedures.InsertNewOrder;
 import org.voltdb.catalog.LoadCatalogToString;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcCallException;
+import org.voltdb.client.ProcedureCallback;
+import org.voltdb.client.SyncCallback;
+import org.voltdb.types.TimestampType;
 
 /**
  * Tests a mix of multi-partition and single partition procedures on a
@@ -51,7 +59,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
     static Class<?>[] EXPANDEDPROCS = { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
                                         org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
                                         org.voltdb.benchmark.tpcc.procedures.delivery.class,
-                                        org.voltdb.benchmark.tpcc.procedures.slev.class };
+                                        org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class };
     static Class<?>[] CONFLICTPROCS = { org.voltdb.catalog.InsertNewOrder.class,
                                         org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
                                         org.voltdb.benchmark.tpcc.procedures.delivery.class };
@@ -73,48 +81,151 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         super(name);
     }
 
+    AtomicInteger m_outstandingCalls = new AtomicInteger(0);
+
+    class CatTestCallback extends ProcedureCallback {
+
+        final byte m_expectedStatus;
+
+        CatTestCallback(byte expectedStatus) {
+            m_expectedStatus = expectedStatus;
+            m_outstandingCalls.incrementAndGet();
+        }
+
+        @Override
+        protected void clientCallback(ClientResponse clientResponse) {
+            m_outstandingCalls.decrementAndGet();
+            if (m_expectedStatus != clientResponse.getStatus()) {
+                if (clientResponse.getExtra() != null)
+                    System.err.println(clientResponse.getExtra());
+                if (clientResponse.getException() != null)
+                    clientResponse.getException().printStackTrace();
+                assertTrue(false);
+            }
+        }
+    }
+
+    public void blockUntilNoOutstandingTransactions() {
+
+    }
+
     public void testUpdate() throws Exception {
         Client client = getClient();
 
         String newCatalogURL;
         VoltTable[] results;
+        CatTestCallback callback;
+
+        loadSomeData(client, 0, 25);
+        client.drain();
 
         testStuffThatShouldObviouslyFail(client);
 
-        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-onesite-expanded.jar");
+        // asynchronously call some random inserts
+        loadSomeData(client, 25, 25);
+
+        // add a procedure "InsertOrderLineBatched"
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.jar");
+        callback = new CatTestCallback(ClientResponse.SUCCESS);
+        client.callProcedure(callback, "@UpdateApplicationCatalog", newCatalogURL);
+
+        client.drain();
+
+        // don't care if this succeeds or fails.
+        // calling the new proc before the cat change returns is not guaranteed to work
+        // we just hope it doesn't crash anything
+        int x = 3;
+        SyncCallback cb = new SyncCallback();
+        client.callProcedure(cb,
+                org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class.getSimpleName(),
+                new long[] {x}, new long[] {x}, x, new long[] {x},
+                new long[] {x}, new long[] {x}, new TimestampType[] { new TimestampType() }, new long[] {x},
+                new double[] {x}, new String[] {"a"});
+        cb.waitForResponse();
+
+        // make sure the previous catalog change has completed
+        client.drain();
+
+        // now calling the new proc better work
+        x = 2;
+        client.callProcedure(org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class.getSimpleName(),
+                new long[] {x}, new long[] {x}, x, new long[] {x},
+                new long[] {x}, new long[] {x}, new TimestampType[] { new TimestampType() }, new long[] {x},
+                new double[] {x}, new String[] {"a"});
+
+        loadSomeData(client, 50, 5);
+
+        // this is a do nothing change... shouldn't affect anything
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.jar");
         results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
         assertTrue(results.length == 0);
 
-        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-onesite-expanded.jar");
+        client.drain();
+
+        // now calling the new proc better work
+        x = 4;
+        client.callProcedure(org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class.getSimpleName(),
+                new long[] {x}, new long[] {x}, x, new long[] {x},
+                new long[] {x}, new long[] {x}, new TimestampType[] { new TimestampType() }, new long[] {x},
+                new double[] {x}, new String[] {"a"});
+
+        // remove the procedure we just added async
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
+        callback = new CatTestCallback(ClientResponse.SUCCESS);
+        client.callProcedure(callback, "@UpdateApplicationCatalog", newCatalogURL);
+
+        // don't care if this works now
+        x = 4;
+        cb = new SyncCallback();
+        client.callProcedure(cb,
+                org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class.getSimpleName(),
+                new long[] {x}, new long[] {x}, x, new long[] {x},
+                new long[] {x}, new long[] {x}, new TimestampType[] { new TimestampType() }, new long[] {x},
+                new double[] {x}, new String[] {"a"});
+        cb.waitForResponse();
+
+        // make sure the previous catalog change has completed
+        client.drain();
+
+        // now calling the new proc better fail
+        x = 5;
+        cb = new SyncCallback();
+        client.callProcedure(cb,
+                org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class.getSimpleName(),
+                new long[] {x}, new long[] {x}, x, new long[] {x},
+                new long[] {x}, new long[] {x}, new TimestampType[] { new TimestampType() }, new long[] {x},
+                new double[] {x}, new String[] {"a"});
+        cb.waitForResponse();
+        assertNotSame(cb.getResponse().getStatus(), ClientResponse.SUCCESS);
+
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-conflict.jar");
         results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
         assertTrue(results.length == 0);
 
-        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-onesite-base.jar");
-        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
-        assertTrue(results.length == 0);
-
-        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-onesite-conflict.jar");
-        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
-        assertTrue(results.length == 0);
-
-        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-onesite-many.jar");
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-many.jar");
         results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
         assertTrue(results.length == 0);
 
         assertTrue(true);
     }
 
-    public void loadSomeData() {
-
+    public void loadSomeData(Client client, int start, int count) throws NoConnectionsException, ProcCallException {
+        for (int i = start; i < (start + count); i++) {
+            CatTestCallback callback = new CatTestCallback(ClientResponse.SUCCESS);
+            client.callProcedure(callback, InsertNewOrder.class.getSimpleName(), i, i, i);
+        }
     }
+
+
 
     public void queryAndVerifySomeData() {
 
     }
 
     public void testStuffThatShouldObviouslyFail(Client client) throws UnsupportedEncodingException {
+        // this fails because it tries to change schema
         String newCatalogURL;
-        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-onesite-addtables.jar");
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtables.jar");
         try {
             client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
             fail();
@@ -123,6 +234,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
             assertTrue(e.getMessage().startsWith("The requested catalog change is not"));
         }
 
+        // this fails because the catalog URL isn't a real thing
         URL url = LoadCatalogToString.class.getResource("catalog.txt");
         newCatalogURL = URLDecoder.decode(url.getPath(), "UTF-8");
         try {
@@ -152,7 +264,8 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         // get a server config for the native backend with one sites/partitions
-        VoltServerConfig config = new LocalSingleProcessServer("catalogupdate-onesite-base.jar", 1, BackendTarget.NATIVE_EE_JNI);
+        //VoltServerConfig config = new LocalSingleProcessServer("catalogupdate-local-base.jar", 2, BackendTarget.NATIVE_EE_JNI);
+        VoltServerConfig config = new LocalCluster("catalogupdate-cluster-base.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
 
         // build up a project builder for the workload
         TPCCProjectBuilder project = new TPCCProjectBuilder();
@@ -170,7 +283,8 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         // Build a new catalog
-        config = new LocalSingleProcessServer("catalogupdate-onesite-addtables.jar", 1, BackendTarget.NATIVE_EE_JNI);
+        //config = new LocalSingleProcessServer("catalogupdate-local-addtables.jar", 2, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("catalogupdate-cluster-addtables.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addSchema(TestCatalogUpdateSuite.class.getResource("testorderby-ddl.sql").getPath());
@@ -179,7 +293,8 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         config.compile(project);
 
         // Build a new catalog
-        config = new LocalSingleProcessServer("catalogupdate-onesite-expanded.jar", 1, BackendTarget.NATIVE_EE_JNI);
+        //config = new LocalSingleProcessServer("catalogupdate-local-expanded.jar", 2, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("catalogupdate-cluster-expanded.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
@@ -187,7 +302,8 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         config.compile(project);
 
         // Build a new catalog
-        config = new LocalSingleProcessServer("catalogupdate-onesite-conflict.jar", 1, BackendTarget.NATIVE_EE_JNI);
+        //config = new LocalSingleProcessServer("catalogupdate-local-conflict.jar", 2, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("catalogupdate-cluster-conflict.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
@@ -195,22 +311,13 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         config.compile(project);
 
         // Build a new catalog
-        config = new LocalSingleProcessServer("catalogupdate-onesite-many.jar", 1, BackendTarget.NATIVE_EE_JNI);
+        //config = new LocalSingleProcessServer("catalogupdate-local-many.jar", 2, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("catalogupdate-cluster-many.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
         project.addProcedures(SOMANYPROCS);
         config.compile(project);
-
-        // Build a new catalog
-        /*config = new LocalSingleProcessServer("catalogupdate-onesite-expanded.jar", 1, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
-        UserInfo[] users;
-        project.addUsers(users)
-        config.compile(project);*/
 
         return builder;
     }

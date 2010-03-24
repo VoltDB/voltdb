@@ -108,6 +108,12 @@ public class RealVoltDB implements VoltDBInterface
     private FaultDistributor m_faultManager;
     private Object m_instanceId[];
 
+    // Synchronize initialize and shutdown.
+    private final Object m_startAndStopLock = new Object();
+
+    // Synchronize updates of catalog contexts with context accessors.
+    private final Object m_catalogUpdateLock = new Object();
+
     // add a random number to the sampler output to make it likely to be unique for this process.
     private final VoltSampler m_sampler = new VoltSampler(10, "sample" + String.valueOf(new Random().nextInt() % 10000) + ".txt");
     private final AtomicBoolean m_hasStartedSampler = new AtomicBoolean(false);
@@ -124,226 +130,231 @@ public class RealVoltDB implements VoltDBInterface
     /**
      * Initialize all the global components, then initialize all the m_sites.
      */
-    public synchronized void initialize(VoltDB.Configuration config) {
-        hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+    public void initialize(VoltDB.Configuration config) {
+        synchronized(m_startAndStopLock) {
+            hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
 
-        m_faultManager = new FaultDistributor();
+            m_faultManager = new FaultDistributor();
 
-        // start the dumper thread
-        if (config.listenForDumpRequests)
-            DumpManager.init();
+            // start the dumper thread
+            if (config.listenForDumpRequests)
+                DumpManager.init();
 
-        readBuildInfo();
-        m_config = config;
+            readBuildInfo();
+            m_config = config;
 
-        // start the admin console
-        int port;
-        for (port = 8080; true; port++) {
-            try {
-                m_adminListener = new HTTPAdminListener(port);
-                break;
-            } catch (IOException e1) {}
-        }
-        if (port == 8081)
-            hostLog.info("HTTP admin console unable to bind to port 8080");
-        else if (port > 8081)
-            hostLog.info("HTTP admin console unable to bind to ports 8080 through " + (port - 1));
-        hostLog.info("HTTP admin console listening on port " + port);
-
-        // Initialize the catalog and some common shortcuts
-        if (m_config.m_pathToCatalog.startsWith("http")) {
-            hostLog.info("Loading application catalog jarfile from " + m_config.m_pathToCatalog);
-        }
-        else {
-            File f = new File(m_config.m_pathToCatalog);
-            hostLog.info("Loading application catalog jarfile from " + f.getAbsolutePath());
-        }
-
-        final String serializedCatalog = CatalogUtil.loadCatalogFromJar(m_config.m_pathToCatalog, hostLog);
-        if ((serializedCatalog == null) || (serializedCatalog.length() == 0))
-            VoltDB.crashVoltDB();
-
-        Catalog catalog = new Catalog();
-        catalog.execute(serializedCatalog);
-        m_catalogContext = new CatalogContext(catalog, m_config.m_pathToCatalog);
-        final SnapshotSchedule schedule = m_catalogContext.database.getSnapshotschedule().get("default");
-
-        /*
-         * The lowest non-exec siteId (ClientInterface) is tasked with
-         * running a SnapshotDaemon.
-         */
-        int lowestNonExecSiteId = -1;
-        for (Site site : m_catalogContext.sites) {
-            if (!site.getIsexec()) {
-                if (lowestNonExecSiteId == -1) {
-                    lowestNonExecSiteId = Integer.parseInt(site.getTypeName());
-                } else {
-                    lowestNonExecSiteId = Math.min(lowestNonExecSiteId, Integer.parseInt(site.getTypeName()));
-                }
-            }
-        }
-
-        // Initialize the complex partitioning scheme
-        TheHashinator.initialize(catalog);
-
-        // Prepare the network socket manager for work
-        m_network = new VoltNetwork( new Runnable[] { new Runnable() {
-            @Override
-            public void run() {
-                for (final ClientInterface ci : m_clientInterfaces) {
-                    ci.processPeriodicWork();
-                }
-            }
-        }});
-
-        // Let the ELT system read its configuration from the catalog.
-        try {
-            ELTManager.initialize(catalog);
-        } catch (ELTManager.SetupException e) {
-            hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ELTInitFailure.name(), e);
-            System.exit(-1);
-        }
-
-        // Create the intra-cluster mesh
-        InetAddress leader = null;
-        try {
-            leader = InetAddress.getByName(m_catalogContext.cluster.getLeaderaddress());
-        } catch (UnknownHostException ex) {
-            hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_CouldNotRetrieveLeaderAddress.name(), new Object[] { m_catalogContext.cluster.getLeaderaddress() }, ex);
-            throw new RuntimeException(ex);
-        }
-        // ensure at least one host (catalog compiler should check this too
-        if (m_catalogContext.numberOfNodes <= 0) {
-            hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_InvalidHostCount.name(), new Object[] { m_catalogContext.numberOfNodes }, null);
-            VoltDB.crashVoltDB();
-        }
-
-        hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_CreatingVoltDB.name(), new Object[] { m_catalogContext.numberOfNodes, leader }, null);
-        m_messenger = new HostMessenger(m_network, leader, m_catalogContext.numberOfNodes, hostLog);
-        m_instanceId = m_messenger.waitForGroupJoin();
-
-        // Use the host messenger's hostId.
-        int myHostId = m_messenger.getHostId();
-
-        // set up site structure
-        m_localSites = new Hashtable<Integer, ExecutionSite>();
-        m_siteThreads = new Hashtable<Integer, Thread>();
-        m_runners = new ArrayList<ExecutionSiteRunner>();
-
-        /*
-         * Create execution sites runners (and threads) for all exec sites except the first one.
-         * This allows the sites to be set up in the thread that will end up running them.
-         * Cache the first Site from the catalog and only do the setup once the other threads have been started.
-         */
-        Site siteForThisThread = null;
-        m_currentThreadSite = null;
-        for (Site site : m_catalogContext.sites) {
-            int sitesHostId = Integer.parseInt(site.getHost().getTypeName());
-            int siteId = Integer.parseInt(site.getTypeName());
-
-            // start a local site
-            if (sitesHostId == myHostId) {
-                log.l7dlog( Level.TRACE, LogKeys.org_voltdb_VoltDB_CreatingLocalSite.name(), new Object[] { siteId }, null);
-                m_messenger.createLocalSite(siteId);
-                if (site.getIsexec()) {
-                    if (siteForThisThread == null) {
-                        siteForThisThread = site;
-                    } else {
-                        ExecutionSiteRunner runner = new ExecutionSiteRunner(siteId, m_catalogContext, serializedCatalog);
-                        m_runners.add(runner);
-                        Thread runnerThread = new Thread(runner, "Site " + siteId);
-                        runnerThread.start();
-                        log.l7dlog(Level.TRACE, LogKeys.org_voltdb_VoltDB_CreatingThreadForSite.name(), new Object[] { siteId }, null);
-                        m_siteThreads.put(siteId, runnerThread);
-                    }
-                }
-            }
-        }
-
-        /*
-         * Now that the runners have been started and are doing setup of the other sites in parallel
-         * this thread can set up its own execution site.
-         */
-        ExecutionSite siteObj =
-            new ExecutionSite(Integer.parseInt(siteForThisThread.getTypeName()), m_catalogContext, serializedCatalog);
-        m_localSites.put(Integer.parseInt(siteForThisThread.getTypeName()), siteObj);
-        m_currentThreadSite = siteObj;
-
-        /*
-         * Stop and wait for the runners to finish setting up and then put
-         * the constructed ExecutionSites in the local site map.
-         */
-        for (ExecutionSiteRunner runner : m_runners) {
-            synchronized (runner) {
-                if (!runner.m_isSiteCreated) {
-                    try {
-                        runner.wait();
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-                m_localSites.put(runner.m_siteId, runner.m_siteObj);
-            }
-        }
-
-
-        // set up profiling and tracing
-        // hack to prevent profiling on multiple machines
-        if (m_localSites.size() == 1) {
-            if (m_config.m_profilingLevel != ProcedureProfiler.Level.DISABLED)
-                hostLog.l7dlog(
-                        Level.INFO,
-                        LogKeys.host_VoltDB_ProfileLevelIs.name(),
-                        new Object[] { m_config.m_profilingLevel },
-                        null);
-            ProcedureProfiler.profilingLevel = m_config.m_profilingLevel;
-        }
-        else {
-            hostLog.l7dlog(
-                    Level.INFO,
-                    LogKeys.host_VoltDB_InternalProfilingDisabledOnMultipartitionHosts.name(),
-                    null);
-        }
-
-        // if a workload tracer is specified, start her up!
-        ProcedureProfiler.initializeWorkloadTrace(catalog);
-
-        // Create the client interfaces and associated dtxn initiators
-        int portOffset = 0;
-        for (Site site : m_catalogContext.sites) {
-            int sitesHostId = Integer.parseInt(site.getHost().getTypeName());
-            int siteId = Integer.parseInt(site.getTypeName());
-
-            // create CI for each local non-EE site
-            if ((sitesHostId == myHostId) && (site.getIsexec() == false)) {
-                ClientInterface ci =
-                    ClientInterface.create(
-                            m_network,
-                            m_messenger,
-                            m_catalogContext,
-                            m_catalogContext.numberOfNodes,
-                            siteId,
-                            site.getInitiatorid(),
-                            config.m_port + portOffset++,
-                            siteId == lowestNonExecSiteId ? schedule : null);
-                m_clientInterfaces.add(ci);
+            // start the admin console
+            int port;
+            for (port = 8080; true; port++) {
                 try {
-                    ci.startAcceptingConnections();
-                } catch (IOException e) {
-                    hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_ErrorStartAcceptingConnections.name(), e);
-                    VoltDB.crashVoltDB();
+                    m_adminListener = new HTTPAdminListener(port);
+                    break;
+                } catch (IOException e1) {}
+            }
+            if (port == 8081)
+                hostLog.info("HTTP admin console unable to bind to port 8080");
+            else if (port > 8081)
+                hostLog.info("HTTP admin console unable to bind to ports 8080 through " + (port - 1));
+            hostLog.info("HTTP admin console listening on port " + port);
+
+            // Initialize the catalog and some common shortcuts
+            if (m_config.m_pathToCatalog.startsWith("http")) {
+                hostLog.info("Loading application catalog jarfile from " + m_config.m_pathToCatalog);
+            }
+            else {
+                File f = new File(m_config.m_pathToCatalog);
+                hostLog.info("Loading application catalog jarfile from " + f.getAbsolutePath());
+            }
+
+            final String serializedCatalog = CatalogUtil.loadCatalogFromJar(m_config.m_pathToCatalog, hostLog);
+            if ((serializedCatalog == null) || (serializedCatalog.length() == 0))
+                VoltDB.crashVoltDB();
+
+            Catalog catalog = new Catalog();
+            catalog.execute(serializedCatalog);
+            m_catalogContext = new CatalogContext(catalog, m_config.m_pathToCatalog);
+            final SnapshotSchedule schedule = m_catalogContext.database.getSnapshotschedule().get("default");
+
+            /*
+             * The lowest non-exec siteId (ClientInterface) is tasked with
+             * running a SnapshotDaemon.
+             */
+            int lowestNonExecSiteId = -1;
+            for (Site site : m_catalogContext.sites) {
+                if (!site.getIsexec()) {
+                    if (lowestNonExecSiteId == -1) {
+                        lowestNonExecSiteId = Integer.parseInt(site.getTypeName());
+                    } else {
+                        lowestNonExecSiteId = Math.min(lowestNonExecSiteId, Integer.parseInt(site.getTypeName()));
+                    }
                 }
             }
+
+            // Initialize the complex partitioning scheme
+            TheHashinator.initialize(catalog);
+
+            // Prepare the network socket manager for work
+            m_network = new VoltNetwork( new Runnable[] { new Runnable() {
+                @Override
+                public void run() {
+                    for (final ClientInterface ci : m_clientInterfaces) {
+                        ci.processPeriodicWork();
+                    }
+                }
+            }});
+
+            // Let the ELT system read its configuration from the catalog.
+            try {
+                ELTManager.initialize(catalog);
+            } catch (ELTManager.SetupException e) {
+                hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ELTInitFailure.name(), e);
+                System.exit(-1);
+            }
+
+            // Create the intra-cluster mesh
+            InetAddress leader = null;
+            try {
+                leader = InetAddress.getByName(m_catalogContext.cluster.getLeaderaddress());
+            } catch (UnknownHostException ex) {
+                hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_CouldNotRetrieveLeaderAddress.name(), new Object[] { m_catalogContext.cluster.getLeaderaddress() }, ex);
+                throw new RuntimeException(ex);
+            }
+            // ensure at least one host (catalog compiler should check this too
+            if (m_catalogContext.numberOfNodes <= 0) {
+                hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_InvalidHostCount.name(), new Object[] { m_catalogContext.numberOfNodes }, null);
+                VoltDB.crashVoltDB();
+            }
+
+            hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_CreatingVoltDB.name(), new Object[] { m_catalogContext.numberOfNodes, leader }, null);
+            m_messenger = new HostMessenger(m_network, leader, m_catalogContext.numberOfNodes, hostLog);
+            m_instanceId = m_messenger.waitForGroupJoin();
+
+            // Use the host messenger's hostId.
+            int myHostId = m_messenger.getHostId();
+
+            // set up site structure
+            m_localSites = new Hashtable<Integer, ExecutionSite>();
+            m_siteThreads = new Hashtable<Integer, Thread>();
+            m_runners = new ArrayList<ExecutionSiteRunner>();
+
+            /*
+             * Create execution sites runners (and threads) for all exec sites except the first one.
+             * This allows the sites to be set up in the thread that will end up running them.
+             * Cache the first Site from the catalog and only do the setup once the other threads have been started.
+             */
+            Site siteForThisThread = null;
+            m_currentThreadSite = null;
+            for (Site site : m_catalogContext.sites) {
+                int sitesHostId = Integer.parseInt(site.getHost().getTypeName());
+                int siteId = Integer.parseInt(site.getTypeName());
+
+                // start a local site
+                if (sitesHostId == myHostId) {
+                    log.l7dlog( Level.TRACE, LogKeys.org_voltdb_VoltDB_CreatingLocalSite.name(), new Object[] { siteId }, null);
+                    m_messenger.createLocalSite(siteId);
+                    if (site.getIsexec()) {
+                        if (siteForThisThread == null) {
+                            siteForThisThread = site;
+                        } else {
+                            ExecutionSiteRunner runner = new ExecutionSiteRunner(siteId, m_catalogContext, serializedCatalog);
+                            m_runners.add(runner);
+                            Thread runnerThread = new Thread(runner, "Site " + siteId);
+                            runnerThread.start();
+                            log.l7dlog(Level.TRACE, LogKeys.org_voltdb_VoltDB_CreatingThreadForSite.name(), new Object[] { siteId }, null);
+                            m_siteThreads.put(siteId, runnerThread);
+                        }
+                    }
+                }
+            }
+
+            /*
+             * Now that the runners have been started and are doing setup of the other sites in parallel
+             * this thread can set up its own execution site.
+             */
+            int siteId = Integer.parseInt(siteForThisThread.getTypeName());
+            ExecutionSite siteObj =
+                new ExecutionSite(siteId,
+                                  m_catalogContext,
+                                  serializedCatalog);
+            m_localSites.put(Integer.parseInt(siteForThisThread.getTypeName()), siteObj);
+            m_currentThreadSite = siteObj;
+
+            /*
+             * Stop and wait for the runners to finish setting up and then put
+             * the constructed ExecutionSites in the local site map.
+             */
+            for (ExecutionSiteRunner runner : m_runners) {
+                synchronized (runner) {
+                    if (!runner.m_isSiteCreated) {
+                        try {
+                            runner.wait();
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                    m_localSites.put(runner.m_siteId, runner.m_siteObj);
+                }
+            }
+
+
+            // set up profiling and tracing
+            // hack to prevent profiling on multiple machines
+            if (m_localSites.size() == 1) {
+                if (m_config.m_profilingLevel != ProcedureProfiler.Level.DISABLED)
+                    hostLog.l7dlog(
+                                   Level.INFO,
+                                   LogKeys.host_VoltDB_ProfileLevelIs.name(),
+                                   new Object[] { m_config.m_profilingLevel },
+                                   null);
+                ProcedureProfiler.profilingLevel = m_config.m_profilingLevel;
+            }
+            else {
+                hostLog.l7dlog(
+                               Level.INFO,
+                               LogKeys.host_VoltDB_InternalProfilingDisabledOnMultipartitionHosts.name(),
+                               null);
+            }
+
+            // if a workload tracer is specified, start her up!
+            ProcedureProfiler.initializeWorkloadTrace(catalog);
+
+            // Create the client interfaces and associated dtxn initiators
+            int portOffset = 0;
+            for (Site site : m_catalogContext.sites) {
+                int sitesHostId = Integer.parseInt(site.getHost().getTypeName());
+                int currSiteId = Integer.parseInt(site.getTypeName());
+
+                // create CI for each local non-EE site
+                if ((sitesHostId == myHostId) && (site.getIsexec() == false)) {
+                    ClientInterface ci =
+                        ClientInterface.create(
+                                               m_network,
+                                               m_messenger,
+                                               m_catalogContext,
+                                               m_catalogContext.numberOfNodes,
+                                               currSiteId,
+                                               site.getInitiatorid(),
+                                               config.m_port + portOffset++,
+                                               currSiteId == lowestNonExecSiteId ? schedule : null);
+                    m_clientInterfaces.add(ci);
+                    try {
+                        ci.startAcceptingConnections();
+                    } catch (IOException e) {
+                        hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_ErrorStartAcceptingConnections.name(), e);
+                        VoltDB.crashVoltDB();
+                    }
+                }
+            }
+
+            // Start running the socket handlers
+            hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartingNetwork.name(), null);
+            m_network.start();
+
+            m_messenger.sendReadyMessage();
+            m_messenger.waitForAllHostsToBeReady();
+
+            hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null);
         }
-
-        // Start running the socket handlers
-        hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartingNetwork.name(), null);
-        m_network.start();
-
-        m_messenger.sendReadyMessage();
-        m_messenger.waitForAllHostsToBeReady();
-
-        hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null);
     }
 
     public void readBuildInfo() {
@@ -401,83 +412,87 @@ public class RealVoltDB implements VoltDBInterface
      * @param mainSiteThread The thread that m_inititalized the VoltDB or
      * null if called from that thread.
      */
-    public synchronized void shutdown(Thread mainSiteThread) throws InterruptedException {
+    public void shutdown(Thread mainSiteThread) throws InterruptedException {
+        synchronized(m_startAndStopLock) {
+            if (m_hasStartedSampler.get()) {
+                m_sampler.setShouldStop();
+                m_sampler.join();
+            }
 
-        if (m_hasStartedSampler.get()) {
-            m_sampler.setShouldStop();
-            m_sampler.join();
-        }
+            // shutdown the web monitoring
+            m_adminListener.shutdown(true);
 
-        // shutdown the web monitoring
-        m_adminListener.shutdown(true);
+            // shut down the client interface
+            for (ClientInterface ci : m_clientInterfaces) {
+                ci.shutdown();
+            }
 
-        // shut down the client interface
-        for (ClientInterface ci : m_clientInterfaces) {
-            ci.shutdown();
-        }
+            // tell all m_sites to stop their runloops
+            if (m_localSites != null) {
+                for (ExecutionSite site : m_localSites.values())
+                    site.startShutdown();
+            }
 
-        // tell all m_sites to stop their runloops
-        if (m_localSites != null) {
-            for (ExecutionSite site : m_localSites.values())
-                site.startShutdown();
-        }
-
-        // try to join all threads but the main one
-        // probably want to check if one of these is the current thread
-        if (m_siteThreads != null) {
-            for (Thread siteThread : m_siteThreads.values()) {
-                if (Thread.currentThread().equals(siteThread) == false) {
-                    siteThread.interrupt();
-                    siteThread.join();
+            // try to join all threads but the main one
+            // probably want to check if one of these is the current thread
+            if (m_siteThreads != null) {
+                for (Thread siteThread : m_siteThreads.values()) {
+                    if (Thread.currentThread().equals(siteThread) == false) {
+                        siteThread.interrupt();
+                        siteThread.join();
+                    }
                 }
             }
-        }
 
-        // try to join the main thread (possibly this one)
-        if (mainSiteThread != null) {
-            if (Thread.currentThread().equals(mainSiteThread) == false) {
-                mainSiteThread.interrupt();
-                mainSiteThread.join();
+            // try to join the main thread (possibly this one)
+            if (mainSiteThread != null) {
+                if (Thread.currentThread().equals(mainSiteThread) == false) {
+                    mainSiteThread.interrupt();
+                    mainSiteThread.join();
+                }
             }
+
+            // help the gc along
+            m_localSites = null;
+            m_currentThreadSite = null;
+            m_siteThreads = null;
+            m_messenger = null;
+            m_runners = null;
+
+            // shut down the network/messaging stuff
+            if (m_network != null) {
+                //Synchronized so the interruption won't interrupt the network thread
+                //while it is waiting for the executor service to shutdown
+                m_network.shutdown();
+            }
+
+            m_network = null;
+
+            //Also for test code that expects a fresh stats agent
+            m_statsAgent = new StatsAgent();
+
+            // The network iterates this list. Clear it after network's done.
+            m_clientInterfaces.clear();
+
+            // probably unnecessary
+            System.gc();
+            m_isRunning = false;
         }
-
-        // help the gc along
-        m_localSites = null;
-        m_currentThreadSite = null;
-        m_siteThreads = null;
-        m_messenger = null;
-        m_runners = null;
-
-        // shut down the network/messaging stuff
-        if (m_network != null) {
-            //Synchronized so the interruption won't interrupt the network thread
-            //while it is waiting for the executor service to shutdown
-            m_network.shutdown();
-        }
-
-        m_network = null;
-
-        //Also for test code that expects a fresh stats agent
-        m_statsAgent = new StatsAgent();
-
-        // The network iterates this list. Clear it after network's done.
-        m_clientInterfaces.clear();
-
-        // probably unnecessary
-        System.gc();
-
-        m_isRunning = false;
     }
 
     @Override
-    public synchronized void catalogUpdate(String diffCommands,
-            String newCatalogURL, int expectedCatalogVersion) {
+    public void catalogUpdate(String diffCommands,
+            String newCatalogURL, int expectedCatalogVersion)
+    {
+        synchronized(m_catalogUpdateLock) {
+            if (m_catalogContext.catalog.getSubTreeVersion() != expectedCatalogVersion)
+                throw new RuntimeException("Trying to update main catalog context with diff " +
+                "commands generated for an out-of date catalog.");
+            m_catalogContext = m_catalogContext.update(newCatalogURL, diffCommands);
+        }
 
-        if (m_catalogContext.catalog.getSubTreeVersion() != expectedCatalogVersion)
-            throw new RuntimeException("Trying to update main catalog context with diff " +
-                    "commands generated for an out-of date catalog.");
-
-        m_catalogContext = m_catalogContext.update(newCatalogURL, diffCommands);
+        for (ClientInterface ci : m_clientInterfaces)
+            ci.notifyOfCatalogUpdate();
     }
 
     public VoltDB.Configuration getConfig()
@@ -522,8 +537,10 @@ public class RealVoltDB implements VoltDBInterface
         return m_faultManager;
     }
 
-    public synchronized CatalogContext getCatalogContext() {
-        return m_catalogContext;
+    public CatalogContext getCatalogContext() {
+        synchronized(m_catalogUpdateLock) {
+            return m_catalogContext;
+        }
     }
 
     /**

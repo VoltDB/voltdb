@@ -675,6 +675,15 @@ public class ClientInterface implements DumpManager.Dumpable {
     }
 
     /**
+     * Set the flag that tells this client interface to update its
+     * catalog when it's threadsafe.
+     */
+    public void notifyOfCatalogUpdate() {
+        m_shouldUpdateCatalog.set(true);
+        m_asyncCompilerWorkThread.notifyOfCatalogUpdate();
+    }
+
+    /**
      *
      * @param port
      * * return True if an error was generated and needs to be returned to the client

@@ -101,6 +101,14 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
     }
 
     /**
+     * Set the flag that tells this thread to update its
+     * catalog when it's threadsafe.
+     */
+    public void notifyOfCatalogUpdate() {
+        m_shouldUpdateCatalog.set(true);
+    }
+
+    /**
      *
      * @param sql
      * @param clientHandle Handle provided by the client application (not ClientInterface)
