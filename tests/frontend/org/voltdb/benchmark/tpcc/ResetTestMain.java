@@ -25,18 +25,20 @@ package org.voltdb.benchmark.tpcc;
 
 import java.io.File;
 import java.util.Date;
-import java.util.logging.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.ClientInterface;
 import org.voltdb.ExecutionSite;
-import org.voltdb.client.Client;
-import org.voltdb.client.ClientFactory;
-import org.voltdb.VoltProcedure;
 import org.voltdb.ServerThread;
-import org.voltdb.jni.ExecutionEngine;
-import org.voltdb.utils.BuildDirectoryUtils;
+import org.voltdb.VoltProcedure;
 import org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched;
 import org.voltdb.benchmark.tpcc.procedures.ResetWarehouse;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientFactory;
+import org.voltdb.jni.ExecutionEngine;
+import org.voltdb.utils.BuildDirectoryUtils;
 
 public class ResetTestMain {
     public static void main(final String[] args) throws Exception {
@@ -76,7 +78,6 @@ public class ResetTestMain {
         int BATCH_SIZE = 1000;
         long[] b_ol_o_id = new long[BATCH_SIZE];
         long[] b_ol_d_id = new long[BATCH_SIZE];
-        long[] b_ol_w_id = new long[BATCH_SIZE];
         long[] b_ol_number = new long[BATCH_SIZE];
         long[] b_ol_i_id = new long[BATCH_SIZE];
         long[] b_ol_supply_w_id = new long[BATCH_SIZE];
@@ -99,7 +100,6 @@ public class ResetTestMain {
                     //(long ol_w_id, long ol_d_id, long ol_o_id, long ol_number, boolean newOrder)
                     b_ol_o_id[batch_cnt] = o_id;
                     b_ol_d_id[batch_cnt] = d_id;
-                    b_ol_w_id[batch_cnt] = w_id;
                     b_ol_number[batch_cnt] = ol_number;
                     b_ol_i_id[batch_cnt] = generator.number(1, parameters.items);
                     b_ol_supply_w_id[batch_cnt] = w_id;
@@ -119,7 +119,7 @@ public class ResetTestMain {
                         total += BATCH_SIZE;
                         System.out.println ("loading: " + total + "/" + (parameters.districtsPerWarehouse * customersPerDistrictAfterInsertion * (Constants.MAX_OL_CNT - Constants.MIN_OL_CNT)));
                         client.callProcedure(InsertOrderLineBatched.class.getSimpleName(),
-                            b_ol_o_id, b_ol_d_id, b_ol_w_id, b_ol_number, b_ol_i_id,
+                            b_ol_o_id, b_ol_d_id, w_id, b_ol_number, b_ol_i_id,
                             b_ol_supply_w_id, b_ol_delivery_d, b_ol_quantity, b_ol_amount, b_ol_dist_info);
                         batch_cnt = 0;
                     }

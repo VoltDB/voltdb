@@ -50,9 +50,11 @@
 
 package org.voltdb.benchmark.tpcc.procedures;
 
-import java.util.Date;
-
-import org.voltdb.*;
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.types.TimestampType;
 
 @ProcInfo (
     partitionInfo = "ORDER_LINE.OL_W_ID: 2",
@@ -62,13 +64,13 @@ public class InsertOrderLineBatched extends VoltProcedure {
 
     public final SQLStmt insert = new SQLStmt("INSERT INTO ORDER_LINE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
-    public VoltTable[] run(long[] ol_o_id, long[] ol_d_id, long[] ol_w_id, long[] ol_number,
-        long[] ol_i_id, long[] ol_supply_w_id, Date[] ol_delivery_d, long[] ol_quantity,
+    public VoltTable[] run(long[] ol_o_id, long[] ol_d_id, long ol_w_id, long[] ol_number,
+        long[] ol_i_id, long[] ol_supply_w_id, TimestampType[] ol_delivery_d, long[] ol_quantity,
         double[] ol_amount, String[] ol_dist_info) {
 
         int size = ol_o_id.length;
         for (int i = 0; i < size; ++i) {
-            voltQueueSQL(insert, ol_o_id[i], ol_d_id[i], ol_w_id[i], ol_number[i],
+            voltQueueSQL(insert, ol_o_id[i], ol_d_id[i], ol_w_id, ol_number[i],
             ol_i_id[i], ol_supply_w_id[i], ol_delivery_d[i], ol_quantity[i],
             ol_amount[i], ol_dist_info[i]);
         }
