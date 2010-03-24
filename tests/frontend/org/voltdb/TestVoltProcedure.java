@@ -92,10 +92,6 @@ public class TestVoltProcedure extends TestCase {
     }
 
     static class NullProcedureWrapper extends VoltProcedure {
-        //NullProcedureWrapper(ExecutionSite site, Class<?> c) {
-        //  super(site, new Procedure(), c);
-        //}
-
         VoltTable runQueryStatement(SQLStmt stmt, Object... params) {
             assert false;
             return null;
@@ -178,7 +174,7 @@ public class TestVoltProcedure extends TestCase {
         assertNotNull(agent.m_selector);
         assertNotNull(agent.m_source);
         assertEquals(agent.m_selector, SysProcSelector.PROCEDURE);
-        assertEquals(agent.m_catalogId, Integer.parseInt(site.m_context.cluster.getSites().get(Integer.toString(site.siteId)).getTypeName()));
+        assertEquals(agent.m_catalogId, Integer.parseInt(site.m_context.cluster.getSites().get(Integer.toString(site.getSiteId())).getTypeName()));
         Object statsRow[][] = agent.m_source.getStatsRows(false, 0L);
         assertNotNull(statsRow);
         assertEquals( 0, statsRow.length);
@@ -212,8 +208,7 @@ public class TestVoltProcedure extends TestCase {
 
     private class MockExecutionSite extends ExecutionSite {
         public MockExecutionSite(int siteId, String serializedCatalog) {
-            this.siteId = siteId;
-
+            super(siteId);
             // get some catalog shortcuts ready
             Catalog catalog = new Catalog();
             catalog.execute(serializedCatalog);

@@ -161,6 +161,12 @@ public class TestEELibraryLoader {
             // TODO Auto-generated method stub
             return null;
         }
+
+        @Override
+        public BackendTarget getBackendTargetType() {
+            // TODO Auto-generated method stub
+            return null;
+        }
     }
 
     @Test

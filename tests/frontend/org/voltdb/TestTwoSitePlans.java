@@ -45,22 +45,10 @@ import org.voltdb.utils.CatalogUtil;
 
 public class TestTwoSitePlans extends TestCase {
 
-    public static class MockSite extends ExecutionSite {
-        public VoltTable dep = null;
-        public int depId = 0;
-
-        public MockSite() {}
-
-        @Override
-        public void run() {
-            assert(false);
-        }
-    }
-
     static final String JAR = "distplanningregression.jar";
 
-    MockSite site1;
-    MockSite site2;
+    ExecutionSite site1;
+    ExecutionSite site2;
     ExecutionEngine ee1;
     ExecutionEngine ee2;
 
@@ -101,10 +89,10 @@ public class TestTwoSitePlans extends TestCase {
         assert(selectProc != null);
 
         // create two EEs
-        site1 = new MockSite();
+        site1 = new ExecutionSite(0); // site 0
         ee1 = new ExecutionEngineJNI(site1, cluster.getRelativeIndex(), 1, 0, 0, "");
         ee1.loadCatalog(catalog.serialize());
-        site2 = new MockSite();
+        site2 = new ExecutionSite(1); // site 1
         ee2 = new ExecutionEngineJNI(site2, cluster.getRelativeIndex(), 2, 0, 0, "");
         ee2.loadCatalog(catalog.serialize());
 

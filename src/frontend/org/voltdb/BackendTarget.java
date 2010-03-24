@@ -32,8 +32,8 @@ public enum BackendTarget {
     NATIVE_EE_JNI("jni"),
     NATIVE_EE_IPC("ipc"),
     NATIVE_EE_VALGRIND_IPC("valgrind_ipc"),
-    HSQLDB_BACKEND("hsqldb");
-
+    HSQLDB_BACKEND("hsqldb"),
+    NONE("none");
     private BackendTarget(String display) { this.display = display; }
     public final String display;
 }

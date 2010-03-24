@@ -281,4 +281,9 @@ public class MockVoltDB implements VoltDBInterface
         return null;
     }
 
+    @Override
+    public BackendTarget getBackendTargetType() {
+        return BackendTarget.NONE;
+    }
+
 }

@@ -167,7 +167,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                                   PF_restoreSendPartitionedTableResults,
                                   this);
         m_cluster = cluster;
-        m_siteId = site.siteId;
+        m_siteId = site.getSiteId();
         m_hostId =
             Integer.valueOf(m_cluster.getSites().get(String.valueOf(m_siteId)).
                             getHost().getTypeName());

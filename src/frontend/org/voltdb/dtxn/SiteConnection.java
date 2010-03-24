@@ -37,8 +37,7 @@ public abstract class SiteConnection {
      * connection. This id matches up with the a site in the catalog.
      */
     protected final int m_siteId;
-
-    public int getSiteId() { return m_siteId; }
+    public final int getSiteId() { return m_siteId; }
 
     /**
      * Lets <code>TransactionInitiator</code> create a new

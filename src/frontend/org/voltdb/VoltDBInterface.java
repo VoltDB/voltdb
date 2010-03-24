@@ -65,6 +65,7 @@ public interface VoltDBInterface
     public VoltNetwork getNetwork();
     public StatsAgent getStatsAgent();
     public FaultDistributor getFaultDistributor();
+    public BackendTarget getBackendTargetType();
 
     /**
     * Updates the catalog context stored by this VoltDB without destroying the old one,

@@ -36,6 +36,7 @@ import org.voltdb.catalog.Site;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.elt.ELTManager;
 import org.voltdb.fault.FaultDistributor;
+import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.impl.HostMessenger;
 import org.voltdb.network.VoltNetwork;
@@ -62,20 +63,22 @@ public class RealVoltDB implements VoltDBInterface
 
         private volatile boolean m_isSiteCreated = false;
         private final int m_siteId;
-        private final CatalogContext m_context;
         private final String m_serializedCatalog;
         private volatile ExecutionSite m_siteObj;
 
         public ExecutionSiteRunner(final int siteId, final CatalogContext context, final String serializedCatalog) {
             m_siteId = siteId;
-            m_context = context;
             m_serializedCatalog = serializedCatalog;
         }
 
         @Override
         public void run() {
+            Mailbox mailbox = VoltDB.instance().getMessenger()
+            .createMailbox(m_siteId, VoltDB.DTXN_MAILBOX_ID, null);
+
             m_siteObj =
-                new ExecutionSite(m_siteId, m_context, m_serializedCatalog);
+                new ExecutionSite(VoltDB.instance(),
+                                  mailbox, m_siteId, m_serializedCatalog);
             synchronized (this) {
                 m_isSiteCreated = true;
                 this.notifyAll();
@@ -273,8 +276,9 @@ public class RealVoltDB implements VoltDBInterface
              */
             int siteId = Integer.parseInt(siteForThisThread.getTypeName());
             ExecutionSite siteObj =
-                new ExecutionSite(siteId,
-                                  m_catalogContext,
+                new ExecutionSite(VoltDB.instance(),
+                                  VoltDB.instance().getMessenger().createMailbox(siteId, VoltDB.DTXN_MAILBOX_ID, null),
+                                  siteId,
                                   serializedCatalog);
             m_localSites.put(Integer.parseInt(siteForThisThread.getTypeName()), siteObj);
             m_currentThreadSite = siteObj;
@@ -584,5 +588,10 @@ public class RealVoltDB implements VoltDBInterface
     @Override
     public Object[] getInstanceId() {
         return m_instanceId;
+    }
+
+    @Override
+    public BackendTarget getBackendTargetType() {
+        return m_config.m_backend;
     }
 }

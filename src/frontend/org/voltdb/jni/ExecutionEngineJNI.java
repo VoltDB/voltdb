@@ -88,7 +88,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         // base class loads the volt shared library
         super(site);
         //exceptionBuffer.order(ByteOrder.nativeOrder());
-        LOG.trace("Creating Execution Engine on clusterIndex=" + clusterIndex
+        System.out.println("Creating Execution Engine on clusterIndex=" + clusterIndex
                 + ", site_id = " + siteId + "...");
         pointer = nativeCreate();
         nativeSetLogLevels(pointer, EELoggers.getLogLevels());

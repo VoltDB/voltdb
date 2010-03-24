@@ -62,9 +62,8 @@ implements Runnable, DumpManager.Dumpable
 
     // Catalog
     public CatalogContext m_context;
-    public int siteId;
     Site getCatalogSite() {
-        return m_context.cluster.getSites().get(Integer.toString(siteId));
+        return m_context.cluster.getSites().get(Integer.toString(getSiteId()));
     }
 
     HashMap<Long, TransactionState> m_transactionsById = new HashMap<Long, TransactionState>();
@@ -262,9 +261,12 @@ implements Runnable, DumpManager.Dumpable
 
     SystemProcedureContext m_systemProcedureContext;
 
-    /** For test MockExecutionSite */
-    ExecutionSite() {
-        super(0);
+    /**
+     * Dummy ExecutionSite useful to some tests that require Mock/Do-Nothing sites.
+     * @param siteId
+     */
+    ExecutionSite(int siteId) {
+        super(siteId);
         m_systemProcedureContext = new SystemProcedureContext();
         m_watchdog = null;
         ee = null;
@@ -275,36 +277,54 @@ implements Runnable, DumpManager.Dumpable
         m_transactionQueue = null;
     }
 
-    /**
-     * Initialize the StoredProcedure runner and EE for this Site.
-     * @param siteManager
-     * @param siteId
-     * @param context A reference to the current catalog context
-     * newlines that, when executed, reconstruct the complete m_catalog.
-     */
-    ExecutionSite(final int siteId, final CatalogContext context, String serializedCatalog) {
-        super(siteId);
-        hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_Initializing.name(), new Object[] { String.valueOf(siteId) }, null);
+    ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox, final int siteId)
+    {
+        this(voltdb, mailbox, siteId, null);
+    }
 
-        String hostname = "";
-        try {
-            java.net.InetAddress localMachine = java.net.InetAddress.getLocalHost();
-            hostname = localMachine.getHostName();
-        } catch (java.net.UnknownHostException uhe) {
+    ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
+                  final int siteId, String serializedCatalog)
+    {
+        super(siteId);
+
+        hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_Initializing.name(),
+                        new Object[] { String.valueOf(siteId) }, null);
+
+        m_context = voltdb.getCatalogContext();
+
+        if (voltdb.getBackendTargetType() == BackendTarget.NONE) {
+            ee = null;
+            hsql = null;
+        }
+        else if (voltdb.getBackendTargetType() == BackendTarget.HSQLDB_BACKEND) {
+            hsql = initializeHSQLBackend();
+            ee = new MockExecutionEngine();
+        }
+        else {
+            if (serializedCatalog == null) {
+                serializedCatalog = voltdb.getCatalogContext().catalog.serialize();
+            }
+            hsql = null;
+            ee = initializeEE(voltdb.getBackendTargetType(), serializedCatalog);
         }
 
-        if (serializedCatalog == null)
-            serializedCatalog = context.catalog.serialize();
-
+        // Should pass in the watchdog class to allow sleepy dogs..
         m_watchdog = new Watchdog(siteId, siteIndex);
-        this.siteId = siteId;
-        m_context = context;
-        m_systemProcedureContext = new SystemProcedureContext();
 
-        m_dumpId = "ExecutionSite." + String.valueOf(siteId);
+        m_dumpId = "ExecutionSite." + String.valueOf(getSiteId());
         DumpManager.register(m_dumpId, this);
 
-        // get an array of all the initiators
+        m_systemProcedureContext = new SystemProcedureContext();
+        m_transactionQueue = initializeTransactionQueue(siteId);
+        m_mailbox = mailbox;
+
+        loadProceduresFromCatalog(voltdb.getBackendTargetType());
+        m_snapshotter = new SnapshotSiteProcessor();
+    }
+
+    private RestrictedPriorityQueue initializeTransactionQueue(final int siteId)
+    {
+        // build an array of all the initiators
         int initiatorCount = 0;
         for (final Site s : m_context.cluster.getSites())
             if (s.getIsexec() == false)
@@ -315,43 +335,51 @@ implements Runnable, DumpManager.Dumpable
             if (s.getIsexec() == false)
                 initiatorIds[index++] = Integer.parseInt(s.getTypeName());
 
-        m_mailbox = VoltDB.instance().getMessenger()
-            .createMailbox(siteId, VoltDB.DTXN_MAILBOX_ID, null);
+        return new RestrictedPriorityQueue(initiatorIds, siteId);
+    }
 
-        m_transactionQueue = new RestrictedPriorityQueue(initiatorIds, siteId);
-
-        // An execution site can be backed by HSQLDB, by volt's EE accessed
-        // via JNI or by volt's EE accessed via IPC.  When backed by HSQLDB,
-        // the VoltProcedure interface invokes HSQLDB directly through its
-        // hsql Backend member variable.  The real volt backend is encapsulated
-        // by the ExecutionEngine class. This class has implementations for both
-        // JNI and IPC - and selects the desired implementation based on the
-        // value of this.eeBackend.
+    private HsqlBackend initializeHSQLBackend()
+    {
         HsqlBackend hsqlTemp = null;
+        try {
+            hsqlTemp = new HsqlBackend(getSiteId());
+            final String hexDDL = m_context.database.getSchema();
+            final String ddl = Encoder.hexDecodeToString(hexDDL);
+            final String[] commands = ddl.split(";");
+            for (String command : commands) {
+                command = command.trim();
+                if (command.length() == 0) {
+                    continue;
+                }
+                hsqlTemp.runDDL(command);
+            }
+        }
+        catch (final Exception ex) {
+            hostLog.l7dlog( Level.FATAL, LogKeys.host_ExecutionSite_FailedConstruction.name(),
+                            new Object[] { getSiteId(), siteIndex }, ex);
+            VoltDB.crashVoltDB();
+        }
+        return hsqlTemp;
+    }
+
+    private ExecutionEngine
+    initializeEE(BackendTarget target, String serializedCatalog)
+    {
+        String hostname = "";
+        try {
+            hostname = java.net.InetAddress.getLocalHost().getHostName();
+        } catch (java.net.UnknownHostException uhe) {
+        }
+
         ExecutionEngine eeTemp = null;
         try {
-            final BackendTarget target = VoltDB.getEEBackendType();
-            if (target == BackendTarget.HSQLDB_BACKEND) {
-                hsqlTemp = new HsqlBackend(siteId);
-                final String hexDDL = m_context.database.getSchema();
-                final String ddl = Encoder.hexDecodeToString(hexDDL);
-                final String[] commands = ddl.split(";");
-                for (String command : commands) {
-                    command = command.trim();
-                    if (command.length() == 0) {
-                        continue;
-                    }
-                    hsqlTemp.runDDL(command);
-                }
-                eeTemp = new MockExecutionEngine();
-            }
-            else if (target == BackendTarget.NATIVE_EE_JNI) {
+            if (target == BackendTarget.NATIVE_EE_JNI) {
                 Site site = getCatalogSite();
                 eeTemp =
                     new ExecutionEngineJNI(
                         this,
                         m_context.cluster.getRelativeIndex(),
-                        siteId,
+                        getSiteId(),
                         Integer.valueOf(site.getPartition().getTypeName()),
                         Integer.valueOf(site.getHost().getTypeName()),
                         hostname);
@@ -366,7 +394,7 @@ implements Runnable, DumpManager.Dumpable
                     new ExecutionEngineIPC(
                             this,
                             m_context.cluster.getRelativeIndex(),
-                            siteId,
+                            getSiteId(),
                             Integer.valueOf(site.getPartition().getTypeName()),
                             Integer.valueOf(site.getHost().getTypeName()),
                             hostname,
@@ -378,25 +406,21 @@ implements Runnable, DumpManager.Dumpable
         }
         // just print error info an bail if we run into an error here
         catch (final Exception ex) {
-            hostLog.l7dlog( Level.FATAL, LogKeys.host_ExecutionSite_FailedConstruction.name(), new Object[] { siteId, siteIndex }, ex);
+            hostLog.l7dlog( Level.FATAL, LogKeys.host_ExecutionSite_FailedConstruction.name(),
+                            new Object[] { getSiteId(), siteIndex }, ex);
             VoltDB.crashVoltDB();
         }
-        ee = eeTemp;
-        hsql = hsqlTemp;
-
-        // load up all the stored procedures
-        loadProceduresFromCatalog();
-        m_snapshotter = new SnapshotSiteProcessor();
+        return eeTemp;
     }
 
     public boolean updateCatalog(String catalogDiffCommands) {
         m_context = VoltDB.instance().getCatalogContext();
-        loadProceduresFromCatalog();
+        loadProceduresFromCatalog(VoltDB.getEEBackendType());
         ee.updateCatalog(catalogDiffCommands);
         return true;
     }
 
-    void loadProceduresFromCatalog() {
+    void loadProceduresFromCatalog(BackendTarget backendTarget) {
         m_registeredSysProcPlanFragments.clear();
         procs.clear();
         // load up all the stored procedures
@@ -413,7 +437,7 @@ implements Runnable, DumpManager.Dumpable
                     hostLog.l7dlog(
                             Level.WARN,
                             LogKeys.host_ExecutionSite_GenericException.name(),
-                            new Object[] { siteId, siteIndex },
+                            new Object[] { getSiteId(), siteIndex },
                             e);
                     VoltDB.crashVoltDB();
                 }
@@ -421,17 +445,19 @@ implements Runnable, DumpManager.Dumpable
                     wrapper = (VoltProcedure) procClass.newInstance();
                 }
                 catch (final InstantiationException e) {
-                    hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(), new Object[] { siteId, siteIndex }, e);
+                    hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
+                                    new Object[] { getSiteId(), siteIndex }, e);
                 }
                 catch (final IllegalAccessException e) {
-                    hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(), new Object[] { siteId, siteIndex }, e);
+                    hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
+                                    new Object[] { getSiteId(), siteIndex }, e);
                 }
             }
             else {
                 wrapper = new VoltProcedure.StmtProcedure();
             }
 
-            wrapper.init(this, proc, VoltDB.getEEBackendType(), hsql, m_context.cluster);
+            wrapper.init(this, proc, backendTarget, hsql, m_context.cluster);
             procs.put(proc.getTypeName(), wrapper);
         }
     }
@@ -442,16 +468,15 @@ implements Runnable, DumpManager.Dumpable
      */
     @Override
     public void run() {
-        // pick a name with four places for site id so it can be sorted later
-        // bit hackish, sorry
+        // enumerate site id (pad to 4 digits for sort)
         String name = "ExecutionSite:";
-        if (siteId < 10) name += "0";
-        if (siteId < 100) name += "0";
-        if (siteId < 1000) name += "0";
-        name += String.valueOf(siteId);
+        if (getSiteId() < 10) name += "0";
+        if (getSiteId() < 100) name += "0";
+        if (getSiteId() < 1000) name += "0";
+        name += String.valueOf(getSiteId());
         Thread.currentThread().setName(name);
 
-        NDC.push("ExecutionSite - " + siteId + " index " + siteIndex);
+        NDC.push("ExecutionSite - " + getSiteId() + " index " + siteIndex);
         if (VoltDB.getUseWatchdogs()) {
             m_watchdog.start(Thread.currentThread());
         }
@@ -470,11 +495,10 @@ implements Runnable, DumpManager.Dumpable
             }
         }
         try {
+            // Only poll messaging layer if necessary. Allow the poll
+            // to block if the execution site is truly idle.
             while (m_shouldContinue) {
                 TransactionState currentTxnState = m_transactionQueue.poll();
-
-                // Only poll messaging layer if necessary. Allow the poll
-                // to block if the execution site is truly idle.
                 if (currentTxnState == null) {
                     VoltMessage message = m_mailbox.recvBlocking(5);
                     tick();
@@ -503,7 +527,7 @@ implements Runnable, DumpManager.Dumpable
         final long fragmentId = ftask.getFragmentId(0);
         final int outputDepId = ftask.getOutputDepId(0);
 
-        final FragmentResponse currentFragResponse = new FragmentResponse(ftask, siteId);
+        final FragmentResponse currentFragResponse = new FragmentResponse(ftask, getSiteId());
 
         // this is a horrible performance hack, and can be removed with small changes
         // to the ee interface layer.. (rtb: not sure what 'this' encompasses...)
@@ -669,7 +693,7 @@ implements Runnable, DumpManager.Dumpable
 
     /**
      * Shutdown all resources that need to be shutdown for this <code>ExecutionSite</code>.
-     * May be called twice if recurssing via recursableRun(). Protected against that..
+     * May be called twice if recursing via recursableRun(). Protected against that..
      */
     private boolean haveShutdownAlready;
     @Override
@@ -732,7 +756,7 @@ implements Runnable, DumpManager.Dumpable
      */
     public ExecutorContext getDumpContents() {
         final ExecutorContext context = new ExecutorContext();
-        context.siteId = siteId;
+        context.siteId = getSiteId();
 
         // messaging log window stored in mailbox history
         if (m_mailbox instanceof SiteMailbox)
@@ -748,21 +772,21 @@ implements Runnable, DumpManager.Dumpable
     }
 
 
+    /*
+     * Continue doing runnable work for the current transaction.
+     * If doWork() returns true, the transaction is over.
+     * Otherwise, the procedure may have more java to run
+     * or a dependency or fragment to collect from the network.
+     *
+     * doWork() can sneak in a new SP transaction. Maybe it would
+     * be better if transactions didn't trigger other transactions
+     * and those optimization decisions where made somewhere closer
+     * to this code?
+     */
     @Override
     public Map<Integer, List<VoltTable>>
     recursableRun(TransactionState currentTxnState)
     {
-        /*
-         * Continue doing runnable work for the current transaction.
-         * If doWork() returns true, the transaction is over.
-         * Otherwise, the procedure may have more java to run
-         * or a dependency or fragment to collect from the network.
-         *
-         * doWork() can sneak in a new SP transaction. Maybe it would
-         * be better if transactions didn't trigger other transactions
-         * and those optimization decisions where made somewhere closer
-         * to this code?
-         */
         do
         {
             if (currentTxnState.doWork()) {
@@ -891,30 +915,30 @@ implements Runnable, DumpManager.Dumpable
      * Try to execute a single partition procedure if one is available in the
      * priority queue.
      *
-     * @return true if a procedure was executed, false if none available
+     * @return false if there is no possibility for speculative work.
      */
     public boolean tryToSneakInASinglePartitionProcedure() {
         // poll for an available message. don't block
-        {
-            VoltMessage message = m_mailbox.recv();
-            tick(); // unclear if this necessary (rtb)
-            if (message != null) {
-                handleMailboxMessage(message);
-            }
-        }
-
-        TransactionState nextTxn = m_transactionQueue.peek();
-
-        // only sneak in single partition work
-        if (nextTxn instanceof SinglePartitionTxnState) {
-            nextTxn = m_transactionQueue.peek();
-            boolean success = nextTxn.doWork();
-            assert(success);
+        VoltMessage message = m_mailbox.recv();
+        tick(); // unclear if this necessary (rtb)
+        if (message != null) {
+            handleMailboxMessage(message);
             return true;
         }
         else {
-            // multipartition is next or no work
-            return false;
+            TransactionState nextTxn = m_transactionQueue.peek();
+
+            // only sneak in single partition work
+            if (nextTxn instanceof SinglePartitionTxnState) {
+                nextTxn = m_transactionQueue.peek();
+                boolean success = nextTxn.doWork();
+                assert(success);
+                return true;
+            }
+            else {
+                // multipartition is next or no work
+                return false;
+            }
         }
     }
 }

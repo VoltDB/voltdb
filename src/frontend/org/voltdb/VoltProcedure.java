@@ -876,7 +876,7 @@ public abstract class VoltProcedure {
          * Constructor requires no args because it has access to the enclosing classes members.
          */
         public ProcedureStatsCollector() {
-            super(m_site.siteId + " " + catProc.getClassname(), m_site.siteId);
+            super(m_site.getSiteId() + " " + catProc.getClassname(), m_site.getSiteId());
         }
 
         /**
@@ -1155,7 +1155,7 @@ public abstract class VoltProcedure {
 
         // create all the local work for the transaction
         FragmentTask localTask = new FragmentTask(m_currentTxnState.initiatorSiteId,
-                                                  m_site.siteId,
+                                                  m_site.getSiteId(),
                                                   m_currentTxnState.txnId,
                                                   m_currentTxnState.isReadOnly,
                                                   localFragIds,
@@ -1172,7 +1172,7 @@ public abstract class VoltProcedure {
 
         // create and distribute work for all sites in the transaction
         FragmentTask distributedTask = new FragmentTask(m_currentTxnState.initiatorSiteId,
-                                                        m_site.siteId,
+                                                        m_site.getSiteId(),
                                                         m_currentTxnState.txnId,
                                                         m_currentTxnState.isReadOnly,
                                                         distributedFragIdArray,

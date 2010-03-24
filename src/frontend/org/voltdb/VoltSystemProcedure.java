@@ -138,7 +138,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
 
             FragmentTask task = new FragmentTask(
                     m_currentTxnState.initiatorSiteId,
-                    m_site.siteId,
+                    m_site.getSiteId(),
                     m_currentTxnState.txnId,
                     false,
                     new long[] { pf.fragmentId },
