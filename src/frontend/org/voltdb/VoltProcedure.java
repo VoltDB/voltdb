@@ -1184,7 +1184,7 @@ public abstract class VoltProcedure {
 
         // recursively call recurableRun and don't allow it to shutdown
         Map<Integer,List<VoltTable>> mapResults =
-            m_site.recursableRun(m_currentTxnState, false);
+            m_site.recursableRun(m_currentTxnState);
 
         assert(mapResults != null);
         assert(depsToResume != null);

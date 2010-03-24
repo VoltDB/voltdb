@@ -53,5 +53,5 @@ public abstract class SiteConnection {
     public abstract void shutdown() throws InterruptedException;
 
     public abstract Map<Integer,List<VoltTable>>
-    recursableRun(TransactionState txnState, boolean shutdownAllowed);
+    recursableRun(TransactionState txnState);
 }

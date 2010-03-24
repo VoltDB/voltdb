@@ -470,9 +470,22 @@ implements Runnable, DumpManager.Dumpable
             }
         }
         try {
-            // true indicates starting new stack; allow recursableRun to return.
-            Object test = recursableRun(null, true);
-            assert(test == null);
+            while (m_shouldContinue) {
+                TransactionState currentTxnState = m_transactionQueue.poll();
+
+                // Only poll messaging layer if necessary. Allow the poll
+                // to block if the execution site is truly idle.
+                if (currentTxnState == null) {
+                    VoltMessage message = m_mailbox.recvBlocking(5);
+                    tick();
+                    if (message != null) {
+                        handleMailboxMessage(message);
+                    }
+                }
+                if (currentTxnState != null) {
+                    recursableRun(currentTxnState);
+                }
+            }
         }
         catch (final RuntimeException e) {
             hostLog.l7dlog( Level.ERROR, LogKeys.host_ExecutionSite_RuntimeException.name(), e);
@@ -736,65 +749,41 @@ implements Runnable, DumpManager.Dumpable
 
 
     @Override
-    public Map<Integer, List<VoltTable>> recursableRun(TransactionState currentTxnState,
-                                                       boolean shutdownAllowed)
+    public Map<Integer, List<VoltTable>>
+    recursableRun(TransactionState currentTxnState)
     {
-        // loop until the system decided to stop this thread
-        // but don't return with null if not the base stack frame for this method
-        while ((!shutdownAllowed) || (m_shouldContinue)) {
-
-
-            // DO ALL READY-TO-RUN WORK WITHOUT MORE MESSAGES
-            // repeat until:
-            // 1. no current transaction AND no ready transaction, or
-            // 2. the current transaction is blocked (see end of loop)
-
-            boolean moreWork = (currentTxnState != null) ||
-                               ((currentTxnState = m_transactionQueue.poll()) != null);
-
-            while (moreWork)
-            {
-                // assume there's a current txn inside this loop
-                assert(currentTxnState != null);
-
-                // do all runnable work for the current txn
-                // if doWork returns true, the transaction is over
-                if (currentTxnState.doWork())
-                {
-                    completeTransaction(currentTxnState.isReadOnly);
-                    TransactionState ts = m_transactionsById.remove(currentTxnState.txnId);
-                    assert(ts != null);
-
-                    // try to get the next current in line
-                    // continue if there's a ready txn
-                    moreWork = (currentTxnState = m_transactionQueue.poll()) != null;
-                }
-                else {
-                    // the current transaction is blocked
-                    moreWork = false;
-
-                    // check if we should drop down a stack frame
-                    //  note, calling this resets the internal state so
-                    //  subsequent calls won't return true
-                    if (currentTxnState.shouldResumeProcedure()) {
-                        Map<Integer, List<VoltTable>> retval = currentTxnState.getPreviousStackFrameDropDependendencies();
-                        assert(retval != null);
-                        assert(shutdownAllowed == false);
-                        return retval;
-                    }
+        /*
+         * Continue doing runnable work for the current transaction.
+         * If doWork() returns true, the transaction is over.
+         * Otherwise, the procedure may have more java to run
+         * or a dependency or fragment to collect from the network.
+         *
+         * doWork() can sneak in a new SP transaction. Maybe it would
+         * be better if transactions didn't trigger other transactions
+         * and those optimization decisions where made somewhere closer
+         * to this code?
+         */
+        do
+        {
+            if (currentTxnState.doWork()) {
+                completeTransaction(currentTxnState.isReadOnly);
+                TransactionState ts = m_transactionsById.remove(currentTxnState.txnId);
+                assert(ts != null);
+                return null;
+            }
+            else if (currentTxnState.shouldResumeProcedure()){
+                Map<Integer, List<VoltTable>> retval = currentTxnState.getPreviousStackFrameDropDependendencies();
+                assert(retval != null);
+                return retval;
+            }
+            else {
+                VoltMessage message = m_mailbox.recvBlocking(5);
+                tick();
+                if (message != null) {
+                    handleMailboxMessage(message);
                 }
             }
-
-            // Poll messaging layer, possibly blocking for awhile if idle.
-            VoltMessage message = m_mailbox.recvBlocking(5);
-            tick();
-            if (message != null) {
-                handleMailboxMessage(message);
-            }
-        }
-
-        assert(shutdownAllowed);
-        return null;
+        } while (true);
     }
 
     private void handleMailboxMessage(VoltMessage message)
