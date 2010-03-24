@@ -63,8 +63,8 @@ import org.voltdb.utils.VoltLoggerFactory;
 public abstract class VoltProcedure {
     private static final Logger log = Logger.getLogger(VoltProcedure.class.getName(), VoltLoggerFactory.instance());
 
-    // Used to get around the "abstract" for stmt procedures
-    // kinda a weird hack, but is possibly the path of least resistence
+    // Used to get around the "abstract" for StmtProcedures.
+    // Path of least resistance?
     static class StmtProcedure extends VoltProcedure {}
 
     final static Double DOUBLE_NULL = new Double(-1.7976931348623157E+308);
@@ -74,7 +74,7 @@ public abstract class VoltProcedure {
 
     final private ProcedureProfiler profiler = new ProcedureProfiler();
 
-    //For runtime stats collection
+    //For runtime statistics collection
     private ProcedureStatsCollector statsCollector;
 
     // package scoped members used by VoltSystemProcedure
@@ -102,7 +102,6 @@ public abstract class VoltProcedure {
     private Procedure catProc;
     private boolean isNative = true;
     private int numberOfPartitions;
-
 
     // cached fake SQLStmt array for single statement non-java procs
     SQLStmt[] m_cachedSingleStmt = { null };
@@ -273,7 +272,8 @@ public abstract class VoltProcedure {
         }
     }
 
-    final ClientResponseImpl call(TransactionState txnState, Object... paramList) {
+    /* Package private but not final, to enable mock volt procedure objects */
+    ClientResponseImpl call(TransactionState txnState, Object... paramList) {
         m_currentTxnState = txnState;
 
         if (ProcedureProfiler.profilingLevel != ProcedureProfiler.Level.DISABLED) {
@@ -652,13 +652,18 @@ public abstract class VoltProcedure {
                         duplicate = true;
                 }
             }
-            if (duplicate)
-                retval = executeQueriesInIndividualBatches(batchQueryStmtIndex, batchQueryStmts, batchQueryArgs, isFinalSQL);
-            else
-                retval = executeQueriesInABatch(batchQueryStmtIndex, batchQueryStmts, batchQueryArgs, isFinalSQL);
+            if (duplicate) {
+                retval = executeQueriesInIndividualBatches(
+                    batchQueryStmtIndex, batchQueryStmts, batchQueryArgs, isFinalSQL);
+            }
+            else {
+                retval = executeQueriesInABatch(
+                    batchQueryStmtIndex, batchQueryStmts, batchQueryArgs, isFinalSQL);
+            }
         }
         else {
-            retval = executeQueriesInABatch(batchQueryStmtIndex, batchQueryStmts, batchQueryArgs, isFinalSQL);
+            retval = executeQueriesInABatch(
+                batchQueryStmtIndex, batchQueryStmts, batchQueryArgs, isFinalSQL);
         }
 
         // Workload Trace - Stop Query

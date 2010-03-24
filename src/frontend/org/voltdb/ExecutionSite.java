@@ -190,6 +190,7 @@ implements Runnable, DumpManager.Dumpable
             assert(txnBeginUndoToken == kInvalidUndoToken);
             assert(batchBeginUndoToken == kInvalidUndoToken);
             txnBeginUndoToken = latestUndoToken;
+            assert(txnBeginUndoToken != kInvalidUndoToken);
         }
     }
 
@@ -293,7 +294,7 @@ implements Runnable, DumpManager.Dumpable
         m_context = voltdb.getCatalogContext();
 
         if (voltdb.getBackendTargetType() == BackendTarget.NONE) {
-            ee = null;
+            ee = new MockExecutionEngine();
             hsql = null;
         }
         else if (voltdb.getBackendTargetType() == BackendTarget.HSQLDB_BACKEND) {
@@ -796,7 +797,8 @@ implements Runnable, DumpManager.Dumpable
                 return null;
             }
             else if (currentTxnState.shouldResumeProcedure()){
-                Map<Integer, List<VoltTable>> retval = currentTxnState.getPreviousStackFrameDropDependendencies();
+                Map<Integer, List<VoltTable>> retval =
+                    currentTxnState.getPreviousStackFrameDropDependendencies();
                 assert(retval != null);
                 return retval;
             }

@@ -54,12 +54,16 @@ public class MockVoltDB implements VoltDBInterface
         m_catalog.execute("add / clusters " + m_clusterName);
         m_catalog.execute("add " + m_catalog.getClusters().get(m_clusterName).getPath() + " databases " +
                           m_databaseName);
+
+        m_statsAgent = new StatsAgent();
     }
 
     public Procedure addProcedureForTest(String name)
     {
         Procedure retval = getCluster().getDatabases().get(m_databaseName).getProcedures().add(name);
+        retval.setClassname(name);
         retval.setHasjava(true);
+        retval.setSystemproc(false);
         return retval;
     }
 
@@ -208,7 +212,6 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public StatsAgent getStatsAgent()
     {
-        // TODO Auto-generated method stub
         return m_statsAgent;
     }
 

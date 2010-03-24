@@ -131,10 +131,10 @@ public class TestVoltProcedure extends TestCase {
         agent = new MockStatsAgent();
         manager.setStatsAgent(agent);
         VoltDB.replaceVoltDBInstanceForTest(manager);
-        manager.addProcedureForTest(DateProcedure.class.getName()).setClassname(DateProcedure.class.getName());
-        manager.addProcedureForTest(LongProcedure.class.getName()).setClassname(LongProcedure.class.getName());
-        manager.addProcedureForTest(LongArrayProcedure.class.getName()).setClassname(LongArrayProcedure.class.getName());
-        manager.addProcedureForTest(NPEProcedure.class.getName()).setClassname(NPEProcedure.class.getName());
+        manager.addProcedureForTest(DateProcedure.class.getName());
+        manager.addProcedureForTest(LongProcedure.class.getName());
+        manager.addProcedureForTest(LongArrayProcedure.class.getName());
+        manager.addProcedureForTest(NPEProcedure.class.getName());
         site = new MockExecutionSite(1, VoltDB.instance().getCatalogContext().catalog.serialize());
         nullParam = new ParameterSet();
         nullParam.setParameters(new Object[]{null});
