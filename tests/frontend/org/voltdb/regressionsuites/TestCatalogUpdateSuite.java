@@ -63,7 +63,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
     static Class<?>[] CONFLICTPROCS = { org.voltdb.catalog.InsertNewOrder.class,
                                         org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
                                         org.voltdb.benchmark.tpcc.procedures.delivery.class };
-    static Class<?>[] SOMANYPROCS =   { org.voltdb.catalog.InsertNewOrder.class,
+    static Class<?>[] SOMANYPROCS =   { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
                                         org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
                                         org.voltdb.benchmark.tpcc.procedures.neworder.class,
                                         org.voltdb.benchmark.tpcc.procedures.ostatByCustomerId.class,
@@ -169,6 +169,8 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
                 new long[] {x}, new long[] {x}, new TimestampType[] { new TimestampType() }, new long[] {x},
                 new double[] {x}, new String[] {"a"});
 
+        loadSomeData(client, 55, 5);
+
         // remove the procedure we just added async
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
         callback = new CatTestCallback(ClientResponse.SUCCESS);
@@ -198,13 +200,26 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         cb.waitForResponse();
         assertNotSame(cb.getResponse().getStatus(), ClientResponse.SUCCESS);
 
+        loadSomeData(client, 60, 5);
+
+        // change the insert new order procedure
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-conflict.jar");
         results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
         assertTrue(results.length == 0);
 
+        // call the new proc and make sure the one we want gets run
+        results = client.callProcedure(InsertNewOrder.class.getSimpleName(), 100, 100, 100, 100, 100, 100, 1.0, "a");
+        assertEquals(1, results.length);
+        assertEquals(1776, results[0].asScalarLong());
+
+        // load a big catalog change just to make sure nothing fails horribly
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-many.jar");
         results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
         assertTrue(results.length == 0);
+
+        loadSomeData(client, 65, 5);
+
+        client.drain();
 
         assertTrue(true);
     }
