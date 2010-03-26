@@ -66,11 +66,6 @@ import org.voltdb.types.VoltDecimalHelper;
 
     /** Sets the internal array to params. Note: this does *not* copy the argument. */
     public void setParameters(Object... params) {
-        for (Object param : params)
-            if (param instanceof String)
-                if (((String)param).length() > VoltType.MAX_VALUE_LENGTH)
-                    throw new VoltOverflowException(
-                            "Parameter set value larger than allowed max " + VoltType.MAX_VALUE_LENGTH_STR);
         this.m_params = params;
     }
 
@@ -100,12 +95,6 @@ import org.voltdb.types.VoltDecimalHelper;
 
         for (int i = 0; i < paramLen; i++) {
             m_params[i] = readOneParameter(in);
-
-            // check if any values are bigger than the maximum value
-            if (m_params[i] instanceof String)
-                if (((String)m_params[i]).length() > VoltType.MAX_VALUE_LENGTH)
-                    throw new VoltOverflowException(
-                            "Parameter set value larger than allowed max " + VoltType.MAX_VALUE_LENGTH_STR);
         }
     }
 
@@ -222,11 +211,6 @@ import org.voltdb.types.VoltDecimalHelper;
                     break;
                 default:
                     throw new RuntimeException("FIXME: Unsupported type " + type);
-            }
-
-            if ((out.getPosition() - initialPosition) > MAX_SERIALIZED_PARAMETERSET_LENGTH) {
-                throw new VoltOverflowException(
-                        "Parameter set total length larger than allowed max " + MAX_SERIALIZED_PARAMETERSET_LENGTH_STR);
             }
         }
     }
