@@ -56,7 +56,9 @@ void InsertPlanNode::loadFromJSONObject(json_spirit::Object &obj, const catalog:
     AbstractOperationPlanNode::loadFromJSONObject(obj, catalog_db);
     json_spirit::Value multiPartitionValue = json_spirit::find_value(obj, "MULTI_PARTITION");
     if (multiPartitionValue == json_spirit::Value::null) {
-        throwFatalException("InsertPlanNode::loadFromJSONObject: Can't find MULTI_PARTITION value");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "InsertPlanNode::loadFromJSONObject:"
+                                      " Can't find MULTI_PARTITION value");
     }
     m_multiPartition = multiPartitionValue.get_bool();
 }

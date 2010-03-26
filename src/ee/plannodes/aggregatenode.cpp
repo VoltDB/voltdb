@@ -285,8 +285,9 @@ AggregatePlanNode::loadFromJSONObject(Object &obj,
     Value outputColumnsValue = find_value(obj, "OUTPUT_COLUMNS");
     if (outputColumnsValue == Value::null)
     {
-        throw runtime_error(
-                "AggregatePlanNode::loadFromJSONObject: Can't find OUTPUT_COLUMNS value");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "AggregatePlanNode::loadFromJSONObject:"
+                                      " Can't find OUTPUT_COLUMNS value");
     }
     Array outputColumnsArray = outputColumnsValue.get_array();
 
@@ -303,8 +304,9 @@ AggregatePlanNode::loadFromJSONObject(Object &obj,
     Value aggregateColumnsValue = find_value(obj, "AGGREGATE_COLUMNS");
     if (aggregateColumnsValue == Value::null)
     {
-        throw runtime_error(
-                "AggregatePlanNode::loadFromJSONObject: Can't find AGGREGATE_COLUMNS value");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "AggregatePlanNode::loadFromJSONObject:"
+                                      " Can't find AGGREGATE_COLUMNS value");
     }
     Array aggregateColumnsArray = aggregateColumnsValue.get_array();
     for (int ii = 0; ii < aggregateColumnsArray.size(); ii++)

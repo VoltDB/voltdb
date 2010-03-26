@@ -115,13 +115,17 @@ std::string LimitPlanNode::debugInfo(const std::string &spacer) const {
 void LimitPlanNode::loadFromJSONObject(json_spirit::Object &obj, const catalog::Database *catalog_db) {
     json_spirit::Value limitValue = json_spirit::find_value( obj, "LIMIT");
     if (limitValue == json_spirit::Value::null) {
-        throwFatalException("LimitPlanNode::loadFromJSONObject: can't find LIMIT value");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "LimitPlanNode::loadFromJSONObject:"
+                                      " can't find LIMIT value");
     }
     limit = limitValue.get_int();
 
     json_spirit::Value offsetValue = json_spirit::find_value( obj, "OFFSET");
     if (offsetValue == json_spirit::Value::null) {
-        throwFatalException("LimitPlanNode::loadFromJSONObject: can't find OFFSET value");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "LimitPlanNode::loadFromJSONObject:"
+                                      " can't find OFFSET value");
     }
     offset = offsetValue.get_int();
 

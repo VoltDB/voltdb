@@ -466,50 +466,56 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
 }
 
 /*
+ * Executes a plan fragment of an adhoc query.
  * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    nativeExecuteCustomPlanFragment
  * Signature: (JLjava/lang/String;JJJ)I
  */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecuteCustomPlanFragment (
-        JNIEnv *env,
-        jobject obj,
-        jlong engine_ptr,
-        jstring plan,
-        jint outputDependencyId,
-        jint inputDependencyId,
-        jlong txnId,
-        jlong lastCommittedTxnId,
-        jlong undoToken) {
+SHAREDLIB_JNIEXPORT jint JNICALL
+Java_org_voltdb_jni_ExecutionEngine_nativeExecuteCustomPlanFragment (
+    JNIEnv *env,
+    jobject obj,
+    jlong engine_ptr,
+    jstring plan,
+    jint outputDependencyId,
+    jint inputDependencyId,
+    jlong txnId,
+    jlong lastCommittedTxnId,
+    jlong undoToken) {
+    int retval = org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
+
     VOLT_DEBUG("nativeExecuteCustomPlanFragment() start");
 
     // setup
     VoltDBEngine *engine = castToEngine(engine_ptr);
     assert(engine);
-    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+
+    //JNIEnv pointer can change between calls, must be updated
+    updateJNILogProxy(engine);
+    engine->resetReusedResultOutputBuffer();
+    engine->setUndoToken(undoToken);
+    static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    Pool *stringPool = engine->getStringPool();
+
+    // convert java plan string to stdc++ string plan
+    const char *str = static_cast<const char*>(env->GetStringUTFChars(plan, NULL));
+    assert(str);
+    string cppplan = str;
+    env->ReleaseStringUTFChars(plan, str);
+    engine->setUsedParamcnt(0);
+
     try {
-        updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
-        engine->resetReusedResultOutputBuffer();
-        engine->setUndoToken(undoToken);
-        static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-        Pool *stringPool = engine->getStringPool();
-
-        // convert java plan string to stdc++ string plan
-        const char *str = static_cast<const char*>(env->GetStringUTFChars(plan, NULL));
-        assert(str);
-        string cppplan = str;
-        env->ReleaseStringUTFChars(plan, str);
-
         // execute
-        engine->setUsedParamcnt(0);
-        int retval = engine->executePlanFragment(cppplan, outputDependencyId, inputDependencyId, txnId, lastCommittedTxnId);
+        retval = engine->executePlanFragment(cppplan, outputDependencyId,
+                                             inputDependencyId, txnId,
+                                             lastCommittedTxnId);
+    } catch (SerializableEEException e) {}
 
-        // cleanup
-        stringPool->purge();
-        return retval;
-    } catch (FatalException e) {
-        topend->crashVoltDB(e);
-    }
-    return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
+    // cleanup
+    stringPool->purge();
+
+    return retval;
 }
 
 /**

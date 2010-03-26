@@ -160,9 +160,10 @@ PlanNodeFragment::loadFromJSONObject(json_spirit::Object &obj)
 {
     json_spirit::Value executeListValue = json_spirit::find_value( obj, "EXECUTE_LIST");
     if (executeListValue == json_spirit::Value::null) {
-            // throw if list arrived without an execution ordering
-        throwFatalException("Failure while loading a PlanNodeList. "
-                                         "Couldn't find value \"EXECUTE_LIST\"");
+        // throw if list arrived without an execution ordering
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "Failure while loading a PlanNodeList. "
+                                      "Couldn't find value \"EXECUTE_LIST\"");
     }
     else {
         json_spirit::Array executeListArray = executeListValue.get_array();
@@ -174,8 +175,9 @@ PlanNodeFragment::loadFromJSONObject(json_spirit::Object &obj)
     json_spirit::Value parametersArrayValue = json_spirit::find_value( obj, "PARAMETERS");
     if (parametersArrayValue == json_spirit::Value::null) {
         //throw if list arrived without a parameter mapping
-        throwFatalException("Failure while loading a PlanNodeList. "
-                                     "Couldn't find value \"PARAMETERS\"");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "Failure while loading a PlanNodeList. "
+                                      "Couldn't find value \"PARAMETERS\"");
     }
     else {
         json_spirit::Array parametersArray = parametersArrayValue.get_array();

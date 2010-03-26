@@ -70,22 +70,24 @@ getGeneral(ExpressionType c,
     assert (l);
     assert (r);
     switch (c) {
-        case (EXPRESSION_TYPE_COMPARE_EQUAL):
-            return new ComparisonExpression<CmpEq>(c, l, r);
-        case (EXPRESSION_TYPE_COMPARE_NOTEQUAL):
-            return new ComparisonExpression<CmpNe>(c, l, r);
-        case (EXPRESSION_TYPE_COMPARE_LESSTHAN):
-            return new ComparisonExpression<CmpLt>(c, l, r);
-        case (EXPRESSION_TYPE_COMPARE_GREATERTHAN):
-            return new ComparisonExpression<CmpGt>(c, l, r);
-        case (EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO):
-            return new ComparisonExpression<CmpLte>(c, l, r);
-        case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
-            return new ComparisonExpression<CmpGte>(c, l, r);
-        default: {
-            throwFatalException( "Invalid ExpressionType '%s' called for ComparisonExpression",
-                    expressionutil::getTypeName(c).c_str());
-        }
+    case (EXPRESSION_TYPE_COMPARE_EQUAL):
+        return new ComparisonExpression<CmpEq>(c, l, r);
+    case (EXPRESSION_TYPE_COMPARE_NOTEQUAL):
+        return new ComparisonExpression<CmpNe>(c, l, r);
+    case (EXPRESSION_TYPE_COMPARE_LESSTHAN):
+        return new ComparisonExpression<CmpLt>(c, l, r);
+    case (EXPRESSION_TYPE_COMPARE_GREATERTHAN):
+        return new ComparisonExpression<CmpGt>(c, l, r);
+    case (EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO):
+        return new ComparisonExpression<CmpLte>(c, l, r);
+    case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
+        return new ComparisonExpression<CmpGte>(c, l, r);
+    default:
+        char message[256];
+        sprintf(message, "Invalid ExpressionType '%s' called"
+                " for ComparisonExpression",
+                expressionutil::getTypeName(c).c_str());
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
     }
 }
 
@@ -97,22 +99,23 @@ getMoreSpecialized(ExpressionType c, L* l, R* r)
     assert (l);
     assert (r);
     switch (c) {
-      case (EXPRESSION_TYPE_COMPARE_EQUAL):
+    case (EXPRESSION_TYPE_COMPARE_EQUAL):
         return new InlinedComparisonExpression<CmpEq, L, R>(c, l, r);
-      case (EXPRESSION_TYPE_COMPARE_NOTEQUAL):
+    case (EXPRESSION_TYPE_COMPARE_NOTEQUAL):
         return new InlinedComparisonExpression<CmpNe, L, R>(c, l, r);
-      case (EXPRESSION_TYPE_COMPARE_LESSTHAN):
+    case (EXPRESSION_TYPE_COMPARE_LESSTHAN):
         return new InlinedComparisonExpression<CmpLt, L, R>(c, l, r);
-      case (EXPRESSION_TYPE_COMPARE_GREATERTHAN):
+    case (EXPRESSION_TYPE_COMPARE_GREATERTHAN):
         return new InlinedComparisonExpression<CmpGt, L, R>(c, l, r);
-      case (EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO):
+    case (EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO):
         return new InlinedComparisonExpression<CmpLte, L, R>(c, l, r);
-      case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
+    case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
         return new InlinedComparisonExpression<CmpGte, L, R>(c, l, r);
-      default: {
-          throwFatalException( "Invalid ExpressionType '%s' called for ComparisonExpression",
-                  expressionutil::getTypeName(c).c_str());
-      }
+    default:
+        char message[256];
+        sprintf(message, "Invalid ExpressionType '%s' called for"
+                " ComparisonExpression", expressionutil::getTypeName(c).c_str());
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
     }
 }
 
@@ -132,9 +135,9 @@ comparisonFactory(ExpressionType c,
     //fflush(stdout);
 
     VOLT_TRACE("comparisonFactoryHelper request:%s left:%s(%p) right:%s(%p)",
-             expressionutil::getTypeName(c).c_str(),
-             typeid(*(lc)).name(), lc,
-             typeid(*(rc)).name(), rc);
+               expressionutil::getTypeName(c).c_str(),
+               typeid(*(lc)).name(), lc,
+               typeid(*(rc)).name(), rc);
 
     /*if (!l) {
         printf("no left\n");
@@ -158,7 +161,7 @@ comparisonFactory(ExpressionType c,
     // this will inline getValue(), hooray!
     if (l_const != NULL && r_const != NULL) { // CONST-CONST can it happen?
         return getMoreSpecialized<ConstantValueExpression,
-          ConstantValueExpression>(c, l_const, r_const);
+            ConstantValueExpression>(c, l_const, r_const);
     } else if (l_const != NULL && r_tuple != NULL) { // CONST-TUPLE
         return getMoreSpecialized<ConstantValueExpression,
           TupleValueExpression>(c, l_const, r_tuple);
@@ -175,15 +178,17 @@ comparisonFactory(ExpressionType c,
 }
 
 AbstractExpression *
-inComparisonExpressionFactory(json_spirit::Object &obj,
-                              AbstractExpression *lc)
+inComparisonExpressionFactory(json_spirit::Object &obj, AbstractExpression *lc)
 {
     std::vector<AbstractExpression*> vals;
 
     // # of Value Expressions
-    json_spirit::Value valueExpressionsValue = json_spirit::find_value( obj, "VALUES");
+    json_spirit::Value valueExpressionsValue = json_spirit::find_value(obj,
+                                                                       "VALUES");
     if (valueExpressionsValue == json_spirit::Value::null) {
-        throwFatalException("inComparisonExpressionFactory: can't find VALUES value");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "inComparisonExpressionFactory: can't find"
+                                      "VALUES value");
     }
     json_spirit::Array valueExpressionsArray = valueExpressionsValue.get_array();
     for (int ii = 0; ii < valueExpressionsArray.size(); ii++) {
@@ -203,23 +208,19 @@ operatorFactory(ExpressionType et,
 
    switch(et) {
      case (EXPRESSION_TYPE_OPERATOR_PLUS):
-       ret = new OperatorExpression<OpPlus>
-         (et, lc, rc);
+       ret = new OperatorExpression<OpPlus>(et, lc, rc);
        break;
 
      case (EXPRESSION_TYPE_OPERATOR_MINUS):
-       ret = new OperatorExpression<OpMinus>
-         (et, lc, rc);
+       ret = new OperatorExpression<OpMinus>(et, lc, rc);
        break;
 
      case (EXPRESSION_TYPE_OPERATOR_MULTIPLY):
-       ret = new OperatorExpression<OpMultiply>
-         (et, lc, rc);
+       ret = new OperatorExpression<OpMultiply>(et, lc, rc);
        break;
 
      case (EXPRESSION_TYPE_OPERATOR_DIVIDE):
-       ret = new OperatorExpression<OpDivide>
-         (et, lc, rc);
+       ret = new OperatorExpression<OpDivide>(et, lc, rc);
        break;
 
      case (EXPRESSION_TYPE_OPERATOR_NOT):
@@ -227,20 +228,20 @@ operatorFactory(ExpressionType et,
        break;
 
      case (EXPRESSION_TYPE_OPERATOR_MOD):
-        throwFatalException("Mod operator is not yet supported.");
-       break;
+       throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                     "Mod operator is not yet supported.");
 
      case (EXPRESSION_TYPE_OPERATOR_CONCAT):
-        throwFatalException("Concat operator not yet supported.");
-       break;
+       throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                     "Concat operator not yet supported.");
 
      case (EXPRESSION_TYPE_OPERATOR_CAST):
-        throwFatalException("Cast operator not yet supported.");
-       break;
+       throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                     "Cast operator not yet supported.");
 
      default:
-         throwFatalException("operator ctor helper out of sync");
-       break;
+       throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                     "operator ctor helper out of sync");
    }
    return ret;
 }
@@ -256,16 +257,20 @@ constantValueFactory(json_spirit::Object &obj,
     NValue newvalue;
     json_spirit::Value valueValue = json_spirit::find_value( obj, "VALUE");
     if (valueValue == json_spirit::Value::null) {
-        throwFatalException("constantValueFactory: Could not find VALUE value");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "constantValueFactory: Could not find"
+                                      " VALUE value");
     }
 
     switch (vt) {
     case VALUE_TYPE_INVALID:
-        throwFatalException("constantValueFactory: Value type should never be VALUE_TYPE_INVALID");
-        break;
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "constantValueFactory: Value type should"
+                                      " never be VALUE_TYPE_INVALID");
     case VALUE_TYPE_NULL:
-        throwFatalException("constantValueFactory: And they should be never be this either! VALUE_TYPE_NULL");
-        break;
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "constantValueFactory: And they should be"
+                                      " never be this either! VALUE_TYPE_NULL");
     case VALUE_TYPE_TINYINT:
         newvalue = ValueFactory::getTinyIntValue(static_cast<int8_t>(valueValue.get_int64()));
         break;
@@ -290,9 +295,10 @@ constantValueFactory(json_spirit::Object &obj,
     case VALUE_TYPE_DECIMAL:
         newvalue = ValueFactory::getDecimalValueFromString(valueValue.get_str());
         break;
-     default:
-         throwFatalException("constantValueFactory: Unrecognized value type");
-        break;
+    default:
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "constantValueFactory: Unrecognized value"
+                                      " type");
     }
 
     return constantValueFactory(newvalue);
@@ -334,7 +340,9 @@ parameterValueFactory(json_spirit::Object &obj,
     // read before ctor - can then instantiate fully init'd obj.
     json_spirit::Value paramIdxValue = json_spirit::find_value( obj, "PARAM_IDX");
     if (paramIdxValue == json_spirit::Value::null) {
-        throwFatalException("parameterValueFactory: Could not find PARAM_IDX value");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "parameterValueFactory: Could not find"
+                                      " PARAM_IDX value");
     }
     int param_idx = paramIdxValue.get_int();
     assert (param_idx >= 0);
@@ -363,18 +371,24 @@ tupleValueFactory(json_spirit::Object &obj, ExpressionType et,
 
     // verify input
     if (valueIdxValue == json_spirit::Value::null) {
-        throwFatalException("tupleValueFactory: Could not find COLUMN_IDX value");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "tupleValueFactory: Could not find"
+                                      " COLUMN_IDX value");
     }
     if (valueIdxValue.get_int() < 0) {
-        throwFatalException("tupleValueFactory: invalid column_idx.");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "tupleValueFactory: invalid column_idx.");
     }
 
     if (tableName == json_spirit::Value::null) {
-        throwFatalException("tupleValueFactory: no table name in TVE");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "tupleValueFactory: no table name in TVE");
     }
 
     if (columnName == json_spirit::Value::null) {
-        throwFatalException("tupleValueFactory: no column name in TVE");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "tupleValueFactory: no column name in"
+                                      " TVE");
     }
 
 
@@ -386,13 +400,12 @@ tupleValueFactory(json_spirit::Object &obj, ExpressionType et,
 AbstractExpression *
 conjunctionFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc)
 {
-    switch (et)
-    {
-      case (EXPRESSION_TYPE_CONJUNCTION_AND):
+    switch (et) {
+    case (EXPRESSION_TYPE_CONJUNCTION_AND):
         return new ConjunctionExpression<ConjunctionAnd>(et, lc, rc);
-      case (EXPRESSION_TYPE_CONJUNCTION_OR):
+    case (EXPRESSION_TYPE_CONJUNCTION_OR):
         return new ConjunctionExpression<ConjunctionOr>(et, lc, rc);
-      default:
+    default:
         return NULL;
     }
 
@@ -410,76 +423,78 @@ expressionFactory(json_spirit::Object &obj,
                   AbstractExpression* lc,
                   AbstractExpression* rc)
 {
-    VOLT_TRACE("expressionFactory request: %s(%d), %s(%d), %d, left: %p right: %p",
+    VOLT_TRACE("expressionFactory request: %s(%d), %s(%d), %d, left: %p"
+               " right: %p",
                expressionutil::getTypeName(et).c_str(), et,
                getTypeName(vt).c_str(), vt, vs,
-             lc, rc);
+               lc, rc);
 
     AbstractExpression *ret = NULL;
 
     switch (et) {
 
-      // Operators
-      case (EXPRESSION_TYPE_OPERATOR_PLUS):
-      case (EXPRESSION_TYPE_OPERATOR_MINUS):
-      case (EXPRESSION_TYPE_OPERATOR_MULTIPLY):
-      case (EXPRESSION_TYPE_OPERATOR_DIVIDE):
-      case (EXPRESSION_TYPE_OPERATOR_CONCAT):
-      case (EXPRESSION_TYPE_OPERATOR_MOD):
-      case (EXPRESSION_TYPE_OPERATOR_CAST):
-      case (EXPRESSION_TYPE_OPERATOR_NOT):
+        // Operators
+    case (EXPRESSION_TYPE_OPERATOR_PLUS):
+    case (EXPRESSION_TYPE_OPERATOR_MINUS):
+    case (EXPRESSION_TYPE_OPERATOR_MULTIPLY):
+    case (EXPRESSION_TYPE_OPERATOR_DIVIDE):
+    case (EXPRESSION_TYPE_OPERATOR_CONCAT):
+    case (EXPRESSION_TYPE_OPERATOR_MOD):
+    case (EXPRESSION_TYPE_OPERATOR_CAST):
+    case (EXPRESSION_TYPE_OPERATOR_NOT):
         ret = operatorFactory(et, lc, rc);
-        break;
+    break;
 
-      // Comparisons
-      case (EXPRESSION_TYPE_COMPARE_EQUAL):
-      case (EXPRESSION_TYPE_COMPARE_NOTEQUAL):
-      case (EXPRESSION_TYPE_COMPARE_LESSTHAN):
-      case (EXPRESSION_TYPE_COMPARE_GREATERTHAN):
-      case (EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO):
-      case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
-      case (EXPRESSION_TYPE_COMPARE_LIKE):
+    // Comparisons
+    case (EXPRESSION_TYPE_COMPARE_EQUAL):
+    case (EXPRESSION_TYPE_COMPARE_NOTEQUAL):
+    case (EXPRESSION_TYPE_COMPARE_LESSTHAN):
+    case (EXPRESSION_TYPE_COMPARE_GREATERTHAN):
+    case (EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO):
+    case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
+    case (EXPRESSION_TYPE_COMPARE_LIKE):
         ret = comparisonFactory( et, lc, rc);
-        break;
+    break;
 
-      // InComparison
-      case (EXPRESSION_TYPE_COMPARE_IN):
+    // InComparison
+    case (EXPRESSION_TYPE_COMPARE_IN):
         ret = inComparisonExpressionFactory(obj, lc);
         break;
 
-      // Conjunctions
-      case (EXPRESSION_TYPE_CONJUNCTION_AND):
-      case (EXPRESSION_TYPE_CONJUNCTION_OR):
+        // Conjunctions
+    case (EXPRESSION_TYPE_CONJUNCTION_AND):
+    case (EXPRESSION_TYPE_CONJUNCTION_OR):
         ret = conjunctionFactory(et, lc, rc);
-        break;
+    break;
 
-      // Constant Values, parameters, tuples
-      case (EXPRESSION_TYPE_VALUE_CONSTANT):
+    // Constant Values, parameters, tuples
+    case (EXPRESSION_TYPE_VALUE_CONSTANT):
         ret = constantValueFactory(obj, vt, et, lc, rc);
         break;
 
-      case (EXPRESSION_TYPE_VALUE_PARAMETER):
+    case (EXPRESSION_TYPE_VALUE_PARAMETER):
         ret = parameterValueFactory(obj, et, lc, rc);
         break;
 
-      case (EXPRESSION_TYPE_VALUE_TUPLE):
+    case (EXPRESSION_TYPE_VALUE_TUPLE):
         ret = tupleValueFactory(obj, et, lc, rc);
         break;
 
-      case (EXPRESSION_TYPE_VALUE_TUPLE_ADDRESS):
+    case (EXPRESSION_TYPE_VALUE_TUPLE_ADDRESS):
         ret = new TupleAddressExpression();
         break;
 
-      // must handle all known expressions in this factory
-      default: {
-          throwFatalException( "Invalid ExpressionType '%s' requested from factory",
-                  expressionutil::getTypeName(et).c_str());
-      }
+        // must handle all known expressions in this factory
+    default:
+        char message[256];
+        sprintf(message, "Invalid ExpressionType '%s' requested from factory",
+                expressionutil::getTypeName(et).c_str());
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
     }
 
     // written thusly to ease testing/inspecting return content.
     VOLT_TRACE("Created expression %p", ret);
-    return (ret);
+    return ret;
 }
 
 } // namespace voltdb

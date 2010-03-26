@@ -79,8 +79,10 @@ string AbstractOperationPlanNode::debugInfo(const string &spacer) const {
 void AbstractOperationPlanNode::loadFromJSONObject(json_spirit::Object &obj, const catalog::Database *catalog_db) {
     json_spirit::Value targetTableNameValue = json_spirit::find_value( obj, "TARGET_TABLE_NAME");
     if (targetTableNameValue == json_spirit::Value::null) {
-        throw runtime_error("AbstractOperationPlanNode::loadFromJSONObject: "
-                            "Couldn't find TARGET_TABLE_NAME value");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "AbstractOperationPlanNode::"
+                                      "loadFromJSONObject: "
+                                      "Couldn't find TARGET_TABLE_NAME value");
     }
     target_table_name = targetTableNameValue.get_str();
 }

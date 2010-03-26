@@ -187,17 +187,25 @@ AbstractExpression::buildExpressionTree_recurse(json_spirit::Object &obj)
     AbstractExpression *right_child = NULL;
 
     // read the expression type
-    json_spirit::Value expressionTypeValue = json_spirit::find_value( obj, "TYPE");
+    json_spirit::Value expressionTypeValue = json_spirit::find_value(obj,
+                                                                     "TYPE");
     if (expressionTypeValue == json_spirit::Value::null) {
-        throwFatalException("AbstractExpression::buildExpressionTree_recurse: Couldn't find TYPE value");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "AbstractExpression::"
+                                      "buildExpressionTree_recurse:"
+                                      " Couldn't find TYPE value");
     }
     assert(stringToExpression(expressionTypeValue.get_str()) != EXPRESSION_TYPE_INVALID);
     peek_type = stringToExpression(expressionTypeValue.get_str());
 
     // and the value type
-    json_spirit::Value valueTypeValue = json_spirit::find_value( obj, "VALUE_TYPE");
+    json_spirit::Value valueTypeValue = json_spirit::find_value(obj,
+                                                                "VALUE_TYPE");
     if (valueTypeValue == json_spirit::Value::null) {
-        throwFatalException("AbstractExpression::buildExpressionTree_recurse: Couldn't find VALUE_TYPE value");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "AbstractExpression::"
+                                      "buildExpressionTree_recurse:"
+                                      " Couldn't find VALUE_TYPE value");
     }
     std::string valueTypeString = valueTypeValue.get_str();
     value_type = stringToValue(valueTypeString);
@@ -213,15 +221,19 @@ AbstractExpression::buildExpressionTree_recurse(json_spirit::Object &obj)
     assert(value_type != VALUE_TYPE_INVALID);
 
     // add the value size
-    json_spirit::Value valueSizeValue = json_spirit::find_value( obj, "VALUE_SIZE");
+    json_spirit::Value valueSizeValue = json_spirit::find_value(obj,
+                                                                "VALUE_SIZE");
     if (valueSizeValue == json_spirit::Value::null) {
-        throwFatalException("AbstractExpression::buildExpressionTree_recurse: Couldn't find VALUE_SIZE value");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "AbstractExpression::"
+                                      "buildExpressionTree_recurse:"
+                                      " Couldn't find VALUE_SIZE value");
     }
     int valueSize = valueSizeValue.get_int();
 
     // recurse to children
     try {
-        json_spirit::Value leftValue = json_spirit::find_value( obj, "LEFT");
+        json_spirit::Value leftValue = json_spirit::find_value(obj, "LEFT");
         if (!(leftValue == json_spirit::Value::null)) {
             left_child = AbstractExpression::buildExpressionTree_recurse(leftValue.get_obj());
         } else {

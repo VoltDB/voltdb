@@ -174,9 +174,9 @@ AbstractScanPlanNode::loadFromJSONObject(json_spirit::Object& obj,
     Value outputColumnsValue = find_value(obj, "OUTPUT_COLUMNS");
     if (outputColumnsValue == Value::null)
     {
-        throw runtime_error(
-                "AbstractScanPlanNode::loadFromJSONObject: "
-                "Can't find OUTPUT_COLUMNS value");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "AbstractScanPlanNode::loadFromJSONObject:"
+                                      " Can't find OUTPUT_COLUMNS value");
     }
     Array outputColumnsArray = outputColumnsValue.get_array();
 
@@ -194,8 +194,9 @@ AbstractScanPlanNode::loadFromJSONObject(json_spirit::Object& obj,
         json_spirit::find_value(obj, "TARGET_TABLE_NAME");
     if (targetTableNameValue == json_spirit::Value::null)
     {
-        throw runtime_error("AbstractScanPlanNode::loadFromJSONObject: "
-                            "Couldn't find TARGET_TABLE_NAME value");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "AbstractScanPlanNode::loadFromJSONObject:"
+                                      " Couldn't find TARGET_TABLE_NAME value");
     }
 
     m_targetTableName = targetTableNameValue.get_str();

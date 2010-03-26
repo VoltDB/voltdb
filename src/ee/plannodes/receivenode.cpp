@@ -154,7 +154,9 @@ ReceivePlanNode::loadFromJSONObject(json_spirit::Object& obj,
         json_spirit::find_value( obj, "OUTPUT_COLUMNS");
     if (outputColumnsValue == json_spirit::Value::null)
     {
-        throw runtime_error("AggregatePlanNode::loadFromJSONObject: Can't find OUTPUT_COLUMNS value");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "AggregatePlanNode::loadFromJSONObject:"
+                                      " Can't find OUTPUT_COLUMNS value");
     }
     json_spirit::Array outputColumnsArray = outputColumnsValue.get_array();
 

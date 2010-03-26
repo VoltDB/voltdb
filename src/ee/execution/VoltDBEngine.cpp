@@ -383,7 +383,9 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId, int32_t outputDependencyI
  * catalog with all the necessary tables needs to already have been
  * loaded.
  */
-int VoltDBEngine::executePlanFragment(std::string fragmentString, int32_t outputDependencyId, int32_t inputDependencyId,
+int VoltDBEngine::executePlanFragment(std::string fragmentString,
+                                      int32_t outputDependencyId,
+                                      int32_t inputDependencyId,
                                       int64_t txnId,
                                       int64_t lastCommittedTxnId)
 {
@@ -404,12 +406,15 @@ int VoltDBEngine::executePlanFragment(std::string fragmentString, int32_t output
         if (initPlanFragment(AD_HOC_FRAG_ID, hexEncodedFragment))
         {
             voltdb::NValueArray parameterValueArray(0);
-            retval = executeQuery(AD_HOC_FRAG_ID, outputDependencyId, inputDependencyId, parameterValueArray,
+            retval = executeQuery(AD_HOC_FRAG_ID, outputDependencyId,
+                                  inputDependencyId, parameterValueArray,
                                   txnId, lastCommittedTxnId, true, true);
         }
         else
         {
-            throwFatalException("Unable to load ad-hoc plan fragment.");
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                          "Unable to load ad-hoc plan"
+                                          " fragment.");
         }
     }
     catch (SerializableEEException &e)
@@ -608,39 +613,50 @@ bool VoltDBEngine::clearAndLoadAllPlanFragments() {
 // -------------------------------------------------
 // Initialization Functions
 // -------------------------------------------------
-bool VoltDBEngine::initPlanFragment(const int64_t fragId, const std::string planNodeTree) {
+bool VoltDBEngine::initPlanFragment(const int64_t fragId,
+                                    const std::string planNodeTree) {
 
     // Deserialize the PlanFragment and stick in our local map
 
     std::map<int64_t, boost::shared_ptr<ExecutorVector> >::const_iterator iter = m_executorMap.find(fragId);
     if (iter != m_executorMap.end()) {
-        throwFatalException( "Duplicate PlanNodeList entry for PlanFragment '%jd' during initialization", (intmax_t)fragId);
+        VOLT_ERROR("Duplicate PlanNodeList entry for PlanFragment '%jd' during"
+                   " initialization", (intmax_t)fragId);
+        return false;
     }
 
     // catalog method plannodetree returns PlanNodeList.java
-    PlanNodeFragment *pnf = PlanNodeFragment::createFromCatalog(planNodeTree, m_database);
+    PlanNodeFragment *pnf = PlanNodeFragment::createFromCatalog(planNodeTree,
+                                                                m_database);
     m_planFragments.push_back(pnf);
     VOLT_TRACE("\n%s\n", pnf->debug().c_str());
     assert(pnf->getRootNode());
 
     if (!pnf->getRootNode()) {
-        throwFatalException( "Deserialized PlanNodeFragment for PlanFragment '%jd' "
-                "does not have a root PlanNode", (intmax_t)fragId);
+        VOLT_ERROR("Deserialized PlanNodeFragment for PlanFragment '%jd' "
+                   "does not have a root PlanNode", (intmax_t)fragId);
+        return false;
     }
 
     boost::shared_ptr<ExecutorVector> ev = boost::shared_ptr<ExecutorVector>(new ExecutorVector());
     ev->tempTableMemoryInBytes = 0;
 
     // Initialize each node!
-    for (int ctr = 0, cnt = (int)pnf->getExecuteList().size(); ctr < cnt; ctr++) {
-        if (!initPlanNode(fragId, pnf->getExecuteList()[ctr], &(ev->tempTableMemoryInBytes))) {
-            throwFatalException( "Failed to initialize PlanNode '%s' at position '%d' for PlanFragment '%jd'",
-                    pnf->getExecuteList()[ctr]->debug().c_str(), ctr, (intmax_t)fragId);
+    for (int ctr = 0, cnt = (int)pnf->getExecuteList().size();
+         ctr < cnt; ctr++) {
+        if (!initPlanNode(fragId, pnf->getExecuteList()[ctr],
+                          &(ev->tempTableMemoryInBytes))) {
+            VOLT_ERROR("Failed to initialize PlanNode '%s' at position '%d'"
+                       " for PlanFragment '%jd'",
+                       pnf->getExecuteList()[ctr]->debug().c_str(), ctr,
+                       (intmax_t)fragId);
+            return false;
         }
     }
 
     // Initialize the vector of executors for this planfragment, used at runtime.
-    for (int ctr = 0, cnt = (int)pnf->getExecuteList().size(); ctr < cnt; ctr++) {
+    for (int ctr = 0, cnt = (int)pnf->getExecuteList().size();
+         ctr < cnt; ctr++) {
         ev->list.push_back(pnf->getExecuteList()[ctr]->getExecutor());
     }
     m_executorMap[fragId] = ev;

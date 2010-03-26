@@ -124,8 +124,9 @@ DistinctPlanNode::loadFromJSONObject(json_spirit::Object& obj,
         json_spirit::find_value( obj, "DISTINCT_COLUMN_GUID");
     if (distinctColumnGuidValue == json_spirit::Value::null)
     {
-        throw runtime_error("DistinctPlanNode::loadFromJSONObject: "
-                            "Can't find DISTINCT_COLUMN_GUID value");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "DistinctPlanNode::loadFromJSONObject: "
+                                      "Can't find DISTINCT_COLUMN_GUID value");
     }
     m_distinctColumnGuid = distinctColumnGuidValue.get_int();
 
@@ -133,8 +134,9 @@ DistinctPlanNode::loadFromJSONObject(json_spirit::Object& obj,
         json_spirit::find_value( obj, "DISTINCT_COLUMN_NAME");
     if (distinctColumnNameValue == json_spirit::Value::null)
     {
-        throw runtime_error("DistinctPlanNode::loadFromJSONObject: "
-                            "Can't find DISTINCT_COLUMN_NAME value");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "DistinctPlanNode::loadFromJSONObject: "
+                                      "Can't find DISTINCT_COLUMN_NAME value");
     }
     m_distinctColumnName = distinctColumnNameValue.get_str();
 }

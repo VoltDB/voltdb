@@ -131,8 +131,9 @@ AbstractJoinPlanNode::loadFromJSONObject(Object& obj,
     Value joinTypeValue = find_value(obj, "JOIN_TYPE");
     if (joinTypeValue == Value::null)
     {
-        throw runtime_error("AbstractJoinPlanNode::loadFromJSONObject: "
-                            "Couldn't find JOIN_TYPE value");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "AbstractJoinPlanNode::loadFromJSONObject:"
+                                      " Couldn't find JOIN_TYPE value");
     }
     m_joinType = stringToJoin(joinTypeValue.get_str());
 

@@ -160,7 +160,9 @@ OrderByPlanNode::loadFromJSONObject(json_spirit::Object& obj,
         json_spirit::find_value(obj, "SORT_COLUMNS");
     if (sortColumnsValue == json_spirit::Value::null)
     {
-        throw runtime_error("OrderByPlanNode::loadFromJSONObject: Can't find SORT_COLUMNS value");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "OrderByPlanNode::loadFromJSONObject:"
+                                      " Can't find SORT_COLUMNS value");
     }
     json_spirit::Array sortColumnsArray = sortColumnsValue.get_array();
 

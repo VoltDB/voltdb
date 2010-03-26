@@ -70,7 +70,9 @@ void MaterializePlanNode::loadFromJSONObject(json_spirit::Object &obj, const cat
     ProjectionPlanNode::loadFromJSONObject( obj, catalog_db);
     json_spirit::Value batchedValue = json_spirit::find_value( obj, "BATCHED");
     if (batchedValue == json_spirit::Value::null) {
-        throwFatalException("MaterializePlanNode::loadFromJSONObject: Can't find BATCHED value");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "MaterializePlanNode::loadFromJSONObject:"
+                                      " Can't find BATCHED value");
     }
     batched = batchedValue.get_bool();
 }

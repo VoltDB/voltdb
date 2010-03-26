@@ -66,8 +66,9 @@ void DeletePlanNode::loadFromJSONObject(json_spirit::Object &obj, const catalog:
     AbstractOperationPlanNode::loadFromJSONObject(obj, catalog_db);
     json_spirit::Value truncateValue = json_spirit::find_value( obj, "TRUNCATE");
     if (truncateValue == json_spirit::Value::null) {
-        throw runtime_error("DeletePlanNode::loadFromJSONObject: "
-                            "Couldn't find TRUNCATE value");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "DeletePlanNode::loadFromJSONObject: "
+                                      "Couldn't find TRUNCATE value");
     }
     truncate = truncateValue.get_bool();
 }

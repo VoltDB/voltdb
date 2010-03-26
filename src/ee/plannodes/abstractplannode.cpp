@@ -237,8 +237,9 @@ AbstractPlanNode::fromJSONObject(Object &obj, const catalog::Database *catalog_d
     Value typeValue = find_value(obj, "PLAN_NODE_TYPE");
     if (typeValue == Value::null)
     {
-        throw runtime_error(
-                "AbstractPlanNode::fromJSONObject: PLAN_NODE_TYPE value is null");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "AbstractPlanNode::fromJSONObject:"
+                                      " PLAN_NODE_TYPE value is null");
     }
     string typeString = typeValue.get_str();
     AbstractPlanNode* node =
@@ -248,8 +249,9 @@ AbstractPlanNode::fromJSONObject(Object &obj, const catalog::Database *catalog_d
     if (idValue == Value::null)
     {
         delete node;
-        throw runtime_error(
-                "AbstractPlanNode::fromJSONObject: ID value is null");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "AbstractPlanNode::fromJSONObject:"
+                                      " ID value is null");
     }
     node->m_planNodeId = (int32_t) idValue.get_int();
 
@@ -257,8 +259,9 @@ AbstractPlanNode::fromJSONObject(Object &obj, const catalog::Database *catalog_d
     if (inlineNodesValue == Value::null)
     {
         delete node;
-        throw runtime_error(
-                "AbstractPlanNode::fromJSONObject: INLINE_NODES value is null");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "AbstractPlanNode::fromJSONObject:"
+                                      " INLINE_NODES value is null");
     }
 
     Array inlineNodes = inlineNodesValue.get_array();
@@ -275,7 +278,8 @@ AbstractPlanNode::fromJSONObject(Object &obj, const catalog::Database *catalog_d
             throw;
         }
 
-        // todo: if this throws, new Node can be leaked
+        // todo: if this throws, new Node can be leaked.
+        // As long as newNode is not NULL, this will not throw.
         node->addInlinePlanNode(newNode);
     }
 
@@ -283,8 +287,9 @@ AbstractPlanNode::fromJSONObject(Object &obj, const catalog::Database *catalog_d
     if (parentNodeIdsValue == Value::null)
     {
         delete node;
-        throw runtime_error(
-                "AbstractPlanNode::fromJSONObject: PARENT_IDS value is null");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "AbstractPlanNode::fromJSONObject:"
+                                      " PARENT_IDS value is null");
     }
 
     Array parentNodeIdsArray = parentNodeIdsValue.get_array();
@@ -298,8 +303,9 @@ AbstractPlanNode::fromJSONObject(Object &obj, const catalog::Database *catalog_d
     if (childNodeIdsValue == Value::null)
     {
         delete node;
-        throw runtime_error(
-                "AbstractPlanNode::fromJSONObject: CHILDREN_IDS value is null");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "AbstractPlanNode::fromJSONObject:"
+                                      " CHILDREN_IDS value is null");
     }
 
     Array childNodeIdsArray = childNodeIdsValue.get_array();
@@ -313,8 +319,9 @@ AbstractPlanNode::fromJSONObject(Object &obj, const catalog::Database *catalog_d
     if (outputColumnsValue == Value::null)
     {
         delete node;
-        throw runtime_error(
-                "AbstractPlanNode::loadFromJSONObject: Can't find OUTPUT_COLUMNS value");
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "AbstractPlanNode::loadFromJSONObject:"
+                                      " Can't find OUTPUT_COLUMNS value");
     }
     Array outputColumnsArray = outputColumnsValue.get_array();
 
