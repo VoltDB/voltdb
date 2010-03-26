@@ -1027,21 +1027,23 @@ voltdb::StatsAgent& VoltDBEngine::getStatsManager() {
 }
 
 /**
- * Retrieve a set of statistics and place them into the result buffer as a set of VoltTables.
- * @param selector StatisticsSelectorType indicating what set of statistics should be retrieved
- * @param locators Integer identifiers specifying what subset of possible statistical sources should be polled. Probably a CatalogId
- *                 Can be NULL in which case all possible sources for the selector should be included.
+ * Retrieve a set of statistics and place them into the result buffer as a set
+ * of VoltTables.
+ *
+ * @param selector StatisticsSelectorType indicating what set of statistics
+ *                 should be retrieved
+ * @param locators Integer identifiers specifying what subset of possible
+ *                 statistical sources should be polled. Probably a CatalogId
+ *                 Can be NULL in which case all possible sources for the
+ *                 selector should be included.
  * @param numLocators Size of locators array.
- * @param interval Whether to return counters since the beginning or since the last time this was called
+ * @param interval Whether to return counters since the beginning or since the
+ *                 last time this was called
  * @param Timestamp to embed in each row
- *  @return Number of result tables, 0 on no results, -1 on failure.
+ * @return Number of result tables, 0 on no results, -1 on failure.
  */
-int VoltDBEngine::getStats(
-        int selector,
-        int locators[],
-        int numLocators,
-        bool interval,
-        int64_t now) {
+int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
+                           bool interval, int64_t now) {
     voltdb::Table *resultTable = NULL;
     std::vector<voltdb::CatalogId> locatorIds;
 
@@ -1050,29 +1052,45 @@ int VoltDBEngine::getStats(
         locatorIds.push_back(locator);
     }
     std::size_t lengthPosition = m_resultOutput.reserveBytes(sizeof(int32_t));
-    switch (selector) {
-    case STATISTICS_SELECTOR_TYPE_TABLE: {
-        for (int ii = 0; ii < numLocators; ii++) {
-            voltdb::CatalogId locator = static_cast<voltdb::CatalogId>(locators[ii]);
-            if (m_tables[locator] == NULL) {
-                throwFatalException( "getStats() called with selector %d, and an invalid locator"
-                        " %d that does not correspond to a table", selector, locator);
+
+    try {
+        switch (selector) {
+        case STATISTICS_SELECTOR_TYPE_TABLE:
+            for (int ii = 0; ii < numLocators; ii++) {
+                voltdb::CatalogId locator = static_cast<voltdb::CatalogId>(locators[ii]);
+                if (m_tables[locator] == NULL) {
+                    char message[256];
+                    sprintf(message, "getStats() called with selector %d, and"
+                            " an invalid locator %d that does not correspond to"
+                            " a table", selector, locator);
+                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                                  message);
+                }
             }
+
+            resultTable = m_statsManager.getStats(
+                (voltdb::StatisticsSelectorType) selector,
+                locatorIds, interval, now);
+
+            break;
+        default:
+            char message[256];
+            sprintf(message, "getStats() called with an unrecognized selector"
+                    " %d", selector);
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                          message);
         }
-        resultTable = m_statsManager.getStats(
-                (voltdb::StatisticsSelectorType)selector,
-                locatorIds,
-                interval,
-                now);
-        break;
+    } catch (SerializableEEException &e) {
+        resetReusedResultOutputBuffer();
+        e.serialize(getExceptionOutputSerializer());
+        return -1;
     }
-    default: {
-        throwFatalException( "getStats() called with an unrecognized selector %d", selector );
-    }
-    }
+
     if (resultTable != NULL) {
         resultTable->serializeTo(m_resultOutput);
-        m_resultOutput.writeIntAt( lengthPosition, static_cast<int32_t>(m_resultOutput.size() - sizeof(int32_t)));
+        m_resultOutput.writeIntAt(lengthPosition,
+                                  static_cast<int32_t>(m_resultOutput.size()
+                                                       - sizeof(int32_t)));
         return 1;
     } else {
         return 0;

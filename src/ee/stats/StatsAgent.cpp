@@ -47,11 +47,9 @@ void StatsAgent::registerStatsSource(voltdb::StatisticsSelectorType sst, voltdb:
  * @param interval Whether to return counters since the beginning or since the last time this was called
  * @param Timestamp to embed in each row
  */
-Table* StatsAgent::getStats(
-        voltdb::StatisticsSelectorType sst,
-        std::vector<voltdb::CatalogId> catalogIds,
-        bool interval,
-        int64_t now) {
+Table* StatsAgent::getStats(voltdb::StatisticsSelectorType sst,
+                            std::vector<voltdb::CatalogId> catalogIds,
+                            bool interval, int64_t now) {
     assert (catalogIds.size() > 0);
     if (catalogIds.size() < 1) {
         return NULL;

@@ -499,18 +499,17 @@ Java_org_voltdb_jni_ExecutionEngine_nativeExecuteCustomPlanFragment (
     Pool *stringPool = engine->getStringPool();
 
     // convert java plan string to stdc++ string plan
-    const char *str = static_cast<const char*>(env->GetStringUTFChars(plan, NULL));
+    const char *str = static_cast<const char*>(env->GetStringUTFChars(plan,
+                                                                      NULL));
     assert(str);
     string cppplan = str;
     env->ReleaseStringUTFChars(plan, str);
-    engine->setUsedParamcnt(0);
 
-    try {
-        // execute
-        retval = engine->executePlanFragment(cppplan, outputDependencyId,
-                                             inputDependencyId, txnId,
-                                             lastCommittedTxnId);
-    } catch (SerializableEEException e) {}
+    // execute
+    engine->setUsedParamcnt(0);
+    retval = engine->executePlanFragment(cppplan, outputDependencyId,
+                                         inputDependencyId, txnId,
+                                         lastCommittedTxnId);
 
     // cleanup
     stringPool->purge();
@@ -729,41 +728,54 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeQuies
  * @param locatorsArray Java array of CatalogIds indicating what set of sources should the statistics be retrieved from.
  * @return Number of result tables, 0 on no results, -1 on failure.
  */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeGetStats
-  (JNIEnv *env, jobject obj, jlong pointer, jint selector, jintArray locatorsArray, jboolean jinterval, jlong now) {
+SHAREDLIB_JNIEXPORT jint JNICALL
+Java_org_voltdb_jni_ExecutionEngine_nativeGetStats(JNIEnv *env, jobject obj,
+                                                   jlong pointer, jint selector,
+                                                   jintArray locatorsArray,
+                                                   jboolean jinterval,
+                                                   jlong now) {
     VoltDBEngine *engine = castToEngine(pointer);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-    try {
-        updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
-        engine->resetReusedResultOutputBuffer();
+    /*
+     * Can't use the standard JNI EE error code here because this method
+     * actually uses that integer to indicate the number of result tables.
+     */
+    int result = -1;
 
-        /*
-         * Retrieve locators if any
-         */
-        int *locators = NULL;
-        int numLocators = 0;
-        if (locatorsArray != NULL) {
-            locators = env->GetIntArrayElements(locatorsArray, NULL);
-            if (locators == NULL) {
-                env->ExceptionDescribe();
-                return JNI_FALSE;
-            }
-            numLocators = env->GetArrayLength(locatorsArray);
-            if (env->ExceptionCheck()) {
-                env->ExceptionDescribe();
-                env->ReleaseIntArrayElements(locatorsArray, locators, JNI_ABORT);
-                return JNI_FALSE;
-            }
+    //JNIEnv pointer can change between calls, must be updated
+    updateJNILogProxy(engine);
+    engine->resetReusedResultOutputBuffer();
+
+    /*
+     * Retrieve locators if any
+     */
+    int *locators = NULL;
+    int numLocators = 0;
+    if (locatorsArray != NULL) {
+        locators = env->GetIntArrayElements(locatorsArray, NULL);
+        if (locators == NULL) {
+            env->ExceptionDescribe();
+            return JNI_FALSE;
         }
-        const bool interval = jinterval == JNI_TRUE ? true : false;
-        int result = engine->getStats(static_cast<int>(selector), locators, numLocators, interval, now);
-        env->ReleaseIntArrayElements(locatorsArray, locators, JNI_ABORT);
+        numLocators = env->GetArrayLength(locatorsArray);
+        if (env->ExceptionCheck()) {
+            env->ExceptionDescribe();
+            env->ReleaseIntArrayElements(locatorsArray, locators, JNI_ABORT);
+            return JNI_FALSE;
+        }
+    }
+    const bool interval = jinterval == JNI_TRUE ? true : false;
 
-        return static_cast<jint>(result);
+    try {
+        result = engine->getStats(static_cast<int>(selector), locators,
+                                  numLocators, interval, now);
     } catch (FatalException e) {
         topend->crashVoltDB(e);
     }
-    return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
+
+    env->ReleaseIntArrayElements(locatorsArray, locators, JNI_ABORT);
+
+    return static_cast<jint>(result);
 }
 
 /*

@@ -1665,9 +1665,11 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
             }
         }
         break;
-      default: {
-          throwFatalException( "NValue::getLength() unrecognized type '%d'", type);
-      }
+      default:
+          char message[128];
+          sprintf(message, "NValue::getLength() unrecognized type '%d'", type);
+          throw SQLException(SQLException::volt_unsupported_type_conversion_error,
+                             message);
     }
 }
 
@@ -2082,7 +2084,11 @@ inline NValue NValue::castAs(ValueType type) const {
       case VALUE_TYPE_DECIMAL:
         return castAsDecimal();
       default:
-          throwFatalException ("Type %d not a recognized type for casting", (int) type);
+          char message[128];
+          sprintf(message, "Type %d not a recognized type for casting",
+                  (int) type);
+          throw SQLException(SQLException::volt_unsupported_type_conversion_error,
+                             message);
     }
 }
 

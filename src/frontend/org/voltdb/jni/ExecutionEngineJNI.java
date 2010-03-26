@@ -422,7 +422,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * @param locators CatalogIds specifying what set of items the stats should come from.
      * @param interval Return counters since the beginning or since this method was last invoked
      * @param now Timestamp to return with each row
-     * @return Array of results tables. An array of length 0 indicates there are no results. null indicates failure.
+     * @return Array of results tables. An array of length 0 indicates there are no results. On error, an EEException will be thrown.
      */
     @Override
     public VoltTable[] getStats(
@@ -433,7 +433,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         deserializer.clear();
         final int numResults = nativeGetStats(pointer, selector.ordinal(), locators, interval, now);
         if (numResults == -1) {
-            return null;
+            throwExceptionForError(ERRORCODE_ERROR);
         }
 
 
