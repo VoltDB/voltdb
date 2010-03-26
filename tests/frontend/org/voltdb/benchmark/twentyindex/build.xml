@@ -1,0 +1,153 @@
+<?xml version="1.0" ?>
+<project default="main" name="build file">
+
+<!--
+***************************************
+PATHS AND PROPERTIES
+***************************************
+-->
+
+<!-- make environment var FOO available as env.FOO -->
+<property environment="env"/>
+
+<property name='build.dir'             location='obj/' />
+<property name='src.dir'               location='../../..' />
+<property name='debugoutput.dir'       location='debugoutput/' />
+<property name='junit.haltonfailure'   value='true' />
+
+<path id='benchmark.classpath'>
+    <pathelement location='${env.VOLTBIN}/voltdbfat.jar'/>
+    <pathelement location='${env.VOLTBIN}/log4j.jar'/>
+    <pathelement location='${env.VOLTBIN}/mysql.jar'/>
+    <pathelement location='${build.dir}' />
+    <pathelement path="${java.class.path}"/>
+</path>
+
+<!--
+***************************************
+PRIMARY ENTRY POINTS
+***************************************
+-->
+    
+<target name="main" depends="srccompile, compile" description="default. Compile Java stored procedures and and then run the VoltDB compiler on the stored procedures and schema to generate a catalog" />
+
+<target name="benchmark" depends="srccompile" description="Run a basic benchmark client." > 
+    <copy file="ddl.sql" toDir="obj/com" />
+    <java fork="yes" classname="org.voltdb.benchmark.BenchmarkController" >
+        <jvmarg value="-Djava.library.path=${env.VOLTBIN}" />
+        <arg value="CLIENT=com.ClientBenchmark" />
+        <arg value="HOSTCOUNT=${hostcount}" />
+        <arg value="SITESPERHOST=${sitesperhost}"/>
+        <arg value="CLIENTCOUNT=${clientcount}" />
+        <arg value="PROCESSESPERCLIENT=${processesperclient}" />
+        <arg value="HOST=${host1}" />
+        <arg value="HOST=${host2}" />
+        <arg value="HOST=${host3}" />
+        <arg value="HOST=${host4}" />
+        <arg value="HOST=${host5}" />
+        <arg value="HOST=${host6}" />
+        <arg value="CLIENTHOST=${clienthost1}" />
+        <arg value="CLIENTHOST=${clienthost2}" />
+        <arg value="CLIENTHOST=${clienthost3}" />
+        <arg value="USEPROFILE=${useprofile}" />
+        <arg value="CLIENTHEAP=${volt.client.memory}" />
+        <arg value="SERVERHEAP=${volt.server.memory}" />
+        <arg value="LOCAL=${local}" />
+        <arg value="DURATION=${duration}" />
+        <arg value="INTERVAL=${interval}" />
+        <arg value="TXNRATE=${txnrate}" />
+        <arg value="transaction=poc001" />
+        <arg value="indexes=20" />
+        <arg value="indextype=hash" />
+        <jvmarg value="-server" />
+        <jvmarg value="-Xmx2048m" />
+        <jvmarg value="-Xcheck:jni"/>
+        <classpath refid='benchmark.classpath' />
+        <assertions><disable/></assertions>
+    </java>
+</target>
+
+<target name="benchmarklocal" description="Run a basic benchmark client on my local machine." > 
+    <antcall target="benchmark" inheritAll='true'>
+        <param name="local" value="false"/>
+        <param name="hostcount" value="1"/>
+        <param name="sitesperhost" value="2"/>
+        <param name="clientcount" value="1"/>
+        <param name="processesperclient" value="1"/>
+        <param name="host1" value="localhost"/>
+        <param name="clienthost1" value="localhost"/>
+        <param name="duration" value="60000"/>
+        <param name="interval" value="10000"/>
+<!--        <param name="txnrate" value="30000"/>    -->
+        <param name="volt.server.memory" value="2048"/>
+    </antcall>
+</target>
+
+
+<target name="benchmarkcluster" description="Run a cluster benchmark.">
+    <antcall target="benchmark" inheritAll='true'>
+        <param name="local" value="false"/>
+        <param name="hostcount" value="3"/>
+        <param name="sitesperhost" value="8"/>
+        <param name="clientcount" value="3"/>
+        <param name="processesperclient" value="1"/>
+        <param name="host1" value="volt3a"/>
+        <param name="host2" value="volt3b"/>
+        <param name="host3" value="volt3c"/>
+        <param name="host4" value="volt3d"/>
+        <param name="host5" value="volt3e"/>
+        <param name="host6" value="volt3f"/>
+        <param name="clienthost1" value="volt4a"/>
+        <param name="clienthost2" value="volt4b"/>
+        <param name="clienthost3" value="volt4c"/>
+        <param name="duration" value="120000"/>
+        <param name="interval" value="10000"/>
+<!--        <param name="txnrate" value="500"/>   -->
+        <param name="volt.server.memory" value="2048"/>
+    </antcall>
+</target>
+
+<target name="compile" depends="srccompile" description="Compile the catalog using the schema and the DDL file" >
+    <java fork="yes" classname="org.voltdb.compiler.VoltCompiler" >
+        <arg value="project.xml"/> <!-- project file -->
+        <arg value="1"/>           <!-- servers -->
+        <arg value="2"/>           <!-- partitions per server -->
+        <arg value="localhost"/>   <!-- leader -->
+        <arg value="catalog.jar"/> <!-- output -->
+        <classpath refid='benchmark.classpath' />
+        <assertions><disable /></assertions>
+    </java>
+</target>
+
+
+
+<!--
+***************************************
+CLEANING
+***************************************
+-->
+
+<target name='clean' description="remove all compiled files">
+    <delete includeemptydirs="true" failonerror='false'>
+        <fileset dir="${build.dir}" includes="**/*" />
+        <fileset dir="${debugoutput.dir}" includes="**/*" />
+        <fileset dir="." defaultexcludes="yes" >
+            <include name="catalog.jar" />
+        </fileset>
+    </delete>
+</target>
+
+<!--
+***************************************
+JAVA COMPILATION
+***************************************
+-->
+
+<target name="srccompile">
+    <mkdir dir='${build.dir}' />
+    <javac target="1.6" srcdir="${src.dir}" destdir='${build.dir}' debug='true'>
+        <classpath refid="benchmark.classpath" />
+    </javac>
+</target>
+
+</project>

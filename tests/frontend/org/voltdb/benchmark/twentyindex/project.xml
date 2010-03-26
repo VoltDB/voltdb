@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<project>
+    <database name='database'>
+        <schemas>
+            <schema path='ddl.sql' />
+        </schemas>
+        <procedures>
+            <procedure class='org.voltdb.benchmark.twentyindex.procedures.Insert' />
+        </procedures>
+        <partitions>
+            <partition table='TABLE1' column='MAINID' />
+            <partition table='TABLE2' column='MAINID' />
+            <partition table='TABLE3' column='MAINID' />
+        </partitions>
+    </database>
+</project>
