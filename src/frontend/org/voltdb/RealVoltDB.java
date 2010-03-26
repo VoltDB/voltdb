@@ -43,6 +43,7 @@ import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.HTTPAdminListener;
+import org.voltdb.utils.JarReader;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltLoggerFactory;
 import org.voltdb.utils.VoltSampler;
@@ -173,6 +174,14 @@ public class RealVoltDB implements VoltDBInterface
             if ((serializedCatalog == null) || (serializedCatalog.length() == 0))
                 VoltDB.crashVoltDB();
 
+            // get a CRC for the jarfile to check if everyone has the same one
+            long catalogCRC = 0;
+            try {
+                catalogCRC = JarReader.crcForJar(m_config.m_pathToCatalog);
+            } catch (IOException e1) {
+                VoltDB.crashVoltDB();
+            }
+
             Catalog catalog = new Catalog();
             catalog.execute(serializedCatalog);
             m_catalogContext = new CatalogContext(catalog, m_config.m_pathToCatalog);
@@ -229,7 +238,7 @@ public class RealVoltDB implements VoltDBInterface
             }
 
             hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_CreatingVoltDB.name(), new Object[] { m_catalogContext.numberOfNodes, leader }, null);
-            m_messenger = new HostMessenger(m_network, leader, m_catalogContext.numberOfNodes, hostLog);
+            m_messenger = new HostMessenger(m_network, leader, m_catalogContext.numberOfNodes, catalogCRC, hostLog);
             m_instanceId = m_messenger.waitForGroupJoin();
 
             // Use the host messenger's hostId.

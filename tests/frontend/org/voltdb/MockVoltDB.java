@@ -47,6 +47,7 @@ public class MockVoltDB implements VoltDBInterface
     final String m_clusterName = "cluster";
     final String m_databaseName = "database";
     StatsAgent m_statsAgent = null;
+    int m_howManyCrashes = 0;
 
     public MockVoltDB()
     {
@@ -109,6 +110,10 @@ public class MockVoltDB implements VoltDBInterface
     public Cluster getCluster()
     {
         return m_catalog.getClusters().get(m_clusterName);
+    }
+
+    public int getCrashCount() {
+        return m_howManyCrashes;
     }
 
     Database getDatabase()
@@ -226,7 +231,8 @@ public class MockVoltDB implements VoltDBInterface
     public boolean ignoreCrash()
     {
         // TODO Auto-generated method stub
-        return false;
+        m_howManyCrashes++;
+        return true;
     }
 
     @Override

@@ -17,6 +17,7 @@
 
 package org.voltdb.sysprocs;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 
@@ -34,6 +35,7 @@ import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.JarReader;
 
 @ProcInfo(singlePartition = false)
 public class UpdateApplicationCatalog extends VoltSystemProcedure {
@@ -61,10 +63,11 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         String catalogDiffCommands = (String) paramObj[0];
 
         if (fragmentId == SysProcFragmentId.PF_catalogUpdateGlobal) {
-            assert(paramObj.length == 3);
+            assert(paramObj.length == 4);
             String catalogURL = (String) paramObj[1];
             int expectedCatalogVersion = (Integer) paramObj[2];
-            if (updateVoltDBSingleton(context, catalogDiffCommands, catalogURL, expectedCatalogVersion))
+            long crc = (Long) paramObj[3];
+            if (updateVoltDBSingleton(context, catalogDiffCommands, catalogURL, expectedCatalogVersion, crc))
                 t.addRow(1);
             else
                 t.addRow(0);
@@ -83,9 +86,20 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
     }
 
     boolean updateVoltDBSingleton(SystemProcedureExecutionContext context,
-            String encodedCatalogDiffCommands, String catalogURL, int expectedCatalogVersion) {
+            String encodedCatalogDiffCommands, String catalogURL, int expectedCatalogVersion, long crc) {
 
         String catalogDiffCommands = Encoder.decodeBase64AndDecompress(encodedCatalogDiffCommands);
+
+        // computer CRC for catalog
+        long localcrc;
+        try {
+            localcrc = JarReader.crcForJar(catalogURL);
+        } catch (IOException e) {
+            throw new VoltAbortException("Error reading Catalog URL.");
+        }
+
+        if (localcrc != crc)
+            throw new VoltAbortException("Error reading Catalog URL.");
 
         VoltDB.instance().catalogUpdate(catalogDiffCommands, catalogURL, expectedCatalogVersion);
 
@@ -108,6 +122,15 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
 
     public VoltTable[] run(String catalogDiffCommands, String catalogURL, int expectedCatalogVersion) {
         System.err.println("Running update catalog system procedure with url = " + catalogURL);
+
+        // computer CRC for catalog
+        long crc;
+        try {
+            crc = JarReader.crcForJar(catalogURL);
+        } catch (IOException e) {
+            throw new VoltAbortException("Error reading Catalog URL.");
+        }
+
         SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[1];
 
         // Give the new catalog to all the nodes and have their VoltDB singleton update
@@ -118,7 +141,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         pfs[0].multipartition = false;
         pfs[0].nonExecSites = true;
         pfs[0].parameters = new ParameterSet();
-        pfs[0].parameters.setParameters(new Object[] { catalogDiffCommands, catalogURL, expectedCatalogVersion });
+        pfs[0].parameters.setParameters(new Object[] { catalogDiffCommands, catalogURL, expectedCatalogVersion, crc });
 
         VoltTable[] retval = executeSysProcPlanFragments(pfs, ROUNDONE_DEP);
         assert(retval != null);

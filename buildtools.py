@@ -276,16 +276,12 @@ def buildMakefile(CTX):
         binname, objectname, sourcename = namesForTestCode(test)
 
         # build the object file
-        makefile.write("%s: ../../%s" % (objectname, sourcename))
+        makefile.write("%s: ../../%s objects/harness.o objects/volt.a" % (binname, sourcename))
         mydeps = deps[sourcename]
         for dep in mydeps:
             makefile.write(" ../../%s" % (dep))
         makefile.write("\n")
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I../../%s %s -o $@ ../../%s\n" % (TEST_PREFIX, CTX.TEST_EXTRAFLAGS, sourcename))
-
-        # link the test
-        makefile.write("%s: %s objects/volt.a\n" % (binname, objectname))
-        makefile.write("\t$(LINK.cpp) %s -o %s %s objects/volt.a\n" % (CTX.TEST_EXTRAFLAGS, binname, objectname))
+        makefile.write("\t$(LINK.cpp) -I../../%s %s -o %s ../../%s objects/harness.o objects/volt.a\n" % (TEST_PREFIX, CTX.TEST_EXTRAFLAGS, binname, sourcename))
         targetpath = OUTPUT_PREFIX + "/" + "/".join(binname.split("/")[:-1])
         os.system("mkdir -p %s" % (targetpath))
 

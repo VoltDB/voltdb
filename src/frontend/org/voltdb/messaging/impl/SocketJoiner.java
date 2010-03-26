@@ -45,8 +45,9 @@ public class SocketJoiner extends Thread {
     static final int COMMAND_CONNECT = 1; // followed by hostId, hostId
     static final int COMMAND_LISTEN = 2;  // followed by hostId
     static final int COMMAND_COMPLETE = 3;
-    static final int COMMAND_SENDTIME = 4;
+    static final int COMMAND_SENDTIME_AND_CRC = 4;
     static final int COMMAND_NTPFAIL = 5;
+    static final int COMMAND_CRCFAIL = 6;
     static final int RESPONSE_LISTENING = 0;
     static final int RESPONSE_CONNECTED = 1;
     static final int MAX_ACCEPTABLE_TIME_DIFF_IN_MS = 2000;
@@ -59,8 +60,9 @@ public class SocketJoiner extends Thread {
     ServerSocketChannel m_listenerSocket = null;
     int m_expectedHosts;
     Logger m_hostLog;
-    Long m_timestamp;//Part of instanceId
+    long m_timestamp;//Part of instanceId
     Integer m_addr;
+    long m_catalogCRC;
 
     // helper so all streams in inputs are wrapped uniformly
     private DataInputStream addToInputs(Integer hostId, InputStream s) {
@@ -90,10 +92,11 @@ public class SocketJoiner extends Thread {
         return success;
     }
 
-    public SocketJoiner(InetAddress coordIp, int expectedHosts, Logger hostLog) {
-        this.m_coordIp = coordIp;
-        this.m_expectedHosts = expectedHosts;
-        this.m_hostLog = hostLog;
+    public SocketJoiner(InetAddress coordIp, int expectedHosts, long catalogCRC, Logger hostLog) {
+        m_coordIp = coordIp;
+        m_expectedHosts = expectedHosts;
+        m_hostLog = hostLog;
+        m_catalogCRC = catalogCRC;
     }
 
     @Override
@@ -167,7 +170,8 @@ public class SocketJoiner extends Thread {
         m_addr = ByteBuffer.wrap(m_coordIp.getAddress()).getInt();
         ByteBuffer instanceIdBuffer = ByteBuffer.allocate(12);
         instanceIdBuffer.putLong(m_timestamp);
-        instanceIdBuffer.put(m_coordIp.getAddress()).flip();
+        instanceIdBuffer.put(m_coordIp.getAddress());
+        instanceIdBuffer.flip();
         SocketChannel socket = null;
         DataInputStream in = null;
         DataOutputStream out = null;
@@ -219,20 +223,22 @@ public class SocketJoiner extends Thread {
             }
 
             long difftimes[] = new long[m_expectedHosts - 1];
+            long othercrcs[] = new long[m_expectedHosts - 1];
 
-            // ask each connection to send it's time
+            // ask each connection to send it's time and catalog CRC
             for (int hostId = 1; hostId < m_expectedHosts; hostId++) {
                 out = getOutputForHost(hostId);
                 in = getInputForHost(hostId);
 
-                out.writeInt(COMMAND_SENDTIME);
+                out.writeInt(COMMAND_SENDTIME_AND_CRC);
                 out.flush();
                 long timestamp = in.readLong();
                 difftimes[hostId - 1] = System.currentTimeMillis() - timestamp;
+                othercrcs[hostId - 1] = in.readLong();
             }
 
             // figure out how bad the skew is and if it's acceptable
-            boolean success = true;
+            int command = COMMAND_COMPLETE;
             long minimumDiff = 0;
             long maximumDiff = 0;
             for (long diff : difftimes) {
@@ -243,25 +249,33 @@ public class SocketJoiner extends Thread {
             }
             long maxDiffMS = maximumDiff - minimumDiff;
             if (maxDiffMS > MAX_ACCEPTABLE_TIME_DIFF_IN_MS)
-                success = false;
+                command = COMMAND_NTPFAIL;
+
+            // figure out if any catalogs are not identical
+            for (long crc : othercrcs) {
+                if (crc != m_catalogCRC) {
+                    command = COMMAND_CRCFAIL;
+                }
+            }
 
             for (int hostId = 1; hostId < m_expectedHosts; hostId++) {
                 out = getOutputForHost(hostId);
-
                 out.writeLong(maxDiffMS);
-                if (success)
-                    out.writeInt(COMMAND_COMPLETE);
-                else
-                    out.writeInt(COMMAND_NTPFAIL);
+                out.writeInt(command);
                 out.flush();
             }
 
             if (m_hostLog != null)
                 m_hostLog.info("Maximum clock/network skew is " + maxDiffMS + " milliseconds (according to leader)");
-            if (!success) {
+            if (command == COMMAND_NTPFAIL) {
                 if (m_hostLog != null)
                     m_hostLog.info("Maximum clock/network is " + (maxDiffMS*100)/MAX_ACCEPTABLE_TIME_DIFF_IN_MS +
                                    "% higher than allowable limit");
+                VoltDB.crashVoltDB();
+            }
+            if (command == COMMAND_CRCFAIL) {
+                if (m_hostLog != null)
+                    m_hostLog.info("Catalog checksums do not match across cluster");
                 VoltDB.crashVoltDB();
             }
 
@@ -293,7 +307,7 @@ public class SocketJoiner extends Thread {
                 catch (java.net.ConnectException e) {
                     LOG.warn("Joining primary failed: " + e.getMessage() + " retrying..");
                     try {
-                        sleep(500); //  milliseconds
+                        sleep(250); //  milliseconds
                     }
                     catch (InterruptedException ex) {
                         // don't really care.
@@ -323,12 +337,13 @@ public class SocketJoiner extends Thread {
             }
 
             out = getOutputForHost(COORD_HOSTID);
+
             out.writeInt(RESPONSE_LISTENING);
             out.flush();
 
             LOG.debug("Non-Primary Fetching Instructions");
             int command = COMMAND_NONE;
-            while (command != COMMAND_SENDTIME) {
+            while (command != COMMAND_SENDTIME_AND_CRC) {
                 command = in.readInt();
                 if ((command != COMMAND_CONNECT) && (command != COMMAND_LISTEN)) {
                     continue;
@@ -372,18 +387,25 @@ public class SocketJoiner extends Thread {
 
             // write the current time
             out.writeLong(System.currentTimeMillis());
+            // write the local catalog crc
+            out.writeLong(m_catalogCRC);
             out.flush();
             long maxDiffMS = in.readLong();
             if (m_hostLog != null)
                 m_hostLog.info("Maximum clock/network skew is " + maxDiffMS + " milliseconds (according to leader)");
             command = in.readInt();
-            if (command != COMMAND_COMPLETE) {
-                assert(command == COMMAND_NTPFAIL);
+            if (command == COMMAND_NTPFAIL) {
                 if (m_hostLog != null)
                     m_hostLog.info("Maximum clock/network is " + (maxDiffMS*100)/MAX_ACCEPTABLE_TIME_DIFF_IN_MS +
                                    "% higher than allowable limit");
                 VoltDB.crashVoltDB();
             }
+            if (command == COMMAND_CRCFAIL) {
+                if (m_hostLog != null)
+                    m_hostLog.info("Catalog checksums do not match across cluster");
+                VoltDB.crashVoltDB();
+            }
+            assert(command == COMMAND_COMPLETE);
         }
         catch (IOException e) {
             m_hostLog.error("Failed to establish socket mesh.", e);

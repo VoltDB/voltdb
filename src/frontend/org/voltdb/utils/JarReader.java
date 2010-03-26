@@ -22,6 +22,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.*;
 import java.util.jar.*;
+import java.util.zip.CRC32;
 
 /**
  * Read a text file from within a Jarfile and return the contents as
@@ -98,15 +99,37 @@ public class JarReader {
         return bytes;
     }
 
+    static public long crcForJar(String jarpath) throws IOException {
+        InputStream fin = openJarFile(jarpath);
+        if (fin == null)
+            throw new FileNotFoundException();
+        CRC32 crc = new CRC32();
+        int b = -1;
+        while ((b = fin.read()) != -1)
+            crc.update(b);
+        return crc.getValue();
+    }
+
     /**
      *
      * @param jarpath
      * @return
      */
     static JarInputStream openJar(String jarpath) {
+        InputStream fin = openJarFile(jarpath);
+        if (fin == null) return null;
+        JarInputStream jarIn = null;
+        try {
+            jarIn = new JarInputStream(fin);
+        } catch (IOException ioex) {
+            return null;
+        }
+        return jarIn;
+    }
+
+    private static InputStream openJarFile(String jarpath) {
         URL jar_url = null;
         InputStream fin = null;
-        JarInputStream jarIn = null;
         try {
             jar_url = new URL(jarpath);
             fin = jar_url.openStream();
@@ -120,12 +143,7 @@ public class JarReader {
         } catch (IOException ioex) {
             return null;
         }
-        try {
-            jarIn = new JarInputStream(fin);
-        } catch (IOException ioex) {
-            return null;
-        }
-        return jarIn;
+        return fin;
     }
 
     /**

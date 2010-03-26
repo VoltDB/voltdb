@@ -78,13 +78,13 @@ public class HostMessenger implements Messenger {
 
     final AtomicInteger m_hostsToWaitFor = new AtomicInteger();
 
-    public HostMessenger(VoltNetwork network, InetAddress coordinatorIp, int expectedHosts, Logger hostLog)
+    public HostMessenger(VoltNetwork network, InetAddress coordinatorIp, int expectedHosts, long catalogCRC, Logger hostLog)
     {
         m_coordinatorAddr = coordinatorIp;
         m_expectedHosts = expectedHosts;
         m_hostsToWaitFor.set(expectedHosts);
         m_network = network;
-        m_joiner = new SocketJoiner(m_coordinatorAddr, m_expectedHosts, hostLog);
+        m_joiner = new SocketJoiner(m_coordinatorAddr, m_expectedHosts, catalogCRC, hostLog);
         m_joiner.start();
 
         m_foreignHosts = new ForeignHost[expectedHosts + 1];
