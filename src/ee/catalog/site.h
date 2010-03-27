@@ -44,6 +44,7 @@ protected:
     CatalogType* m_host;
     CatalogType* m_partition;
     int32_t m_initiatorid;
+    bool m_isUp;
 
     virtual void update();
 
@@ -60,6 +61,8 @@ public:
     const Partition * partition() const;
     /** GETTER: If the site is an initiator, this is its tightly packed id */
     int32_t initiatorid() const;
+    /** GETTER: Is the site up? */
+    bool isUp() const;
 };
 
 } // namespace catalog

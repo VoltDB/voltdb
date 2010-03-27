@@ -80,6 +80,7 @@ public class ClusterCompiler
                 site.setIsexec(false);
             }
             site.setHost(host);
+            site.setIsup(true);
         }
     }
 }

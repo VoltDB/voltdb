@@ -38,6 +38,10 @@ public class CatalogDiffEngine {
 
         // handle all of the local fields
         for (String field : prevType.getFields()) {
+            if (field.equals("isUp"))
+            {
+                continue;
+            }
             Object prevValue = prevType.getField(field);
             Object newValue = newType.getField(field);
 

@@ -18,15 +18,14 @@
 package org.voltdb.sysprocs.saverestore;
 
 import java.io.IOException;
-import java.util.HashMap;
+import java.util.Collection;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 import org.voltdb.ParameterSet;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
-import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
 import org.voltdb.sysprocs.SysProcFragmentId;
@@ -62,19 +61,17 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
 
     @Override
     public SynthesizedPlanFragment[]
-    generateRestorePlan(Table catalogTable,
-                        CatalogMap<Site> clusterSites)
+    generateRestorePlan(Table catalogTable)
     {
-        final HashMap<Integer, List<Integer>> hostToSitesMap =
-            getHostToSitesMap(clusterSites);
         for (int hostId : m_hostsWithThisTable) {
-            m_sitesWithThisTable.addAll(hostToSitesMap.get(hostId));
+            m_sitesWithThisTable.addAll(VoltDB.instance().getCatalogContext().
+                                        siteTracker.getLiveExecutionSitesForHost(hostId));
         }
 
         SynthesizedPlanFragment[] restore_plan = null;
         if (catalogTable.getIsreplicated())
         {
-            restore_plan = generateReplicatedToReplicatedPlan(clusterSites);
+            restore_plan = generateReplicatedToReplicatedPlan();
         }
         else
         {
@@ -95,11 +92,11 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
     }
 
     private SynthesizedPlanFragment[]
-    generateReplicatedToReplicatedPlan(CatalogMap<Site> clusterSites)
+    generateReplicatedToReplicatedPlan()
     {
         SynthesizedPlanFragment[] restore_plan = null;
         Set<Integer> execution_site_ids =
-            TableSaveFileState.getExecutionSiteIds(clusterSites);
+            VoltDB.instance().getCatalogContext().siteTracker.getExecutionSiteIds();
         Set<Integer> sites_missing_table =
             getSitesMissingTable(execution_site_ids);
         // not sure we want to deal with handling expected load failures,

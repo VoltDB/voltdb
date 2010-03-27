@@ -17,9 +17,12 @@
 
 package org.voltdb.dtxn;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.Map.Entry;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Site;
@@ -36,12 +39,22 @@ import org.voltdb.catalog.Site;
  */
 public class SiteTracker {
 
-    int m_siteCount;
+    int m_liveSiteCount = 0;
+    int m_liveInitiatorCount = 0;
+
+    // Cache a reference to the Catalog sites list
+    CatalogMap<Site> m_sites;
 
     // a map of site ids (index) to partition ids (value)
     Map<Integer, Integer> m_sitesToPartitions = new HashMap<Integer, Integer>();
 
     HashMap<Integer, ArrayList<Integer>> m_partitionsToSites =
+        new HashMap<Integer, ArrayList<Integer>>();
+
+    HashMap<Integer, ArrayList<Integer>> m_partitionsToLiveSites =
+        new HashMap<Integer, ArrayList<Integer>>();
+
+    Map<Integer, ArrayList<Integer>> m_hostsToSites =
         new HashMap<Integer, ArrayList<Integer>>();
 
     // records the timestamp of the last message sent to each sites
@@ -58,31 +71,54 @@ public class SiteTracker {
      */
     public SiteTracker(CatalogMap<Site> clusterSites)
     {
+        m_sites = clusterSites;
         for (Site site : clusterSites)
         {
-            // don't put non-exec (has ee) sites in the list.
-            if (site.getIsexec() == false)
-                continue;
-
             int siteId = Integer.parseInt(site.getTypeName());
 
-            int partitionId = Integer.parseInt(site.getPartition().getTypeName());
+            int hostId = Integer.parseInt(site.getHost().getTypeName());
 
-            m_sitesToPartitions.put(siteId, partitionId);
-            if (!m_partitionsToSites.containsKey(partitionId))
+            if (!m_hostsToSites.containsKey(hostId))
             {
-                m_partitionsToSites.put(partitionId,
-                                        new ArrayList<Integer>());
+                m_hostsToSites.put(hostId, new ArrayList<Integer>());
             }
-            m_partitionsToSites.get(partitionId).add(siteId);
+            m_hostsToSites.get(hostId).add(siteId);
+
+            // don't put non-exec (has ee) sites in the list.
+            if (site.getIsexec() == false)
+            {
+                if (site.getIsup())
+                {
+                    m_liveInitiatorCount++;
+                }
+            }
+            else
+            {
+
+                int partitionId = Integer.parseInt(site.getPartition().getTypeName());
+
+                m_sitesToPartitions.put(siteId, partitionId);
+                if (!m_partitionsToSites.containsKey(partitionId))
+                {
+                    m_partitionsToSites.put(partitionId,
+                                            new ArrayList<Integer>());
+                }
+                m_partitionsToSites.get(partitionId).add(siteId);
+
+                if (!m_partitionsToLiveSites.containsKey(partitionId))
+                {
+                    m_partitionsToLiveSites.put(partitionId,
+                                                new ArrayList<Integer>());
+                }
+                if (site.getIsup() == true)
+                {
+                    m_liveSiteCount++;
+                    m_partitionsToLiveSites.get(partitionId).add(siteId);
+                }
+            }
         }
 
-        m_siteCount = m_sitesToPartitions.size();
-
-        // make sure it's an even multiple
-        assert((m_siteCount % m_partitionsToSites.size()) == 0);
-
-        m_tempOldSitesScratch = new int[m_siteCount];
+        m_tempOldSitesScratch = new int[m_sites.size()];
 
         for (int siteId : m_sitesToPartitions.keySet())
         {
@@ -91,7 +127,26 @@ public class SiteTracker {
     }
 
     /**
-     * Get a site that contains a copy of the given partition.
+     * @return The number of live non-exec sites currently in the cluster.
+     *         Right now, this corresponds to the number of hosts and the
+     *         number of initiators in the cluster.
+     */
+    public int getLiveInitiatorCount()
+    {
+        return m_liveInitiatorCount;
+    }
+
+    /**
+     * @return The number of live executions sites currently in the cluster.
+     */
+    public int getLiveSiteCount()
+    {
+        return m_liveSiteCount;
+    }
+
+    /**
+     * Get a site that contains a copy of the given partition.  The site ID
+     * returned may correspond to a site that is currently down.
      *
      * @param partition The id of a VoltDB partition.
      * @return The id of a VoltDB site containing a copy of
@@ -104,8 +159,21 @@ public class SiteTracker {
     }
 
     /**
+     * Get a live site that contains a copy of the given partition.
+     *
+     * @param partition The id of a VoltDB partition.
+     * @return The id of a VoltDB site containing a copy of
+     * the requested partition.
+     */
+    public int getOneLiveSiteForPartition(int partition) {
+        ArrayList<Integer> sites = m_partitionsToLiveSites.get(partition);
+        assert(sites != null);
+        return sites.get(0);
+    }
+
+    /**
      * Get the ids of all sites that contain a copy of the
-     * partition specified.
+     * partition specified.  The list will include sites that are down.
      *
      * @param partition A VoltDB partition id.
      * @return An array of VoltDB site ids.
@@ -113,6 +181,18 @@ public class SiteTracker {
     public ArrayList<Integer> getAllSitesForPartition(int partition) {
         assert (m_partitionsToSites.containsKey(partition));
         return m_partitionsToSites.get(partition);
+    }
+
+    /**
+     * Get the ids of all live sites that contain a copy of the
+     * partition specified.
+     *
+     * @param partition A VoltDB partition id.
+     * @return An array of VoltDB site ids.
+     */
+    public ArrayList<Integer> getLiveSitesForPartition(int partition) {
+        assert (m_partitionsToLiveSites.containsKey(partition));
+        return m_partitionsToLiveSites.get(partition);
     }
 
     /**
@@ -154,6 +234,61 @@ public class SiteTracker {
         return retval;
     }
 
+    /**
+     * Get the ids of all live sites that contain a copy of ANY of
+     * the given partitions.
+     *
+     * @param partitions A set of unique, non-null VoltDB
+     * partition ids.
+     * @return An array of VoltDB site ids.
+     */
+    public int[] getLiveSitesForEachPartition(int[] partitions) {
+        ArrayList<Integer> all_sites = new ArrayList<Integer>();
+        for (int p : partitions) {
+            ArrayList<Integer> sites = getLiveSitesForPartition(p);
+            for (int site : sites)
+            {
+                all_sites.add(site);
+            }
+        }
+        int[] retval = new int[all_sites.size()];
+        for (int i = 0; i < all_sites.size(); i++)
+        {
+            retval[i] = (int) all_sites.get(i);
+        }
+        return retval;
+    }
+
+    /**
+     * Get the list of all site IDs that are on a specific host ID
+     * @param hostId
+     * @return An ArrayList of VoltDB site IDs.
+     */
+    public ArrayList<Integer> getAllSitesForHost(int hostId)
+    {
+        assert m_hostsToSites.containsKey(hostId);
+        return m_hostsToSites.get(hostId);
+    }
+
+    /**
+     * Get the list of live execution site IDs on a specific host ID
+     * @param hostId
+     * @return
+     */
+    public ArrayList<Integer> getLiveExecutionSitesForHost(int hostId)
+    {
+        assert m_hostsToSites.containsKey(hostId);
+        ArrayList<Integer> retval = new ArrayList<Integer>();
+        for (Integer site_id : m_hostsToSites.get(hostId))
+        {
+            if (m_sites.get(Integer.toString(site_id)).getIsexec() &&
+                m_sites.get(Integer.toString(site_id)).getIsup())
+            {
+                retval.add(site_id);
+            }
+        }
+        return retval;
+    }
 
     /**
      * Return the id of the partition stored by a given site.
@@ -165,6 +300,40 @@ public class SiteTracker {
     {
         assert(m_sitesToPartitions.containsKey(siteId));
         return m_sitesToPartitions.get(siteId);
+    }
+
+    /**
+     * @return An ArrayDeque containing references for the catalog Site
+     *         objects which are currrently up.  This includes both
+     *         execution sites and non-execution sites (initiators, basically)
+     */
+    public ArrayDeque<Site> getUpSites()
+    {
+        ArrayDeque<Site> retval = new ArrayDeque<Site>();
+        for (Site site : m_sites)
+        {
+            if (site.getIsup())
+            {
+                retval.add(site);
+            }
+        }
+        return retval;
+    }
+
+    /**
+     * @return A Set of all the execution site IDs in the cluster.
+     */
+    public Set<Integer> getExecutionSiteIds()
+    {
+        Set<Integer> exec_sites = new HashSet<Integer>(m_sites.size());
+        for (Site site : m_sites)
+        {
+            if (site.getIsexec())
+            {
+                exec_sites.add(Integer.parseInt(site.getTypeName()));
+            }
+        }
+        return exec_sites;
     }
 
     /**

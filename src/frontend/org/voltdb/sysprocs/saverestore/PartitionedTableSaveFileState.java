@@ -19,6 +19,7 @@ package org.voltdb.sysprocs.saverestore;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -29,9 +30,9 @@ import java.util.TreeSet;
 
 import org.apache.log4j.Logger;
 import org.voltdb.ParameterSet;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
-import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
 import org.voltdb.sysprocs.SysProcFragmentId;
@@ -94,16 +95,14 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
 
     @Override
     public SynthesizedPlanFragment[]
-    generateRestorePlan(Table catalogTable,
-                        CatalogMap<Site> clusterSites)
+    generateRestorePlan(Table catalogTable)
     {
         SynthesizedPlanFragment[] restore_plan = null;
         LOG.info("Total partitions for Table: " + getTableName() + ": " +
                  getTotalPartitions());
         if (!catalogTable.getIsreplicated())
         {
-            restore_plan = generatePartitionedToPartitionedPlan(
-                    getHostToSitesMap(clusterSites));
+            restore_plan = generatePartitionedToPartitionedPlan();
         }
         else
         {
@@ -133,8 +132,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
         }
     }
 
-    private SynthesizedPlanFragment[] generatePartitionedToPartitionedPlan(
-            HashMap<Integer, List<Integer>> hostToSites)
+    private SynthesizedPlanFragment[] generatePartitionedToPartitionedPlan()
     {
         LOG.info("Partition set: " + m_partitionsSeen);
         ArrayList<SynthesizedPlanFragment> restorePlan =
@@ -168,7 +166,9 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
                 }
             }
 
-            List<Integer> sitesAtHost = hostToSites.get(nextHost);
+            List<Integer> sitesAtHost =
+                VoltDB.instance().getCatalogContext().siteTracker.
+                getLiveExecutionSitesForHost(nextHost);
 
             int originalHostsArray[] = new int[originalHosts.size()];
             int qq = 0;
@@ -237,6 +237,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
         return plan_fragment;
     }
 
+    // XXX-BLAH should this move to SiteTracker?
     public Set<Pair<Integer, Integer>> getPartitionsAtHost(int hostId) {
         return m_partitionsAtHost.get(hostId);
     }

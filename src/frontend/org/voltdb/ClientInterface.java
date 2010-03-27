@@ -614,6 +614,9 @@ public class ClientInterface implements DumpManager.Dumpable {
         int myHostId = -1;
 
         // create a topology for the initiator
+        // XXX-FAILURE this is a horrible way to figure out our host ID
+        // XXX-FAILURE also, can iterate through all sites because we might
+        // be the dead site.
         for (Site site : context.sites) {
             int aSiteId = Integer.parseInt(site.getTypeName());
             int hostId = Integer.parseInt(site.getHost().getTypeName());

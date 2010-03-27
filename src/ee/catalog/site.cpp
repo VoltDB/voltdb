@@ -36,6 +36,7 @@ Site::Site(Catalog *catalog, CatalogType *parent, const string &path, const stri
     m_fields["host"] = value;
     m_fields["partition"] = value;
     m_fields["initiatorid"] = value;
+    m_fields["isUp"] = value;
 }
 
 void Site::update() {
@@ -43,6 +44,7 @@ void Site::update() {
     m_host = m_fields["host"].typeValue;
     m_partition = m_fields["partition"].typeValue;
     m_initiatorid = m_fields["initiatorid"].intValue;
+    m_isUp = m_fields["isUp"].intValue;
 }
 
 CatalogType * Site::addChild(const std::string &collectionName, const std::string &childName) {
@@ -72,5 +74,9 @@ const Partition * Site::partition() const {
 
 int32_t Site::initiatorid() const {
     return m_initiatorid;
+}
+
+bool Site::isUp() const {
+    return m_isUp;
 }
 

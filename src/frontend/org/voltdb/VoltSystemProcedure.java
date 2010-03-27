@@ -164,7 +164,8 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                 // create a workunit for one arbitrary site on each host.
                 final HashMap<Host,String> foundHosts = new HashMap<Host,String>();
                 final ArrayList<Integer> sites = new ArrayList<Integer>();
-                for (Site site : m_cluster.getSites()) {
+                for (Site site : VoltDB.instance().getCatalogContext().siteTracker.getUpSites())
+                {
                     if (site.getIsexec() && (foundHosts.containsKey(site.getHost()) == false)) {
                         foundHosts.put(site.getHost(), site.getTypeName());
                         int siteId = Integer.parseInt(site.getTypeName());

@@ -625,7 +625,7 @@ public class SnapshotSave extends VoltSystemProcedure
     private int[] getPartitionsOnHost(
             SystemProcedureExecutionContext c, Host h) {
         final ArrayList<Partition> results = new ArrayList<Partition>();
-        for (final Site s : c.getCluster().getSites()) {
+        for (final Site s : VoltDB.instance().getCatalogContext().siteTracker.getUpSites()) {
             if (s.getHost().getTypeName().equals(h.getTypeName())) {
                 if (s.getPartition() != null) {
                     results.add(s.getPartition());

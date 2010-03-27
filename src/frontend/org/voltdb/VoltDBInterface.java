@@ -67,7 +67,7 @@ public interface VoltDBInterface
     public FaultDistributor getFaultDistributor();
     public BackendTarget getBackendTargetType();
 
-    /**
+   /**
     * Updates the catalog context stored by this VoltDB without destroying the old one,
     * in case anything still links to it.
     *
@@ -77,7 +77,14 @@ public interface VoltDBInterface
     */
    public void catalogUpdate(String diffCommands, String newCatalogURL, int expectedCatalogVersion);
 
-    /**
+   /**
+    * Updates the physical cluster configuration stored in the catalog at this server.
+    *
+    * @param diffCommands  The catalog commands that will update the cluster config
+    */
+   void clusterUpdate(String diffCommands);
+
+   /**
      * Tells if the VoltDB is running. m_isRunning needs to be set to true
      * when the run() method is called, and set to false when shutting down.
      *

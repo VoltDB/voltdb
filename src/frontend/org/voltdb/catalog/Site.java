@@ -28,6 +28,7 @@ public class Site extends CatalogType {
 
     boolean m_isexec;
     int m_initiatorid;
+    boolean m_isUp;
 
     void setBaseValues(Catalog catalog, CatalogType parent, String path, String name) {
         super.setBaseValues(catalog, parent, path, name);
@@ -35,11 +36,13 @@ public class Site extends CatalogType {
         m_fields.put("host", null);
         m_fields.put("partition", null);
         m_fields.put("initiatorid", m_initiatorid);
+        m_fields.put("isUp", m_isUp);
     }
 
     void update() {
         m_isexec = (Boolean) m_fields.get("isexec");
         m_initiatorid = (Integer) m_fields.get("initiatorid");
+        m_isUp = (Boolean) m_fields.get("isUp");
     }
 
     /** GETTER: Does the site execute workunits? */
@@ -78,6 +81,11 @@ public class Site extends CatalogType {
         return m_initiatorid;
     }
 
+    /** GETTER: Is the site up? */
+    public boolean getIsup() {
+        return m_isUp;
+    }
+
     /** SETTER: Does the site execute workunits? */
     public void setIsexec(boolean value) {
         m_isexec = value; m_fields.put("isexec", value);
@@ -96,6 +104,11 @@ public class Site extends CatalogType {
     /** SETTER: If the site is an initiator, this is its tightly packed id */
     public void setInitiatorid(int value) {
         m_initiatorid = value; m_fields.put("initiatorid", value);
+    }
+
+    /** SETTER: Is the site up? */
+    public void setIsup(boolean value) {
+        m_isUp = value; m_fields.put("isUp", value);
     }
 
 }

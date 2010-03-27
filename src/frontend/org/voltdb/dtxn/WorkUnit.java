@@ -176,10 +176,10 @@ class WorkUnit {
             for (int dependency : dependencyIds) {
                 int depsToExpect = 1;
                 if ((dependency & DtxnConstants.MULTIPARTITION_DEPENDENCY) != 0) {
-                    depsToExpect = context.numberOfExecSites;
+                    depsToExpect = context.siteTracker.getLiveSiteCount();
                 }
                 else if ((dependency & DtxnConstants.MULTINODE_DEPENDENCY) != 0) {
-                    depsToExpect = context.numberOfNodes;
+                    depsToExpect = context.siteTracker.getLiveInitiatorCount();
                 }
                 m_unsatisfiedDependencies += depsToExpect;
                 m_dependencies.put(dependency, new HashMap<Integer, VoltTable>());

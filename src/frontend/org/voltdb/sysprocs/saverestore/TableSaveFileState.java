@@ -18,15 +18,15 @@
 package org.voltdb.sysprocs.saverestore;
 
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
-import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
 
@@ -41,22 +41,6 @@ public abstract class TableSaveFileState
         return NEXT_DEPENDENCY_ID++;
     }
 
-    // XXX THIS METHOD DOES NOT BELONG HERE BUT SHOULD PROBABLY LIVE IN THE
-    // CATALOG SOMEWHERE.  HOWEVER, I DON'T FEEL LIKE FINDING A HOME FOR IT
-    // AT THE MOMENT --izzy
-    static Set<Integer> getExecutionSiteIds(CatalogMap<Site> clusterSites)
-    {
-        Set<Integer> exec_sites = new HashSet<Integer>(clusterSites.size());
-        for (Site site : clusterSites)
-        {
-            if (site.getIsexec())
-            {
-                exec_sites.add(Integer.parseInt(site.getTypeName()));
-            }
-        }
-        return exec_sites;
-    }
-
     TableSaveFileState(String tableName, int allowELT)
     {
         m_tableName = tableName;
@@ -65,8 +49,7 @@ public abstract class TableSaveFileState
     }
 
     abstract public SynthesizedPlanFragment[]
-    generateRestorePlan(Table catalogTable,
-                        CatalogMap<Site> clusterSites);
+    generateRestorePlan(Table catalogTable);
 
     String getTableName()
     {
@@ -102,24 +85,6 @@ public abstract class TableSaveFileState
     public int getRootDependencyId()
     {
         return m_rootDependencyId;
-    }
-
-    protected HashMap<Integer, List<Integer>> getHostToSitesMap(
-            CatalogMap<Site> clusterSites) {
-        HashMap<Integer, List<Integer>> hostToSitesMap =
-            new HashMap<Integer, List<Integer>>();
-        for (Site s : clusterSites) {
-            int hostId = Integer.parseInt(s.getHost().getTypeName());
-            List<Integer> sites = hostToSitesMap.get(hostId);
-            if (sites == null) {
-                sites = new ArrayList<Integer>();
-                hostToSitesMap.put(hostId, sites);
-            }
-            if (s.getIsexec()) {
-                sites.add(Integer.parseInt(s.getTypeName()));
-            }
-        }
-        return hostToSitesMap;
     }
 
     private String m_tableName;

@@ -327,12 +327,12 @@ implements Runnable, DumpManager.Dumpable
     {
         // build an array of all the initiators
         int initiatorCount = 0;
-        for (final Site s : m_context.cluster.getSites())
+        for (final Site s : m_context.siteTracker.getUpSites())
             if (s.getIsexec() == false)
                 initiatorCount++;
         final int[] initiatorIds = new int[initiatorCount];
         int index = 0;
-        for (final Site s : m_context.cluster.getSites())
+        for (final Site s : m_context.siteTracker.getUpSites())
             if (s.getIsexec() == false)
                 initiatorIds[index++] = Integer.parseInt(s.getTypeName());
 
@@ -418,6 +418,12 @@ implements Runnable, DumpManager.Dumpable
         m_context = VoltDB.instance().getCatalogContext();
         loadProceduresFromCatalog(VoltDB.getEEBackendType());
         ee.updateCatalog(catalogDiffCommands);
+        return true;
+    }
+
+    public boolean updateCluster()
+    {
+        m_context = VoltDB.instance().getCatalogContext();
         return true;
     }
 

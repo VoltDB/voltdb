@@ -30,6 +30,7 @@ import java.util.Set;
 import junit.framework.TestCase;
 
 import org.voltdb.MockVoltDB;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
 import org.voltdb.catalog.Table;
@@ -109,6 +110,7 @@ public class TestReplicatedTableSaveFileState extends TestCase
     {
         MockVoltDB catalog_creator =
             new MockVoltDB();
+        VoltDB.replaceVoltDBInstanceForTest(catalog_creator);
         catalog_creator.addTable(TABLE_NAME, true);
 
         int number_of_sites = 4;
@@ -141,9 +143,7 @@ public class TestReplicatedTableSaveFileState extends TestCase
         Table test_table = catalog_creator.getTable(TABLE_NAME);
 
         SynthesizedPlanFragment[] test_plan =
-            m_state.
-            generateRestorePlan(test_table,
-                                catalog_creator.getCluster().getSites());
+            m_state.generateRestorePlan(test_table);
         assertEquals(test_plan.length, number_of_sites + 1);
         for (int i = 0; i < number_of_sites - 1; ++i)
         {
@@ -168,6 +168,7 @@ public class TestReplicatedTableSaveFileState extends TestCase
     public void testSiteMissingTableRestorePlan()
     {
         MockVoltDB catalog_creator = new MockVoltDB();
+        VoltDB.replaceVoltDBInstanceForTest(catalog_creator);
         catalog_creator.addTable(TABLE_NAME, true);
 
         int number_of_sites = 4;
@@ -207,9 +208,7 @@ public class TestReplicatedTableSaveFileState extends TestCase
         Table test_table = catalog_creator.getTable(TABLE_NAME);
 
         SynthesizedPlanFragment[] test_plan =
-            m_state.
-            generateRestorePlan(test_table,
-                                catalog_creator.getCluster().getSites());
+            m_state.generateRestorePlan(test_table);
         assertEquals(test_plan.length, number_of_sites + 1);
         for (int i = 0; i < number_of_sites - 1; ++i)
         {

@@ -149,7 +149,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
 
             // store only partitions that are NOT the coordinator
             // this is a bit too slow
-            int[] allSiteIds = m_siteTracker.getAllSitesForEachPartition(partitions);
+            int[] allSiteIds = m_siteTracker.getLiveSitesForEachPartition(partitions);
             int coordinatorId = allSiteIds[0];
             int[] otherSiteIds = new int[allSiteIds.length - 1];
 
@@ -215,7 +215,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         long txnId = m_idManager.getNextUniqueTransactionId();
 
         // split the list of partitions into coordinator and the set of participants
-        ArrayList<Integer> site_ids = m_siteTracker.getAllSitesForPartition(partition);
+        ArrayList<Integer> site_ids = m_siteTracker.getLiveSitesForPartition(partition);
         ArrayList<InFlightTxnState> txn_states = new ArrayList<InFlightTxnState>();
 
         increaseBackpressure(messageSize);

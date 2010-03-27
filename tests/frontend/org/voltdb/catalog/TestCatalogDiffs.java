@@ -96,4 +96,18 @@ public class TestCatalogDiffs extends TestCase {
         assertEquals(updatedOriginalSerialized, updatedSerialized);
     }
 
+    public void testIsUpIgnored()
+    {
+        String original = compile("base", BASEPROCS);
+        Catalog catOriginal = catalogForJar(original);
+        catOriginal.getClusters().get("cluster").getSites().add("999");
+        catOriginal.getClusters().get("cluster").getSites().get("999").set("isUp", "true");
+        Catalog cat_copy = catOriginal.deepCopy();
+        String null_diff = CatalogDiffEngine.getCommandsToDiff(catOriginal, cat_copy);
+        assertEquals("", null_diff);
+        cat_copy.getClusters().get("cluster").getSites().get("999").set("isUp", "false");
+        null_diff = CatalogDiffEngine.getCommandsToDiff(catOriginal, cat_copy);
+        assertEquals("", null_diff);
+    }
+
 }

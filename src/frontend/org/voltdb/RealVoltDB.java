@@ -192,7 +192,7 @@ public class RealVoltDB implements VoltDBInterface
              * running a SnapshotDaemon.
              */
             int lowestNonExecSiteId = -1;
-            for (Site site : m_catalogContext.sites) {
+            for (Site site : m_catalogContext.siteTracker.getUpSites()) {
                 if (!site.getIsexec()) {
                     if (lowestNonExecSiteId == -1) {
                         lowestNonExecSiteId = Integer.parseInt(site.getTypeName());
@@ -256,7 +256,7 @@ public class RealVoltDB implements VoltDBInterface
              */
             Site siteForThisThread = null;
             m_currentThreadSite = null;
-            for (Site site : m_catalogContext.sites) {
+            for (Site site : m_catalogContext.siteTracker.getUpSites()) {
                 int sitesHostId = Integer.parseInt(site.getHost().getTypeName());
                 int siteId = Integer.parseInt(site.getTypeName());
 
@@ -333,7 +333,7 @@ public class RealVoltDB implements VoltDBInterface
 
             // Create the client interfaces and associated dtxn initiators
             int portOffset = 0;
-            for (Site site : m_catalogContext.sites) {
+            for (Site site : m_catalogContext.siteTracker.getUpSites()) {
                 int sitesHostId = Integer.parseInt(site.getHost().getTypeName());
                 int currSiteId = Integer.parseInt(site.getTypeName());
 
@@ -506,6 +506,26 @@ public class RealVoltDB implements VoltDBInterface
 
         for (ClientInterface ci : m_clientInterfaces)
             ci.notifyOfCatalogUpdate();
+    }
+
+    @Override
+    public void clusterUpdate(String diffCommands)
+    {
+        synchronized(m_catalogUpdateLock)
+        {
+            m_catalogContext = m_catalogContext.update(CatalogContext.NO_PATH,
+                                                       diffCommands);
+        }
+
+        for (int site_id : m_localSites.keySet())
+        {
+            m_localSites.get(site_id).updateCluster();
+        }
+
+        for (ClientInterface ci : m_clientInterfaces)
+        {
+            ci.notifyOfCatalogUpdate();
+        }
     }
 
     public VoltDB.Configuration getConfig()

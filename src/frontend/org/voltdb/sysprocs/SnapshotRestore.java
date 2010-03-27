@@ -42,6 +42,7 @@ import org.voltdb.HsqlBackend;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.TheHashinator;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -783,8 +784,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             TableSaveFileState table_state =
                 savefileState.getTableState(t.getTypeName());
             SynthesizedPlanFragment[] restore_plan =
-                table_state.generateRestorePlan(t,
-                                                m_cluster.getSites());
+                table_state.generateRestorePlan(t);
             if (restore_plan == null) {
                 HOST_LOG.error(
                         "Unable to generate restore plan for " + t.getTypeName() + " table not restored");
@@ -940,7 +940,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         // LoadMultipartitionTable.  Consider ways to consolidate later
         Map<Integer, Integer> sites_to_partitions =
             new HashMap<Integer, Integer>();
-        for (Site site : m_cluster.getSites())
+        for (Site site : VoltDB.instance().getCatalogContext().siteTracker.getUpSites())
         {
             if (site.getPartition() != null)
             {

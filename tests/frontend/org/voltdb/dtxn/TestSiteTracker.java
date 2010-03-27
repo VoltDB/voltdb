@@ -23,9 +23,14 @@
 
 package org.voltdb.dtxn;
 
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Set;
+
 import junit.framework.TestCase;
 
 import org.voltdb.MockVoltDB;
+import org.voltdb.catalog.Site;
 
 public class TestSiteTracker extends TestCase
 {
@@ -101,5 +106,128 @@ public class TestSiteTracker extends TestCase
         assertEquals(1, tracker.getPartitionForSite(2));
         assertEquals(0, tracker.getPartitionForSite(101));
         assertEquals(1, tracker.getPartitionForSite(102));
+    }
+
+    public void testHostToSites()
+    {
+        MockVoltDB helper = new MockVoltDB();
+
+        helper.addHost(0);
+        helper.addHost(1);
+        helper.addPartition(0);
+        helper.addPartition(1);
+        helper.addSite(0, 0, 0, false, true);
+        helper.addSite(1, 0, 0, true, true);
+        helper.addSite(2, 0, 1, true, true);
+        helper.addSite(3, 0, 1, true, false);
+        helper.addSite(100, 1, 0, false, true);
+        helper.addSite(101, 1, 0, true, true);
+        helper.addSite(102, 1, 1, true, false);
+        helper.addSite(103, 1, 1, true, true);
+
+        SiteTracker tracker = helper.getCatalogContext().siteTracker;
+        ArrayList<Integer> host0 = tracker.getAllSitesForHost(0);
+        assertTrue(host0.contains(0));
+        assertTrue(host0.contains(1));
+        assertTrue(host0.contains(2));
+        assertFalse(host0.contains(101));
+        host0 = tracker.getLiveExecutionSitesForHost(0);
+        assertFalse(host0.contains(0));
+        assertTrue(host0.contains(1));
+        assertTrue(host0.contains(2));
+        assertFalse(host0.contains(3));
+        assertFalse(host0.contains(101));
+        ArrayList<Integer> host1 = tracker.getAllSitesForHost(1);
+        assertTrue(host1.contains(100));
+        assertTrue(host1.contains(101));
+        assertTrue(host1.contains(102));
+        assertFalse(host1.contains(1));
+        host1 = tracker.getLiveExecutionSitesForHost(1);
+        assertFalse(host1.contains(100));
+        assertTrue(host1.contains(101));
+        assertFalse(host1.contains(102));
+        assertTrue(host1.contains(103));
+        assertFalse(host1.contains(1));
+    }
+
+    public void testUpSites()
+    {
+        MockVoltDB helper = new MockVoltDB();
+
+        helper.addHost(0);
+        helper.addHost(1);
+        helper.addPartition(0);
+        helper.addPartition(1);
+        helper.addSite(0, 0, 0, false, true);
+        helper.addSite(1, 0, 0, true, true);
+        helper.addSite(2, 0, 1, true, true);
+        helper.addSite(100, 1, 0, false, false);
+        helper.addSite(101, 1, 0, true, false);
+        helper.addSite(102, 1, 1, true, false);
+
+        SiteTracker tracker = helper.getCatalogContext().siteTracker;
+        ArrayDeque<Site> up_sites = tracker.getUpSites();
+        assertTrue(up_sites.contains(helper.getSite(0)));
+        assertTrue(up_sites.contains(helper.getSite(1)));
+        assertTrue(up_sites.contains(helper.getSite(2)));
+        assertFalse(up_sites.contains(helper.getSite(100)));
+        assertFalse(up_sites.contains(helper.getSite(101)));
+        assertFalse(up_sites.contains(helper.getSite(102)));
+
+        assertEquals(1, tracker.getLiveInitiatorCount());
+        assertEquals(2, tracker.getLiveSiteCount());
+    }
+
+    public void testExecutionSiteIds()
+    {
+        MockVoltDB helper = new MockVoltDB();
+
+        helper.addHost(0);
+        helper.addHost(1);
+        helper.addPartition(0);
+        helper.addPartition(1);
+        helper.addSite(0, 0, 0, false);
+        helper.addSite(1, 0, 0, true);
+        helper.addSite(2, 0, 1, true);
+        helper.addSite(100, 1, 0, false);
+        helper.addSite(101, 1, 0, true);
+        helper.addSite(102, 1, 1, true);
+
+        SiteTracker tracker = helper.getCatalogContext().siteTracker;
+        Set<Integer> exec_sites = tracker.getExecutionSiteIds();
+        assertFalse(exec_sites.contains(0));
+        assertTrue(exec_sites.contains(1));
+        assertTrue(exec_sites.contains(2));
+        assertFalse(exec_sites.contains(100));
+        assertTrue(exec_sites.contains(101));
+        assertTrue(exec_sites.contains(102));
+    }
+
+    public void testLiveSitesForPartitions()
+    {
+        MockVoltDB helper = new MockVoltDB();
+        helper.addHost(0);
+        helper.addHost(1);
+        helper.addPartition(0);
+        helper.addPartition(1);
+        helper.addSite(0, 0, 0, false, true);
+        helper.addSite(1, 0, 0, true, true);
+        helper.addSite(2, 0, 1, true, true);
+        helper.addSite(100, 1, 0, false, false);
+        helper.addSite(101, 1, 0, true, false);
+        helper.addSite(102, 1, 1, true, false);
+
+        SiteTracker tracker = helper.getCatalogContext().siteTracker;
+        assertEquals(1, tracker.getLiveSitesForPartition(0).size());
+        assertEquals(1, tracker.getLiveSitesForPartition(1).size());
+        assertTrue(tracker.getLiveSitesForPartition(0).contains(1));
+        assertFalse(tracker.getLiveSitesForPartition(0).contains(101));
+
+        int[] sites = tracker.getLiveSitesForEachPartition(new int[] {0, 1});
+        assertEquals(2, sites.length);
+        for (int site : sites)
+        {
+            assertTrue(site == 1 || site == 2);
+        }
     }
 }

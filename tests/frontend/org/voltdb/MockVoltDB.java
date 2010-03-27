@@ -83,7 +83,18 @@ public class MockVoltDB implements VoltDBInterface
         getCluster().getSites().add(Integer.toString(siteId));
         getSite(siteId).setHost(getHost(hostId));
         getSite(siteId).setIsexec(isExec);
-        getSite(siteId).setPartition(getPartition(partitionId));
+        if (isExec)
+        {
+            getSite(siteId).setPartition(getPartition(partitionId));
+        }
+        getSite(siteId).setIsup(true);
+    }
+
+    public void addSite(int siteId, int hostId, int partitionId, boolean isExec,
+                        boolean isUp)
+    {
+        addSite(siteId, hostId, partitionId, isExec);
+        getSite(siteId).setIsup(isUp);
     }
 
     public void addTable(String tableName, boolean isReplicated)
@@ -141,7 +152,7 @@ public class MockVoltDB implements VoltDBInterface
         return getCluster().getPartitions().get(String.valueOf(partitionId));
     }
 
-    Site getSite(int siteId)
+    public Site getSite(int siteId)
     {
         return getCluster().getSites().get(String.valueOf(siteId));
     }
@@ -279,6 +290,13 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public void catalogUpdate(String diffCommands, String newCatalogURL, int expectedCatalogVersion)
+    {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public void clusterUpdate(String diffCommands)
     {
         // TODO Auto-generated method stub
 
