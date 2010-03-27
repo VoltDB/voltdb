@@ -1,30 +1,38 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2010 VoltDB L.L.C.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+
 package org.voltdb.benchmark.twentyindex;
 
+import java.util.Random;
+import java.util.concurrent.atomic.AtomicLong;
+
+import org.voltdb.VoltTable;
 import org.voltdb.benchmark.ClientMain;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.VoltTable;
+import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.TimestampType;
-
-import java.util.ArrayDeque;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.ArrayList;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.*;
-import java.text.SimpleDateFormat;
-import java.util.Random;
-import java.io.FileInputStream;
-import java.io.DataInputStream;
-import java.io.FileOutputStream;
-import java.io.PrintStream;
-import java.io.IOException;
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.util.ArrayDeque;
 
 public class ClientBenchmark extends ClientMain {
     public static final AtomicLong globalMainId = new AtomicLong(1);
@@ -61,7 +69,7 @@ public class ClientBenchmark extends ClientMain {
                 pClientCallback(clientResponse.getResults());
             }
         }
-        
+
         protected void pClientCallback(VoltTable[] results) {
         };
     }
@@ -91,7 +99,7 @@ public class ClientBenchmark extends ClientMain {
         boolean queued = false;
 
         // Determine mainId
-        int mainIdOdds = rand.nextInt(100); 
+        int mainIdOdds = rand.nextInt(100);
         if (mainIdOdds < 80) {
             // same mainId
             mainId = currentMainId;
@@ -116,7 +124,7 @@ public class ClientBenchmark extends ClientMain {
         }
 
         TimestampType ttEventTime = new TimestampType();
-        long eventId = rand.nextInt(3000); 
+        long eventId = rand.nextInt(3000);
         long flag1 = rand.nextInt(2);
         long flag2 = rand.nextInt(2);
         String field1 = sb.toString();
@@ -157,7 +165,7 @@ public class ClientBenchmark extends ClientMain {
 
         m_counts[0].getAndIncrement();
     }
-    
+
     @Override
     protected boolean runOnce() throws NoConnectionsException {
         doOne();
