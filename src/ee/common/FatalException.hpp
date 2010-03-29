@@ -31,7 +31,7 @@ class FatalException {
 public:
     /**
      * Stack trace code from http://tombarta.wordpress.com/2008/08/01/c-stack-traces-with-gcc/
-     * 
+     *
      */
     FatalException(std::string message, const char *filename, unsigned long lineno) :
         m_reason(message), m_filename(filename), m_lineno(lineno) {
