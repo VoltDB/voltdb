@@ -1406,9 +1406,12 @@ inline uint16_t NValue::getTupleStorageSize(const ValueType type) {
         return sizeof(char*);
       case VALUE_TYPE_DECIMAL:
         return sizeof(TTInt);
-      default: {
-          throwFatalException( "NValue::getTupleStorageSize() unrecognized type '%d'", type);
-      }
+      default:
+          char message[128];
+          sprintf(message, "NValue::getTupleStorageSize() unrecognized type"
+                  " '%d'", type);
+          throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                        message);
     }
 }
 
@@ -1587,7 +1590,8 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
                 char *copy = NULL;
                 if (length > maxLength) {
                     char msg[1024];
-                    sprintf(msg, "Object exceeds specified size. Size is %hd and max is %hd", length, maxLength);
+                    sprintf(msg, "Object exceeds specified size. Size is %hd"
+                            " and max is %hd", length, maxLength);
                     throw SQLException(
                         SQLException::data_exception_string_data_length_mismatch,
                         msg);

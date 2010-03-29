@@ -134,14 +134,17 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstract_node,
     //
     int num_of_searchkeys = (int)inline_node->getSearchKeyExpressions().size();
     if (num_of_searchkeys == 0) {
-        throwFatalException( "There are no search key expressions for the internal PlanNode '%s' "
-                "of PlanNode '%s'", inline_node->debug().c_str(), node->debug().c_str());
+        VOLT_ERROR("There are no search key expressions for the internal"
+                   " PlanNode '%s' of PlanNode '%s'",
+                   inline_node->debug().c_str(), node->debug().c_str());
+        return false;
     }
     for (int ctr = 0; ctr < num_of_searchkeys; ctr++) {
         if (inline_node->getSearchKeyExpressions()[ctr] == NULL) {
-            throwFatalException( "The search key expression at position '%d' is NULL for internal "
-                    "PlanNode '%s' of PlanNode '%s'", ctr, inline_node->debug().c_str(),
-                    node->debug().c_str());
+            VOLT_ERROR("The search key expression at position '%d' is NULL for"
+                       " internal PlanNode '%s' of PlanNode '%s'",
+                       ctr, inline_node->debug().c_str(), node->debug().c_str());
+            return false;
         }
     }
 
@@ -162,11 +165,11 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstract_node,
     //
     index = inner_table->index(inline_node->getTargetIndexName());
     if (index == NULL) {
-        throwFatalException( "Failed to retreive index '%s' from inner table '%s' for internal PlanNode '%s'",
-                inline_node->getTargetIndexName().c_str(),
-                inner_table->name().c_str(),
-                inline_node->debug().c_str());
-        return (false);
+        VOLT_ERROR("Failed to retreive index '%s' from inner table '%s' for"
+                   " internal PlanNode '%s'",
+                   inline_node->getTargetIndexName().c_str(),
+                   inner_table->name().c_str(), inline_node->debug().c_str());
+        return false;
     }
 
     index_values = TableTuple(index->getKeySchema());
@@ -174,7 +177,7 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstract_node,
     index_values.move( index_values_backing_store - TUPLE_HEADER_SIZE);
     index_values.setAllNulls();
 
-    return (true);
+    return true;
 }
 
 bool NestLoopIndexExecutor::p_execute(const NValueArray &params)

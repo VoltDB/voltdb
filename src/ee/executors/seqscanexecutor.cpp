@@ -60,7 +60,9 @@
 
 using namespace voltdb;
 
-bool SeqScanExecutor::p_init(AbstractPlanNode *abstract_node, const catalog::Database* catalog_db, int* tempTableMemoryInBytes) {
+bool SeqScanExecutor::p_init(AbstractPlanNode *abstract_node,
+                             const catalog::Database* catalog_db,
+                             int* tempTableMemoryInBytes) {
     VOLT_TRACE("init SeqScan Executor");
 
     SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(abstract_node);
@@ -111,7 +113,7 @@ bool SeqScanExecutor::p_init(AbstractPlanNode *abstract_node, const catalog::Dat
                     tempTableMemoryInBytes));
         }
     }
-    return (true);
+    return true;
 }
 
 bool SeqScanExecutor::needsOutputTableClear() {
@@ -133,7 +135,8 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     //cout << "SeqScanExecutor: node id" << node->getPlanNodeId() << endl;
     VOLT_TRACE("Sequential Scanning table :\n %s",
                target_table->debug().c_str());
-    VOLT_DEBUG("Sequential Scanning table : %s which has %d active, %d allocated, %d deleted tuples",
+    VOLT_DEBUG("Sequential Scanning table : %s which has %d active, %d"
+               " allocated, %d deleted tuples",
                target_table->name().c_str(),
                (int)target_table->activeTupleCount(),
                (int)target_table->allocatedTupleCount(),
@@ -165,7 +168,9 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     if (limit_node != NULL) {
         limit_node->getLimitAndOffsetByReference(params, limit, offset);
         if (offset > 0) {
-            throwFatalException( "Nested Limit Offset is not yet supported for PlanNode '%s'", node->debug().c_str());
+            VOLT_ERROR("Nested Limit Offset is not yet supported for PlanNode"
+                       " '%s'", node->debug().c_str());
+            return false;
         }
     }
 
@@ -225,10 +230,11 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                     }
                     if (!output_table->insertTuple(temp_tuple))
                     {
-                        throwFatalException(
-                                "Failed to insert tuple from table '%s' into output table '%s'",
-                                target_table->name().c_str(),
-                                output_table->name().c_str());
+                        VOLT_ERROR("Failed to insert tuple from table '%s' into"
+                                   " output table '%s'",
+                                   target_table->name().c_str(),
+                                   output_table->name().c_str());
+                        return false;
                     }
                 }
                 else
@@ -237,9 +243,11 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                     // Insert the tuple into our output table
                     //
                     if (!output_table->insertTuple(tuple)) {
-                        throwFatalException("Failed to insert tuple from table '%s' into output table '%s'",
-                                target_table->name().c_str(),
-                                output_table->name().c_str());
+                        VOLT_ERROR("Failed to insert tuple from table '%s' into"
+                                   " output table '%s'",
+                                   target_table->name().c_str(),
+                                   output_table->name().c_str());
+                        return false;
                     }
                 }
                 ++tuple_ctr;

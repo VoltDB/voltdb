@@ -116,13 +116,16 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
         if (found_values.find(tuple_value) == found_values.end()) {
             found_values.insert(tuple_value);
             if (!output_table->insertTuple(tuple)) {
-                throwFatalException("Failed to insert tuple from input table '%s' into output table '%s'",
-                        input_table->name().c_str(), output_table->name().c_str());
+                VOLT_ERROR("Failed to insert tuple from input table '%s' into"
+                           " output table '%s'",
+                           input_table->name().c_str(),
+                           output_table->name().c_str());
+                return false;
             }
         } // IF unique
     }
 
-    return (true);
+    return true;
 }
 
 DistinctExecutor::~DistinctExecutor() {

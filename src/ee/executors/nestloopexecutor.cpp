@@ -66,7 +66,7 @@
 
 namespace voltdb {
 
-void
+bool
 assignTupleValueIndex(AbstractExpression *ae,
                       const std::string &oname,
                       const std::string &iname)
@@ -82,7 +82,8 @@ assignTupleValueIndex(AbstractExpression *ae,
     std::string tname = tve->getTableName();
 
     if (oname == "temp" && iname == "temp") {
-        throwFatalException("Unsuported join on two temp tables.");
+        VOLT_ERROR("Unsuported join on two temp tables.");
+        return false;
     }
 
     if (tname == oname)
@@ -94,8 +95,11 @@ assignTupleValueIndex(AbstractExpression *ae,
     else if (iname == "temp")
         tve->setTupleIndex(1);
     else {
-        throwFatalException("TableTupleValue in join with unknown table name.");
+        VOLT_ERROR("TableTupleValue in join with unknown table name.");
+        return false;
     }
+
+    return true;
 }
 
 bool NestLoopExecutor::p_init(AbstractPlanNode* abstract_node, const catalog::Database* catalog_db, int* tempTableMemoryInBytes) {
@@ -147,20 +151,27 @@ bool NestLoopExecutor::p_init(AbstractPlanNode* abstract_node, const catalog::Da
     while (predicate != NULL) {
         const AbstractExpression *left = predicate->getLeft();
         const AbstractExpression *right = predicate->getRight();
+
         if (right != NULL) {
             if (right->getExpressionType() == EXPRESSION_TYPE_VALUE_TUPLE) {
-                assignTupleValueIndex(const_cast<AbstractExpression*>(right),
-                                      node->getInputTables()[0]->name(),
-                                      node->getInputTables()[1]->name());
+                if (!assignTupleValueIndex(const_cast<AbstractExpression*>(right),
+                                           node->getInputTables()[0]->name(),
+                                           node->getInputTables()[1]->name())) {
+                    delete [] columnNames;
+                    return false;
+                }
             }
             // remember the right node - must visit its children
             stack.push(right);
         }
         if (left != NULL) {
             if (left->getExpressionType() == EXPRESSION_TYPE_VALUE_TUPLE) {
-                assignTupleValueIndex(const_cast<AbstractExpression*>(left),
-                                      node->getInputTables()[0]->name(),
-                                      node->getInputTables()[1]->name());
+                if (!assignTupleValueIndex(const_cast<AbstractExpression*>(left),
+                                           node->getInputTables()[0]->name(),
+                                           node->getInputTables()[1]->name())) {
+                    delete [] columnNames;
+                    return false;
+                }
             }
         }
 

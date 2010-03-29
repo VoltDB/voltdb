@@ -111,9 +111,11 @@ LimitExecutor::p_execute(const NValueArray &params)
         if (start) {
             if (!output_table->insertTuple(tuple))
             {
-                throwFatalException( "Failed to insert tuple from input table '%s' into output table '%s'",
-                        input_table->name().c_str(),
-                        output_table->name().c_str());
+                VOLT_ERROR("Failed to insert tuple from input table '%s' into"
+                           " output table '%s'",
+                           input_table->name().c_str(),
+                           output_table->name().c_str());
+                return false;
             }
             tuple_ctr++;
         } else

@@ -187,9 +187,10 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
             (m_distinctColumnType != VALUE_TYPE_SMALLINT) &&
             (m_distinctColumnType != VALUE_TYPE_INTEGER) &&
             (m_distinctColumnType != VALUE_TYPE_BIGINT)) {
-            throwFatalException(
-                    "The Distinct operation is not supported for '%s' columns",
-                    getTypeName(m_distinctColumnType).c_str());
+            VOLT_ERROR("The Distinct operation is not supported for '%s'"
+                       " columns", getTypeName(m_distinctColumnType).c_str());
+            delete [] m_projectionExpressions;
+            return false;
         }
     }
 
@@ -228,8 +229,10 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     {
         if (m_node->getSearchKeyExpressions()[ctr] == NULL)
         {
-            throwFatalException( "The search key expression at position '%d' is NULL for PlanNode '%s'",
-                    ctr, m_node->debug().c_str());
+            VOLT_ERROR("The search key expression at position '%d' is NULL for"
+                       " PlanNode '%s'", ctr, m_node->debug().c_str());
+            delete [] m_projectionExpressions;
+            return false;
         }
         m_needsSubstituteSearchKeyPtr[ctr] =
             m_node->getSearchKeyExpressions()[ctr]->hasParameter();
@@ -257,10 +260,12 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     m_searchKey.moveNoHeader(m_searchKeyBackingStore);
     if (m_index == NULL)
     {
-        throwFatalException( "Failed to retreive index '%s' from table '%s' for PlanNode '%s'",
-                m_node->getTargetIndexName().c_str(),
-                m_targetTable->name().c_str(),
-                m_node->debug().c_str());
+        VOLT_ERROR("Failed to retreive index '%s' from table '%s' for PlanNode"
+                   " '%s'", m_node->getTargetIndexName().c_str(),
+                   m_targetTable->name().c_str(), m_node->debug().c_str());
+        delete [] m_searchKeyBackingStore;
+        delete [] m_projectionExpressions;
+        return false;
     }
     m_tuple = TableTuple(m_targetTable->schema());
 
@@ -290,9 +295,12 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
         if ((aggregateType != EXPRESSION_TYPE_AGGREGATE_MIN) &&
             (aggregateType != EXPRESSION_TYPE_AGGREGATE_MAX))
         {
-            throwFatalException( "Unsupported inline Aggregate type '%s' in PlanNode '%s'",
-                    expressionutil::getTypeName(aggregateType).c_str(),
-                    m_node->debug().c_str());
+            VOLT_ERROR("Unsupported inline Aggregate type '%s' in PlanNode '%s'",
+                       expressionutil::getTypeName(aggregateType).c_str(),
+                       m_node->debug().c_str());
+            delete [] m_searchKeyBackingStore;
+            delete [] m_projectionExpressions;
+            return false;
         }
 
         //
@@ -375,7 +383,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         m_limitNode->getLimitAndOffsetByReference(params, m_limitSize, m_limitOffset);
         if (m_limitOffset > 0)
         {
-            throwFatalException("The limit offset operation is not supported for IndexScans yet");
+            VOLT_ERROR("The limit offset operation is not supported for"
+                       " IndexScans yet");
+            return false;
         }
     }
 

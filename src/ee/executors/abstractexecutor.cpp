@@ -69,8 +69,9 @@ bool AbstractExecutor::init(VoltDBEngine *engine, const catalog::Database* catal
     for (int ctr = 0, cnt = (int)abstract_node->getChildren().size(); ctr < cnt; ctr++) {
         Table* table = abstract_node->getChildren()[ctr]->getOutputTable();
         if (table == NULL) {
-            throwFatalException( "Output table from PlanNode '%s' is NULL",
-                    abstract_node->getChildren()[ctr]->debug().c_str());
+            VOLT_ERROR("Output table from PlanNode '%s' is NULL",
+                       abstract_node->getChildren()[ctr]->debug().c_str());
+            return false;
         }
         input_tables.push_back(table);
     }
@@ -103,9 +104,11 @@ bool AbstractExecutor::init(VoltDBEngine *engine, const catalog::Database* catal
         if (target_table == NULL) {
             target_table = engine->getTable(targetTableName);
             if (target_table == NULL) {
-                throwFatalException( "Failed to retrieve target table '%s' "
-                        "from execution engine for PlanNode '%s'",
-                        targetTableName.c_str(), abstract_node->debug().c_str());
+                VOLT_ERROR("Failed to retrieve target table '%s' "
+                           "from execution engine for PlanNode '%s'",
+                           targetTableName.c_str(),
+                           abstract_node->debug().c_str());
+                return false;
             }
             if (scan_node) {
                 scan_node->setTargetTable(target_table);
@@ -118,9 +121,14 @@ bool AbstractExecutor::init(VoltDBEngine *engine, const catalog::Database* catal
 
     // Call the p_init() method on our derived class
     try {
-        this->p_init(abstract_node, catalog_db, tempTableMemoryInBytes);
+        if (!this->p_init(abstract_node, catalog_db, tempTableMemoryInBytes))
+            return false;
     } catch (std::exception& err) {
-        throwFatalException( "The Executor failed to initialize PlanNode '%s'", abstract_node->debug().c_str());
+        char message[128];
+        sprintf(message, "The Executor failed to initialize PlanNode '%s'",
+                abstract_node->debug().c_str());
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      message);
     }
     Table *tmp_output_table_base = abstract_node->getOutputTable();
     this->tmp_output_table = dynamic_cast<TempTable*>(tmp_output_table_base);
@@ -128,7 +136,8 @@ bool AbstractExecutor::init(VoltDBEngine *engine, const catalog::Database* catal
     // determines whether the output table should be cleared or not.
     // specific executor might not need (and must not do) clearing.
     if (!this->needs_outputtable_clear_cached) {
-        VOLT_TRACE("Did not clear output table because the derived class answered so");
+        VOLT_TRACE("Did not clear output table because the derived class"
+                   " answered so");
         this->tmp_output_table = NULL;
     }
     return true;

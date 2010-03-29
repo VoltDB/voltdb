@@ -114,7 +114,9 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     // running in a distributed cluster
     //
     if (m_inputTable->activeTupleCount() == 0) {
-        throwFatalException( "No tuples were found in our input table '%s'", m_inputTable->name().c_str());
+        VOLT_ERROR("No tuples were found in our input table '%s'",
+                   m_inputTable->name().c_str());
+        return false;
     }
 #endif
     assert (m_inputTable->activeTupleCount() > 0);
@@ -164,14 +166,20 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
 
         // try to put the tuple into the target table
         if (!m_targetTable->insertTuple(m_tuple)) {
-            throwFatalException( "Failed to insert tuple from input table '%s' into target table '%s'",
-                    m_inputTable->name().c_str(), m_targetTable->name().c_str());
+            VOLT_ERROR("Failed to insert tuple from input table '%s' into"
+                       " target table '%s'",
+                       m_inputTable->name().c_str(),
+                       m_targetTable->name().c_str());
+            return false;
         }
 
         // try to put the tuple into the output table
         if (!outputTable->insertTuple(m_tuple)) {
-            throwFatalException( "Failed to insert tuple from input table '%s' into output table '%s'",
-                    m_inputTable->name().c_str(), outputTable->name().c_str());
+            VOLT_ERROR("Failed to insert tuple from input table '%s' into"
+                       " output table '%s'",
+                       m_inputTable->name().c_str(),
+                       outputTable->name().c_str());
+            return false;
         }
 
         // successfully inserted

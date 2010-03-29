@@ -253,7 +253,9 @@ bool VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput* out) const {
 // ------------------------------------------------------------------
 // EXECUTION FUNCTIONS
 // ------------------------------------------------------------------
-int VoltDBEngine::executeQuery(int64_t planfragmentId, int32_t outputDependencyId, int32_t inputDependencyId,
+int VoltDBEngine::executeQuery(int64_t planfragmentId,
+                               int32_t outputDependencyId,
+                               int32_t inputDependencyId,
                                const NValueArray &params,
                                int64_t txnId, int64_t lastCommittedTxnId,
                                bool first, bool last)
@@ -269,7 +271,8 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId, int32_t outputDependencyI
      * not be known in advance.
      */
     if (first) {
-        m_startOfResultBuffer = m_resultOutput.reserveBytes(sizeof(int32_t) + sizeof(int8_t));
+        m_startOfResultBuffer = m_resultOutput.reserveBytes(sizeof(int32_t)
+                                                            + sizeof(int8_t));
         m_dirtyFragmentBatch = false;
     }
 
@@ -681,18 +684,20 @@ bool VoltDBEngine::initPlanNode(const int64_t fragId, AbstractPlanNode* node, in
         for (internal_it = node->getInlinePlanNodes().begin(); internal_it != node->getInlinePlanNodes().end(); internal_it++) {
             AbstractPlanNode* inline_node = internal_it->second;
             if (!initPlanNode(fragId, inline_node, tempTableMemoryInBytes)) {
-                throwFatalException(
-                        "Failed to initialize the internal PlanNode '%s' of PlanNode '%s'",
-                        inline_node->debug().c_str(), node->debug().c_str());
+                VOLT_ERROR("Failed to initialize the internal PlanNode '%s' of"
+                           " PlanNode '%s'", inline_node->debug().c_str(),
+                           node->debug().c_str());
+                return false;
             }
         }
     }
 
     // Now use the executor to initialize the plannode for execution later on
     if (!executor->init(this, m_database, tempTableMemoryInBytes)) {
-        throwFatalException(
-                "The Executor failed to initialize PlanNode '%s' for PlanFragment '%jd'",
-                node->debug().c_str(), (intmax_t)fragId);
+        VOLT_ERROR("The Executor failed to initialize PlanNode '%s' for"
+                   " PlanFragment '%jd'", node->debug().c_str(),
+                   (intmax_t)fragId);
+        return false;
     }
 
     return true;

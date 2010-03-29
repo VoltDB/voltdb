@@ -62,7 +62,9 @@
 
 namespace voltdb {
 
-bool SendExecutor::p_init(AbstractPlanNode *abstractNode, const catalog::Database* catalog_db, int* tempTableMemoryInBytes) {
+bool SendExecutor::p_init(AbstractPlanNode *abstractNode,
+                          const catalog::Database* catalog_db,
+                          int* tempTableMemoryInBytes) {
     VOLT_TRACE("init Send Executor");
 
     SendPlanNode* node = dynamic_cast<SendPlanNode*>(abstractNode);
@@ -86,7 +88,7 @@ bool SendExecutor::p_execute(const NValueArray &params) {
     //m_inputTable->setDependencyId(m_dependencyId);//Multiple send executors sharing the same input table apparently.
     // Just blast the input table on through VoltDBEngine!
     if (!m_engine->send(m_inputTable)) {
-        throwFatalException( "Failed to send table '%s'", m_inputTable->name().c_str());
+        VOLT_ERROR("Failed to send table '%s'", m_inputTable->name().c_str());
         return false;
     }
     VOLT_DEBUG("SEND TABLE: %s", m_inputTable->debug().c_str());

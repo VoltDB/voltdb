@@ -64,7 +64,9 @@ void StreamedTable::cleanupManagedBuffers(Topend *topend)
 
 void StreamedTable::deleteAllTuples(bool freeAllocatedStrings)
 {
-    throwFatalException("May not delete all tuples of a streamed table.");
+    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                  "May not delete all tuples of a streamed"
+                                  " table.");
 }
 
 bool StreamedTable::insertTuple(TableTuple &source)

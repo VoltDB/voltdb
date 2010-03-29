@@ -62,7 +62,8 @@ using namespace std;
 
 bool
 OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
-                        const catalog::Database* catalog_db, int* tempTableMemoryInBytes)
+                        const catalog::Database* catalog_db,
+                        int* tempTableMemoryInBytes)
 {
     VOLT_TRACE("init OrderBy Executor");
 
@@ -91,9 +92,10 @@ OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
                     node->getSortColumnGuids()[ii]);
         }
         else if (!(index < input_column_count)) {
-            throwFatalException( "Sorting column guid %d calculated index %d for input "
-                    " with %d columns", node->getSortColumnGuids()[ii],
-                    index, input_column_count);
+            VOLT_ERROR("Sorting column guid %d calculated index %d for input "
+                       " with %d columns", node->getSortColumnGuids()[ii],
+                       index, input_column_count);
+            return false;
         }
 
         sortColumns.push_back(index);
@@ -115,7 +117,7 @@ OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
         dynamic_cast<LimitPlanNode*>(node->
                                      getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
 
-    return (true);
+    return true;
 }
 
 class TupleComparer
@@ -180,8 +182,9 @@ OrderByExecutor::p_execute(const NValueArray &params)
         limit_node->getLimitAndOffsetByReference(params, limit, offset);
         if (offset > 0)
         {
-            throwFatalException( "Nested Limit Offset is not yet supported for PlanNode '%s'",
-                    node->debug().c_str());
+            VOLT_ERROR("Nested Limit Offset is not yet supported for PlanNode"
+                       " '%s'", node->debug().c_str());
+            return false;
         }
     }
 
@@ -207,9 +210,11 @@ OrderByExecutor::p_execute(const NValueArray &params)
                    input_table->debug().c_str());
         if (!output_table->insertTuple(*it))
         {
-            throwFatalException( "Failed to insert order-by tuple from input table '%s' into output table '%s'",
-                    input_table->name().c_str(),
-                    output_table->name().c_str());
+            VOLT_ERROR("Failed to insert order-by tuple from input table '%s'"
+                       " into output table '%s'",
+                       input_table->name().c_str(),
+                       output_table->name().c_str());
+            return false;
         }
         //
         // Check whether we have gone past our limit

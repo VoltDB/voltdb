@@ -108,16 +108,19 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
     while (inputIterator.next(m_inputTuple)) {
         //
         // OPTIMIZATION: Single-Sited Query Plans
-        // If our beloved DeletePlanNode is apart of a single-site query plan, then the first
-        // column in the input table will be the address of a tuple on the target table that we
-        // will want to blow away. This saves us the trouble of having to do an index lookup
+        // If our beloved DeletePlanNode is apart of a single-site query plan,
+        // then the first column in the input table will be the address of a
+        // tuple on the target table that we will want to blow away. This saves
+        // us the trouble of having to do an index lookup
         //
         void *targetAddress = m_inputTuple.getNValue(0).castAsAddress();
         m_targetTuple.move(targetAddress);
 
         // Delete from target table
         if (!m_targetTable->deleteTuple(m_targetTuple, true)) {
-            throwFatalException("Failed to delete tuple from table '%s'", m_targetTable->name().c_str());
+            VOLT_ERROR("Failed to delete tuple from table '%s'",
+                       m_targetTable->name().c_str());
+            return false;
         }
     }
 

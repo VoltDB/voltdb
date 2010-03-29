@@ -241,7 +241,9 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple) {
             m_updatedTuple.setNValue(i, existingValue.op_decrement());
         }
         else {
-            throwFatalException("Error in materialized view table update.");
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                          "Error in materialized view table"
+                                          " update.");
         }
     }
 
@@ -263,8 +265,10 @@ bool MaterializedViewMetadata::findExistingTuple(TableTuple &oldTuple, bool expe
     m_existingTuple = m_index->nextValueAtKey();
     if (m_existingTuple.isNullTuple()) {
         if (expected) {
-            throwFatalException("MaterializedViewMetadata went looking for"
-                    "a tuple in the view and expected to find it but didn't");
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                          "MaterializedViewMetadata went"
+                                          " looking for a tuple in the view and"
+                                          " expected to find it but didn't");
         }
         return false;
     }

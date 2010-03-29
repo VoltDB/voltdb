@@ -57,7 +57,9 @@
 
 namespace voltdb {
 
-bool ProjectionExecutor::p_init(AbstractPlanNode *abstract_node, const catalog::Database* catalog_db, int* tempTableMemoryInBytes) {
+bool ProjectionExecutor::p_init(AbstractPlanNode *abstract_node,
+                                const catalog::Database* catalog_db,
+                                int* tempTableMemoryInBytes) {
     VOLT_TRACE("init Projection Executor");
     assert(tempTableMemoryInBytes);
 
@@ -110,7 +112,7 @@ bool ProjectionExecutor::p_init(AbstractPlanNode *abstract_node, const catalog::
         input_table = node->getInputTables()[0];
         tuple = TableTuple(input_table->schema());
     }
-    return (true);
+    return true;
 }
 
 bool ProjectionExecutor::p_execute(const NValueArray &params) {
@@ -118,7 +120,8 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
     ProjectionPlanNode* node = dynamic_cast<ProjectionPlanNode*>(abstract_node);
 #endif
     assert (node);
-    assert (!node->isInline()); // inline projection's execute() should not be called
+    assert (!node->isInline()); // inline projection's execute() should not be
+                                // called
     assert (output_table == dynamic_cast<TempTable*>(node->getOutputTable()));
     assert (output_table);
     assert (input_table == node->getInputTables()[0]);
@@ -127,21 +130,24 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
     VOLT_TRACE("INPUT TABLE: %s\n", input_table->debug().c_str());
 
     //
-    // Since we have the input params, we need to call substitute to change any nodes in our expression tree
-    // to be ready for the projection operations in execute
+    // Since we have the input params, we need to call substitute to change any
+    // nodes in our expression tree to be ready for the projection operations in
+    // execute
     //
     assert (num_of_columns == (int)node->getOutputColumnNames().size());
     if (all_tuple_array == NULL && all_param_array == NULL) {
         for (int ctr = num_of_columns - 1; ctr >= 0; --ctr) {
             assert(expression_array[ctr]);
             expression_array[ctr]->substitute(params);
-            VOLT_TRACE("predicate[%d]: %s", ctr, expression_array[ctr]->debug(true).c_str());
+            VOLT_TRACE("predicate[%d]: %s", ctr,
+                       expression_array[ctr]->debug(true).c_str());
         }
     }
 
     //
-    // Now loop through all the tuples and push them through our output expression
-    // This will generate new tuple values that we will insert into our output table
+    // Now loop through all the tuples and push them through our output
+    // expression This will generate new tuple values that we will insert into
+    // our output table
     //
     TableIterator iterator(input_table);
     assert (tuple.sizeInValues() == input_table->columnCount());

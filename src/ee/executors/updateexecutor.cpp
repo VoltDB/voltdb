@@ -89,7 +89,8 @@ bool UpdateExecutor::p_init(AbstractPlanNode *abstract_node, const catalog::Data
     AbstractPlanNode *child = node->getChildren()[0];
     ProjectionPlanNode *proj_node = NULL;
     if (NULL == child) {
-        throwFatalException("Attempted to initialize update executor with NULL child");
+        VOLT_ERROR("Attempted to initialize update executor with NULL child");
+        return false;
     }
 
     PlanNodeType pnt = child->getPlanNodeType();
@@ -156,22 +157,25 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
     while (input_iterator.next(m_inputTuple)) {
         //
         // OPTIMIZATION: Single-Sited Query Plans
-        // If our beloved UpdatePlanNode is apart of a single-site query plan, then the first
-        // column in the input table will be the address of a tuple on the target table that we
-        // will want to update. This saves us the trouble of having to do an index lookup
+        // If our beloved UpdatePlanNode is apart of a single-site query plan,
+        // then the first column in the input table will be the address of a
+        // tuple on the target table that we will want to update. This saves us
+        // the trouble of having to do an index lookup
         //
         void *target_address = m_inputTuple.getNValue(0).castAsAddress();
         m_targetTuple.move(target_address);
 
-        // Loop through INPUT_COL_IDX->TARGET_COL_IDX mapping and only update the values
-        // that we need to. The key thing to note here is that we grab a temp tuple that is a
-        // copy of the target tuple (i.e., the tuple we want to update). This insures that if
-        // the input tuple is somehow bringing garbage with it, we're only going to copy what we
-        // really need to into the target tuple.
+        // Loop through INPUT_COL_IDX->TARGET_COL_IDX mapping and only update
+        // the values that we need to. The key thing to note here is that we
+        // grab a temp tuple that is a copy of the target tuple (i.e., the tuple
+        // we want to update). This insures that if the input tuple is somehow
+        // bringing garbage with it, we're only going to copy what we really
+        // need to into the target tuple.
         //
         TableTuple &tempTuple = m_targetTable->getTempTupleInlined(m_targetTuple);
         for (int map_ctr = 0; map_ctr < m_inputTargetMapSize; map_ctr++) {
-            tempTuple.setNValue(m_inputTargetMap[map_ctr].second, m_inputTuple.getNValue(m_inputTargetMap[map_ctr].first));
+            tempTuple.setNValue(m_inputTargetMap[map_ctr].second,
+                                m_inputTuple.getNValue(m_inputTargetMap[map_ctr].first));
         }
 
         // if there is a partition column for the target table
@@ -191,20 +195,23 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
 
             // if it doesn't map to this site
             if (!isLocal) {
-                throwFatalException(
-                        "Mispartitioned tuple in single-partition plan for table '%s'",
-                        m_targetTable->name().c_str());
+                VOLT_ERROR("Mispartitioned tuple in single-partition plan for"
+                           " table '%s'", m_targetTable->name().c_str());
+                return false;
             }
         }
 
-        if (!m_targetTable->updateTuple(tempTuple, m_targetTuple, m_updatesIndexes)) {
-            VOLT_INFO("Failed to update tuple from table '%s'", m_targetTable->name().c_str());
+        if (!m_targetTable->updateTuple(tempTuple, m_targetTuple,
+                                        m_updatesIndexes)) {
+            VOLT_INFO("Failed to update tuple from table '%s'",
+                      m_targetTable->name().c_str());
             return false;
         }
     }
 
     VOLT_TRACE("TARGET TABLE - AFTER: %s\n", m_targetTable->debug().c_str());
-    // TODO lets output result table here, not in result executor. same thing in delete/insert
+    // TODO lets output result table here, not in result executor. same thing in
+    // delete/insert
 
     // add to the planfragments count of modified tuples
     m_engine->m_tuplesModified += m_inputTable->activeTupleCount();
