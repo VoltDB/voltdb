@@ -12,6 +12,7 @@
 # simultaneous invocations by the same user may have unpredictable results.
 
 import sys
+from time import sleep 
 from subprocess import Popen, PIPE
 
 # constants
@@ -21,7 +22,7 @@ LOCKFILE = "/dev/shm/reserved"
 CHECK_UMASK = "umask -S | sed 's/.*,//g' | grep -v w"
 
 def usage():
-    print sys.argv[0], "[release|reserve] [machine...]"
+    print sys.argv[0], "[release|reserve|wait] [machine...]"
     sys.exit()
 
 def system(args):
@@ -71,5 +72,16 @@ elif (option == "reserve"):
             print machine, "could not be reserved"
             delete_lockfiles(reserved)
             sys.exit(-1)
+elif (option == "wait"):
+    while 1:
+        for machine in machines:
+            if 0 == system(["ssh", machine, "test -O " + LOCKFILE]):
+                # one of the machines we're waiting for is unavailable
+                break # out of the for loop
+        else: # for...else, not if...else!!  yes this indentation is correct
+            # we made it all the way through the for loop
+            # no machines are reserved
+            break # out of the while loop
+        sleep(5)
 else:
     usage()
