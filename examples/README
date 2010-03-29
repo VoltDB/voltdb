@@ -13,6 +13,9 @@ helloworld
 satellite
   This example is a simulation of satellite tracking.
 
+voter
+  This example is a simulation of a telephone based voting process where callers are allowed a limited number of votes.
+
 
 Each example includes a DDL file and a project.xml that lists the DDL file and the stored procedures names. The auction and satellite examples also include an ant build file.
 

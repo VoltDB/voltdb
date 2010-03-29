@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<project>
+    <database name='database'>
+        <schemas>
+            <schema path='ddl.sql' />
+        </schemas>
+        <procedures>
+            <procedure class='com.procedures.Initialize' />
+            <procedure class='com.procedures.Results' />
+            <procedure class='com.procedures.Vote' />
+        </procedures>
+        <partitions>
+            <partition table='votes' column='phone_number' />
+        </partitions>
+    </database>
+</project>

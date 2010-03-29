@@ -31,6 +31,7 @@
 <property name='dist.examples.dir'           location='${dist.dir}/examples' />
 <property name='dist.examples.auction.dir'   location='${dist.examples.dir}/auction' />
 <property name='dist.examples.satellite.dir' location='${dist.examples.dir}/satellite' />
+<property name='dist.examples.voter.dir'     location='${dist.examples.dir}/voter' />
 <property name='doc.dir'                     location='doc' />
 <property name='src.gpl.dir'                 location='src/frontend' />
 <property name='src.hsqldb.dir'              location='src/hsqldb19b3' />
@@ -1064,6 +1065,14 @@ TEST CASES
         target='main'
     />
     -->
+
+    <!-- make sure voter example compiles -->
+    <ant
+        dir='${dist.examples.voter.dir}'
+        inheritAll='false'
+        inheritRefs='false'
+        target='main'
+    />
 
     <!-- test the generator -->
     <exec dir="${dist.dir}" executable='${dist.dir}/tools/generate'>
