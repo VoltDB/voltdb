@@ -32,11 +32,22 @@ public class TestFaultDistributor extends TestCase
     {
         FaultType m_faultType;
         boolean m_gotFault;
+        int m_order;
+        OrderTracker m_orderTracker;
 
         public MockFaultHandler(FaultType type)
         {
             m_faultType = type;
             m_gotFault = false;
+        }
+
+        public MockFaultHandler(FaultType type, int order,
+                                OrderTracker orderTracker)
+        {
+            m_faultType = type;
+            m_gotFault = false;
+            m_order = order;
+            m_orderTracker = orderTracker;
         }
 
         @Override
@@ -46,6 +57,31 @@ public class TestFaultDistributor extends TestCase
             {
                 m_gotFault = true;
             }
+            if (m_orderTracker != null)
+            {
+                m_orderTracker.updateOrder(m_order);
+            }
+        }
+    }
+
+    class OrderTracker
+    {
+        boolean m_goodOrder;
+        int m_lastOrder;
+
+        OrderTracker(int startingOrder)
+        {
+            m_goodOrder = true;
+            m_lastOrder = startingOrder;
+        }
+
+        void updateOrder(int newOrder)
+        {
+            if (newOrder < m_lastOrder)
+            {
+                m_goodOrder = false;
+            }
+            m_lastOrder = newOrder;
         }
     }
 
@@ -54,8 +90,8 @@ public class TestFaultDistributor extends TestCase
         FaultDistributor dut = new FaultDistributor();
         MockFaultHandler unk_handler = new MockFaultHandler(FaultType.UNKNOWN);
         MockFaultHandler node_handler = new MockFaultHandler(FaultType.NODE_FAILURE);
-        dut.registerFaultHandler(FaultType.UNKNOWN, unk_handler);
-        dut.registerFaultHandler(FaultType.NODE_FAILURE, node_handler);
+        dut.registerFaultHandler(FaultType.UNKNOWN, unk_handler, 1);
+        dut.registerFaultHandler(FaultType.NODE_FAILURE, node_handler, 1);
         dut.reportFault(new VoltFault(FaultType.UNKNOWN));
         assertTrue(unk_handler.m_gotFault);
         assertFalse(node_handler.m_gotFault);
@@ -68,9 +104,9 @@ public class TestFaultDistributor extends TestCase
     {
         FaultDistributor dut = new FaultDistributor();
         MockFaultHandler node_handler1 = new MockFaultHandler(FaultType.NODE_FAILURE);
-        dut.registerFaultHandler(FaultType.NODE_FAILURE, node_handler1);
+        dut.registerFaultHandler(FaultType.NODE_FAILURE, node_handler1, 1);
         MockFaultHandler node_handler2 = new MockFaultHandler(FaultType.NODE_FAILURE);
-        dut.registerFaultHandler(FaultType.NODE_FAILURE, node_handler2);
+        dut.registerFaultHandler(FaultType.NODE_FAILURE, node_handler2, 1);
         dut.reportFault(new VoltFault(FaultType.NODE_FAILURE));
         assertTrue(node_handler1.m_gotFault);
         assertTrue(node_handler2.m_gotFault);
@@ -86,6 +122,40 @@ public class TestFaultDistributor extends TestCase
         dut.registerDefaultHandler(unk_handler);
         dut.reportFault(new VoltFault(FaultType.NODE_FAILURE));
         assertTrue(unk_handler.m_gotFault);
+    }
+
+    public void testSingleTypeOrder()
+    {
+        FaultDistributor dut = new FaultDistributor();
+        OrderTracker order_tracker = new OrderTracker(-1);
+        MockFaultHandler node_handler1 =
+            new MockFaultHandler(FaultType.NODE_FAILURE, 1, order_tracker);
+        MockFaultHandler node_handler2 =
+            new MockFaultHandler(FaultType.NODE_FAILURE, 2, order_tracker);
+        MockFaultHandler node_handler2a =
+            new MockFaultHandler(FaultType.NODE_FAILURE, 2, order_tracker);
+        MockFaultHandler node_handler5 =
+            new MockFaultHandler(FaultType.NODE_FAILURE, 5, order_tracker);
+        MockFaultHandler node_handler5a =
+            new MockFaultHandler(FaultType.NODE_FAILURE, 5, order_tracker);
+        MockFaultHandler node_handler7 =
+            new MockFaultHandler(FaultType.NODE_FAILURE, 7, order_tracker);
+        // register handlers in non-sequential order to avoid getting lucky
+        // with insertion order
+        dut.registerFaultHandler(FaultType.NODE_FAILURE, node_handler7, 7);
+        dut.registerFaultHandler(FaultType.NODE_FAILURE, node_handler2a, 2);
+        dut.registerFaultHandler(FaultType.NODE_FAILURE, node_handler5, 5);
+        dut.registerFaultHandler(FaultType.NODE_FAILURE, node_handler1, 1);
+        dut.registerFaultHandler(FaultType.NODE_FAILURE, node_handler5a, 5);
+        dut.registerFaultHandler(FaultType.NODE_FAILURE, node_handler2, 2);
+        dut.reportFault(new VoltFault(FaultType.NODE_FAILURE));
+        assertTrue(node_handler1.m_gotFault);
+        assertTrue(node_handler2.m_gotFault);
+        assertTrue(node_handler2a.m_gotFault);
+        assertTrue(node_handler5.m_gotFault);
+        assertTrue(node_handler5a.m_gotFault);
+        assertTrue(node_handler7.m_gotFault);
+        assertTrue(order_tracker.m_goodOrder);
     }
 
     // threadedness?

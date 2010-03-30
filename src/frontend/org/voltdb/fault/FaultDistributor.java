@@ -19,6 +19,7 @@ package org.voltdb.fault;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.TreeMap;
 
 import org.voltdb.fault.VoltFault.FaultType;
 
@@ -30,7 +31,8 @@ public class FaultDistributor
 {
     public FaultDistributor()
     {
-        m_faultHandlers = new HashMap<FaultType, List<FaultHandler>>();
+        m_faultHandlers =
+            new HashMap<FaultType, TreeMap<Integer, List<FaultHandler>>>();
     }
 
     /**
@@ -39,14 +41,33 @@ public class FaultDistributor
      * @param type The FaultType in which the caller is interested
      * @param handler The FaultHandler object which the caller wants called back
      *        when the the specified type occurs
+     * @param order Where in the calling sequence of fault handlers this
+     *        handler should appear.  Lower values will be called first; multiple
+     *        handlers can have the same value but there is no guarantee of
+     *        the order in which they will be called
      */
-    public synchronized void registerFaultHandler(FaultType type, FaultHandler handler)
+    public synchronized void registerFaultHandler(FaultType type,
+                                                  FaultHandler handler,
+                                                  int order)
     {
-        List<FaultHandler> handler_list = m_faultHandlers.get(type);
-        if (handler_list == null)
+        TreeMap<Integer, List<FaultHandler>> handler_map =
+            m_faultHandlers.get(type);
+        List<FaultHandler> handler_list = null;
+        if (handler_map == null)
         {
+            handler_map = new TreeMap<Integer, List<FaultHandler>>();
+            m_faultHandlers.put(type, handler_map);
             handler_list = new ArrayList<FaultHandler>();
-            m_faultHandlers.put(type, handler_list);
+            handler_map.put(order, handler_list);
+        }
+        else
+        {
+            handler_list = handler_map.get(order);
+            if (handler_list == null)
+            {
+                handler_list = new ArrayList<FaultHandler>();
+                handler_map.put(order, handler_list);
+            }
         }
         handler_list.add(handler);
     }
@@ -58,13 +79,16 @@ public class FaultDistributor
      */
     public void registerDefaultHandler(FaultHandler handler)
     {
-        registerFaultHandler(FaultType.UNKNOWN, handler);
+        // semi-arbitrarily large enough priority value so that
+        // the default handler is last
+        registerFaultHandler(FaultType.UNKNOWN, handler, 1000);
     }
 
     /**
-     * Report that a fault (represted by the fault arg) has occured.  All
-     * registered FaultHandlers for that type will get called, currently in
-     * no guaranteed order (this will likely change in the future).  Any reported
+     * Report that a fault (represented by the fault arg) has occurred.  All
+     * registered FaultHandlers for that type will get called, sequenced from
+     * lowest order to highest order, with no guaranteed order within an 'order'
+     * (yes, horrible word overloading).  Any reported
      * fault for which there is no registered handler will be handled by
      * any registered handlers for the UNKNOWN fault type.  If there is no
      * registered handler for the UNKNOWN fault type, a DefaultFaultHandler will
@@ -76,22 +100,25 @@ public class FaultDistributor
     // XXX-FAILURE need more error checking, default handling, and whatnot
     public synchronized void reportFault(VoltFault fault)
     {
-        List<FaultHandler> handler_list =
+        TreeMap<Integer, List<FaultHandler>> handler_map =
             m_faultHandlers.get(fault.getFaultType());
-        if (handler_list == null)
+        if (handler_map == null)
         {
-            handler_list = m_faultHandlers.get(FaultType.UNKNOWN);
-            if (handler_list == null)
+            handler_map = m_faultHandlers.get(FaultType.UNKNOWN);
+            if (handler_map == null)
             {
                 registerDefaultHandler(new DefaultFaultHandler());
-                handler_list = m_faultHandlers.get(FaultType.UNKNOWN);
+                handler_map = m_faultHandlers.get(FaultType.UNKNOWN);
             }
         }
-        for (FaultHandler handler : handler_list)
+        for (List<FaultHandler> handler_list : handler_map.values())
         {
-            handler.faultOccured(fault);
+            for (FaultHandler handler : handler_list)
+            {
+                handler.faultOccured(fault);
+            }
         }
     }
 
-    private HashMap<FaultType, List<FaultHandler>> m_faultHandlers;
+    private HashMap<FaultType, TreeMap<Integer, List<FaultHandler>>> m_faultHandlers;
 }
