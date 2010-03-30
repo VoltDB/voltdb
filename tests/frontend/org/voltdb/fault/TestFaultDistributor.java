@@ -26,7 +26,7 @@ import org.voltdb.fault.VoltFault.FaultType;
 
 import junit.framework.TestCase;
 
-public class TestFaultManager extends TestCase
+public class TestFaultDistributor extends TestCase
 {
     public class MockFaultHandler implements FaultHandler
     {
