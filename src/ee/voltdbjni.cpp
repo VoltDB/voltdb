@@ -233,31 +233,34 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadC
     jlong engine_ptr, jstring serialized_catalog) {
     VOLT_DEBUG("nativeLoadCatalog() start");
     VoltDBEngine *engine = castToEngine(engine_ptr);
-    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     if (engine == NULL) {
         VOLT_ERROR("engine_ptr was NULL or invalid pointer");
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
     }
-    try {
-        updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
 
-        //copy to std::string. utf_chars may or may not by a copy of the string
-        const char* utf_chars = env->GetStringUTFChars(serialized_catalog, NULL);
-        string str(utf_chars);
-        env->ReleaseStringUTFChars(serialized_catalog, utf_chars);
-        VOLT_DEBUG("calling loadCatalog...");
+    //JNIEnv pointer can change between calls, must be updated
+    updateJNILogProxy(engine);
+
+    //copy to std::string. utf_chars may or may not by a copy of the string
+    const char* utf_chars = env->GetStringUTFChars(serialized_catalog, NULL);
+    string str(utf_chars);
+    env->ReleaseStringUTFChars(serialized_catalog, utf_chars);
+    VOLT_DEBUG("calling loadCatalog...");
+
+    try {
         bool success = engine->loadCatalog(str);
 
         if (success) {
             VOLT_DEBUG("loadCatalog succeeded");
             return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
-        } else {
-            throwFatalException("loadCatalog failed");
-            return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
         }
-    } catch (FatalException e) {
-        topend->crashVoltDB(e);
+    } catch (SerializableEEException &e) {
+        engine->resetReusedResultOutputBuffer();
+        e.serialize(engine->getExceptionOutputSerializer());
     }
+
+    VOLT_ERROR("loadCatalog failed");
     return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
 }
 
@@ -269,36 +272,40 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadC
  * human-readable text strings separated by line feeds.
  * @return error code
 */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeUpdateCatalog(
+SHAREDLIB_JNIEXPORT jint JNICALL
+Java_org_voltdb_jni_ExecutionEngine_nativeUpdateCatalog(
     JNIEnv *env, jobject obj,
     jlong engine_ptr, jstring catalog_diffs) {
     VOLT_DEBUG("nativeUpdateCatalog() start");
     VoltDBEngine *engine = castToEngine(engine_ptr);
-    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     if (engine == NULL) {
         VOLT_ERROR("engine_ptr was NULL or invalid pointer");
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
     }
-    try {
-        updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
 
-        //copy to std::string. utf_chars may or may not by a copy of the string
-        const char* utf_chars = env->GetStringUTFChars(catalog_diffs, NULL);
-        string str(utf_chars);
-        env->ReleaseStringUTFChars(catalog_diffs, utf_chars);
-        VOLT_DEBUG("calling loadCatalog...");
+    //JNIEnv pointer can change between calls, must be updated
+    updateJNILogProxy(engine);
+
+    //copy to std::string. utf_chars may or may not by a copy of the string
+    const char* utf_chars = env->GetStringUTFChars(catalog_diffs, NULL);
+    string str(utf_chars);
+    env->ReleaseStringUTFChars(catalog_diffs, utf_chars);
+    VOLT_DEBUG("calling loadCatalog...");
+
+    try {
         bool success = engine->updateCatalog(str);
 
         if (success) {
             VOLT_DEBUG("updateCatalog succeeded");
             return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
-        } else {
-            throwFatalException("updateCatalog failed");
-            return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
         }
-    } catch (FatalException e) {
-        topend->crashVoltDB(e);
+    } catch (SerializableEEException &e) {
+        engine->resetReusedResultOutputBuffer();
+        e.serialize(engine->getExceptionOutputSerializer());
     }
+
+    VOLT_ERROR("updateCatalog failed");
     return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
 }
 
@@ -308,40 +315,45 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeUpdat
  * @param table_id catalog ID of the table
  * @param serialized_table the table data to be loaded
 */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable
-(JNIEnv *env, jobject obj, jlong engine_ptr, jint table_id, jbyteArray serialized_table,
- jlong txnId, jlong lastCommittedTxnId, jlong undoToken, jboolean allowELT)
+SHAREDLIB_JNIEXPORT jint JNICALL
+Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
+    JNIEnv *env, jobject obj, jlong engine_ptr, jint table_id,
+    jbyteArray serialized_table, jlong txnId, jlong lastCommittedTxnId,
+    jlong undoToken, jboolean allowELT)
 {
     VoltDBEngine *engine = castToEngine(engine_ptr);
-    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     if (engine == NULL) {
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
     }
+
+    //JNIEnv pointer can change between calls, must be updated
+    updateJNILogProxy(engine);
+    engine->setUndoToken(undoToken);
+    VOLT_DEBUG("loading table %d in C++...", table_id);
+
+    // convert jboolean to bool
+    bool bAllowELT = (allowELT == JNI_FALSE ? false : true);
+
+    // deserialize dependency.
+    jsize length = env->GetArrayLength(serialized_table);
+    VOLT_DEBUG("deserializing %d bytes ...", (int) length);
+    jbyte *bytes = env->GetByteArrayElements(serialized_table, NULL);
+    ReferenceSerializeInput serialize_in(bytes, length);
+
     try {
-        updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
-        engine->setUndoToken(undoToken);
-        VOLT_DEBUG("loading table %d in C++...", table_id);
-
-        // convert jboolean to bool
-        bool bAllowELT = (allowELT == JNI_FALSE ? false : true);
-
-        // deserialize dependency.
-        jsize length = env->GetArrayLength(serialized_table);
-        VOLT_DEBUG("deserializing %d bytes ...", (int) length);
-        jbyte *bytes = env->GetByteArrayElements(serialized_table, NULL);
-        ReferenceSerializeInput serialize_in(bytes, length);
-        bool success = engine->loadTable(bAllowELT, table_id, serialize_in, txnId, lastCommittedTxnId);
+        bool success = engine->loadTable(bAllowELT, table_id, serialize_in,
+                                         txnId, lastCommittedTxnId);
         env->ReleaseByteArrayElements(serialized_table, bytes, JNI_ABORT);
         VOLT_DEBUG("deserialized table");
 
-        if (success) {
+        if (success)
             return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
-        } else {
-            return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
-        }
-    } catch (FatalException e) {
-        topend->crashVoltDB(e);
+    } catch (SerializableEEException &e) {
+        engine->resetReusedResultOutputBuffer();
+        e.serialize(engine->getExceptionOutputSerializer());
     }
+
     return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
 }
 

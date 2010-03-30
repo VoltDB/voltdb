@@ -121,23 +121,16 @@ void MaterializedViewMetadata::parsePredicate(catalog::MaterializedViewInfo *met
 }
 
 void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple) {
-    //printf("Inserting a tuple: %s.\n", newTuple.debugNoHeader().c_str());
-    //fflush(stdout);
-
     // don't change the view if this tuple doesn't match the predicate
-    if (m_filterPredicate && (m_filterPredicate->eval(&newTuple, NULL).isFalse()))
+    if (m_filterPredicate
+        && (m_filterPredicate->eval(&newTuple, NULL).isFalse()))
         return;
 
     bool exists = findExistingTuple(newTuple);
-    //printf("  Existing tuple exists? %d\n", exists);
-    //fflush(stdout);
     if (!exists) {
         // create a blank tuple
         m_existingTuple.move(m_emptyTupleBackingStore);
     }
-
-    //printf("  Existing tuple: %s.\n", m_existingTuple.debugNoHeader().c_str());
-    //fflush(stdout);
 
     // clear the tuple that will be built to insert or overwrite
     memset(m_updatedTupleBackingStore, 0, m_target->schema()->tupleLength() + 1);
@@ -145,11 +138,13 @@ void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple) {
     int colindex = 0;
     // set up the first n columns, based on group-by columns
     for (colindex = 0; colindex < m_groupByColumnCount; colindex++) {
-        m_updatedTuple.setNValue(colindex, newTuple.getNValue(m_groupByColumns[colindex]));
+        m_updatedTuple.setNValue(colindex,
+                                 newTuple.getNValue(m_groupByColumns[colindex]));
     }
 
     // set up the next column, which is a count
-    m_updatedTuple.setNValue(colindex, m_existingTuple.getNValue(colindex).op_increment());
+    m_updatedTuple.setNValue(colindex,
+                             m_existingTuple.getNValue(colindex).op_increment());
     colindex++;
 
     // set values for the other columns
@@ -164,27 +159,23 @@ void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple) {
             m_updatedTuple.setNValue(i, existingValue.op_increment());
         }
         else {
-            throwFatalException( "Error in materialized view table update for col %d. Expression type %d",
-                    i, m_outputColumnAggTypes[i]);
+            char message[128];
+            sprintf(message, "Error in materialized view table update for"
+                    " col %d. Expression type %d", i, m_outputColumnAggTypes[i]);
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                          message);
         }
     }
 
-    //printf("  Updating tuple: %s.\n", m_updatedTuple.debugNoHeader().c_str());
-    //fflush(stdout);
-
-    //printf("    table before: %s\n", m_target->debug().c_str());
-
     // update or insert the row
     if (exists) {
-        // shouldn't need to update indexes as this shouldn't ever change the key
+        // shouldn't need to update indexes as this shouldn't ever change the
+        // key
         m_target->updateTuple(m_updatedTuple, m_existingTuple, false);
     }
     else {
         m_target->insertTuple(m_updatedTuple);
     }
-
-    //printf("    table after: %s\n", m_target->debug().c_str());
-    //fflush(stdout);
 }
 
 void MaterializedViewMetadata::processTupleUpdate(TableTuple &oldTuple, TableTuple &newTuple) {
@@ -256,9 +247,6 @@ bool MaterializedViewMetadata::findExistingTuple(TableTuple &oldTuple, bool expe
     // find the key for this tuple (which is the group by columns)
     for (int i = 0; i < m_groupByColumnCount; i++)
         m_searchKey.setNValue(i, oldTuple.getNValue(m_groupByColumns[i]));
-
-    //printf("    Looking for a tuple with key: %s.\n", m_searchKey.debugNoHeader().c_str());
-    //fflush(stdout);
 
     // determine if the row exists (create the empty one if it doesn't)
     m_index->moveToKey(&m_searchKey);

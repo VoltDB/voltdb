@@ -477,17 +477,20 @@ bool VoltDBEngine::loadCatalog(const std::string &catalogPayload) {
     // get a reference to the database and cluster
     catalog::Cluster *cluster = m_catalog->clusters().get("cluster");
     if (!cluster) {
-        throwFatalException("Unable to find cluster catalog information");
+        VOLT_ERROR("Unable to find cluster catalog information");
+        return false;
     }
     m_database = cluster->databases().get("database");
     if (!m_database) {
-        throwFatalException("Unable to find database catalog information");
+        VOLT_ERROR("Unable to find database catalog information");
+        return false;
     }
 
      // initialize the list of partition ids
     bool success = initCluster(cluster);
     if (success == false) {
-        throwFatalException("Unable to load partition list for cluster");
+        VOLT_ERROR("Unable to load partition list for cluster");
+        return false;
     }
 
     // Tables care about EL state.
@@ -501,9 +504,12 @@ bool VoltDBEngine::loadCatalog(const std::string &catalogPayload) {
 
     // Loop through all the tables...
     std::map<std::string, catalog::Table*>::const_iterator table_iterator;
-    for (table_iterator = m_database->tables().begin(); table_iterator != m_database->tables().end(); table_iterator++) {
+    for (table_iterator = m_database->tables().begin();
+         table_iterator != m_database->tables().end(); table_iterator++) {
         if (!initTable(m_database->relativeIndex(), table_iterator->second)) {
-            throwFatalException( "Failed to initialize table '%s' from catalogs\n", table_iterator->second->name().c_str());
+            VOLT_ERROR("Failed to initialize table '%s' from catalogs\n",
+                       table_iterator->second->name().c_str());
+            return false;
         }
     }
 
@@ -511,7 +517,8 @@ bool VoltDBEngine::loadCatalog(const std::string &catalogPayload) {
     initMaterializedViews();
 
     // load the plan fragments from the catalog
-    clearAndLoadAllPlanFragments();
+    if (!clearAndLoadAllPlanFragments())
+        return false;
 
     // deal with the epoch
     int64_t epoch = cluster->localepoch() * (int64_t)1000;
@@ -526,26 +533,24 @@ bool VoltDBEngine::updateCatalog(const std::string &catalogPayload) {
     VOLT_DEBUG("Updating catalog...");
 
     // apply the diff commands to the existing catalog
-    try {
-        m_catalog->execute(catalogPayload);
-    }
-    catch (std::string s) {
-        throwFatalException( "Error updating catalog: %s", s.c_str());
-    }
+    m_catalog->execute(catalogPayload);
 
     // cache the database in m_database
     catalog::Cluster *cluster = m_catalog->clusters().get("cluster");
     if (!cluster) {
-        throwFatalException("Unable to find cluster catalog information");
+        VOLT_ERROR("Unable to find cluster catalog information");
+        return false;
     }
     m_database = cluster->databases().get("database");
     if (!m_database) {
-        throwFatalException("Unable to find database catalog information");
+        VOLT_ERROR("Unable to find database catalog information");
+        return false;
     }
 
     // this does the actual scary bits of reinitializing plan fragments
     if (!clearAndLoadAllPlanFragments()) {
-        throwFatalException("Error updating catalog planfragments");
+        VOLT_ERROR("Error updating catalog planfragments");
+        return false;
     }
 
     VOLT_DEBUG("Updated catalog...");
@@ -562,12 +567,17 @@ bool VoltDBEngine::loadTable(bool allowELT, int32_t tableId,
 
     Table* ret = getTable(tableId);
     if (ret == NULL) {
-        throwFatalException( "Table ID %d doesn't exist. Could not load data", (int) tableId);
+        VOLT_ERROR("Table ID %d doesn't exist. Could not load data",
+                   (int) tableId);
+        return false;
     }
+
     PersistentTable* table = dynamic_cast<PersistentTable*>(ret);
     if (table == NULL) {
-        throwFatalException( "Table ID %d(name '%s') is not a persistent table. Could not load data",
-                (int) tableId, ret->name().c_str());
+        VOLT_ERROR("Table ID %d(name '%s') is not a persistent table."
+                   " Could not load data",
+                   (int) tableId, ret->name().c_str());
+        return false;
     }
 
     table->loadTuplesFrom(allowELT, serializeIn);
@@ -575,7 +585,8 @@ bool VoltDBEngine::loadTable(bool allowELT, int32_t tableId,
 }
 
 bool VoltDBEngine::clearAndLoadAllPlanFragments() {
-    // clear the existing stuff if this is being called as part of a catalog change
+    // clear the existing stuff if this is being called as part of a catalog
+    // change
     for (int ii = 0; ii < m_planFragments.size(); ii++)
         delete m_planFragments[ii];
     m_planFragments.clear();
@@ -583,28 +594,31 @@ bool VoltDBEngine::clearAndLoadAllPlanFragments() {
 
     // initialize all the planfragments.
     std::map<std::string, catalog::Procedure*>::const_iterator proc_iterator;
-    for (proc_iterator = m_database->procedures().begin(); proc_iterator != m_database->procedures().end(); proc_iterator++) {
-
+    for (proc_iterator = m_database->procedures().begin();
+         proc_iterator != m_database->procedures().end(); proc_iterator++) {
         // Procedure
         const catalog::Procedure *catalog_proc = proc_iterator->second;
         VOLT_DEBUG("proc: %s", catalog_proc->name().c_str());
         std::map<std::string, catalog::Statement*>::const_iterator stmt_iterator;
-        for (stmt_iterator = catalog_proc->statements().begin(); stmt_iterator != catalog_proc->statements().end(); stmt_iterator++) {
-
+        for (stmt_iterator = catalog_proc->statements().begin();
+             stmt_iterator != catalog_proc->statements().end();
+             stmt_iterator++) {
             // PlanFragment
             const catalog::Statement *catalogStmt = stmt_iterator->second;
-            VOLT_DEBUG("  stmt: %s : %s", catalogStmt->name().c_str(), catalogStmt->sqltext().c_str());
+            VOLT_DEBUG("  stmt: %s : %s", catalogStmt->name().c_str(),
+                       catalogStmt->sqltext().c_str());
 
             std::map<std::string, catalog::PlanFragment*>::const_iterator pf_iterator;
-            for (pf_iterator = catalogStmt->fragments().begin(); pf_iterator!= catalogStmt->fragments().end(); pf_iterator++) {
+            for (pf_iterator = catalogStmt->fragments().begin();
+                 pf_iterator!= catalogStmt->fragments().end(); pf_iterator++) {
                 int64_t fragId = uniqueIdForFragment(pf_iterator->second);
                 std::string planNodeTree = pf_iterator->second->plannodetree();
                 if (!initPlanFragment(fragId, planNodeTree)) {
-                    throwFatalException(
-                            "Failed to initialize plan fragment '%s' from catalogs\n"
-                            "Failed SQL Statement: %s",
-                            pf_iterator->second->name().c_str(),
-                            catalogStmt->sqltext().c_str());
+                    VOLT_ERROR("Failed to initialize plan fragment '%s' from"
+                               " catalogs\nFailed SQL Statement: %s",
+                               pf_iterator->second->name().c_str(),
+                               catalogStmt->sqltext().c_str());
+                    return false;
                 }
             }
         }
@@ -703,16 +717,20 @@ bool VoltDBEngine::initPlanNode(const int64_t fragId, AbstractPlanNode* node, in
     return true;
 }
 
-bool VoltDBEngine::initTable(const int32_t databaseId, const catalog::Table *catalogTable) {
+bool VoltDBEngine::initTable(const int32_t databaseId,
+                             const catalog::Table *catalogTable) {
     assert(catalogTable);
 
     // Create a persistent table for this table in our catalog
     int32_t table_id = catalogTable->relativeIndex();
     if (m_tables.find(table_id) != m_tables.end()) {
-        throwFatalException( "Duplicate table '%d' during initialization", table_id);
+        VOLT_ERROR( "Duplicate table '%d' during initialization", table_id);
+        return false;
     }
     if (m_tablesByName.find(catalogTable->name()) != m_tablesByName.end()) {
-        throwFatalException( "Duplicate table '%s' during initialization", catalogTable->name().c_str());
+        VOLT_ERROR( "Duplicate table '%s' during initialization",
+                    catalogTable->name().c_str());
+        return false;
     }
 
     // Columns:
@@ -724,47 +742,63 @@ bool VoltDBEngine::initTable(const int32_t databaseId, const catalog::Table *cat
     std::vector<bool> columnAllowNull(numColumns);
     std::map<std::string, catalog::Column*>::const_iterator col_iterator;
     std::string *columnNames = new std::string[numColumns];
-    for (col_iterator = catalogTable->columns().begin(); col_iterator != catalogTable->columns().end(); col_iterator++) {
+    for (col_iterator = catalogTable->columns().begin();
+         col_iterator != catalogTable->columns().end(); col_iterator++) {
         const catalog::Column *catalog_column = col_iterator->second;
         const int columnIndex = catalog_column->index();
         const voltdb::ValueType type = static_cast<voltdb::ValueType>(catalog_column->type());
         columnTypes[columnIndex] = type;
         const uint16_t size = static_cast<uint16_t>(catalog_column->size());
-        const uint16_t length = type == VALUE_TYPE_VARCHAR ? size : static_cast<uint16_t>(NValue::getTupleStorageSize(type));//Strings length is provided, other lengths are derived from type
+        //Strings length is provided, other lengths are derived from type
+        const uint16_t length = type == VALUE_TYPE_VARCHAR ? size
+            : static_cast<uint16_t>(NValue::getTupleStorageSize(type));
         columnLengths[columnIndex] = length;
         columnAllowNull[columnIndex] = catalog_column->nullable();
         columnNames[catalog_column->index()] = catalog_column->name();
     }
 
-    TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
-    //cout << "Created schema for " << catalogTable->name() << endl << schema->debug();
+    TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes,
+                                                         columnLengths,
+                                                         columnAllowNull, true);
+
     // Indexes
     std::map<std::string, TableIndexScheme> index_map;
     std::map<std::string, catalog::Index*>::const_iterator idx_iterator;
-    for (idx_iterator = catalogTable->indexes().begin(); idx_iterator != catalogTable->indexes().end(); idx_iterator++) {
+    for (idx_iterator = catalogTable->indexes().begin();
+         idx_iterator != catalogTable->indexes().end(); idx_iterator++) {
         catalog::Index *catalog_index = idx_iterator->second;
         std::vector<int> index_columns;
         std::vector<ValueType> column_types;
 
-        // The catalog::Index object now has a list of columns that are to be used
+        // The catalog::Index object now has a list of columns that are to be
+        // used
         if (catalog_index->columns().size() == (size_t)0) {
-            throwFatalException(
-                    "Index '%s' in table '%s' does not declare any columns to use",
-                    catalog_index->name().c_str(), catalogTable->name().c_str());
+            VOLT_ERROR("Index '%s' in table '%s' does not declare any columns"
+                       " to use",
+                       catalog_index->name().c_str(),
+                       catalogTable->name().c_str());
+            delete [] columnNames;
+            return false;
         }
 
-        // Since the columns are not going to come back in the proper order from the catalogs, we'll use
-        // the index attribute to make sure we put them in the right order
+        // Since the columns are not going to come back in the proper order from
+        // the catalogs, we'll use the index attribute to make sure we put them
+        // in the right order
         index_columns.resize(catalog_index->columns().size());
         column_types.resize(catalog_index->columns().size());
         bool isIntsOnly = true;
         std::map<std::string, catalog::ColumnRef*>::const_iterator colref_iterator;
-        for (colref_iterator = catalog_index->columns().begin(); colref_iterator != catalog_index->columns().end(); colref_iterator++) {
+        for (colref_iterator = catalog_index->columns().begin();
+             colref_iterator != catalog_index->columns().end();
+             colref_iterator++) {
             catalog::ColumnRef *catalog_colref = colref_iterator->second;
             if (catalog_colref->index() < 0) {
-                throwFatalException(
-                        "Invalid column '%d' for index '%s' in table '%s'",
-                        catalog_colref->index(), catalog_index->name().c_str(), catalogTable->name().c_str());
+                VOLT_ERROR("Invalid column '%d' for index '%s' in table '%s'",
+                           catalog_colref->index(),
+                           catalog_index->name().c_str(),
+                           catalogTable->name().c_str());
+                delete [] columnNames;
+                return false;
             }
             // check if the column does not have an int type
             if ((catalog_colref->column()->type() != VALUE_TYPE_TINYINT) &&
@@ -776,14 +810,20 @@ bool VoltDBEngine::initTable(const int32_t databaseId, const catalog::Table *cat
             column_types[catalog_colref->index()] = (ValueType) catalog_colref->column()->type();
         }
 
-        TableIndexScheme index_scheme(catalog_index->name(), (TableIndexType)catalog_index->type(), index_columns, column_types, catalog_index->unique(), isIntsOnly, schema);
+        TableIndexScheme index_scheme(catalog_index->name(),
+                                      (TableIndexType)catalog_index->type(),
+                                      index_columns, column_types,
+                                      catalog_index->unique(), isIntsOnly,
+                                      schema);
         index_map[catalog_index->name()] = index_scheme;
     }
 
     // Constraints
     std::string pkey_index_id;
     std::map<std::string, catalog::Constraint*>::const_iterator constraint_iterator;
-    for (constraint_iterator = catalogTable->constraints().begin(); constraint_iterator != catalogTable->constraints().end(); constraint_iterator++) {
+    for (constraint_iterator = catalogTable->constraints().begin();
+         constraint_iterator != catalogTable->constraints().end();
+         constraint_iterator++) {
         catalog::Constraint *catalog_constraint = constraint_iterator->second;
 
         // Constraint Type
@@ -792,48 +832,57 @@ bool VoltDBEngine::initTable(const int32_t databaseId, const catalog::Table *cat
             case CONSTRAINT_TYPE_PRIMARY_KEY:
                 // Make sure we have an index to use
                 if (catalog_constraint->index() == NULL) {
-                    throwFatalException(
-                            "The '%s' constraint '%s' on table '%s' does not specify an index",
-                            constraintutil::getTypeName(type).c_str(), catalog_constraint->name().c_str(),
-                            catalogTable->name().c_str());
-
+                    VOLT_ERROR("The '%s' constraint '%s' on table '%s' does"
+                               " not specify an index",
+                               constraintutil::getTypeName(type).c_str(),
+                               catalog_constraint->name().c_str(),
+                               catalogTable->name().c_str());
+                    delete [] columnNames;
+                    return false;
                 }
                 // Make sure they didn't declare more than one primary key index
                 else if (pkey_index_id.size() > 0) {
-                    throwFatalException(
-                            "Trying to declare a primary key on table '%s'"
-                            "using index '%s' but '%s' was already set as the primary key",
-                            catalogTable->name().c_str(),
-                            catalog_constraint->index()->name().c_str(),
-                            pkey_index_id.c_str());
+                    VOLT_ERROR("Trying to declare a primary key on table '%s'"
+                               "using index '%s' but '%s' was already set as"
+                               " the primary key",
+                               catalogTable->name().c_str(),
+                               catalog_constraint->index()->name().c_str(),
+                               pkey_index_id.c_str());
+                    delete [] columnNames;
+                    return false;
                 }
                 pkey_index_id = catalog_constraint->index()->name();
                 break;
             case CONSTRAINT_TYPE_UNIQUE:
                 // Make sure we have an index to use
-                // TODO: In the future I would like bring back my Constraint object so that we can keep
-                //       track of everything that a table has...
+                // TODO: In the future I would like bring back my Constraint
+                //       object so that we can keep track of everything that a
+                //       table has...
                 if (catalog_constraint->index() == NULL) {
-                    throwFatalException(
-                            "The '%s' constraint '%s' on table '%s' does not specify an index",
-                            constraintutil::getTypeName(type).c_str(),
-                            catalog_constraint->name().c_str(),
-                            catalogTable->name().c_str());
+                    VOLT_ERROR("The '%s' constraint '%s' on table '%s' does"
+                               " not specify an index",
+                               constraintutil::getTypeName(type).c_str(),
+                               catalog_constraint->name().c_str(),
+                               catalogTable->name().c_str());
+                    delete [] columnNames;
+                    return false;
                 }
                 break;
             // Unsupported
             case CONSTRAINT_TYPE_CHECK:
             case CONSTRAINT_TYPE_FOREIGN_KEY:
             case CONSTRAINT_TYPE_MAIN:
-                VOLT_WARN("Unsupported type '%s' for constraint '%s'", constraintutil::getTypeName(type).c_str(), catalog_constraint->name().c_str());
+                VOLT_WARN("Unsupported type '%s' for constraint '%s'",
+                          constraintutil::getTypeName(type).c_str(),
+                          catalog_constraint->name().c_str());
                 break;
             // Unknown
-            default: {
-                throwFatalException(
-                        "Invalid constraint type '%s' for '%s'",
-                        constraintutil::getTypeName(type).c_str(),
-                        catalog_constraint->name().c_str());
-            }
+            default:
+                VOLT_ERROR("Invalid constraint type '%s' for '%s'",
+                           constraintutil::getTypeName(type).c_str(),
+                           catalog_constraint->name().c_str());
+                delete [] columnNames;
+                return false;
         }
     }
 
@@ -841,12 +890,11 @@ bool VoltDBEngine::initTable(const int32_t databaseId, const catalog::Table *cat
     std::vector<TableIndexScheme> indexes;
     TableIndexScheme pkey_index;
     std::map<std::string, TableIndexScheme>::const_iterator index_iterator;
-    for (index_iterator = index_map.begin(); index_iterator != index_map.end(); index_iterator++) {
-
+    for (index_iterator = index_map.begin(); index_iterator != index_map.end();
+         index_iterator++) {
         // Exclude the primary key
         if (index_iterator->first.compare(pkey_index_id) == 0) {
             pkey_index = index_iterator->second;
-
         // Just add it to the list
         } else {
             indexes.push_back(index_iterator->second);
@@ -874,7 +922,8 @@ bool VoltDBEngine::initTable(const int32_t databaseId, const catalog::Table *cat
                                                          isTableExportOnly(m_database, table_id));
     }
     assert(table != NULL);
-    getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE, table_id, table->getTableStats());
+    getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
+                                          table_id, table->getTableStats());
     m_tables[table_id] = table;
     m_tablesByName[table->name()] = table;
 

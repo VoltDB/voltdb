@@ -85,7 +85,8 @@ void TempTable::onSetColumns() {
     m_tmpTarget2 = TableTuple(m_schema);
 }
 
-void TempTable::loadTuplesFrom(bool, SerializeInput &serialize_io, Pool *stringPool) {
+void TempTable::loadTuplesFrom(bool, SerializeInput &serialize_io,
+                               Pool *stringPool) {
 
     /*
      * directly receives a VoltTable buffer.

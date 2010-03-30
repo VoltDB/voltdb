@@ -48,16 +48,16 @@ CatalogType * Connector::addChild(const std::string &collectionName, const std::
     if (collectionName.compare("tableInfo") == 0) {
         CatalogType *exists = m_tableInfo.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_tableInfo.add(childName);
     }
     if (collectionName.compare("destInfo") == 0) {
         CatalogType *exists = m_destInfo.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_destInfo.add(childName);
     }
-    throw std::string("Trying to add to an unknown child collection.");
+
     return NULL;
 }
 

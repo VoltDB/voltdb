@@ -91,8 +91,12 @@ InComparisonExpression::eval(const TableTuple *tuple1,
                              const TableTuple *tuple2) const
 {
     if (this->m_type != EXPRESSION_TYPE_COMPARE_IN) {
-        throwFatalException("Invalid ExpressionType '%s' called for InComparisonExpression",
-                 expressionutil::getTypeName(this->m_type).c_str());
+        char message[128];
+        sprintf(message, "Invalid ExpressionType '%s' called for"
+                " InComparisonExpression",
+                expressionutil::getTypeName(this->m_type).c_str());
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_SQL,
+                                      message);
     }
 
     // First get the left value

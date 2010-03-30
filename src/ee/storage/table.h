@@ -327,7 +327,8 @@ inline void Table::allocateNextBlock() {
         (*m_tempTableMemoryInBytes) += bytes;
         if ((*m_tempTableMemoryInBytes) > MAX_TEMP_TABLE_MEMORY) {
             throw SQLException(SQLException::volt_temp_table_memory_overflow,
-                               "More than 100MB of temp table memory used while executing SQL. Aborting.");
+                               "More than 100MB of temp table memory used while"
+                               " executing SQL. Aborting.");
         }
     }
 }

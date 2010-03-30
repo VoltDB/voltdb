@@ -144,7 +144,8 @@ bool PersistentTable::insertTuple(TableTuple &source) {
 
     // not null checks at first
     FAIL_IF(!checkNulls(source)) {
-        throw ConstraintFailureException(this, m_id, source, TableTuple(), voltdb::CONSTRAINT_TYPE_NOT_NULL);
+        throw ConstraintFailureException(this, m_id, source, TableTuple(),
+                                         voltdb::CONSTRAINT_TYPE_NOT_NULL);
     }
 
     //
@@ -162,10 +163,11 @@ bool PersistentTable::insertTuple(TableTuple &source) {
     m_tmpTarget1.setDeletedFalse();
 
     /**
-     * Inserts never "dirty" a tuple since the tuple is new, but...
-     * The COWIterator may still be scanning and if the tuple came from the free list
-     * then it may need to be marked as dirty so it will be skipped. If COW is on have it decide. COW should
-     * always set the dirty to false unless the tuple is in a to be scanned area.
+     * Inserts never "dirty" a tuple since the tuple is new, but...  The
+     * COWIterator may still be scanning and if the tuple came from the free
+     * list then it may need to be marked as dirty so it will be skipped. If COW
+     * is on have it decide. COW should always set the dirty to false unless the
+     * tuple is in a to be scanned area.
      */
     if (m_COWContext.get() != NULL) {
         m_COWContext->markTupleDirty(m_tmpTarget1, true);
@@ -176,7 +178,8 @@ bool PersistentTable::insertTuple(TableTuple &source) {
 
     if (!tryInsertOnAllIndexes(&m_tmpTarget1)) {
         deleteTupleStorage(m_tmpTarget1);
-        throw ConstraintFailureException(this, m_id, source, TableTuple(), voltdb::CONSTRAINT_TYPE_UNIQUE);
+        throw ConstraintFailureException(this, m_id, source, TableTuple(),
+                                         voltdb::CONSTRAINT_TYPE_UNIQUE);
     }
 
     // if EL is enabled, append the tuple to the buffer
@@ -297,16 +300,21 @@ bool PersistentTable::updateTuple(TableTuple &source, TableTuple &target, bool u
      ptuua->setNewTuple(target, pool);
 
      if (!undoQuantum->isDummy()) {
-         undoQuantum->registerUndoAction(ptuua);//DummyUndoQuantum calls destructor upon register.
+         //DummyUndoQuantum calls destructor upon register.
+         undoQuantum->registerUndoAction(ptuua);
      }
 
     // the planner should determine if this update can affect indexes.
     // if so, update the indexes here
     if (updatesIndexes) {
         if (!tryUpdateOnAllIndexes(ptuua->getOldTuple(), target)) {
-            throw ConstraintFailureException(this, m_id, ptuua->getOldTuple(), target, voltdb::CONSTRAINT_TYPE_UNIQUE);
+            throw ConstraintFailureException(this, m_id, ptuua->getOldTuple(),
+                                             target,
+                                             voltdb::CONSTRAINT_TYPE_UNIQUE);
         }
-        //If the CFE is thrown the Undo action should not attempt to revert the indexes.
+
+        //If the CFE is thrown the Undo action should not attempt to revert the
+        //indexes.
         ptuua->needToRevertIndexes();
         updateFromAllIndexes(ptuua->getOldTuple(), target);
     }
@@ -330,12 +338,15 @@ bool PersistentTable::updateTuple(TableTuple &source, TableTuple &target, bool u
      * some columns
      */
     FAIL_IF(!checkNulls(target)) {
-        throw ConstraintFailureException(this, m_id, ptuua->getOldTuple(), target, voltdb::CONSTRAINT_TYPE_NOT_NULL);
+        throw ConstraintFailureException(this, m_id, ptuua->getOldTuple(),
+                                         target,
+                                         voltdb::CONSTRAINT_TYPE_NOT_NULL);
     }
 
     if (undoQuantum->isDummy()) {
-        undoQuantum->registerUndoAction(ptuua);//DummyUndoQuantum calls destructor upon register
-                                               //so it can't be called earlier
+        //DummyUndoQuantum calls destructor upon register so it can't be called
+        //earlier
+        undoQuantum->registerUndoAction(ptuua);
     }
 
     return true;
@@ -688,7 +699,8 @@ void PersistentTable::loadTuplesFrom(bool allowELT,
 
         // if EL is enabled, append the tuple to the buffer
         if (allowELT && m_exportEnabled) {
-            appendToELBuffer(m_tmpTarget1, tsSeqNo++, TupleStreamWrapper::INSERT);
+            appendToELBuffer(m_tmpTarget1, tsSeqNo++,
+                             TupleStreamWrapper::INSERT);
         }
     }
 

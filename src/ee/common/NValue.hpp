@@ -1742,11 +1742,13 @@ inline void NValue::deserializeFrom(SerializeInput &input, const ValueType type,
           longStorage[0] = input.readLong();
           break;
       }
-      default: {
-          throwFatalException( "NValue::deserializeFrom() unrecognized type '%d'", type);
-      }
+      default:
+          char message[128];
+          sprintf(message, "NValue::deserializeFrom() unrecognized type '%d'",
+                  type);
+          throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                        message);
     }
-    return;
 }
 
 /**
@@ -1911,11 +1913,14 @@ inline size_t NValue::serializeToELT(char *dataPtr) const
       case VALUE_TYPE_NULL:
       case VALUE_TYPE_BOOLEAN:
       case VALUE_TYPE_ADDRESS:
-          throwFatalException("Invalid type in serializeToELT: %d", getValueType());
-        break;
+          char message[128];
+          sprintf(message, "Invalid type in serializeToELT: %d", getValueType());
+          throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                        message);
     }
-    throwFatalException("Invalid type in serializeToELT");
-    return 0;
+
+    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                  "Invalid type in serializeToELT");
 }
 
 inline bool NValue::isNull() const {

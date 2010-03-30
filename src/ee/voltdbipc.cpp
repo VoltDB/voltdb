@@ -274,9 +274,8 @@ int8_t VoltDBIPC::loadCatalog(struct ipc_command *cmd) {
         if (m_engine->loadCatalog(std::string(cmd->data)) == true) {
             return kErrorCode_Success;
         }
-    } catch (FatalException e) {
-        crashVoltDB(e);
-    }
+    } catch (SerializableEEException &e) {}
+
     return kErrorCode_Error;
 }
 
@@ -586,28 +585,24 @@ void VoltDBIPC::executeCustomPlanFragmentAndGetResults(struct ipc_command *cmd) 
 
     customplanfrag *plan = (customplanfrag*)cmd;
 
-    try {
-        // setup
-        m_engine->resetReusedResultOutputBuffer();
-        m_engine->setUsedParamcnt(0);
-        m_engine->setUndoToken(ntohll(plan->undoToken));
+    // setup
+    m_engine->resetReusedResultOutputBuffer();
+    m_engine->setUsedParamcnt(0);
+    m_engine->setUndoToken(ntohll(plan->undoToken));
 
-        // data as fast serialized string
-        int16_t len = ntohs(plan->length);
-        string plan_str = string(plan->data, len);
+    // data as fast serialized string
+    int16_t len = ntohs(plan->length);
+    string plan_str = string(plan->data, len);
 
-        // deps info
-        int32_t outputDepId = ntohl(plan->outputDepId);
-        int32_t inputDepId = ntohl(plan->inputDepId);
+    // deps info
+    int32_t outputDepId = ntohl(plan->outputDepId);
+    int32_t inputDepId = ntohl(plan->inputDepId);
 
-        // execute
-        if (m_engine->executePlanFragment(plan_str, outputDepId, inputDepId,
-                                          ntohll(plan->txnId),
-                                          ntohll(plan->lastCommittedTxnId))) {
-            ++errors;
-        }
-    } catch (FatalException e) {
-        crashVoltDB(e);
+    // execute
+    if (m_engine->executePlanFragment(plan_str, outputDepId, inputDepId,
+                                      ntohll(plan->txnId),
+                                      ntohll(plan->lastCommittedTxnId))) {
+        ++errors;
     }
 
     // write the results array back across the wire

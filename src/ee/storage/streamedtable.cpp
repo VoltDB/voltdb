@@ -116,7 +116,8 @@ bool StreamedTable::deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings)
 
 void StreamedTable::loadTuplesFrom(bool, SerializeInput&, Pool*)
 {
-    throwFatalException("May not update a streamed table.");
+    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                  "May not update a streamed table.");
 }
 
 void StreamedTable::flushOldTuples(int64_t timeInMillis)
