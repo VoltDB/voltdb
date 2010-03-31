@@ -35,7 +35,7 @@ import junit.framework.*;
 
 public class TestDDLCompiler extends TestCase {
 
-    public void testSimpleDDLCompiler() {
+    public void testSimpleDDLCompiler() throws HSQLParseException {
         String ddl1 =
             "CREATE TABLE \"warehouse\" ( " +
             "\"w_id\" integer default '0' NOT NULL, " +
@@ -46,30 +46,15 @@ public class TestDDLCompiler extends TestCase {
             "\"w_state\" char(2) default NULL, " +
             "\"w_zip\" varchar(9) default NULL, " +
             "\"w_tax\" float default NULL, " +
-            "\"w_ytd\" money default NULL, " +
             "PRIMARY KEY  (\"w_id\") " +
             ");";
 
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
 
-        try {
-            hsql.runDDLCommand(ddl1);
-        } catch (HSQLParseException e) {
-            e.printStackTrace();
-        }
+        hsql.runDDLCommand(ddl1);
 
-        String xml = null;
-        try
-        {
-            xml = hsql.getXMLFromCatalog();
-        }
-        catch (HSQLParseException e)
-        {
-            e.printStackTrace();
-        }
-
+        String xml = hsql.getXMLFromCatalog();
         System.out.println(xml);
-
         assertTrue(xml != null);
 
         hsql.close();
@@ -79,8 +64,9 @@ public class TestDDLCompiler extends TestCase {
      * Note, this should succeed as HSQL doesn't have a hard limit
      * on the number of columns. The test in TestVoltCompiler will
      * fail on 1025 columns.
+     * @throws HSQLParseException
      */
-    public void testTooManyColumnTable() throws IOException {
+    public void testTooManyColumnTable() throws IOException, HSQLParseException {
         String schemaPath = "";
         URL url = TestVoltCompiler.class.getResource("toowidetable-ddl.sql");
         schemaPath = URLDecoder.decode(url.getPath(), "UTF-8");
@@ -94,24 +80,10 @@ public class TestDDLCompiler extends TestCase {
 
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
 
-        try {
-            hsql.runDDLCommand(ddl1);
-        } catch (HSQLParseException e) {
-            e.printStackTrace();
-        }
+        hsql.runDDLCommand(ddl1);
 
-        String xml = null;
-        try
-        {
-            xml = hsql.getXMLFromCatalog();
-        }
-        catch (HSQLParseException e)
-        {
-            e.printStackTrace();
-        }
-
+        String xml = hsql.getXMLFromCatalog();
         System.out.println(xml);
-
         assertTrue(xml != null);
 
         hsql.close();
