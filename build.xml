@@ -1,15 +1,26 @@
 <?xml version="1.0" ?>
 <project default="default" name="VoltDB">
 
+<!-- GENERAL HELPER MACROS -->
+
+<macrodef name="envdefault">
+    <attribute name="prop" />
+    <attribute name="var" />
+    <attribute name="default" />
+    <sequential>
+        <condition property="@{prop}" value="${env.@{var}}" else="@{default}">
+            <isset property="env.@{var}" />
+        </condition>
+    </sequential>
+</macrodef>
+
 <!-- PATHS AND PROPERTIES -->
 
 <!-- make environment var foo available as env.foo -->
 <property environment="env"/>
 
 <!-- allow env.VOLTBUILD to override "build" property -->
-<condition property="build" value="${env.VOLTBUILD}" else='release'>
-    <isset property="env.VOLTBUILD"/>
-</condition>
+<envdefault prop="build" var="VOLTBUILD" default="release" />
 
 <!-- allow env.VOLTPRO to override "voltpro" property -->
 <condition property="voltpro" value="${env.VOLTPRO}">
@@ -93,6 +104,76 @@
     <not><isset property="workload.trace.ignore"/></not>
 </condition>
 
+<!-- cluster machine names -->
+<macrodef name="nexthosthelper">
+    <attribute name="h1" />
+    <attribute name="h2" />
+    <attribute name="p1" />
+    <attribute name="p2" />
+    <sequential>
+        <condition property="@{p2}" value="@{h2}">
+            <equals arg1="${@{p1}}" arg2="@{h1}" />
+        </condition>
+    </sequential>
+</macrodef>
+
+<macrodef name="nexthostprop">
+    <attribute name="prop" />
+    <attribute name="next" />
+    <sequential>
+        <nexthosthelper h1="volt3a" h2="volt3b" p1="@{prop}" p2="@{next}" />
+        <nexthosthelper h1="volt3b" h2="volt3c" p1="@{prop}" p2="@{next}" />
+        <nexthosthelper h1="volt3c" h2="volt3d" p1="@{prop}" p2="@{next}" />
+        <nexthosthelper h1="volt3d" h2="volt3e" p1="@{prop}" p2="@{next}" />
+        <nexthosthelper h1="volt3e" h2="volt3f" p1="@{prop}" p2="@{next}" />
+        <nexthosthelper h1="volt3f" h2="volt3g" p1="@{prop}" p2="@{next}" />
+        <nexthosthelper h1="volt3g" h2="volt3h" p1="@{prop}" p2="@{next}" />
+        <nexthosthelper h1="volt3h" h2="volt3i" p1="@{prop}" p2="@{next}" />
+        <nexthosthelper h1="volt3i" h2="volt3j" p1="@{prop}" p2="@{next}" />
+        <nexthosthelper h1="volt3j" h2="volt3k" p1="@{prop}" p2="@{next}" />
+        <nexthosthelper h1="volt3k" h2="volt3l" p1="@{prop}" p2="@{next}" />
+
+        <nexthosthelper h1="volt4a" h2="volt4b" p1="@{prop}" p2="@{next}" />
+        <nexthosthelper h1="volt4b" h2="volt4c" p1="@{prop}" p2="@{next}" />
+        <nexthosthelper h1="volt4c" h2="volt2"  p1="@{prop}" p2="@{next}" />
+
+        <nexthosthelper h1="volt5a" h2="volt5b" p1="@{prop}" p2="@{next}" />
+        <nexthosthelper h1="volt5b" h2="volt5c" p1="@{prop}" p2="@{next}" />
+        <nexthosthelper h1="volt5c" h2="volt5d" p1="@{prop}" p2="@{next}" />
+    </sequential>
+</macrodef>
+
+<envdefault prop="host1" var="FIRSTSERVER" default="volt3a" />
+<nexthostprop prop="host1"  next="host2"  />
+<nexthostprop prop="host2"  next="host3"  />
+<nexthostprop prop="host3"  next="host4"  />
+<nexthostprop prop="host4"  next="host5"  />
+<nexthostprop prop="host5"  next="host6"  />
+<nexthostprop prop="host6"  next="host7"  />
+<nexthostprop prop="host7"  next="host8"  />
+<nexthostprop prop="host8"  next="host9"  />
+<nexthostprop prop="host9"  next="host10" />
+<nexthostprop prop="host10" next="host11" />
+<nexthostprop prop="host11" next="host12" />
+
+<envdefault prop="clienthost1" var="FIRSTCLIENT" default="volt4a" />
+<nexthostprop prop="clienthost1" next="clienthost2" />
+<nexthostprop prop="clienthost2" next="clienthost3" />
+<nexthostprop prop="clienthost3" next="clienthost4" />
+
+<target name="testnexthostprop">
+    <fail>
+        <condition>
+            <not>
+                <and>
+                    <equals arg1="${host12}" arg2="volt3l" />
+                    <equals arg1="${clienthost4}" arg2="volt2" />
+                </and>
+            </not>
+        </condition>
+    </fail>
+</target>
+
 <!--
 ***************************************
 PRIMARY ENTRY POINTS
@@ -105,11 +186,12 @@ PRIMARY ENTRY POINTS
 />
 <target name="check"
     depends="compile, voltdbipc, eecheck, junit, distcheck, pythonfser,
-             licensecheck"
+             licensecheck, ant_unit_tests"
     description="Run Java and C++ JNI testcases and test plan fragments."
 />
 <target name="check_quick"
-    depends="compile, voltdbipc, junit_quick, distcheck"
+    depends="licensecheck, compile, voltdbipc, junit_quick, distcheck,
+             ant_unit_tests"
     description="Run a subset of Java testcases and test fragments."
 />
 <target name="all"
@@ -643,6 +725,9 @@ LICENSING
 TEST CASES
 ***************************************
 -->
+
+<!-- tests of build.xml itself -->
+<target name="ant_unit_tests" depends="testnexthostprop" />
 
 <target name="pythonfser" description="run python fastserializer tests">
     <property name="build.dir.suffix" value="" /> <!-- Default -->
@@ -1207,21 +1292,6 @@ BENCHMARKS
         <param name="clientcount" value="3"/>
         <param name="processesperclient" value="1"/>
         <param name="duration" value="60000" />
-        <param name="host1" value="volt3a"/>
-        <param name="host2" value="volt3b"/>
-        <param name="host3" value="volt3c"/>
-        <param name="host4" value="volt3d"/>
-        <param name="host5" value="volt3e"/>
-        <param name="host6" value="volt3f"/>
-        <param name="host7" value="volt3g"/>
-        <param name="host8" value="volt3h"/>
-        <param name="host9" value="volt3i"/>
-        <param name="host10" value="volt3j"/>
-        <param name="host11" value="volt3k"/>
-        <param name="host12" value="volt3l"/>
-        <param name="clienthost1" value="volt4a"/>
-        <param name="clienthost2" value="volt4b"/>
-        <param name="clienthost3" value="volt4c"/>
         <param name="warehouses" value="144"/>
         <param name="loadthreads" value="12" />
     </antcall>
@@ -1234,15 +1304,6 @@ BENCHMARKS
         <param name="sitesperhost" value="12"/>
         <param name="clientcount" value="1"/>
         <param name="processesperclient" value="6"/>
-        <param name="host1" value="volt3a"/>
-        <param name="host2" value="volt3b"/>
-        <param name="host3" value="volt3c"/>
-        <param name="host4" value="volt3d"/>
-        <param name="host5" value="volt3e"/>
-        <param name="host6" value="volt3f"/>
-        <param name="clienthost1" value="volt4a"/>
-        <param name="clienthost2" value="volt4b"/>
-        <param name="clienthost3" value="volt4c"/>
         <param name="warehouses" value="12"/>
         <param name="volt.server.memory" value="5096"/>
     </antcall>
@@ -1251,7 +1312,8 @@ BENCHMARKS
 <target name='benchmark'
     description="Compile VoltDB and run a benchmark">
     <java fork="true" failonerror="true"
-        classname="org.voltdb.benchmark.BenchmarkController" >
+        classname="org.voltdb.benchmark.BenchmarkController"
+        jvm="/opt/jdk/bin/java" >
         <classpath refid='project.classpath' />
         <jvmarg value="-Xmx512m" />
         <jvmarg value="-Djava.library.path=${build.dir}/nativelibs" />
@@ -1318,7 +1380,33 @@ BENCHMARKS
         <arg value="SNAPSHOTFREQUENCY=${snapshotFrequency}" />
         <arg value="SNAPSHOTPREFIX=${snapshotPrefix}" />
         <arg value="SNAPSHOTRETAIN=${snapshotRetain}" />
+
+        <!-- miscellaneous reporting parameters -->
+        <arg value="OS=${os}" />
+
+        <jvmarg value="-server" />
+        <jvmarg value="-Xmx2048m" />
+        <jvmarg value="-XX:-ReduceInitialCardMarks" />
+        <jvmarg value="-Xcheck:jni"/>
     </java>
+</target>
+
+<target name="benchmarkenv" description="Run second cluster using parameters from the environment">
+    <antcall target="benchmark" inheritAll='true'>
+        <param name="local" value="false"/>
+        <param name="client" value="${env.BMCLIENT}"/>
+        <param name="hostcount" value="${env.BMHOSTCOUNT}"/>
+        <!-- use env.FIRSTSERVER to override host1 from volt3a -->
+        <param name="sitesperhost" value="${env.BMSITESPERHOST}"/>
+        <param name="clientcount" value="${env.BMCLIENTCOUNT}"/>
+        <!-- use env.FIRSTCLIENT to override clienthost1 from volt4a -->
+        <param name="processesperclient" value="1"/>
+        <param name="duration" value="${env.BMDURATION}000"/>
+        <param name="interval" value="${env.BMINTERVAL}000"/>
+        <param name="txnrate" value="${env.BMRATELIMIT}"/>
+        <param name="volt.server.memory" value="2048"/>
+        <param name="os" value="CentOS"/>
+    </antcall>
 </target>
 
 <target name='proccallmicrobench' depends='ee, compile'
