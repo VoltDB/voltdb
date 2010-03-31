@@ -24,7 +24,7 @@ PATHS AND PROPERTIES
 PRIMARY ENTRY POINTS
 ***************************************
 -->
-    
+
 <target name="main" depends="srccompile, catalog" description="Default. Compile Java clients and stored procedures, then run the VoltDB compiler to generate the catalog." />
 
 <target name="server" depends="srccompile, catalog" description="Start VoltDB Server.">
@@ -61,7 +61,9 @@ PRIMARY ENTRY POINTS
 </target>
 
 <target name="catalog" depends="srccompile" description="Create the catalog." >
-    <java fork="yes" classname="org.voltdb.compiler.VoltCompiler" >
+    <java fork="yes" failonerror="true"
+          classname="org.voltdb.compiler.VoltCompiler" >
+        <jvmarg value="-Djava.library.path=../../voltdb" />
         <arg value="project.xml"/>                  <!-- project file -->
         <arg value="1"/>                            <!-- hosts -->
         <arg value="2"/>                            <!-- sites -->

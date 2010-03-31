@@ -31,6 +31,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.LoadCatalogToString;
+import org.voltdb.exceptions.EEException;
 
 /**
  * Tests native execution engine JNI interface.
@@ -41,6 +42,17 @@ public class TestExecutionEngine extends TestCase {
         Catalog catalog = new Catalog();
         catalog.execute(LoadCatalogToString.THE_CATALOG);
         engine.loadCatalog(catalog.serialize());
+    }
+
+    public void testLoadBadCatalogs() throws Exception {
+        String badCatalog = LoadCatalogToString.THE_CATALOG.replaceFirst("set", "bad");
+        try {
+            engine.loadCatalog(badCatalog);
+        } catch (final EEException e) {
+            return;
+        }
+
+        assertFalse(true);
     }
 
     public void testMultiSiteInSamePhysicalNodeWithExecutionSite() throws Exception {

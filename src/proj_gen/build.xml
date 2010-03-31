@@ -54,7 +54,9 @@ PRIMARY ENTRY POINTS
 
 
 <target name="compile" depends="srccompile" description="Compile the catalog using the schema and the DDL file" >
-    <java fork="yes" classname="org.voltdb.compiler.VoltCompiler" >
+    <java fork="yes" failonerror="true"
+          classname="org.voltdb.compiler.VoltCompiler" >
+        <jvmarg value="-Djava.library.path=##voltdb_lib_path##" />
         <arg value="project.xml"/> <!-- project file -->
         <arg value="1"/>           <!-- hosts -->
         <arg value="2"/>           <!-- sites -->

@@ -77,7 +77,9 @@ JAVA & CATALOG COMPILATION
     <copy todir='${build.dir}/com/auctionexample' file='auction-ddl.sql' />
 
     <!-- Build the VoltDB Catalog for the Auction example -->
-    <java fork="yes" classname="org.voltdb.compiler.VoltCompiler" >
+    <java fork="yes" failonerror="true"
+          classname="org.voltdb.compiler.VoltCompiler" >
+        <jvmarg value="-Djava.library.path=../../voltdb" />
         <arg value="project.xml"/> <!-- project file -->
         <arg value="1"/>           <!-- hosts -->
         <arg value="1"/>           <!-- sites -->

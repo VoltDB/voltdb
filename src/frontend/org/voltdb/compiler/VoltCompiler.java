@@ -69,6 +69,9 @@ import org.voltdb.compiler.projectfile.ClassdependenciesType.Classdependency;
 import org.voltdb.compiler.projectfile.ExportsType.Connector;
 import org.voltdb.compiler.projectfile.ExportsType.Connector.Tables;
 import org.voltdb.compiler.projectfile.ExportsType.Connector.Destinations.Destination;
+import org.voltdb.exceptions.EEException;
+import org.voltdb.jni.ExecutionEngine;
+import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.JarReader;
 import org.voltdb.utils.LogKeys;
@@ -317,6 +320,19 @@ public class VoltCompiler {
 
         // WRITE CATALOG TO JAR HERE
         final String catalogCommands = catalog.serialize();
+
+        // Create a temp EE instance and try to load the catalog,
+        // this will tell us if the plan fragments can be
+        // initialized correctly.
+        final ExecutionEngine ee =
+            new ExecutionEngineJNI(null, catalog.getRelativeIndex(), 1, 0, 0, "");
+        try {
+            ee.loadCatalog(catalogCommands);
+        } catch (final EEException e) {
+            addErr("Failed to load plan fragments in EE");
+            return false;
+        }
+
         byte[] catalogBytes = null;
         try {
             catalogBytes =  catalogCommands.getBytes("UTF-8");
