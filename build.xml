@@ -1405,7 +1405,7 @@ BENCHMARKS
         <param name="interval" value="${env.BMINTERVAL}000"/>
         <param name="txnrate" value="${env.BMRATELIMIT}"/>
         <param name="volt.server.memory" value="2048"/>
-        <param name="os" value="CentOS"/>
+        <param name="os" value="${env.MACHTYPE}"/>
     </antcall>
 </target>
 
