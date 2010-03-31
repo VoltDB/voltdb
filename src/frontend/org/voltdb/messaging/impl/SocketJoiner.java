@@ -16,12 +16,19 @@
  */
 package org.voltdb.messaging.impl;
 
-import java.io.*;
-import java.net.*;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.*;
+import java.util.Hashtable;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -50,7 +57,7 @@ public class SocketJoiner extends Thread {
     static final int COMMAND_CRCFAIL = 6;
     static final int RESPONSE_LISTENING = 0;
     static final int RESPONSE_CONNECTED = 1;
-    static final int MAX_ACCEPTABLE_TIME_DIFF_IN_MS = 2000;
+    static final int MAX_ACCEPTABLE_TIME_DIFF_IN_MS = 100;
     static final int PING = 333;
     InetAddress m_coordIp;
     int m_localHostId;

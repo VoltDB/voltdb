@@ -105,7 +105,23 @@ public class TransactionIdManager {
             // reset the counter and lastUsedTime for the new millisecond
             if (currentTime < lastUsedTime) {
                 System.err.println("Initiator time moved backwards from: " + lastUsedTime + " to " + currentTime);
-                VoltDB.crashVoltDB();
+                // if the diff is less than 5 ms, wait a bit
+                if ((lastUsedTime - currentTime) < 5) {
+                    int count = 0;
+                    // note, the loop should stop once lastUsedTime is PASSED, not current
+                    while ((currentTime <= lastUsedTime) && (count++ < 100000)) {
+                        Thread.yield();
+                        currentTime = System.currentTimeMillis();
+                    }
+                    // if the loop above ended because it ran too much
+                    if (count >= 100000) {
+                        VoltDB.crashVoltDB();
+                    }
+                }
+                // crash immediately if time has gone backwards by too much
+                else {
+                    VoltDB.crashVoltDB();
+                }
             }
             lastUsedTime = currentTime;
             counterValue = 0;
