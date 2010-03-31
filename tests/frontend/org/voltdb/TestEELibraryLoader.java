@@ -23,174 +23,27 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
-import java.util.ArrayList;
-import java.util.Hashtable;
 
 import org.junit.Test;
-import org.voltdb.VoltDB.Configuration;
-import org.voltdb.fault.FaultDistributorInterface;
-import org.voltdb.messaging.Messenger;
-import org.voltdb.messaging.impl.HostMessenger;
-import org.voltdb.network.VoltNetwork;
 
-public class TestEELibraryLoader {
-
-    private class Interface implements VoltDBInterface {
-
-        @Override
-        public String getBuildString() {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public ArrayList<ClientInterface> getClientInterfaces() {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public Configuration getConfig() {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public CatalogContext getCatalogContext() {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public HostMessenger getHostMessenger() {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public Hashtable<Integer, ExecutionSite> getLocalSites() {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public Messenger getMessenger() {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public VoltNetwork getNetwork() {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public StatsAgent getStatsAgent() {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public FaultDistributorInterface getFaultDistributor()
-        {
-            return null;
-        }
-
-        @Override
-        public String getVersionString() {
-            return "foobar";
-        }
-
-        @Override
-        public void initialize(Configuration config) {
-            // TODO Auto-generated method stub
-
-        }
-
-        @Override
-        public boolean isRunning() {
-            // TODO Auto-generated method stub
-            return false;
-        }
-
-        @Override
-        public void readBuildInfo() {
-            // TODO Auto-generated method stub
-
-        }
-
-        @Override
-        public void run() {
-            // TODO Auto-generated method stub
-
-        }
-
-        @Override
-        public void shutdown(Thread mainSiteThread)
-                throws InterruptedException {
-            // TODO Auto-generated method stub
-
-        }
-
-        @Override
-        public void startSampler() {
-            // TODO Auto-generated method stub
-
-        }
-
-        @Override
-        public boolean ignoreCrash() {
-            m_crash = true;
-            return true;
-        }
-
-        private boolean m_crash = false;
-
-        @Override
-        public void catalogUpdate(String diffCommands, String newCatalogURL, int expectedCatalogVersion) {
-            // TODO Auto-generated method stub
-
-        }
-
-        @Override
-        public Object[] getInstanceId() {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public BackendTarget getBackendTargetType() {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public void clusterUpdate(String diffCommands)
-        {
-            // TODO Auto-generated method stub
-
-        }
-    }
-
+public class TestEELibraryLoader
+{
     @Test
     public void testLoader() {
         final VoltDB.Configuration configuration = new VoltDB.Configuration();
         configuration.m_noLoadLibVOLTDB = true;
-        Interface intf = new Interface();
+        MockVoltDB mockvolt = new MockVoltDB();
 
-        VoltDB.replaceVoltDBInstanceForTest(intf);
+        VoltDB.replaceVoltDBInstanceForTest(mockvolt);
 
         assertFalse(EELibraryLoader.loadExecutionEngineLibrary(false));
-        assertFalse(intf.m_crash);
+        assertEquals(0, mockvolt.getCrashCount());
         assertFalse(EELibraryLoader.loadExecutionEngineLibrary(true));
-        assertTrue(intf.m_crash);
+        assertEquals(1, mockvolt.getCrashCount());
         VoltDB.initialize(configuration);
-        intf.m_crash = false;
         assertFalse(EELibraryLoader.loadExecutionEngineLibrary(true));
-        assertFalse(intf.m_crash);
+        assertEquals(1, mockvolt.getCrashCount());
     }
 }
