@@ -17,6 +17,7 @@
 
 #include "common/SerializableEEException.h"
 #include "common/serializeio.h"
+#include "execution/VoltDBEngine.h"
 
 #include <stdint.h>
 
@@ -33,6 +34,8 @@ void SerializableEEException::serialize(ReferenceSerializeOutput *output) {
     output->writeInt(static_cast<int32_t>(messageLength));
     output->writeBytes(messageBytes, messageLength);
     p_serialize(output);
+    if (m_exceptionType == VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION)
+        output->writeInt(ENGINE_ERRORCODE_ERROR);
     const int16_t length = static_cast<int16_t>(output->position() - (lengthPosition + sizeof(int16_t)));
     output->writeShortAt( lengthPosition, length);
 }
