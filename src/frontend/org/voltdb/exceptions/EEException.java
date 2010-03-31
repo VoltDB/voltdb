@@ -19,6 +19,8 @@ package org.voltdb.exceptions;
 
 import java.nio.ByteBuffer;
 
+import org.voltdb.jni.ExecutionEngine;
+
 /**
  * Exceptions thrown by native Execution Engine
  * that should only be caught by Volt
@@ -40,7 +42,7 @@ public class EEException extends SerializableException {
 
     public EEException(ByteBuffer b) {
         super(b);
-        this.m_errorCode = b.getInt();
+        this.m_errorCode = ExecutionEngine.ERRORCODE_ERROR;
     }
 
     public int getErrorCode() { return m_errorCode;}
