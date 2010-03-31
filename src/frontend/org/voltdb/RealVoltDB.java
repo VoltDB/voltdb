@@ -36,6 +36,7 @@ import org.voltdb.catalog.Site;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.elt.ELTManager;
 import org.voltdb.fault.FaultDistributor;
+import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.impl.HostMessenger;
@@ -565,7 +566,7 @@ public class RealVoltDB implements VoltDBInterface
         return m_statsAgent;
     }
 
-    public FaultDistributor getFaultDistributor()
+    public FaultDistributorInterface getFaultDistributor()
     {
         return m_faultManager;
     }

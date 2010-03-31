@@ -35,7 +35,7 @@ import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
-import org.voltdb.fault.FaultDistributor;
+import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.impl.HostMessenger;
 import org.voltdb.network.VoltNetwork;
@@ -48,6 +48,7 @@ public class MockVoltDB implements VoltDBInterface
     final String m_databaseName = "database";
     StatsAgent m_statsAgent = null;
     int m_howManyCrashes = 0;
+    FaultDistributorInterface m_faultDistributor = null;
 
     public MockVoltDB()
     {
@@ -185,11 +186,15 @@ public class MockVoltDB implements VoltDBInterface
         return null;
     }
 
-    @Override
-    public FaultDistributor getFaultDistributor()
+    public void setFaultDistributor(FaultDistributorInterface distributor)
     {
-        // TODO Auto-generated method stub
-        return null;
+        m_faultDistributor = distributor;
+    }
+
+    @Override
+    public FaultDistributorInterface getFaultDistributor()
+    {
+        return m_faultDistributor;
     }
 
     @Override

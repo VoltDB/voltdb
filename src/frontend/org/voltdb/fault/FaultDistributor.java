@@ -27,7 +27,7 @@ import org.voltdb.fault.VoltFault.FaultType;
  * FaultDistributor routes VoltFaults from reporters to entities that have
  * registered their interest in particular types/subclasses of VoltFault.
  */
-public class FaultDistributor
+public class FaultDistributor implements FaultDistributorInterface
 {
     public FaultDistributor()
     {

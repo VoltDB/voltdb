@@ -31,7 +31,7 @@ import java.util.Hashtable;
 
 import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.fault.FaultDistributor;
+import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.impl.HostMessenger;
 import org.voltdb.network.VoltNetwork;
@@ -95,7 +95,7 @@ public class TestEELibraryLoader {
         }
 
         @Override
-        public FaultDistributor getFaultDistributor()
+        public FaultDistributorInterface getFaultDistributor()
         {
             return null;
         }

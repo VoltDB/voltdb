@@ -19,7 +19,7 @@ package org.voltdb;
 import java.util.ArrayList;
 import java.util.Hashtable;
 
-import org.voltdb.fault.FaultDistributor;
+import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.impl.HostMessenger;
 import org.voltdb.network.VoltNetwork;
@@ -64,7 +64,7 @@ public interface VoltDBInterface
     public Hashtable<Integer, ExecutionSite> getLocalSites();
     public VoltNetwork getNetwork();
     public StatsAgent getStatsAgent();
-    public FaultDistributor getFaultDistributor();
+    public FaultDistributorInterface getFaultDistributor();
     public BackendTarget getBackendTargetType();
 
    /**
