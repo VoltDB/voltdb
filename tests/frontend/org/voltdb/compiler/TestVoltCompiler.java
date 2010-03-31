@@ -243,10 +243,10 @@ public class TestVoltCompiler extends TestCase {
 
     public void testXMLFileWithDDL() throws IOException {
         final String simpleSchema1 =
-            "create table books (cash integer default 23, title varchar default 'foo', PRIMARY KEY(cash));";
+            "create table books (cash integer default 23, title varchar(3) default 'foo', PRIMARY KEY(cash));";
         // newline inserted to test catalog friendliness
         final String simpleSchema2 =
-            "create table books2\n (cash integer default 23, title varchar default 'foo', PRIMARY KEY(cash));";
+            "create table books2\n (cash integer default 23, title varchar(3) default 'foo', PRIMARY KEY(cash));";
 
         final File schemaFile1 = VoltProjectBuilder.writeStringToTempFile(simpleSchema1);
         final String schemaPath1 = schemaFile1.getPath();
@@ -302,9 +302,43 @@ public class TestVoltCompiler extends TestCase {
         jar.delete();
     }
 
+    public void testDDLWithNoLengthString() throws IOException {
+        final String simpleSchema1 =
+            "create table books (cash integer default 23, title varchar default 'foo', PRIMARY KEY(cash));";
+
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema1);
+        final String schemaPath = schemaFile.getPath();
+
+        final String simpleProject =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "<database name='database'>" +
+            "<schemas>" +
+            "<schema path='" + schemaPath + "' />" +
+            "</schemas>" +
+            "<procedures>" +
+            "<procedure class='org.voltdb.compiler.procedures.AddBook' />" +
+            "<procedure class='Foo'>" +
+            "<sql>select * from books;</sql>" +
+            "</procedure>" +
+            "</procedures>" +
+            "</database>" +
+            "</project>";
+
+        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
+        final String projectPath = projectFile.getPath();
+
+        final VoltCompiler compiler = new VoltCompiler();
+        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
+
+        final boolean success = compiler.compile(projectPath, cluster_config,
+                                                 "testout.jar", System.out, null);
+        assertFalse(success);
+    }
+
     public void testNullablePartitionColumn() throws IOException {
         final String simpleSchema =
-            "create table books (cash integer default 23, title varchar default 'foo', PRIMARY KEY(cash));";
+            "create table books (cash integer default 23, title varchar(3) default 'foo', PRIMARY KEY(cash));";
 
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
         final String schemaPath = schemaFile.getPath();
@@ -523,7 +557,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testXMLFileWithELEnabled() throws IOException {
         final String simpleSchema =
-            "create table books (cash integer default 23, title varchar default 'foo', PRIMARY KEY(cash));";
+            "create table books (cash integer default 23, title varchar(3) default 'foo', PRIMARY KEY(cash));";
 
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
         final String schemaPath = schemaFile.getPath();
@@ -571,7 +605,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testOverrideProcInfo() throws IOException {
         final String simpleSchema =
-            "create table books (cash integer default 23 not null, title varchar default 'foo', PRIMARY KEY(cash));";
+            "create table books (cash integer default 23 not null, title varchar(3) default 'foo', PRIMARY KEY(cash));";
 
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
         final String schemaPath = schemaFile.getPath();
@@ -649,7 +683,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testGoodStmtProcName() throws IOException {
         final String simpleSchema =
-            "create table books (cash integer default 23 not null, title varchar default 'foo', PRIMARY KEY(cash));";
+            "create table books (cash integer default 23 not null, title varchar(3) default 'foo', PRIMARY KEY(cash));";
 
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
         final String schemaPath = schemaFile.getPath();

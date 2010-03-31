@@ -17,15 +17,32 @@
 
 package org.voltdb.compiler;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.LineNumberReader;
+import java.io.PrintStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map.Entry;
-import javax.xml.parsers.*;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+
 import org.hsqldb.HSQLInterface;
 import org.hsqldb.HSQLInterface.HSQLParseException;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.*;
+import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Constraint;
+import org.voltdb.catalog.ConstraintRef;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Index;
+import org.voltdb.catalog.MaterializedViewInfo;
+import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -38,8 +55,12 @@ import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.StringInputStream;
-import org.w3c.dom.*;
-import org.xml.sax.*;
+import org.w3c.dom.Document;
+import org.w3c.dom.NamedNodeMap;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
+import org.xml.sax.SAXParseException;
 
 /**
  * Compiles schema (SQL DDL) text files and stores the results in a given catalog.
@@ -328,14 +349,24 @@ public class DDLCompiler {
         if (defaulttype != null)
             defaulttype = Integer.toString(VoltType.typeFromString(defaulttype).getValue());
 
+        VoltType type = VoltType.typeFromString(typename);
+        int size = Integer.parseInt(sizeString);
+        // check valid length if varchar
+        if (type == VoltType.STRING) {
+            if ((size == 0) || (size > VoltType.MAX_VALUE_LENGTH)) {
+                String msg = "VARCHAR Column " + name + " in table " + table.getTypeName() + " has unsupported length " + sizeString;
+                throw m_compiler.new VoltCompilerException(msg);
+            }
+        }
+
         Column column = table.getColumns().add(name);
         // need to set other column data here (default, nullable, etc)
         column.setName(name);
         column.setIndex(index);
-        VoltType type = VoltType.typeFromString(typename);
+
         column.setType(type.getValue());
         column.setNullable(nullable.toLowerCase().startsWith("t") ? true : false);
-        column.setSize(Integer.parseInt(sizeString));
+        column.setSize(size);
 
         column.setDefaultvalue(defaultvalue);
         if (defaulttype != null)
