@@ -30,6 +30,7 @@ import java.util.zip.CRC32;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltdb.EELibraryLoader;
 
 /**
  * An abstraction around a table's save file for restore.  Deserializes the
@@ -78,6 +79,7 @@ public class TableSaveFile
             int readAheadChunks,
             int relevantPartitionIds[]) throws IOException
     {
+        EELibraryLoader.loadExecutionEngineLibrary(true);
         if (relevantPartitionIds == null) {
             m_relevantPartitionIds = null;
         } else {
@@ -244,7 +246,20 @@ public class TableSaveFile
     }
 
     public void close() throws IOException {
-        m_saveFile.close();
+        if (m_chunkReaderThread != null) {
+            m_chunkReaderThread.interrupt();
+            try {
+                m_chunkReaderThread.join();
+            } catch (InterruptedException e) {
+                throw new IOException(e);
+            }
+        }
+        synchronized (this) {
+            while (!m_availableChunks.isEmpty()) {
+                m_availableChunks.poll().discard();
+            }
+            notifyAll();
+        }
     }
 
     public ByteBuffer getTableHeader() {
@@ -254,9 +269,14 @@ public class TableSaveFile
     // Will get the next chunk of the table that is just over the chunk size
     public synchronized BBContainer getNextChunk() throws IOException
     {
+        if (!m_hasMoreChunks) {
+            return m_availableChunks.poll();
+        }
+
         if (m_chunkReader == null) {
             m_chunkReader = new ChunkReader();
-            new Thread(m_chunkReader, "ChunkReader").start();
+            m_chunkReaderThread = new Thread(m_chunkReader, "ChunkReader");
+            m_chunkReaderThread.start();
         }
 
         Container c = null;
@@ -266,7 +286,7 @@ public class TableSaveFile
                 try {
                     wait();
                 } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
+                    throw new IOException(e);
                 }
             }
         }
@@ -341,6 +361,7 @@ public class TableSaveFile
     private final Semaphore m_chunkReads;
 
     private ChunkReader m_chunkReader = null;
+    private Thread m_chunkReaderThread = null;
     private IOException m_chunkReaderException = null;
 
     /**
@@ -354,7 +375,7 @@ public class TableSaveFile
                 try {
                     m_chunkReads.acquire();
                 } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
+                    return;
                 }
                 try {
 
@@ -461,6 +482,10 @@ public class TableSaveFile
                 synchronized (TableSaveFile.this) {
                     m_hasMoreChunks = false;
                     TableSaveFile.this.notifyAll();
+                    try {
+                        m_saveFile.close();
+                    } catch (IOException e) {
+                    }
                 }
             }
         }

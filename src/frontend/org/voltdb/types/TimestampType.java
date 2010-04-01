@@ -50,6 +50,14 @@ public class TimestampType {
     }
 
     /**
+     * Get the microsecond portion of this timestamp
+     * @return Microsecond portion of timestamp as a short
+     */
+    public short getUSec() {
+        return m_usecs;
+    }
+
+    /**
      * Equality.
      * @return true if equal.
      */

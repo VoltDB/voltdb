@@ -895,7 +895,7 @@ public abstract class ClientMain {
 
                     // Get chunks from table
                     while (isSatisfied && saveFile.hasMoreChunks()) {
-                        BBContainer chunk = saveFile.getNextChunk();
+                        final BBContainer chunk = saveFile.getNextChunk();
                         VoltTable table = null;
 
                         // This probably should not happen
@@ -913,8 +913,9 @@ public abstract class ClientMain {
                         chunk.discard();
                     }
                 } finally {
-                    if (saveFile != null)
+                    if (saveFile != null) {
                         saveFile.close();
+                    }
                     if (inputStream != null)
                         inputStream.close();
                     if (!hostName.equals("localhost") && !hostName.equals(localhostName)

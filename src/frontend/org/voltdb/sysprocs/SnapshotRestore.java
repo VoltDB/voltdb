@@ -310,7 +310,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 VoltTable table = null;
                 try
                 {
-                    org.voltdb.utils.DBBPool.BBContainer c = savefile.getNextChunk();
+                    final org.voltdb.utils.DBBPool.BBContainer c = savefile.getNextChunk();
                     if (c == null) {
                         continue;//Should be equivalent to break
                     }
@@ -852,7 +852,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             VoltTable table = null;
             try
             {
-                org.voltdb.utils.DBBPool.BBContainer c = savefile.getNextChunk();
+                final org.voltdb.utils.DBBPool.BBContainer c = savefile.getNextChunk();
                 if (c == null) {
                     continue;//Should be equivalent to break
                 }
