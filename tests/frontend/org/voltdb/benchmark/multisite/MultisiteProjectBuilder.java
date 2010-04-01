@@ -50,10 +50,11 @@ public class MultisiteProjectBuilder extends VoltProjectBuilder {
 
     @Override
     public void addAllDefaults() {
-        addProcedures(MultisiteClient.Transaction.class,
-                      MultisiteClient.RunChangeSeatCallback.class,
-                      MultisiteClient.RunUpdateReservationCallback.class,
-                      MultisiteClient.RunFindOpenSeats.class);
+        addProcedures(
+                      LoadTables.class,
+                      ChangeSeat.class,
+                      UpdateReservation.class,
+                      FindOpenSeats.class);
         addSchema(ddlURL);
         addPartitionInfo("CUSTOMERS", "CID");
         addPartitionInfo("RESERVATIONS", "FID");
