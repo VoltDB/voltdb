@@ -48,9 +48,13 @@ public class TransactionIdManager {
     static final long VOLT_EPOCH = getEpoch();
     public static long getEpoch() {
         Calendar c = Calendar.getInstance();
-        c.clear();
-        c.set(2008, 0, 1);
-        return c.getTimeInMillis();
+        c.setTimeInMillis(0);
+        c.set(2008, 0, 1, 0, 0, 0);
+        c.set(Calendar.MILLISECOND, 0);
+        c.set(Calendar.ZONE_OFFSET, 0);
+        c.set(Calendar.DST_OFFSET, 0);
+        long retval = c.getTimeInMillis();
+        return retval;
     }
 
     // maximum values for the fields
