@@ -34,14 +34,6 @@ import org.voltdb.types.VoltDecimalHelper;
  */
  public class ParameterSet implements FastSerializable {
 
-    /**
-     * Size in bytes of the maximum length for a VoltDB parameter set.
-     * This value is counted from byte 0 of the param count to the end of values.
-     */
-    public static final int MAX_SERIALIZED_PARAMETERSET_LENGTH = 2 * 1024 * 1024;
-    public static final String MAX_SERIALIZED_PARAMETERSET_LENGTH_STR
-        = String.valueOf(MAX_SERIALIZED_PARAMETERSET_LENGTH / 1024) + "k";
-
     static final byte ARRAY = -99;
 
     private final boolean m_serializingToEE;
@@ -100,8 +92,6 @@ import org.voltdb.types.VoltDecimalHelper;
 
     @Override
     public void writeExternal(FastSerializer out) throws IOException {
-        int initialPosition = out.getPosition();
-
         out.writeShort(m_params.length);
 
         for (Object obj : m_params) {
@@ -117,7 +107,11 @@ import org.voltdb.types.VoltDecimalHelper;
                 // EE doesn't support array parameters. Arrays of bytes are
                 // only useful to strings. Special case them here.
                 if (m_serializingToEE && obj instanceof byte[]) {
-                    byte[] b = (byte[]) obj;
+                    final byte[] b = (byte[]) obj;
+                    if (b.length > VoltType.MAX_VALUE_LENGTH) {
+                        throw new VoltOverflowException(
+                                "Value of string byte[] larger than allowed max " + VoltType.MAX_VALUE_LENGTH_STR);
+                    }
                     out.writeByte(VoltType.STRING.getValue());
                     out.writeInt(b.length);
                     out.write(b);

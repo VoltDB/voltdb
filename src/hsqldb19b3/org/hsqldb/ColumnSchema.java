@@ -351,10 +351,10 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
         sb.append(" size='").append(dataType.precision).append("'");
 
         if ((typestring.compareTo("VARCHAR") == 0) &&
-            (dataType.precision > 32000)) {
+            (dataType.precision > 1048576)) {
             String msg = "VARCHAR column size for column ";
             msg += getTableNameString() + "." + columnName.name;
-            msg += " is > 32000 char maximum.";
+            msg += " is > 1048576 char maximum.";
             throw new HSQLParseException(msg);
         }
 

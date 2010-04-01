@@ -78,7 +78,7 @@ voltdb::ValueType COLUMN_TYPES[NUM_OF_COLUMNS]  = { voltdb::VALUE_TYPE_BIGINT,
                                                     voltdb::VALUE_TYPE_SMALLINT,
                                                     voltdb::VALUE_TYPE_INTEGER,
                                                     voltdb::VALUE_TYPE_BIGINT };
-uint16_t COLUMN_SIZES[NUM_OF_COLUMNS]                = {
+int32_t COLUMN_SIZES[NUM_OF_COLUMNS]                = {
                            NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT),
                            NValue::getTupleStorageSize(voltdb::VALUE_TYPE_TINYINT),
                            NValue::getTupleStorageSize(voltdb::VALUE_TYPE_SMALLINT),
@@ -104,7 +104,7 @@ class TableTest : public Test {
 
             std::string *columnNames = new std::string[NUM_OF_COLUMNS];
             std::vector<voltdb::ValueType> columnTypes;
-            std::vector<uint16_t> columnLengths;
+            std::vector<int32_t> columnLengths;
             std::vector<bool> columnAllowNull;
             for (int ctr = 0; ctr < NUM_OF_COLUMNS; ctr++) {
                 sprintf(buffer, "column%02d", ctr);

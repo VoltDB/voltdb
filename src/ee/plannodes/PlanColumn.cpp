@@ -50,7 +50,7 @@ PlanColumn::PlanColumn(Object& colObject) : m_colObject(colObject)
         else if (m_colObject[attr].name_ == "SIZE")
         {
             contains_size = true;
-            m_size = static_cast<uint16_t>(m_colObject[attr].value_.get_int());
+            m_size = m_colObject[attr].value_.get_int();
         }
         else if (m_colObject[attr].name_ == "INPUT_COLUMN_NAME")
         {
@@ -85,7 +85,7 @@ PlanColumn::getType() const
     return m_type;
 }
 
-uint16_t
+int32_t
 PlanColumn::getSize() const
 {
     return m_size;

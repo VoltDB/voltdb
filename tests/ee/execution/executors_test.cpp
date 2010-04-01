@@ -261,7 +261,7 @@ protected:
         //
         std::string *columnNames = new std::string[NUM_OF_COLUMNS];
         std::vector<voltdb::ValueType> columnTypes;
-        std::vector<uint16_t> columnLengths;
+        std::vector<int32_t> columnLengths;
         std::vector<bool> columnAllowNull;
         std::vector<boost::shared_ptr<const voltdb::TableColumn> > table_columns;
         char buffer[32];

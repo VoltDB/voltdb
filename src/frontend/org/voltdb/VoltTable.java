@@ -110,7 +110,8 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
      * This value is counted from byte 0 of the header size to the end of row data.
      */
     public static final int MAX_SERIALIZED_TABLE_LENGTH = 10 * 1024 * 1024;
-    public static final String MAX_SERIALIZED_TABLE_LENGTH_STR = String.valueOf(MAX_SERIALIZED_TABLE_LENGTH / 1024) + "k";
+    public static final String MAX_SERIALIZED_TABLE_LENGTH_STR =
+        String.valueOf(MAX_SERIALIZED_TABLE_LENGTH / 1024) + "k";
 
     static final int NULL_STRING_INDICATOR = -1;
     static final String METADATA_ENCODING = "US-ASCII";

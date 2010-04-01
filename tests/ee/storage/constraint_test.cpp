@@ -94,7 +94,7 @@ protected:
 
     std::vector<std::string> columnNames;
     std::vector<voltdb::ValueType> columnTypes;
-    std::vector<uint16_t> columnSizes;
+    std::vector<int32_t> columnSizes;
     std::vector<bool> columnNullables;
 
     void addColumn(const char* name, voltdb::ValueType type, uint16_t size, bool allow_null) {

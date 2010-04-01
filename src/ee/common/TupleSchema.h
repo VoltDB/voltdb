@@ -26,7 +26,7 @@
 #include <iostream>
 #include <vector>
 
-#define UNINLINEABLE_STRLEN 255
+#define UNINLINEABLE_OBJECT_LENGTH 64
 
 namespace voltdb {
 
@@ -38,7 +38,7 @@ namespace voltdb {
 class TupleSchema {
 public:
     /** Static factory method to create a TupleSchema object with a fixed number of columns */
-    static TupleSchema* createTupleSchema(const std::vector<ValueType> columnTypes, const std::vector<uint16_t> columnSizes, const std::vector<bool> allowNull, bool allowInlinedStrings);
+    static TupleSchema* createTupleSchema(const std::vector<ValueType> columnTypes, const std::vector<int32_t> columnSizes, const std::vector<bool> allowNull, bool allowInlinedStrings);
     /** Static factory method fakes a copy constructor */
     static TupleSchema* createTupleSchema(const TupleSchema *schema);
 
@@ -82,35 +82,35 @@ public:
     inline bool columnIsInlined(const int index) const;
     /** Get the oftset in the tuples bytes of the column at a given index.
         Behavior unpredicatble if invalid index. */
-    inline uint16_t columnOffset(int index) const;
+    inline uint32_t columnOffset(int index) const;
     /** Get the length in bytes of the column at a given index.
         Behavior unpredictable if invalid index. Length for inlined
         strings will be the maximum length specified or 8 if string is
         not inlined. */
-    inline uint16_t columnLength(int index) const;
+    inline uint32_t columnLength(int index) const;
 
     /** Return the number of columns in the schema for the tuple. */
     inline uint16_t columnCount() const;
     /** Return the number of bytes used by one tuple. */
-    inline uint16_t tupleLength() const;
+    inline uint32_t tupleLength() const;
 
     /** Returns a flag indicating whether strings will be inlined in this schema **/
-    bool allowInlinedStrings() const;
+    bool allowInlinedObjects() const;
 
     /** Get a string representation of this schema for debugging */
     std::string debug() const;
 
-    uint16_t getUninlinedStringColumnCount() const ;
+    uint16_t getUninlinedObjectColumnCount() const ;
 
-    uint16_t getUninlinedStringColumnInfoIndex(const int stringColumnIndex) const;
+    uint16_t getUninlinedObjectColumnInfoIndex(const int objectColumnIndex) const;
 
     bool equals(const TupleSchema *other) const;
 
 private:
     // holds per column info
     struct ColumnInfo {
-        uint16_t offset;
-        uint16_t length;   // does not include length prefix for ObjectTypes
+        uint32_t offset;
+        uint32_t length;   // does not include length prefix for ObjectTypes
         char type;
         char allowNull;
         bool inlined;      // Stored inside the tuple or outside the tuple.
@@ -119,26 +119,26 @@ private:
     /*
      * Report the actual length in bytes of a column. For inlined strings this will include the two byte length prefix and null terminator.
      */
-    uint16_t columnLengthPrivate(const int index) const;
+    uint32_t columnLengthPrivate(const int index) const;
 
     const ColumnInfo* getColumnInfo(int columnIndex) const;
     ColumnInfo* getColumnInfo(int columnIndex);
 
-    void setUninlinedStringColumnInfoIndex(uint16_t stringColumnIndex, uint16_t stringColumnInfoIndex);
+    void setUninlinedObjectColumnInfoIndex(uint16_t objectColumnIndex, uint16_t objectColumnInfoIndex);
 
     /** Set the type and column size for a column. The columns can be set in any order,
         but it's important to set this data for all columns before any use. Note, the "length"
         param may not be read in some places for some types (like integers), so make sure it
         is correct, or the code will act all wonky. */
-    void setColumnMetaData(uint16_t index, ValueType type, uint16_t length, bool allowNull, uint16_t &uninlinedStringColumnIndex);
+    void setColumnMetaData(uint16_t index, ValueType type, int32_t length, bool allowNull, uint16_t &uninlinedObjectColumnIndex);
 
     /*
      * Returns the number of string columns that can't be inlined.
      */
-    static uint16_t countUninlineableStringColumns(
+    static uint16_t countUninlineableObjectColumns(
             std::vector<ValueType> columnTypes,
-            std::vector<uint16_t> columnSizes,
-            bool allowInlinedStrings);
+            std::vector<int32_t> columnSizes,
+            bool allowInlinedObjects);
 
     // can't (shouldn't) call constructors or destructor
     // prevents TupleSchema from being created on the stack
@@ -146,10 +146,10 @@ private:
     TupleSchema(const TupleSchema &ts) {};
     ~TupleSchema() {}
     //Whether this schema allows strings to be inlined
-    bool m_allowInlinedStrings;
+    bool m_allowInlinedObjects;
     // number of columns
     uint16_t m_columnCount;
-    uint16_t m_uninlinedStringColumnCount;
+    uint16_t m_uninlinedObjectColumnCount;
 
     /*
      * Data storage for column info and for indices of string columns
@@ -180,57 +180,57 @@ inline bool TupleSchema::columnIsInlined(const int index) const {
     return columnInfo->inlined;
 }
 
-inline uint16_t TupleSchema::columnOffset(int index) const {
+inline uint32_t TupleSchema::columnOffset(int index) const {
     assert(index < m_columnCount);
     const ColumnInfo *columnInfo = getColumnInfo(index);
     return columnInfo->offset;
 }
 
 /** Return the column length in DDL terms (do not include length-prefix bytes) */
-inline uint16_t TupleSchema::columnLength(const int index) const {
+inline uint32_t TupleSchema::columnLength(const int index) const {
     assert(index < m_columnCount);
     const ColumnInfo *columnInfo = getColumnInfo(index);
     return columnInfo->length;
 }
 
-inline uint16_t TupleSchema::columnLengthPrivate(const int index) const {
+inline uint32_t TupleSchema::columnLengthPrivate(const int index) const {
     assert(index < m_columnCount);
     const ColumnInfo *columnInfo = getColumnInfo(index);
     const ColumnInfo *columnInfoPlusOne = getColumnInfo(index + 1);
     // calculate the real column length in raw bytes
-    return static_cast<uint16_t>(columnInfoPlusOne->offset - columnInfo->offset);
+    return static_cast<uint32_t>(columnInfoPlusOne->offset - columnInfo->offset);
 }
 
 inline uint16_t TupleSchema::columnCount() const {
     return m_columnCount;
 }
 
-inline uint16_t TupleSchema::tupleLength() const {
+inline uint32_t TupleSchema::tupleLength() const {
     // index "m_count" has the offset for the end of the tuple
     // index "m_count-1" has the offset for the last column
     return getColumnInfo(m_columnCount)->offset;
 }
 
-inline bool TupleSchema::allowInlinedStrings() const {
-    return m_allowInlinedStrings;
+inline bool TupleSchema::allowInlinedObjects() const {
+    return m_allowInlinedObjects;
 }
 
 inline const TupleSchema::ColumnInfo* TupleSchema::getColumnInfo(int columnIndex) const {
-    return &reinterpret_cast<const ColumnInfo*>(m_data + (sizeof(uint16_t) * m_uninlinedStringColumnCount))[columnIndex];
+    return &reinterpret_cast<const ColumnInfo*>(m_data + (sizeof(uint16_t) * m_uninlinedObjectColumnCount))[columnIndex];
 }
 
 inline TupleSchema::ColumnInfo* TupleSchema::getColumnInfo(int columnIndex) {
-    return &reinterpret_cast<ColumnInfo*>(m_data + (sizeof(uint16_t) * m_uninlinedStringColumnCount))[columnIndex];
+    return &reinterpret_cast<ColumnInfo*>(m_data + (sizeof(uint16_t) * m_uninlinedObjectColumnCount))[columnIndex];
 }
 
-inline uint16_t TupleSchema::getUninlinedStringColumnCount() const { return m_uninlinedStringColumnCount; }
+inline uint16_t TupleSchema::getUninlinedObjectColumnCount() const { return m_uninlinedObjectColumnCount; }
 
-inline uint16_t TupleSchema::getUninlinedStringColumnInfoIndex(const int stringColumnIndex) const {
-    return reinterpret_cast<const uint16_t*>(m_data)[stringColumnIndex];
+inline uint16_t TupleSchema::getUninlinedObjectColumnInfoIndex(const int objectColumnIndex) const {
+    return reinterpret_cast<const uint16_t*>(m_data)[objectColumnIndex];
 }
 
-inline void TupleSchema::setUninlinedStringColumnInfoIndex(uint16_t stringColumnIndex, uint16_t stringColumnInfoIndex) {
-    reinterpret_cast<uint16_t*>(m_data)[stringColumnIndex] = stringColumnInfoIndex;
+inline void TupleSchema::setUninlinedObjectColumnInfoIndex(uint16_t objectColumnIndex, uint16_t objectColumnInfoIndex) {
+    reinterpret_cast<uint16_t*>(m_data)[objectColumnIndex] = objectColumnInfoIndex;
 }
 } // namespace voltdb
 

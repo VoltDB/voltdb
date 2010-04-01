@@ -24,6 +24,7 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
+import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.DBBPool;
@@ -272,7 +273,7 @@ public class FastSerializer implements DataOutput {
      * @throws IOException Rethrows any IOExceptions thrown.
      */
     public void writeString(String string) throws IOException {
-        final int MAX_LENGTH = Integer.MAX_VALUE - 2;
+        final int MAX_LENGTH = VoltType.MAX_VALUE_LENGTH;
         final int NULL_STRING_INDICATOR = -1;
         if (string == null) {
             writeInt(NULL_STRING_INDICATOR);
@@ -309,11 +310,11 @@ public class FastSerializer implements DataOutput {
     }
 
     public void writeArray(byte[] values) throws IOException {
-        if (values.length > Short.MAX_VALUE) {
+        if (values.length > VoltType.MAX_VALUE_LENGTH) {
             throw new IOException("Array exceeds maximum length of "
-                                  + Short.MAX_VALUE + " bytes");
+                                  + VoltType.MAX_VALUE_LENGTH + " bytes");
         }
-        writeShort(values.length);
+        writeInt(values.length);
         for (int i = 0; i < values.length; ++i) {
             writeByte(values[i]);
         }

@@ -78,7 +78,7 @@ class TableSerializeTest : public Test {
 
             std::string *columnNames = new std::string[NUM_OF_COLUMNS];
             std::vector<voltdb::ValueType> columnTypes;
-            std::vector<uint16_t> columnSizes;
+            std::vector<int32_t> columnSizes;
             std::vector<bool> columnAllowNull(NUM_OF_COLUMNS, false);
             for (int ctr = 0; ctr < NUM_OF_COLUMNS; ctr++) {
                 char name[16];
@@ -86,7 +86,7 @@ class TableSerializeTest : public Test {
                 else ::sprintf(name, "val%02d", ctr);
                 columnNames[ctr] = name;
                 int size = (col_types[ctr] != VALUE_TYPE_VARCHAR ? 8 : 20);
-                columnSizes.push_back(static_cast<uint16_t>(size));
+                columnSizes.push_back(static_cast<int32_t>(size));
                 columnTypes.push_back(col_types[ctr]);
             }
             voltdb::TupleSchema *schema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnSizes, columnAllowNull, true);
@@ -161,7 +161,7 @@ TEST_F(TableSerializeTest, RoundTrip) {
 TEST_F(TableSerializeTest, NullStrings) {
     std::string *columnNames = new std::string[1];
     std::vector<voltdb::ValueType> columnTypes(1, voltdb::VALUE_TYPE_VARCHAR);
-    std::vector<uint16_t> columnSizes(1, 20);
+    std::vector<int32_t> columnSizes(1, 20);
     std::vector<bool> columnAllowNull(1, false);
     voltdb::TupleSchema *schema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnSizes, columnAllowNull, true);
     columnNames[0] = "";

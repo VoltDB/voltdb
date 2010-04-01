@@ -74,7 +74,7 @@ bool ReceiveExecutor::p_init(AbstractPlanNode *abstract_node,
     assert(num_of_columns == node->getOutputColumnSizes().size());
     const std::vector<std::string> outputColumnNames = node->getOutputColumnNames();
     const std::vector<voltdb::ValueType> outputColumnTypes = node->getOutputColumnTypes();
-    const std::vector<uint16_t> outputColumnSizes = node->getOutputColumnSizes();
+    const std::vector<int32_t> outputColumnSizes = node->getOutputColumnSizes();
     const std::vector<bool> outputColumnAllowNull(num_of_columns, true);
     TupleSchema *schema = TupleSchema::createTupleSchema(outputColumnTypes, outputColumnSizes, outputColumnAllowNull, true);
     std::string *columnNames = new std::string[num_of_columns];

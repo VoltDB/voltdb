@@ -97,7 +97,7 @@ public:
 
         // set up the schema used to fill the new buffer
         std::vector<ValueType> columnTypes;
-        std::vector<uint16_t> columnLengths;
+        std::vector<int32_t> columnLengths;
         std::vector<bool> columnAllowNull;
         for (int i = 0; i < COLUMN_COUNT; i++) {
             columnTypes.push_back(VALUE_TYPE_INTEGER);

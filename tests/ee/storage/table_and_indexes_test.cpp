@@ -60,7 +60,7 @@ class TableAndIndexTest : public Test {
             mem = 0;
 
             vector<voltdb::ValueType> districtColumnTypes;
-            vector<uint16_t> districtColumnLengths;
+            vector<int32_t> districtColumnLengths;
             vector<bool> districtColumnAllowNull(11, true);
             districtColumnAllowNull[0] = false;
 
@@ -86,7 +86,7 @@ class TableAndIndexTest : public Test {
             districtIndex1Scheme = TableIndexScheme("District primary key index", HASH_TABLE_INDEX, districtIndex1ColumnIndices, districtIndex1ColumnTypes, true, true, districtTupleSchema);
 
             vector<voltdb::ValueType> warehouseColumnTypes;
-            vector<uint16_t> warehouseColumnLengths;
+            vector<int32_t> warehouseColumnLengths;
             vector<bool> warehouseColumnAllowNull(9, true);
             warehouseColumnAllowNull[0] = false;
 
@@ -108,7 +108,7 @@ class TableAndIndexTest : public Test {
             warehouseIndex1Scheme = TableIndexScheme("Warehouse primary key index", ARRAY_INDEX, warehouseIndex1ColumnIndices, warehouseIndex1ColumnTypes, true, true, warehouseTupleSchema);
 
             vector<voltdb::ValueType> customerColumnTypes;
-            vector<uint16_t> customerColumnLengths;
+            vector<int32_t> customerColumnLengths;
             vector<bool> customerColumnAllowNull(21, true);
             customerColumnAllowNull[0] = false;
             customerColumnAllowNull[1] = false;

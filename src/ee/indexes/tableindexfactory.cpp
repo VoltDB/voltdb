@@ -66,7 +66,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
     std::vector<int32_t> columnIndices = scheme.columnIndices;
     voltdb::TupleSchema *tupleSchema = scheme.tupleSchema;
     std::vector<voltdb::ValueType> keyColumnTypes;
-    std::vector<uint16_t> keyColumnLengths;
+    std::vector<int32_t> keyColumnLengths;
     std::vector<bool> keyColumnAllowNull(colCount, true);
     for (int i = 0; i < colCount; ++i) {
         keyColumnTypes.push_back(tupleSchema->columnType(columnIndices[i]));

@@ -66,8 +66,8 @@ public:
     std::vector<ValueType>& getOutputColumnTypes();
     const std::vector<ValueType>& getOutputColumnTypes() const;
 
-    std::vector<uint16_t>& getOutputColumnSizes();
-    const std::vector<uint16_t>& getOutputColumnSizes() const;
+    std::vector<int32_t>& getOutputColumnSizes();
+    const std::vector<int32_t>& getOutputColumnSizes() const;
 
     std::vector<int>& getOutputColumnInputGuids();
     const std::vector<int>& getOutputColumnInputGuids() const;
@@ -119,7 +119,7 @@ public:
     //
     void setOutputColumnNames(std::vector<std::string>& names);
     void setOutputColumnTypes(std::vector<ValueType>& types);
-    void setOutputColumnSizes(std::vector<uint16_t>& sizes);
+    void setOutputColumnSizes(std::vector<int32_t>& sizes);
     void setAggregates(std::vector<ExpressionType> &aggregates);
     void setAggregateOutputColumns(std::vector<int> outputColumns);
     void setAggregateColumnNames(std::vector<std::string> column_names);
@@ -139,7 +139,7 @@ protected:
     std::vector<int> m_outputColumnGuids;
     std::vector<std::string> m_outputColumnNames;
     std::vector<ValueType> m_outputColumnTypes;
-    std::vector<uint16_t> m_outputColumnSizes;
+    std::vector<int32_t> m_outputColumnSizes;
 
     //
     // HACK: We use a simple type to keep track of function we are

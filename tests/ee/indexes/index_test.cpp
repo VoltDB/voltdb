@@ -98,7 +98,7 @@ public:
 
         char buffer[32];
         vector<ValueType> columnTypes(NUM_OF_COLUMNS, VALUE_TYPE_BIGINT);
-        vector<uint16_t>
+        vector<int32_t>
             columnLengths(NUM_OF_COLUMNS,
                           NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
         vector<bool> columnAllowNull(NUM_OF_COLUMNS, false);
@@ -189,7 +189,7 @@ TEST_F(IndexTest, ArrayUnique) {
 
     TableTuple tuple(table->schema());
     vector<ValueType> keyColumnTypes(1, VALUE_TYPE_BIGINT);
-    vector<uint16_t>
+    vector<int32_t>
         keyColumnLengths(1, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
     vector<bool> keyColumnAllowNull(1, true);
     TupleSchema* keySchema =
@@ -298,7 +298,7 @@ TEST_F(IndexTest, IntsUnique) {
 
     TableTuple tuple(table->schema());
     vector<ValueType> keyColumnTypes(2, VALUE_TYPE_BIGINT);
-    vector<uint16_t>
+    vector<int32_t>
         keyColumnLengths(2, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
     vector<bool> keyColumnAllowNull(2, true);
     TupleSchema* keySchema =
@@ -470,7 +470,7 @@ TEST_F(IndexTest, IntsMulti) {
     EXPECT_EQ(true, index != NULL);
     TableTuple tuple(table->schema());
     vector<ValueType> keyColumnTypes(2, VALUE_TYPE_BIGINT);
-    vector<uint16_t>
+    vector<int32_t>
         keyColumnLengths(2, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
     vector<bool> keyColumnAllowNull(2, true);
     TupleSchema* keySchema =

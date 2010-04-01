@@ -335,7 +335,8 @@ inline void TableTuple::setNValue(const int idx, voltdb::NValue value) {
     value = value.castAs(type);
     const bool isInlined = m_schema->columnIsInlined(idx);
     char *dataPtr = getDataPtr(idx);
-    value.serializeToTupleStorage(dataPtr, isInlined, m_schema->columnLength(idx));
+    const int32_t columnLength = m_schema->columnLength(idx);
+    value.serializeToTupleStorage(dataPtr, isInlined, columnLength);
 }
 
 /* Copy strictly by value from slimvalue into this tuple */
@@ -350,8 +351,9 @@ inline void TableTuple::setNValueAllocateForObjectCopies(const int idx,
     value = value.castAs(type);
     const bool isInlined = m_schema->columnIsInlined(idx);
     char *dataPtr = getDataPtr(idx);
+    const int32_t columnLength = m_schema->columnLength(idx);
     value.serializeToTupleStorageAllocateForObjects(dataPtr, isInlined,
-                                                    m_schema->columnLength(idx), dataPool);
+                                                    columnLength, dataPool);
 }
 
 /*
@@ -363,10 +365,10 @@ inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source
     assert(source.m_data);
     assert(m_data);
 
-    const bool allowInlinedStrings = m_schema->allowInlinedStrings();
+    const bool allowInlinedObjects = m_schema->allowInlinedObjects();
     const TupleSchema *sourceSchema = source.m_schema;
-    const bool oAllowInlinedStrings = sourceSchema->allowInlinedStrings();
-    const uint16_t uninlineableStringColumnCount = m_schema->getUninlinedStringColumnCount();
+    const bool oAllowInlinedObjects = sourceSchema->allowInlinedObjects();
+    const uint16_t uninlineableObjectColumnCount = m_schema->getUninlinedObjectColumnCount();
 
 #ifndef NDEBUG
     if(!compatibleForCopy(source)) {
@@ -378,23 +380,23 @@ inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source
     }
 #endif
 
-    if (allowInlinedStrings == oAllowInlinedStrings) {
+    if (allowInlinedObjects == oAllowInlinedObjects) {
         /*
          * The source and target tuple have the same policy WRT to
          * inlining strings. A memcpy can be used to speed the process
          * up for all columns that are not uninlineable strings.
          */
-        if (uninlineableStringColumnCount > 0) {
+        if (uninlineableObjectColumnCount > 0) {
             // copy the data AND the isActive flag
             ::memcpy(m_data, source.m_data, m_schema->tupleLength() + TUPLE_HEADER_SIZE);
             /*
              * Copy each uninlined string column doing an allocation for string copies.
              */
-            for (uint16_t ii = 0; ii < uninlineableStringColumnCount; ii++) {
-                const uint16_t uinlineableStringColumnIndex =
-                  m_schema->getUninlinedStringColumnInfoIndex(ii);
-                setNValueAllocateForObjectCopies(uinlineableStringColumnIndex,
-                                                    source.getNValue(uinlineableStringColumnIndex),
+            for (uint16_t ii = 0; ii < uninlineableObjectColumnCount; ii++) {
+                const uint16_t uinlineableObjectColumnIndex =
+                  m_schema->getUninlinedObjectColumnInfoIndex(ii);
+                setNValueAllocateForObjectCopies(uinlineableObjectColumnIndex,
+                                                    source.getNValue(uinlineableObjectColumnIndex),
                                                     pool);
             }
             m_data[0] = source.m_data[0];
@@ -405,7 +407,7 @@ inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source
     } else {
         // Can't copy the string ptr from the other tuple if the string
         // is inlined into the tuple
-        assert(!(!allowInlinedStrings && oAllowInlinedStrings));
+        assert(!(!allowInlinedObjects && oAllowInlinedObjects));
         const uint16_t columnCount = m_schema->columnCount();
         for (uint16_t ii = 0; ii < columnCount; ii++) {
             setNValueAllocateForObjectCopies(ii, source.getNValue(ii), pool);
@@ -423,15 +425,15 @@ inline void TableTuple::copyForPersistentUpdate(const TableTuple &source) {
     assert(m_schema);
     assert(m_schema == source.m_schema);
     const int columnCount = m_schema->columnCount();
-    const uint16_t uninlineableStringColumnCount = m_schema->getUninlinedStringColumnCount();
+    const uint16_t uninlineableObjectColumnCount = m_schema->getUninlinedObjectColumnCount();
     /*
      * The source and target tuple have the same policy WRT to
      * inlining strings because a TableTuple used for updating a
      * persistent table uses the same schema as the persistent table.
      */
-    if (uninlineableStringColumnCount > 0) {
-        uint16_t uninlineableStringColumnIndex = 0;
-        uint16_t nextUninlineableStringColumnInfoIndex = m_schema->getUninlinedStringColumnInfoIndex(0);
+    if (uninlineableObjectColumnCount > 0) {
+        uint16_t uninlineableObjectColumnIndex = 0;
+        uint16_t nextUninlineableObjectColumnInfoIndex = m_schema->getUninlinedObjectColumnInfoIndex(0);
         /*
          * Copy each column doing an allocation for string
          * copies. Compare the source and target pointer to see if it
@@ -439,7 +441,7 @@ inline void TableTuple::copyForPersistentUpdate(const TableTuple &source) {
          * old string and copy/allocate the new one from the source.
          */
         for (uint16_t ii = 0; ii < columnCount; ii++) {
-            if (ii == nextUninlineableStringColumnInfoIndex) {
+            if (ii == nextUninlineableObjectColumnInfoIndex) {
                 const char *mPtr = *reinterpret_cast<char* const*>(getDataPtr(ii));
                 const char *oPtr = *reinterpret_cast<char* const*>(source.getDataPtr(ii));
                 if (mPtr != oPtr) {
@@ -448,12 +450,12 @@ inline void TableTuple::copyForPersistentUpdate(const TableTuple &source) {
                     // by the UndoAction for the update.
                     setNValueAllocateForObjectCopies(ii, source.getNValue(ii), NULL);
                 }
-                uninlineableStringColumnIndex++;
-                if (uninlineableStringColumnIndex < uninlineableStringColumnCount) {
-                    nextUninlineableStringColumnInfoIndex =
-                      m_schema->getUninlinedStringColumnInfoIndex(uninlineableStringColumnIndex);
+                uninlineableObjectColumnIndex++;
+                if (uninlineableObjectColumnIndex < uninlineableObjectColumnCount) {
+                    nextUninlineableObjectColumnInfoIndex =
+                      m_schema->getUninlinedObjectColumnInfoIndex(uninlineableObjectColumnIndex);
                 } else {
-                    nextUninlineableStringColumnInfoIndex = 0;
+                    nextUninlineableObjectColumnInfoIndex = 0;
                 }
             } else {
                 setNValueAllocateForObjectCopies(ii, source.getNValue(ii), NULL);
@@ -473,9 +475,9 @@ inline void TableTuple::copy(const TableTuple &source) {
     assert(m_data);
 
     const uint16_t columnCount = m_schema->columnCount();
-    const bool allowInlinedStrings = m_schema->allowInlinedStrings();
+    const bool allowInlinedObjects = m_schema->allowInlinedObjects();
     const TupleSchema *sourceSchema = source.m_schema;
-    const bool oAllowInlinedStrings = sourceSchema->allowInlinedStrings();
+    const bool oAllowInlinedObjects = sourceSchema->allowInlinedObjects();
 
 #ifndef NDEBUG
     if(!compatibleForCopy(source)) {
@@ -487,13 +489,13 @@ inline void TableTuple::copy(const TableTuple &source) {
     }
 #endif
 
-    if (allowInlinedStrings == oAllowInlinedStrings) {
+    if (allowInlinedObjects == oAllowInlinedObjects) {
         // copy the data AND the isActive flag
         ::memcpy(m_data, source.m_data, m_schema->tupleLength() + TUPLE_HEADER_SIZE);
     } else {
         // Can't copy the string ptr from the other tuple if the
         // string is inlined into the tuple
-        assert(!(!allowInlinedStrings && oAllowInlinedStrings));
+        assert(!(!allowInlinedObjects && oAllowInlinedObjects));
         for (uint16_t ii = 0; ii < columnCount; ii++) {
             setNValue(ii, source.getNValue(ii));
         }
@@ -620,9 +622,9 @@ inline size_t TableTuple::hashCode() const {
  * Release to the heap any memory allocated for any uninlined columns.
  */
 inline void TableTuple::freeObjectColumns() {
-    const uint16_t unlinlinedColumnCount = m_schema->getUninlinedStringColumnCount();
+    const uint16_t unlinlinedColumnCount = m_schema->getUninlinedObjectColumnCount();
     for (int ii = 0; ii < unlinlinedColumnCount; ii++) {
-        getNValue(m_schema->getUninlinedStringColumnInfoIndex(ii)).free();
+        getNValue(m_schema->getUninlinedObjectColumnInfoIndex(ii)).free();
     }
 }
 

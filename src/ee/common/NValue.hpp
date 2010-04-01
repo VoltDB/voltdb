@@ -34,6 +34,7 @@
 #include <limits>
 #include <stdint.h>
 #include <string>
+#include <algorithm>
 
 #include "boost/unordered_map.hpp"
 #include "ttmath/ttmathint.h"
@@ -41,6 +42,8 @@
 #define CHECK_FPE( x ) ( std::isinf(x) || std::isnan(x) )
 namespace voltdb {
 
+#define SHORT_OBJECT_LENGTHLENGTH 1
+#define LONG_OBJECT_LENGTHLENGTH 4
 
 //The int used for storage and return values
 typedef ttmath::Int<2> TTInt;
@@ -134,7 +137,7 @@ class NValue {
        inlined then the provided data pool or the heap will be used to
        allocated storage for a copy of the object. */
     void serializeToTupleStorageAllocateForObjects(
-        void *storage, const bool isInlined, const int16_t maxLength,
+        void *storage, const bool isInlined, const int32_t maxLength,
         Pool *dataPool) const;
 
     /* Serialize the scalar this NValue represents to the storage area
@@ -143,7 +146,7 @@ class NValue {
        pointer to the object will be copied into the storage area. No
        allocations are performed. */
     void serializeToTupleStorage(
-        void *storage, const bool isInlined, const int16_t maxLength) const;
+        void *storage, const bool isInlined, const int32_t maxLength) const;
 
     /* Deserialize a scalar value of the specified type from the
        SerializeInput directly into the tuple storage area
@@ -306,8 +309,8 @@ class NValue {
     }
 
     /**
-     * 16 bytes of storage for NValue data.
-     * The 16th byte stores the ValueType!
+     * 17 bytes of storage for NValue data.
+     * The 17th byte stores the ValueType!
      */
     char m_data[17];
 
@@ -316,7 +319,7 @@ class NValue {
      * that will be stored in this instance
      */
     NValue(const ValueType type) {
-        ::memset( m_data, 0, 16);
+        ::memset( m_data, 0, 17);
         setValueType(type);
     }
 
@@ -345,7 +348,7 @@ class NValue {
      * Leverage private access and enforce strict requirements on
      * calling correctness.
      */
-    int16_t getObjectLength() const {
+    int32_t getObjectLength() const {
         if (isNull()) {
             // Conceptually, I think a NULL object should just have
             // length 0. In practice, this code path is often a defect
@@ -358,8 +361,52 @@ class NValue {
             // at the moment, only varchars are using getObjectLength().
             throwFatalException("Must not ask for object length for non-object types");
         }
+
         // now safe to read and return the length preceding value.
-        return **(reinterpret_cast<int16_t * const*>(m_data));
+        return *reinterpret_cast<const int32_t *>(&m_data[8]);
+    }
+
+    static int32_t getPersistentObjectLengthFromLocation(const char *location) {
+        if (location == NULL) {
+            return -1;
+        }
+        char firstByte = location[0];
+        const char premask = static_cast<char>(3 << 6);
+        const char mask = ~premask;
+        int32_t decodedNumber = 0;
+        if ((firstByte & (1 << 6)) != 0) {
+            return -1;
+        } else if ((firstByte & (1 << 7)) != 0) {
+            char numberBytes[4];
+            numberBytes[0] = static_cast<char>(location[0] & mask);
+            numberBytes[1] = location[1];
+            numberBytes[2] = location[2];
+            numberBytes[3] = location[3];
+            decodedNumber = ntohl(*reinterpret_cast<int32_t*>(numberBytes));
+        } else {
+            decodedNumber = location[0] & mask;
+        }
+        return decodedNumber;
+    }
+
+    static void setPersistentObjectLengthToLocation(int32_t length, char *location) {
+        int32_t beNumber = htonl(length);
+        if (length < -1) {
+            throwFatalException("Object length cannot be < -1");
+        } else if (length == -1) {
+            location[0] = 64;
+        } if (length < 64) {
+            location[0] = reinterpret_cast<char*>(&beNumber)[3];
+            location[0] = static_cast<char>(location[0] & ~(1 << 7));
+            location[0] = static_cast<char>(location[0] & ~(1 << 6));
+        } else {
+            char *pointer = reinterpret_cast<char*>(&beNumber);
+            location[0] = pointer[0];
+            location[0] |= static_cast<char>(1 << 7);
+            location[1] = pointer[1];
+            location[2] = pointer[2];
+            location[3] = pointer[3];
+        }
     }
 
     /**
@@ -368,10 +415,10 @@ class NValue {
     void* getObjectValue() const {
         if (*reinterpret_cast<void* const*>(m_data) == NULL) {
             return NULL;
-        } else if(**reinterpret_cast<int16_t* const*>(m_data) == OBJECTLENGTH_NULL) {
+        } else if(*reinterpret_cast<const int32_t*>(&m_data[8]) == OBJECTLENGTH_NULL) {
             return NULL;
         } else {
-            void *value = *reinterpret_cast<char* const*>(m_data) + sizeof(int16_t);
+            void * value = *reinterpret_cast<char* const*>(m_data) + m_data[12];
             return value;
         }
     }
@@ -828,20 +875,20 @@ class NValue {
      * Copy the arbitrary size object that this value points to as an
      * inline object in the provided storage area
      */
-    void inlineCopyObject(void *storage, int16_t maxLength) const {
+    void inlineCopyObject(void *storage, int32_t maxLength) const {
         if (isNull()) {
-            *reinterpret_cast<int16_t*>(storage) = OBJECTLENGTH_NULL;
+            *reinterpret_cast<char*>(storage) = 64;//null bit
         }
         else {
-            const int16_t objectLength = getObjectLength();
+            const int32_t objectLength = getObjectLength();
             if (objectLength > maxLength) {
                 char msg[1024];
-                sprintf(msg, "Object exceeds specified size. Size is %hd and max is %hd", objectLength, maxLength);
+                sprintf(msg, "Object exceeds specified size. Size is %d and max is %d", objectLength, maxLength);
                 throw SQLException(SQLException::data_exception_string_data_length_mismatch,
                                    msg);
             }
-            ::memcpy( storage, *reinterpret_cast<char *const *>(m_data), sizeof(int16_t) + objectLength);
-            reinterpret_cast<char *>(storage)[sizeof(int16_t) + objectLength] = '\0';
+            ::memcpy( storage, *reinterpret_cast<char *const *>(m_data), m_data[12] + objectLength);
+            *reinterpret_cast<int8_t*>(storage) = static_cast<int8_t>(objectLength);
         }
 
     }
@@ -923,8 +970,8 @@ class NValue {
         if (rhs.getValueType() != VALUE_TYPE_VARCHAR) {
             throwFatalException( "non comparable types lhs '%d' rhs '%d'", getValueType(), rhs.getValueType());
         }
-        const char* left = *reinterpret_cast<char* const*>(m_data);
-        const char* right = *reinterpret_cast<char* const*>(rhs.m_data);
+        const char* left = reinterpret_cast<const char*>(getObjectValue());
+        const char* right = reinterpret_cast<const char*>(rhs.getObjectValue());
         if (isNull()) {
             if (rhs.isNull()) {
                 return VALUE_COMPARE_EQUAL;
@@ -934,7 +981,16 @@ class NValue {
         } else if (rhs.isNull()) {
             return VALUE_COMPARE_GREATERTHAN;
         }
-        const int result = ::strcmp(left + sizeof(int16_t), right + sizeof(int16_t));
+        const int32_t leftLength = getObjectLength();
+        const int32_t rightLength = rhs.getObjectLength();
+        const int result = ::strncmp(left, right, std::min(leftLength, rightLength));
+        if (result == 0 && leftLength != rightLength) {
+            if (leftLength > rightLength) {
+                return  1;
+            } else {
+                return -1;
+            }
+        }
         return result;
     }
 
@@ -1240,13 +1296,19 @@ class NValue {
 
     static NValue getStringValue(std::string value) {
         NValue retval(VALUE_TYPE_VARCHAR);
-        const int16_t length = static_cast<int16_t>(value.length());
-        const std::size_t minLength = value.length() + sizeof(int16_t) + 1;
+        const int32_t length = static_cast<int32_t>(value.length());
+        const int8_t lengthLength =
+                static_cast<int8_t>(
+                        length < 64 ?
+                                SHORT_OBJECT_LENGTHLENGTH :
+                                LONG_OBJECT_LENGTHLENGTH);
+        const std::size_t minLength = value.length() + lengthLength;
         char *storage = new char[minLength];
-        *reinterpret_cast<int16_t*>(storage) = length;
-        ::memcpy( storage + sizeof(int16_t), value.c_str(), length);
-        storage[sizeof(int16_t) + length] = '\0';
+        setPersistentObjectLengthToLocation(length, storage);
+        ::memcpy( storage + lengthLength, value.c_str(), length);
         *reinterpret_cast<char**>(retval.m_data) = storage;
+        *reinterpret_cast<int32_t*>(&retval.m_data[8]) = length;
+        *reinterpret_cast<int8_t*>(&retval.m_data[12]) = lengthLength;
         return retval;
     }
 
@@ -1523,7 +1585,7 @@ inline const NValue NValue::deserializeFromTupleStorage(const void *storage,
           case VALUE_TYPE_DECIMAL:
             ::memcpy( retval.m_data, storage, NValue::getTupleStorageSize(type));
             break;
-          case VALUE_TYPE_VARCHAR:
+          case VALUE_TYPE_VARCHAR: {
             //Potentially non-inlined type requires special handling
             if (isInlined) {
                 //If it is inlined the storage area contains the actual data so copy a reference
@@ -1534,7 +1596,15 @@ inline const NValue NValue::deserializeFromTupleStorage(const void *storage,
                 //containing the string.
                 memcpy( retval.m_data, storage, sizeof(void*));
             }
+            const int32_t length = getPersistentObjectLengthFromLocation(*reinterpret_cast<char**>(retval.m_data));
+            *reinterpret_cast<int32_t*>(&retval.m_data[8]) = length;
+            if (length < 64) {
+                retval.m_data[12] = SHORT_OBJECT_LENGTHLENGTH;
+            } else {
+                retval.m_data[12] = LONG_OBJECT_LENGTHLENGTH;
+            }
             break;
+          }
           default:
               throwFatalException( "NValue::getLength() unrecognized type '%d'", type);
         }
@@ -1548,10 +1618,10 @@ inline const NValue NValue::deserializeFromTupleStorage(const void *storage,
  * allocated storage for a copy of the object.
  */
 inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, const bool isInlined,
-                                                       const int16_t maxLength, Pool *dataPool) const
+                                                       const int32_t maxLength, Pool *dataPool) const
 {
     const ValueType type = getValueType();
-    int16_t length = 0;
+    int32_t length = 0;
 
     switch (type) {
       case VALUE_TYPE_TIMESTAMP:
@@ -1586,31 +1656,34 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
             }
             else {
                 length = getObjectLength();
-                const size_t minlength = sizeof(int16_t) + length + 1;
+                const int8_t lengthLength = static_cast<int8_t>(
+                        length < 64 ?
+                                SHORT_OBJECT_LENGTHLENGTH :
+                                LONG_OBJECT_LENGTHLENGTH);
+                const size_t minlength = lengthLength + length;
                 char *copy = NULL;
                 if (length > maxLength) {
                     char msg[1024];
-                    sprintf(msg, "Object exceeds specified size. Size is %hd"
-                            " and max is %hd", length, maxLength);
+                    sprintf(msg, "Object exceeds specified size. Size is %d"
+                            " and max is %d", length, maxLength);
                     throw SQLException(
                         SQLException::data_exception_string_data_length_mismatch,
                         msg);
 
                 }
                 if (dataPool != NULL) {
-                    copy = reinterpret_cast<char*>(dataPool->allocate(length + sizeof(int16_t) + 1));
+                    copy = reinterpret_cast<char*>(dataPool->allocate(length + lengthLength));
                 } else {
                     copy = new char[minlength];
                 }
-                *(reinterpret_cast<int16_t*>(copy)) = static_cast<int16_t>(length);
-                ::memcpy(copy + sizeof(int16_t),getObjectValue(), length);
-                copy[length + sizeof(int16_t)] = '\0';
+                setPersistentObjectLengthToLocation(length, copy);
+                ::memcpy(copy + lengthLength,getObjectValue(), length);
                 *reinterpret_cast<char**>(storage) = copy;
             }
         }
         break;
       default: {
-          throwFatalException("NValue::getLength() unrecognized type '%d'", type);
+          throwFatalException("NValue::serializeToTupleStorageAllocateForObjects() unrecognized type '%d'", type);
       }
     }
 }
@@ -1622,7 +1695,7 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
  * pointer to the object will be copied into the storage area. No
  * allocations are performed.
  */
-inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined, const int16_t maxLength) const
+inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined, const int32_t maxLength) const
 {
     const ValueType type = getValueType();
     switch (type) {
@@ -1659,9 +1732,9 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
                   *reinterpret_cast<char* const*>(m_data);
             }
             else {
-                const int16_t length = getObjectLength();
+                const int32_t length = getObjectLength();
                 char msg[1024];
-                sprintf(msg, "Object exceeds specified size. Size is %hd and max is %hd", length, maxLength);
+                sprintf(msg, "Object exceeds specified size. Size is %d and max is %d", length, maxLength);
                 throw SQLException(
                     SQLException::data_exception_string_data_length_mismatch,
                     msg);
@@ -1671,7 +1744,7 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
         break;
       default:
           char message[128];
-          sprintf(message, "NValue::getLength() unrecognized type '%d'", type);
+          sprintf(message, "NValue::serializeToTupleStorage() unrecognized type '%d'", type);
           throw SQLException(SQLException::volt_unsupported_type_conversion_error,
                              message);
     }
@@ -1706,31 +1779,33 @@ inline void NValue::deserializeFrom(SerializeInput &input, const ValueType type,
         break;
       case VALUE_TYPE_VARCHAR: {
           const int32_t length = input.readInt();
+          const int8_t lengthLength = static_cast<int8_t>(
+                  length < 64 ?
+                          SHORT_OBJECT_LENGTHLENGTH :
+                          LONG_OBJECT_LENGTHLENGTH);
           // the NULL SQL string is a NULL C pointer
           if (isInlined) {
-              *reinterpret_cast<int16_t*>(storage) = static_cast<int16_t>(length);
+              setPersistentObjectLengthToLocation(length, storage);
               if (length == OBJECTLENGTH_NULL) {
                   break;
               }
               const char *data = reinterpret_cast<const char*>(input.getRawPointer(length));
-              ::memcpy( storage + sizeof(int16_t), data, length);
-              storage[sizeof(int16_t) + length] = '\0';
+              ::memcpy( storage + lengthLength, data, length);
           } else {
               if (length == OBJECTLENGTH_NULL) {
                   *reinterpret_cast<void**>(storage) = NULL;
                   return;
               }
               const char *data = reinterpret_cast<const char*>(input.getRawPointer(length));
-              const size_t minlength = sizeof(int16_t) + length + 1;
+              const size_t minlength = lengthLength + length;
               char *copy = NULL;
               if (dataPool != NULL) {
-                  copy = reinterpret_cast<char*>(dataPool->allocate(length + sizeof(int16_t) + 1));
+                  copy = reinterpret_cast<char*>(dataPool->allocate(length + lengthLength));
               } else {
                   copy = new char[minlength];
               }
-              *(reinterpret_cast<int16_t*>(copy)) = static_cast<int16_t>(length);
-              ::memcpy(copy + sizeof(int16_t), data, length);
-              copy[length + sizeof(int16_t)] = '\0';
+              setPersistentObjectLengthToLocation( length, copy);
+              ::memcpy(copy + lengthLength, data, length);
               *reinterpret_cast<char**>(storage) = copy;
           }
           break;
@@ -1780,23 +1855,28 @@ inline const NValue NValue::deserializeFromAllocateForStorage(SerializeInput &in
         break;
       case VALUE_TYPE_VARCHAR: {
           const int32_t length = input.readInt();
+          const int8_t lengthLength = static_cast<int8_t>(
+                  length < 64 ?
+                          SHORT_OBJECT_LENGTHLENGTH :
+                          LONG_OBJECT_LENGTHLENGTH);
           // the NULL SQL string is a NULL C pointer
           if (length == OBJECTLENGTH_NULL) {
               retval.setNull();
               break;
           }
           const void *str = input.getRawPointer(length);
-          const size_t minlength = sizeof(int16_t) + length + 1;
+          const size_t minlength = lengthLength + length;
           char *copy = NULL;
           if (dataPool != NULL) {
-              copy = reinterpret_cast<char*>(dataPool->allocate(length + sizeof(int16_t) + 1));
+              copy = reinterpret_cast<char*>(dataPool->allocate(length + lengthLength));
           } else {
               copy = new char[minlength];
           }
-          *(reinterpret_cast<int16_t*>(copy)) = static_cast<int16_t>(length);
-          ::memcpy(copy + sizeof(int16_t), str, length);
-          copy[length + sizeof(int16_t)] = '\0';
+          retval.setPersistentObjectLengthToLocation( length, copy);
+          ::memcpy(copy + lengthLength, str, length);
           *reinterpret_cast<char**>(retval.m_data) = copy;
+          *reinterpret_cast<int32_t*>(&retval.m_data[8]) = length;
+          retval.m_data[12] = lengthLength;
           break;
       }
       case VALUE_TYPE_DECIMAL: {
@@ -1824,7 +1904,7 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
           }
           const int32_t length = getObjectLength();
           if (length < OBJECTLENGTH_NULL) {
-              throwFatalException("Attempted to serialize an NValue with a negaitve length");
+              throwFatalException("Attempted to serialize an NValue with a negative length");
           }
           output.writeInt(static_cast<int32_t>(length));
           if (length != OBJECTLENGTH_NULL) {
@@ -1943,7 +2023,7 @@ inline bool NValue::isNull() const {
         return getDouble() <= DOUBLE_NULL;
       case VALUE_TYPE_VARCHAR:
         return *reinterpret_cast<void* const*>(m_data) == NULL ||
-          **reinterpret_cast<int16_t* const*>(m_data) == OBJECTLENGTH_NULL;
+          *reinterpret_cast<const int32_t*>(&m_data[8]) == OBJECTLENGTH_NULL;
       case VALUE_TYPE_DECIMAL: {
           TTInt min;
           min.SetMin();
@@ -2052,11 +2132,12 @@ inline void NValue::hashCombine(std::size_t &seed) const {
       case VALUE_TYPE_DOUBLE:
         boost::hash_combine( seed, getDouble()); break;
       case VALUE_TYPE_VARCHAR: {
-        int length = getObjectLength();
-        if ((getObjectValue() == NULL) || (length == OBJECTLENGTH_NULL))
+        if (getObjectValue() == NULL) {
             boost::hash_combine( seed, std::string(""));
-        else
-            boost::hash_combine( seed, std::string( reinterpret_cast<const char*>(getObjectValue()) ));
+        } else {
+            const int32_t length = getObjectLength();
+            boost::hash_combine( seed, std::string( reinterpret_cast<const char*>(getObjectValue()), length ));
+        }
         break;
       }
       case VALUE_TYPE_DECIMAL:

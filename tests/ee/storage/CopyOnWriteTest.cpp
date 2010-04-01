@@ -210,10 +210,10 @@ public:
     voltdb::PersistentTable *m_table;
     std::vector<std::string> m_columnNames;
     std::vector<voltdb::ValueType> m_tableSchemaTypes;
-    std::vector<uint16_t> m_tableSchemaColumnSizes;
+    std::vector<int32_t> m_tableSchemaColumnSizes;
     std::vector<bool> m_tableSchemaAllowNull;
     std::vector<voltdb::ValueType> m_primaryKeyIndexSchemaTypes;
-    std::vector<uint16_t> m_primaryKeyIndexSchemaColumnSizes;
+    std::vector<int32_t> m_primaryKeyIndexSchemaColumnSizes;
     std::vector<bool> m_primaryKeyIndexSchemaAllowNull;
     std::vector<int> m_primaryKeyIndexColumns;
 

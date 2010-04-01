@@ -111,8 +111,8 @@ bool addRandomTuples(voltdb::Table* table, int num_of_tuples) {
          * The insert into the table (assuming a persistent table) will make a copy of the strings so the string allocations
          * for unlined columns need to be freed here.
          */
-        for (int ii = 0; ii < tuple.getSchema()->getUninlinedStringColumnCount(); ii++) {
-            tuple.getNValue(tuple.getSchema()->getUninlinedStringColumnInfoIndex(ii)).free();
+        for (int ii = 0; ii < tuple.getSchema()->getUninlinedObjectColumnCount(); ii++) {
+            tuple.getNValue(tuple.getSchema()->getUninlinedObjectColumnInfoIndex(ii)).free();
         }
     }
     return (true);

@@ -114,19 +114,19 @@ ProjectionPlanNode::getOutputColumnTypes() const
 }
 
 
-void ProjectionPlanNode::setOutputColumnSizes(vector<uint16_t>& sizes)
+void ProjectionPlanNode::setOutputColumnSizes(vector<int32_t>& sizes)
 {
     m_outputColumnSizes = sizes;
 
 }
 
-vector<uint16_t>&
+vector<int32_t>&
 ProjectionPlanNode::getOutputColumnSizes()
 {
     return m_outputColumnSizes;
 }
 
-const vector<uint16_t>&
+const vector<int32_t>&
 ProjectionPlanNode::getOutputColumnSizes() const
 {
     return m_outputColumnSizes;

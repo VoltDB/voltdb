@@ -39,11 +39,11 @@ void PersistentTableUndoDeleteAction::release() {
      * strings stored in the table.
      */
     const voltdb::TupleSchema *schema = m_tuple.getSchema();
-    const int uninlinedStringColumnCount = schema->getUninlinedStringColumnCount();
-    if (uninlinedStringColumnCount > 0) {
-        for (int ii = 0; ii < uninlinedStringColumnCount; ii++) {
-            const uint16_t stringColumnIndex = schema->getUninlinedStringColumnInfoIndex(ii);
-            delete [] *reinterpret_cast<char**>(m_tuple.getDataPtr(stringColumnIndex));
+    const int uninlinedObjectColumnCount = schema->getUninlinedObjectColumnCount();
+    if (uninlinedObjectColumnCount > 0) {
+        for (int ii = 0; ii < uninlinedObjectColumnCount; ii++) {
+            const uint16_t objectColumnIndex = schema->getUninlinedObjectColumnInfoIndex(ii);
+            delete [] *reinterpret_cast<char**>(m_tuple.getDataPtr(objectColumnIndex));
         }
     }
 }

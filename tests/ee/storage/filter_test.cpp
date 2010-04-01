@@ -78,7 +78,7 @@ public:
 
         std::string *columnNames = new std::string[5];
         std::vector<voltdb::ValueType> columnTypes;
-        std::vector<uint16_t> columnLengths;
+        std::vector<int32_t> columnLengths;
         std::vector<bool> columnAllowNull;
         for (int ctr = 0; ctr < 5; ctr++) {
             char name[16];

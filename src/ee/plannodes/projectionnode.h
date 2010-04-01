@@ -69,9 +69,9 @@ class ProjectionPlanNode : public AbstractPlanNode
     std::vector<ValueType>& getOutputColumnTypes();
     const std::vector<ValueType>& getOutputColumnTypes() const;
 
-    void setOutputColumnSizes(std::vector<uint16_t>& sizes);
-    std::vector<uint16_t>& getOutputColumnSizes();
-    const std::vector<uint16_t>& getOutputColumnSizes() const;
+    void setOutputColumnSizes(std::vector<int32_t>& sizes);
+    std::vector<int32_t>& getOutputColumnSizes();
+    const std::vector<int32_t>& getOutputColumnSizes() const;
 
     void setOutputColumnExpressions(std::vector<AbstractExpression*>& exps);
     std::vector<AbstractExpression*>& getOutputColumnExpressions();
@@ -96,7 +96,7 @@ class ProjectionPlanNode : public AbstractPlanNode
     std::vector<int> m_outputColumnGuids;
     std::vector<std::string> m_outputColumnNames;
     std::vector<ValueType> m_outputColumnTypes;
-    std::vector<uint16_t> m_outputColumnSizes;
+    std::vector<int32_t> m_outputColumnSizes;
 
     // indicate how to project (or replace) each column value. indices
     // are same as output table's.

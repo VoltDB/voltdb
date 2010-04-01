@@ -147,10 +147,10 @@ public:
     voltdb::PersistentTable *m_table;
     std::vector<std::string> m_columnNames;
     std::vector<voltdb::ValueType> m_tableSchemaTypes;
-    std::vector<uint16_t> m_tableSchemaColumnSizes;
+    std::vector<int32_t> m_tableSchemaColumnSizes;
     std::vector<bool> m_tableSchemaAllowNull;
     std::vector<voltdb::ValueType> m_primaryKeyIndexSchemaTypes;
-    std::vector<uint16_t> m_primaryKeyIndexSchemaColumnSizes;
+    std::vector<int32_t> m_primaryKeyIndexSchemaColumnSizes;
     std::vector<bool> m_primaryKeyIndexSchemaAllowNull;
     std::vector<int> m_primaryKeyIndexColumns;
 };
@@ -240,8 +240,8 @@ TEST_F(PersistentTableLogTest, InsertUpdateThenUndoOneTest) {
 
 TEST_F(PersistentTableLogTest, InsertThenUndoInsertsOneTest) {
     initTable(true);
-    tableutil::addRandomTuples(m_table, 1000);
-    ASSERT_EQ( m_table->activeTupleCount(), 1000);
+    tableutil::addRandomTuples(m_table, 10);
+    ASSERT_EQ( m_table->activeTupleCount(), 10);
     m_engine->undoUndoToken(INT64_MIN + 1);
     ASSERT_EQ( m_table->activeTupleCount(), 0);
 }

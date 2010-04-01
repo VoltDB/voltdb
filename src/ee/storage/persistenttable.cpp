@@ -91,8 +91,8 @@ PersistentTable::~PersistentTable() {
     voltdb::TableTuple tuple(m_schema);
     while (ti.next(tuple)) {
         // indexs aren't released as they don't have ownership of strings
-        for (int ii = 0; ii < m_schema->getUninlinedStringColumnCount(); ii++) {
-            delete [] *reinterpret_cast<char**>(tuple.getDataPtr(m_schema->getUninlinedStringColumnInfoIndex(ii)));
+        for (int ii = 0; ii < m_schema->getUninlinedObjectColumnCount(); ii++) {
+            delete [] *reinterpret_cast<char**>(tuple.getDataPtr(m_schema->getUninlinedObjectColumnInfoIndex(ii)));
         }
         tuple.setDeletedTrue(); // this DOES NOT  free strings
     }
@@ -477,9 +477,9 @@ void PersistentTable::deleteTupleForUndo(voltdb::TableTuple &tupleCopy, size_t w
         deleteFromAllIndexes(&target);
 
         // Delete the strings.
-        for (int ii = 0; ii < m_schema->getUninlinedStringColumnCount(); ii++) {
+        for (int ii = 0; ii < m_schema->getUninlinedObjectColumnCount(); ii++) {
             delete [] *reinterpret_cast<char**>
-                (target.getDataPtr(m_schema->getUninlinedStringColumnInfoIndex(ii)));
+                (target.getDataPtr(m_schema->getUninlinedObjectColumnInfoIndex(ii)));
         }
 
         deleteTupleStorage(target);

@@ -73,7 +73,7 @@ bool MaterializeExecutor::p_init(AbstractPlanNode* abstract_node, const catalog:
 
     const std::vector<std::string> outputColumnNames = node->getOutputColumnNames();
     const std::vector<voltdb::ValueType> outputColumnTypes = node->getOutputColumnTypes();
-    const std::vector<uint16_t> outputColumnSizes = node->getOutputColumnSizes();
+    const std::vector<int32_t> outputColumnSizes = node->getOutputColumnSizes();
     const std::vector<bool> outputColumnAllowNull(m_columnCount, true);
     TupleSchema *schema = TupleSchema::createTupleSchema(outputColumnTypes, outputColumnSizes, outputColumnAllowNull, true);
     std::string *columnNames = new std::string[m_columnCount];

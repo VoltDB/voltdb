@@ -61,20 +61,20 @@ public:
         ::memcpy(tupleData, newTuple.address(), m_newTuple.tupleLength());
 
         const voltdb::TupleSchema *schema = m_oldTuple.getSchema();
-        const uint16_t uninlineableStringColumnCount = schema->getUninlinedStringColumnCount();
+        const uint16_t uninlineableObjectColumnCount = schema->getUninlinedObjectColumnCount();
 
         /*
-         * Record which unlineableStringColumns were updated so the
+         * Record which unlineableObjectColumns were updated so the
          * strings can be freed when this UndoAction is released or
          * undone.
          */
-        if (uninlineableStringColumnCount > 0) {
-            for (uint16_t ii = 0; ii < uninlineableStringColumnCount; ii++) {
-                const uint16_t uninlineableStringColumn = schema->getUninlinedStringColumnInfoIndex(ii);
+        if (uninlineableObjectColumnCount > 0) {
+            for (uint16_t ii = 0; ii < uninlineableObjectColumnCount; ii++) {
+                const uint16_t uninlineableObjectColumn = schema->getUninlinedObjectColumnInfoIndex(ii);
                 const char *mPtr = *reinterpret_cast<char* const*>
-                  (m_oldTuple.getDataPtr(uninlineableStringColumn));
+                  (m_oldTuple.getDataPtr(uninlineableObjectColumn));
                 const char *oPtr = *reinterpret_cast<char* const*>
-                  (m_newTuple.getDataPtr(uninlineableStringColumn));
+                  (m_newTuple.getDataPtr(uninlineableObjectColumn));
                 /*
                  * Only need to record the ones that are different and
                  * thus separate allocations.

@@ -38,7 +38,7 @@ class IndexKeyTest : public Test {
 
 TEST_F(IndexKeyTest, Int64KeyTest) {
     std::vector<voltdb::ValueType> columnTypes(1, voltdb::VALUE_TYPE_BIGINT);
-    std::vector<uint16_t> columnLengths(1, NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+    std::vector<int32_t> columnLengths(1, NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
     std::vector<bool> columnAllowNull(1, true);
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
 
@@ -86,7 +86,7 @@ TEST_F(IndexKeyTest, Int64KeyTest) {
 
 TEST_F(IndexKeyTest, TwoInt64KeyTest) {
     std::vector<voltdb::ValueType> columnTypes(2, voltdb::VALUE_TYPE_BIGINT);
-    std::vector<uint16_t> columnLengths(2, NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+    std::vector<int32_t> columnLengths(2, NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
     std::vector<bool> columnAllowNull(2, true);
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
 
@@ -140,7 +140,7 @@ TEST_F(IndexKeyTest, TwoInt64KeyTest) {
 
 TEST_F(IndexKeyTest, TwoInt64RegressionKeyTest) {
     std::vector<voltdb::ValueType> columnTypes(2, voltdb::VALUE_TYPE_BIGINT);
-    std::vector<uint16_t> columnLengths(2, NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+    std::vector<int32_t> columnLengths(2, NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
     std::vector<bool> columnAllowNull(2, true);
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
 
@@ -187,7 +187,7 @@ TEST_F(IndexKeyTest, TwoInt64RegressionKeyTest) {
 
 TEST_F(IndexKeyTest, Int32AndTwoInt8KeyTest) {
     std::vector<voltdb::ValueType> columnTypes;
-    std::vector<uint16_t> columnLengths;
+    std::vector<int32_t> columnLengths;
     std::vector<bool> columnAllowNull(3, true);
 
     columnTypes.push_back(voltdb::VALUE_TYPE_INTEGER);
@@ -246,7 +246,7 @@ TEST_F(IndexKeyTest, Int32AndTwoInt8KeyTest) {
 TEST_F(IndexKeyTest, Int32AndTwoInt8KeyTest2) {
 
     std::vector<voltdb::ValueType> columnTypes;
-    std::vector<uint16_t> columnLengths;
+    std::vector<int32_t> columnLengths;
     std::vector<bool> columnAllowNull(3, true);
 
     columnTypes.push_back(voltdb::VALUE_TYPE_TINYINT);
@@ -322,7 +322,7 @@ TEST_F(IndexKeyTest, Int32AndTwoInt8KeyTest2) {
 
 TEST_F(IndexKeyTest, Int32AndTwoInt8RegressionTest) {
     std::vector<voltdb::ValueType> columnTypes;
-    std::vector<uint16_t> columnLengths;
+    std::vector<int32_t> columnLengths;
     std::vector<bool> columnAllowNull(3, true);
 
     columnTypes.push_back(voltdb::VALUE_TYPE_TINYINT);
@@ -369,7 +369,7 @@ TEST_F(IndexKeyTest, Int32AndTwoInt8RegressionTest) {
 
 TEST_F(IndexKeyTest, SingleVarChar30) {
     std::vector<voltdb::ValueType> columnTypes;
-    std::vector<uint16_t> columnLengths;
+    std::vector<int32_t> columnLengths;
     std::vector<bool> columnAllowNull(1, true);
 
     columnTypes.push_back(voltdb::VALUE_TYPE_VARCHAR);
@@ -420,7 +420,7 @@ TEST_F(IndexKeyTest, SingleVarChar30) {
 
 TEST_F(IndexKeyTest, Int64Packing2Int32sWithSecondNull) {
     std::vector<voltdb::ValueType> columnTypes;
-    std::vector<uint16_t> columnLengths;
+    std::vector<int32_t> columnLengths;
     std::vector<bool> columnAllowNull(2, true);
 
     columnTypes.push_back(voltdb::VALUE_TYPE_INTEGER);

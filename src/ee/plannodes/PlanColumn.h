@@ -43,7 +43,7 @@ public:
     int getGuid() const;
     std::string getName() const;
     ValueType getType() const;
-    uint16_t getSize() const;
+    int32_t getSize() const;
     std::string getInputColumnName() const;
 
     // getExpression lazily evaluates the expression in the JSON
@@ -58,7 +58,7 @@ private:
     int m_guid;
     std::string m_name;
     ValueType m_type;
-    uint16_t m_size;
+    int32_t m_size;
     std::string m_inputColumnName;
 };
 

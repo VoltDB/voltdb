@@ -738,7 +738,7 @@ bool VoltDBEngine::initTable(const int32_t databaseId,
     // sort it by Column index to preserve column order.
     const int numColumns = static_cast<int>(catalogTable->columns().size());
     std::vector<voltdb::ValueType> columnTypes(numColumns);
-    std::vector<uint16_t> columnLengths(numColumns);
+    std::vector<int32_t> columnLengths(numColumns);
     std::vector<bool> columnAllowNull(numColumns);
     std::map<std::string, catalog::Column*>::const_iterator col_iterator;
     std::string *columnNames = new std::string[numColumns];
@@ -748,10 +748,10 @@ bool VoltDBEngine::initTable(const int32_t databaseId,
         const int columnIndex = catalog_column->index();
         const voltdb::ValueType type = static_cast<voltdb::ValueType>(catalog_column->type());
         columnTypes[columnIndex] = type;
-        const uint16_t size = static_cast<uint16_t>(catalog_column->size());
+        const int32_t size = static_cast<int32_t>(catalog_column->size());
         //Strings length is provided, other lengths are derived from type
-        const uint16_t length = type == VALUE_TYPE_VARCHAR ? size
-            : static_cast<uint16_t>(NValue::getTupleStorageSize(type));
+        const int32_t length = type == VALUE_TYPE_VARCHAR ? size
+            : static_cast<int32_t>(NValue::getTupleStorageSize(type));
         columnLengths[columnIndex] = length;
         columnAllowNull[columnIndex] = catalog_column->nullable();
         columnNames[catalog_column->index()] = catalog_column->name();

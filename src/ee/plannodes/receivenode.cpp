@@ -112,18 +112,18 @@ ReceivePlanNode::getOutputColumnTypes() const
 }
 
 void
-ReceivePlanNode::setOutputColumnSizes(vector<uint16_t>& sizes)
+ReceivePlanNode::setOutputColumnSizes(vector<int32_t>& sizes)
 {
     m_outputColumnSizes = sizes;
 }
 
-vector<uint16_t>&
+vector<int32_t>&
 ReceivePlanNode::getOutputColumnSizes()
 {
     return m_outputColumnSizes;
 }
 
-const vector<uint16_t>&
+const vector<int32_t>&
 ReceivePlanNode::getOutputColumnSizes() const
 {
     return m_outputColumnSizes;

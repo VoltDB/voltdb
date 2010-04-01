@@ -61,8 +61,10 @@ public abstract class VoltTableRow {
     /**
      * Size in bytes of the maximum length for a VoltDB tuple.
      * This is inclusive of the 4-byte row length prefix.
+     *
+     * 2 megs to allow a max size string/blob + length prefix + some other stuff
      */
-    public static final int MAX_TUPLE_LENGTH = 512 * 1024;
+    public static final int MAX_TUPLE_LENGTH = 2097152;
     public static final String MAX_TUPLE_LENGTH_STR = String.valueOf(MAX_TUPLE_LENGTH / 1024) + "k";
 
     static final int ROW_HEADER_SIZE = Integer.SIZE/8;

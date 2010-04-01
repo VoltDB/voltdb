@@ -54,67 +54,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
     private static final byte OO = (byte) 0x00;  // font test?
 
     // 1500 character string
-    private static final String ReallyLongString =
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +    // 50 characters
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +    // 10 rows
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +    // 20 rows
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +    // 30 rows
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +    // 40 rows
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +    // 50 rows
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";    // 60 rows
+    private static final String ReallyLongString;
 
 
 
@@ -201,9 +141,9 @@ public class TestSQLTypesSuite extends RegressionSuite {
         VoltType.FLOAT,
         VoltType.TIMESTAMP,
         VoltType.STRING,   // varchar(4)
-        VoltType.STRING,   // varchar(10)
+        VoltType.STRING,   // varchar(63)
         VoltType.STRING,   // varchar(1024)
-        VoltType.STRING,   // varchar(32000)
+        VoltType.STRING,   // varchar(42000)
         VoltType.DECIMAL
         // UPDATE WHEN ADDING NEW TYPE
     };
@@ -259,7 +199,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
 
 
     // maximum value for each type
-    public Object[] m_maxValues = {
+    public static Object[] m_maxValues = {
       Byte.MAX_VALUE,
       Short.MAX_VALUE,
       Integer.MAX_VALUE,
@@ -267,12 +207,36 @@ public class TestSQLTypesSuite extends RegressionSuite {
       Double.MAX_VALUE,
       new TimestampType(Long.MAX_VALUE),
       new String("ZZZZ"),
-      new String("ZZZZZZZZZZ"),
-      String.format(String.format("%%0%dd", 1024), 0).replace("0", "Z"),
-      String.format(String.format("%%0%dd", 32000), 0).replace("0", "Z"),
+      new String("ZZZZZZZZZZ" +//10
+                 "ZZZZZZZZZZ" +//20
+                 "ZZZZZZZZZZ" + //30
+                 "ZZZZZZZZZZ" + //40
+                 "ZZZZZZZZZZ" + //50
+                 "ZZZZZZZZZZ" + //60
+                 "ZZZ"       ), //63
+      "",
+      "",
       new BigDecimal(new BigInteger("99999999999999999999999999999999999999")).scaleByPowerOfTen(-1 * VoltDecimalHelper.kDefaultScale)
       // UPDATE WHEN ADDING NEW TYPE
     };
+
+    static {
+        StringBuilder sb = new StringBuilder(1048576);
+        int ii = 0;
+        for ( ; ii < 65536; ii++) {
+            sb.append('Z');
+        }
+        m_maxValues[8] = sb.toString();
+        for ( ; ii < 1048576; ii++) {
+            sb.append('Z');
+        }
+        m_maxValues[9] = sb.toString();
+        sb = new StringBuilder(102400);
+        for (ii = 0; ii < 102400; ii++) {
+            sb.append('a');
+        }
+        ReallyLongString = sb.toString();
+    }
 
     // a non-max, non-min value for each type
     public static Object[] m_midValues = {
@@ -403,8 +367,8 @@ public class TestSQLTypesSuite extends RegressionSuite {
         params[0] = "NO_NULLS";
 
         // array to build the Big String.
-        final char blob[] = new char[Short.MAX_VALUE - 2];
-        for (int i=0; i < Short.MAX_VALUE - 2; i++) {
+        final char blob[] = new char[VoltType.MAX_VALUE_LENGTH + 4];
+        for (int i=0; i < blob.length; i++) {
             blob[i] = 'a';
         }
 
@@ -427,7 +391,9 @@ public class TestSQLTypesSuite extends RegressionSuite {
                 caught = false;
                 client.callProcedure("Insert", params);
             }
-            catch (final ProcCallException e) {
+            catch (final RuntimeException e) {
+                assertTrue(e.getCause() instanceof java.io.IOException);
+                assertTrue(e.toString().contains("String exceeds maximum length of"));
                 caught = true;
             }
             assertTrue(caught);
@@ -444,8 +410,8 @@ public class TestSQLTypesSuite extends RegressionSuite {
         params[0] = "NO_NULLS";
 
         // array to build the Big String.
-        final char blob[] = new char[32000];
-        for (int i=0; i < 32000; i++) {
+        final char blob[] = new char[VoltType.MAX_VALUE_LENGTH];
+        for (int i=0; i < blob.length; i++) {
             blob[i] = 'a';
         }
 

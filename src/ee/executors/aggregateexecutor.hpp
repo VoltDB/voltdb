@@ -842,7 +842,7 @@ AggregateExecutor<aggregateType>::p_init(AbstractPlanNode *abstract_node,
          * up being important for inlined strings.
          */
         const TupleSchema* childSchema = child_node->getOutputTable()->schema();
-        std::vector<uint16_t> outputColumnSizes = node->getOutputColumnSizes();
+        std::vector<int32_t> outputColumnSizes = node->getOutputColumnSizes();
         for (int ii = 0; ii < passThroughColumnIndices.size(); ii++)
         {
             int outputColumnIndex = passThroughColumnIndices[ii];
@@ -905,7 +905,7 @@ AggregateExecutor<aggregateType>::p_init(AbstractPlanNode *abstract_node,
 
         const std::vector<int> groupByColumns = node->getGroupByColumns();
         std::vector<ValueType> groupByColumnTypes;
-        std::vector<uint16_t> groupByColumnSizes;
+        std::vector<int32_t> groupByColumnSizes;
         std::vector<bool> groupByColumnAllowNull;
         for (int ii = 0; ii < groupByColumns.size(); ii++)
         {

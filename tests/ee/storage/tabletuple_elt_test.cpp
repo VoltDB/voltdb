@@ -41,7 +41,7 @@ class TableTupleELTTest : public Test {
 
   public:
     std::vector<ValueType> columnTypes;
-    std::vector<uint16_t> columnLengths;
+    std::vector<int32_t> columnLengths;
     std::vector<bool> columnAllowNull;
     TupleSchema *m_schema;
 
@@ -70,7 +70,7 @@ class TableTupleELTTest : public Test {
         columnAllowNull.push_back(allownull);
 
         columnTypes.push_back(VALUE_TYPE_VARCHAR);   // 7
-        columnLengths.push_back(UNINLINEABLE_STRLEN * 2);
+        columnLengths.push_back(UNINLINEABLE_OBJECT_LENGTH * 2);
         columnAllowNull.push_back(allownull);
 
         m_schema = TupleSchema::createTupleSchema(

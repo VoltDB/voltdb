@@ -87,7 +87,7 @@ protected:
     std::vector<int> m_outputColumnGuids;
     std::vector<std::string> m_outputColumnNames;
     std::vector<ValueType> m_outputColumnTypes;
-    std::vector<uint16_t> m_outputColumnSizes;
+    std::vector<int32_t> m_outputColumnSizes;
     //
     // Target Table
     // These tables are different from the input and the output tables

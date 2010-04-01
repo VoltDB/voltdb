@@ -107,13 +107,13 @@ AggregatePlanNode::getOutputColumnTypes() const
     return m_outputColumnTypes;
 }
 
-vector<uint16_t>&
+vector<int32_t>&
 AggregatePlanNode::getOutputColumnSizes()
 {
     return m_outputColumnSizes;
 }
 
-const vector<uint16_t>&
+const vector<int32_t>&
 AggregatePlanNode::getOutputColumnSizes() const
 {
     return m_outputColumnSizes;
@@ -378,7 +378,7 @@ AggregatePlanNode::setOutputColumnTypes(vector<ValueType> &types)
 }
 
 void
-AggregatePlanNode::setOutputColumnSizes(vector<uint16_t> &sizes)
+AggregatePlanNode::setOutputColumnSizes(vector<int32_t> &sizes)
 {
     m_outputColumnSizes = sizes;
 }

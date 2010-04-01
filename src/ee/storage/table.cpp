@@ -55,6 +55,7 @@
 #include "common/FatalException.hpp"
 #include "indexes/tableindex.h"
 #include "storage/tableiterator.h"
+#include "storage/persistenttable.h"
 
 using std::string;
 
@@ -435,13 +436,13 @@ bool Table::deserializeFrom(SerializeInput &serialize_io, Pool *stringPool) {
 
         // read the column lengths, types and nullness (only types are serialized)
         std::vector<voltdb::ValueType> columnTypes;
-        std::vector<uint16_t> columnLengths;
+        std::vector<int32_t> columnLengths;
         std::vector<bool> allowNullColumn(columnCount, true);
         for (int i = 0; i < columnCount; ++i) {
             columnTypes.push_back(static_cast<voltdb::ValueType>(serialize_io.readEnumInSingleByte()));
             //VOLT_DEBUG("TYPE OF COLUMN %d IS %d", i, columnTypes[i]);
             if (columnTypes[i] == voltdb::VALUE_TYPE_VARCHAR) {
-                columnLengths.push_back(UNINLINEABLE_STRLEN);
+                columnLengths.push_back(UNINLINEABLE_OBJECT_LENGTH);
             } else {
                 columnLengths.push_back(static_cast<uint16_t>(voltdb::NValue::getTupleStorageSize(columnTypes[i])));
             }

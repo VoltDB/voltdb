@@ -75,7 +75,7 @@ public:
         return value.getObjectValue();
     }
 
-    static inline int16_t peekObjectLength(const NValue value) {
+    static inline int32_t peekObjectLength(const NValue value) {
         assert(value.getValueType() == VALUE_TYPE_VARCHAR);
         return value.getObjectLength();
     }

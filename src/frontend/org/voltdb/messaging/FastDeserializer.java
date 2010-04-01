@@ -27,6 +27,7 @@ import java.nio.ByteOrder;
 
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
+import org.voltdb.VoltType;
 
 /**
  * <code>DataInputStream</code> subclass to read objects that implement
@@ -154,9 +155,10 @@ public class FastDeserializer implements DataInput {
             return null;
         assert len >= 0;
 
-        /*if (len > Short.MAX_VALUE - 2) {
-            throw new IOException("Serializable strings cannot be longer then (2 ^ 15) - 2");
-        }*/
+        if (len > VoltType.MAX_VALUE_LENGTH) {
+            throw new IOException("Serializable strings cannot be longer then "
+                    + VoltType.MAX_VALUE_LENGTH + " bytes");
+        }
 
         // now assume not null
         final byte[] strbytes = new byte[len];
@@ -167,6 +169,7 @@ public class FastDeserializer implements DataInput {
         } catch (final UnsupportedEncodingException e) {
             e.printStackTrace();
         }
+
         return retval;
     }
 
@@ -189,7 +192,7 @@ public class FastDeserializer implements DataInput {
     }
 
     public Object readArray(final Class<?> type) throws IOException {
-        final short count = readShort();
+        final int count = type == byte.class ? readInt() : readShort();
 
         if (type == byte.class) {
             final byte[] retval = new byte[count];

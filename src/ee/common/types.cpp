@@ -68,6 +68,7 @@ NValue getRandomValue(ValueType type) {
                 characters[ii] = (char)(32 + (rand() % 94)); //printable characters
             }
             characters[length] = '\0';
+            //printf("Characters are \"%s\"\n", characters);
             return ValueFactory::getStringValue(string(characters));
         }
             break;

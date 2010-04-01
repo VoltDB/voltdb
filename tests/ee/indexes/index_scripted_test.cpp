@@ -61,7 +61,7 @@ struct Command {
 };
 
 vector<voltdb::ValueType> currentColumnTypes;
-vector<uint16_t> currentColumnLengths;
+vector<int32_t> currentColumnLengths;
 vector<bool> currentColumnAllowNull;
 
 voltdb::TableIndex *currentIndex = NULL;
@@ -115,7 +115,7 @@ cleanUp()
 }
 
 void
-setNewCurrent(const char *testName, vector<const char*> indexNames, vector<voltdb::ValueType> columnTypes, vector<uint16_t> columnLengths, vector<bool> columnAllowNull)
+setNewCurrent(const char *testName, vector<const char*> indexNames, vector<voltdb::ValueType> columnTypes, vector<int32_t> columnLengths, vector<bool> columnAllowNull)
 {
     cleanUp();
 
@@ -209,7 +209,7 @@ main(int argc, char **argv)
 
             // read all the types
             vector<voltdb::ValueType> columnTypes;
-            vector<uint16_t> columnLengths;
+            vector<int32_t> columnLengths;
             vector<bool> columnAllowNull;
             while (char *typecode = strtok(NULL, " ")) {
                 if (strcmp(typecode, kBigIntTypecode) == 0) {

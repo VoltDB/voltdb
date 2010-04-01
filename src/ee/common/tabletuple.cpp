@@ -112,9 +112,9 @@ bool TableTuple::compatibleForCopy(const TableTuple &source) {
             VOLT_ERROR("Can not copy tuple: incompatible column types.");
             return false;
         }
-        const bool mAllowInlinedStrings = m_schema->allowInlinedStrings();
-        const bool sAllowInlinedStrings = source.m_schema->allowInlinedStrings();
-        if (mAllowInlinedStrings && sAllowInlinedStrings) {
+        const bool mAllowInlinedObjects = m_schema->allowInlinedObjects();
+        const bool sAllowInlinedObjects = source.m_schema->allowInlinedObjects();
+        if (mAllowInlinedObjects && sAllowInlinedObjects) {
             const bool mIsInlined = m_schema->columnIsInlined(i);
             const bool sIsInlined = source.m_schema->columnIsInlined(i);
             if (mIsInlined != sIsInlined) {
@@ -123,8 +123,8 @@ bool TableTuple::compatibleForCopy(const TableTuple &source) {
             }
         }
         else {
-            const uint16_t mColumnLength = m_schema->columnLength(i);
-            const uint16_t sColumnLength = source.m_schema->columnLength(i);
+            const int32_t mColumnLength = m_schema->columnLength(i);
+            const int32_t sColumnLength = source.m_schema->columnLength(i);
             if (mColumnLength < sColumnLength) {
                 VOLT_ERROR("Can not copy tuple: incompatible column lengths.");
                 return false;
