@@ -201,6 +201,7 @@ public class TestMessaging extends TestCase {
                     }
                 }
             }
+            messenger.shutdown();
             try {
                 network.shutdown();
             } catch (InterruptedException e) {
@@ -387,6 +388,8 @@ public class TestMessaging extends TestCase {
             }
             assertTrue(mt.verify());
         }
+        msg1.shutdown();
+        msg2.shutdown();
         network.shutdown();
     }
 
@@ -491,6 +494,9 @@ public class TestMessaging extends TestCase {
             if (wc == 0)
             assertTrue(wc < 2);
         }
+        msg1.shutdown();
+        msg2.shutdown();
+        msg3.shutdown();
         network.shutdown();
     }
 

@@ -354,6 +354,20 @@ public class HostMessenger implements Messenger {
         return true;
     }
 
+    public void shutdown()
+    {
+        for (ForeignHost host : m_foreignHosts)
+        {
+            // the m_foreignHosts array is put together awkwardly.
+            // I'm going to do the null check here to make progress and
+            // revisit later --izzy
+            if (host != null)
+            {
+                host.close();
+            }
+        }
+    }
+
     /**
      * Tell the system a host is ready, including the local host.
      *

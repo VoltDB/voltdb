@@ -470,16 +470,22 @@ public class RealVoltDB implements VoltDBInterface
             m_localSites = null;
             m_currentThreadSite = null;
             m_siteThreads = null;
-            m_messenger = null;
             m_runners = null;
 
             // shut down the network/messaging stuff
+            // Close the host messenger first, which should close down all of
+            // the ForeignHost sockets cleanly
+            if (m_messenger != null)
+            {
+                m_messenger.shutdown();
+            }
             if (m_network != null) {
                 //Synchronized so the interruption won't interrupt the network thread
                 //while it is waiting for the executor service to shutdown
                 m_network.shutdown();
             }
 
+            m_messenger = null;
             m_network = null;
 
             //Also for test code that expects a fresh stats agent

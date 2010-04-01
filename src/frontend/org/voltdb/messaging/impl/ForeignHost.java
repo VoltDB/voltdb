@@ -41,6 +41,7 @@ public class ForeignHost {
     private final int m_tcpPort;
     @SuppressWarnings("unused")
     private String m_remoteHostname;
+    private boolean m_closing;
 
     /** ForeignHost's implementation of InputHandler */
     public class FHInputHandler extends VoltProtocolHandler {
@@ -89,6 +90,13 @@ public class ForeignHost {
         m_ipAddress = socket.socket().getInetAddress();
         m_tcpPort = socket.socket().getLocalPort();
         m_connection = host.getNetwork().registerChannel( socket, m_handler);
+        m_closing = false;
+    }
+
+    void close()
+    {
+        m_closing = true;
+        m_hostMessenger.getNetwork().unregisterChannel(m_connection);
     }
 
     /** Send a message to the network. This public method is re-entrant. */
