@@ -24,16 +24,18 @@
 
 package org.voltdb;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.*;
-
-import org.voltdb.catalog.Procedure;
-import org.voltdb.dtxn.SinglePartitionTxnState;
-import org.voltdb.dtxn.TransactionState;
-import org.voltdb.messages.InitiateTask;
-import org.voltdb.messaging.MockMailbox;
-import org.voltdb.messaging.VoltMessage;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import junit.framework.TestCase;
+
+import org.voltdb.catalog.Procedure;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.dtxn.*;
+import org.voltdb.messages.*;
+import org.voltdb.messaging.*;
 
 public class TestExecutionSite extends TestCase {
 
@@ -50,45 +52,112 @@ public class TestExecutionSite extends TestCase {
     int initiator1 = 100;
     int initiator2 = 200;
 
-    /*
-     * Mock single VoltProcedure that does nothing.
-     */
+    /* Single partition write */
     public static class MockSPVoltProcedure extends VoltProcedure
     {
+        public static int m_called = 0;
+
+        boolean testReadOnly() {
+            return false;
+        }
+
         @Override
         ClientResponseImpl call(TransactionState txnState, Object... paramList)
         {
-            // not read-only.
-            m_site.getNextUndoToken();
-            ClientResponseImpl response = new ClientResponseImpl();
+            if (!testReadOnly()) {
+                m_site.getNextUndoToken();
+            }
+            final ClientResponseImpl response = new ClientResponseImpl();
             response.setResults(ClientResponseImpl.SUCCESS,
                                 new VoltTable[] {}, "MockSPVoltProcedure Response");
+            ++m_called;
             return response;
         }
     }
 
-    /*
-     * Mock multi-partition VoltProcedure's through slowPath().
-     */
-    public static class MockMPVoltProcedure extends VoltProcedure
+     /* Single partition read */
+    public static class MockROSPVoltProcedure extends MockSPVoltProcedure
     {
         @Override
-        ClientResponseImpl call(TransactionState txnState, Object... paramList) {
-            // Basically the txnState state transitions done by VoltProcedure.slowPath()
-
-            // txnState.getNextDependencyId()
-            // txnState.setupProcedureResume(finalTask, depsToResume)
-            // txnState.createLocalFragmentWork(localTask, fragsNonTransactional && finalTask)
-            // txnState.createAllParticipatingFragmentWork(distributedTasks)
-
-            Map<Integer, List<VoltTable>> resultDeps = m_site.recursableRun(txnState);
-            // recursableRun will then call txnState.doWork() {
-            //     the coordinator will possibly hit the sneak-in optimization
-            //     non-coordinator sites will not.
-            // }
-            return null;
+        boolean testReadOnly() {
+            return true;
         }
     }
+
+    /* Multi-partition - mock VoltProcedure.slowPath() */
+    public static class MockMPVoltProcedure extends VoltProcedure
+    {
+        public static int m_called = 0;
+
+        boolean finalTask() { return false; }
+        boolean nonTransactional() { return false; }
+
+        /** Helper to turn object list into parameter set buffer */
+        private ByteBuffer createParametersBuffer(Object... paramList) {
+            ParameterSet paramSet = new ParameterSet(true);
+            paramSet.setParameters(paramList);
+            FastSerializer fs = new FastSerializer();
+            try {
+                fs.writeObject(paramSet);
+            }
+            catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            ByteBuffer paramBuf = fs.getBuffer();
+            return paramBuf;
+        }
+
+        @Override
+        ClientResponseImpl call(TransactionState txnState, Object... paramList)
+        {
+            ByteBuffer paramBuf = createParametersBuffer(paramList);
+
+            // Build the aggregator and the distributed tasks.
+            int localTask_startDep = txnState.getNextDependencyId() | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+            int localTask_outputDep = txnState.getNextDependencyId();
+
+            FragmentTask localTask =
+                new FragmentTask(txnState.initiatorSiteId,
+                                 txnState.coordinatorSiteId,
+                                 txnState.txnId,
+                                 txnState.isReadOnly,
+                                 new long[] {0},
+                                 new int[] {localTask_outputDep},
+                                 new ByteBuffer[] {paramBuf},
+                                 finalTask());
+
+            localTask.addInputDepId(0, localTask_startDep);
+
+            FragmentTask distributedTask =
+                new FragmentTask(txnState.initiatorSiteId,
+                                 txnState.coordinatorSiteId,
+                                 txnState.txnId,
+                                 txnState.isReadOnly,
+                                 new long[] {0},
+                                 new int[] {localTask_startDep},
+                                 new ByteBuffer[] {paramBuf},
+                                 finalTask());
+
+            txnState.createLocalFragmentWork(localTask, nonTransactional() && finalTask());
+            txnState.createAllParticipatingFragmentWork(distributedTask);
+            txnState.setupProcedureResume(finalTask(), new int[] {localTask_outputDep});
+
+            final Map<Integer, List<VoltTable>> resultDeps =
+                m_site.recursableRun(txnState);
+
+            assertTrue(resultDeps != null);
+
+            // Return a made up table (no EE interaction anyway.. )
+            VoltTable[] vta = new VoltTable[1];
+            vta[0] = new VoltTable(new VoltTable.ColumnInfo("", VoltType.INTEGER));
+            vta[0].addRow(new Integer(1));
+
+            ++m_called;
+            return new ClientResponseImpl(ClientResponse.SUCCESS, vta, null);
+        }
+    }
+
+
 
     @Override
     protected void setUp() throws Exception
@@ -107,16 +176,23 @@ public class TestExecutionSite extends TestCase {
         proc.setReadonly(false);
         proc.setSinglepartition(true);
 
+        proc = m_voltdb.addProcedureForTest(MockROSPVoltProcedure.class.getName());
+        proc.setReadonly(true);
+        proc.setSinglepartition(true);
+
+        proc = m_voltdb.addProcedureForTest(MockMPVoltProcedure.class.getName());
+        proc.setReadonly(false);
+        proc.setSinglepartition(false);
+
         VoltDB.replaceVoltDBInstanceForTest(m_voltdb);
 
-        m_mboxes[site1] = new MockMailbox(new LinkedList<VoltMessage>());
-        m_mboxes[site2] = new MockMailbox(new LinkedList<VoltMessage>());
+        m_mboxes[site1] = new MockMailbox(new LinkedBlockingQueue<VoltMessage>());
+        m_mboxes[site2] = new MockMailbox(new LinkedBlockingQueue<VoltMessage>());
         m_sites[site1] = new ExecutionSite(m_voltdb, m_mboxes[site1], site1);
         m_sites[site2] = new ExecutionSite(m_voltdb, m_mboxes[site2], site2);
 
-        m_sites[site1].getNextUndoToken();
-        m_sites[site2].getNextUndoToken();
-
+        MockMailbox.registerMailbox(site1, m_mboxes[site1]);
+        MockMailbox.registerMailbox(site2, m_mboxes[site2]);
     }
 
     @Override
@@ -134,25 +210,114 @@ public class TestExecutionSite extends TestCase {
      * SinglePartition basecase. Show that recursableRun completes a
      * single partition transaction.
      */
-    public void testMockSinglePartitionTxn()
+    public void testSinglePartitionTxn()
     {
+        final boolean readOnly = false;
+        final boolean singlePartition = true;
+
         // That the full procedure name is necessary is a bug in the
         // mock objects - or perhaps an issue with a nested class?
-        StoredProcedureInvocation tx1_spi = new StoredProcedureInvocation();
+        // Or maybe a difference in what ClientInterface does?
+        final StoredProcedureInvocation tx1_spi = new StoredProcedureInvocation();
         tx1_spi.setProcName("org.voltdb.TestExecutionSite$MockSPVoltProcedure");
         tx1_spi.setParams(new Integer(0));
 
-        InitiateTask tx1_mn =
-            new InitiateTask(initiator1, site1, 1000, false, true, tx1_spi);
+        final InitiateTask tx1_mn =
+            new InitiateTask(initiator1, site1, 1000, readOnly, singlePartition, tx1_spi);
 
-        SinglePartitionTxnState tx1 =
+        final SinglePartitionTxnState tx1 =
             new SinglePartitionTxnState(m_mboxes[site1], m_sites[site1], tx1_mn);
+
+        int callcheck = MockSPVoltProcedure.m_called;
 
         assertFalse(tx1.isDone());
         m_sites[site1].m_transactionsById.put(tx1.txnId, tx1);
         m_sites[site1].recursableRun(tx1);
         assertTrue(tx1.isDone());
         assertEquals(null, m_sites[site1].m_transactionsById.get(tx1.txnId));
+        assertEquals((++callcheck), MockSPVoltProcedure.m_called);
+    }
+
+    /*
+     * Single partition read-only
+     */
+    public void testROSinglePartitionTxn()
+    {
+        final boolean readOnly = true;
+        final boolean singlePartition = true;
+
+        final StoredProcedureInvocation tx1_spi = new StoredProcedureInvocation();
+        tx1_spi.setProcName("org.voltdb.TestExecutionSite$MockROSPVoltProcedure");
+        tx1_spi.setParams(new Integer(0));
+
+        final InitiateTask tx1_mn =
+            new InitiateTask(initiator1, site1, 1000, readOnly, singlePartition, tx1_spi);
+
+        final SinglePartitionTxnState tx1 =
+            new SinglePartitionTxnState(m_mboxes[site1], m_sites[site1], tx1_mn);
+
+        int callcheck = MockSPVoltProcedure.m_called;
+
+        assertFalse(tx1.isDone());
+        m_sites[site1].m_transactionsById.put(tx1.txnId, tx1);
+        m_sites[site1].recursableRun(tx1);
+        assertTrue(tx1.isDone());
+        assertEquals(null, m_sites[site1].m_transactionsById.get(tx1.txnId));
+        assertEquals((++callcheck), MockSPVoltProcedure.m_called);
+    }
+
+    /*
+     * Multipartition basecase. Show that recursableRun completes a
+     * multi partition transaction.
+     */
+    public void testMultiPartitionTxn() throws InterruptedException {
+        final boolean readOnly = false, singlePartition = false;
+        Thread es1, es2;
+
+        final StoredProcedureInvocation tx1_spi = new StoredProcedureInvocation();
+        tx1_spi.setProcName("org.voltdb.TestExecutionSite$MockMPVoltProcedure");
+        tx1_spi.setParams(new Integer(0));
+
+        // site 1 is the coordinator
+        final InitiateTask tx1_mn_1 =
+            new InitiateTask(initiator1, site1, 1000, readOnly, singlePartition, tx1_spi);
+        tx1_mn_1.setNonCoordinatorSites(new int[] {site2});
+
+        final MultiPartitionParticipantTxnState tx1_1 =
+            new MultiPartitionParticipantTxnState(m_mboxes[site1], m_sites[site1], tx1_mn_1);
+
+        // site 2 is a participant
+        final MembershipNotice tx1_mn_2 =
+            new MembershipNotice(initiator1, site1, 1000, readOnly);
+
+        final MultiPartitionParticipantTxnState tx1_2 =
+            new MultiPartitionParticipantTxnState(m_mboxes[site2], m_sites[site2], tx1_mn_2);
+
+        // pre-conditions
+        int callcheck = MockMPVoltProcedure.m_called;
+        assertFalse(tx1_1.isDone());
+        assertFalse(tx1_2.isDone());
+        m_sites[site1].m_transactionsById.put(tx1_1.txnId, tx1_1);
+        m_sites[site2].m_transactionsById.put(tx1_2.txnId, tx1_2);
+
+        // execute transaction
+        es1 = new Thread(new Runnable() {
+            public void run() {m_sites[site1].recursableRun(tx1_1);}});
+        es1.start();
+
+        es2 = new Thread(new Runnable() {
+            public void run() {m_sites[site2].recursableRun(tx1_2);}});
+        es2.start();
+
+        es1.join();
+        es2.join();
+
+        // post-conditions
+        assertTrue(tx1_1.isDone());
+        assertTrue(tx1_2.isDone());
+        assertEquals(null, m_sites[site1].m_transactionsById.get(tx1_1.txnId));
+        assertEquals(null, m_sites[site2].m_transactionsById.get(tx1_2.txnId));
+        assertEquals((++callcheck), MockMPVoltProcedure.m_called);
     }
 
 

@@ -102,7 +102,12 @@ public class SimpleDtxnInitiatorTest extends TestCase {
         public Mailbox createMailbox(int siteId, int mailboxId,
                                      Queue<VoltMessage> queue)
         {
-            return new MockMailbox(queue);
+            if (queue == null) {
+                return new MockMailbox(null);
+            }
+            else {
+                throw new UnsupportedOperationException("Test case doesn't supoprt mailbox queue.");
+            }
         }
     }
 

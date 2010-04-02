@@ -17,10 +17,8 @@
 
 package org.voltdb.jni;
 
-import org.voltdb.DependencyPair;
-import org.voltdb.ParameterSet;
-import org.voltdb.SysProcSelector;
-import org.voltdb.VoltTable;
+import org.voltdb.*;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.utils.DBBPool.BBContainer;
 
@@ -32,10 +30,15 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     public DependencyPair executePlanFragment(final long planFragmentId, int outputDepId,
-            int inputDepIdfinal, ParameterSet parameterSet, final long txnId, final long lastCommittedTxnId, final long undoToken)
-            throws EEException {
-        // TODO Auto-generated method stub
-        return null;
+            int inputDepIdfinal, ParameterSet parameterSet, final long txnId,
+            final long lastCommittedTxnId, final long undoToken) throws EEException
+    {
+        // Create a mocked up dependency pair. Required by some tests
+        VoltTable vt;
+        vt = new VoltTable(new ColumnInfo[] {
+                           new ColumnInfo("foo", VoltType.INTEGER)});
+        vt.addRow(new Integer(1));
+        return new DependencyPair(outputDepId, vt);
     }
 
     @Override

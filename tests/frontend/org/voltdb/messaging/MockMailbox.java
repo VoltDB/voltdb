@@ -50,23 +50,41 @@
 
 package org.voltdb.messaging;
 
-import java.util.ArrayDeque;
-import java.util.Queue;
+import java.util.*;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
 
 public class MockMailbox implements Mailbox {
 
-    public MockMailbox(Queue<VoltMessage> queue) {
+    private static HashMap<Integer, MockMailbox> postoffice =
+        new HashMap<Integer, MockMailbox>();
+
+    public static void registerMailbox(int siteId, MockMailbox mbox) {
+        postoffice.put(siteId, mbox);
+    }
+
+    public MockMailbox(LinkedBlockingQueue<VoltMessage> queue) {
         incomingMessages = queue;
     }
+
     public void send(int siteId, int mailboxId, VoltMessage message) throws MessagingException {
         outgoingMessages.add(new Message(siteId, mailboxId, message));
+
+        MockMailbox dest = postoffice.get(siteId);
+        if (dest != null) {
+            dest.deliver(message);
+        }
     }
 
     public void send(int[] siteIds, int mailboxId, VoltMessage message) throws MessagingException {
-        throw new UnsupportedOperationException();
+        for (int i=0; siteIds != null && i < siteIds.length; ++i) {
+            MockMailbox dest = postoffice.get(siteIds[i]);
+            if (dest != null) {
+                dest.deliver(message);
+            }
+        }
     }
 
     public int getWaitingCount() {
@@ -95,7 +113,14 @@ public class MockMailbox implements Mailbox {
     }
     @Override
     public VoltMessage recvBlocking(Subject s, long timeout) {
-        throw new UnsupportedOperationException();
+        do {
+            try {
+                return incomingMessages.take();
+            }
+            catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        } while (true);
     }
 
     public VoltMessage popLastMessage() {
@@ -132,6 +157,6 @@ public class MockMailbox implements Mailbox {
         public final VoltMessage contents;
     }
 
-    private final Queue<VoltMessage> incomingMessages;
+    private final LinkedBlockingQueue<VoltMessage> incomingMessages;
     private final ArrayDeque<Message> outgoingMessages = new ArrayDeque<Message>();
 }
