@@ -23,8 +23,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
 import org.voltdb.catalog.Host;
 import org.voltdb.catalog.Site;
+import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messages.FragmentTask;
@@ -122,6 +124,12 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
             // check mutually exclusive flags
             assert(!(pf.multipartition && pf.nonExecSites));
             assert(pf.parameters != null);
+
+            // check the output dep id makes sense given the number of sites to run this on
+            if (pf.multipartition)
+                assert((pf.outputDepId & DtxnConstants.MULTIPARTITION_DEPENDENCY) == DtxnConstants.MULTIPARTITION_DEPENDENCY);
+            if (pf.nonExecSites)
+                assert((pf.outputDepId & DtxnConstants.MULTINODE_DEPENDENCY) == DtxnConstants.MULTINODE_DEPENDENCY);
 
             // serialize parameters
             ByteBuffer parambytes = null;

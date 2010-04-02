@@ -34,14 +34,15 @@ import org.voltdb.VoltType;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.JarReader;
 
 @ProcInfo(singlePartition = false)
 public class UpdateApplicationCatalog extends VoltSystemProcedure {
 
-    final int ROUNDONE_DEP = 1;
-    final int ROUNDTWO_DEP = 1;
+    final int ROUNDONE_DEP = 1 | DtxnConstants.MULTINODE_DEPENDENCY;
+    final int ROUNDTWO_DEP = 2 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
 
     @Override
     public void init(ExecutionSite site, Procedure catProc,
@@ -103,8 +104,6 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
 
         VoltDB.instance().catalogUpdate(catalogDiffCommands, catalogURL, expectedCatalogVersion);
 
-        System.err.printf("Inside frag that updates global catalog.\n");
-
         return true;
     }
 
@@ -115,14 +114,10 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
 
         context.getExecutionSite().updateCatalog(catalogDiffCommands);
 
-        System.err.printf("Running update catalog on a site.\n");
-
         return true;
     }
 
     public VoltTable[] run(String catalogDiffCommands, String catalogURL, int expectedCatalogVersion) {
-        System.err.println("Running update catalog system procedure with url = " + catalogURL);
-
         // computer CRC for catalog
         long crc;
         try {

@@ -19,25 +19,51 @@ package org.voltdb;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.NDC;
 import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
-import org.voltdb.catalog.*;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.Site;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.debugstate.ExecutorContext;
-import org.voltdb.dtxn.*;
+import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
+import org.voltdb.dtxn.RestrictedPriorityQueue;
+import org.voltdb.dtxn.SinglePartitionTxnState;
+import org.voltdb.dtxn.SiteConnection;
+import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.exceptions.SerializableException;
-import org.voltdb.jni.*;
-import org.voltdb.messages.*;
-import org.voltdb.messaging.*;
+import org.voltdb.jni.ExecutionEngine;
+import org.voltdb.jni.ExecutionEngineIPC;
+import org.voltdb.jni.ExecutionEngineJNI;
+import org.voltdb.jni.MockExecutionEngine;
+import org.voltdb.messages.DebugMessage;
+import org.voltdb.messages.FragmentResponse;
+import org.voltdb.messages.FragmentTask;
+import org.voltdb.messages.InitiateResponse;
+import org.voltdb.messages.InitiateTask;
+import org.voltdb.messages.MembershipNotice;
+import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.messaging.Mailbox;
+import org.voltdb.messaging.VoltMessage;
 import org.voltdb.messaging.impl.SiteMailbox;
-import org.voltdb.utils.*;
+import org.voltdb.utils.DumpManager;
+import org.voltdb.utils.Encoder;
+import org.voltdb.utils.EstTime;
+import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.VoltLoggerFactory;
 
 /**
  * The main executor of transactional work in the system. Controls running
@@ -655,7 +681,10 @@ implements Runnable, DumpManager.Dumpable
     public InitiateResponse processInitiateTask(TransactionState txnState, final VoltMessage task) {
         final InitiateTask itask = (InitiateTask)task;
         final VoltProcedure wrapper = procs.get(itask.getStoredProcedureName());
-        assert(wrapper != null); // existed in ClientInterface's catalog.
+        if (wrapper == null) {
+            System.err.printf("Missing procedure \"%s\" at execution site. %d\n", itask.getStoredProcedureName(), m_siteId);
+            VoltDB.crashVoltDB();
+        }
 
         final InitiateResponse response = new InitiateResponse(itask);
 

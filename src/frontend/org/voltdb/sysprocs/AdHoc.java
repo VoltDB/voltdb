@@ -20,7 +20,16 @@ package org.voltdb.sysprocs;
 import java.util.HashMap;
 import java.util.List;
 
-import org.voltdb.*;
+import org.voltdb.BackendTarget;
+import org.voltdb.DependencyPair;
+import org.voltdb.ExecutionSite;
+import org.voltdb.HsqlBackend;
+import org.voltdb.ParameterSet;
+import org.voltdb.ProcInfo;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltSystemProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
@@ -100,7 +109,7 @@ public class AdHoc extends VoltSystemProcedure {
             pfs[0] = new SynthesizedPlanFragment();
             pfs[0].fragmentId = SysProcFragmentId.PF_runAdHocFragment;
             pfs[0].outputDepId = AGG_DEPID;
-            pfs[0].multipartition = true;
+            pfs[0].multipartition = false;
             pfs[0].nonExecSites = false;
             params = new ParameterSet();
             params.setParameters(AGG_DEPID, "", sql);
