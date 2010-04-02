@@ -45,6 +45,8 @@ public class TestRestrictedPriorityQueue extends TestCase{
     TransactionState m_state6;
     Vector<Long> m_txnIds;
 
+    TransactionState m_states[] = new TransactionState[6];
+
     @Override
     public void setUp() throws InterruptedException {
         m_initiators = new int[2];
@@ -59,30 +61,35 @@ public class TestRestrictedPriorityQueue extends TestCase{
                 true, true, m_proc);
         m_txnIds.add(m_task.getTxnId());
         m_state1 = new SinglePartitionTxnState(null, null, m_task);
+        m_states[0] = m_state1;
 
         m_task = new InitiateTask(1, 1, m_idManager.getNextUniqueTransactionId(),
                 true, true, m_proc);
         assertTrue(m_txnIds.lastElement() < m_task.getTxnId());
         m_txnIds.add(m_task.getTxnId());
         m_state2 = new SinglePartitionTxnState(null, null, m_task);
+        m_states[1] = m_state2;
 
         m_task = new InitiateTask(0, 0, m_idManager.getNextUniqueTransactionId(),
                 true, true, m_proc);
         assertTrue(m_txnIds.lastElement() < m_task.getTxnId());
         m_txnIds.add(m_task.getTxnId());
         m_state3 = new SinglePartitionTxnState(null, null, m_task);
+        m_states[2] = m_state3;
 
         m_task = new InitiateTask(1, 1, m_idManager.getNextUniqueTransactionId(),
                 true, true, m_proc);
         assertTrue(m_txnIds.lastElement() < m_task.getTxnId());
         m_txnIds.add(m_task.getTxnId());
         m_state4 = new SinglePartitionTxnState(null, null, m_task);
+        m_states[3] = m_state4;
 
         m_task = new InitiateTask(0, 0, m_idManager.getNextUniqueTransactionId(),
                 true, true, m_proc);
         assertTrue(m_txnIds.lastElement() < m_task.getTxnId());
         m_txnIds.add(m_task.getTxnId());
         m_state5 = new SinglePartitionTxnState(null, null, m_task);
+        m_states[4] = m_state5;
 
         // Create an additional transaction to add to the priority queue but
         // don't add it to m_txnIds.  This additional transaction allows us
@@ -91,6 +98,8 @@ public class TestRestrictedPriorityQueue extends TestCase{
                 true, true, m_proc);
         assertTrue(m_txnIds.lastElement() < m_task.getTxnId());
         m_state6 = new SinglePartitionTxnState(null, null, m_task);
+        m_states[5] = m_state6;
+
         m_queue.shutdown();
     }
 
@@ -117,17 +126,13 @@ public class TestRestrictedPriorityQueue extends TestCase{
     // all arrive in the order in which they were generated
     public void testIdealOrder()
     {
-        addTxnToQueue(m_state1);
-        addTxnToQueue(m_state2);
-        addTxnToQueue(m_state3);
-        addTxnToQueue(m_state4);
-        addTxnToQueue(m_state5);
-        addTxnToQueue(m_state6);
+        for (int i=0; i < m_states.length; ++i) {
+            addTxnToQueue(m_states[i]);
+        }
         assertEquals(m_queue.size(), 6);
 
-        for (long txnId : m_txnIds)
-        {
-                checkNextStateValid(txnId);
+        for (long txnId : m_txnIds) {
+            checkNextStateValid(txnId);
         }
     }
 
@@ -156,5 +161,66 @@ public class TestRestrictedPriorityQueue extends TestCase{
         addTxnToQueue(m_state6);
         checkNextStateValid(m_state5.txnId);
         checkNextStateNull();
+    }
+
+    // Setup the interleaved transactions from different initiators
+    // Then remove initiator and see that the next states are valid
+    public void testInitiatorRemoval1() {
+        for (int i=0; i < m_states.length; ++i) {
+            addTxnToQueue(m_states[i]);
+        }
+        assertEquals(m_queue.size(), 6);
+        checkNextStateValid(m_txnIds.get(0));
+
+        // the interesting part of the test
+        m_queue.gotFaultForInitiator(1);
+        assertEquals(m_queue.size(), 2);
+        checkNextStateValid(m_txnIds.get(2));
+        checkNextStateValid(m_txnIds.get(4));
+        checkNextStateNull();
+    }
+
+    // same as above but removing other initiator
+    public void testInitiatorRemoval0() {
+        for (int i=0; i < m_states.length; ++i) {
+            addTxnToQueue(m_states[i]);
+        }
+        assertEquals(m_queue.size(), 6);
+        checkNextStateValid(m_states[0].txnId);
+
+        // the interesting part of the test
+        m_queue.gotFaultForInitiator(0);
+        assertEquals(m_queue.size(), 3);
+        checkNextStateValid(m_states[1].txnId);
+        checkNextStateValid(m_states[3].txnId);
+        checkNextStateValid(m_states[5].txnId);
+    }
+
+    // setup the rpq. remove the first item's initiator.
+    // verify that the next item in line is for a new
+    // initiator and that its txnid is gt than the first
+    // peek'ed result.
+    public void testInitiatorRemovalFixesMinTxnId() {
+        for (int i=0; i < m_states.length; ++i) {
+            addTxnToQueue(m_states[i]);
+        }
+        assertEquals(m_queue.size(), 6);
+
+        TransactionState peek = m_queue.peek();
+        m_queue.gotFaultForInitiator(peek.initiatorSiteId);
+        TransactionState peek2 = m_queue.peek();
+        assertTrue(peek != peek2);
+        assertTrue(peek2.txnId > peek.txnId);
+
+        assertEquals(m_queue.size(), 3);
+    }
+
+    // Check that adding an old message from the dead initiator is ok/ignored
+    public void testMessageAddFromDeadInitiator() {
+        m_queue.gotFaultForInitiator(0);
+        addTxnToQueue(m_states[0]);
+        addTxnToQueue(m_states[1]);
+        assertEquals(1, m_queue.size());
+        checkNextStateValid(m_states[1].txnId);
     }
 }

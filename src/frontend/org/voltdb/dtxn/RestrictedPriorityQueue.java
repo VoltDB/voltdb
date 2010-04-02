@@ -17,9 +17,7 @@
 
 package org.voltdb.dtxn;
 
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.PriorityQueue;
+import java.util.*;
 import java.util.Map.Entry;
 
 import org.voltdb.TransactionIdManager;
@@ -90,34 +88,70 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
     }
 
     /**
+     * Drop data for unknown initiators. This is the only valid add interface.
+     */
+    @Override
+    public boolean add(TransactionState txnState) {
+        if (m_lastTxnFromEachInitiator.containsKey(txnState.initiatorSiteId)) {
+            return super.add(txnState);
+        }
+        return false;
+    }
+
+    /**
      * Update the information stored about the latest transaction
      * seen from each initiator. Compute the newest safe transaction id.
      */
-    public void gotTransaction(int initiatorId, long txnId, boolean isHeartbeat) {
-        assert(m_lastTxnFromEachInitiator.containsKey(initiatorId));
+    public void gotTransaction(int initiatorId, long txnId, boolean isHeartbeat)
+    {
+        // Drop old data from already-failed initiators.
+        if (m_lastTxnFromEachInitiator.containsKey(initiatorId)) {
+            if (m_lastTxnPopped > txnId) {
+                StringBuilder msg = new StringBuilder();
+                msg.append("Txn ordering deadlock (QUEUE) at site ").append(m_siteId).append(":\n");
+                msg.append("   txn ").append(m_lastTxnPopped).append(" (");
+                msg.append(TransactionIdManager.toString(m_lastTxnPopped)).append(" HB: ?) before\n");
+                msg.append("   txn ").append(txnId).append(" (");
+                msg.append(TransactionIdManager.toString(txnId)).append(" HB:");
+                msg.append(isHeartbeat).append(").\n");
+                throw new RuntimeException(msg.toString());
+            }
 
-        if (m_lastTxnPopped > txnId) {
-            StringBuilder msg = new StringBuilder();
-            msg.append("Txn ordering deadlock (QUEUE) at site ").append(m_siteId).append(":\n");
-            msg.append("   txn ").append(m_lastTxnPopped).append(" (");
-            msg.append(TransactionIdManager.toString(m_lastTxnPopped)).append(" HB: ?) before\n");
-            msg.append("   txn ").append(txnId).append(" (");
-            msg.append(TransactionIdManager.toString(txnId)).append(" HB:");
-            msg.append(isHeartbeat).append(").\n");
-            throw new RuntimeException(msg.toString());
+            // update the latest transaction for the specified initiator
+            long prevTxnId = m_lastTxnFromEachInitiator.get(initiatorId);
+            if (prevTxnId < txnId)
+                m_lastTxnFromEachInitiator.put(initiatorId, txnId);
+            // find the minimum value across all latest transactions
+            long min = Long.MAX_VALUE;
+            for (long l : m_lastTxnFromEachInitiator.values())
+                if (l < min) min = l;
+
+            // this minimum is the newest safe transaction to run
+            m_newestSafeTransaction = min;
         }
+    }
 
-        // update the latest transaction for the specified initiator
-        long prevTxnId = m_lastTxnFromEachInitiator.get(initiatorId);
-        if (prevTxnId < txnId)
-            m_lastTxnFromEachInitiator.put(initiatorId, txnId);
-        // find the minimum value across all latest transactions
-        long min = Long.MAX_VALUE;
-        for (long l : m_lastTxnFromEachInitiator.values())
-            if (l < min) min = l;
+    /**
+     * Remove all pending transactions from the specified initiator
+     * and do not require heartbeats from that initiator to proceed.
+     * @param initiatorId id of the failed initiator.
+     */
+    public void gotFaultForInitiator(int initiatorId) {
+        // calculate the next minimum transaction w/o our dead friend
+        gotTransaction(initiatorId, Long.MAX_VALUE, true);
 
-        // this minimum is the newest safe transaction to run
-        m_newestSafeTransaction = min;
+        // remove initiator from minimum. txnid scoreboard
+        Long remove = m_lastTxnFromEachInitiator.remove(initiatorId);
+        assert(remove != null);
+
+        // prune any work from the dead initiator from the queue
+        Iterator<TransactionState> it = iterator();
+        while (it.hasNext()) {
+            TransactionState txnState = it.next();
+            if (txnState.initiatorSiteId == initiatorId) {
+                it.remove();
+            }
+        }
     }
 
     /**
@@ -155,4 +189,5 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
 
     public void shutdown() throws InterruptedException {
     }
+
 }
