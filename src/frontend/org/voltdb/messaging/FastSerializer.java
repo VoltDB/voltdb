@@ -200,7 +200,11 @@ public class FastSerializer implements DataOutput {
     }
 
     /**
-     * Returns the buffer. Only use this if the container is not needed because this is a heap buffer
+     * Return a readOnly slice of this buffer. Flips the internal buffer.
+     * May not be, usefully, invoked multiple times on the same internal
+     * state.
+     *
+     * Only use this if using a non-direct ByteBuffer!
      */
     public ByteBuffer getBuffer() {
         assert(m_pool == null);
