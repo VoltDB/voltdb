@@ -25,10 +25,14 @@ package org.voltdb.dtxn;
 import java.nio.ByteBuffer;
 
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.MockVoltDB;
 import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.fault.FaultDistributor;
+import org.voltdb.fault.NodeFailureFault;
 import org.voltdb.messages.InitiateResponse;
 import org.voltdb.messages.InitiateTask;
 import org.voltdb.messaging.FastSerializable;
@@ -42,8 +46,11 @@ import junit.framework.TestCase;
 
 public class TestDtxnInitiatorQueue extends TestCase
 {
-    static int SITE_ID = 5;
+    static int INITIATOR_SITE_ID = 5;
+    static int HOST_ID = 0;
     static int MESSAGE_SIZE = 13;
+
+    MockVoltDB m_mockVolt = null;
 
     class MockWriteStream implements WriteStream
     {
@@ -224,7 +231,7 @@ public class TestDtxnInitiatorQueue extends TestCase
                                             boolean readOnly, boolean isSinglePart,
                                             VoltTable[] results)
     {
-        InitiateTask task = new InitiateTask(SITE_ID, coordId, txnId,
+        InitiateTask task = new InitiateTask(INITIATOR_SITE_ID, coordId, txnId,
                                              readOnly, isSinglePart,
                                              new StoredProcedureInvocation());
         InitiateResponse response = new InitiateResponse(task);
@@ -232,10 +239,20 @@ public class TestDtxnInitiatorQueue extends TestCase
         return response;
     }
 
+    public void setUp()
+    {
+        m_mockVolt = new MockVoltDB();
+        m_mockVolt.addHost(HOST_ID);
+        m_mockVolt.addPartition(0);
+        m_mockVolt.addSite(0, HOST_ID, 0, true);
+        m_mockVolt.setFaultDistributor(new FaultDistributor());
+        VoltDB.replaceVoltDBInstanceForTest(m_mockVolt);
+    }
+
     public void testNonReplicatedBasicOps()
     {
         MockInitiator initiator = new MockInitiator();
-        DtxnInitiatorQueue dut = new DtxnInitiatorQueue(SITE_ID);
+        DtxnInitiatorQueue dut = new DtxnInitiatorQueue(INITIATOR_SITE_ID);
         dut.setInitiator(initiator);
         m_testStream.reset();
         // Single-partition read-only txn
@@ -272,7 +289,7 @@ public class TestDtxnInitiatorQueue extends TestCase
     public void testReplicatedBasicOps()
     {
         MockInitiator initiator = new MockInitiator();
-        DtxnInitiatorQueue dut = new DtxnInitiatorQueue(SITE_ID);
+        DtxnInitiatorQueue dut = new DtxnInitiatorQueue(INITIATOR_SITE_ID);
         dut.setInitiator(initiator);
         m_testStream.reset();
         // Single-partition read-only txn
@@ -304,7 +321,7 @@ public class TestDtxnInitiatorQueue extends TestCase
     public void testInconsistentResults()
     {
         MockInitiator initiator = new MockInitiator();
-        DtxnInitiatorQueue dut = new DtxnInitiatorQueue(SITE_ID);
+        DtxnInitiatorQueue dut = new DtxnInitiatorQueue(INITIATOR_SITE_ID);
         dut.setInitiator(initiator);
         m_testStream.reset();
         // Single-partition read-only txn
@@ -362,10 +379,10 @@ public class TestDtxnInitiatorQueue extends TestCase
     public void testEarlyReadWriteFailure()
     {
         MockInitiator initiator = new MockInitiator();
-        DtxnInitiatorQueue dut = new DtxnInitiatorQueue(SITE_ID);
+        DtxnInitiatorQueue dut = new DtxnInitiatorQueue(INITIATOR_SITE_ID);
         dut.setInitiator(initiator);
         m_testStream.reset();
-        // Single-partition read-only txn
+        // Single-partition read-write txn
         dut.addPendingTxn(createTxnState(0, 0, false, true));
         dut.addPendingTxn(createTxnState(0, 1, false, true));
         dut.removeSite(0);
@@ -378,10 +395,10 @@ public class TestDtxnInitiatorQueue extends TestCase
     public void testMidReadWriteFailure()
     {
         MockInitiator initiator = new MockInitiator();
-        DtxnInitiatorQueue dut = new DtxnInitiatorQueue(SITE_ID);
+        DtxnInitiatorQueue dut = new DtxnInitiatorQueue(INITIATOR_SITE_ID);
         dut.setInitiator(initiator);
         m_testStream.reset();
-        // Single-partition read-only txn
+        // Single-partition read-write txn
         dut.addPendingTxn(createTxnState(0, 0, false, true));
         dut.addPendingTxn(createTxnState(0, 1, false, true));
         dut.offer(createInitiateResponse(0, 1, true, true, createResultSet("dude")));
@@ -394,10 +411,10 @@ public class TestDtxnInitiatorQueue extends TestCase
     public void testMultipleTxnIdMidFailure()
     {
         MockInitiator initiator = new MockInitiator();
-        DtxnInitiatorQueue dut = new DtxnInitiatorQueue(SITE_ID);
+        DtxnInitiatorQueue dut = new DtxnInitiatorQueue(INITIATOR_SITE_ID);
         dut.setInitiator(initiator);
         m_testStream.reset();
-        // Single-partition read-only txn
+        // Single-partition read-write txn
         dut.addPendingTxn(createTxnState(0, 0, false, true));
         dut.addPendingTxn(createTxnState(0, 1, false, true));
         dut.addPendingTxn(createTxnState(1, 0, false, true));
@@ -422,6 +439,25 @@ public class TestDtxnInitiatorQueue extends TestCase
 //        dut.removeSite(0);
 //        dut.removeSite(1);
 //    }
+
+    public void testFaultNotification()
+    {
+        MockInitiator initiator = new MockInitiator();
+        DtxnInitiatorQueue dut = new DtxnInitiatorQueue(INITIATOR_SITE_ID);
+        dut.setInitiator(initiator);
+        m_testStream.reset();
+        // Single-partition read-write txn
+        dut.addPendingTxn(createTxnState(0, 0, false, true));
+        dut.addPendingTxn(createTxnState(0, 1, false, true));
+
+        NodeFailureFault node_failure = new NodeFailureFault(HOST_ID);
+        VoltDB.instance().getFaultDistributor().reportFault(node_failure);
+
+        dut.offer(createInitiateResponse(0, 1, true, true, createResultSet("dude")));
+        assertTrue(m_testStream.gotResponse());
+        assertEquals(1, initiator.m_reduceCount);
+        assertEquals(MESSAGE_SIZE, initiator.m_reduceSize);
+    }
 
     MockWriteStream m_testStream = new MockWriteStream();
     MockConnection m_testConnect = new MockConnection(m_testStream);

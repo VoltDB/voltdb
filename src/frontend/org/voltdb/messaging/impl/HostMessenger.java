@@ -125,7 +125,7 @@ public class HostMessenger implements Messenger {
             }
             ForeignHost fhost = null;
             try {
-                fhost = new ForeignHost(this, socket);
+                fhost = new ForeignHost(this, hostId, socket);
             } catch (java.io.IOException e) {
                 e.printStackTrace();
             }

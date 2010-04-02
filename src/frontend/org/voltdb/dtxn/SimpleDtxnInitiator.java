@@ -63,7 +63,6 @@ import org.voltdb.utils.VoltLoggerFactory;
 /** Supports correct execution of multiple partition transactions by executing them one at a time. */
 public class SimpleDtxnInitiator extends TransactionInitiator {
     final TransactionIdManager m_idManager;
-    final SiteTracker m_siteTracker;
 
     private final DtxnInitiatorQueue m_queue;
 
@@ -114,7 +113,6 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         m_mailbox = messenger.createMailbox(siteId, VoltDB.DTXN_MAILBOX_ID,
                                             m_queue);
         m_queue.setInitiator(this);
-        m_siteTracker = VoltDB.instance().getCatalogContext().siteTracker;
         m_onBackPressure = onBackPressure;
         m_offBackPressure = offBackPressure;
     }
@@ -149,7 +147,9 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
 
             // store only partitions that are NOT the coordinator
             // this is a bit too slow
-            int[] allSiteIds = m_siteTracker.getLiveSitesForEachPartition(partitions);
+            int[] allSiteIds =
+                VoltDB.instance().getCatalogContext().
+                siteTracker.getLiveSitesForEachPartition(partitions);
             int coordinatorId = allSiteIds[0];
             int[] otherSiteIds = new int[allSiteIds.length - 1];
 
@@ -189,7 +189,9 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         MembershipNotice tickNotice = new MembershipNotice(m_siteId, -1, txnId, false);
         tickNotice.setIsHeartBeat(true);
 
-        int[] outOfDateSites = m_siteTracker.getSitesWhichNeedAHeartbeat(time, interval);
+        int[] outOfDateSites =
+            VoltDB.instance().getCatalogContext().
+            siteTracker.getSitesWhichNeedAHeartbeat(time, interval);
         try {
             m_mailbox.send(outOfDateSites, 0, tickNotice);
         } catch (MessagingException e) {
@@ -215,7 +217,9 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         long txnId = m_idManager.getNextUniqueTransactionId();
 
         // split the list of partitions into coordinator and the set of participants
-        ArrayList<Integer> site_ids = m_siteTracker.getLiveSitesForPartition(partition);
+        ArrayList<Integer> site_ids =
+            VoltDB.instance().getCatalogContext().
+            siteTracker.getLiveSitesForPartition(partition);
         ArrayList<InFlightTxnState> txn_states = new ArrayList<InFlightTxnState>();
 
         increaseBackpressure(messageSize);

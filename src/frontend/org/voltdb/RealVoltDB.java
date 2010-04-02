@@ -37,6 +37,10 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.elt.ELTManager;
 import org.voltdb.fault.FaultDistributor;
 import org.voltdb.fault.FaultDistributorInterface;
+import org.voltdb.fault.FaultHandler;
+import org.voltdb.fault.NodeFailureFault;
+import org.voltdb.fault.VoltFault;
+import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.impl.HostMessenger;
@@ -55,6 +59,34 @@ public class RealVoltDB implements VoltDBInterface
         Logger.getLogger(VoltDB.class.getName(), VoltLoggerFactory.instance());
     private static final Logger hostLog =
         Logger.getLogger("HOST", VoltLoggerFactory.instance());
+
+    private class VoltDBNodeFailureFaultHandler implements FaultHandler
+    {
+        @Override
+        public void faultOccured(VoltFault fault)
+        {
+            if (fault instanceof NodeFailureFault)
+            {
+                NodeFailureFault node_fault = (NodeFailureFault) fault;
+                System.err.println("Host failed: " + node_fault.getHostId());
+                ArrayList<Integer> dead_sites =
+                    VoltDB.instance().getCatalogContext().
+                    siteTracker.getAllSitesForHost(node_fault.getHostId());
+                StringBuilder sb = new StringBuilder();
+                for (int site_id : dead_sites)
+                {
+                    sb.append("set ");
+                    String site_path = VoltDB.instance().getCatalogContext().catalog.
+                                       getClusters().get("cluster").getSites().
+                                       get(Integer.toString(site_id)).getPath();
+                    sb.append(site_path).append(" ").append("isUp false");
+                    sb.append("\n");
+                }
+                System.out.println(sb.toString());
+                VoltDB.instance().clusterUpdate(sb.toString());
+            }
+        }
+    }
 
     /**
      * A class that instantiates an ExecutionSite and then waits for notification before
@@ -140,6 +172,11 @@ public class RealVoltDB implements VoltDBInterface
             hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
 
             m_faultManager = new FaultDistributor();
+            // Install a handler for NODE_FAILURE faults to update the catalog
+            // This should be the first handler to run when a node fails
+            m_faultManager.registerFaultHandler(FaultType.NODE_FAILURE,
+                                                new VoltDBNodeFailureFaultHandler(),
+                                                NodeFailureFault.NODE_FAILURE_CATALOG);
 
             // start the dumper thread
             if (config.listenForDumpRequests)

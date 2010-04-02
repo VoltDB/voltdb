@@ -123,7 +123,6 @@ public class LocalCluster implements VoltServerConfig {
                     }
                 }
                 catch (IOException ex) {
-                    Logger.getLogger(LocalCluster.class.getName()).log(Level.SEVERE, null, ex);
                     eof = true;
                 }
             }
@@ -294,6 +293,13 @@ public class LocalCluster implements VoltServerConfig {
             m_running = false;
         }
         return null;
+    }
+
+    public void shutDownSingleHost(int hostNum)
+    {
+        Process proc = m_cluster.get(hostNum);
+        proc.destroy();
+        m_cluster.remove(hostNum);
     }
 
     public void shutDownExternal() throws InterruptedException

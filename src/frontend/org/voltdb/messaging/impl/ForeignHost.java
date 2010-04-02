@@ -24,6 +24,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 
 import org.voltdb.VoltDB;
+import org.voltdb.fault.NodeFailureFault;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.VoltMessage;
 import org.voltdb.network.Connection;
@@ -39,6 +40,8 @@ public class ForeignHost {
     private final HostMessenger m_hostMessenger;
     private final InetAddress m_ipAddress;
     private final int m_tcpPort;
+    private final int m_hostId;
+
     @SuppressWarnings("unused")
     private String m_remoteHostname;
     private boolean m_closing;
@@ -59,6 +62,16 @@ public class ForeignHost {
         @Override
         public void handleMessage(ByteBuffer message, Connection c) {
             handleRead(message, c);
+        }
+
+        @Override
+        public void stopping(Connection c)
+        {
+            if (!m_closing)
+            {
+                VoltDB.instance().getFaultDistributor().
+                reportFault(new NodeFailureFault(m_hostId));
+            }
         }
 
         @Override
@@ -84,12 +97,15 @@ public class ForeignHost {
     }
 
     /** Create a ForeignHost and install in VoltNetwork */
-    ForeignHost(HostMessenger host, SocketChannel socket) throws IOException {
+    ForeignHost(HostMessenger host, int hostId, SocketChannel socket)
+    throws IOException
+    {
         m_hostMessenger = host;
         m_handler = new FHInputHandler();
         m_ipAddress = socket.socket().getInetAddress();
         m_tcpPort = socket.socket().getLocalPort();
         m_connection = host.getNetwork().registerChannel( socket, m_handler);
+        m_hostId = hostId;
         m_closing = false;
     }
 

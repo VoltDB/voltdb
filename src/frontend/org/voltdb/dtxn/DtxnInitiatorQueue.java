@@ -17,6 +17,7 @@
 
 package org.voltdb.dtxn;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -27,6 +28,10 @@ import java.util.Queue;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.fault.FaultHandler;
+import org.voltdb.fault.NodeFailureFault;
+import org.voltdb.fault.VoltFault;
+import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.messages.InitiateResponse;
 import org.voltdb.messaging.VoltMessage;
 import org.voltdb.network.Connection;
@@ -45,6 +50,24 @@ import org.voltdb.utils.EstTime;
  */
 public class DtxnInitiatorQueue implements Queue<VoltMessage>
 {
+    private class InitiatorNodeFailureFaultHandler implements FaultHandler
+    {
+        @Override
+        public void faultOccured(VoltFault fault)
+        {
+            if (fault instanceof NodeFailureFault)
+            {
+                NodeFailureFault node_fault = (NodeFailureFault) fault;
+                ArrayList<Integer> dead_sites =
+                    VoltDB.instance().getCatalogContext().siteTracker.
+                    getAllSitesForHost(node_fault.getHostId());
+                for (Integer site_id : dead_sites)
+                {
+                    removeSite(site_id);
+                }
+            }
+        }
+    }
 
     /** Map of transaction ids to transaction information */
     private final int m_siteId;
@@ -71,6 +94,12 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
         m_txnIdResults =
             new HashMap<Long, VoltTable[]>();
         m_txnIdResponses = new HashMap<Long, InitiateResponse>();
+        VoltDB.instance().getFaultDistributor().
+        // For Node failure, the initiators need to be ordered after the catalog
+        // but before everything else (to prevent any new work for bad sites)
+        registerFaultHandler(FaultType.NODE_FAILURE,
+                             new InitiatorNodeFailureFaultHandler(),
+                             NodeFailureFault.NODE_FAILURE_INITIATOR);
     }
 
     public void setInitiator(TransactionInitiator initiator) {
