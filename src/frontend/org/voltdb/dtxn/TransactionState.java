@@ -17,8 +17,7 @@
 
 package org.voltdb.dtxn;
 
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import org.voltdb.ExecutionSite;
 import org.voltdb.VoltTable;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
@@ -68,6 +67,10 @@ public abstract class TransactionState implements Comparable<TransactionState> {
      */
     final public boolean isDone() {
         return m_done;
+    }
+
+    public boolean isInProgress() {
+        return false;
     }
 
     public abstract boolean doWork();
@@ -129,4 +132,12 @@ public abstract class TransactionState implements Comparable<TransactionState> {
         if (x > 0) return -1;
         return 0;
     }
+
+    /**
+     * Process the failure of failedSites.
+     * @param globalCommitPoint greatest committed transaction id in the cluster
+     * @param failedSites list of execution and initiator sites that have failed
+     */
+    public abstract void handleSiteFaults(ArrayList<Integer> failedSites);
+
 }

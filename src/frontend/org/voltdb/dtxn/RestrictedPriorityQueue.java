@@ -143,15 +143,10 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
         // remove initiator from minimum. txnid scoreboard
         Long remove = m_lastTxnFromEachInitiator.remove(initiatorId);
         assert(remove != null);
+    }
 
-        // prune any work from the dead initiator from the queue
-        Iterator<TransactionState> it = iterator();
-        while (it.hasNext()) {
-            TransactionState txnState = it.next();
-            if (txnState.initiatorSiteId == initiatorId) {
-                it.remove();
-            }
-        }
+    public void faultTransaction(TransactionState txnState) {
+        this.remove(txnState);
     }
 
     /**

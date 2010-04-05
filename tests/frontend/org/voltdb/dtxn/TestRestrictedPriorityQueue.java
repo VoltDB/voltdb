@@ -23,6 +23,7 @@
 
 package org.voltdb.dtxn;
 
+import java.util.Iterator;
 import java.util.Vector;
 
 import junit.framework.TestCase;
@@ -163,6 +164,25 @@ public class TestRestrictedPriorityQueue extends TestCase{
         checkNextStateNull();
     }
 
+    /**
+     * Provide a failure and then prune based on txnids.
+     * @param initiatorId
+     */
+    public void simulateInitiatorFault(int initiatorId, long globalInitiationPoint) {
+        m_queue.gotFaultForInitiator(1);
+        Iterator<TransactionState> iterator = m_queue.iterator();
+        while (iterator.hasNext()) {
+            TransactionState next = iterator.next();
+
+            // Execution site does something along these lines
+            if (next.txnId > globalInitiationPoint &&
+                next.initiatorSiteId == initiatorId)
+            {
+                iterator.remove();
+            }
+        }
+    }
+
     // Setup the interleaved transactions from different initiators
     // Then remove initiator and see that the next states are valid
     public void testInitiatorRemoval1() {
@@ -173,7 +193,7 @@ public class TestRestrictedPriorityQueue extends TestCase{
         checkNextStateValid(m_txnIds.get(0));
 
         // the interesting part of the test
-        m_queue.gotFaultForInitiator(1);
+        simulateInitiatorFault(1, Long.MIN_VALUE);
         assertEquals(m_queue.size(), 2);
         checkNextStateValid(m_txnIds.get(2));
         checkNextStateValid(m_txnIds.get(4));
@@ -189,11 +209,10 @@ public class TestRestrictedPriorityQueue extends TestCase{
         checkNextStateValid(m_states[0].txnId);
 
         // the interesting part of the test
-        m_queue.gotFaultForInitiator(0);
+        simulateInitiatorFault(0, Long.MIN_VALUE);
         assertEquals(m_queue.size(), 3);
         checkNextStateValid(m_states[1].txnId);
         checkNextStateValid(m_states[3].txnId);
-        checkNextStateValid(m_states[5].txnId);
     }
 
     // setup the rpq. remove the first item's initiator.
@@ -207,7 +226,7 @@ public class TestRestrictedPriorityQueue extends TestCase{
         assertEquals(m_queue.size(), 6);
 
         TransactionState peek = m_queue.peek();
-        m_queue.gotFaultForInitiator(peek.initiatorSiteId);
+        simulateInitiatorFault(peek.initiatorSiteId, Long.MIN_VALUE);
         TransactionState peek2 = m_queue.peek();
         assertTrue(peek != peek2);
         assertTrue(peek2.txnId > peek.txnId);

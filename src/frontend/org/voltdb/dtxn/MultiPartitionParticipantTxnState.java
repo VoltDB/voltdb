@@ -81,6 +81,11 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     }
 
     @Override
+    public boolean isInProgress() {
+        return m_hasStartedWork;
+    }
+
+    @Override
     public boolean doWork() {
         if (m_done) {
             return true;
@@ -456,6 +461,34 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         return m_previousStackFrameDropDependencies;
     }
 
+
+    /**
+     * Clean up internal state in response to a set of failed sites.
+     * Note that failedSites contains both initiators and execution
+     * sites. An external agent will drive the deletion/fault or
+     * commit of this transaction state block. Only responsibility
+     * here is to make internal book keeping right.
+     */
+    @Override
+    public void handleSiteFaults(ArrayList<Integer> failedSites)
+    {
+        // remove failed sites from the non-coordinating lists
+        // and decrement expected dependency response count
+        ArrayDeque<Integer> newlist = new ArrayDeque<Integer>(m_nonCoordinatingSites.length);
+        for (int i=0; i < m_nonCoordinatingSites.length; ++i) {
+            if (!failedSites.contains(m_nonCoordinatingSites[i])) {
+                newlist.addLast(m_nonCoordinatingSites[i]);
+            }
+        }
+
+        m_nonCoordinatingSites = new int[newlist.size()];
+        for (int i=0; i < m_nonCoordinatingSites.length; ++i) {
+            m_nonCoordinatingSites[i] = newlist.removeFirst();
+        }
+
+        // fix work units
+    }
+
     // STUFF BELOW HERE IS REALY ONLY FOR SYSPROCS
     // SOME DAY MAYBE FOR MORE GENERAL TRANSACTIONS
 
@@ -469,4 +502,6 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
             throw new RuntimeException(e);
         }
     }
+
 }
+

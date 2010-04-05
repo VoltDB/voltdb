@@ -19,11 +19,7 @@ package org.voltdb;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Level;
@@ -645,13 +641,82 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         }
     }
 
-    void handleInitiatorFault(int initiatorId) {
-        // 1. fix context
+    /**
+     * Process a node failure detection.
+     * @param hostId
+     */
+    void handleNodeFault(int hostId) {
 
-        // 2. fix rpg
-        m_transactionQueue.gotFaultForInitiator(initiatorId);
-        // fix transaction hash
-            // fix transaction states
+        // Note: different sites can process UpdateCatalog sysproc
+        // and handleNodeFault() in different orders. Adding
+        // new procedures (or other supported catalog changes) must
+        // be commutative with handleNodeFault.
+
+        // 0. Determine greatest committed txnId and  greatest safe txnId
+        long globalCommitPoint = Long.MAX_VALUE;
+        long globalInitiationPoint = Long.MAX_VALUE;
+
+        // 1. fix context and associated site tracker and find
+        // the dead sites corresponding to the failed host id.
+        m_context = VoltDB.instance().getCatalogContext();
+
+        ArrayList<Integer> failedSites =
+            m_context.siteTracker.getAllSitesForHost(hostId);
+
+        // 2. Fix safe transaction scoreboard in transaction queue
+        for (Integer i : failedSites)
+        {
+            if (m_context.siteTracker.getSiteForId(i).getIsexec() == false) {
+                m_transactionQueue.gotFaultForInitiator(i);
+            }
+        }
+
+        // 3. correct transaction states internals and commit
+        // or remove affected transactions from RPQ and txnId hash.
+        Iterator<Long> it = m_transactionsById.keySet().iterator();
+        while (it.hasNext())
+        {
+            final long tid = it.next();
+            TransactionState ts = m_transactionsById.get(tid);
+            ts.handleSiteFaults(failedSites);
+
+            // Fault a transaction that was not globally initiated
+            if (ts.txnId > globalInitiationPoint &&
+                failedSites.contains(ts.initiatorSiteId))
+            {
+                log.info("Site " + getSiteId() + " faulting transaction " + ts.txnId +
+                         " as a result of host failure at node " + hostId);
+                it.remove();
+                m_transactionQueue.faultTransaction(ts);
+            }
+
+            // Multipartition transaction without a surviving coordinator:
+            // Commit a txn that is in progress and committed elsewhere.
+            // Must have lost the commit message during the failure.
+            // Otherwise, without a coordinator, the transaction can't
+            // continue. Must destroy it.
+            else if (ts instanceof MultiPartitionParticipantTxnState &&
+                     failedSites.contains(ts.coordinatorSiteId))
+            {
+                if (ts.isInProgress() && ts.txnId <= globalCommitPoint)
+                {
+                    System.err.println("Commit in-progress MP on failure, not supported.");
+                    VoltDB.crashVoltDB();
+                }
+                else if (ts.isInProgress() && ts.txnId > globalCommitPoint) {
+                    // rollback -- make up a rollback message for the mbox.
+                    System.err.println("Rollback in-progress MP on failure, not supported.");
+                    VoltDB.crashVoltDB();
+                }
+                else
+                {
+                    log.info("Site " + getSiteId() + " faulting transaction " + ts.txnId +
+                             " as a result of host failure at node " + hostId);
+                    it.remove();
+                    m_transactionQueue.faultTransaction(ts);
+                }
+            }
+        }
     }
 
 

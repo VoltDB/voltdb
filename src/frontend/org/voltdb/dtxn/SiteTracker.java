@@ -127,6 +127,13 @@ public class SiteTracker {
     }
 
     /**
+     * @return Site object for the corresponding siteId
+     */
+    public Site getSiteForId(int siteId) {
+        return m_sites.get(Integer.toString(siteId));
+    }
+
+    /**
      * @return The number of live non-exec sites currently in the cluster.
      *         Right now, this corresponds to the number of hosts and the
      *         number of initiators in the cluster.
@@ -371,4 +378,5 @@ public class SiteTracker {
 
         return retval;
     }
+
 }

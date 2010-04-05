@@ -17,6 +17,8 @@
 
 package org.voltdb.dtxn;
 
+import java.util.ArrayList;
+
 import org.voltdb.ExecutionSite;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
@@ -80,5 +82,10 @@ public class SinglePartitionTxnState extends TransactionState {
     public String toString() {
         return "SinglePartitionTxnState initiator: " + initiatorSiteId +
             " txnId: " + TransactionIdManager.toString(txnId);
+    }
+
+    @Override
+    public void handleSiteFaults(ArrayList<Integer> failedSites) {
+        // nothing to be done here.
     }
 }
