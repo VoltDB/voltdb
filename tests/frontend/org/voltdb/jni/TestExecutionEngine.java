@@ -45,6 +45,11 @@ public class TestExecutionEngine extends TestCase {
     }
 
     public void testLoadBadCatalogs() throws Exception {
+        /*
+         * Tests if the intended EE exception will be thrown when bad catalog is
+         * loaded. We are really expecting an ERROR message on the terminal in
+         * this case.
+         */
         String badCatalog = LoadCatalogToString.THE_CATALOG.replaceFirst("set", "bad");
         try {
             engine.loadCatalog(badCatalog);
