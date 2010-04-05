@@ -34,6 +34,8 @@ import org.voltdb.dtxn.*;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.exceptions.SerializableException;
+import org.voltdb.fault.*;
+import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
@@ -163,6 +165,27 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         public void start(final Thread thread) {
             m_watchThread = thread;
             super.start();
+        }
+    }
+
+    private static class ExecutionSiteNodeFailureMessage extends VoltMessage
+    {
+        final int m_failedHostId;
+        ExecutionSiteNodeFailureMessage(int failedHostId) {
+            m_failedHostId = failedHostId;
+        }
+    }
+
+    private class ExecutionSiteNodeFailureFaultHandler implements FaultHandler
+    {
+        @Override
+        public void faultOccured(VoltFault fault)
+        {
+            if (fault instanceof NodeFailureFault)
+            {
+                NodeFailureFault node_fault = (NodeFailureFault)fault;
+                m_mailbox.deliver(new ExecutionSiteNodeFailureMessage(node_fault.getHostId()));
+            }
         }
     }
 
@@ -296,6 +319,11 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
 
         m_context = voltdb.getCatalogContext();
 
+        VoltDB.instance().getFaultDistributor().
+        registerFaultHandler(FaultType.NODE_FAILURE,
+                             new ExecutionSiteNodeFailureFaultHandler(),
+                             NodeFailureFault.NODE_FAILURE_EXECUTION_SITE);
+
         if (voltdb.getBackendTargetType() == BackendTarget.NONE) {
             ee = new MockExecutionEngine();
             hsql = null;
@@ -324,6 +352,8 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
 
         loadProceduresFromCatalog(voltdb.getBackendTargetType());
         m_snapshotter = new SnapshotSiteProcessor();
+
+
     }
 
     private RestrictedPriorityQueue initializeTransactionQueue(final int siteId)
@@ -591,6 +621,9 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             DebugMessage dmsg = (DebugMessage) message;
             if (dmsg.shouldDump)
                 DumpManager.putDump(m_dumpId, m_currentDumpTimestamp, true, getDumpContents());
+        }
+        else if (message instanceof ExecutionSiteNodeFailureMessage) {
+            handleNodeFault(((ExecutionSiteNodeFailureMessage)message).m_failedHostId);
         }
         else {
             hostLog.l7dlog(Level.FATAL, LogKeys.org_voltdb_dtxn_SimpleDtxnConnection_UnkownMessageClass.name(),

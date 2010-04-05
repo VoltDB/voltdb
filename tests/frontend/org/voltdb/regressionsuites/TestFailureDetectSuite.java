@@ -78,9 +78,9 @@ public class TestFailureDetectSuite extends RegressionSuite
         // be roughly like pulling the plug
         for (int i = 0; i < 100; i++)
         {
-//            results = client.callProcedure("UpdateSinglePart", 1, 200);
-//            System.out.println(results[0].toString());
-//            assertEquals(1, results[0].getRowCount());
+            results = client.callProcedure("UpdateSinglePart", 1, 200);
+            System.out.println(results[0].toString());
+            assertEquals(1, results[0].getRowCount());
         }
     }
 

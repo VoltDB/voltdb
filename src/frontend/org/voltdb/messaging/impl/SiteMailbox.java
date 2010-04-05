@@ -60,7 +60,8 @@ public class SiteMailbox implements Mailbox {
         }
     }
 
-    void deliver(VoltMessage message) {
+    @Override
+    public void deliver(VoltMessage message) {
         assert(message != null);
         final Queue<VoltMessage> dq = m_messages.get(message.getSubject());
         assert(dq != null);

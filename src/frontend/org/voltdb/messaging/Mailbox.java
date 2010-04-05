@@ -55,6 +55,12 @@ public interface Mailbox {
         throws MessagingException;
 
     /**
+     * Allow message delivery to this mailbox.
+     * @param message
+     */
+    public void deliver(VoltMessage message);
+
+    /**
      * Get the number of messages waiting to be delivered for this mailbox.
      *
      * @return An integer representing the number of waiting messages.

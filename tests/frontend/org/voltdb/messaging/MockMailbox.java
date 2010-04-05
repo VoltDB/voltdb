@@ -139,6 +139,7 @@ public class MockMailbox implements Mailbox {
         return lastEquals(siteId, mailboxId) && outgoingMessages.peekLast().contents == contents;
     }
 
+    @Override
     public void deliver(VoltMessage message) {
         incomingMessages.offer(message);
     }
