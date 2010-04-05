@@ -307,6 +307,12 @@ public class LocalCluster implements VoltServerConfig {
         if (m_cluster != null) {
             for (Process proc : m_cluster) {
                 proc.destroy();
+                int retval = proc.waitFor();
+                // exit code 143 is the forcible shutdown code from .destroy()
+                if (retval != 0 && retval != 143)
+                {
+                    System.out.println("External VoltDB process terminated abnormally with return: " + retval);
+                }
             }
         }
 
