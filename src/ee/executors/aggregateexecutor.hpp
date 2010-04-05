@@ -322,7 +322,10 @@ inline Agg* getAggInstance(Pool* memoryPool, ExpressionType agg_type)
         agg = new (memoryPool->allocate(sizeof(MaxAgg))) MaxAgg();
         break;
     default: {
-        throwFatalException("Unknown aggregate type %d", agg_type);
+        char message[128];
+        sprintf(message, "Unknown aggregate type %d", agg_type);
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      message);
     }
     }
     return agg;
@@ -441,8 +444,10 @@ helper(AggregatePlanNode* node, Agg** aggs,
     }
 
     if (!output_table->insertTuple(tmptup)) {
-        throwFatalException( "Failed to insert order-by tuple from input table '%s' into output table '%s'",
-                input_table->name().c_str(), output_table->name().c_str());
+        VOLT_ERROR("Failed to insert order-by tuple from input table '%s' into"
+                   " output table '%s'",
+                   input_table->name().c_str(), output_table->name().c_str());
+        return false;
     }
     return true;
 }

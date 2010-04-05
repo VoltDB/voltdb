@@ -52,29 +52,29 @@
 
 namespace voltdb {
 
-AbstractExecutor* getNewExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) {
+AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
+                                 AbstractPlanNode* abstract_node) {
     PlanNodeType type = abstract_node->getPlanNodeType();
     switch (type) {
-        case PLAN_NODE_TYPE_AGGREGATE: return new AggregateExecutor<PLAN_NODE_TYPE_AGGREGATE>(engine, abstract_node);
-        case PLAN_NODE_TYPE_HASHAGGREGATE: return new AggregateExecutor<PLAN_NODE_TYPE_HASHAGGREGATE>(engine, abstract_node);
-        case PLAN_NODE_TYPE_DELETE: return new DeleteExecutor(engine, abstract_node);
-        case PLAN_NODE_TYPE_DISTINCT: return new DistinctExecutor(engine, abstract_node);
-        case PLAN_NODE_TYPE_INDEXSCAN: return new IndexScanExecutor(engine, abstract_node);
-        case PLAN_NODE_TYPE_INSERT: return new InsertExecutor(engine, abstract_node);
-        case PLAN_NODE_TYPE_LIMIT: return new LimitExecutor(engine, abstract_node);
-        case PLAN_NODE_TYPE_MATERIALIZE: return new MaterializeExecutor(engine, abstract_node);
-        case PLAN_NODE_TYPE_NESTLOOP: return new NestLoopExecutor(engine, abstract_node);
-        case PLAN_NODE_TYPE_NESTLOOPINDEX: return new NestLoopIndexExecutor(engine, abstract_node);
-        case PLAN_NODE_TYPE_ORDERBY: return new OrderByExecutor(engine, abstract_node);
-        case PLAN_NODE_TYPE_PROJECTION: return new ProjectionExecutor(engine, abstract_node);
-        case PLAN_NODE_TYPE_RECEIVE: return new ReceiveExecutor(engine, abstract_node);
-        case PLAN_NODE_TYPE_SEND: return new SendExecutor(engine, abstract_node);
-        case PLAN_NODE_TYPE_SEQSCAN: return new SeqScanExecutor(engine, abstract_node);
-        case PLAN_NODE_TYPE_UNION: return new UnionExecutor(engine, abstract_node);
-        case PLAN_NODE_TYPE_UPDATE: return new UpdateExecutor(engine, abstract_node);
-        default: {
-            throwFatalException( "Invalid PlannodeType %d", (int) type);
-        }
+    case PLAN_NODE_TYPE_AGGREGATE: return new AggregateExecutor<PLAN_NODE_TYPE_AGGREGATE>(engine, abstract_node);
+    case PLAN_NODE_TYPE_HASHAGGREGATE: return new AggregateExecutor<PLAN_NODE_TYPE_HASHAGGREGATE>(engine, abstract_node);
+    case PLAN_NODE_TYPE_DELETE: return new DeleteExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_DISTINCT: return new DistinctExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_INDEXSCAN: return new IndexScanExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_INSERT: return new InsertExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_LIMIT: return new LimitExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_MATERIALIZE: return new MaterializeExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_NESTLOOP: return new NestLoopExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_NESTLOOPINDEX: return new NestLoopIndexExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_ORDERBY: return new OrderByExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_PROJECTION: return new ProjectionExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_RECEIVE: return new ReceiveExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_SEND: return new SendExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_SEQSCAN: return new SeqScanExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_UNION: return new UnionExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_UPDATE: return new UpdateExecutor(engine, abstract_node);
+    default:
+        VOLT_ERROR( "Invalid PlannodeType %d", (int) type);
     }
     return NULL;
 }

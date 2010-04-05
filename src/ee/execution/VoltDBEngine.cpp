@@ -317,12 +317,12 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
                 dynamic_cast<Table*>(executor->getPlanNode()->getOutputTable());
 
         try {
-            // Now call the execute method to actually perform whatever action it is that
-            // the node is supposed to do...
+            // Now call the execute method to actually perform whatever action
+            // it is that the node is supposed to do...
             if (!executor->execute(params)) {
                 VOLT_TRACE("The Executor's execution at position '%d'"
-                         " failed for PlanFragment '%d'",
-                         ctr, planfragmentId);
+                           " failed for PlanFragment '%jd'",
+                           ctr, (intmax_t)planfragmentId);
                 if (cleanUpTable != NULL)
                     cleanUpTable->deleteAllTuples(false);
                 // set these back to -1 for error handling
@@ -332,8 +332,8 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
             }
         } catch (SerializableEEException &e) {
             VOLT_TRACE("The Executor's execution at position '%d'"
-                     " failed for PlanFragment '%d'",
-                     ctr, planfragmentId);
+                       " failed for PlanFragment '%jd'",
+                       ctr, (intmax_t)planfragmentId);
             if (cleanUpTable != NULL)
                 cleanUpTable->deleteAllTuples(false);
             resetReusedResultOutputBuffer();
@@ -415,9 +415,11 @@ int VoltDBEngine::executePlanFragment(std::string fragmentString,
         }
         else
         {
+            char message[128];
+            sprintf(message, "Unable to load ad-hoc plan fragment for"
+                    " transaction %jd.", (intmax_t)txnId);
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                          "Unable to load ad-hoc plan"
-                                          " fragment.");
+                                          message);
         }
     }
     catch (SerializableEEException &e)
@@ -688,14 +690,17 @@ bool VoltDBEngine::initPlanNode(const int64_t fragId, AbstractPlanNode* node, in
     // Executor is created here. An executor is *devoted* to this plannode
     // so that it can cache anything for the plannode
     AbstractExecutor* executor = getNewExecutor(this, node);
-    assert(executor);
+    if (executor == NULL)
+        return false;
     node->setExecutor(executor);
 
-    // If this PlanNode has an internal PlanNode (e.g., AbstractScanPlanNode can have internal Projections), then
-    // we need to make sure that we set that internal node's executor as well
+    // If this PlanNode has an internal PlanNode (e.g., AbstractScanPlanNode can
+    // have internal Projections), then we need to make sure that we set that
+    // internal node's executor as well
     if (node->getInlinePlanNodes().size() > 0) {
         std::map<PlanNodeType, AbstractPlanNode*>::iterator internal_it;
-        for (internal_it = node->getInlinePlanNodes().begin(); internal_it != node->getInlinePlanNodes().end(); internal_it++) {
+        for (internal_it = node->getInlinePlanNodes().begin();
+             internal_it != node->getInlinePlanNodes().end(); internal_it++) {
             AbstractPlanNode* inline_node = internal_it->second;
             if (!initPlanNode(fragId, inline_node, tempTableMemoryInBytes)) {
                 VOLT_ERROR("Failed to initialize the internal PlanNode '%s' of"

@@ -88,8 +88,9 @@ OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
         assert(index != -1);
         if (index == -1)
         {
-            throwFatalException( "Can not find index for sort col guid %d",
-                    node->getSortColumnGuids()[ii]);
+            VOLT_ERROR("Can not find index for sort col guid %d",
+                       node->getSortColumnGuids()[ii]);
+            return false;
         }
         else if (!(index < input_column_count)) {
             VOLT_ERROR("Sorting column guid %d calculated index %d for input "
@@ -149,7 +150,9 @@ public:
             }
             else
             {
-                throwFatalException("Attempted to sort using SORT_DIRECTION_TYPE_INVALID");
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                              "Attempted to sort using"
+                                              " SORT_DIRECTION_TYPE_INVALID");
             }
         }
         return false; // ta == tb on these keys
