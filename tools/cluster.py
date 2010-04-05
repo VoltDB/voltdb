@@ -25,13 +25,14 @@ def usage():
     print sys.argv[0], "[release|reserve|wait] [machine...]"
     sys.exit()
 
-def system(args):
+def ssh(machine, command):
+    args = ["ssh", "-o StrictHostKeyChecking=no", machine, command]
     process = Popen(args, stdout=PIPE, stderr=PIPE)
     return process.wait()
 
 def delete_lockfiles(machines):
     for machine in machines:
-        system(["ssh", machine, "rm " + LOCKFILE])
+        ssh(machine, "rm " + LOCKFILE)
         print "released", machine
 
 # check inputs
@@ -40,7 +41,7 @@ if len(sys.argv) < 3:
 option = sys.argv[1]
 machines = sys.argv[2:]
 for machine in machines:
-    if 0 != system(["ssh", machine, CHECK_UMASK]):
+    if 0 != ssh(machine, CHECK_UMASK):
         print machine, "is not a valid machine"
         sys.exit(-1)
 
@@ -48,11 +49,11 @@ for machine in machines:
 if (option == "release"):
     # first, check that this user has all the machines reserved
     for machine in machines:
-        if 0 != system(["ssh", machine, "ls " + LOCKFILE]):
+        if 0 != ssh(machine, "ls " + LOCKFILE):
             print machine, "was not reserved"
             print "not releasing any machines"
             sys.exit(-1)
-        if 0 != system(["ssh", machine, "touch -c " + LOCKFILE]):
+        if 0 != ssh(machine, "touch -c " + LOCKFILE):
             print machine, "is reserved by someone else"
             print "not releasing any machines"
             sys.exit(-1)
@@ -60,11 +61,11 @@ if (option == "release"):
 elif (option == "reserve"):
     reserved = []
     for machine in machines:
-        if 0 == system(["ssh", machine, "test -O " + LOCKFILE]):
+        if 0 == ssh(machine, "test -O " + LOCKFILE):
             # we already had this machine reserved
             print machine, "was already reserved by this user"
             pass
-        elif 0 == system(["ssh", machine, "touch " + LOCKFILE]):
+        elif 0 == ssh(machine, "touch " + LOCKFILE):
             reserved.append(machine)
             print "reserved", machine
         else:
@@ -75,7 +76,7 @@ elif (option == "reserve"):
 elif (option == "wait"):
     while 1:
         for machine in machines:
-            if 0 == system(["ssh", machine, "test -O " + LOCKFILE]):
+            if 0 == ssh(machine, "test -O " + LOCKFILE):
                 # one of the machines we're waiting for is unavailable
                 break # out of the for loop
         else: # for...else, not if...else!!  yes this indentation is correct
