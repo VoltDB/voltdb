@@ -45,6 +45,7 @@ public class ForeignHost {
     @SuppressWarnings("unused")
     private String m_remoteHostname;
     private boolean m_closing;
+    private boolean m_isUp;
 
     /** ForeignHost's implementation of InputHandler */
     public class FHInputHandler extends VoltProtocolHandler {
@@ -67,6 +68,7 @@ public class ForeignHost {
         @Override
         public void stopping(Connection c)
         {
+            m_isUp = false;
             if (!m_closing)
             {
                 VoltDB.instance().getFaultDistributor().
@@ -107,12 +109,18 @@ public class ForeignHost {
         m_connection = host.getNetwork().registerChannel( socket, m_handler);
         m_hostId = hostId;
         m_closing = false;
+        m_isUp = true;
     }
 
     void close()
     {
         m_closing = true;
         m_hostMessenger.getNetwork().unregisterChannel(m_connection);
+    }
+
+    boolean isUp()
+    {
+        return m_isUp;
     }
 
     /** Send a message to the network. This public method is re-entrant. */

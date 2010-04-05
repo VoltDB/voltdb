@@ -204,7 +204,15 @@ public class HostMessenger implements Messenger {
         ForeignHost fhost = m_foreignHosts[hostId];
 
         if (fhost == null)
+        {
             throw new MessagingException("Really shouldn't have gotten here...");
+        }
+
+        if (!fhost.isUp())
+        {
+            m_logger.info("Attempted delivery of message to failed site: " + siteId);
+            return null;
+        }
         return fhost;
     }
 
