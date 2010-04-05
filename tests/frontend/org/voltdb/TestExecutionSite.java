@@ -64,9 +64,8 @@ public class TestExecutionSite extends TestCase {
         @Override
         ClientResponseImpl call(TransactionState txnState, Object... paramList)
         {
-            if (!testReadOnly()) {
-                m_site.getNextUndoToken();
-            }
+            m_site.simulateExecutePlanFragments(txnState.txnId, testReadOnly());
+
             final ClientResponseImpl response = new ClientResponseImpl();
             response.setResults(ClientResponseImpl.SUCCESS,
                                 new VoltTable[] {}, "MockSPVoltProcedure Response");

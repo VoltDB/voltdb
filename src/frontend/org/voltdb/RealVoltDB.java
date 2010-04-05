@@ -561,11 +561,6 @@ public class RealVoltDB implements VoltDBInterface
                                                        diffCommands);
         }
 
-        for (int site_id : m_localSites.keySet())
-        {
-            m_localSites.get(site_id).updateCluster();
-        }
-
         for (ClientInterface ci : m_clientInterfaces)
         {
             ci.notifyOfCatalogUpdate();

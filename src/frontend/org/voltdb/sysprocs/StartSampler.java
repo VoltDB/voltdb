@@ -38,8 +38,9 @@ public class StartSampler extends VoltSystemProcedure {
     static final int DEP_ID = 1 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
 
     @Override
-    public void init(ExecutionSite site, Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster) {
-        super.init(site, catProc, eeType, hsql, cluster);
+        public void init(int numberOfPartitions, SiteProcedureConnection site,
+                Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster) {
+        super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
         site.registerPlanFragment(SysProcFragmentId.PF_startSampler, this);
         m_db = cluster.getDatabases().get("database");
     }

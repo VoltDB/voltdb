@@ -17,16 +17,7 @@
 
 package org.voltdb.sysprocs;
 
-import org.voltdb.HsqlBackend;
-import org.voltdb.BackendTarget;
-import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite;
-import org.voltdb.VoltDB;
-import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
-import org.voltdb.VoltSystemProcedure;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
+import org.voltdb.*;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
@@ -49,8 +40,9 @@ public class UpdateLogging extends VoltSystemProcedure {
     private static final int DEP_loggersUpdated = 4;
 
     @Override
-    public void init(ExecutionSite site, Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster) {
-        super.init(site, catProc, eeType, hsql, cluster);
+        public void init(int numberOfPartitions, SiteProcedureConnection site,
+            Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster) {
+        super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
         site.registerPlanFragment(SysProcFragmentId.PF_updateLoggers, this);
     };
 

@@ -24,16 +24,7 @@ import java.io.StringWriter;
 import java.io.PrintWriter;
 
 import org.apache.log4j.Logger;
-import org.voltdb.BackendTarget;
-import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite;
-import org.voltdb.HsqlBackend;
-import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
-import org.voltdb.VoltSystemProcedure;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltTableRow;
-import org.voltdb.VoltType;
+import org.voltdb.*;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Cluster;
@@ -58,10 +49,10 @@ public class SnapshotStatus extends VoltSystemProcedure {
         SysProcFragmentId.PF_scanSnapshotRegistriesResults;
 
     @Override
-    public void init(ExecutionSite site, Procedure catProc,
-                     BackendTarget eeType, HsqlBackend hsql, Cluster cluster)
+    public void init(int numberOfPartitions, SiteProcedureConnection site,
+            Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster)
     {
-        super.init(site, catProc, eeType, hsql, cluster);
+        super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
         site.registerPlanFragment(SysProcFragmentId.PF_scanSnapshotRegistries, this);
         site.registerPlanFragment(SysProcFragmentId.PF_scanSnapshotRegistriesResults, this);
     }

@@ -34,13 +34,11 @@ import java.util.Set;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Database;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
-import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
@@ -79,7 +77,7 @@ public abstract class VoltProcedure {
 
     // package scoped members used by VoltSystemProcedure
     Cluster m_cluster;
-    ExecutionSite m_site;
+    SiteProcedureConnection m_site;
     TransactionState m_currentTxnState;  // assigned in call()
 
     /**
@@ -134,7 +132,14 @@ public abstract class VoltProcedure {
      * End users should not call this method.
      * Used by the VoltDB runtime to initialize stored procedures for execution.
      */
-    public void init(ExecutionSite site, Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster) {
+    public void init(
+            int numberOfPartitions,
+            SiteProcedureConnection site,
+            Procedure catProc,
+            BackendTarget eeType,
+            HsqlBackend hsql,
+            Cluster cluster)
+    {
         if (m_initialized) {
             throw new IllegalStateException("VoltProcedure has already been initialized");
         } else {
@@ -146,11 +151,11 @@ public abstract class VoltProcedure {
         this.isNative = (eeType != BackendTarget.HSQLDB_BACKEND);
         this.hsql = hsql;
         this.m_cluster = cluster;
-        numberOfPartitions = site.m_context.cluster.getPartitions().size();
+        this.numberOfPartitions = numberOfPartitions;
         statsCollector = new ProcedureStatsCollector();
         VoltDB.instance().getStatsAgent().registerStatsSource(
                 SysProcSelector.PROCEDURE,
-                Integer.parseInt(site.getCatalogSite().getTypeName()),
+                Integer.parseInt(site.getCorrespondingCatalogSite().getTypeName()),
                 statsCollector);
 
         // this is a stupid hack to make the EE happy
@@ -539,32 +544,16 @@ public abstract class VoltProcedure {
                               String tableName, VoltTable data, int allowELT)
     throws VoltAbortException
     {
-        if (data == null || data.getRowCount() == 0) return;
-
-        Cluster cluster = m_site.m_context.cluster;
-        if (cluster == null) {
-            throw new VoltAbortException("cluster '" + clusterName + "' does not exist");
+        if (data == null || data.getRowCount() == 0) {
+            return;
         }
-        Database db = cluster.getDatabases().get(databaseName);
-        if (db == null) {
-            throw new VoltAbortException("database '" + databaseName + "' does not exist in cluster " + clusterName);
+        try {
+            m_site.loadTable(m_currentTxnState.txnId,
+                             clusterName, databaseName,
+                             tableName, data, allowELT);
         }
-        Table table = db.getTables().getIgnoreCase(tableName);
-        if (table == null) {
-            throw new VoltAbortException("table '" + tableName + "' does not exist in database " + clusterName + "." + databaseName);
-        }
-        try
-        {
-            m_site.ee.loadTable(table.getRelativeIndex(), data,
-                                m_currentTxnState.txnId,
-                                m_site.lastCommittedTxnId,
-                                m_site.getNextUndoToken(),
-                                allowELT != 0);
-        }
-        catch (EEException e)
-        {
-            throw new VoltAbortException("Failed to load table: " + tableName +
-                                         " into EE");
+        catch (EEException e) {
+            throw new VoltAbortException("Failed to load table: " + tableName);
         }
     }
 
@@ -762,14 +751,13 @@ public abstract class VoltProcedure {
 
         VoltTable[] results = null;
         try {
-            results = m_site.ee.executeQueryPlanFragmentsAndGetResults(
+            results = m_site.executeQueryPlanFragmentsAndGetResults(
                 fragmentIds,
                 fragmentIdIndex,
                 parameterSets,
                 parameterSetIndex,
                 m_currentTxnState.txnId,
-                m_site.lastCommittedTxnId,
-                catProc.getReadonly() ? Long.MAX_VALUE : m_site.getNextUndoToken());
+                catProc.getReadonly());
         }
         finally {
             ProcedureProfiler.stopStatementCounter();
@@ -881,7 +869,8 @@ public abstract class VoltProcedure {
          * Constructor requires no args because it has access to the enclosing classes members.
          */
         public ProcedureStatsCollector() {
-            super(m_site.getSiteId() + " " + catProc.getClassname(), m_site.getSiteId());
+            super(m_site.getCorrespondingSiteId() + " " + catProc.getClassname(),
+                  m_site.getCorrespondingSiteId());
         }
 
         /**
@@ -928,7 +917,7 @@ public abstract class VoltProcedure {
         protected void updateStatsRow(Object rowKey, Object rowValues[]) {
             super.updateStatsRow(rowKey, rowValues);
             rowValues[columnNameToIndex.get("PARTITION_ID")] =
-                Integer.valueOf(m_site.getCatalogSite().getPartition().getTypeName());
+                m_site.getCorrespondingPartitionId();
             rowValues[columnNameToIndex.get("PROCEDURE")] = catProc.getClassname();
             long invocations = m_invocations;
             long totalTimedExecutionTime = m_totalTimedExecutionTime;
@@ -1160,7 +1149,7 @@ public abstract class VoltProcedure {
 
         // create all the local work for the transaction
         FragmentTask localTask = new FragmentTask(m_currentTxnState.initiatorSiteId,
-                                                  m_site.getSiteId(),
+                                                  m_site.getCorrespondingSiteId(),
                                                   m_currentTxnState.txnId,
                                                   m_currentTxnState.isReadOnly,
                                                   localFragIds,
@@ -1177,7 +1166,7 @@ public abstract class VoltProcedure {
 
         // create and distribute work for all sites in the transaction
         FragmentTask distributedTask = new FragmentTask(m_currentTxnState.initiatorSiteId,
-                                                        m_site.getSiteId(),
+                                                        m_site.getCorrespondingSiteId(),
                                                         m_currentTxnState.txnId,
                                                         m_currentTxnState.isReadOnly,
                                                         distributedFragIdArray,

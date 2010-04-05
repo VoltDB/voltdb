@@ -106,19 +106,19 @@ public class TestSimpleWorkUnit extends TestCase
 
     public void testNoDependenciesNoReplicas() {
         setUpSites(1, 2, 1);
-        WorkUnit w = new WorkUnit(m_voltdb.getCatalogContext(), work, new int[]{}, false);
+        WorkUnit w = new WorkUnit(m_voltdb.getCatalogContext().siteTracker, work, new int[]{}, false);
         assertTrue(w.allDependenciesSatisfied());
         assertEquals(work, w.getPayload());
         assertNull(w.getDependencies());
         assertNull(w.getDependency(0));
 
-        w = new WorkUnit(m_voltdb.getCatalogContext(), work, null, false);
+        w = new WorkUnit(m_voltdb.getCatalogContext().siteTracker, work, null, false);
         assertTrue(w.allDependenciesSatisfied());
     }
 
     public void testDependenciesNoReplicas() {
         setUpSites(1, 2, 1);
-        WorkUnit w = new WorkUnit(m_voltdb.getCatalogContext(), work, new int[]{ 4, 5 }, false);
+        WorkUnit w = new WorkUnit(m_voltdb.getCatalogContext().siteTracker, work, new int[]{ 4, 5 }, false);
         assertFalse(w.allDependenciesSatisfied());
         assertEquals(w.getDependency(4).size(), 0);
         assertEquals(w.getDependency(5).size(), 0);
@@ -132,7 +132,7 @@ public class TestSimpleWorkUnit extends TestCase
 
     public void testBadPutDependencyNoReplicas() {
         setUpSites(1, 2, 1);
-        WorkUnit w = new WorkUnit(m_voltdb.getCatalogContext(), work, new int[]{ 4, 5 }, false);
+        WorkUnit w = new WorkUnit(m_voltdb.getCatalogContext().siteTracker, work, new int[]{ 4, 5 }, false);
 
         // Put a dependency that does not exist
         try {
@@ -158,7 +158,7 @@ public class TestSimpleWorkUnit extends TestCase
     {
         setUpSites(2, 2, 1);
         int multi_dep = 5 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-        WorkUnit w = new WorkUnit(m_voltdb.getCatalogContext(),
+        WorkUnit w = new WorkUnit(m_voltdb.getCatalogContext().siteTracker,
                                   work, new int[]{ 4, multi_dep }, false);
         assertFalse(w.allDependenciesSatisfied());
         assertEquals(w.getDependency(4).size(), 0);
@@ -185,7 +185,7 @@ public class TestSimpleWorkUnit extends TestCase
 
         setUpSites(2, 2, 1);
         int multi_dep = 5 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-        WorkUnit w = new WorkUnit(m_voltdb.getCatalogContext(),
+        WorkUnit w = new WorkUnit(m_voltdb.getCatalogContext().siteTracker,
                                   work, new int[]{ 4, multi_dep }, false);
         assertFalse(w.allDependenciesSatisfied());
         assertEquals(w.getDependency(4).size(), 0);

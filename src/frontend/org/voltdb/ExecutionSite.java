@@ -30,18 +30,11 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.NDC;
 import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.Site;
+import org.voltdb.VoltProcedure.VoltAbortException;
+import org.voltdb.catalog.*;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.debugstate.ExecutorContext;
-import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
-import org.voltdb.dtxn.RestrictedPriorityQueue;
-import org.voltdb.dtxn.SinglePartitionTxnState;
-import org.voltdb.dtxn.SiteConnection;
-import org.voltdb.dtxn.TransactionState;
+import org.voltdb.dtxn.*;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.exceptions.SerializableException;
@@ -72,8 +65,7 @@ import org.voltdb.utils.VoltLoggerFactory;
  * do other things, but this is where the good stuff happens.
  */
 public class ExecutionSite
-extends SiteConnection
-implements Runnable, DumpManager.Dumpable
+implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProcedureConnection
 {
     private static final Logger log = Logger.getLogger(ExecutionSite.class.getName(), VoltLoggerFactory.instance());
     private static final Logger hostLog = Logger.getLogger("HOST", VoltLoggerFactory.instance());
@@ -90,6 +82,11 @@ implements Runnable, DumpManager.Dumpable
     public CatalogContext m_context;
     Site getCatalogSite() {
         return m_context.cluster.getSites().get(Integer.toString(getSiteId()));
+    }
+
+    final int m_siteId;
+    public final int getSiteId() {
+        return m_siteId;
     }
 
     HashMap<Long, TransactionState> m_transactionsById = new HashMap<Long, TransactionState>();
@@ -114,6 +111,10 @@ implements Runnable, DumpManager.Dumpable
 
     // Each execution site manages snapshot using a SnapshotSiteProcessor
     private final SnapshotSiteProcessor m_snapshotter;
+
+    // Trigger if shutdown has been run already.
+    private boolean haveShutdownAlready;
+
 
     private final Watchdog m_watchdog;
     private class Watchdog extends Thread {
@@ -169,17 +170,9 @@ implements Runnable, DumpManager.Dumpable
         }
     }
 
-    // Associate the system procedure planfragment ids to wrappers.
-    // Planfragments are registered when the procedure wrapper is init()'d.
     private final HashMap<Long, VoltSystemProcedure> m_registeredSysProcPlanFragments =
         new HashMap<Long, VoltSystemProcedure>();
 
-    public void registerPlanFragment(final long pfId, final VoltSystemProcedure proc) {
-        synchronized (m_registeredSysProcPlanFragments) {
-            assert(m_registeredSysProcPlanFragments.containsKey(pfId) == false);
-            m_registeredSysProcPlanFragments.put(pfId, proc);
-        }
-    }
 
     /**
      * Log settings changed. Signal EE to update log level.
@@ -187,6 +180,49 @@ implements Runnable, DumpManager.Dumpable
     public void updateBackendLogLevels() {
         ee.setLogLevels(org.voltdb.jni.EELoggers.getLogLevels());
     }
+
+    void startShutdown() {
+        m_shouldContinue = false;
+    }
+
+    /**
+     * Shutdown all resources that need to be shutdown for this <code>ExecutionSite</code>.
+     * May be called twice if recursing via recursableRun(). Protected against that..
+     */
+    public void shutdown() {
+        if (haveShutdownAlready) {
+            return;
+        }
+        haveShutdownAlready = true;
+        m_shouldContinue = false;
+
+        boolean finished = false;
+        while (!finished) {
+            try {
+                if (m_watchdog.isAlive()) {
+                    m_watchdog.m_shouldContinue = false;
+                    m_watchdog.interrupt();
+                    m_watchdog.join();
+                }
+
+                m_transactionQueue.shutdown();
+
+                ProcedureProfiler.flushProfile();
+                if (hsql != null) {
+                    hsql.shutdown();
+                }
+                if (ee != null) {
+                    ee.release();
+                }
+                finished = true;
+            } catch (final InterruptedException e) {
+                //Ignore interruptions and finish shutting down.
+            }
+        }
+
+        m_snapshotter.shutdown();
+    }
+
 
 
     public void tick() {
@@ -202,61 +238,6 @@ implements Runnable, DumpManager.Dumpable
         // do other periodic work
         m_snapshotter.doSnapshotWork(ee);
         m_watchdog.pet();
-    }
-
-    /**
-     * Set the txn id from the WorkUnit and set/release undo tokens as
-     * necessary. The DTXN currently has no notion of maintaining undo
-     * tokens beyond the life of a transaction so it is up to the execution
-     * site to release the undo data in the EE up until the current point
-     * when the transaction ID changes.
-     */
-    public final void beginNewTxn(long txnId, boolean readOnly) {
-        if (!readOnly) {
-            assert(txnBeginUndoToken == kInvalidUndoToken);
-            assert(batchBeginUndoToken == kInvalidUndoToken);
-            txnBeginUndoToken = latestUndoToken;
-            assert(txnBeginUndoToken != kInvalidUndoToken);
-        }
-    }
-
-    public final void beginNewBatch(boolean readOnly) {
-        if (!readOnly) {
-            assert(latestUndoToken != kInvalidUndoToken);
-            assert(txnBeginUndoToken != kInvalidUndoToken);
-            assert(latestUndoToken >= txnBeginUndoToken);
-            batchBeginUndoToken = latestUndoToken;
-        }
-    }
-
-    public final void rollbackTransaction(boolean readOnly) {
-        if (!readOnly) {
-            assert(latestUndoToken != kInvalidUndoToken);
-            assert(txnBeginUndoToken != kInvalidUndoToken);
-            assert(latestUndoToken >= txnBeginUndoToken);
-
-            // don't go to the EE of no work was done
-            if (latestUndoToken > txnBeginUndoToken) {
-                ee.undoUndoToken(txnBeginUndoToken);
-            }
-        }
-    }
-
-    public final void completeTransaction(boolean readOnly) {
-        if (!readOnly) {
-            assert(latestUndoToken != kInvalidUndoToken);
-            assert(txnBeginUndoToken != kInvalidUndoToken);
-            assert(latestUndoToken >= txnBeginUndoToken);
-
-            // release everything through the end of the current window.
-            if (latestUndoToken > txnBeginUndoToken) {
-                ee.releaseUndoToken(latestUndoToken);
-            }
-
-            // reset for error checking purposes
-            txnBeginUndoToken = kInvalidUndoToken;
-            batchBeginUndoToken = kInvalidUndoToken;
-        }
     }
 
 
@@ -293,7 +274,7 @@ implements Runnable, DumpManager.Dumpable
      * @param siteId
      */
     ExecutionSite(int siteId) {
-        super(siteId);
+        m_siteId = siteId;
         m_systemProcedureContext = new SystemProcedureContext();
         m_watchdog = null;
         ee = null;
@@ -312,7 +293,7 @@ implements Runnable, DumpManager.Dumpable
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
                   final int siteId, String serializedCatalog)
     {
-        super(siteId);
+        m_siteId = siteId;
 
         hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_Initializing.name(),
                         new Object[] { String.valueOf(siteId) }, null);
@@ -447,12 +428,6 @@ implements Runnable, DumpManager.Dumpable
         return true;
     }
 
-    public boolean updateCluster()
-    {
-        m_context = VoltDB.instance().getCatalogContext();
-        return true;
-    }
-
     void loadProceduresFromCatalog(BackendTarget backendTarget) {
         m_registeredSysProcPlanFragments.clear();
         procs.clear();
@@ -490,7 +465,8 @@ implements Runnable, DumpManager.Dumpable
                 wrapper = new VoltProcedure.StmtProcedure();
             }
 
-            wrapper.init(this, proc, backendTarget, hsql, m_context.cluster);
+            wrapper.init(m_context.cluster.getPartitions().size(),
+                         this, proc, backendTarget, hsql, m_context.cluster);
             procs.put(proc.getTypeName(), wrapper);
         }
     }
@@ -551,300 +527,21 @@ implements Runnable, DumpManager.Dumpable
         shutdown();
     }
 
-    public FragmentResponse processFragmentTask(TransactionState txnState,
-            final HashMap<Integer,List<VoltTable>> dependencies, final VoltMessage task)
-    {
-        ParameterSet params = null;
-        final FragmentTask ftask = (FragmentTask) task;
-        assert(ftask.getFragmentCount() == 1);
-        final long fragmentId = ftask.getFragmentId(0);
-        final int outputDepId = ftask.getOutputDepId(0);
+    private void completeTransaction(boolean readOnly) {
+        if (!readOnly) {
+            assert(latestUndoToken != kInvalidUndoToken);
+            assert(txnBeginUndoToken != kInvalidUndoToken);
+            assert(latestUndoToken >= txnBeginUndoToken);
 
-        final FragmentResponse currentFragResponse = new FragmentResponse(ftask, getSiteId());
-
-        // this is a horrible performance hack, and can be removed with small changes
-        // to the ee interface layer.. (rtb: not sure what 'this' encompasses...)
-        final ByteBuffer paramData = ftask.getParameterDataForFragment(0);
-        if (paramData != null) {
-            final FastDeserializer fds = new FastDeserializer(paramData);
-            try {
-                params = fds.readObject(ParameterSet.class);
-            }
-            catch (final IOException e) {
-                hostLog.l7dlog( Level.FATAL,
-                                LogKeys.host_ExecutionSite_FailedDeserializingParamsForFragmentTask.name(), e);
-                VoltDB.crashVoltDB();
-            }
-        }
-        else {
-            params = new ParameterSet();
-        }
-
-        if (ftask.isSysProcTask()) {
-            return processSysprocFragmentTask(txnState, dependencies, fragmentId,
-                                              currentFragResponse, params);
-        }
-        else {
-            // start the clock on this statement
-            ProcedureProfiler.startStatementCounter(fragmentId);
-
-            if (dependencies != null) {
-                ee.stashWorkUnitDependencies(dependencies);
-            }
-            final int inputDepId = ftask.getOnlyInputDepId(0);
-
-            /*
-             * Currently the error path when executing plan fragments
-             * does not adequately distinguish between fatal errors and
-             * abort type errors that should result in a roll back.
-             * Assume that it is ninja: succeeds or doesn't return.
-             * No roll back support.
-             */
-            currentFragResponse.setStatus(FragmentResponse.SUCCESS, null);
-            try {
-                final DependencyPair dep = ee.executePlanFragment(fragmentId,
-                                                                  outputDepId,
-                                                                  inputDepId,
-                                                                  params,
-                                                                  txnState.txnId,
-                                                                  lastCommittedTxnId,
-                                                                  getNextUndoToken());
-
-                sendDependency(currentFragResponse, dep.depId, dep.dependency);
-
-            } catch (final EEException e) {
-                hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
-                currentFragResponse.setStatus(FragmentResponse.UNEXPECTED_ERROR, e);
-            } catch (final SQLException e) {
-                hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
-                currentFragResponse.setStatus(FragmentResponse.UNEXPECTED_ERROR, e);
+            // release everything through the end of the current window.
+            if (latestUndoToken > txnBeginUndoToken) {
+                ee.releaseUndoToken(latestUndoToken);
             }
 
-            ProcedureProfiler.stopStatementCounter();
-            return currentFragResponse;
+            // reset for error checking purposes
+            txnBeginUndoToken = kInvalidUndoToken;
+            batchBeginUndoToken = kInvalidUndoToken;
         }
-    }
-
-    public FragmentResponse processSysprocFragmentTask(
-            final TransactionState txnState,
-            final HashMap<Integer,List<VoltTable>> dependencies,
-            final long fragmentId, final FragmentResponse currentFragResponse,
-            final ParameterSet params)
-    {
-        // assume success. errors correct this assumption as they occur
-        currentFragResponse.setStatus(FragmentResponse.SUCCESS, null);
-
-        VoltSystemProcedure proc = null;
-        synchronized (m_registeredSysProcPlanFragments) {
-            proc = m_registeredSysProcPlanFragments.get(fragmentId);
-        }
-
-        try {
-            // set transaction state for non-coordinator snapshot restore sites
-            proc.setTransactionState(txnState);
-            final DependencyPair dep
-                = proc.executePlanFragment(dependencies,
-                                           fragmentId,
-                                           params,
-                                           m_systemProcedureContext);
-
-            sendDependency(currentFragResponse, dep.depId, dep.dependency);
-        }
-        catch (final EEException e)
-        {
-            hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
-            currentFragResponse.setStatus(FragmentResponse.UNEXPECTED_ERROR, e);
-        }
-        catch (final SQLException e)
-        {
-            hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
-            currentFragResponse.setStatus(FragmentResponse.UNEXPECTED_ERROR, e);
-        }
-        catch (final Exception e)
-        {
-            // Just indicate that we failed completely
-            currentFragResponse.setStatus(FragmentResponse.UNEXPECTED_ERROR, new SerializableException(e));
-        }
-
-        return currentFragResponse;
-    }
-
-
-    /*
-     * Do snapshot work exclusively until there is no more. Also blocks
-     * until the syncing and closing of snapshot data targets has completed.
-     */
-    public HashSet<Exception> completeSnapshotWork() throws InterruptedException {
-        return m_snapshotter.completeSnapshotWork(ee);
-    }
-
-    public InitiateResponse processInitiateTask(TransactionState txnState, final VoltMessage task) {
-        final InitiateTask itask = (InitiateTask)task;
-        final VoltProcedure wrapper = procs.get(itask.getStoredProcedureName());
-        if (wrapper == null) {
-            System.err.printf("Missing procedure \"%s\" at execution site. %d\n", itask.getStoredProcedureName(), m_siteId);
-            VoltDB.crashVoltDB();
-        }
-
-        final InitiateResponse response = new InitiateResponse(itask);
-
-        try {
-            final ClientResponseImpl cr = wrapper.call(txnState, itask.getParameters());
-            response.setResults(cr, itask);
-        }
-        catch (final ExpectedProcedureException e) {
-            log.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_ExpectedProcedureException.name(), e);
-            response.setResults(
-                    new ClientResponseImpl(
-                            ClientResponse.GRACEFUL_FAILURE,
-                            new VoltTable[]{},
-                            e.toString()));
-        }
-        catch (final Exception e) {
-            // Show the WHOLE exception in the log
-            hostLog.l7dlog( Level.ERROR, LogKeys.host_ExecutionSite_UnexpectedProcedureException.name(), e);
-            VoltDB.crashVoltDB();
-        }
-
-        log.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
-        if (txnState.txnId > lastCommittedTxnId) {
-            lastCommittedTxnId = txnState.txnId;
-        }
-
-        return response;
-    }
-
-    public void sendDependency(final FragmentResponse currentFragResponse,
-                               final int dependencyId, final VoltTable dependency) {
-        if (log.isTraceEnabled()) {
-            log.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingDependency.name(), new Object[] { dependencyId }, null);
-        }
-
-        currentFragResponse.addDependency(dependencyId, dependency);
-    }
-
-    void startShutdown() {
-        m_shouldContinue = false;
-    }
-
-    /**
-     * Shutdown all resources that need to be shutdown for this <code>ExecutionSite</code>.
-     * May be called twice if recursing via recursableRun(). Protected against that..
-     */
-    private boolean haveShutdownAlready;
-    @Override
-    public
-    void shutdown() {
-
-        if (haveShutdownAlready) {
-            return;
-        }
-        haveShutdownAlready = true;
-        m_shouldContinue = false;
-
-        boolean finished = false;
-        while (!finished) {
-            try {
-                if (m_watchdog.isAlive()) {
-                    m_watchdog.m_shouldContinue = false;
-                    m_watchdog.interrupt();
-                    m_watchdog.join();
-                }
-
-                m_transactionQueue.shutdown();
-
-                ProcedureProfiler.flushProfile();
-                if (hsql != null) {
-                    hsql.shutdown();
-                }
-                if (ee != null) {
-                    ee.release();
-                }
-                finished = true;
-            } catch (final InterruptedException e) {
-                //Ignore interruptions and finish shutting down.
-            }
-        }
-
-        m_snapshotter.shutdown();
-    }
-
-    public void initiateSnapshots(Deque<SnapshotTableTask> tasks) {
-        m_snapshotter.initiateSnapshots(ee, tasks);
-    }
-
-    @Override
-    public void goDumpYourself(final long timestamp) {
-        m_currentDumpTimestamp = timestamp;
-        DebugMessage dmsg = new DebugMessage();
-        dmsg.shouldDump = true;
-        try {
-            m_mailbox.send(getSiteId(), 0, dmsg);
-        }
-        catch (org.voltdb.messaging.MessagingException e) {
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * Get the actual file contents for a dump of state reachable by
-     * this thread. Can be called unsafely or safely.
-     */
-    public ExecutorContext getDumpContents() {
-        final ExecutorContext context = new ExecutorContext();
-        context.siteId = getSiteId();
-
-        // messaging log window stored in mailbox history
-        if (m_mailbox instanceof SiteMailbox)
-            context.mailboxHistory = ((SiteMailbox) m_mailbox).getHistory();
-
-        // restricted priority queue content
-        m_transactionQueue.getDumpContents(context);
-
-        // TODO:
-        // m_transactionsById.getDumpContents(context);
-
-        return context;
-    }
-
-
-    /*
-     * Continue doing runnable work for the current transaction.
-     * If doWork() returns true, the transaction is over.
-     * Otherwise, the procedure may have more java to run
-     * or a dependency or fragment to collect from the network.
-     *
-     * doWork() can sneak in a new SP transaction. Maybe it would
-     * be better if transactions didn't trigger other transactions
-     * and those optimization decisions where made somewhere closer
-     * to this code?
-     */
-    @Override
-    public Map<Integer, List<VoltTable>>
-    recursableRun(TransactionState currentTxnState)
-    {
-        do
-        {
-            if (currentTxnState.doWork()) {
-                completeTransaction(currentTxnState.isReadOnly);
-                TransactionState ts = m_transactionsById.remove(currentTxnState.txnId);
-                assert(ts != null);
-                return null;
-            }
-            else if (currentTxnState.shouldResumeProcedure()){
-                Map<Integer, List<VoltTable>> retval =
-                    currentTxnState.getPreviousStackFrameDropDependendencies();
-                assert(retval != null);
-                return retval;
-            }
-            else {
-                VoltMessage message = m_mailbox.recvBlocking(5);
-                tick();
-                if (message != null) {
-                    handleMailboxMessage(message);
-                }
-            }
-        } while (true);
     }
 
     private void handleMailboxMessage(VoltMessage message)
@@ -948,12 +645,380 @@ implements Runnable, DumpManager.Dumpable
         }
     }
 
+    void handleInitiatorFault(int initiatorId) {
+        // 1. fix context
+
+        // 2. fix rpg
+        m_transactionQueue.gotFaultForInitiator(initiatorId);
+        // fix transaction hash
+            // fix transaction states
+    }
+
+
+    private FragmentResponse processSysprocFragmentTask(
+            final TransactionState txnState,
+            final HashMap<Integer,List<VoltTable>> dependencies,
+            final long fragmentId, final FragmentResponse currentFragResponse,
+            final ParameterSet params)
+    {
+        // assume success. errors correct this assumption as they occur
+        currentFragResponse.setStatus(FragmentResponse.SUCCESS, null);
+
+        VoltSystemProcedure proc = null;
+        synchronized (m_registeredSysProcPlanFragments) {
+            proc = m_registeredSysProcPlanFragments.get(fragmentId);
+        }
+
+        try {
+            // set transaction state for non-coordinator snapshot restore sites
+            proc.setTransactionState(txnState);
+            final DependencyPair dep
+                = proc.executePlanFragment(dependencies,
+                                           fragmentId,
+                                           params,
+                                           m_systemProcedureContext);
+
+            sendDependency(currentFragResponse, dep.depId, dep.dependency);
+        }
+        catch (final EEException e)
+        {
+            hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
+            currentFragResponse.setStatus(FragmentResponse.UNEXPECTED_ERROR, e);
+        }
+        catch (final SQLException e)
+        {
+            hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
+            currentFragResponse.setStatus(FragmentResponse.UNEXPECTED_ERROR, e);
+        }
+        catch (final Exception e)
+        {
+            // Just indicate that we failed completely
+            currentFragResponse.setStatus(FragmentResponse.UNEXPECTED_ERROR, new SerializableException(e));
+        }
+
+        return currentFragResponse;
+    }
+
+
+    private void sendDependency(
+            final FragmentResponse currentFragResponse,
+            final int dependencyId,
+            final VoltTable dependency)
+    {
+        if (log.isTraceEnabled()) {
+            log.l7dlog(Level.TRACE,
+                       LogKeys.org_voltdb_ExecutionSite_SendingDependency.name(),
+                       new Object[] { dependencyId }, null);
+        }
+        currentFragResponse.addDependency(dependencyId, dependency);
+    }
+
+
+    /*
+     * Do snapshot work exclusively until there is no more. Also blocks
+     * until the syncing and closing of snapshot data targets has completed.
+     */
+    public void initiateSnapshots(Deque<SnapshotTableTask> tasks) {
+        m_snapshotter.initiateSnapshots(ee, tasks);
+    }
+
+    public HashSet<Exception> completeSnapshotWork() throws InterruptedException {
+        return m_snapshotter.completeSnapshotWork(ee);
+    }
+
+
+    /*
+     *
+     *  SiteConnection Interface (VoltProcedure -> ExecutionSite)
+     *
+     */
+
+    @Override
+    public void registerPlanFragment(final long pfId, final VoltSystemProcedure proc) {
+        synchronized (m_registeredSysProcPlanFragments) {
+            assert(m_registeredSysProcPlanFragments.containsKey(pfId) == false);
+            m_registeredSysProcPlanFragments.put(pfId, proc);
+        }
+    }
+
+    @Override
+    public Site getCorrespondingCatalogSite() {
+        return getCatalogSite();
+    }
+
+    @Override
+    public int getCorrespondingSiteId() {
+        return m_siteId;
+    }
+
+    @Override
+    public int getCorrespondingPartitionId() {
+        return Integer.valueOf(getCatalogSite().getPartition().getTypeName());
+    }
+
+    @Override
+    public void loadTable(
+            long txnId,
+            String clusterName,
+            String databaseName,
+            String tableName,
+            VoltTable data,
+            int allowELT)
+    throws VoltAbortException
+    {
+        Cluster cluster = m_context.cluster;
+        if (cluster == null) {
+            throw new VoltAbortException("cluster '" + clusterName + "' does not exist");
+        }
+        Database db = cluster.getDatabases().get(databaseName);
+        if (db == null) {
+            throw new VoltAbortException("database '" + databaseName + "' does not exist in cluster " + clusterName);
+        }
+        Table table = db.getTables().getIgnoreCase(tableName);
+        if (table == null) {
+            throw new VoltAbortException("table '" + tableName + "' does not exist in database " + clusterName + "." + databaseName);
+        }
+
+        ee.loadTable(table.getRelativeIndex(), data,
+                     txnId,
+                     lastCommittedTxnId,
+                     getNextUndoToken(),
+                     allowELT != 0);
+    }
+
+    @Override
+    public VoltTable[] executeQueryPlanFragmentsAndGetResults(
+            long[] planFragmentIds,
+            int numFragmentIds,
+            ParameterSet[] parameterSets,
+            int numParameterSets,
+            long txnId,
+            boolean readOnly) throws EEException
+    {
+        return ee.executeQueryPlanFragmentsAndGetResults(
+            planFragmentIds,
+            numFragmentIds,
+            parameterSets,
+            numParameterSets,
+            txnId,
+            lastCommittedTxnId,
+            readOnly ? Long.MAX_VALUE : getNextUndoToken());
+    }
+
+    @Override
+    public void simulateExecutePlanFragments(long txnId, boolean readOnly) {
+        if (!readOnly) {
+            // pretend real work was done
+            getNextUndoToken();
+        }
+    }
+
+    /**
+     * Continue doing runnable work for the current transaction.
+     * If doWork() returns true, the transaction is over.
+     * Otherwise, the procedure may have more java to run
+     * or a dependency or fragment to collect from the network.
+     *
+     * doWork() can sneak in a new SP transaction. Maybe it would
+     * be better if transactions didn't trigger other transactions
+     * and those optimization decisions where made somewhere closer
+     * to this code?
+     */
+    @Override
+    public Map<Integer, List<VoltTable>>
+    recursableRun(TransactionState currentTxnState)
+    {
+        do
+        {
+            if (currentTxnState.doWork()) {
+                completeTransaction(currentTxnState.isReadOnly);
+                TransactionState ts = m_transactionsById.remove(currentTxnState.txnId);
+                assert(ts != null);
+                return null;
+            }
+            else if (currentTxnState.shouldResumeProcedure()){
+                Map<Integer, List<VoltTable>> retval =
+                    currentTxnState.getPreviousStackFrameDropDependendencies();
+                assert(retval != null);
+                return retval;
+            }
+            else {
+                VoltMessage message = m_mailbox.recvBlocking(5);
+                tick();
+                if (message != null) {
+                    handleMailboxMessage(message);
+                }
+            }
+        } while (true);
+    }
+
+    /*
+     *
+     *  SiteTransactionConnection Interface (TransactionState -> ExecutionSite)
+     *
+     */
+
+    public SiteTracker getSiteTracker() {
+        return m_context.siteTracker;
+    }
+
+    /**
+     * Set the txn id from the WorkUnit and set/release undo tokens as
+     * necessary. The DTXN currently has no notion of maintaining undo
+     * tokens beyond the life of a transaction so it is up to the execution
+     * site to release the undo data in the EE up until the current point
+     * when the transaction ID changes.
+     */
+    @Override
+    public final void beginNewTxn(long txnId, boolean readOnly) {
+        if (!readOnly) {
+            assert(txnBeginUndoToken == kInvalidUndoToken);
+            assert(batchBeginUndoToken == kInvalidUndoToken);
+            txnBeginUndoToken = latestUndoToken;
+            assert(txnBeginUndoToken != kInvalidUndoToken);
+        }
+    }
+
+    @Override
+    public final void rollbackTransaction(boolean readOnly) {
+        if (!readOnly) {
+            assert(latestUndoToken != kInvalidUndoToken);
+            assert(txnBeginUndoToken != kInvalidUndoToken);
+            assert(latestUndoToken >= txnBeginUndoToken);
+
+            // don't go to the EE of no work was done
+            if (latestUndoToken > txnBeginUndoToken) {
+                ee.undoUndoToken(txnBeginUndoToken);
+            }
+        }
+    }
+
+
+    @Override
+    public FragmentResponse processFragmentTask(
+            TransactionState txnState,
+            final HashMap<Integer,List<VoltTable>> dependencies,
+            final VoltMessage task)
+    {
+        ParameterSet params = null;
+        final FragmentTask ftask = (FragmentTask) task;
+        assert(ftask.getFragmentCount() == 1);
+        final long fragmentId = ftask.getFragmentId(0);
+        final int outputDepId = ftask.getOutputDepId(0);
+
+        final FragmentResponse currentFragResponse = new FragmentResponse(ftask, getSiteId());
+
+        // this is a horrible performance hack, and can be removed with small changes
+        // to the ee interface layer.. (rtb: not sure what 'this' encompasses...)
+        final ByteBuffer paramData = ftask.getParameterDataForFragment(0);
+        if (paramData != null) {
+            final FastDeserializer fds = new FastDeserializer(paramData);
+            try {
+                params = fds.readObject(ParameterSet.class);
+            }
+            catch (final IOException e) {
+                hostLog.l7dlog( Level.FATAL,
+                                LogKeys.host_ExecutionSite_FailedDeserializingParamsForFragmentTask.name(), e);
+                VoltDB.crashVoltDB();
+            }
+        }
+        else {
+            params = new ParameterSet();
+        }
+
+        if (ftask.isSysProcTask()) {
+            return processSysprocFragmentTask(txnState, dependencies, fragmentId,
+                                              currentFragResponse, params);
+        }
+        else {
+            // start the clock on this statement
+            ProcedureProfiler.startStatementCounter(fragmentId);
+
+            if (dependencies != null) {
+                ee.stashWorkUnitDependencies(dependencies);
+            }
+            final int inputDepId = ftask.getOnlyInputDepId(0);
+
+            /*
+             * Currently the error path when executing plan fragments
+             * does not adequately distinguish between fatal errors and
+             * abort type errors that should result in a roll back.
+             * Assume that it is ninja: succeeds or doesn't return.
+             * No roll back support.
+             */
+            currentFragResponse.setStatus(FragmentResponse.SUCCESS, null);
+            try {
+                final DependencyPair dep = ee.executePlanFragment(fragmentId,
+                                                                  outputDepId,
+                                                                  inputDepId,
+                                                                  params,
+                                                                  txnState.txnId,
+                                                                  lastCommittedTxnId,
+                                                                  getNextUndoToken());
+
+                sendDependency(currentFragResponse, dep.depId, dep.dependency);
+
+            } catch (final EEException e) {
+                hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
+                currentFragResponse.setStatus(FragmentResponse.UNEXPECTED_ERROR, e);
+            } catch (final SQLException e) {
+                hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
+                currentFragResponse.setStatus(FragmentResponse.UNEXPECTED_ERROR, e);
+            }
+
+            ProcedureProfiler.stopStatementCounter();
+            return currentFragResponse;
+        }
+    }
+
+
+    @Override
+    public InitiateResponse processInitiateTask(
+            TransactionState txnState,
+            final VoltMessage task)
+    {
+        final InitiateTask itask = (InitiateTask)task;
+        final VoltProcedure wrapper = procs.get(itask.getStoredProcedureName());
+        if (wrapper == null) {
+            System.err.printf("Missing procedure \"%s\" at execution site. %d\n", itask.getStoredProcedureName(), m_siteId);
+            VoltDB.crashVoltDB();
+        }
+
+        final InitiateResponse response = new InitiateResponse(itask);
+
+        try {
+            final ClientResponseImpl cr = wrapper.call(txnState, itask.getParameters());
+            response.setResults(cr, itask);
+        }
+        catch (final ExpectedProcedureException e) {
+            log.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_ExpectedProcedureException.name(), e);
+            response.setResults(
+                    new ClientResponseImpl(
+                            ClientResponse.GRACEFUL_FAILURE,
+                            new VoltTable[]{},
+                            e.toString()));
+        }
+        catch (final Exception e) {
+            // Show the WHOLE exception in the log
+            hostLog.l7dlog( Level.ERROR, LogKeys.host_ExecutionSite_UnexpectedProcedureException.name(), e);
+            VoltDB.crashVoltDB();
+        }
+
+        log.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
+        if (txnState.txnId > lastCommittedTxnId) {
+            lastCommittedTxnId = txnState.txnId;
+        }
+
+        return response;
+    }
+
     /**
      * Try to execute a single partition procedure if one is available in the
      * priority queue.
      *
      * @return false if there is no possibility for speculative work.
      */
+    @Override
     public boolean tryToSneakInASinglePartitionProcedure() {
         // poll for an available message. don't block
         VoltMessage message = m_mailbox.recv();
@@ -977,5 +1042,47 @@ implements Runnable, DumpManager.Dumpable
                 return false;
             }
         }
+    }
+
+
+
+    /*
+     *
+     * Dump manager interface
+     *
+     */
+
+    @Override
+    public void goDumpYourself(final long timestamp) {
+        m_currentDumpTimestamp = timestamp;
+        DebugMessage dmsg = new DebugMessage();
+        dmsg.shouldDump = true;
+        try {
+            m_mailbox.send(getSiteId(), 0, dmsg);
+        }
+        catch (org.voltdb.messaging.MessagingException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Get the actual file contents for a dump of state reachable by
+     * this thread. Can be called unsafely or safely.
+     */
+    public ExecutorContext getDumpContents() {
+        final ExecutorContext context = new ExecutorContext();
+        context.siteId = getSiteId();
+
+        // messaging log window stored in mailbox history
+        if (m_mailbox instanceof SiteMailbox)
+            context.mailboxHistory = ((SiteMailbox) m_mailbox).getHistory();
+
+        // restricted priority queue content
+        m_transactionQueue.getDumpContents(context);
+
+        // TODO:
+        // m_transactionsById.getDumpContents(context);
+
+        return context;
     }
 }

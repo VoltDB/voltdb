@@ -23,17 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.log4j.Logger;
-import org.voltdb.HsqlBackend;
-import org.voltdb.BackendTarget;
-import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite;
-import org.voltdb.VoltDB;
-import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
-import org.voltdb.SysProcSelector;
-import org.voltdb.VoltSystemProcedure;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
+import org.voltdb.*;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
@@ -78,9 +68,9 @@ public class Statistics extends VoltSystemProcedure {
 //        SysProcFragmentId.PF_initiatorAggregator;
 
     @Override
-    public void init(ExecutionSite site, Procedure catProc,
-                     BackendTarget eeType, HsqlBackend hsql, Cluster cluster) {
-        super.init(site, catProc, eeType, hsql, cluster);
+        public void init(int numberOfPartitions, SiteProcedureConnection site,
+            Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster) {
+        super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
         site.registerPlanFragment(SysProcFragmentId.PF_tableData, this);
         site.registerPlanFragment(SysProcFragmentId.PF_tableAggregator, this);
         site.registerPlanFragment(SysProcFragmentId.PF_procedureData, this);

@@ -28,16 +28,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 
 import org.apache.log4j.Logger;
-import org.voltdb.BackendTarget;
-import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite;
-import org.voltdb.HsqlBackend;
-import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
-import org.voltdb.VoltSystemProcedure;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
-import org.voltdb.VoltTableRow;
+import org.voltdb.*;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Cluster;
@@ -74,10 +65,9 @@ public class SnapshotScan extends VoltSystemProcedure {
         SysProcFragmentId.PF_hostDiskFreeScanResults;
 
     @Override
-    public void init(ExecutionSite site, Procedure catProc,
-                     BackendTarget eeType, HsqlBackend hsql, Cluster cluster)
-    {
-        super.init(site, catProc, eeType, hsql, cluster);
+    public void init(int numberOfPartitions, SiteProcedureConnection site,
+            Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster) {
+        super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
         site.registerPlanFragment(SysProcFragmentId.PF_snapshotDigestScan, this);
         site.registerPlanFragment(SysProcFragmentId.PF_snapshotDigestScanResults, this);
         site.registerPlanFragment(SysProcFragmentId.PF_snapshotScan, this);

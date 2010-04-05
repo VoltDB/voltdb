@@ -31,7 +31,6 @@ import java.util.concurrent.Semaphore;
 import org.apache.log4j.Logger;
 import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite;
 import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.*;
@@ -83,10 +82,10 @@ public class SnapshotSave extends VoltSystemProcedure
         m_taskListsForSites = new LinkedList<Deque<SnapshotTableTask>>();
 
     @Override
-    public void init(ExecutionSite site, Procedure catProc,
-                     BackendTarget eeType, HsqlBackend hsql, Cluster cluster)
+    public void init(int numberOfPartitions, SiteProcedureConnection site,
+            Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster)
     {
-        super.init(site, catProc, eeType, hsql, cluster);
+        super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
         site.registerPlanFragment(SysProcFragmentId.PF_saveTest, this);
         site.registerPlanFragment(SysProcFragmentId.PF_saveTestResults, this);
         site.registerPlanFragment(SysProcFragmentId.PF_createSnapshotTargets, this);

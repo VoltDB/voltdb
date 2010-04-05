@@ -19,7 +19,6 @@ package org.voltdb.sysprocs.saverestore;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -33,7 +32,6 @@ import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
-import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
 import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.utils.Pair;
@@ -250,14 +248,14 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
     /**
      * Set of original PartitionId
      */
-    private TreeSet<Integer> m_partitionsSeen =
+    private final TreeSet<Integer> m_partitionsSeen =
           new TreeSet<Integer>();
 
     /**
      * Map from a current host id to a pair of an original
      * partition id and the original host id
      */
-    private Map<Integer, Set<Pair<Integer, Integer>>> m_partitionsAtHost =
+    private final Map<Integer, Set<Pair<Integer, Integer>>> m_partitionsAtHost =
         new HashMap<Integer, Set<Pair<Integer, Integer>>>();
     private int m_totalPartitions = 0;
 }

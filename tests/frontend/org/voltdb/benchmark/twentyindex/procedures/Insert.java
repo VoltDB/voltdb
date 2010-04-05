@@ -107,7 +107,7 @@ public class Insert extends VoltProcedure {
         }
 
         if (secondSql == 1) {
-            final VoltTable results2[] = voltExecuteSQL();
+            voltExecuteSQL();
         }
 
         VoltTable vtLoad = new VoltTable(new VoltTable.ColumnInfo("called_time_milliseconds",VoltType.BIGINT));

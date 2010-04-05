@@ -35,18 +35,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
-import org.voltdb.BackendTarget;
-import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite;
-import org.voltdb.HsqlBackend;
-import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
-import org.voltdb.TheHashinator;
-import org.voltdb.VoltDB;
-import org.voltdb.VoltSystemProcedure;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
-import org.voltdb.VoltTypeException;
+import org.voltdb.*;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Cluster;
@@ -133,10 +122,10 @@ public class SnapshotRestore extends VoltSystemProcedure
     }
 
     @Override
-    public void init(ExecutionSite site, Procedure catProc,
-                     BackendTarget eeType, HsqlBackend hsql, Cluster cluster)
+    public void init(int numberOfPartitions, SiteProcedureConnection site,
+            Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster)
     {
-        super.init(site, catProc, eeType, hsql, cluster);
+        super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
         site.registerPlanFragment(SysProcFragmentId.PF_restoreScan, this);
         site.registerPlanFragment(SysProcFragmentId.PF_restoreScanResults,
                                   this);
@@ -168,7 +157,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                                   PF_restoreSendPartitionedTableResults,
                                   this);
         m_cluster = cluster;
-        m_siteId = site.getSiteId();
+        m_siteId = site.getCorrespondingSiteId();
         m_hostId =
             Integer.valueOf(m_cluster.getSites().get(String.valueOf(m_siteId)).
                             getHost().getTypeName());

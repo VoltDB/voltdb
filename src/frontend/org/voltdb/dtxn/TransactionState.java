@@ -40,7 +40,7 @@ public abstract class TransactionState implements Comparable<TransactionState> {
     public final boolean isReadOnly;
     protected int m_nextDepId = 1;
     protected final Mailbox m_mbox;
-    protected final ExecutionSite m_site;
+    protected final SiteTransactionConnection m_site;
     protected boolean m_done = false;
 
     /**

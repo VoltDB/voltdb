@@ -33,7 +33,6 @@ import junit.framework.*;
 
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltDBInterface;
 import org.voltdb.messaging.*;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.DBBPool;

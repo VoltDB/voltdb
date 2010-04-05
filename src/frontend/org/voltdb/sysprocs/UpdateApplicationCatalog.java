@@ -21,16 +21,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 
-import org.voltdb.BackendTarget;
-import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite;
-import org.voltdb.HsqlBackend;
-import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
-import org.voltdb.VoltDB;
-import org.voltdb.VoltSystemProcedure;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
+import org.voltdb.*;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
@@ -45,10 +36,9 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
     final int ROUNDTWO_DEP = 2 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
 
     @Override
-    public void init(ExecutionSite site, Procedure catProc,
-            BackendTarget eeType, HsqlBackend hsql, Cluster cluster) {
-
-        super.init(site, catProc, eeType, hsql, cluster);
+        public void init(int numberOfPartitions, SiteProcedureConnection site,
+            Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster) {
+        super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
         site.registerPlanFragment(SysProcFragmentId.PF_catalogUpdateGlobal, this);
         site.registerPlanFragment(SysProcFragmentId.PF_catalogUptateExecSite, this);
     }

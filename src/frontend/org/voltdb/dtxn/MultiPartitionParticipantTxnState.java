@@ -68,7 +68,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
             m_isCoordinator = true;
             InitiateTask task = (InitiateTask) notice;
             m_nonCoordinatingSites = task.getNonCoordinatorSites();
-            m_readyWorkUnits.add(new WorkUnit(site.m_context, task, null, false));
+            m_readyWorkUnits.add(new WorkUnit(site.getSiteTracker(), task, null, false));
         }
     }
 
@@ -259,7 +259,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         assert(dependencies != null);
         assert(dependencies.length > 0);
 
-        WorkUnit w = new WorkUnit(m_site.m_context, null, dependencies, true);
+        WorkUnit w = new WorkUnit(m_site.getSiteTracker(), null, dependencies, true);
         if (isFinal)
             w.nonTransactional = true;
         for (int depId : dependencies) {
@@ -323,7 +323,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         //    the transaction is clean (and stays clean after this work)
         if ((!m_isCoordinator) && (task.isFinalTask())) {
             // add a workunit that will commit the txn
-            WorkUnit wu = new WorkUnit(m_site.m_context, null, null, false);
+            WorkUnit wu = new WorkUnit(m_site.getSiteTracker(), null, null, false);
             wu.commitEvenIfDirty = task.getFragmentCount() == 0;
             m_readyWorkUnits.add(wu);
         }
@@ -333,7 +333,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     {
         if (task.getFragmentCount() <= 0) return;
 
-        WorkUnit w = new WorkUnit(m_site.m_context, task, task.getAllUnorderedInputDepIds(), false);
+        WorkUnit w = new WorkUnit(m_site.getSiteTracker(), task, task.getAllUnorderedInputDepIds(), false);
         w.nonTransactional = nonTransactional;
 
         for (int i = 0; i < task.getFragmentCount(); i++) {

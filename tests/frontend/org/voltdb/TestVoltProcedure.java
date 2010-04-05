@@ -167,7 +167,9 @@ public class TestVoltProcedure extends TestCase {
 
     public void testProcedureStatsCollector() {
         NullProcedureWrapper wrapper = new LongProcedure();
-        wrapper.init(site, site.m_context.database.getProcedures().get(LongProcedure.class.getName()), BackendTarget.NATIVE_EE_JNI, null, null);
+        wrapper.init(site.m_context.cluster.getPartitions().size(),
+                     site, site.m_context.database.getProcedures().get(LongProcedure.class.getName()),
+                     BackendTarget.NATIVE_EE_JNI, null, null);
         ParameterSet params = new ParameterSet();
         params.m_params = new Object[1];
         params.m_params[0] = new Long(1);
@@ -202,7 +204,8 @@ public class TestVoltProcedure extends TestCase {
             e.printStackTrace();
         }
 
-        wrapper.init(site, site.m_context.database.getProcedures().get(procedure.getName()), BackendTarget.NATIVE_EE_JNI, null, null);
+        wrapper.init(site.m_context.cluster.getPartitions().size(), site,
+                     site.m_context.database.getProcedures().get(procedure.getName()), BackendTarget.NATIVE_EE_JNI, null, null);
         return wrapper.call(null, (Object) null);
     }
 

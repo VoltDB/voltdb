@@ -20,16 +20,7 @@ package org.voltdb.sysprocs;
 import java.util.HashMap;
 import java.util.List;
 
-import org.voltdb.HsqlBackend;
-import org.voltdb.BackendTarget;
-import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite;
-import org.voltdb.VoltDB;
-import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
-import org.voltdb.ProcedureProfiler;
-import org.voltdb.VoltSystemProcedure;
-import org.voltdb.VoltTable;
+import org.voltdb.*;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.DtxnConstants;
@@ -50,8 +41,9 @@ import org.apache.log4j.Logger;
 public class Shutdown extends VoltSystemProcedure {
 
     @Override
-    public void init(ExecutionSite site, Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster) {
-        super.init(site, catProc, eeType, hsql, cluster);
+    public void init(int numberOfPartitions, SiteProcedureConnection site,
+            Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster) {
+        super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
         site.registerPlanFragment(SysProcFragmentId.PF_shutdownCommand, this);
         site.registerPlanFragment(SysProcFragmentId.PF_procedureDone, this);
     }

@@ -19,15 +19,7 @@ package org.voltdb.sysprocs;
 
 import java.util.HashMap;
 import java.util.List;
-import org.voltdb.HsqlBackend;
-import org.voltdb.BackendTarget;
-import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite;
-import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
-import org.voltdb.VoltSystemProcedure;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
+import org.voltdb.*;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.DtxnConstants;
@@ -45,8 +37,9 @@ public class LastCommittedTransaction extends VoltSystemProcedure {
         SysProcFragmentId.PF_lastCommittedResults;
 
     @Override
-    public void init(ExecutionSite site, Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster) {
-        super.init(site, catProc, eeType, hsql, cluster);
+    public void init(int numberOfPartitions, SiteProcedureConnection site,
+            Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster) {
+        super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
         site.registerPlanFragment(SysProcFragmentId.PF_lastCommittedScan, this);
         site.registerPlanFragment(SysProcFragmentId.PF_lastCommittedResults,
                                   this);
