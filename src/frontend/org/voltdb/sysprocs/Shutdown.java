@@ -32,6 +32,7 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.utils.VoltLoggerFactory;
 import org.apache.log4j.Logger;
 
@@ -91,7 +92,7 @@ public class Shutdown extends VoltSystemProcedure {
         SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[1];
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_shutdownCommand;
-        pfs[0].outputDepId = (int) SysProcFragmentId.PF_procedureDone;
+        pfs[0].outputDepId = (int) SysProcFragmentId.PF_procedureDone | DtxnConstants.MULTINODE_DEPENDENCY;
         pfs[0].inputDepIds = new int[]{};
         pfs[0].multipartition = false;
         pfs[0].nonExecSites = true;
