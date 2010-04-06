@@ -15,11 +15,9 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.messages;
+package org.voltdb.messaging;
 
 import org.voltdb.debugstate.MailboxHistory.MessageState;
-import org.voltdb.messaging.Subject;
-import org.voltdb.messaging.VoltMessage;
 
 /**
  * Message from an initiator to an execution site, informing the
@@ -36,11 +34,11 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
     boolean m_isReadOnly;
 
     /** Empty constructor for de-serialization */
-    public TransactionInfoBaseMessage() {
+    TransactionInfoBaseMessage() {
         m_subject = Subject.DEFAULT.getId();
     }
 
-    public TransactionInfoBaseMessage(int initiatorSiteId,
+    TransactionInfoBaseMessage(int initiatorSiteId,
                                       int coordinatorSiteId,
                                       long txnId,
                                       boolean isReadOnly) {
@@ -87,20 +85,6 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         m_coordinatorSiteId = m_buffer.getInt();
         m_txnId = m_buffer.getLong();
         m_isReadOnly = m_buffer.get() == 1;
-    }
-
-    @Override
-    public String toString() {
-        StringBuilder sb = new StringBuilder();
-
-        sb.append("TXN_INFO_BASE (FROM ");
-        sb.append(m_initiatorSiteId);
-        sb.append(" TO ");
-        sb.append(receivedFromSiteId);
-        sb.append(") FOR TXN ");
-        sb.append(m_txnId);
-
-        return sb.toString();
     }
 
     @Override

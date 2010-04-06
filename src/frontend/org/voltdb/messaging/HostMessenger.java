@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.messaging.impl;
+package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -33,10 +33,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 import org.voltdb.VoltDB;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.MessagingException;
-import org.voltdb.messaging.Messenger;
-import org.voltdb.messaging.VoltMessage;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DeferredSerialization;

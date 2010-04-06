@@ -58,17 +58,17 @@ import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.jni.MockExecutionEngine;
-import org.voltdb.messages.DebugMessage;
-import org.voltdb.messages.FragmentResponse;
-import org.voltdb.messages.FragmentTask;
-import org.voltdb.messages.Heartbeat;
-import org.voltdb.messages.InitiateResponse;
-import org.voltdb.messages.InitiateTask;
-import org.voltdb.messages.TransactionInfoBaseMessage;
+import org.voltdb.messaging.DebugMessage;
 import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.messaging.FragmentResponseMessage;
+import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.HeartbeatMessage;
+import org.voltdb.messaging.InitiateResponseMessage;
+import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.Mailbox;
+import org.voltdb.messaging.SiteMailbox;
+import org.voltdb.messaging.TransactionInfoBaseMessage;
 import org.voltdb.messaging.VoltMessage;
-import org.voltdb.messaging.impl.SiteMailbox;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.Encoder;
@@ -602,7 +602,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             assertTxnIdOrdering(info);
 
             // Special case heartbeats which only update RPQ
-            if (info instanceof Heartbeat) {
+            if (info instanceof HeartbeatMessage) {
                 m_transactionQueue.gotTransaction(info.getInitiatorSiteId(),
                                                   info.getTxnId(),
                                                   true);
@@ -610,7 +610,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             }
             // FragmentTasks aren't sent by initiators and shouldn't update
             // transaction queue initiator states.
-            else if (!(info instanceof FragmentTask)) {
+            else if (!(info instanceof FragmentTaskMessage)) {
                 m_transactionQueue.gotTransaction(info.getInitiatorSiteId(),
                                                   info.getTxnId(),
                                                   false);
@@ -629,12 +629,12 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 m_transactionsById.put(ts.txnId, ts);
             }
 
-            if (message instanceof FragmentTask) {
-                ts.createLocalFragmentWork((FragmentTask)message, false);
+            if (message instanceof FragmentTaskMessage) {
+                ts.createLocalFragmentWork((FragmentTaskMessage)message, false);
             }
         }
-        else if (message instanceof FragmentResponse) {
-            FragmentResponse response = (FragmentResponse)message;
+        else if (message instanceof FragmentResponseMessage) {
+            FragmentResponseMessage response = (FragmentResponseMessage)message;
             TransactionState txnState = m_transactionsById.get(response.getTxnId());
             // possible in rollback to receive an unnecessary response
             if (txnState != null) {
@@ -666,7 +666,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         // arrive after sneaked-in SP transactions have advanced the last
         // committed transaction point. A commit message is a fragment task
         // with a null payload.
-        if (notice instanceof FragmentTask) {
+        if (notice instanceof FragmentTaskMessage) {
             return;
         }
 
@@ -678,7 +678,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             msg.append(") before\n");
             msg.append("   txn ").append(notice.getTxnId()).append(" (");
             msg.append(TransactionIdManager.toString(notice.getTxnId())).append(" HB:");
-            msg.append(notice instanceof Heartbeat).append(").\n");
+            msg.append(notice instanceof HeartbeatMessage).append(").\n");
 
             TransactionState txn = m_transactionsById.get(notice.getTxnId());
             if (txn != null) {
@@ -692,8 +692,8 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             VoltDB.crashVoltDB();
         }
 
-        if (notice instanceof InitiateTask) {
-            InitiateTask task = (InitiateTask)notice;
+        if (notice instanceof InitiateTaskMessage) {
+            InitiateTaskMessage task = (InitiateTaskMessage)notice;
             assert (task.getInitiatorSiteId() != getSiteId());
             assert(task.isSinglePartition() || (task.getNonCoordinatorSites() != null));
         }
@@ -778,14 +778,14 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     }
 
 
-    private FragmentResponse processSysprocFragmentTask(
+    private FragmentResponseMessage processSysprocFragmentTask(
             final TransactionState txnState,
             final HashMap<Integer,List<VoltTable>> dependencies,
-            final long fragmentId, final FragmentResponse currentFragResponse,
+            final long fragmentId, final FragmentResponseMessage currentFragResponse,
             final ParameterSet params)
     {
         // assume success. errors correct this assumption as they occur
-        currentFragResponse.setStatus(FragmentResponse.SUCCESS, null);
+        currentFragResponse.setStatus(FragmentResponseMessage.SUCCESS, null);
 
         VoltSystemProcedure proc = null;
         synchronized (m_registeredSysProcPlanFragments) {
@@ -806,17 +806,17 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         catch (final EEException e)
         {
             hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
-            currentFragResponse.setStatus(FragmentResponse.UNEXPECTED_ERROR, e);
+            currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
         }
         catch (final SQLException e)
         {
             hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
-            currentFragResponse.setStatus(FragmentResponse.UNEXPECTED_ERROR, e);
+            currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
         }
         catch (final Exception e)
         {
             // Just indicate that we failed completely
-            currentFragResponse.setStatus(FragmentResponse.UNEXPECTED_ERROR, new SerializableException(e));
+            currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, new SerializableException(e));
         }
 
         return currentFragResponse;
@@ -824,7 +824,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
 
 
     private void sendDependency(
-            final FragmentResponse currentFragResponse,
+            final FragmentResponseMessage currentFragResponse,
             final int dependencyId,
             final VoltTable dependency)
     {
@@ -1018,18 +1018,18 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
 
 
     @Override
-    public FragmentResponse processFragmentTask(
+    public FragmentResponseMessage processFragmentTask(
             TransactionState txnState,
             final HashMap<Integer,List<VoltTable>> dependencies,
             final VoltMessage task)
     {
         ParameterSet params = null;
-        final FragmentTask ftask = (FragmentTask) task;
+        final FragmentTaskMessage ftask = (FragmentTaskMessage) task;
         assert(ftask.getFragmentCount() == 1);
         final long fragmentId = ftask.getFragmentId(0);
         final int outputDepId = ftask.getOutputDepId(0);
 
-        final FragmentResponse currentFragResponse = new FragmentResponse(ftask, getSiteId());
+        final FragmentResponseMessage currentFragResponse = new FragmentResponseMessage(ftask, getSiteId());
 
         // this is a horrible performance hack, and can be removed with small changes
         // to the ee interface layer.. (rtb: not sure what 'this' encompasses...)
@@ -1069,7 +1069,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
              * Assume that it is ninja: succeeds or doesn't return.
              * No roll back support.
              */
-            currentFragResponse.setStatus(FragmentResponse.SUCCESS, null);
+            currentFragResponse.setStatus(FragmentResponseMessage.SUCCESS, null);
             try {
                 final DependencyPair dep = ee.executePlanFragment(fragmentId,
                                                                   outputDepId,
@@ -1083,10 +1083,10 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
 
             } catch (final EEException e) {
                 hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
-                currentFragResponse.setStatus(FragmentResponse.UNEXPECTED_ERROR, e);
+                currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
             } catch (final SQLException e) {
                 hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
-                currentFragResponse.setStatus(FragmentResponse.UNEXPECTED_ERROR, e);
+                currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
             }
 
             ProcedureProfiler.stopStatementCounter();
@@ -1096,18 +1096,18 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
 
 
     @Override
-    public InitiateResponse processInitiateTask(
+    public InitiateResponseMessage processInitiateTask(
             TransactionState txnState,
             final VoltMessage task)
     {
-        final InitiateTask itask = (InitiateTask)task;
+        final InitiateTaskMessage itask = (InitiateTaskMessage)task;
         final VoltProcedure wrapper = procs.get(itask.getStoredProcedureName());
         if (wrapper == null) {
             System.err.printf("Missing procedure \"%s\" at execution site. %d\n", itask.getStoredProcedureName(), m_siteId);
             VoltDB.crashVoltDB();
         }
 
-        final InitiateResponse response = new InitiateResponse(itask);
+        final InitiateResponseMessage response = new InitiateResponseMessage(itask);
 
         try {
             final ClientResponseImpl cr = wrapper.call(txnState, itask.getParameters());

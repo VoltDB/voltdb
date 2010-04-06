@@ -20,8 +20,8 @@ import java.util.ArrayList;
 import java.util.Hashtable;
 
 import org.voltdb.fault.FaultDistributorInterface;
+import org.voltdb.messaging.HostMessenger;
 import org.voltdb.messaging.Messenger;
-import org.voltdb.messaging.impl.HostMessenger;
 import org.voltdb.network.VoltNetwork;
 
 public interface VoltDBInterface

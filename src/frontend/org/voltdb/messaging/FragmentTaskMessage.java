@@ -15,15 +15,13 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.messages;
+package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 
 import org.voltdb.ParameterSet;
-import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.Subject;
 import org.voltdb.utils.DBBPool;
 
 /**
@@ -32,7 +30,7 @@ import org.voltdb.utils.DBBPool;
  * which planfragment to run and with which parameters.
  *
  */
-public class FragmentTask extends TransactionInfoBaseMessage
+public class FragmentTaskMessage extends TransactionInfoBaseMessage
 {
     public static final byte USER_PROC = 0;
     public static final byte SYS_PROC_PER_PARTITION = 1;
@@ -48,7 +46,7 @@ public class FragmentTask extends TransactionInfoBaseMessage
     int m_inputDepCount = 0;
 
     /** Empty constructor for de-serialization */
-    public FragmentTask() {
+    FragmentTaskMessage() {
         m_subject = Subject.DEFAULT.getId();
     }
 
@@ -63,7 +61,7 @@ public class FragmentTask extends TransactionInfoBaseMessage
      * @param parameterSets
      * @param isFinal
      */
-    public FragmentTask(int initiatorSiteId,
+    public FragmentTaskMessage(int initiatorSiteId,
                         int coordinatorSiteId,
                         long txnId,
                         boolean isReadOnly,

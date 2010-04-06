@@ -15,14 +15,12 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.messages;
+package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltdb.StoredProcedureInvocation;
-import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.DBBPool;
 
 /**
@@ -31,7 +29,7 @@ import org.voltdb.utils.DBBPool;
  * execution sites if needed.
  *
  */
-public class InitiateTask extends TransactionInfoBaseMessage {
+public class InitiateTaskMessage extends TransactionInfoBaseMessage {
 
     boolean m_isSinglePartition;
     StoredProcedureInvocation m_invocation;
@@ -39,9 +37,11 @@ public class InitiateTask extends TransactionInfoBaseMessage {
     int[] m_nonCoordinatorSites = null;
 
     /** Empty constructor for de-serialization */
-    public InitiateTask() {}
+    InitiateTaskMessage() {
+        super();
+    }
 
-    public InitiateTask(int initiatorSiteId,
+    public InitiateTaskMessage(int initiatorSiteId,
                         int coordinatorSiteId,
                         long txnId,
                         boolean isReadOnly,
@@ -92,6 +92,10 @@ public class InitiateTask extends TransactionInfoBaseMessage {
 
     public int[] getNonCoordinatorSites() {
         return m_nonCoordinatorSites;
+    }
+
+    public long getLastSafeTxnId() {
+        return m_lastSafeTxnID;
     }
 
     @Override

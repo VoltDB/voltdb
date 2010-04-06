@@ -21,19 +21,21 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.messaging.impl;
+package org.voltdb.messaging;
 
 import java.io.IOException;
-import java.net.*;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.channels.Selector;
-import java.util.*;
-import java.util.concurrent.atomic.*;
-import java.util.concurrent.locks.*;
-import junit.framework.*;
+import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
+import junit.framework.TestCase;
 
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
-import org.voltdb.messaging.*;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.DBBPool;
 

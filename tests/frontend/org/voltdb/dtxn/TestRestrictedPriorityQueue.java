@@ -30,14 +30,14 @@ import junit.framework.TestCase;
 
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TransactionIdManager;
-import org.voltdb.messages.InitiateTask;
+import org.voltdb.messaging.InitiateTaskMessage;
 
 public class TestRestrictedPriorityQueue extends TestCase{
     int[] m_initiators;
     RestrictedPriorityQueue m_queue;
     TransactionIdManager m_idManager;
     StoredProcedureInvocation m_proc;
-    InitiateTask m_task;
+    InitiateTaskMessage m_task;
     TransactionState m_state1;
     TransactionState m_state2;
     TransactionState m_state3;
@@ -58,34 +58,34 @@ public class TestRestrictedPriorityQueue extends TestCase{
         m_txnIds = new Vector<Long>();
         m_proc = new StoredProcedureInvocation();
 
-        m_task = new InitiateTask(0, 0, m_idManager.getNextUniqueTransactionId(),
+        m_task = new InitiateTaskMessage(0, 0, m_idManager.getNextUniqueTransactionId(),
                 true, true, m_proc, Long.MAX_VALUE);
         m_txnIds.add(m_task.getTxnId());
         m_state1 = new SinglePartitionTxnState(null, null, m_task);
         m_states[0] = m_state1;
 
-        m_task = new InitiateTask(1, 1, m_idManager.getNextUniqueTransactionId(),
+        m_task = new InitiateTaskMessage(1, 1, m_idManager.getNextUniqueTransactionId(),
                 true, true, m_proc, Long.MAX_VALUE);
         assertTrue(m_txnIds.lastElement() < m_task.getTxnId());
         m_txnIds.add(m_task.getTxnId());
         m_state2 = new SinglePartitionTxnState(null, null, m_task);
         m_states[1] = m_state2;
 
-        m_task = new InitiateTask(0, 0, m_idManager.getNextUniqueTransactionId(),
+        m_task = new InitiateTaskMessage(0, 0, m_idManager.getNextUniqueTransactionId(),
                 true, true, m_proc, Long.MAX_VALUE);
         assertTrue(m_txnIds.lastElement() < m_task.getTxnId());
         m_txnIds.add(m_task.getTxnId());
         m_state3 = new SinglePartitionTxnState(null, null, m_task);
         m_states[2] = m_state3;
 
-        m_task = new InitiateTask(1, 1, m_idManager.getNextUniqueTransactionId(),
+        m_task = new InitiateTaskMessage(1, 1, m_idManager.getNextUniqueTransactionId(),
                 true, true, m_proc, Long.MAX_VALUE);
         assertTrue(m_txnIds.lastElement() < m_task.getTxnId());
         m_txnIds.add(m_task.getTxnId());
         m_state4 = new SinglePartitionTxnState(null, null, m_task);
         m_states[3] = m_state4;
 
-        m_task = new InitiateTask(0, 0, m_idManager.getNextUniqueTransactionId(),
+        m_task = new InitiateTaskMessage(0, 0, m_idManager.getNextUniqueTransactionId(),
                 true, true, m_proc, Long.MAX_VALUE);
         assertTrue(m_txnIds.lastElement() < m_task.getTxnId());
         m_txnIds.add(m_task.getTxnId());
@@ -95,7 +95,7 @@ public class TestRestrictedPriorityQueue extends TestCase{
         // Create an additional transaction to add to the priority queue but
         // don't add it to m_txnIds.  This additional transaction allows us
         // to iterate through all of m_txnIds safely.
-        m_task = new InitiateTask(1, 1, m_idManager.getNextUniqueTransactionId(),
+        m_task = new InitiateTaskMessage(1, 1, m_idManager.getNextUniqueTransactionId(),
                 true, true, m_proc, Long.MAX_VALUE);
         assertTrue(m_txnIds.lastElement() < m_task.getTxnId());
         m_state6 = new SinglePartitionTxnState(null, null, m_task);

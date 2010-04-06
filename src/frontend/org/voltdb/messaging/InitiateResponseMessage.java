@@ -15,17 +15,13 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.messages;
+package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.debugstate.MailboxHistory.MessageState;
-import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializer;
-import org.voltdb.messaging.Subject;
-import org.voltdb.messaging.VoltMessage;
 import org.voltdb.utils.DBBPool;
 
 /**
@@ -35,20 +31,21 @@ import org.voltdb.utils.DBBPool;
  * for this transaction.
  *
  */
-public class InitiateResponse extends VoltMessage {
+public class InitiateResponseMessage extends VoltMessage {
 
     private long m_txnId;
     private int m_initiatorSiteId;
     private int m_coordinatorSiteId;
     private boolean m_commit;
     private ClientResponseImpl m_response;
-    private long m_lastRecievedTxnID; // this is the largest txn acked by all partitions running the java for it
+    private long m_lastReceivedTxnId; // this is the largest txn acked by all partitions running the java for it
 
     /** Empty constructor for de-serialization */
-    public InitiateResponse()
+    InitiateResponseMessage()
     {
         m_initiatorSiteId = -1;
         m_coordinatorSiteId = -1;
+        m_lastReceivedTxnId = -1;
         m_subject = Subject.DEFAULT.getId();
     }
 
@@ -58,7 +55,7 @@ public class InitiateResponse extends VoltMessage {
      * @param task The initiation request object to collect the
      * metadata from.
      */
-    public InitiateResponse(InitiateTask task) {
+    public InitiateResponseMessage(InitiateTaskMessage task) {
         m_txnId = task.m_txnId;
         m_initiatorSiteId = task.m_initiatorSiteId;
         m_coordinatorSiteId = task.m_coordinatorSiteId;
@@ -67,6 +64,10 @@ public class InitiateResponse extends VoltMessage {
 
     public void setClientHandle(long clientHandle) {
         m_response.setClientHandle(clientHandle);
+    }
+
+    public void setLastReceivedTxnId(long lastReceivedTxnId) {
+        m_lastReceivedTxnId = lastReceivedTxnId;
     }
 
     public long getTxnId() {
@@ -93,9 +94,13 @@ public class InitiateResponse extends VoltMessage {
         setResults( r, null);
     }
 
-    public void setResults(ClientResponseImpl r, InitiateTask task) {
+    public void setResults(ClientResponseImpl r, InitiateTaskMessage task) {
         m_commit = (r.getStatus() == ClientResponseImpl.SUCCESS);
         m_response = r;
+    }
+
+    public long getLastReceivedTxnId() {
+        return m_lastReceivedTxnId;
     }
 
     @Override
@@ -123,7 +128,7 @@ public class InitiateResponse extends VoltMessage {
         m_buffer.put(INITIATE_RESPONSE_ID);
 
         m_buffer.putLong(m_txnId);
-        m_buffer.putLong(m_lastRecievedTxnID);
+        m_buffer.putLong(m_lastReceivedTxnId);
         m_buffer.putInt(m_initiatorSiteId);
         m_buffer.putInt(m_coordinatorSiteId);
         m_buffer.put(responseBytes);
@@ -134,7 +139,7 @@ public class InitiateResponse extends VoltMessage {
     protected void initFromBuffer() {
         m_buffer.position(HEADER_SIZE + 1); // skip the msg id
         m_txnId = m_buffer.getLong();
-        m_lastRecievedTxnID = m_buffer.getLong();
+        m_lastReceivedTxnId = m_buffer.getLong();
         m_initiatorSiteId = m_buffer.getInt();
         m_coordinatorSiteId = m_buffer.getInt();
 

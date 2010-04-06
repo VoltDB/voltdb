@@ -32,7 +32,7 @@ import org.voltdb.fault.FaultHandler;
 import org.voltdb.fault.NodeFailureFault;
 import org.voltdb.fault.VoltFault;
 import org.voltdb.fault.VoltFault.FaultType;
-import org.voltdb.messages.InitiateResponse;
+import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.VoltMessage;
 import org.voltdb.network.Connection;
 import org.voltdb.utils.EstTime;
@@ -73,7 +73,7 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
     private final int m_siteId;
     private final PendingTxnList m_pendingTxns = new PendingTxnList();
     private TransactionInitiator m_initiator;
-    private final HashMap<Long, InitiateResponse> m_txnIdResponses;
+    private final HashMap<Long, InitiateResponseMessage> m_txnIdResponses;
     // need a separate copy of the VoltTables so that we can have
     // thread-safe meta-data
     private final HashMap<Long, VoltTable[]> m_txnIdResults;
@@ -93,7 +93,7 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
         m_stats = new InitiatorStats("Initiator " + siteId + " stats", siteId);
         m_txnIdResults =
             new HashMap<Long, VoltTable[]>();
-        m_txnIdResponses = new HashMap<Long, InitiateResponse>();
+        m_txnIdResponses = new HashMap<Long, InitiateResponseMessage>();
         VoltDB.instance().getFaultDistributor().
         // For Node failure, the initiators need to be ordered after the catalog
         // but before everything else (to prevent any new work for bad sites)
@@ -127,7 +127,7 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
                         // XXX-FAILURE don't like this crashing long-term
                         VoltDB.crashVoltDB();
                     }
-                    InitiateResponse r = m_txnIdResponses.get(txn_id);
+                    InitiateResponseMessage r = m_txnIdResponses.get(txn_id);
                     m_pendingTxns.removeTxnId(r.getTxnId());
                     m_initiator.reduceBackpressure(state.messageSize);
                     m_txnIdResponses.remove(r.getTxnId());
@@ -152,8 +152,8 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
 
     @Override
     public synchronized boolean offer(VoltMessage message) {
-        assert(message instanceof InitiateResponse);
-        final InitiateResponse r = (InitiateResponse) message;
+        assert(message instanceof InitiateResponseMessage);
+        final InitiateResponseMessage r = (InitiateResponseMessage) message;
 
         InFlightTxnState state;
         int sites_left = -1;
@@ -247,7 +247,7 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
         return true;
     }
 
-    private void enqueueResponse(InitiateResponse response,
+    private void enqueueResponse(InitiateResponseMessage response,
                                  InFlightTxnState state)
     {
         response.setClientHandle(state.invocation.getClientHandle());

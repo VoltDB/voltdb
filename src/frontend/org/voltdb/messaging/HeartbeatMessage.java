@@ -15,26 +15,30 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.messages;
+package org.voltdb.messaging;
 
 import org.voltdb.utils.DBBPool;
 
-public class MultiPartitionParticipantNotice extends TransactionInfoBaseMessage {
+public class HeartbeatMessage extends TransactionInfoBaseMessage {
 
-    public MultiPartitionParticipantNotice() {
+    long m_lastSafeTxnId; // this is the largest txn acked by all partitions running the java for it
+
+    HeartbeatMessage() {
         super();
     }
 
-    public MultiPartitionParticipantNotice(int initiatorSiteId,
-                                           int coordinatorSiteId,
-                                           long txnId,
-                                           boolean isReadOnly) {
-        super(initiatorSiteId, coordinatorSiteId, txnId, isReadOnly);
+    public HeartbeatMessage(int initiatorSiteId, long txnId, long lastSafeTxnId) {
+        super(initiatorSiteId, -1, txnId, true);
+    }
+
+    public long getLastSafeTxnId() {
+        return m_lastSafeTxnId;
     }
 
     @Override
     protected void flattenToBuffer(DBBPool pool) {
         int msgsize = super.getMessageByteCount();
+        msgsize += 8;
 
         if (m_buffer == null) {
             m_container = pool.acquire(msgsize + 1 + HEADER_SIZE);
@@ -43,17 +47,35 @@ public class MultiPartitionParticipantNotice extends TransactionInfoBaseMessage 
         setBufferSize(msgsize + 1, pool);
 
         m_buffer.position(HEADER_SIZE);
-        m_buffer.put(PARTICIPANT_NOTICE_ID);
+        m_buffer.put(HEARTBEAT_ID);
 
         super.writeToBuffer();
 
+        m_buffer.putLong(m_lastSafeTxnId);
+
         m_buffer.limit(m_buffer.position());
+
     }
 
     @Override
     protected void initFromBuffer() {
         m_buffer.position(HEADER_SIZE + 1); // skip the msg id
         super.readFromBuffer();
+
+        m_lastSafeTxnId = m_buffer.getLong();
     }
 
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("HEARTBEAT (FROM ");
+        sb.append(m_coordinatorSiteId);
+        sb.append(" TO ");
+        sb.append(receivedFromSiteId);
+        sb.append(") FOR TXN ");
+        sb.append(m_txnId);
+
+        return sb.toString();
+    }
 }

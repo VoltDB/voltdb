@@ -15,16 +15,13 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.messages;
+package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+
 import org.voltdb.VoltTable;
 import org.voltdb.debugstate.MailboxHistory.MessageState;
-import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializer;
-import org.voltdb.messaging.Subject;
-import org.voltdb.messaging.VoltMessage;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.utils.DBBPool;
 
@@ -35,7 +32,7 @@ import org.voltdb.utils.DBBPool;
  * event of an error, a text message can be embedded in a table attached.
  *
  */
-public class FragmentResponse extends VoltMessage {
+public class FragmentResponseMessage extends VoltMessage {
 
     public static final byte SUCCESS          = 1;
     public static final byte USER_ERROR       = 2;
@@ -53,11 +50,11 @@ public class FragmentResponse extends VoltMessage {
     SerializableException m_exception;
 
     /** Empty constructor for de-serialization */
-    public FragmentResponse() {
+    FragmentResponseMessage() {
         m_subject = Subject.DEFAULT.getId();
     }
 
-    public FragmentResponse(FragmentTask task, int siteId) {
+    public FragmentResponseMessage(FragmentTaskMessage task, int siteId) {
         m_executorSiteId = siteId;
         m_txnId = task.m_txnId;
         m_destinationSiteId = task.m_coordinatorSiteId;

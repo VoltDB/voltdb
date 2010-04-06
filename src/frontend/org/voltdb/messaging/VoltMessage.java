@@ -22,14 +22,6 @@ import java.util.HashMap;
 
 import org.voltdb.VoltDB;
 import org.voltdb.debugstate.MailboxHistory.MessageState;
-import org.voltdb.messages.DebugMessage;
-import org.voltdb.messages.FragmentResponse;
-import org.voltdb.messages.FragmentTask;
-import org.voltdb.messages.Heartbeat;
-import org.voltdb.messages.HeartbeatResponse;
-import org.voltdb.messages.InitiateResponse;
-import org.voltdb.messages.InitiateTask;
-import org.voltdb.messages.MultiPartitionParticipantNotice;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
 
@@ -114,25 +106,25 @@ public abstract class VoltMessage {
 
         switch (messageType) {
         case INITIATE_TASK_ID:
-            message = new InitiateTask();
+            message = new InitiateTaskMessage();
             break;
         case INITIATE_RESPONSE_ID:
-            message = new InitiateResponse();
+            message = new InitiateResponseMessage();
             break;
         case FRAGMENT_TASK_ID:
-            message = new FragmentTask();
+            message = new FragmentTaskMessage();
             break;
         case FRAGMENT_RESPONSE_ID:
-            message = new FragmentResponse();
+            message = new FragmentResponseMessage();
             break;
         case PARTICIPANT_NOTICE_ID:
-            message = new MultiPartitionParticipantNotice();
+            message = new MultiPartitionParticipantMessage();
             break;
         case HEARTBEAT_ID:
-            message = new Heartbeat();
+            message = new HeartbeatMessage();
             break;
         case HEARTBEAT_RESPONSE_ID:
-            message = new HeartbeatResponse();
+            message = new HeartbeatResponseMessage();
             break;
         case DEBUG_MESSAGE_ID:
             message = new DebugMessage();

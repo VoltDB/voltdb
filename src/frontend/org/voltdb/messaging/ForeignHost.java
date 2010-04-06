@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.messaging.impl;
+package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -25,8 +25,6 @@ import java.nio.channels.SocketChannel;
 
 import org.voltdb.VoltDB;
 import org.voltdb.fault.NodeFailureFault;
-import org.voltdb.messaging.FastSerializer;
-import org.voltdb.messaging.VoltMessage;
 import org.voltdb.network.Connection;
 import org.voltdb.network.QueueMonitor;
 import org.voltdb.network.VoltProtocolHandler;

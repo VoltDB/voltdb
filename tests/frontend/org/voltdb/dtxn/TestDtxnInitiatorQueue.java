@@ -35,9 +35,9 @@ import org.voltdb.VoltType;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.fault.FaultDistributor;
 import org.voltdb.fault.NodeFailureFault;
-import org.voltdb.messages.InitiateResponse;
-import org.voltdb.messages.InitiateTask;
 import org.voltdb.messaging.FastSerializable;
+import org.voltdb.messaging.InitiateResponseMessage;
+import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.network.Connection;
 import org.voltdb.network.NIOReadStream;
 import org.voltdb.network.WriteStream;
@@ -227,15 +227,15 @@ public class TestDtxnInitiatorQueue extends TestCase
         return retval;
     }
 
-    InitiateResponse createInitiateResponse(long txnId, int coordId,
+    InitiateResponseMessage createInitiateResponse(long txnId, int coordId,
                                             boolean readOnly, boolean isSinglePart,
                                             VoltTable[] results)
     {
-        InitiateTask task = new InitiateTask(INITIATOR_SITE_ID, coordId, txnId,
+        InitiateTaskMessage task = new InitiateTaskMessage(INITIATOR_SITE_ID, coordId, txnId,
                                              readOnly, isSinglePart,
                                              new StoredProcedureInvocation(),
                                              Long.MAX_VALUE);
-        InitiateResponse response = new InitiateResponse(task);
+        InitiateResponseMessage response = new InitiateResponseMessage(task);
         response.setResults(new ClientResponseImpl((byte) 0, results, ""), task);
         return response;
     }

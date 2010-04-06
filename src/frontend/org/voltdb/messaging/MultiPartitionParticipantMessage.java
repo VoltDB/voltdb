@@ -15,48 +15,59 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.messages;
+package org.voltdb.messaging;
 
-import org.voltdb.messaging.Subject;
-import org.voltdb.messaging.VoltMessage;
 import org.voltdb.utils.DBBPool;
 
-/**
- * This is basically a dummy message. It is currently used to add special
- * interrupt-style handling to message queues.
- *
- */
-public class DebugMessage extends VoltMessage {
+public class MultiPartitionParticipantMessage extends TransactionInfoBaseMessage {
 
-
-    public DebugMessage() {
-        m_subject = Subject.DEFAULT.getId();
+    MultiPartitionParticipantMessage() {
+        super();
     }
 
-    /** should the receiver dump state */
-    public boolean shouldDump = false;
+    public MultiPartitionParticipantMessage(int initiatorSiteId,
+                                           int coordinatorSiteId,
+                                           long txnId,
+                                           boolean isReadOnly) {
+        super(initiatorSiteId, coordinatorSiteId, txnId, isReadOnly);
+    }
 
     @Override
     protected void flattenToBuffer(DBBPool pool) {
-        int msgsize = 1;
+        int msgsize = super.getMessageByteCount();
 
         if (m_buffer == null) {
             m_container = pool.acquire(msgsize + 1 + HEADER_SIZE);
             m_buffer = m_container.b;
         }
-
         setBufferSize(msgsize + 1, pool);
 
         m_buffer.position(HEADER_SIZE);
-        m_buffer.put(INITIATE_RESPONSE_ID);
+        m_buffer.put(PARTICIPANT_NOTICE_ID);
 
-        m_buffer.put((byte) (shouldDump ? 1 : 0));
+        super.writeToBuffer();
+
         m_buffer.limit(m_buffer.position());
     }
 
     @Override
     protected void initFromBuffer() {
         m_buffer.position(HEADER_SIZE + 1); // skip the msg id
-        shouldDump = m_buffer.get() == 0;
+        super.readFromBuffer();
     }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("MULTI_PARTITION_PARTICIPANT (FROM ");
+        sb.append(m_coordinatorSiteId);
+        sb.append(" TO ");
+        sb.append(receivedFromSiteId);
+        sb.append(") FOR TXN ");
+        sb.append(m_txnId);
+
+        return sb.toString();
+    }
+
 }

@@ -22,29 +22,31 @@ import java.util.ArrayList;
 import org.voltdb.ExecutionSite;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
-import org.voltdb.messages.*;
+import org.voltdb.messaging.InitiateResponseMessage;
+import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
+import org.voltdb.messaging.TransactionInfoBaseMessage;
 
 public class SinglePartitionTxnState extends TransactionState {
 
-    InitiateTask m_task = null;
+    InitiateTaskMessage m_task = null;
 
     public SinglePartitionTxnState(Mailbox mbox,
                                    ExecutionSite site,
                                    TransactionInfoBaseMessage task)
     {
         super(mbox, site, task);
-        assert(task instanceof InitiateTask) :
+        assert(task instanceof InitiateTaskMessage) :
             "Creating single partition txn from invalid membership notice.";
-        m_task = (InitiateTask)task;
+        m_task = (InitiateTaskMessage)task;
     }
 
     @Override
     public boolean doWork() {
         if (!m_done) {
             m_site.beginNewTxn(m_task.getTxnId(), isReadOnly);
-            InitiateResponse response = m_site.processInitiateTask(this, m_task);
+            InitiateResponseMessage response = m_site.processInitiateTask(this, m_task);
             if (response.shouldCommit() == false) {
                 if (!isReadOnly) {
                     m_site.rollbackTransaction(isReadOnly);

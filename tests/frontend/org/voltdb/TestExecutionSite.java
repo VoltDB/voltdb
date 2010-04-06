@@ -41,11 +41,11 @@ import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
 import org.voltdb.dtxn.SinglePartitionTxnState;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.fault.FaultDistributor;
-import org.voltdb.messages.FragmentTask;
-import org.voltdb.messages.InitiateTask;
-import org.voltdb.messages.MultiPartitionParticipantNotice;
 import org.voltdb.messaging.FastSerializer;
+import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.MockMailbox;
+import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.messaging.VoltMessage;
 
 public class TestExecutionSite extends TestCase {
@@ -126,8 +126,8 @@ public class TestExecutionSite extends TestCase {
             int localTask_startDep = txnState.getNextDependencyId() | DtxnConstants.MULTIPARTITION_DEPENDENCY;
             int localTask_outputDep = txnState.getNextDependencyId();
 
-            FragmentTask localTask =
-                new FragmentTask(txnState.initiatorSiteId,
+            FragmentTaskMessage localTask =
+                new FragmentTaskMessage(txnState.initiatorSiteId,
                                  txnState.coordinatorSiteId,
                                  txnState.txnId,
                                  txnState.isReadOnly,
@@ -138,8 +138,8 @@ public class TestExecutionSite extends TestCase {
 
             localTask.addInputDepId(0, localTask_startDep);
 
-            FragmentTask distributedTask =
-                new FragmentTask(txnState.initiatorSiteId,
+            FragmentTaskMessage distributedTask =
+                new FragmentTaskMessage(txnState.initiatorSiteId,
                                  txnState.coordinatorSiteId,
                                  txnState.txnId,
                                  txnState.isReadOnly,
@@ -233,8 +233,8 @@ public class TestExecutionSite extends TestCase {
         tx1_spi.setProcName("org.voltdb.TestExecutionSite$MockSPVoltProcedure");
         tx1_spi.setParams(new Integer(0));
 
-        final InitiateTask tx1_mn =
-            new InitiateTask(initiator1, site1, 1000, readOnly, singlePartition, tx1_spi, Long.MAX_VALUE);
+        final InitiateTaskMessage tx1_mn =
+            new InitiateTaskMessage(initiator1, site1, 1000, readOnly, singlePartition, tx1_spi, Long.MAX_VALUE);
 
         final SinglePartitionTxnState tx1 =
             new SinglePartitionTxnState(m_mboxes[site1], m_sites[site1], tx1_mn);
@@ -261,8 +261,8 @@ public class TestExecutionSite extends TestCase {
         tx1_spi.setProcName("org.voltdb.TestExecutionSite$MockROSPVoltProcedure");
         tx1_spi.setParams(new Integer(0));
 
-        final InitiateTask tx1_mn =
-            new InitiateTask(initiator1, site1, 1000, readOnly, singlePartition, tx1_spi, Long.MAX_VALUE);
+        final InitiateTaskMessage tx1_mn =
+            new InitiateTaskMessage(initiator1, site1, 1000, readOnly, singlePartition, tx1_spi, Long.MAX_VALUE);
 
         final SinglePartitionTxnState tx1 =
             new SinglePartitionTxnState(m_mboxes[site1], m_sites[site1], tx1_mn);
@@ -290,16 +290,16 @@ public class TestExecutionSite extends TestCase {
         tx1_spi.setParams(new Integer(0));
 
         // site 1 is the coordinator
-        final InitiateTask tx1_mn_1 =
-            new InitiateTask(initiator1, site1, 1000, readOnly, singlePartition, tx1_spi, Long.MAX_VALUE);
+        final InitiateTaskMessage tx1_mn_1 =
+            new InitiateTaskMessage(initiator1, site1, 1000, readOnly, singlePartition, tx1_spi, Long.MAX_VALUE);
         tx1_mn_1.setNonCoordinatorSites(new int[] {site2});
 
         final MultiPartitionParticipantTxnState tx1_1 =
             new MultiPartitionParticipantTxnState(m_mboxes[site1], m_sites[site1], tx1_mn_1);
 
         // site 2 is a participant
-        final MultiPartitionParticipantNotice tx1_mn_2 =
-            new MultiPartitionParticipantNotice(initiator1, site1, 1000, readOnly);
+        final MultiPartitionParticipantMessage tx1_mn_2 =
+            new MultiPartitionParticipantMessage(initiator1, site1, 1000, readOnly);
 
         final MultiPartitionParticipantTxnState tx1_2 =
             new MultiPartitionParticipantTxnState(m_mboxes[site2], m_sites[site2], tx1_mn_2);
@@ -337,7 +337,11 @@ public class TestExecutionSite extends TestCase {
      * ExecutionSite and Mailbox are necessary to construct a MP txn state.
      */
     public void testMultiPartitionParticipantTxnState_handleSiteFaults() {
-        InitiateTask mn = new InitiateTask();
+        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        spi.setClientHandle(25);
+        spi.setProcName("johnisgreat");
+        spi.setParams(57, "gooniestoo");
+        InitiateTaskMessage mn = new InitiateTaskMessage(-1, -1, -1, false, false, spi, Long.MIN_VALUE);
         mn.setNonCoordinatorSites(new int[] {1,2,3,4,5});
 
         MultiPartitionParticipantTxnState ts =

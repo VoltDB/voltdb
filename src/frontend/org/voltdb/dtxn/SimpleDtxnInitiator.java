@@ -52,13 +52,13 @@ import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltDB;
 import org.voltdb.debugstate.InitiatorContext;
-import org.voltdb.messages.Heartbeat;
-import org.voltdb.messages.InitiateTask;
-import org.voltdb.messages.MultiPartitionParticipantNotice;
+import org.voltdb.messaging.HeartbeatMessage;
+import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.Messenger;
-import org.voltdb.messaging.impl.SiteMailbox;
+import org.voltdb.messaging.MultiPartitionParticipantMessage;
+import org.voltdb.messaging.SiteMailbox;
 import org.voltdb.utils.VoltLoggerFactory;
 
 /** Supports correct execution of multiple partition transactions by executing them one at a time. */
@@ -187,7 +187,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     @Override
     public synchronized void tick(long time, long interval) {
         long txnId = m_idManager.getNextUniqueTransactionId();
-        Heartbeat tickNotice = new Heartbeat(m_siteId, txnId);
+        HeartbeatMessage tickNotice = new HeartbeatMessage(m_siteId, txnId, Long.MAX_VALUE);
 
         int[] outOfDateSites =
             VoltDB.instance().getCatalogContext().
@@ -265,7 +265,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         m_queue.addPendingTxn(txn);
         increaseBackpressure(txn.messageSize);
 
-        MultiPartitionParticipantNotice notice = new MultiPartitionParticipantNotice(
+        MultiPartitionParticipantMessage notice = new MultiPartitionParticipantMessage(
                 m_siteId, txn.coordinatorId, txn.txnId, txn.isReadOnly);
         try {
             m_mailbox.send(txn.otherSiteIds, 0, notice);
@@ -286,7 +286,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
      */
     private void sendTransactionToCoordinator(InFlightTxnState txn)
     {
-        InitiateTask workRequest = new InitiateTask(
+        InitiateTaskMessage workRequest = new InitiateTaskMessage(
                 m_siteId,
                 txn.coordinatorId,
                 txn.txnId,

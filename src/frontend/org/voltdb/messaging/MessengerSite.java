@@ -15,11 +15,10 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.messaging.impl;
+package org.voltdb.messaging;
 
-import java.util.*;
-
-import org.voltdb.messaging.*;
+import java.util.HashMap;
+import java.util.Queue;
 
 class MessengerSite {
 

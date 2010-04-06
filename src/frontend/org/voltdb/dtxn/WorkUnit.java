@@ -27,7 +27,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState.WorkUnitState;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState.WorkUnitState.DependencyState;
-import org.voltdb.messages.FragmentTask;
+import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.VoltMessage;
 
 /**
@@ -54,7 +54,7 @@ class WorkUnit {
      * What kind of FragmentTask type, if any, does this WorkUnit represent.
      * Used to determine what sort of duplicate suppression to perform for sysprocs
      */
-    int m_taskType = FragmentTask.USER_PROC;
+    int m_taskType = FragmentTaskMessage.USER_PROC;
 
     /**
      * The list of dependencies for this <code>WorkUnit</code>.
@@ -164,9 +164,9 @@ class WorkUnit {
     WorkUnit(SiteTracker siteTracker, VoltMessage payload, int[] dependencyIds, boolean shouldResumeProcedure) {
         this.m_payload = payload;
         m_shouldResumeProcedure = shouldResumeProcedure;
-        if (payload != null && payload instanceof FragmentTask)
+        if (payload != null && payload instanceof FragmentTaskMessage)
         {
-            m_taskType = ((FragmentTask) payload).getFragmentTaskType();
+            m_taskType = ((FragmentTaskMessage) payload).getFragmentTaskType();
         }
 
         m_unsatisfiedDependencies = 0;
@@ -195,7 +195,7 @@ class WorkUnit {
 
         int partition = VoltDB.instance().getCatalogContext().siteTracker.getPartitionForSite(siteId);
         int map_id = partition;
-        if (m_taskType == FragmentTask.SYS_PROC_PER_SITE)
+        if (m_taskType == FragmentTaskMessage.SYS_PROC_PER_SITE)
         {
             map_id = siteId;
         }

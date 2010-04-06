@@ -15,50 +15,46 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.messages;
+package org.voltdb.messaging;
 
 import org.voltdb.utils.DBBPool;
 
-public class Heartbeat extends TransactionInfoBaseMessage {
+/**
+ * This is basically a dummy message. It is currently used to add special
+ * interrupt-style handling to message queues.
+ *
+ */
+public class DebugMessage extends VoltMessage {
 
-    long m_lastRecievedTxnID; // this is the largest txn acked by all partitions running the java for it
 
-    public Heartbeat() {
-        super();
+    public DebugMessage() {
+        m_subject = Subject.DEFAULT.getId();
     }
 
-    public Heartbeat(int initiatorSiteId, long txnId) {
-        super(initiatorSiteId, -1, txnId, true);
-    }
+    /** should the receiver dump state */
+    public boolean shouldDump = false;
 
     @Override
     protected void flattenToBuffer(DBBPool pool) {
-        int msgsize = super.getMessageByteCount();
-        msgsize += 8;
+        int msgsize = 1;
 
         if (m_buffer == null) {
             m_container = pool.acquire(msgsize + 1 + HEADER_SIZE);
             m_buffer = m_container.b;
         }
+
         setBufferSize(msgsize + 1, pool);
 
         m_buffer.position(HEADER_SIZE);
-        m_buffer.put(HEARTBEAT_ID);
+        m_buffer.put(INITIATE_RESPONSE_ID);
 
-        super.writeToBuffer();
-
-        m_buffer.putLong(m_lastRecievedTxnID);
-
+        m_buffer.put((byte) (shouldDump ? 1 : 0));
         m_buffer.limit(m_buffer.position());
-
     }
 
     @Override
     protected void initFromBuffer() {
         m_buffer.position(HEADER_SIZE + 1); // skip the msg id
-        super.readFromBuffer();
-
-        m_lastRecievedTxnID = m_buffer.getLong();
+        shouldDump = m_buffer.get() == 0;
     }
-
 }

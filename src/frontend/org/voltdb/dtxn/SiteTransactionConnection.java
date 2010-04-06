@@ -21,8 +21,8 @@ import java.util.HashMap;
 import java.util.List;
 
 import org.voltdb.VoltTable;
-import org.voltdb.messages.FragmentResponse;
-import org.voltdb.messages.InitiateResponse;
+import org.voltdb.messaging.FragmentResponseMessage;
+import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.VoltMessage;
 
 /**
@@ -32,12 +32,12 @@ import org.voltdb.messaging.VoltMessage;
 public interface SiteTransactionConnection {
 
 
-    public FragmentResponse processFragmentTask(
+    public FragmentResponseMessage processFragmentTask(
             TransactionState txnState,
             final HashMap<Integer,List<VoltTable>> dependencies,
             final VoltMessage task);
 
-    public InitiateResponse processInitiateTask(
+    public InitiateResponseMessage processInitiateTask(
             TransactionState txnState,
             final VoltMessage task);
 

@@ -27,13 +27,13 @@ import java.util.Map;
 import org.voltdb.*;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState.WorkUnitState;
-import org.voltdb.messages.FragmentResponse;
-import org.voltdb.messages.FragmentTask;
-import org.voltdb.messages.InitiateResponse;
-import org.voltdb.messages.InitiateTask;
-import org.voltdb.messages.TransactionInfoBaseMessage;
+import org.voltdb.messaging.FragmentResponseMessage;
+import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.InitiateResponseMessage;
+import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
+import org.voltdb.messaging.TransactionInfoBaseMessage;
 import org.voltdb.messaging.VoltMessage;
 
 public class MultiPartitionParticipantTxnState extends TransactionState {
@@ -63,10 +63,10 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         super(mbox, site, notice);
         m_nonCoordinatingSites = null;
         m_isCoordinator = false;
-        if (notice instanceof InitiateTask)
+        if (notice instanceof InitiateTaskMessage)
         {
             m_isCoordinator = true;
-            InitiateTask task = (InitiateTask) notice;
+            InitiateTaskMessage task = (InitiateTaskMessage) notice;
             m_nonCoordinatingSites = task.getNonCoordinatorSites();
             m_readyWorkUnits.add(new WorkUnit(site.getSiteTracker(), task, null, false));
         }
@@ -122,11 +122,11 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
             if (payload == null) {
                 m_done = ((m_dirty == false) || (wu.commitEvenIfDirty));
             }
-            else if (payload instanceof InitiateTask) {
-                initiateProcedure((InitiateTask) payload);
+            else if (payload instanceof InitiateTaskMessage) {
+                initiateProcedure((InitiateTaskMessage) payload);
             }
-            else if (payload instanceof FragmentTask) {
-                processFragmentWork((FragmentTask) payload, wu.getDependencies());
+            else if (payload instanceof FragmentTaskMessage) {
+                processFragmentWork((FragmentTaskMessage) payload, wu.getDependencies());
             }
 
             // get the next workunit from the ready list
@@ -169,13 +169,13 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         return false;
     }
 
-    void initiateProcedure(InitiateTask itask) {
+    void initiateProcedure(InitiateTaskMessage itask) {
         assert(m_isCoordinator);
 
-        InitiateResponse response = m_site.processInitiateTask(this, itask);
+        InitiateResponseMessage response = m_site.processInitiateTask(this, itask);
 
         // send commit notices to everyone
-        FragmentTask ftask = new FragmentTask(
+        FragmentTaskMessage ftask = new FragmentTaskMessage(
                 initiatorSiteId,
                 coordinatorSiteId,
                 txnId,
@@ -211,15 +211,15 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         m_done = true;
     }
 
-    void processFragmentWork(FragmentTask ftask, HashMap<Integer, List<VoltTable>> dependencies) {
+    void processFragmentWork(FragmentTaskMessage ftask, HashMap<Integer, List<VoltTable>> dependencies) {
         assert(ftask.getFragmentCount() > 0);
 
-        FragmentResponse response = m_site.processFragmentTask(this, dependencies, ftask);
+        FragmentResponseMessage response = m_site.processFragmentTask(this, dependencies, ftask);
         // mark this transaction as dirty
         if (response.getDirtyFlag())
             m_dirty = true;
 
-        if (response.getStatusCode() != FragmentResponse.SUCCESS)
+        if (response.getStatusCode() != FragmentResponseMessage.SUCCESS)
         {
             m_dirty = true;
             if (m_missingDependencies != null)
@@ -292,7 +292,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     }
 
     @Override
-    public void createAllParticipatingFragmentWork(FragmentTask task) {
+    public void createAllParticipatingFragmentWork(FragmentTaskMessage task) {
         assert(m_isCoordinator); // Participant can't set m_nonCoordinatingSites
         try {
             // send to all non-coordinating sites
@@ -306,7 +306,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     }
 
     @Override
-    public void createLocalFragmentWork(FragmentTask task, boolean nonTransactional) {
+    public void createLocalFragmentWork(FragmentTaskMessage task, boolean nonTransactional) {
         // handle the undo case
         if (task.shouldUndo()) {
             if (m_missingDependencies != null) {
@@ -334,7 +334,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         }
     }
 
-    private void createLocalFragmentWorkDependencies(FragmentTask task, boolean nonTransactional)
+    private void createLocalFragmentWorkDependencies(FragmentTaskMessage task, boolean nonTransactional)
     {
         if (task.getFragmentCount() <= 0) return;
 
@@ -357,8 +357,8 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     }
 
     @Override
-    public void processRemoteWorkResponse(FragmentResponse response) {
-        if (response.getStatusCode() != FragmentResponse.SUCCESS)
+    public void processRemoteWorkResponse(FragmentResponseMessage response) {
+        if (response.getStatusCode() != FragmentResponseMessage.SUCCESS)
         {
             if (m_missingDependencies != null)
                 m_missingDependencies.clear();
@@ -386,7 +386,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         processFragmentResponseDependencies(response);
     }
 
-    private void processFragmentResponseDependencies(FragmentResponse response)
+    private void processFragmentResponseDependencies(FragmentResponseMessage response)
     {
         int depCount = response.getTableCount();
         for (int i = 0; i < depCount; i++) {
@@ -493,7 +493,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     // SOME DAY MAYBE FOR MORE GENERAL TRANSACTIONS
 
     @Override
-    public void createFragmentWork(int[] partitions, FragmentTask task) {
+    public void createFragmentWork(int[] partitions, FragmentTaskMessage task) {
         try {
             // send to all specified sites (possibly including this one)
             m_mbox.send(partitions, 0, task);

@@ -29,8 +29,8 @@ import org.voltdb.catalog.Site;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
 import org.voltdb.dtxn.TransactionState;
-import org.voltdb.messages.FragmentTask;
 import org.voltdb.messaging.FastSerializer;
+import org.voltdb.messaging.FragmentTaskMessage;
 
 /**
  *  System procedures extend VoltSystemProcedure and use its utility
@@ -144,7 +144,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                 parambytes = fs.getBuffer();
             }
 
-            FragmentTask task = new FragmentTask(
+            FragmentTaskMessage task = new FragmentTaskMessage(
                     m_currentTxnState.initiatorSiteId,
                     m_site.getCorrespondingSiteId(),
                     m_currentTxnState.txnId,
@@ -158,10 +158,10 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                     task.addInputDepId(0, depId);
                 }
             }
-            task.setFragmentTaskType(FragmentTask.SYS_PROC_PER_SITE);
+            task.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_SITE);
             if (pf.suppressDuplicates)
             {
-                task.setFragmentTaskType(FragmentTask.SYS_PROC_PER_PARTITION);
+                task.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_PARTITION);
             }
 
             if (pf.multipartition) {

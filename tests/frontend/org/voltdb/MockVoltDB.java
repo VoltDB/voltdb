@@ -36,8 +36,8 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
 import org.voltdb.fault.FaultDistributorInterface;
+import org.voltdb.messaging.HostMessenger;
 import org.voltdb.messaging.Messenger;
-import org.voltdb.messaging.impl.HostMessenger;
 import org.voltdb.network.VoltNetwork;
 
 public class MockVoltDB implements VoltDBInterface

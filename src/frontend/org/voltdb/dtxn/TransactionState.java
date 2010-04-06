@@ -17,12 +17,17 @@
 
 package org.voltdb.dtxn;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
 import org.voltdb.ExecutionSite;
 import org.voltdb.VoltTable;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
-import org.voltdb.messages.*;
+import org.voltdb.messaging.FragmentResponseMessage;
+import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Mailbox;
+import org.voltdb.messaging.TransactionInfoBaseMessage;
 
 /**
  * Controls the state of a transaction. Encapsulates from the SimpleDTXNConnection
@@ -79,19 +84,19 @@ public abstract class TransactionState implements Comparable<TransactionState> {
         return false;
     }
 
-    public void createFragmentWork(int[] partitions, FragmentTask task) {
+    public void createFragmentWork(int[] partitions, FragmentTaskMessage task) {
         String msg = "The current transaction context of type " + this.getClass().getName();
         msg += " doesn't support creating fragment tasks.";
         throw new UnsupportedOperationException(msg);
     }
 
-    public void createAllParticipatingFragmentWork(FragmentTask task) {
+    public void createAllParticipatingFragmentWork(FragmentTaskMessage task) {
         String msg = "The current transaction context of type " + this.getClass().getName();
         msg += " doesn't support creating fragment tasks.";
         throw new UnsupportedOperationException(msg);
     }
 
-    public void createLocalFragmentWork(FragmentTask task, boolean nonTransactional) {
+    public void createLocalFragmentWork(FragmentTaskMessage task, boolean nonTransactional) {
         String msg = "The current transaction context of type " + this.getClass().getName();
         msg += " doesn't support accepting fragment tasks.";
         throw new UnsupportedOperationException(msg);
@@ -103,7 +108,7 @@ public abstract class TransactionState implements Comparable<TransactionState> {
         throw new UnsupportedOperationException(msg);
     }
 
-    public void processRemoteWorkResponse(FragmentResponse response) {
+    public void processRemoteWorkResponse(FragmentResponseMessage response) {
         String msg = "The current transaction context of type ";
         msg += this.getClass().getName();
         msg += " doesn't support receiving fragment responses.";

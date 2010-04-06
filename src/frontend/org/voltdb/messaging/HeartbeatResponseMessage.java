@@ -15,14 +15,26 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.messages;
+package org.voltdb.messaging;
 
-import org.voltdb.messaging.VoltMessage;
 import org.voltdb.utils.DBBPool;
 
-public class HeartbeatResponse extends VoltMessage {
+public class HeartbeatResponseMessage extends VoltMessage {
 
-    long m_lastRecievedTxnID; // this is the largest txn acked by all partitions running the java for it
+    long m_lastReceivedTxnId; // this is the largest txn acked by all partitions running the java for it
+
+    HeartbeatResponseMessage() {
+        super();
+        m_lastReceivedTxnId = -1;
+    }
+
+    public HeartbeatResponseMessage(int lastReceivedTxnId) {
+        m_lastReceivedTxnId = lastReceivedTxnId;
+    }
+
+    public long getLastReceivedTxnId() {
+        return m_lastReceivedTxnId;
+    }
 
     @Override
     protected void flattenToBuffer(DBBPool pool) {
@@ -35,9 +47,9 @@ public class HeartbeatResponse extends VoltMessage {
         setBufferSize(msgsize + 1, pool);
 
         m_buffer.position(HEADER_SIZE);
-        m_buffer.put(PARTICIPANT_NOTICE_ID);
+        m_buffer.put(HEARTBEAT_RESPONSE_ID);
 
-        m_buffer.putLong(m_lastRecievedTxnID);
+        m_buffer.putLong(m_lastReceivedTxnId);
 
         m_buffer.limit(m_buffer.position());
     }
@@ -46,7 +58,19 @@ public class HeartbeatResponse extends VoltMessage {
     protected void initFromBuffer() {
         m_buffer.position(HEADER_SIZE + 1); // skip the msg id
 
-        m_lastRecievedTxnID = m_buffer.getLong();
+        m_lastReceivedTxnId = m_buffer.getLong();
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("HEARTBEAT_RESPONSE");
+        sb.append(" TO ");
+        sb.append(receivedFromSiteId);
+        sb.append(")");
+
+        return sb.toString();
     }
 
 }

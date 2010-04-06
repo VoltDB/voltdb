@@ -32,12 +32,6 @@ import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
-import org.voltdb.messages.FragmentResponse;
-import org.voltdb.messages.FragmentTask;
-import org.voltdb.messages.Heartbeat;
-import org.voltdb.messages.InitiateResponse;
-import org.voltdb.messages.InitiateTask;
-import org.voltdb.messages.MultiPartitionParticipantNotice;
 import org.voltdb.utils.DBBPool;
 
 public class TestVoltMessageSerialization extends TestCase {
@@ -62,10 +56,10 @@ public class TestVoltMessageSerialization extends TestCase {
         spi.setProcName("johnisgreat");
         spi.setParams(57, "gooniestoo");
 
-        InitiateTask itask = new InitiateTask(23, 8, 100045, true, false, spi, Long.MAX_VALUE);
+        InitiateTaskMessage itask = new InitiateTaskMessage(23, 8, 100045, true, false, spi, 2101);
         itask.setNonCoordinatorSites(new int[] { 5, 2003 });
 
-        InitiateTask itask2 = (InitiateTask) checkVoltMessage(itask, pool);
+        InitiateTaskMessage itask2 = (InitiateTaskMessage) checkVoltMessage(itask, pool);
 
         assertEquals(itask.getInitiatorSiteId(), itask2.getInitiatorSiteId());
         assertEquals(itask.getTxnId(), itask2.getTxnId());
@@ -73,6 +67,7 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(itask.isSinglePartition(), itask2.isSinglePartition());
         assertEquals(itask.getStoredProcedureName(), itask2.getStoredProcedureName());
         assertEquals(itask.getParameterCount(), itask2.getParameterCount());
+        assertEquals(itask.getLastSafeTxnId(), itask2.getLastSafeTxnId());
 
         itask.discard();
         itask2.discard();
@@ -86,7 +81,7 @@ public class TestVoltMessageSerialization extends TestCase {
         spi.setProcName("elmerfudd");
         spi.setParams(57, "wrascallywabbit");
 
-        InitiateTask itask = new InitiateTask(23, 8, 100045, true, false, spi, Long.MAX_VALUE);
+        InitiateTaskMessage itask = new InitiateTaskMessage(23, 8, 100045, true, false, spi, 2101);
         itask.setNonCoordinatorSites(new int[] { 5, 2003 });
 
         VoltTable table = new VoltTable(
@@ -94,14 +89,15 @@ public class TestVoltMessageSerialization extends TestCase {
         );
         table.addRow("howmanylicksdoesittaketogettothecenterofatootsiepop");
 
-        InitiateResponse iresponse = new InitiateResponse(itask);
+        InitiateResponseMessage iresponse = new InitiateResponseMessage(itask);
         iresponse.setResults( new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
                 new VoltTable[] { table }, "knockknockbananna", new EEException(1)));
         iresponse.setClientHandle(99);
 
-        InitiateResponse iresponse2 = (InitiateResponse) checkVoltMessage(iresponse, pool);
+        InitiateResponseMessage iresponse2 = (InitiateResponseMessage) checkVoltMessage(iresponse, pool);
 
         assertEquals(iresponse.getTxnId(), iresponse2.getTxnId());
+        assertEquals(iresponse.getLastReceivedTxnId(), iresponse2.getLastReceivedTxnId());
         iresponse.discard();
         iresponse2.discard();
         pool.clear();
@@ -109,11 +105,11 @@ public class TestVoltMessageSerialization extends TestCase {
 
     public void testFragmentTask() {
         DBBPool pool = new DBBPool();
-        FragmentTask ft = new FragmentTask(9, 70654312, -75, true,
+        FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, true,
             new long[] { 5 }, new int[] { 12 }, new ByteBuffer[] { ByteBuffer.allocate(0) }, true);
-        ft.setFragmentTaskType(FragmentTask.SYS_PROC_PER_PARTITION);
+        ft.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_PARTITION);
 
-        FragmentTask ft2 = (FragmentTask) checkVoltMessage(ft, pool);
+        FragmentTaskMessage ft2 = (FragmentTaskMessage) checkVoltMessage(ft, pool);
 
         assertEquals(ft.getInitiatorSiteId(), ft2.getInitiatorSiteId());
         assertEquals(ft.getCoordinatorSiteId(), ft2.getCoordinatorSiteId());
@@ -131,7 +127,7 @@ public class TestVoltMessageSerialization extends TestCase {
 
     public void testFragmentResponse() {
         DBBPool pool = new DBBPool();
-        FragmentTask ft = new FragmentTask(
+        FragmentTaskMessage ft = new FragmentTaskMessage(
                 15, 12, 37,
                 false, new long[0], null,
                 new ByteBuffer[0], false);
@@ -141,11 +137,11 @@ public class TestVoltMessageSerialization extends TestCase {
         );
         table.addRow("sandimashighschoolfootballrules");
 
-        FragmentResponse fr = new FragmentResponse(ft, 23);
-        fr.setStatus(FragmentResponse.UNEXPECTED_ERROR, new EEException(1));
+        FragmentResponseMessage fr = new FragmentResponseMessage(ft, 23);
+        fr.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, new EEException(1));
         fr.addDependency(99, table);
 
-        FragmentResponse fr2 = (FragmentResponse) checkVoltMessage(fr, pool);
+        FragmentResponseMessage fr2 = (FragmentResponseMessage) checkVoltMessage(fr, pool);
 
         assertEquals(fr.getExecutorSiteId(), fr2.getExecutorSiteId());
         assertEquals(fr.getDestinationSiteId(), fr2.getDestinationSiteId());
@@ -164,9 +160,9 @@ public class TestVoltMessageSerialization extends TestCase {
 
     public void testMembershipNotice() {
         DBBPool pool = new DBBPool();
-        MultiPartitionParticipantNotice mn = new MultiPartitionParticipantNotice(100222, -75, 555555555555L, false);
+        MultiPartitionParticipantMessage mn = new MultiPartitionParticipantMessage(100222, -75, 555555555555L, false);
 
-        MultiPartitionParticipantNotice mn2 = (MultiPartitionParticipantNotice) checkVoltMessage(mn, pool);
+        MultiPartitionParticipantMessage mn2 = (MultiPartitionParticipantMessage) checkVoltMessage(mn, pool);
 
         assertEquals(mn.getInitiatorSiteId(), mn2.getInitiatorSiteId());
         assertEquals(mn.getCoordinatorSiteId(), mn2.getCoordinatorSiteId());
@@ -179,14 +175,27 @@ public class TestVoltMessageSerialization extends TestCase {
 
     public void testHeartbeat() {
         DBBPool pool = new DBBPool();
-        Heartbeat mn = new Heartbeat(100222, 555555555555L);
+        HeartbeatMessage mn = new HeartbeatMessage(100222, 555555555555L, 97L);
 
-        Heartbeat mn2 = (Heartbeat) checkVoltMessage(mn, pool);
+        HeartbeatMessage mn2 = (HeartbeatMessage) checkVoltMessage(mn, pool);
 
         assertEquals(mn.getInitiatorSiteId(), mn2.getInitiatorSiteId());
         assertEquals(mn.getCoordinatorSiteId(), mn2.getCoordinatorSiteId());
         assertEquals(mn.getTxnId(), mn2.getTxnId());
         assertEquals(mn.isReadOnly(), mn2.isReadOnly());
+        assertEquals(mn.getLastSafeTxnId(), mn2.getLastSafeTxnId());
+        mn.discard();
+        mn2.discard();
+        pool.clear();
+    }
+
+    public void testHeartbeatResponse() {
+        DBBPool pool = new DBBPool();
+        HeartbeatResponseMessage mn = new HeartbeatResponseMessage(100222);
+
+        HeartbeatResponseMessage mn2 = (HeartbeatResponseMessage) checkVoltMessage(mn, pool);
+
+        assertEquals(mn.getLastReceivedTxnId(), mn2.getLastReceivedTxnId());
         mn.discard();
         mn2.discard();
         pool.clear();

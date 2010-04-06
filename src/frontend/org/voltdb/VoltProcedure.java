@@ -43,8 +43,8 @@ import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
-import org.voltdb.messages.FragmentTask;
 import org.voltdb.messaging.FastSerializer;
+import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltLoggerFactory;
@@ -1148,7 +1148,7 @@ public abstract class VoltProcedure {
         m_currentTxnState.setupProcedureResume(finalTask, depsToResume);
 
         // create all the local work for the transaction
-        FragmentTask localTask = new FragmentTask(m_currentTxnState.initiatorSiteId,
+        FragmentTaskMessage localTask = new FragmentTaskMessage(m_currentTxnState.initiatorSiteId,
                                                   m_site.getCorrespondingSiteId(),
                                                   m_currentTxnState.txnId,
                                                   m_currentTxnState.isReadOnly,
@@ -1165,7 +1165,7 @@ public abstract class VoltProcedure {
         m_currentTxnState.createLocalFragmentWork(localTask, localFragsAreNonTransactional && finalTask);
 
         // create and distribute work for all sites in the transaction
-        FragmentTask distributedTask = new FragmentTask(m_currentTxnState.initiatorSiteId,
+        FragmentTaskMessage distributedTask = new FragmentTaskMessage(m_currentTxnState.initiatorSiteId,
                                                         m_site.getCorrespondingSiteId(),
                                                         m_currentTxnState.txnId,
                                                         m_currentTxnState.isReadOnly,
