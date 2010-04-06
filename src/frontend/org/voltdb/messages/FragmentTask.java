@@ -32,7 +32,7 @@ import org.voltdb.utils.DBBPool;
  * which planfragment to run and with which parameters.
  *
  */
-public class FragmentTask extends MembershipNotice
+public class FragmentTask extends TransactionInfoBaseMessage
 {
     public static final byte USER_PROC = 0;
     public static final byte SYS_PROC_PER_PARTITION = 1;
@@ -181,17 +181,19 @@ public class FragmentTask extends MembershipNotice
 
     @Override
     protected void flattenToBuffer(final DBBPool pool) {
-        super.flattenToBuffer(pool);
-        assert(m_buffer != null);
+        int msgsize = super.getMessageByteCount();
 
-        int startPos = m_buffer.limit();
+        // m_fragmentIds count (2)
+        // m_outputDepIds count (2)
+        // m_inputDepIds count (2)
+        // m_isFinal (1)
+        // m_taskType (1)
+        // m_shouldUndo (1)
 
-        // size of MembershipNotice
-        int msgsize = m_buffer.limit() - (HEADER_SIZE + 1);
-        // fragmentId count + expectedDepId count + blockingDepId count + isFinal + isSysproc + shouldundo
         msgsize += 2 + 2 + 2 + 1 + 1 + 1;
         if (m_fragmentIds != null) {
             msgsize += 8 * m_fragmentIds.length;
+            // each frag has one parameter set
             for (int i = 0; i < m_fragmentIds.length; i++)
                 msgsize += 4 + m_parameterSets[i].remaining();
         }
@@ -203,11 +205,16 @@ public class FragmentTask extends MembershipNotice
             msgsize += 4 * m_outputDepIds.length;
         }
 
+        if (m_buffer == null) {
+            m_container = pool.acquire(msgsize + 1 + HEADER_SIZE);
+            m_buffer = m_container.b;
+        }
         setBufferSize(msgsize + 1, pool);
 
         m_buffer.position(HEADER_SIZE);
         m_buffer.put(FRAGMENT_TASK_ID);
-        m_buffer.position(startPos);
+
+        super.writeToBuffer();
 
         if (m_fragmentIds == null) {
             m_buffer.putShort((short) 0);
@@ -257,7 +264,8 @@ public class FragmentTask extends MembershipNotice
 
     @Override
     protected void initFromBuffer() {
-        super.initFromBuffer();
+        m_buffer.position(HEADER_SIZE + 1); // skip the msg id
+        super.readFromBuffer();
 
         short fragCount = m_buffer.getShort();
         if (fragCount > 0) {
@@ -301,9 +309,6 @@ public class FragmentTask extends MembershipNotice
         m_isFinal = m_buffer.get() == 1;
         m_taskType = m_buffer.get();
         m_shouldUndo = m_buffer.get() == 1;
-
-        // no way a fragment task can be a heartbeat
-        assert(m_isHeartBeat == false);
     }
 
     @Override

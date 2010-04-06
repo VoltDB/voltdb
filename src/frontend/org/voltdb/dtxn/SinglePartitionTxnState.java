@@ -32,7 +32,7 @@ public class SinglePartitionTxnState extends TransactionState {
 
     public SinglePartitionTxnState(Mailbox mbox,
                                    ExecutionSite site,
-                                   MembershipNotice task)
+                                   TransactionInfoBaseMessage task)
     {
         super(mbox, site, task);
         assert(task instanceof InitiateTask) :

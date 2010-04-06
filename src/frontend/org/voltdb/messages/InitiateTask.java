@@ -31,20 +31,28 @@ import org.voltdb.utils.DBBPool;
  * execution sites if needed.
  *
  */
-public class InitiateTask extends MembershipNotice {
+public class InitiateTask extends TransactionInfoBaseMessage {
 
     boolean m_isSinglePartition;
     StoredProcedureInvocation m_invocation;
+    long m_lastSafeTxnID; // this is the largest txn acked by all partitions running the java for it
     int[] m_nonCoordinatorSites = null;
 
     /** Empty constructor for de-serialization */
     public InitiateTask() {}
 
-    public InitiateTask(int initiatorSiteId, int coordinatorSiteId, long txnId, boolean isReadOnly, boolean isSinglePartition, StoredProcedureInvocation invocation) {
+    public InitiateTask(int initiatorSiteId,
+                        int coordinatorSiteId,
+                        long txnId,
+                        boolean isReadOnly,
+                        boolean isSinglePartition,
+                        StoredProcedureInvocation invocation,
+                        long lastSafeTxnID) {
         super(initiatorSiteId, coordinatorSiteId, txnId, isReadOnly);
         m_isSinglePartition = isSinglePartition;
         m_invocation = invocation;
         m_invocation.buildParameterSet();
+        m_lastSafeTxnID = lastSafeTxnID;
     }
 
     public void setNonCoordinatorSites(int[] siteIds) {
@@ -98,21 +106,23 @@ public class InitiateTask extends MembershipNotice {
         }
         ByteBuffer invocationBytes = fs.getBuffer();
 
-        super.flattenToBuffer(pool);
-        assert(m_buffer != null);
-
-        int startPos = m_buffer.limit();
-
         // size of MembershipNotice
-        int msgsize = m_buffer.limit() - (HEADER_SIZE + 1);
-        msgsize += 1 + 2 + invocationBytes.remaining();
+        int msgsize = super.getMessageByteCount();
+        msgsize += 1 + 2 + 8 + invocationBytes.remaining();
         if (m_nonCoordinatorSites != null) msgsize += m_nonCoordinatorSites.length * 4;
 
+        if (m_buffer == null) {
+            m_container = pool.acquire(msgsize + 1 + HEADER_SIZE);
+            m_buffer = m_container.b;
+        }
         setBufferSize(msgsize + 1, pool);
 
         m_buffer.position(HEADER_SIZE);
         m_buffer.put(INITIATE_TASK_ID);
-        m_buffer.position(startPos);
+
+        super.writeToBuffer();
+
+        m_buffer.putLong(m_lastSafeTxnID);
 
         m_buffer.put(m_isSinglePartition ? (byte) 1 : (byte) 0);
         if (m_nonCoordinatorSites == null)
@@ -128,7 +138,10 @@ public class InitiateTask extends MembershipNotice {
 
     @Override
     protected void initFromBuffer() {
-        super.initFromBuffer();
+        m_buffer.position(HEADER_SIZE + 1); // skip the msg id
+        super.readFromBuffer();
+
+        m_lastSafeTxnID = m_buffer.getLong();
 
         m_isSinglePartition = m_buffer.get() == 1;
         int siteCount = m_buffer.getShort();
@@ -145,9 +158,6 @@ public class InitiateTask extends MembershipNotice {
             e.printStackTrace();
             assert(false);
         }
-
-        // no way an initiate task can be a heartbeat
-        assert(m_isHeartBeat == false);
     }
 
     @Override

@@ -59,34 +59,34 @@ public class TestRestrictedPriorityQueue extends TestCase{
         m_proc = new StoredProcedureInvocation();
 
         m_task = new InitiateTask(0, 0, m_idManager.getNextUniqueTransactionId(),
-                true, true, m_proc);
+                true, true, m_proc, Long.MAX_VALUE);
         m_txnIds.add(m_task.getTxnId());
         m_state1 = new SinglePartitionTxnState(null, null, m_task);
         m_states[0] = m_state1;
 
         m_task = new InitiateTask(1, 1, m_idManager.getNextUniqueTransactionId(),
-                true, true, m_proc);
+                true, true, m_proc, Long.MAX_VALUE);
         assertTrue(m_txnIds.lastElement() < m_task.getTxnId());
         m_txnIds.add(m_task.getTxnId());
         m_state2 = new SinglePartitionTxnState(null, null, m_task);
         m_states[1] = m_state2;
 
         m_task = new InitiateTask(0, 0, m_idManager.getNextUniqueTransactionId(),
-                true, true, m_proc);
+                true, true, m_proc, Long.MAX_VALUE);
         assertTrue(m_txnIds.lastElement() < m_task.getTxnId());
         m_txnIds.add(m_task.getTxnId());
         m_state3 = new SinglePartitionTxnState(null, null, m_task);
         m_states[2] = m_state3;
 
         m_task = new InitiateTask(1, 1, m_idManager.getNextUniqueTransactionId(),
-                true, true, m_proc);
+                true, true, m_proc, Long.MAX_VALUE);
         assertTrue(m_txnIds.lastElement() < m_task.getTxnId());
         m_txnIds.add(m_task.getTxnId());
         m_state4 = new SinglePartitionTxnState(null, null, m_task);
         m_states[3] = m_state4;
 
         m_task = new InitiateTask(0, 0, m_idManager.getNextUniqueTransactionId(),
-                true, true, m_proc);
+                true, true, m_proc, Long.MAX_VALUE);
         assertTrue(m_txnIds.lastElement() < m_task.getTxnId());
         m_txnIds.add(m_task.getTxnId());
         m_state5 = new SinglePartitionTxnState(null, null, m_task);
@@ -96,7 +96,7 @@ public class TestRestrictedPriorityQueue extends TestCase{
         // don't add it to m_txnIds.  This additional transaction allows us
         // to iterate through all of m_txnIds safely.
         m_task = new InitiateTask(1, 1, m_idManager.getNextUniqueTransactionId(),
-                true, true, m_proc);
+                true, true, m_proc, Long.MAX_VALUE);
         assertTrue(m_txnIds.lastElement() < m_task.getTxnId());
         m_state6 = new SinglePartitionTxnState(null, null, m_task);
         m_states[5] = m_state6;

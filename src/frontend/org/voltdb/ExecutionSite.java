@@ -19,7 +19,13 @@ package org.voltdb;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Level;
@@ -27,14 +33,26 @@ import org.apache.log4j.Logger;
 import org.apache.log4j.NDC;
 import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
 import org.voltdb.VoltProcedure.VoltAbortException;
-import org.voltdb.catalog.*;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.Site;
+import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.debugstate.ExecutorContext;
-import org.voltdb.dtxn.*;
+import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
+import org.voltdb.dtxn.RestrictedPriorityQueue;
+import org.voltdb.dtxn.SinglePartitionTxnState;
+import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.dtxn.SiteTransactionConnection;
+import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.exceptions.SerializableException;
-import org.voltdb.fault.*;
+import org.voltdb.fault.FaultHandler;
+import org.voltdb.fault.NodeFailureFault;
+import org.voltdb.fault.VoltFault;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineIPC;
@@ -43,13 +61,15 @@ import org.voltdb.jni.MockExecutionEngine;
 import org.voltdb.messages.DebugMessage;
 import org.voltdb.messages.FragmentResponse;
 import org.voltdb.messages.FragmentTask;
+import org.voltdb.messages.Heartbeat;
 import org.voltdb.messages.InitiateResponse;
 import org.voltdb.messages.InitiateTask;
-import org.voltdb.messages.MembershipNotice;
+import org.voltdb.messages.TransactionInfoBaseMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.VoltMessage;
 import org.voltdb.messaging.impl.SiteMailbox;
+import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.EstTime;
@@ -174,6 +194,11 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         ExecutionSiteNodeFailureMessage(int failedHostId) {
             m_failedHostId = failedHostId;
         }
+
+        @Override
+        protected void flattenToBuffer(DBBPool pool) {} // can be empty if only used locally
+        @Override
+        protected void initFromBuffer() {} // can be empty if only used locally
     }
 
     private class ExecutionSiteNodeFailureFaultHandler implements FaultHandler
@@ -572,33 +597,33 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
 
     private void handleMailboxMessage(VoltMessage message)
     {
-        if (message instanceof MembershipNotice) {
-            MembershipNotice mn = (MembershipNotice)message;
-            assertTxnIdOrdering(mn);
+        if (message instanceof TransactionInfoBaseMessage) {
+            TransactionInfoBaseMessage info = (TransactionInfoBaseMessage)message;
+            assertTxnIdOrdering(info);
 
             // Special case heartbeats which only update RPQ
-            if (mn.isHeartBeat()) {
-                m_transactionQueue.gotTransaction(mn.getInitiatorSiteId(),
-                                                  mn.getTxnId(),
+            if (info instanceof Heartbeat) {
+                m_transactionQueue.gotTransaction(info.getInitiatorSiteId(),
+                                                  info.getTxnId(),
                                                   true);
                 return;
             }
             // FragmentTasks aren't sent by initiators and shouldn't update
             // transaction queue initiator states.
-            else if (!(mn instanceof FragmentTask)) {
-                m_transactionQueue.gotTransaction(mn.getInitiatorSiteId(),
-                                                  mn.getTxnId(),
+            else if (!(info instanceof FragmentTask)) {
+                m_transactionQueue.gotTransaction(info.getInitiatorSiteId(),
+                                                  info.getTxnId(),
                                                   false);
             }
 
             // Every non-heartbeat notice requires a transaction state.
-            TransactionState ts = m_transactionsById.get(mn.getTxnId());
+            TransactionState ts = m_transactionsById.get(info.getTxnId());
             if (ts == null) {
-                if (mn.isSinglePartition()) {
-                    ts = new SinglePartitionTxnState(m_mailbox, this, mn);
+                if (info.isSinglePartition()) {
+                    ts = new SinglePartitionTxnState(m_mailbox, this, info);
                 }
                 else {
-                    ts = new MultiPartitionParticipantTxnState(m_mailbox, this, mn);
+                    ts = new MultiPartitionParticipantTxnState(m_mailbox, this, info);
                 }
                 m_transactionQueue.add(ts);
                 m_transactionsById.put(ts.txnId, ts);
@@ -632,7 +657,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         }
     }
 
-    private void assertTxnIdOrdering(final MembershipNotice notice) {
+    private void assertTxnIdOrdering(final TransactionInfoBaseMessage notice) {
         // Because of our rollback implementation, fragment tasks can arrive
         // late. This participant can have aborted and rolled back already,
         // for example.
@@ -653,7 +678,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             msg.append(") before\n");
             msg.append("   txn ").append(notice.getTxnId()).append(" (");
             msg.append(TransactionIdManager.toString(notice.getTxnId())).append(" HB:");
-            msg.append(notice.isHeartBeat()).append(").\n");
+            msg.append(notice instanceof Heartbeat).append(").\n");
 
             TransactionState txn = m_transactionsById.get(notice.getTxnId());
             if (txn != null) {

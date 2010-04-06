@@ -24,6 +24,8 @@ package org.voltdb.dtxn;
 
 import java.nio.ByteBuffer;
 
+import junit.framework.TestCase;
+
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.MockVoltDB;
 import org.voltdb.StoredProcedureInvocation;
@@ -41,8 +43,6 @@ import org.voltdb.network.NIOReadStream;
 import org.voltdb.network.WriteStream;
 import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.DBBPool.BBContainer;
-
-import junit.framework.TestCase;
 
 public class TestDtxnInitiatorQueue extends TestCase
 {
@@ -233,12 +233,14 @@ public class TestDtxnInitiatorQueue extends TestCase
     {
         InitiateTask task = new InitiateTask(INITIATOR_SITE_ID, coordId, txnId,
                                              readOnly, isSinglePart,
-                                             new StoredProcedureInvocation());
+                                             new StoredProcedureInvocation(),
+                                             Long.MAX_VALUE);
         InitiateResponse response = new InitiateResponse(task);
         response.setResults(new ClientResponseImpl((byte) 0, results, ""), task);
         return response;
     }
 
+    @Override
     public void setUp()
     {
         m_mockVolt = new MockVoltDB();

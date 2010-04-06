@@ -25,14 +25,20 @@ package org.voltdb.messaging;
 
 import java.nio.ByteBuffer;
 
-import org.voltdb.exceptions.EEException;
+import junit.framework.TestCase;
+
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltdb.messages.*;
-import junit.framework.TestCase;
+import org.voltdb.exceptions.EEException;
+import org.voltdb.messages.FragmentResponse;
+import org.voltdb.messages.FragmentTask;
+import org.voltdb.messages.Heartbeat;
+import org.voltdb.messages.InitiateResponse;
+import org.voltdb.messages.InitiateTask;
+import org.voltdb.messages.MultiPartitionParticipantNotice;
 import org.voltdb.utils.DBBPool;
-import org.voltdb.ClientResponseImpl;
 
 public class TestVoltMessageSerialization extends TestCase {
 
@@ -56,7 +62,7 @@ public class TestVoltMessageSerialization extends TestCase {
         spi.setProcName("johnisgreat");
         spi.setParams(57, "gooniestoo");
 
-        InitiateTask itask = new InitiateTask(23, 8, 100045, true, false, spi);
+        InitiateTask itask = new InitiateTask(23, 8, 100045, true, false, spi, Long.MAX_VALUE);
         itask.setNonCoordinatorSites(new int[] { 5, 2003 });
 
         InitiateTask itask2 = (InitiateTask) checkVoltMessage(itask, pool);
@@ -80,7 +86,7 @@ public class TestVoltMessageSerialization extends TestCase {
         spi.setProcName("elmerfudd");
         spi.setParams(57, "wrascallywabbit");
 
-        InitiateTask itask = new InitiateTask(23, 8, 100045, true, false, spi);
+        InitiateTask itask = new InitiateTask(23, 8, 100045, true, false, spi, Long.MAX_VALUE);
         itask.setNonCoordinatorSites(new int[] { 5, 2003 });
 
         VoltTable table = new VoltTable(
@@ -158,9 +164,24 @@ public class TestVoltMessageSerialization extends TestCase {
 
     public void testMembershipNotice() {
         DBBPool pool = new DBBPool();
-        MembershipNotice mn = new MembershipNotice(100222, -75, 555555555555L, false);
+        MultiPartitionParticipantNotice mn = new MultiPartitionParticipantNotice(100222, -75, 555555555555L, false);
 
-        MembershipNotice mn2 = (MembershipNotice) checkVoltMessage(mn, pool);
+        MultiPartitionParticipantNotice mn2 = (MultiPartitionParticipantNotice) checkVoltMessage(mn, pool);
+
+        assertEquals(mn.getInitiatorSiteId(), mn2.getInitiatorSiteId());
+        assertEquals(mn.getCoordinatorSiteId(), mn2.getCoordinatorSiteId());
+        assertEquals(mn.getTxnId(), mn2.getTxnId());
+        assertEquals(mn.isReadOnly(), mn2.isReadOnly());
+        mn.discard();
+        mn2.discard();
+        pool.clear();
+    }
+
+    public void testHeartbeat() {
+        DBBPool pool = new DBBPool();
+        Heartbeat mn = new Heartbeat(100222, 555555555555L);
+
+        Heartbeat mn2 = (Heartbeat) checkVoltMessage(mn, pool);
 
         assertEquals(mn.getInitiatorSiteId(), mn2.getInitiatorSiteId());
         assertEquals(mn.getCoordinatorSiteId(), mn2.getCoordinatorSiteId());

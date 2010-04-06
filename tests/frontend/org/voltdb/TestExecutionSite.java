@@ -26,7 +26,9 @@ package org.voltdb;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import junit.framework.TestCase;
@@ -34,10 +36,17 @@ import junit.framework.TestCase;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
-import org.voltdb.dtxn.*;
+import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
+import org.voltdb.dtxn.SinglePartitionTxnState;
+import org.voltdb.dtxn.TransactionState;
 import org.voltdb.fault.FaultDistributor;
-import org.voltdb.messages.*;
-import org.voltdb.messaging.*;
+import org.voltdb.messages.FragmentTask;
+import org.voltdb.messages.InitiateTask;
+import org.voltdb.messages.MultiPartitionParticipantNotice;
+import org.voltdb.messaging.FastSerializer;
+import org.voltdb.messaging.MockMailbox;
+import org.voltdb.messaging.VoltMessage;
 
 public class TestExecutionSite extends TestCase {
 
@@ -225,7 +234,7 @@ public class TestExecutionSite extends TestCase {
         tx1_spi.setParams(new Integer(0));
 
         final InitiateTask tx1_mn =
-            new InitiateTask(initiator1, site1, 1000, readOnly, singlePartition, tx1_spi);
+            new InitiateTask(initiator1, site1, 1000, readOnly, singlePartition, tx1_spi, Long.MAX_VALUE);
 
         final SinglePartitionTxnState tx1 =
             new SinglePartitionTxnState(m_mboxes[site1], m_sites[site1], tx1_mn);
@@ -253,7 +262,7 @@ public class TestExecutionSite extends TestCase {
         tx1_spi.setParams(new Integer(0));
 
         final InitiateTask tx1_mn =
-            new InitiateTask(initiator1, site1, 1000, readOnly, singlePartition, tx1_spi);
+            new InitiateTask(initiator1, site1, 1000, readOnly, singlePartition, tx1_spi, Long.MAX_VALUE);
 
         final SinglePartitionTxnState tx1 =
             new SinglePartitionTxnState(m_mboxes[site1], m_sites[site1], tx1_mn);
@@ -282,15 +291,15 @@ public class TestExecutionSite extends TestCase {
 
         // site 1 is the coordinator
         final InitiateTask tx1_mn_1 =
-            new InitiateTask(initiator1, site1, 1000, readOnly, singlePartition, tx1_spi);
+            new InitiateTask(initiator1, site1, 1000, readOnly, singlePartition, tx1_spi, Long.MAX_VALUE);
         tx1_mn_1.setNonCoordinatorSites(new int[] {site2});
 
         final MultiPartitionParticipantTxnState tx1_1 =
             new MultiPartitionParticipantTxnState(m_mboxes[site1], m_sites[site1], tx1_mn_1);
 
         // site 2 is a participant
-        final MembershipNotice tx1_mn_2 =
-            new MembershipNotice(initiator1, site1, 1000, readOnly);
+        final MultiPartitionParticipantNotice tx1_mn_2 =
+            new MultiPartitionParticipantNotice(initiator1, site1, 1000, readOnly);
 
         final MultiPartitionParticipantTxnState tx1_2 =
             new MultiPartitionParticipantTxnState(m_mboxes[site2], m_sites[site2], tx1_mn_2);

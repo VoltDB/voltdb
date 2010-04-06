@@ -31,7 +31,7 @@ import org.voltdb.messages.FragmentResponse;
 import org.voltdb.messages.FragmentTask;
 import org.voltdb.messages.InitiateResponse;
 import org.voltdb.messages.InitiateTask;
-import org.voltdb.messages.MembershipNotice;
+import org.voltdb.messages.TransactionInfoBaseMessage;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.VoltMessage;
@@ -58,7 +58,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     }
 
     public MultiPartitionParticipantTxnState(Mailbox mbox, ExecutionSite site,
-                                             MembershipNotice notice)
+                                             TransactionInfoBaseMessage notice)
     {
         super(mbox, site, notice);
         m_nonCoordinatingSites = null;

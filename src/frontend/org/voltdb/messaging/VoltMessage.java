@@ -19,9 +19,17 @@ package org.voltdb.messaging;
 
 import java.nio.ByteBuffer;
 import java.util.HashMap;
+
 import org.voltdb.VoltDB;
 import org.voltdb.debugstate.MailboxHistory.MessageState;
-import org.voltdb.messages.*;
+import org.voltdb.messages.DebugMessage;
+import org.voltdb.messages.FragmentResponse;
+import org.voltdb.messages.FragmentTask;
+import org.voltdb.messages.Heartbeat;
+import org.voltdb.messages.HeartbeatResponse;
+import org.voltdb.messages.InitiateResponse;
+import org.voltdb.messages.InitiateTask;
+import org.voltdb.messages.MultiPartitionParticipantNotice;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
 
@@ -37,8 +45,10 @@ public abstract class VoltMessage {
     final public static byte INITIATE_RESPONSE_ID = 2;
     final public static byte FRAGMENT_TASK_ID = 3;
     final public static byte FRAGMENT_RESPONSE_ID = 4;
-    final public static byte MEMBERSHIP_NOTICE_ID = 5;
-    final public static byte DEBUG_MESSAGE_ID = 6;
+    final public static byte PARTICIPANT_NOTICE_ID = 5;
+    final public static byte HEARTBEAT_ID = 6;
+    final public static byte HEARTBEAT_RESPONSE_ID = 7;
+    final public static byte DEBUG_MESSAGE_ID = 8;
 
     // place holder for destination site ids when using multi-cast
     final public static int SEND_TO_MANY = -2;
@@ -115,8 +125,14 @@ public abstract class VoltMessage {
         case FRAGMENT_RESPONSE_ID:
             message = new FragmentResponse();
             break;
-        case MEMBERSHIP_NOTICE_ID:
-            message = new MembershipNotice();
+        case PARTICIPANT_NOTICE_ID:
+            message = new MultiPartitionParticipantNotice();
+            break;
+        case HEARTBEAT_ID:
+            message = new Heartbeat();
+            break;
+        case HEARTBEAT_RESPONSE_ID:
+            message = new HeartbeatResponse();
             break;
         case DEBUG_MESSAGE_ID:
             message = new DebugMessage();
@@ -155,8 +171,8 @@ public abstract class VoltMessage {
         }
     }
 
-    protected void initFromBuffer() {}
-    protected void flattenToBuffer(final DBBPool pool) {}
+    protected abstract void initFromBuffer();
+    protected abstract void flattenToBuffer(final DBBPool pool);
     protected void initNew() {
         m_buffer = ByteBuffer.allocate(HEADER_SIZE + 1024);
         m_container = DBBPool.wrapBB(m_buffer);

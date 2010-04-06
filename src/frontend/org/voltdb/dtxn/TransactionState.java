@@ -51,7 +51,7 @@ public abstract class TransactionState implements Comparable<TransactionState> {
      */
     protected TransactionState(Mailbox mbox,
                                ExecutionSite site,
-                               MembershipNotice notice)
+                               TransactionInfoBaseMessage notice)
     {
         m_mbox = mbox;
         m_site = site;

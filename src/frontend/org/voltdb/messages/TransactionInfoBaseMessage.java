@@ -20,7 +20,6 @@ package org.voltdb.messages;
 import org.voltdb.debugstate.MailboxHistory.MessageState;
 import org.voltdb.messaging.Subject;
 import org.voltdb.messaging.VoltMessage;
-import org.voltdb.utils.DBBPool;
 
 /**
  * Message from an initiator to an execution site, informing the
@@ -29,33 +28,27 @@ import org.voltdb.utils.DBBPool;
  * for this transaction.
  *
  */
-public class MembershipNotice extends VoltMessage {
+public abstract class TransactionInfoBaseMessage extends VoltMessage {
 
     int m_initiatorSiteId;
     int m_coordinatorSiteId;
     long m_txnId;
     boolean m_isReadOnly;
-    boolean m_isHeartBeat;
 
     /** Empty constructor for de-serialization */
-    public MembershipNotice() {
+    public TransactionInfoBaseMessage() {
         m_subject = Subject.DEFAULT.getId();
     }
 
-    public MembershipNotice(int initiatorSiteId,
-                            int coordinatorSiteId,
-                            long txnId,
-                            boolean isReadOnly) {
+    public TransactionInfoBaseMessage(int initiatorSiteId,
+                                      int coordinatorSiteId,
+                                      long txnId,
+                                      boolean isReadOnly) {
         m_initiatorSiteId = initiatorSiteId;
         m_coordinatorSiteId = coordinatorSiteId;
         m_txnId = txnId;
         m_isReadOnly = isReadOnly;
         m_subject = Subject.DEFAULT.getId();
-        m_isHeartBeat = false;
-    }
-
-    public void setIsHeartBeat(boolean isHeartBeat) {
-        m_isHeartBeat = isHeartBeat;
     }
 
     public int getInitiatorSiteId() {
@@ -64,10 +57,6 @@ public class MembershipNotice extends VoltMessage {
 
     public int getCoordinatorSiteId() {
         return m_coordinatorSiteId;
-    }
-
-    public boolean isHeartBeat() {
-        return m_isHeartBeat;
     }
 
     public long getTxnId() {
@@ -82,61 +71,34 @@ public class MembershipNotice extends VoltMessage {
         return false;
     }
 
-    @Override
-    protected void flattenToBuffer(final DBBPool pool) {
-        int msgsize = 4 + 4 + 8 + 1 + 1;
+    protected int getMessageByteCount() {
+        return 4 + 4 + 8 + 1;
+    }
 
-        if (m_buffer == null) {
-            m_container = pool.acquire(msgsize + 1 + HEADER_SIZE);
-            m_buffer = m_container.b;
-        }
-        setBufferSize(msgsize + 1, pool);
-
-        m_buffer.position(HEADER_SIZE);
-        m_buffer.put(MEMBERSHIP_NOTICE_ID);
-
+    protected void writeToBuffer() {
         m_buffer.putInt(m_initiatorSiteId);
         m_buffer.putInt(m_coordinatorSiteId);
         m_buffer.putLong(m_txnId);
         m_buffer.put(m_isReadOnly ? (byte) 1 : (byte) 0);
-        m_buffer.put(m_isHeartBeat ? (byte) 1 : (byte) 0);
-
-        m_buffer.limit(m_buffer.position());
     }
 
-    @Override
-    protected void initFromBuffer() {
-        m_buffer.position(HEADER_SIZE + 1); // skip the msg id
+    protected void readFromBuffer() {
         m_initiatorSiteId = m_buffer.getInt();
         m_coordinatorSiteId = m_buffer.getInt();
         m_txnId = m_buffer.getLong();
         m_isReadOnly = m_buffer.get() == 1;
-        m_isHeartBeat = m_buffer.get() == 1;
     }
 
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
 
-        if (m_isHeartBeat)
-            sb.append("HEARTBEAT_NOTICE (FROM ");
-        else
-            sb.append("MEMBERSHIP_NOTICE (FROM ");
+        sb.append("TXN_INFO_BASE (FROM ");
         sb.append(m_initiatorSiteId);
         sb.append(" TO ");
         sb.append(receivedFromSiteId);
         sb.append(") FOR TXN ");
         sb.append(m_txnId);
-
-
-        if (!m_isHeartBeat) {
-            sb.append("\n");
-            if (m_isReadOnly)
-                sb.append("  READ, COORD ");
-            else
-                sb.append("  WRITE, COORD ");
-            sb.append(m_coordinatorSiteId);
-        }
 
         return sb.toString();
     }

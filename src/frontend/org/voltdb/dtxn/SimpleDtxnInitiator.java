@@ -52,8 +52,9 @@ import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltDB;
 import org.voltdb.debugstate.InitiatorContext;
+import org.voltdb.messages.Heartbeat;
 import org.voltdb.messages.InitiateTask;
-import org.voltdb.messages.MembershipNotice;
+import org.voltdb.messages.MultiPartitionParticipantNotice;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.Messenger;
@@ -186,8 +187,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     @Override
     public synchronized void tick(long time, long interval) {
         long txnId = m_idManager.getNextUniqueTransactionId();
-        MembershipNotice tickNotice = new MembershipNotice(m_siteId, -1, txnId, false);
-        tickNotice.setIsHeartBeat(true);
+        Heartbeat tickNotice = new Heartbeat(m_siteId, txnId);
 
         int[] outOfDateSites =
             VoltDB.instance().getCatalogContext().
@@ -265,10 +265,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         m_queue.addPendingTxn(txn);
         increaseBackpressure(txn.messageSize);
 
-        MembershipNotice notice = new MembershipNotice(m_siteId,
-                                                       txn.coordinatorId,
-                                                       txn.txnId,
-                                                       txn.isReadOnly);
+        MultiPartitionParticipantNotice notice = new MultiPartitionParticipantNotice(
+                m_siteId, txn.coordinatorId, txn.txnId, txn.isReadOnly);
         try {
             m_mailbox.send(txn.otherSiteIds, 0, notice);
         } catch (MessagingException e) {
@@ -294,7 +292,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                 txn.txnId,
                 txn.isReadOnly,
                 txn.isSinglePartition,
-                txn.invocation);
+                txn.invocation,
+                Long.MAX_VALUE); // this will allow all transactions to run for now
         workRequest.setNonCoordinatorSites(txn.otherSiteIds);
 
         try {
@@ -304,6 +303,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         }
     }
 
+    @Override
     void increaseBackpressure(int messageSize)
     {
         m_pendingTxnBytes += messageSize;
@@ -317,6 +317,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         }
     }
 
+    @Override
     void reduceBackpressure(int messageSize)
     {
         m_pendingTxnBytes -= messageSize;

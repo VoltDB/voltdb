@@ -18,13 +18,18 @@
 package org.voltdb.messaging.impl;
 
 import java.util.ArrayDeque;
-import java.util.Queue;
 import java.util.ArrayList;
+import java.util.Queue;
+
 import org.voltdb.debugstate.MailboxHistory;
 import org.voltdb.debugstate.MailboxHistory.MessageState;
 import org.voltdb.messages.DebugMessage;
-import org.voltdb.messages.MembershipNotice;
-import org.voltdb.messaging.*;
+import org.voltdb.messages.Heartbeat;
+import org.voltdb.messages.TransactionInfoBaseMessage;
+import org.voltdb.messaging.Mailbox;
+import org.voltdb.messaging.MessagingException;
+import org.voltdb.messaging.Subject;
+import org.voltdb.messaging.VoltMessage;
 
 /**
  *
@@ -78,9 +83,9 @@ public class SiteMailbox implements Mailbox {
         if (MESSAGE_HISTORY_SIZE > 0) {
             if (message instanceof DebugMessage)
                 return;
-            else if (message instanceof MembershipNotice) {
-                MembershipNotice mn = (MembershipNotice) message;
-                if (mn.isHeartBeat())
+            else if (message instanceof TransactionInfoBaseMessage) {
+                TransactionInfoBaseMessage mn = (TransactionInfoBaseMessage) message;
+                if (mn instanceof Heartbeat)
                     synchronized(m_lastTenHeartbeats) {
                         m_lastTenHeartbeats.addLast(message);
                         if (m_lastTenHeartbeats.size() > MESSAGE_HISTORY_SIZE)
@@ -128,7 +133,7 @@ public class SiteMailbox implements Mailbox {
         m_hostMessenger.send(siteId, mailboxId, message);
 
         // this code keeps track of last 10 non-heartbeat messages sent
-        if ((message instanceof MembershipNotice) && (((MembershipNotice)message).isHeartBeat()))
+        if (message instanceof Heartbeat)
             return;
         synchronized(m_lastTenSentMessages) {
             m_lastTenSentMessages.addLast(message);
@@ -145,7 +150,7 @@ public class SiteMailbox implements Mailbox {
         m_hostMessenger.send(siteIds, mailboxId, message);
 
         // this code keeps track of last 10 non-heartbeat messages sent
-        if ((message instanceof MembershipNotice) && (((MembershipNotice)message).isHeartBeat()))
+        if (message instanceof Heartbeat)
             return;
         synchronized(m_lastTenSentMessages) {
             m_lastTenSentMessages.addLast(message);

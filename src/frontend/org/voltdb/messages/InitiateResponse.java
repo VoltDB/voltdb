@@ -19,6 +19,7 @@ package org.voltdb.messages;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.debugstate.MailboxHistory.MessageState;
 import org.voltdb.messaging.FastDeserializer;
@@ -41,6 +42,7 @@ public class InitiateResponse extends VoltMessage {
     private int m_coordinatorSiteId;
     private boolean m_commit;
     private ClientResponseImpl m_response;
+    private long m_lastRecievedTxnID; // this is the largest txn acked by all partitions running the java for it
 
     /** Empty constructor for de-serialization */
     public InitiateResponse()
@@ -109,7 +111,7 @@ public class InitiateResponse extends VoltMessage {
         ByteBuffer responseBytes = fs.getBuffer();
 
         // I don't know where the two fours that were originally here come from.
-        int msgsize = 8 + 4 + 4 + 4 + 4 + responseBytes.remaining();
+        int msgsize = 8 + 4 + 4 + 4 + 4 + 8 + responseBytes.remaining();
 
         if (m_buffer == null) {
             m_container = pool.acquire(msgsize + 1 + HEADER_SIZE);
@@ -121,6 +123,7 @@ public class InitiateResponse extends VoltMessage {
         m_buffer.put(INITIATE_RESPONSE_ID);
 
         m_buffer.putLong(m_txnId);
+        m_buffer.putLong(m_lastRecievedTxnID);
         m_buffer.putInt(m_initiatorSiteId);
         m_buffer.putInt(m_coordinatorSiteId);
         m_buffer.put(responseBytes);
@@ -131,6 +134,7 @@ public class InitiateResponse extends VoltMessage {
     protected void initFromBuffer() {
         m_buffer.position(HEADER_SIZE + 1); // skip the msg id
         m_txnId = m_buffer.getLong();
+        m_lastRecievedTxnID = m_buffer.getLong();
         m_initiatorSiteId = m_buffer.getInt();
         m_coordinatorSiteId = m_buffer.getInt();
 
