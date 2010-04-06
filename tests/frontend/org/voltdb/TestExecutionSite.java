@@ -34,6 +34,7 @@ import junit.framework.TestCase;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.*;
+import org.voltdb.fault.FaultDistributor;
 import org.voltdb.messages.*;
 import org.voltdb.messaging.*;
 
@@ -165,6 +166,7 @@ public class TestExecutionSite extends TestCase {
         Procedure proc = null;
 
         m_voltdb = new MockVoltDB();
+        m_voltdb.setFaultDistributor(new FaultDistributor());
         m_voltdb.addHost(0);
         m_voltdb.addPartition(0);
         m_voltdb.addSite(site1, 0, 0, true);
