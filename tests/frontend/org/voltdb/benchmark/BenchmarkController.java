@@ -192,7 +192,7 @@ public class BenchmarkController {
             System.exit(-1);
         }
 
-        //uploader = new ResultsUploader(m_config.benchmarkClient, config);
+        uploader = new ResultsUploader(m_config.benchmarkClient, config);
 
         try {
             m_projectBuilder = m_builderClass.newInstance();
@@ -332,7 +332,7 @@ public class BenchmarkController {
                 StringBuilder fullCommand = new StringBuilder();
                 for (String s : command)
                     fullCommand.append(s).append(" ");
-                //uploader.setCommandLineForHost(host, fullCommand.toString());
+                uploader.setCommandLineForHost(host, fullCommand.toString());
 
                 benchmarkLog.debug(fullCommand.toString());
 
@@ -501,9 +501,9 @@ public class BenchmarkController {
                 for (String s : args)
                     fullCommand.append(s).append(" ");
 
-                //uploader.setCommandLineForClient(
-                //        client + ":" + String.valueOf(j),
-                //        fullCommand.toString());
+                uploader.setCommandLineForClient(
+                        client + ":" + String.valueOf(j),
+                        fullCommand.toString());
                 benchmarkLog.debug("Client Commnand: " + fullCommand.toString());
                 m_clientPSM.startProcess(client + ":" + String.valueOf(j), args);
             }
@@ -517,7 +517,7 @@ public class BenchmarkController {
 
 
         registerInterest(new ResultsPrinter());
-        //registerInterest(uploader);
+        registerInterest(uploader);
     }
 
     public void cleanUpBenchmark() {
