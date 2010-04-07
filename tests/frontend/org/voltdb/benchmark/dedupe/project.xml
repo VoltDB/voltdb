@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<project>
+    <database name='database'>
+        <schemas>
+            <schema path='ddl.sql' />
+        </schemas>
+        <procedures>
+            <procedure class='com.procedures.Insert' />
+            <procedure class='com.procedures.Archive' />
+            <procedure class='com.procedures.Delete' />
+        </procedures>
+        <partitions>
+            <partition table='archived' column='column1' />
+            <partition table='unarchived' column='column1' />
+        </partitions>
+    </database>
+</project>
