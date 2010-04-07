@@ -47,6 +47,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     private ArrayList<WorkUnit> m_stackFrameDropWUs = null;
     private Map<Integer, List<VoltTable>> m_previousStackFrameDropDependencies = null;
     private boolean m_dirty = false;
+    private boolean m_didRollback = false;
 
     /**
      *  This is thrown by the TransactionState instance when something
@@ -83,6 +84,10 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     @Override
     public boolean isInProgress() {
         return m_hasStartedWork;
+    }
+
+    public boolean didRollback() {
+        return m_didRollback;
     }
 
     @Override
@@ -169,21 +174,26 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         return false;
     }
 
+    public FragmentTaskMessage createConcludingFragmentTask() {
+        FragmentTaskMessage ft =
+            new FragmentTaskMessage(initiatorSiteId,
+                                    coordinatorSiteId,
+                                    txnId,
+                                    true,
+                                    new long[] {},
+                                    null,
+                                    new ByteBuffer[] {},
+                                    true);
+        return ft;
+    }
+
     void initiateProcedure(InitiateTaskMessage itask) {
         assert(m_isCoordinator);
 
         InitiateResponseMessage response = m_site.processInitiateTask(this, itask);
 
         // send commit notices to everyone
-        FragmentTaskMessage ftask = new FragmentTaskMessage(
-                initiatorSiteId,
-                coordinatorSiteId,
-                txnId,
-                true,
-                new long[] {},
-                null,
-                new ByteBuffer[] {},
-                true);
+        FragmentTaskMessage ftask = createConcludingFragmentTask();
         ftask.setShouldUndo(response.shouldCommit() == false);
         assert(ftask.isFinalTask() == true);
 
@@ -199,6 +209,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                 m_missingDependencies.clear();
             if (!isReadOnly) {
                 m_site.rollbackTransaction(isReadOnly);
+                m_didRollback = true;
             }
         }
 
@@ -240,6 +251,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
             else
             {
                 m_site.rollbackTransaction(isReadOnly);
+                m_didRollback = true;
                 m_done = true;
             }
         }
@@ -314,6 +326,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
             }
             m_readyWorkUnits.clear();
             m_site.rollbackTransaction(isReadOnly);
+            m_didRollback = true;
             m_done = true;
             return;
         }
@@ -379,6 +392,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
             else
             {
                 m_site.rollbackTransaction(isReadOnly);
+                m_didRollback = true;
                 m_done = true;
             }
         }
@@ -474,19 +488,21 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     {
         // remove failed sites from the non-coordinating lists
         // and decrement expected dependency response count
-        ArrayDeque<Integer> newlist = new ArrayDeque<Integer>(m_nonCoordinatingSites.length);
-        for (int i=0; i < m_nonCoordinatingSites.length; ++i) {
-            if (!failedSites.contains(m_nonCoordinatingSites[i])) {
+        if (m_nonCoordinatingSites != null) {
+            ArrayDeque<Integer> newlist = new ArrayDeque<Integer>(m_nonCoordinatingSites.length);
+            for (int i=0; i < m_nonCoordinatingSites.length; ++i) {
+                if (!failedSites.contains(m_nonCoordinatingSites[i])) {
                 newlist.addLast(m_nonCoordinatingSites[i]);
+                }
+            }
+
+            m_nonCoordinatingSites = new int[newlist.size()];
+            for (int i=0; i < m_nonCoordinatingSites.length; ++i) {
+                m_nonCoordinatingSites[i] = newlist.removeFirst();
             }
         }
 
-        m_nonCoordinatingSites = new int[newlist.size()];
-        for (int i=0; i < m_nonCoordinatingSites.length; ++i) {
-            m_nonCoordinatingSites[i] = newlist.removeFirst();
-        }
-
-        // fix work units
+        // fix work units -- izzy to the rescue.
     }
 
     // STUFF BELOW HERE IS REALY ONLY FOR SYSPROCS

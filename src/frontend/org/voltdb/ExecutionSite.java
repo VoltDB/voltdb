@@ -188,7 +188,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         }
     }
 
-    private static class ExecutionSiteNodeFailureMessage extends VoltMessage
+    static class ExecutionSiteNodeFailureMessage extends VoltMessage
     {
         final int m_failedHostId;
         ExecutionSiteNodeFailureMessage(int failedHostId) {
@@ -648,7 +648,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 DumpManager.putDump(m_dumpId, m_currentDumpTimestamp, true, getDumpContents());
         }
         else if (message instanceof ExecutionSiteNodeFailureMessage) {
-            handleNodeFault(((ExecutionSiteNodeFailureMessage)message).m_failedHostId);
+            discoverGlobalFaultData(((ExecutionSiteNodeFailureMessage)message).m_failedHostId);
         }
         else {
             hostLog.l7dlog(Level.FATAL, LogKeys.org_voltdb_dtxn_SimpleDtxnConnection_UnkownMessageClass.name(),
@@ -700,19 +700,41 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     }
 
     /**
-     * Process a node failure detection.
-     * @param hostId
+     * Find the global commit point and the global initiator point for the
+     * failed host. (See handleNodeFault for details).
+     *
+     * This is stubbed for now. Requires collecting the greatest committed
+     * txn id from the surviving nodes and the greatest 2PC transaction id
+     * from any initiator on the failed node from the surviving nodes.
+
+     * @param failedHostId the host id of the failed node.
      */
-    void handleNodeFault(int hostId) {
+    public static long globalCommitPt = Long.MAX_VALUE;    // public stub for testcase
+    public static long globalInitPt = Long.MAX_VALUE;      // public stub for testcase
+    private void discoverGlobalFaultData(int failedHostId)
+    {
+        // send a bunch of messages
+        // spin on mailbox rcv, maybe blocking on Ariel's new subjects?
+        // get the global maximums.
+        // make some snide comments about multiple concurrent failures
+        // call:
+        handleNodeFault(failedHostId, globalCommitPt, globalInitPt);
+    }
 
-        // Note: different sites can process UpdateCatalog sysproc
-        // and handleNodeFault() in different orders. Adding
-        // new procedures (or other supported catalog changes) must
-        // be commutative with handleNodeFault.
-
-        // 0. Determine greatest committed txnId and  greatest safe txnId
-        long globalCommitPoint = Long.MAX_VALUE;
-        long globalInitiationPoint = Long.MAX_VALUE;
+    /**
+     * Process a node failure detection.
+     *
+     * Different sites can process UpdateCatalog sysproc and handleNodeFault()
+     * in different orders. UpdateCatalog changes MUST be commutative with
+     * handleNodeFault.
+     *
+     * @param hostId the failed node's host id.
+     * @param globalCommitPoint the surviving cluster's greatest committed transaction id
+     * @param globalInitiationPoint the greatest transaction id acknowledged as globally
+     * 2PC to any surviving cluster execution site by the failed initiator.
+     *
+     */
+    void handleNodeFault(int hostId, long globalCommitPoint, long globalInitiationPoint) {
 
         // 1. fix context and associated site tracker and find
         // the dead sites corresponding to the failed host id.
@@ -729,7 +751,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             }
         }
 
-        // 3. correct transaction states internals and commit
+        // 3. correct transaction state internals and commit
         // or remove affected transactions from RPQ and txnId hash.
         Iterator<Long> it = m_transactionsById.keySet().iterator();
         while (it.hasNext())
@@ -750,21 +772,24 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
 
             // Multipartition transaction without a surviving coordinator:
             // Commit a txn that is in progress and committed elsewhere.
-            // Must have lost the commit message during the failure.
+            // (Must have lost the commit message during the failure.)
             // Otherwise, without a coordinator, the transaction can't
-            // continue. Must destroy it.
+            // continue. Must rollback, if in progress, or fault it
+            // from the queues if not yet started.
             else if (ts instanceof MultiPartitionParticipantTxnState &&
                      failedSites.contains(ts.coordinatorSiteId))
             {
+                MultiPartitionParticipantTxnState mpts = (MultiPartitionParticipantTxnState) ts;
                 if (ts.isInProgress() && ts.txnId <= globalCommitPoint)
                 {
-                    System.err.println("Commit in-progress MP on failure, not supported.");
-                    VoltDB.crashVoltDB();
+                    FragmentTaskMessage ft = mpts.createConcludingFragmentTask();
+                    ft.setShouldUndo(false);
+                    m_mailbox.deliver(ft);
                 }
                 else if (ts.isInProgress() && ts.txnId > globalCommitPoint) {
-                    // rollback -- make up a rollback message for the mbox.
-                    System.err.println("Rollback in-progress MP on failure, not supported.");
-                    VoltDB.crashVoltDB();
+                    FragmentTaskMessage ft = mpts.createConcludingFragmentTask();
+                    ft.setShouldUndo(true);
+                    m_mailbox.deliver(ft);
                 }
                 else
                 {
