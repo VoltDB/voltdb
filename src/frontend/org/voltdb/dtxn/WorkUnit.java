@@ -19,6 +19,7 @@ package org.voltdb.dtxn;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.Map.Entry;
@@ -42,7 +43,102 @@ import org.voltdb.messaging.VoltMessage;
  * system should probably subclass <code>WorkUnit</code> to taste.
  *
  */
-class WorkUnit {
+class WorkUnit
+{
+    class DependencyTracker
+    {
+        HashMap<Integer, VoltTable> m_results;
+        int m_depId;
+        int m_expectedDeps;
+        HashSet<Integer> m_expectedSites;
+
+        DependencyTracker(int depId, int expectedDeps,
+                          HashSet<Integer> expectedSites)
+        {
+            m_depId = depId;
+            m_results = new HashMap<Integer, VoltTable>();
+            m_expectedDeps = expectedDeps;
+            m_expectedSites = expectedSites;
+        }
+
+        boolean addResult(int siteId, int mapId, VoltTable result)
+        {
+            boolean retval = true;
+            if (!(m_results.containsKey(mapId)))
+            {
+                m_results.put(mapId, result);
+            }
+            else
+            {
+                if (!m_results.get(mapId).hasSameContents(result))
+                {
+                    retval = false;
+                }
+            }
+            m_expectedSites.remove(siteId);
+            m_expectedDeps--;
+            return retval;
+        }
+
+        void removeSite(int siteId)
+        {
+            // This is a really horrible hack to work around the fact that
+            // we don't know the set of remote sites from which to expect
+            // results for any non-local transaction type other than a
+            // multi-partition transaction that goes to all the sites in the
+            // cluster.  This will keep normal transactions running if
+            // a failure occurs while they're in progress, but system procedures
+            // that depend on odd dependency sets (per-node, 1-1, etc) will
+            // not handle site failures (yet).
+            if ((m_depId & DtxnConstants.MULTIPARTITION_DEPENDENCY) != 0)
+            {
+                if (m_expectedSites.contains((Integer) siteId))
+                {
+                    m_expectedSites.remove((Integer) siteId);
+                }
+            }
+        }
+
+        int size()
+        {
+            return m_results.size();
+        }
+
+        boolean isSatisfied()
+        {
+            if ((m_depId & DtxnConstants.MULTIPARTITION_DEPENDENCY) != 0)
+            {
+                return (m_expectedSites.size() == 0);
+            }
+            else
+            {
+                return (m_expectedDeps == 0);
+            }
+        }
+
+        VoltTable getResult(int mapId)
+        {
+            return m_results.get(mapId);
+        }
+
+        List<VoltTable> getResults()
+        {
+            ArrayList<VoltTable> retval =
+                new ArrayList<VoltTable>(m_results.values());
+            return retval;
+        }
+
+        public int getExpectedDepCount()
+        {
+            return m_expectedDeps;
+        }
+    }
+
+    /**
+     * The list of dependencies for this <code>WorkUnit</code>.
+     * The map is hashed by dependency ID
+     */
+    HashMap<Integer, DependencyTracker> m_dependencies = null;
 
     /**
      * A VoltMessage subclass representing work to be done.
@@ -57,19 +153,11 @@ class WorkUnit {
     int m_taskType = FragmentTaskMessage.USER_PROC;
 
     /**
-     * The list of dependencies for this <code>WorkUnit</code>.
-     * The outer map is hashed by dependency ID, and the inner map
-     * is hashed by partition ID
-     */
-    HashMap<Integer, HashMap<Integer, VoltTable>> m_dependencies = null;
-
-    /**
      * Does this workunit indicate that a running stored procedure
      * that was paused should be resumed?
      */
     boolean m_shouldResumeProcedure = false;
 
-    private int m_unsatisfiedDependencies;
     int m_stackCount = 0;
     boolean commitEvenIfDirty = false;
     boolean nonTransactional = false;
@@ -83,18 +171,6 @@ class WorkUnit {
      */
     VoltMessage getPayload() {
         return m_payload;
-    }
-
-    /**
-     * Get the number of dependencies for this <code>WorkUnit</code>.
-     *
-     * @return The number of dependencies.
-     */
-    int getDependencyCount() {
-        if (m_dependencies == null) {
-            return 0;
-        }
-        return m_dependencies.size();
     }
 
     /**
@@ -121,14 +197,10 @@ class WorkUnit {
             return null;
         }
         List<VoltTable> retval = new ArrayList<VoltTable>();
-        HashMap<Integer, VoltTable> deps_by_partition =
-            m_dependencies.get(dependencyId);
-        if (deps_by_partition != null)
+        DependencyTracker dep_tracker = m_dependencies.get(dependencyId);
+        if (dep_tracker != null)
         {
-            for (VoltTable dep : deps_by_partition.values())
-            {
-                retval.add(dep);
-            }
+            retval = dep_tracker.getResults();
         }
         return retval;
     }
@@ -150,7 +222,6 @@ class WorkUnit {
         return retval;
     }
 
-
     /**
      * Does this workunit indicate that a running stored procedure
      * that was paused should be resumed?
@@ -161,7 +232,11 @@ class WorkUnit {
         return m_shouldResumeProcedure;
     }
 
-    WorkUnit(SiteTracker siteTracker, VoltMessage payload, int[] dependencyIds, boolean shouldResumeProcedure) {
+    WorkUnit(SiteTracker siteTracker, VoltMessage payload,
+             int[] dependencyIds, int siteId,
+             int[] nonCoordinatingSiteIds,
+             boolean shouldResumeProcedure)
+    {
         this.m_payload = payload;
         m_shouldResumeProcedure = shouldResumeProcedure;
         if (payload != null && payload instanceof FragmentTaskMessage)
@@ -169,26 +244,32 @@ class WorkUnit {
             m_taskType = ((FragmentTaskMessage) payload).getFragmentTaskType();
         }
 
-        m_unsatisfiedDependencies = 0;
         if (dependencyIds != null && dependencyIds.length > 0) {
-            m_dependencies = new HashMap<Integer, HashMap<Integer, VoltTable>>();
+            m_dependencies = new HashMap<Integer, DependencyTracker>();
             for (int dependency : dependencyIds) {
                 int depsToExpect = 1;
+                HashSet<Integer> expected_sites = new HashSet<Integer>();
+                expected_sites.add(siteId);
                 if ((dependency & DtxnConstants.MULTIPARTITION_DEPENDENCY) != 0) {
                     depsToExpect = siteTracker.getLiveSiteCount();
+                    for (Integer site_id : nonCoordinatingSiteIds)
+                    {
+                        expected_sites.add(site_id);
+                    }
                 }
                 else if ((dependency & DtxnConstants.MULTINODE_DEPENDENCY) != 0) {
                     depsToExpect = siteTracker.getLiveInitiatorCount();
                 }
-                m_unsatisfiedDependencies += depsToExpect;
-                m_dependencies.put(dependency, new HashMap<Integer, VoltTable>());
+                m_dependencies.put(dependency,
+                                   new DependencyTracker(dependency,
+                                                         depsToExpect,
+                                                         expected_sites));
             }
         }
     }
 
     void putDependency(int dependencyId, int siteId, VoltTable payload) {
         assert payload != null;
-        assert m_unsatisfiedDependencies > 0;
         assert m_dependencies != null;
         assert m_dependencies.containsKey(dependencyId);
         assert m_dependencies.get(dependencyId) != null;
@@ -199,27 +280,43 @@ class WorkUnit {
         {
             map_id = siteId;
         }
-        if (!(m_dependencies.get(dependencyId).containsKey(map_id)))
+
+        boolean duplicate_okay =
+            m_dependencies.get(dependencyId).addResult(siteId, map_id, payload);
+        if (!duplicate_okay)
         {
-            m_dependencies.get(dependencyId).put(map_id, payload);
+            String msg = "Mismatched results received for partition: " + partition;
+            msg += "\n  from execution site: " + siteId;
+            msg += "\n  Original results: " + m_dependencies.get(dependencyId).getResult(map_id).toString();
+            msg += "\n  Mismatched results: " + payload.toString();
+            throw new RuntimeException(msg);
         }
-        else
-        {
-            // do a comparison of the results and choke if they differ
-            if (!m_dependencies.get(dependencyId).get(map_id).hasSameContents(payload))
-            {
-                String msg = "Mismatched results received for partition: " + partition;
-                msg += "\n  from execution site: " + siteId;
-                msg += "\n  Original results: " + m_dependencies.get(dependencyId).get(map_id).toString();
-                msg += "\n  Mismatched results: " + payload.toString();
-                throw new RuntimeException(msg);
-            }
-        }
-        m_unsatisfiedDependencies--;
     }
 
     boolean allDependenciesSatisfied() {
-        return (m_unsatisfiedDependencies == 0) && (m_stackCount == 0);
+        boolean satisfied = true;
+        if (m_dependencies != null)
+        {
+            for (DependencyTracker tracker : m_dependencies.values())
+            {
+                if (!tracker.isSatisfied())
+                {
+                    satisfied = false;
+                }
+            }
+        }
+        return satisfied && (m_stackCount == 0);
+    }
+
+    void removeSite(int siteId)
+    {
+        if (m_dependencies != null)
+        {
+            for (DependencyTracker tracker : m_dependencies.values())
+            {
+                tracker.removeSite(siteId);
+            }
+        }
     }
 
     /** Return a simplified, flat version of this objects state for dumping */
@@ -229,15 +326,16 @@ class WorkUnit {
         if (m_payload != null)
             retval.payload = m_payload.toString();
         retval.shouldResume = m_shouldResumeProcedure;
-        retval.outstandingDependencyCount = m_unsatisfiedDependencies;
+        retval.outstandingDependencyCount = 0;
         if (m_dependencies != null) {
             retval.dependencies = new DependencyState[m_dependencies.size()];
             int i = 0;
-            for (Entry<Integer, HashMap<Integer, VoltTable>> entry : m_dependencies.entrySet())
+            for (Entry<Integer, DependencyTracker> entry : m_dependencies.entrySet())
             {
                 DependencyState ds = new DependencyState();
                 ds.dependencyId = entry.getKey();
                 ds.count = entry.getValue().size();
+                retval.outstandingDependencyCount += entry.getValue().getExpectedDepCount();
                 retval.dependencies[i++] = ds;
             }
         }

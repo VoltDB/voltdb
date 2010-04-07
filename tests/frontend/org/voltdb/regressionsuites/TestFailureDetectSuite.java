@@ -44,21 +44,12 @@ public class TestFailureDetectSuite extends RegressionSuite
         assertEquals(1, results[0].getRowCount());
         LocalCluster config = (LocalCluster) m_config;
         config.shutDownSingleHost(0);
-        try
+        for (int i = 0; i < 100; i++)
         {
-            Thread.sleep(1000);
+            results = client.callProcedure("SelectMultiPart");
+            System.out.println(results[0].toString());
+            assertEquals(1, results[0].getRowCount());
         }
-        catch (InterruptedException e)
-        {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-        //for (int i = 0; i < 100; i++)
-        //{
-//            results = client.callProcedure("SelectMultiPart");
-//            System.out.println(results[0].toString());
-//            assertEquals(1, results[0].getRowCount());
-        //}
     }
 
     public void testSinglePartitionTxnAfterFailure()

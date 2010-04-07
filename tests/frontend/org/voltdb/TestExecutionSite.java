@@ -498,5 +498,45 @@ public class TestExecutionSite extends TestCase {
 
     }
 
+    /*
+     * Show that a multi-partition transaction proceeds if one of the participants
+     * fails
+     */
+    public void testFailedMultiPartitionParticipant() throws InterruptedException {
+        final boolean readOnly = false, singlePartition = false;
+        Thread es1;
 
+        final StoredProcedureInvocation tx1_spi = new StoredProcedureInvocation();
+        tx1_spi.setProcName("org.voltdb.TestExecutionSite$MockMPVoltProcedure");
+        tx1_spi.setParams(new Integer(0));
+
+        // site 1 is the coordinator
+        final InitiateTaskMessage tx1_mn_1 =
+            new InitiateTaskMessage(initiator1, site1, 1000, readOnly, singlePartition, tx1_spi, Long.MAX_VALUE);
+        tx1_mn_1.setNonCoordinatorSites(new int[] {site2});
+
+        final MultiPartitionParticipantTxnState tx1_1 =
+            new MultiPartitionParticipantTxnState(m_mboxes[site1], m_sites[site1], tx1_mn_1);
+
+        // Site 2 won't exist, we'll claim it fails
+
+        // pre-conditions
+        int callcheck = MockMPVoltProcedure.m_called;
+        assertFalse(tx1_1.isDone());
+        m_sites[site1].m_transactionsById.put(tx1_1.txnId, tx1_1);
+
+        // execute transaction
+        es1 = new Thread(new Runnable() {
+            public void run() {m_sites[site1].recursableRun(tx1_1);}});
+        es1.start();
+
+        m_mboxes[site1].deliver(new ExecutionSite.ExecutionSiteNodeFailureMessage(host2));
+
+        es1.join();
+
+        // post-conditions
+        assertTrue(tx1_1.isDone());
+        assertEquals(null, m_sites[site1].m_transactionsById.get(tx1_1.txnId));
+        assertEquals((++callcheck), MockMPVoltProcedure.m_called);
+    }
 }

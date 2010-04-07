@@ -201,6 +201,23 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         protected void initFromBuffer() {} // can be empty if only used locally
     }
 
+    // This message is used locally to get the currently active TransactionState
+    // to check whether or not its WorkUnit's dependencies have been satisfied.
+    // Necessary after handling a node failure.
+    static class CheckTxnStateCompletionMessage extends VoltMessage
+    {
+        final long m_txnId;
+        CheckTxnStateCompletionMessage(long txnId)
+        {
+            m_txnId = txnId;
+        }
+
+        @Override
+        protected void flattenToBuffer(DBBPool pool) {} // can be empty if only used locally
+        @Override
+        protected void initFromBuffer() {} // can be empty if only used locally
+    }
+
     private class ExecutionSiteNodeFailureFaultHandler implements FaultHandler
     {
         @Override
@@ -650,6 +667,12 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         else if (message instanceof ExecutionSiteNodeFailureMessage) {
             discoverGlobalFaultData(((ExecutionSiteNodeFailureMessage)message).m_failedHostId);
         }
+        else if (message instanceof CheckTxnStateCompletionMessage) {
+            long txn_id = ((CheckTxnStateCompletionMessage)message).m_txnId;
+            TransactionState txnState = m_transactionsById.get(txn_id);
+            assert(txnState instanceof MultiPartitionParticipantTxnState);
+            ((MultiPartitionParticipantTxnState)txnState).checkWorkUnits();
+        }
         else {
             hostLog.l7dlog(Level.FATAL, LogKeys.org_voltdb_dtxn_SimpleDtxnConnection_UnkownMessageClass.name(),
                            new Object[] { message.getClass().getName() }, null);
@@ -797,6 +820,19 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                              " as a result of host failure at node " + hostId);
                     it.remove();
                     m_transactionQueue.faultTransaction(ts);
+                }
+            }
+            // If we're the coordinator, then after we clean up our internal
+            // state due to a failed node, we need to poke ourselves to check
+            // to see if all the remaining dependencies are satisfied.  Do this
+            // with a message to our mailbox so that happens in the
+            // execution site thread
+            else if (ts instanceof MultiPartitionParticipantTxnState &&
+                     ts.coordinatorSiteId == m_siteId)
+            {
+                if (ts.isInProgress())
+                {
+                    m_mailbox.deliver(new CheckTxnStateCompletionMessage(ts.txnId));
                 }
             }
         }

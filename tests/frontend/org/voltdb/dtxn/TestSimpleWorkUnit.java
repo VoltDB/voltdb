@@ -70,8 +70,8 @@ public class TestSimpleWorkUnit extends TestCase
     {
         assert (numHosts >= replicas);
         assert(((numParts * replicas) % numHosts) == 0);
-        int sites_per_host = (numParts * replicas) / numHosts;
         assert(numHosts % replicas == 0);
+        int sites_per_host = (numParts * replicas) / numHosts;
         for (int i = 0; i < numHosts; i++)
         {
             m_voltdb.addHost(i);
@@ -106,33 +106,43 @@ public class TestSimpleWorkUnit extends TestCase
 
     public void testNoDependenciesNoReplicas() {
         setUpSites(1, 2, 1);
-        WorkUnit w = new WorkUnit(m_voltdb.getCatalogContext().siteTracker, work, new int[]{}, false);
+        WorkUnit w = new WorkUnit(m_voltdb.getCatalogContext().siteTracker,
+                                  work, new int[]{}, 0, null, false);
         assertTrue(w.allDependenciesSatisfied());
         assertEquals(work, w.getPayload());
         assertNull(w.getDependencies());
         assertNull(w.getDependency(0));
 
-        w = new WorkUnit(m_voltdb.getCatalogContext().siteTracker, work, null, false);
+        w = new WorkUnit(m_voltdb.getCatalogContext().siteTracker, work, null,
+                         0, null, false);
         assertTrue(w.allDependenciesSatisfied());
     }
 
     public void testDependenciesNoReplicas() {
         setUpSites(1, 2, 1);
-        WorkUnit w = new WorkUnit(m_voltdb.getCatalogContext().siteTracker, work, new int[]{ 4, 5 }, false);
+        System.out.println(m_voltdb.getCatalogContext().catalog.serialize());
+        int multi_dep = 5 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+        WorkUnit w = new WorkUnit(m_voltdb.getCatalogContext().siteTracker,
+                                  work, new int[]{ 4, multi_dep }, 0,
+                                  new int[]{1}, false);
         assertFalse(w.allDependenciesSatisfied());
         assertEquals(w.getDependency(4).size(), 0);
-        assertEquals(w.getDependency(5).size(), 0);
+        assertEquals(w.getDependency(multi_dep).size(), 0);
         w.putDependency(4, 0, t1);
         assertFalse(w.allDependenciesSatisfied());
-        w.putDependency(5, 0, t2);
+        w.putDependency(multi_dep, 0, t2);
+        assertFalse(w.allDependenciesSatisfied());
+        w.putDependency(multi_dep, 1, t2);
         assertTrue(w.allDependenciesSatisfied());
         assertEquals(t1, w.getDependency(4).get(0));
-        assertEquals(t2, w.getDependency(5).get(0));
+        assertEquals(t2, w.getDependency(multi_dep).get(0));
     }
 
     public void testBadPutDependencyNoReplicas() {
         setUpSites(1, 2, 1);
-        WorkUnit w = new WorkUnit(m_voltdb.getCatalogContext().siteTracker, work, new int[]{ 4, 5 }, false);
+        WorkUnit w = new WorkUnit(m_voltdb.getCatalogContext().siteTracker,
+                                  work, new int[]{ 4, 5 }, 0,
+                                  new int[]{1}, false);
 
         // Put a dependency that does not exist
         try {
@@ -156,10 +166,12 @@ public class TestSimpleWorkUnit extends TestCase
 
     public void testDependenciesWithReplicas()
     {
-        setUpSites(2, 2, 1);
+        setUpSites(2, 2, 2);
+        System.out.println(m_voltdb.getCatalogContext().catalog.serialize());
         int multi_dep = 5 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
         WorkUnit w = new WorkUnit(m_voltdb.getCatalogContext().siteTracker,
-                                  work, new int[]{ 4, multi_dep }, false);
+                                  work, new int[]{ 4, multi_dep }, 0,
+                                  new int[]{1, 2, 3}, false);
         assertFalse(w.allDependenciesSatisfied());
         assertEquals(w.getDependency(4).size(), 0);
         assertEquals(w.getDependency(5).size(), 0);
@@ -168,10 +180,14 @@ public class TestSimpleWorkUnit extends TestCase
         w.putDependency(multi_dep, 0, t2);
         assertFalse(w.allDependenciesSatisfied());
         w.putDependency(multi_dep, 1, t2);
+        assertFalse(w.allDependenciesSatisfied());
+        w.putDependency(multi_dep, 2, t2);
+        assertFalse(w.allDependenciesSatisfied());
+        w.putDependency(multi_dep, 3, t2);
         assertTrue(w.allDependenciesSatisfied());
         assertEquals(1, w.getDependency(4).size());
         assertEquals(t1, w.getDependency(4).get(0));
-        assertEquals(1, w.getDependency(multi_dep).size());
+        assertEquals(2, w.getDependency(multi_dep).size());
         assertEquals(t2, w.getDependency(multi_dep).get(0));
     }
 
@@ -186,7 +202,8 @@ public class TestSimpleWorkUnit extends TestCase
         setUpSites(2, 2, 1);
         int multi_dep = 5 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
         WorkUnit w = new WorkUnit(m_voltdb.getCatalogContext().siteTracker,
-                                  work, new int[]{ 4, multi_dep }, false);
+                                  work, new int[]{ 4, multi_dep }, 0,
+                                  new int[]{1, 2, 3}, false);
         assertFalse(w.allDependenciesSatisfied());
         assertEquals(w.getDependency(4).size(), 0);
         assertEquals(w.getDependency(5).size(), 0);
@@ -205,4 +222,33 @@ public class TestSimpleWorkUnit extends TestCase
         }
         assertTrue(threw);
     }
+
+    public void testDependenciesWithReplicasAndFailure()
+    {
+        setUpSites(2, 2, 2);
+        System.out.println(m_voltdb.getCatalogContext().catalog.serialize());
+        int multi_dep = 5 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+        WorkUnit w = new WorkUnit(m_voltdb.getCatalogContext().siteTracker,
+                                  work, new int[]{ 4, multi_dep }, 0,
+                                  new int[]{1, 2, 3}, false);
+        assertFalse(w.allDependenciesSatisfied());
+        assertEquals(w.getDependency(4).size(), 0);
+        assertEquals(w.getDependency(5).size(), 0);
+        w.putDependency(4, 0, t1);
+        assertFalse(w.allDependenciesSatisfied());
+        w.putDependency(multi_dep, 0, t2);
+        assertFalse(w.allDependenciesSatisfied());
+        w.putDependency(multi_dep, 1, t2);
+        assertFalse(w.allDependenciesSatisfied());
+        w.putDependency(multi_dep, 2, t2);
+        assertFalse(w.allDependenciesSatisfied());
+        w.removeSite(3);
+        assertTrue(w.allDependenciesSatisfied());
+        assertEquals(1, w.getDependency(4).size());
+        assertEquals(t1, w.getDependency(4).get(0));
+        assertEquals(2, w.getDependency(multi_dep).size());
+        assertEquals(t2, w.getDependency(multi_dep).get(0));
+    }
+
+    // add tests for Node-level dependency
 }

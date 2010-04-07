@@ -40,6 +40,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
 
     private final ArrayDeque<WorkUnit> m_readyWorkUnits = new ArrayDeque<WorkUnit>();
     private boolean m_isCoordinator;
+    private int m_siteId;
     private int[] m_nonCoordinatingSites;
     private boolean m_shouldResumeProcedure = false;
     private boolean m_hasStartedWork = false;
@@ -62,6 +63,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                                              TransactionInfoBaseMessage notice)
     {
         super(mbox, site, notice);
+        m_siteId = site.getSiteId();
         m_nonCoordinatingSites = null;
         m_isCoordinator = false;
         if (notice instanceof InitiateTaskMessage)
@@ -69,7 +71,9 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
             m_isCoordinator = true;
             InitiateTaskMessage task = (InitiateTaskMessage) notice;
             m_nonCoordinatingSites = task.getNonCoordinatorSites();
-            m_readyWorkUnits.add(new WorkUnit(site.getSiteTracker(), task, null, false));
+            m_readyWorkUnits.add(new WorkUnit(site.getSiteTracker(), task,
+                                              null, m_siteId,
+                                              null, false));
         }
     }
 
@@ -276,7 +280,8 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         assert(dependencies != null);
         assert(dependencies.length > 0);
 
-        WorkUnit w = new WorkUnit(m_site.getSiteTracker(), null, dependencies, true);
+        WorkUnit w = new WorkUnit(m_site.getSiteTracker(), null, dependencies,
+                                  m_siteId, m_nonCoordinatingSites, true);
         if (isFinal)
             w.nonTransactional = true;
         for (int depId : dependencies) {
@@ -341,7 +346,8 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         //    the transaction is clean (and stays clean after this work)
         if ((!m_isCoordinator) && (task.isFinalTask())) {
             // add a workunit that will commit the txn
-            WorkUnit wu = new WorkUnit(m_site.getSiteTracker(), null, null, false);
+            WorkUnit wu = new WorkUnit(m_site.getSiteTracker(), null, null,
+                                       m_siteId, null, false);
             wu.commitEvenIfDirty = task.getFragmentCount() == 0;
             m_readyWorkUnits.add(wu);
         }
@@ -351,7 +357,9 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     {
         if (task.getFragmentCount() <= 0) return;
 
-        WorkUnit w = new WorkUnit(m_site.getSiteTracker(), task, task.getAllUnorderedInputDepIds(), false);
+        WorkUnit w = new WorkUnit(m_site.getSiteTracker(), task,
+                                  task.getAllUnorderedInputDepIds(),
+                                  m_siteId, m_nonCoordinatingSites, false);
         w.nonTransactional = nonTransactional;
 
         for (int i = 0; i < task.getFragmentCount(); i++) {
@@ -418,29 +426,42 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
 
             w.putDependency(dependencyId, response.getExecutorSiteId(),
                             payload);
-            if (w.allDependenciesSatisfied()) {
-                for (int depId : w.getDependencyIds())
-                    m_missingDependencies.remove(depId);
+            checkWorkUnitComplete(w);
+        }
+    }
 
-                // slide this new stack frame drop into the right position
-                // (before any other stack frame drops)
-                if ((w.shouldResumeProcedure()) &&
-                    (m_readyWorkUnits.peekLast() != null) &&
-                    (m_readyWorkUnits.peekLast().shouldResumeProcedure())) {
+    void checkWorkUnitComplete(WorkUnit w)
+    {
+        if (w.allDependenciesSatisfied()) {
+            for (int depId : w.getDependencyIds())
+                m_missingDependencies.remove(depId);
 
-                    ArrayDeque<WorkUnit> deque = new ArrayDeque<WorkUnit>();
-                    while ((m_readyWorkUnits.peekLast() != null) &&
-                           (m_readyWorkUnits.peekLast().shouldResumeProcedure())) {
-                        deque.add(m_readyWorkUnits.pollLast());
-                    }
-                    deque.add(w);
-                    while (deque.size() > 0)
-                        m_readyWorkUnits.add(deque.pollLast());
+            // slide this new stack frame drop into the right position
+            // (before any other stack frame drops)
+            if ((w.shouldResumeProcedure()) &&
+                (m_readyWorkUnits.peekLast() != null) &&
+                (m_readyWorkUnits.peekLast().shouldResumeProcedure())) {
+
+                ArrayDeque<WorkUnit> deque = new ArrayDeque<WorkUnit>();
+                while ((m_readyWorkUnits.peekLast() != null) &&
+                       (m_readyWorkUnits.peekLast().shouldResumeProcedure())) {
+                    deque.add(m_readyWorkUnits.pollLast());
                 }
-                else {
-                    m_readyWorkUnits.add(w);
-                }
+                deque.add(w);
+                while (deque.size() > 0)
+                    m_readyWorkUnits.add(deque.pollLast());
             }
+            else {
+                m_readyWorkUnits.add(w);
+            }
+        }
+    }
+
+    public void checkWorkUnits()
+    {
+        for (WorkUnit w : m_missingDependencies.values())
+        {
+            checkWorkUnitComplete(w);
         }
     }
 
@@ -502,7 +523,18 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
             }
         }
 
-        // fix work units -- izzy to the rescue.
+        // Remove failed sites from all of the outstanding work units that
+        // may be expecting dependencies from now-dead sites.
+        if (m_missingDependencies != null)
+        {
+            for (WorkUnit wu : m_missingDependencies.values())
+            {
+                for (Integer site_id : failedSites)
+                {
+                    wu.removeSite(site_id);
+                }
+            }
+        }
     }
 
     // STUFF BELOW HERE IS REALY ONLY FOR SYSPROCS
