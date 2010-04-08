@@ -206,7 +206,11 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         m_fos.getFD().sync();
         m_channel.position(8);
         ByteBuffer completed = ByteBuffer.allocate(1);
-        completed.put((byte)1).flip();
+        if (m_writeFailed) {
+            completed.put((byte)0).flip();
+        } else {
+            completed.put((byte)1).flip();
+        }
         m_channel.write(completed);
         m_fos.getFD().sync();
         m_channel.close();

@@ -105,6 +105,10 @@ public class TableSaveFile
             m_continueOnCorruptedChunk = continueOnCorruptedChunk;
 
             final CRC32 crc = new CRC32();
+            /*
+             * If the CRC check fails because the file wasn't completed
+             */
+            final CRC32 secondCRC = new CRC32();
 
             /*
              * Get the header with the save restore specific information
@@ -120,6 +124,7 @@ public class TableSaveFile
             final int originalCRC = lengthBuffer.getInt();
             int length = lengthBuffer.getInt();
             crc.update(lengthBuffer.array(), 4, 4);
+            secondCRC.update(lengthBuffer.array(), 4, 4);
 
             if (length < 0) {
                 throw new IOException("Corrupted save file has negative header length");
@@ -138,6 +143,8 @@ public class TableSaveFile
             }
             saveRestoreHeader.flip();
             crc.update(saveRestoreHeader.array());
+            secondCRC.update(new byte[] { 1 });
+            secondCRC.update(saveRestoreHeader.array(), 1, saveRestoreHeader.array().length - 1);
 
             /*
              *  Get the template for the VoltTable serialization header.
@@ -160,6 +167,7 @@ public class TableSaveFile
                 }
             }
             crc.update(lengthBuffer.array(), 0, 4);
+            secondCRC.update(lengthBuffer.array(), 0, 4);
             lengthBuffer.flip();
             length = lengthBuffer.getInt();
 
@@ -180,14 +188,26 @@ public class TableSaveFile
                 }
             }
             crc.update(m_tableHeader.array(), 4, length);
+            secondCRC.update(m_tableHeader.array(), 4, length);
+
+            boolean failedCRCDueToNotCompleted = false;
 
             final int actualCRC = (int)crc.getValue();
             if (originalCRC != actualCRC) {
-                throw new IOException("Checksum mismatch");
+                /*
+                 * Check if the CRC mismatch is due to the snapshot not being completed
+                 */
+                final int secondCRCValue = (int)secondCRC.getValue();
+                if (secondCRCValue == originalCRC) {
+                    failedCRCDueToNotCompleted = true;
+                } else {
+                    throw new IOException("Checksum mismatch");
+                }
             }
 
             FastDeserializer fd = new FastDeserializer(saveRestoreHeader);
-            m_completed = fd.readByte() == 1 ? true : false;
+            byte completedByte = fd.readByte();
+            m_completed = failedCRCDueToNotCompleted ? false : (completedByte == 1 ? true : false);
             for (int ii = 0; ii < 4; ii++) {
                 m_versionNum[ii] = fd.readInt();
             }
@@ -200,10 +220,18 @@ public class TableSaveFile
             m_isReplicated = fd.readBoolean();
             if (!m_isReplicated) {
                 m_partitionIds = (int[])fd.readArray(int.class);
+                if (!m_completed) {
+                    for (Integer partitionId : m_partitionIds) {
+                        m_corruptedPartitions.add(partitionId);
+                    }
+                }
                 m_totalPartitions = fd.readInt();
             } else {
                 m_partitionIds = new int[] {0};
                 m_totalPartitions = 1;
+                if (!m_completed) {
+                    m_corruptedPartitions.add(0);
+                }
             }
             /*
              * Several runtime exceptions can be thrown in valid failure cases where

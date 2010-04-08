@@ -23,9 +23,7 @@
 
 package org.voltdb.regressionsuites;
 
-import java.io.File;
-import java.io.FilenameFilter;
-import java.io.IOException;
+import java.io.*;
 
 import junit.framework.Test;
 
@@ -45,6 +43,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.regressionsuites.saverestore.CatalogChangeSingleProcessServer;
 import org.voltdb.regressionsuites.saverestore.SaveRestoreTestProjectBuilder;
+import org.voltdb.utils.SnapshotVerifier;
 
 /**
  * Test the SnapshotSave and SnapshotRestore system procedures
@@ -94,7 +93,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         }
     }
 
-    private void corruptTestFiles(boolean random) throws Exception
+    private void corruptTestFiles(java.util.Random r) throws Exception
     {
         FilenameFilter cleaner = new FilenameFilter()
         {
@@ -104,23 +103,22 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             }
         };
 
-        java.util.Random r;
-        if (random) {
-            r = new java.util.Random();
-        } else {
-            r = new java.util.Random(0);
-        }
-
         File tmp_dir = new File(TMPDIR);
         File[] tmp_files = tmp_dir.listFiles(cleaner);
         int tmpIndex = r.nextInt(tmp_files.length);
-        int corruptValue = r.nextInt() % 127;
+        byte corruptValue[] = new byte[1];
+        r.nextBytes(corruptValue);
         java.io.RandomAccessFile raf = new java.io.RandomAccessFile( tmp_files[tmpIndex], "rw");
         int corruptPosition = r.nextInt((int)raf.length());
-        System.out.println("Corrupting file " + tmp_files[tmpIndex].getName() +
-                " at byte " + corruptPosition + " with value " + corruptPosition);
         raf.seek(corruptPosition);
-        raf.writeByte(corruptValue);
+        byte currentValue = raf.readByte();
+        while (currentValue == corruptValue[0]) {
+            r.nextBytes(corruptValue);
+        }
+        System.out.println("Corrupting file " + tmp_files[tmpIndex].getName() +
+                " at byte " + corruptPosition + " with value " + corruptValue[0]);
+        raf.seek(corruptPosition);
+        raf.write(corruptValue);
         raf.close();
     }
 
@@ -251,6 +249,33 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         }
     }
 
+    private void validateSnapshot(boolean expectSuccess) {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PrintStream ps = new PrintStream(baos);
+        PrintStream original = System.out;
+        try {
+            System.setOut(ps);
+            String args[] = new String[] {
+                    "--single",
+                    "--name",
+                    TESTNONCE,
+                    "--dirs",
+                    TMPDIR
+            };
+            SnapshotVerifier.main(args);
+            ps.flush();
+            String reportString = baos.toString("UTF-8");
+            if (expectSuccess) {
+                assertTrue(reportString.startsWith("Snapshot valid\n"));
+            } else {
+                assertTrue(reportString.startsWith("Snapshot corrupted\n"));
+            }
+        } catch (UnsupportedEncodingException e) {}
+          finally {
+            System.setOut(original);
+        }
+    }
+
     /*
      * Also does some basic smoke tests
      * of @SnapshotStatus, @SnapshotScan and @SnapshotDelete
@@ -275,6 +300,8 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
         results = client.callProcedure("@SnapshotSave", TMPDIR,
                                        TESTNONCE, (byte)1);
+
+        validateSnapshot(true);
 
         /*
          * Check that snapshot status returns a reasonable result
@@ -409,6 +436,8 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         assertEquals( 7, deleteResults[0].getRowCount());
         tmp_files = tmp_dir.listFiles(cleaner);
         assertEquals( 0, tmp_files.length);
+
+        validateSnapshot(false);
     }
 
     public void testIdleOnlineSnapshot() throws Exception
@@ -445,6 +474,8 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         assertTrue(TESTNONCE.equals(statusResults[0].getString("NONCE")));
         assertFalse( 0 == statusResults[0].getLong("END_TIME"));
         assertTrue("SUCCESS".equals(statusResults[0].getString("RESULT")));
+
+        validateSnapshot(true);
     }
 
     public void testSaveAndRestoreReplicatedTable()
@@ -501,6 +532,8 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         }
         // make sure all sites were loaded
         assertEquals(3, foundItem);
+
+        validateSnapshot(true);
     }
 
     public void testSaveAndRestorePartitionedTable()
@@ -525,7 +558,11 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
         DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = false;
 
+        validateSnapshot(false);
+
         results = saveTables(client);
+
+        validateSnapshot(true);
 
         while (results[0].advanceRow()) {
             if (!results[0].getString("RESULT").equals("SUCCESS")) {
@@ -604,6 +641,8 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
         results = saveTables(client);
 
+        validateSnapshot(false);
+
         try
         {
             results = client.callProcedure("@SnapshotStatus");
@@ -619,6 +658,8 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         DefaultSnapshotDataTarget.m_simulateFullDiskWritingChunk = false;
         deleteTestFiles();
         results = saveTables(client);
+
+        validateSnapshot(true);
 
         // Kill and restart all the execution sites.
         m_config.shutDown();
@@ -674,6 +715,8 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         loadTable(client, "PARTITION_TESTER", partition_table);
         saveTables(client);
 
+        validateSnapshot(true);
+
         // Kill and restart all the execution sites.
         m_config.shutDown();
         deleteTestFiles();
@@ -697,7 +740,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
     {
         int num_replicated_items = 1000;
         int num_partitioned_items = 126;
-
+        java.util.Random r = new java.util.Random(0);
         final int iterations = isValgrind() ? 5 : 100;
 
         for (int ii = 0; ii < iterations; ii++) {
@@ -710,6 +753,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             loadTable(client, "REPLICATED_TESTER", repl_table);
             loadTable(client, "PARTITION_TESTER", partition_table);
             VoltTable results[] = saveTables(client);
+            validateSnapshot(true);
             while (results[0].advanceRow()) {
                 if (results[0].getString("RESULT").equals("FAILURE")) {
                     System.out.println(results[0].getString("ERR_MSG"));
@@ -717,7 +761,8 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                 assertTrue(results[0].getString("RESULT").equals("SUCCESS"));
             }
 
-            corruptTestFiles(false);
+            corruptTestFiles(r);
+            validateSnapshot(false);
             releaseClient(client);
             // Kill and restart all the execution sites.
             m_config.shutDown();
@@ -739,7 +784,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
     {
         int num_replicated_items = 1000;
         int num_partitioned_items = 126;
-
+        java.util.Random r = new java.util.Random();
         final int iterations = isValgrind() ? 5 : 100;
 
         for (int ii = 0; ii < iterations; ii++) {
@@ -753,11 +798,12 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             loadTable(client, "REPLICATED_TESTER", repl_table);
             loadTable(client, "PARTITION_TESTER", partition_table);
             saveTables(client);
-
+            validateSnapshot(true);
             releaseClient(client);
             // Kill and restart all the execution sites.
             m_config.shutDown();
-            corruptTestFiles(true);
+            corruptTestFiles(r);
+            validateSnapshot(false);
             m_config.startUp();
 
             client = getClient();
@@ -825,7 +871,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                                   num_partitioned_chunks);
         VoltTable[] results = null;
         results = saveTables(client);
-
+        validateSnapshot(true);
         // Kill and restart all the execution sites.
         m_config.shutDown();
 
@@ -898,6 +944,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
         VoltTable[] results = null;
         results = saveTables(client);
+        validateSnapshot(true);
 
         // Kill and restart all the execution sites.
         m_config.shutDown();
@@ -982,6 +1029,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         loadTable(client, "CHANGE_TYPES", change_types);
 
         saveTables(client);
+        validateSnapshot(true);
 
         // Kill and restart all the execution sites.
         m_config.shutDown();
@@ -1050,6 +1098,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
         VoltTable[] results = null;
         results = saveTables(client);
+        validateSnapshot(true);
 
         // Kill and restart all the execution sites.
         m_config.shutDown();

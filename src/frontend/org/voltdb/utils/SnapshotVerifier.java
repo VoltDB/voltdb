@@ -101,11 +101,13 @@ public class SnapshotVerifier {
             SnapshotUtil.retrieveSnapshotFiles( new File(directory), snapshots, filter, 0, true);
         }
 
+        if (snapshots.isEmpty()) {
+            System.out.println("Snapshot corrupted");
+            System.out.println("No files found");
+        }
         for (Map.Entry<Long, Snapshot> s : snapshots.entrySet()) {
             System.out.println(SnapshotUtil.generateSnapshotReport(s.getKey(), s.getValue()).getSecond());
         }
-
-        System.exit(0);
     }
 
     private static void printHelpAndQuit( int code) {

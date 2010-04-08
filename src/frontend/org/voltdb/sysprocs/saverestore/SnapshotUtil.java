@@ -170,6 +170,7 @@ public class SnapshotUtil {
         }
 
         public final List<File> m_files = new ArrayList<File>();
+        public final List<Boolean> m_completed = new ArrayList<Boolean>();
         public final List<Set<Integer>> m_validPartitionIds = new ArrayList<Set<Integer>>();
         public final List<Set<Integer>> m_corruptParititionIds = new ArrayList<Set<Integer>>();
         public final List<Integer> m_totalPartitionCounts = new ArrayList<Integer>();
@@ -302,7 +303,7 @@ public class SnapshotUtil {
                         for (Integer partitionId : saveFile.getPartitionIds()) {
                             partitionIds.add(partitionId);
                         }
-                        if (validate) {
+                        if (validate && saveFile.getCompleted()) {
                             while (saveFile.hasMoreChunks()) {
                                 BBContainer cont = saveFile.getNextChunk();
                                 if (cont != null) {
@@ -323,6 +324,7 @@ public class SnapshotUtil {
                             s.m_tableFiles.put(saveFile.getTableName(), tableFiles);
                         }
                         tableFiles.m_files.add(f);
+                        tableFiles.m_completed.add(saveFile.getCompleted());
                         tableFiles.m_validPartitionIds.add(partitionIds);
                         tableFiles.m_corruptParititionIds.add(saveFile.getCorruptedPartitionIds());
                         tableFiles.m_totalPartitionCounts.add(saveFile.getTotalPartitions());
@@ -351,8 +353,8 @@ public class SnapshotUtil {
      * @return
      */
     public static Pair<Boolean, String> generateSnapshotReport(Long snapshotTime, Snapshot snapshot) {
-        StringWriter sw = new StringWriter();
-        PrintWriter pw = new PrintWriter(sw);
+        CharArrayWriter caw = new CharArrayWriter();
+        PrintWriter pw = new PrintWriter(caw);
         boolean snapshotConsistent = true;
         String indentString = "";
         pw.println(indentString + "Date: " + new Date(snapshotTime));
@@ -464,20 +466,21 @@ public class SnapshotUtil {
              * Calculate the set of visible partitions not corrupted partitions
              */
             TreeSet<Integer> partitionsAvailable = new TreeSet<Integer>();
+            int kk = 0;
             for (Set<Integer> validPartitionIds : tableFiles.m_validPartitionIds) {
-                partitionsAvailable.addAll(validPartitionIds);
+                if (tableFiles.m_completed.get(kk++)) {
+                    partitionsAvailable.addAll(validPartitionIds);
+                }
             }
 
             /*
              * Ensure the correct range of partition ids is present
              */
             boolean partitionsPresent = false;
-            if ((partitionsAvailable.size() == totalPartitionCount) &&
+            if ((partitionsAvailable.size() == (tableFiles.m_isReplicated ? 1 : totalPartitionCount)) &&
                 (partitionsAvailable.first() == 0) &&
-                (partitionsAvailable.last() == totalPartitionCount - 1)) {
+                (partitionsAvailable.last() == (tableFiles.m_isReplicated ? 1 : totalPartitionCount) - 1)) {
                 partitionsPresent = true;
-            } else if (!tableFiles.m_isReplicated){
-                snapshotConsistent = false;
             }
 
             /*
@@ -495,10 +498,6 @@ public class SnapshotUtil {
             indentString = indentString + "\t";
             pw.println(indentString + "Replicated: " + entry.getValue().m_isReplicated);
             pw.println(indentString + "Valid partition set available: " + partitionsPresent);
-            if (hasCorruptPartitions) {
-                pw.println("Corrupt partitions may prevent a restore even if the data " +
-                        "is intact and still available in some replica file. This is being work on.");
-            }
             pw.println(indentString + "Corrupt partitions present: " + hasCorruptPartitions);
 
             /*
@@ -531,10 +530,11 @@ public class SnapshotUtil {
                 if (corruptPartitionIdString.isEmpty()) {
                     consistentTablesSeen.add(entry.getKey());
                     pw.println(indentString + tableFiles.m_files.get(ii).getPath() +
-                            " Partitions: " +
+                            " Completed: " + tableFiles.m_completed.get(ii) + " Partitions: " +
                             validPartitionIdString);
                 } else {
                     pw.println(indentString + tableFiles.m_files.get(ii).getPath() +
+                            " Completed: " + tableFiles.m_completed.get(ii) +
                             " Valid Partitions: " +
                             validPartitionIdString +
                             " Corrupt Partitions: " +
@@ -545,14 +545,32 @@ public class SnapshotUtil {
         }
         indentString = indentString.substring(1);
 
+        StringBuilder missingTables = new StringBuilder(8192);
+        if (!consistentTablesSeen.containsAll(digestTablesSeen)) {
+            snapshotConsistent = false;
+            missingTables.append("Missing tables: ");
+            Set<String> missingTablesSet = new TreeSet<String>(digestTablesSeen);
+            missingTablesSet.removeAll(consistentTablesSeen);
+            int hh = 0;
+            for (String tableName : missingTablesSet) {
+                if (hh > 0) {
+                    missingTables.append(", ");
+                }
+                missingTables.append(tableName);
+            }
+            missingTables.append('\n');
+        }
+
         /*
          * Tack on a summary at the beginning to indicate whether a restore is guaranteed to succede
          * with this file set.
          */
         if (snapshotConsistent) {
-            return Pair.of( true, "Snapshot valid\n" + sw.toString());
+            return Pair.of( true, "Snapshot valid\n" + caw.toString());
         } else {
-            return Pair.of( false, "Snapshot corrupted\n" + sw.toString());
+            StringBuilder sb = new StringBuilder(8192);
+            sb.append("Snapshot corrupted\n").append(missingTables).append(caw.toCharArray());
+            return Pair.of( false,  sb.toString());
         }
     }
 }
