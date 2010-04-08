@@ -58,17 +58,7 @@ import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.jni.MockExecutionEngine;
-import org.voltdb.messaging.DebugMessage;
-import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FragmentResponseMessage;
-import org.voltdb.messaging.FragmentTaskMessage;
-import org.voltdb.messaging.HeartbeatMessage;
-import org.voltdb.messaging.InitiateResponseMessage;
-import org.voltdb.messaging.InitiateTaskMessage;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.SiteMailbox;
-import org.voltdb.messaging.TransactionInfoBaseMessage;
-import org.voltdb.messaging.VoltMessage;
+import org.voltdb.messaging.*;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.Encoder;
@@ -722,27 +712,101 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         }
     }
 
+
     /**
      * Find the global commit point and the global initiator point for the
-     * failed host. (See handleNodeFault for details).
+     * failed host.
      *
-     * This is stubbed for now. Requires collecting the greatest committed
-     * txn id from the surviving nodes and the greatest 2PC transaction id
-     * from any initiator on the failed node from the surviving nodes.
-
      * @param failedHostId the host id of the failed node.
      */
-    public static long globalCommitPt = Long.MAX_VALUE;    // public stub for testcase
-    public static long globalInitPt = Long.MAX_VALUE;      // public stub for testcase
     private void discoverGlobalFaultData(int failedHostId)
     {
-        // send a bunch of messages
-        // spin on mailbox rcv, maybe blocking on Ariel's new subjects?
-        // get the global maximums.
-        // make some snide comments about multiple concurrent failures
-        // call:
-        handleNodeFault(failedHostId, globalCommitPt, globalInitPt);
+        // Fix context and associated site tracker first - need
+        // an accurate topology to perform discovery.
+        m_context = VoltDB.instance().getCatalogContext();
+
+        int expectedResponses = discoverGlobalFaultData_send(failedHostId);
+        long[] commit_and_safe = discoverGlobalFaultData_rcv(failedHostId, expectedResponses);
+
+        handleNodeFault(failedHostId, commit_and_safe[0], commit_and_safe[1]);
     }
+
+    /**
+     * Send one message to each surviving execution site providing this site's commit
+     * point and this site's safe txnid (the receiver will filter the later for its
+     * own partition). Do this once for each newly failed initiator.
+     */
+    private int discoverGlobalFaultData_send(int failedHostId)
+    {
+        int expectedResponses = 0;
+        int[] survivors = m_context.siteTracker.getUpExecutionSites();
+
+        try {
+            for (Integer site : m_context.siteTracker.getAllSitesForHost(failedHostId))
+            {
+                if (m_context.siteTracker.getSiteForId(site).getIsexec() == false) {
+                    FailureSiteUpdateMessage srcmsg =
+                        new FailureSiteUpdateMessage(m_siteId,
+                                                     failedHostId,
+                                                     site,
+                                                     m_transactionQueue.getNewestSafeTransactionForInitiator(site),
+                                                     lastCommittedTxnId);
+
+                    m_mailbox.send(survivors, 0, srcmsg);
+                    expectedResponses += (survivors.length);
+                }
+            }
+        }
+        catch (MessagingException e) {
+            // TODO: unsure what to do with this. maybe it implies concurrent failure?
+            e.printStackTrace();
+            VoltDB.crashVoltDB();
+        }
+        return expectedResponses;
+    }
+
+    /**
+     * Collect the failure site update messages from all sites This site sent
+     * its own mailbox the above broadcast the maximum is local to this site.
+     * This also ensures at least one response.
+     *
+     * This can not handle concurrent failures yet.
+     */
+    private long[] discoverGlobalFaultData_rcv(int failedHostId, int expectedResponses)
+    {
+        final int localPartitionId =
+            m_context.siteTracker.getPartitionForSite(m_siteId);
+
+        int responses = 0;
+        long commitPoint = Long.MIN_VALUE;
+        long safeInitPoint = Long.MIN_VALUE;
+
+        do {
+            VoltMessage m = m_mailbox.recvBlocking(Subject.FAILURE_SITE_UPDATE);
+            FailureSiteUpdateMessage fm = (FailureSiteUpdateMessage)m;
+
+            if (fm.m_failedHostId != failedHostId) {
+                System.err.println("ERROR: Can not handle concurrent fault notices yet.");
+                VoltDB.crashVoltDB();
+            }
+
+            ++responses;
+
+            commitPoint =
+                Math.max(commitPoint, fm.m_committedTxnId);
+
+            final int remotePartitionId =
+                m_context.siteTracker.getPartitionForSite(fm.m_sourceSiteId);
+
+            if (remotePartitionId == localPartitionId) {
+                safeInitPoint =
+                    Math.max(safeInitPoint, fm.m_safeTxnId);
+            }
+        } while(responses < expectedResponses);
+
+        return new long[] {commitPoint, safeInitPoint};
+    }
+
 
     /**
      * Process a node failure detection.
@@ -759,14 +823,11 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
      */
     void handleNodeFault(int hostId, long globalCommitPoint, long globalInitiationPoint) {
 
-        // 1. fix context and associated site tracker and find
-        // the dead sites corresponding to the failed host id.
-        m_context = VoltDB.instance().getCatalogContext();
-
+        // Fix safe transaction scoreboard in transaction queue
         ArrayList<Integer> failedSites =
             m_context.siteTracker.getAllSitesForHost(hostId);
 
-        // 2. Fix safe transaction scoreboard in transaction queue
+
         for (Integer i : failedSites)
         {
             if (m_context.siteTracker.getSiteForId(i).getIsexec() == false) {
@@ -774,7 +835,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             }
         }
 
-        // 3. correct transaction state internals and commit
+        // Correct transaction state internals and commit
         // or remove affected transactions from RPQ and txnId hash.
         Iterator<Long> it = m_transactionsById.keySet().iterator();
         while (it.hasNext())

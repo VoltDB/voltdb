@@ -156,6 +156,14 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
         return m_newestSafeTransaction;
     }
 
+    /**
+     * TODO: implement this functionality.
+     * @param context
+     */
+    public long getNewestSafeTransactionForInitiator(int initiatorId) {
+        return Long.MAX_VALUE;
+    }
+
     public void getDumpContents(ExecutorContext context) {
         // set misc scalars
         context.transactionsStarted = m_txnsPopped;

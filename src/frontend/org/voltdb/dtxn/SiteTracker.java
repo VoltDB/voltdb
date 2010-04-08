@@ -328,6 +328,24 @@ public class SiteTracker {
     }
 
     /**
+     * @return An array containing siteds for all up, Isexec() sites.
+     */
+    public int[] getUpExecutionSites()
+    {
+        ArrayDeque<Integer> tmplist = new ArrayDeque<Integer>();
+        for  (Site site : m_sites) {
+            if (site.getIsup() && site.getIsexec()) {
+                tmplist.add(Integer.parseInt(site.getTypeName()));
+            }
+        }
+        int[] retval = new int[tmplist.size()];
+        for (int i=0; i < retval.length; ++i) {
+            retval[i] = tmplist.poll();
+        }
+        return retval;
+    }
+
+    /**
      * @return A Set of all the execution site IDs in the cluster.
      */
     public Set<Integer> getExecutionSiteIds()

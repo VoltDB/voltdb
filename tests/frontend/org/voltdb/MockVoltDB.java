@@ -91,6 +91,10 @@ public class MockVoltDB implements VoltDBInterface
         getSite(siteId).setIsup(true);
     }
 
+    public void killSite(int siteId) {
+        getSite(siteId).setIsup(false);
+    }
+
     public void addSite(int siteId, int hostId, int partitionId, boolean isExec,
                         boolean isUp)
     {
@@ -301,13 +305,6 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void clusterUpdate(String diffCommands)
-    {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
     public Object[] getInstanceId() {
         // TODO Auto-generated method stub
         return null;
@@ -316,6 +313,12 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public BackendTarget getBackendTargetType() {
         return BackendTarget.NONE;
+    }
+
+    @Override
+    public void clusterUpdate(String diffCommands) {
+        // TODO Auto-generated method stub
+
     }
 
 }

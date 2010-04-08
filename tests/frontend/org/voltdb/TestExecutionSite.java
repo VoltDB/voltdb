@@ -57,7 +57,7 @@ public class TestExecutionSite extends TestCase {
     ExecutionSite m_sites[] = new ExecutionSite[2];
     MockMailbox m_mboxes[] = new MockMailbox[2];
 
-    // catalog identifiers (siteX also used as array offsets)
+    // catalog identifiers (siteX also used as array offset)
     int host1 = 0; int site1 = 0; int initiator1 = 100;
     int host2 = 1; int site2 = 1; int initiator2 = 200;
 
@@ -191,6 +191,8 @@ public class TestExecutionSite extends TestCase {
         m_voltdb.setFaultDistributor(new FaultDistributor());
         m_voltdb.addHost(host1);
         m_voltdb.addHost(host2);
+        m_voltdb.addSite(initiator1, host1, 0, false);  // initiator on host 1
+        m_voltdb.addSite(initiator2, host2, 0, false);  // initiator on host 2
         m_voltdb.addPartition(0);
         m_voltdb.addSite(site1, host1, 0, true);
         m_voltdb.addPartition(1);
@@ -354,11 +356,11 @@ public class TestExecutionSite extends TestCase {
         simulate_coordinator_dies_during_commit = true;
 
         // Want the participant to commit
-        ExecutionSite.globalCommitPt = Long.MAX_VALUE;
-        ExecutionSite.globalInitPt = Long.MAX_VALUE;
+        m_sites[site1].lastCommittedTxnId = 50000;
+        m_sites[site2].lastCommittedTxnId = 50000;
 
         boolean test_rollback = false;
-        multipartitionNodeFailure(test_rollback);
+        multipartitionNodeFailure(test_rollback, 50000);
     }
 
     public
@@ -370,11 +372,11 @@ public class TestExecutionSite extends TestCase {
         simulate_coordinator_dies_during_commit = true;
 
         // Want the participant to rollback
-        ExecutionSite.globalCommitPt = Long.MIN_VALUE;
-        ExecutionSite.globalInitPt = Long.MAX_VALUE;
+        m_sites[site1].lastCommittedTxnId = 50000;
+        m_sites[site2].lastCommittedTxnId = 50000;
 
         boolean test_rollback = true;
-        multipartitionNodeFailure(test_rollback);
+        multipartitionNodeFailure(test_rollback, 50001);
     }
 
     /*
@@ -383,7 +385,7 @@ public class TestExecutionSite extends TestCase {
      * this transaction -- and therefore it must commit at this participant.
      */
     private
-    void multipartitionNodeFailure(boolean should_rollback)
+    void multipartitionNodeFailure(boolean should_rollback, long txnid)
     throws InterruptedException
     {
         final boolean readOnly = false, singlePartition = false;
@@ -395,7 +397,7 @@ public class TestExecutionSite extends TestCase {
 
         // site 1 is the coordinator
         final InitiateTaskMessage tx1_mn_1 =
-            new InitiateTaskMessage(initiator1, site1, 1000, readOnly, singlePartition, tx1_spi, Long.MAX_VALUE);
+            new InitiateTaskMessage(initiator1, site1, txnid, readOnly, singlePartition, tx1_spi, Long.MAX_VALUE);
         tx1_mn_1.setNonCoordinatorSites(new int[] {site2});
 
         final MultiPartitionParticipantTxnState tx1_1 =
@@ -403,7 +405,7 @@ public class TestExecutionSite extends TestCase {
 
         // site 2 is a participant
         final MultiPartitionParticipantMessage tx1_mn_2 =
-            new MultiPartitionParticipantMessage(initiator1, site1, 1000, readOnly);
+            new MultiPartitionParticipantMessage(initiator1, site1, txnid, readOnly);
 
         final MultiPartitionParticipantTxnState tx1_2 =
             new MultiPartitionParticipantTxnState(m_mboxes[site2], m_sites[site2], tx1_mn_2);
@@ -426,8 +428,10 @@ public class TestExecutionSite extends TestCase {
 
         es1.join();
 
-        // coordinator is now dead, push a fault notice to the participant.
-        // must supply the host id corresponding to the coordinator site id.
+        // coordinator is now dead. Update the survivor's catalog and
+        // push a fault notice to the participant. Must supply the host id
+        // corresponding to the coordinator site id.
+        m_voltdb.killSite(site1);
         m_mboxes[site2].deliver(new ExecutionSite.ExecutionSiteNodeFailureMessage(host1));
         es2.join();
 
@@ -530,12 +534,14 @@ public class TestExecutionSite extends TestCase {
             public void run() {m_sites[site1].recursableRun(tx1_1);}});
         es1.start();
 
+        m_voltdb.killSite(site2);
         m_mboxes[site1].deliver(new ExecutionSite.ExecutionSiteNodeFailureMessage(host2));
 
         es1.join();
 
         // post-conditions
         assertTrue(tx1_1.isDone());
+        assertFalse(tx1_1.didRollback());
         assertEquals(null, m_sites[site1].m_transactionsById.get(tx1_1.txnId));
         assertEquals((++callcheck), MockMPVoltProcedure.m_called);
     }

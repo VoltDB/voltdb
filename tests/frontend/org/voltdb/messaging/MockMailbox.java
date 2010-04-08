@@ -67,6 +67,7 @@ public class MockMailbox implements Mailbox {
 
     public MockMailbox(LinkedBlockingQueue<VoltMessage> queue) {
         incomingMessages = queue;
+        m_failureNoticeMessages = new LinkedBlockingQueue<VoltMessage>();
     }
 
     public void send(int siteId, int mailboxId, VoltMessage message) throws MessagingException {
@@ -103,19 +104,35 @@ public class MockMailbox implements Mailbox {
     public VoltMessage recvBlocking(long timeout) {
         return recvBlocking(Subject.DEFAULT, timeout);
     }
+
     @Override
     public VoltMessage recv(Subject s) {
         throw new UnsupportedOperationException();
     }
+
     @Override
     public VoltMessage recvBlocking(Subject s) {
-        throw new UnsupportedOperationException();
+        try {
+            if (s == Subject.DEFAULT)
+                return incomingMessages.take();
+
+            else
+                return m_failureNoticeMessages.take();
+        }
+        catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
     }
+
     @Override
     public VoltMessage recvBlocking(Subject s, long timeout) {
         do {
             try {
-                return incomingMessages.take();
+                if (s == Subject.DEFAULT)
+                    return incomingMessages.take();
+                else
+                    return m_failureNoticeMessages.take();
             }
             catch (InterruptedException e) {
                 e.printStackTrace();
@@ -141,7 +158,10 @@ public class MockMailbox implements Mailbox {
 
     @Override
     public void deliver(VoltMessage message) {
-        incomingMessages.offer(message);
+        if (message.getSubject() == Subject.DEFAULT.getId())
+            incomingMessages.offer(message);
+        else
+            m_failureNoticeMessages.offer(message);
     }
 
     public VoltMessage next;
@@ -158,6 +178,11 @@ public class MockMailbox implements Mailbox {
         public final VoltMessage contents;
     }
 
+    // Queue for DEFAULT Messages
     private final LinkedBlockingQueue<VoltMessage> incomingMessages;
+
+    // Queue for FAILURE_SITE_UPDATE Messages
+    private final LinkedBlockingQueue<VoltMessage> m_failureNoticeMessages;
+
     private final ArrayDeque<Message> outgoingMessages = new ArrayDeque<Message>();
 }
