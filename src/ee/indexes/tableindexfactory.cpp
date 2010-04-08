@@ -96,7 +96,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
         } else if (keySize <= sizeof(int64_t) * 4) {
             return new BinaryTreeUniqueIndex<IntsKey<4>, IntsComparator<4>, IntsEqualityChecker<4> >(schemeCopy);
         } else {
-            throwFatalException("We currently only support a specific set of column index sizes...");
+            throwFatalException("We currently only support tree index on unique integer keys of size 32 bytes or smaller...");
         }
     }
 
@@ -110,7 +110,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
         } else if (keySize <= sizeof(int64_t) * 4) {
             return new BinaryTreeMultiMapIndex<IntsKey<4>, IntsComparator<4>, IntsEqualityChecker<4> >(schemeCopy);
         } else {
-            throwFatalException( "We currently only support a specific set of column index sizes..." );
+            throwFatalException( "We currently only support tree index on non-unique integer keys of size 32 bytes or smaller..." );
         }
     }
 
@@ -124,7 +124,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
         } else if (keySize <= sizeof(int64_t) * 4) {
             return new HashTableUniqueIndex<IntsKey<4>, IntsHasher<4>, IntsEqualityChecker<4> >(schemeCopy);
         } else {
-            throwFatalException( "We currently only support a specific set of column index sizes..." );
+            throwFatalException( "We currently only support hash index on unique integer keys of size 32 bytes or smaller..." );
         }
     }
 
@@ -138,7 +138,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
         } else if (keySize <= sizeof(int64_t) * 4) {
             return new HashTableMultiMapIndex<IntsKey<4>, IntsHasher<4>, IntsEqualityChecker<4> >(schemeCopy);
         } else {
-            throwFatalException( "We currently only support a specific set of column index sizes..." );
+            throwFatalException( "We currently only support hash index on non-unique integer keys of size 32 bytes of smaller..." );
         }
     }
 
@@ -165,10 +165,10 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
             return new BinaryTreeUniqueIndex<GenericKey<73>, GenericComparator<73>, GenericEqualityChecker<73> >(schemeCopy);
         } else if (keySize <= 96) {
             return new BinaryTreeUniqueIndex<GenericKey<96>, GenericComparator<96>, GenericEqualityChecker<96> >(schemeCopy);
-        } else if (keySize < 300) {
+        } else if (keySize < 128) {
             return new BinaryTreeUniqueIndex<GenericKey<128>, GenericComparator<128>, GenericEqualityChecker<128> >(schemeCopy);
         } else {
-            throwFatalException( "We currently only support generic column indexes with keys 32 bits or less..." );
+            throwFatalException( "We currently only support generic column indexes with keys 128 bytes or less..." );
         }
     }
     /*if ((type == BTREE_INDEX) && (!unique)) {
@@ -228,7 +228,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
         } else if (keySize < 128) {
             return new BinaryTreeMultiMapIndex<GenericKey<128>, GenericComparator<128>, GenericEqualityChecker<128> >(schemeCopy);
         } else {
-            throwFatalException( "We currently only support generic column indexes with keys 32 bits or less..." );
+            throwFatalException( "We currently only support generic column indexes with keys 128 bytes or less..." );
         }
     }
 
