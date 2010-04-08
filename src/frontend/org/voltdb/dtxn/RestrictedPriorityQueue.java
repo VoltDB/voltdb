@@ -17,7 +17,9 @@
 
 package org.voltdb.dtxn;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.PriorityQueue;
 import java.util.Map.Entry;
 
 import org.voltdb.TransactionIdManager;
@@ -39,9 +41,19 @@ import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
 public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
     private static final long serialVersionUID = 1L;
 
-    final LinkedHashMap<Integer, Long> m_lastTxnFromEachInitiator = new LinkedHashMap<Integer, Long>();
+    class LastInitiatorData {
+        LastInitiatorData() {
+            m_lastSeenTxnId = DtxnConstants.DUMMY_LAST_SEEN_TXN_ID; // -1
+            m_lastSafeTxnId = DtxnConstants.DUMMY_LAST_SEEN_TXN_ID; // -1
+        }
 
-    long m_newestSafeTransaction = -1;
+        long m_lastSeenTxnId;
+        long m_lastSafeTxnId;
+    }
+
+    final LinkedHashMap<Integer, LastInitiatorData> m_initiatorData = new LinkedHashMap<Integer, LastInitiatorData>();
+
+    long m_newestCandidateTransaction = -1;
     final int m_siteId;
     long m_txnsPopped = 0;
     long m_lastTxnPopped = 0;
@@ -54,7 +66,14 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
     public RestrictedPriorityQueue(int[] initiatorSiteIds, int siteId) {
         m_siteId = siteId;
         for (int id : initiatorSiteIds)
-            m_lastTxnFromEachInitiator.put(id, -1L);
+            m_initiatorData.put(id, new LastInitiatorData());
+    }
+
+    private boolean isSafe(TransactionState ts) {
+        if (ts == null) return false;
+        if (ts.txnId > m_newestCandidateTransaction) return false;
+        LastInitiatorData lid = m_initiatorData.get(ts.initiatorSiteId);
+        return (ts.txnId <= lid.m_lastSafeTxnId);
     }
 
     /**
@@ -63,7 +82,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
     @Override
     public TransactionState poll() {
         TransactionState retval = super.peek();
-        if ((retval != null) && (retval.txnId <= m_newestSafeTransaction)) {
+        if (isSafe(retval)) {
             m_txnsPopped++;
             m_lastTxnPopped = retval.txnId;
             return super.poll();
@@ -78,8 +97,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
     @Override
     public TransactionState peek() {
         TransactionState retval = super.peek();
-        if ((retval != null) && (retval.txnId <= m_newestSafeTransaction)) {
-            m_txnsPopped++;
+        if (isSafe(retval)) {
             m_lastTxnPopped = retval.txnId;
             return retval;
         }
@@ -92,7 +110,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
      */
     @Override
     public boolean add(TransactionState txnState) {
-        if (m_lastTxnFromEachInitiator.containsKey(txnState.initiatorSiteId)) {
+        if (m_initiatorData.containsKey(txnState.initiatorSiteId)) {
             return super.add(txnState);
         }
         return false;
@@ -102,10 +120,14 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
      * Update the information stored about the latest transaction
      * seen from each initiator. Compute the newest safe transaction id.
      */
-    public void gotTransaction(int initiatorId, long txnId, boolean isHeartbeat)
+    public long noteTransactionRecievedAndReturnLastSeen(int initiatorId, long txnId, boolean isHeartbeat, long lastSafeTxnIdFromInitiator)
     {
+        // this excludes dummy txnid but is also a sanity check
+        assert(txnId > 0);
+
         // Drop old data from already-failed initiators.
-        if (m_lastTxnFromEachInitiator.containsKey(initiatorId)) {
+        if (m_initiatorData.containsKey(initiatorId)) {
+            // we've decided that this can happen, and it's fine... just ignore it
             if (m_lastTxnPopped > txnId) {
                 StringBuilder msg = new StringBuilder();
                 msg.append("Txn ordering deadlock (QUEUE) at site ").append(m_siteId).append(":\n");
@@ -114,21 +136,32 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
                 msg.append("   txn ").append(txnId).append(" (");
                 msg.append(TransactionIdManager.toString(txnId)).append(" HB:");
                 msg.append(isHeartbeat).append(").\n");
-                throw new RuntimeException(msg.toString());
+                System.err.print(msg.toString());
             }
 
             // update the latest transaction for the specified initiator
-            long prevTxnId = m_lastTxnFromEachInitiator.get(initiatorId);
-            if (prevTxnId < txnId)
-                m_lastTxnFromEachInitiator.put(initiatorId, txnId);
+            LastInitiatorData lid = m_initiatorData.get(initiatorId);
+            if (lid.m_lastSeenTxnId < txnId)
+                lid.m_lastSeenTxnId = txnId;
+            if (lid.m_lastSafeTxnId < lastSafeTxnIdFromInitiator)
+                lid.m_lastSafeTxnId = lastSafeTxnIdFromInitiator;
+
             // find the minimum value across all latest transactions
             long min = Long.MAX_VALUE;
-            for (long l : m_lastTxnFromEachInitiator.values())
-                if (l < min) min = l;
+            for (LastInitiatorData l : m_initiatorData.values())
+                if (l.m_lastSeenTxnId < min) min = l.m_lastSeenTxnId;
 
             // this minimum is the newest safe transaction to run
-            m_newestSafeTransaction = min;
+            // but you still need to check if a transaction has been confirmed
+            //  by its initiator
+            //  (note: this check is done when peeking/polling from the queue)
+            m_newestCandidateTransaction = min;
+
+            // return the last seen id for the originating initiator
+            return lid.m_lastSeenTxnId;
         }
+
+        return DtxnConstants.DUMMY_LAST_SEEN_TXN_ID;
     }
 
     /**
@@ -138,10 +171,10 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
      */
     public void gotFaultForInitiator(int initiatorId) {
         // calculate the next minimum transaction w/o our dead friend
-        gotTransaction(initiatorId, Long.MAX_VALUE, true);
+        noteTransactionRecievedAndReturnLastSeen(initiatorId, Long.MAX_VALUE, true, DtxnConstants.DUMMY_LAST_SEEN_TXN_ID);
 
         // remove initiator from minimum. txnid scoreboard
-        Long remove = m_lastTxnFromEachInitiator.remove(initiatorId);
+        LastInitiatorData remove = m_initiatorData.remove(initiatorId);
         assert(remove != null);
     }
 
@@ -153,7 +186,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
      * @return The id of the newest safe transaction to run.
      */
     long getNewestSafeTransaction() {
-        return m_newestSafeTransaction;
+        return m_newestCandidateTransaction;
     }
 
     /**
@@ -174,18 +207,18 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
         for (TransactionState txnState : this) {
             assert(txnState != null);
             context.queuedTransactions[i] = txnState.getDumpContents();
-            context.queuedTransactions[i].ready = (txnState.txnId <= m_newestSafeTransaction);
+            context.queuedTransactions[i].ready = (txnState.txnId <= m_newestCandidateTransaction);
             i++;
         }
         Arrays.sort(context.queuedTransactions);
 
         // store the contact history
-        context.contactHistory = new ExecutorContext.InitiatorContactHistory[m_lastTxnFromEachInitiator.size()];
+        context.contactHistory = new ExecutorContext.InitiatorContactHistory[m_initiatorData.size()];
         i = 0;
-        for (Entry<Integer, Long> e : m_lastTxnFromEachInitiator.entrySet()) {
+        for (Entry<Integer, LastInitiatorData> e : m_initiatorData.entrySet()) {
             context.contactHistory[i] = new ExecutorContext.InitiatorContactHistory();
             context.contactHistory[i].initiatorSiteId = e.getKey();
-            context.contactHistory[i].transactionId = e.getValue();
+            context.contactHistory[i].transactionId = e.getValue().m_lastSeenTxnId;
             i++;
         }
     }

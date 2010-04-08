@@ -41,6 +41,7 @@ import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.debugstate.ExecutorContext;
+import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
 import org.voltdb.dtxn.RestrictedPriorityQueue;
 import org.voltdb.dtxn.SinglePartitionTxnState;
@@ -58,7 +59,22 @@ import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.jni.MockExecutionEngine;
-import org.voltdb.messaging.*;
+import org.voltdb.messaging.DebugMessage;
+import org.voltdb.messaging.FailureSiteUpdateMessage;
+import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.messaging.FragmentResponseMessage;
+import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.HeartbeatMessage;
+import org.voltdb.messaging.HeartbeatResponseMessage;
+import org.voltdb.messaging.InitiateResponseMessage;
+import org.voltdb.messaging.InitiateTaskMessage;
+import org.voltdb.messaging.Mailbox;
+import org.voltdb.messaging.MessagingException;
+import org.voltdb.messaging.MultiPartitionParticipantMessage;
+import org.voltdb.messaging.SiteMailbox;
+import org.voltdb.messaging.Subject;
+import org.voltdb.messaging.TransactionInfoBaseMessage;
+import org.voltdb.messaging.VoltMessage;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.Encoder;
@@ -610,17 +626,39 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
 
             // Special case heartbeats which only update RPQ
             if (info instanceof HeartbeatMessage) {
-                m_transactionQueue.gotTransaction(info.getInitiatorSiteId(),
-                                                  info.getTxnId(),
-                                                  true);
+                // use the heartbeat to unclog the priority queue if clogged
+                long lastSeenTxnFromInitiator = m_transactionQueue.noteTransactionRecievedAndReturnLastSeen(
+                        info.getInitiatorSiteId(), info.getTxnId(),
+                        true, ((HeartbeatMessage) info).getLastSafeTxnId());
+
+                // respond to the initiator with the last seen transaction
+                HeartbeatResponseMessage response = new HeartbeatResponseMessage(m_siteId, lastSeenTxnFromInitiator);
+                try {
+                    m_mailbox.send(info.getInitiatorSiteId(), VoltDB.DTXN_MAILBOX_ID, response);
+                } catch (MessagingException e) {
+                    // hope this never happens... it doesn't right?
+                    throw new RuntimeException(e);
+                }
+
+                // we're done here (in the case of heartbeats)
                 return;
+            }
+            else if (info instanceof InitiateTaskMessage) {
+                m_transactionQueue.noteTransactionRecievedAndReturnLastSeen(info.getInitiatorSiteId(),
+                                                  info.getTxnId(),
+                                                  false,
+                                                  ((InitiateTaskMessage) info).getLastSafeTxnId());
             }
             // FragmentTasks aren't sent by initiators and shouldn't update
             // transaction queue initiator states.
-            else if (!(info instanceof FragmentTaskMessage)) {
-                m_transactionQueue.gotTransaction(info.getInitiatorSiteId(),
+            else if (info instanceof MultiPartitionParticipantMessage) {
+                m_transactionQueue.noteTransactionRecievedAndReturnLastSeen(info.getInitiatorSiteId(),
                                                   info.getTxnId(),
-                                                  false);
+                                                  false,
+                                                  DtxnConstants.DUMMY_LAST_SEEN_TXN_ID);
+            }
+            else {
+                assert(info instanceof FragmentTaskMessage);
             }
 
             // Every non-heartbeat notice requires a transaction state.
@@ -1277,7 +1315,12 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
 
             // only sneak in single partition work
             if (nextTxn instanceof SinglePartitionTxnState) {
-                nextTxn = m_transactionQueue.peek();
+
+                // i think this line does nothing... it should go?
+                // seems it will get popped later, but not do any work because the done state is true
+                // ugh
+                //nextTxn = m_transactionQueue.peek();
+
                 boolean success = nextTxn.doWork();
                 assert(success);
                 return true;

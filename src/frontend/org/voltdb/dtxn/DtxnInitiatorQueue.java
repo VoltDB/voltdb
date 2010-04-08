@@ -32,6 +32,7 @@ import org.voltdb.fault.FaultHandler;
 import org.voltdb.fault.NodeFailureFault;
 import org.voltdb.fault.VoltFault;
 import org.voltdb.fault.VoltFault.FaultType;
+import org.voltdb.messaging.HeartbeatResponseMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.VoltMessage;
 import org.voltdb.network.Connection;
@@ -64,6 +65,7 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
                 for (Integer site_id : dead_sites)
                 {
                     removeSite(site_id);
+                    m_safetyState.removeState(site_id);
                 }
             }
         }
@@ -78,6 +80,8 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
     // thread-safe meta-data
     private final HashMap<Long, VoltTable[]> m_txnIdResults;
 
+    private final ExecutorTxnIdSafetyState m_safetyState;
+
     /**
      * Storage for initiator statistics
      */
@@ -87,9 +91,12 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
      * Construct a new DtxnInitiatorQueue
      * @param siteId  The mailbox siteId for this initiator
      */
-    public DtxnInitiatorQueue(int siteId)
+    public DtxnInitiatorQueue(int siteId, ExecutorTxnIdSafetyState safetyState)
     {
+        assert(safetyState != null);
+
         m_siteId = siteId;
+        m_safetyState = safetyState;
         m_stats = new InitiatorStats("Initiator " + siteId + " stats", siteId);
         m_txnIdResults =
             new HashMap<Long, VoltTable[]>();
@@ -152,8 +159,18 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
 
     @Override
     public synchronized boolean offer(VoltMessage message) {
+        // update the state of seen txnids for each executor
+        if (message instanceof HeartbeatResponseMessage) {
+            HeartbeatResponseMessage hrm = (HeartbeatResponseMessage) message;
+            m_safetyState.updateLastSeenTxnIdFromExecutorBySiteId(hrm.getExecSiteId(), hrm.getLastReceivedTxnId());
+            return true;
+        }
+
+        // only valid messages are this and heartbeatresponse
         assert(message instanceof InitiateResponseMessage);
         final InitiateResponseMessage r = (InitiateResponseMessage) message;
+        // update the state of seen txnids for each executor
+        m_safetyState.updateLastSeenTxnIdFromExecutorBySiteId(r.getCoordinatorSiteId(), r.getLastReceivedTxnId());
 
         InFlightTxnState state;
         int sites_left = -1;

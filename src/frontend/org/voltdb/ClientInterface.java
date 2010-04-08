@@ -642,6 +642,7 @@ public class ClientInterface implements DumpManager.Dumpable {
 
         SimpleDtxnInitiator initiator =
             new SimpleDtxnInitiator(
+                    context,
                     messenger, myHostId,
                     siteId, initiatorId,
                     onBackPressure, offBackPressure);

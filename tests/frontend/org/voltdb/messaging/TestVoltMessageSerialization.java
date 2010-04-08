@@ -191,10 +191,11 @@ public class TestVoltMessageSerialization extends TestCase {
 
     public void testHeartbeatResponse() {
         DBBPool pool = new DBBPool();
-        HeartbeatResponseMessage mn = new HeartbeatResponseMessage(100222);
+        HeartbeatResponseMessage mn = new HeartbeatResponseMessage(55, 100222);
 
         HeartbeatResponseMessage mn2 = (HeartbeatResponseMessage) checkVoltMessage(mn, pool);
 
+        assertEquals(mn.getExecSiteId(), mn2.getExecSiteId());
         assertEquals(mn.getLastReceivedTxnId(), mn2.getLastReceivedTxnId());
         mn.discard();
         mn2.discard();

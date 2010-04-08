@@ -17,19 +17,27 @@
 
 package org.voltdb.messaging;
 
+import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.utils.DBBPool;
 
 public class HeartbeatResponseMessage extends VoltMessage {
 
+    int m_execSiteId;
     long m_lastReceivedTxnId; // this is the largest txn acked by all partitions running the java for it
 
     HeartbeatResponseMessage() {
         super();
-        m_lastReceivedTxnId = -1;
+        m_lastReceivedTxnId = DtxnConstants.DUMMY_LAST_SEEN_TXN_ID; // -1
+        m_execSiteId = -1;
     }
 
-    public HeartbeatResponseMessage(int lastReceivedTxnId) {
-        m_lastReceivedTxnId = lastReceivedTxnId;
+    public HeartbeatResponseMessage(int execSiteId, long lastSeenTxnFromInitiator) {
+        m_execSiteId = execSiteId;
+        m_lastReceivedTxnId = lastSeenTxnFromInitiator;
+    }
+
+    public int getExecSiteId() {
+        return m_execSiteId;
     }
 
     public long getLastReceivedTxnId() {
@@ -38,7 +46,7 @@ public class HeartbeatResponseMessage extends VoltMessage {
 
     @Override
     protected void flattenToBuffer(DBBPool pool) {
-        int msgsize = 8;
+        int msgsize = 4 + 8;
 
         if (m_buffer == null) {
             m_container = pool.acquire(msgsize + 1 + HEADER_SIZE);
@@ -49,6 +57,7 @@ public class HeartbeatResponseMessage extends VoltMessage {
         m_buffer.position(HEADER_SIZE);
         m_buffer.put(HEARTBEAT_RESPONSE_ID);
 
+        m_buffer.putInt(m_execSiteId);
         m_buffer.putLong(m_lastReceivedTxnId);
 
         m_buffer.limit(m_buffer.position());
@@ -58,6 +67,7 @@ public class HeartbeatResponseMessage extends VoltMessage {
     protected void initFromBuffer() {
         m_buffer.position(HEADER_SIZE + 1); // skip the msg id
 
+        m_execSiteId = m_buffer.getInt();
         m_lastReceivedTxnId = m_buffer.getLong();
     }
 

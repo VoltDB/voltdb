@@ -48,6 +48,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.log4j.Logger;
+import org.voltdb.CatalogContext;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltDB;
@@ -66,6 +67,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     final TransactionIdManager m_idManager;
 
     private final DtxnInitiatorQueue m_queue;
+    private final ExecutorTxnIdSafetyState m_safetyState;
 
     private static final Logger transactionLog =
         Logger.getLogger("TRANSACTION", VoltLoggerFactory.instance());
@@ -98,7 +100,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     private final int m_siteId;
     private final int m_hostId;
 
-    public SimpleDtxnInitiator(Messenger messenger, int hostId, int siteId,
+    public SimpleDtxnInitiator(CatalogContext context,
+                               Messenger messenger, int hostId, int siteId,
                                int initiatorId,
                                Runnable onBackPressure,
                                Runnable offBackPressure)
@@ -110,7 +113,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         m_idManager = new TransactionIdManager(initiatorId);
         m_hostId = hostId;
         m_siteId = siteId;
-        m_queue = new DtxnInitiatorQueue(siteId);
+        m_safetyState = new ExecutorTxnIdSafetyState(context.siteTracker);
+        m_queue = new DtxnInitiatorQueue(siteId, m_safetyState);
         m_mailbox = messenger.createMailbox(siteId, VoltDB.DTXN_MAILBOX_ID,
                                             m_queue);
         m_queue.setInitiator(this);
@@ -187,13 +191,18 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     @Override
     public synchronized void tick(long time, long interval) {
         long txnId = m_idManager.getNextUniqueTransactionId();
-        HeartbeatMessage tickNotice = new HeartbeatMessage(m_siteId, txnId, Long.MAX_VALUE);
 
         int[] outOfDateSites =
             VoltDB.instance().getCatalogContext().
             siteTracker.getSitesWhichNeedAHeartbeat(time, interval);
         try {
-            m_mailbox.send(outOfDateSites, 0, tickNotice);
+            // loop over all the sites that need a heartbeat and send one
+            for (int siteId : outOfDateSites) {
+                // tack on the last confirmed seen txn id for all sites with a particular partition
+                long newestSafeTxnId = m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(siteId);
+                HeartbeatMessage tickNotice = new HeartbeatMessage(m_siteId, txnId, newestSafeTxnId);
+                m_mailbox.send(siteId, 0, tickNotice);
+            }
         } catch (MessagingException e) {
             throw new RuntimeException(e);
         }
@@ -286,6 +295,10 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
      */
     private void sendTransactionToCoordinator(InFlightTxnState txn)
     {
+        // figure out what the newest txnid seen by ALL partitions for this execution
+        //  site id is and tack it on to this message
+        long newestSafeTxnId = m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(txn.coordinatorId);
+
         InitiateTaskMessage workRequest = new InitiateTaskMessage(
                 m_siteId,
                 txn.coordinatorId,
@@ -293,7 +306,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                 txn.isReadOnly,
                 txn.isSinglePartition,
                 txn.invocation,
-                Long.MAX_VALUE); // this will allow all transactions to run for now
+                newestSafeTxnId); // this will allow all transactions to run for now
         workRequest.setNonCoordinatorSites(txn.otherSiteIds);
 
         try {

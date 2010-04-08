@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.Map.Entry;
+
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Site;
 
@@ -120,9 +121,10 @@ public class SiteTracker {
 
         m_tempOldSitesScratch = new int[m_sites.size()];
 
-        for (int siteId : m_sitesToPartitions.keySet())
-        {
-            m_lastHeartbeatTime.put(siteId, -1L);
+        for (int siteId : m_sitesToPartitions.keySet()) {
+            if (getSiteForId(siteId).getIsup()) {
+                m_lastHeartbeatTime.put(siteId, -1L);
+            }
         }
     }
 
@@ -236,7 +238,7 @@ public class SiteTracker {
         int[] retval = new int[all_sites.size()];
         for (int i = 0; i < all_sites.size(); i++)
         {
-            retval[i] = (int) all_sites.get(i);
+            retval[i] = all_sites.get(i);
         }
         return retval;
     }
@@ -261,7 +263,7 @@ public class SiteTracker {
         int[] retval = new int[all_sites.size()];
         for (int i = 0; i < all_sites.size(); i++)
         {
-            retval[i] = (int) all_sites.get(i);
+            retval[i] = all_sites.get(i);
         }
         return retval;
     }
