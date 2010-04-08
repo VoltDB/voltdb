@@ -362,6 +362,23 @@ public class SiteTracker {
     }
 
     /**
+     * @return A list containing the partition IDs of any partitions
+     * which are not currently present on any live execution sites
+     */
+    public ArrayList<Integer> getFailedPartitions()
+    {
+        ArrayList<Integer> retval = new ArrayList<Integer>();
+        for (Integer partition : m_partitionsToLiveSites.keySet())
+        {
+            if (m_partitionsToLiveSites.get(partition).size() == 0)
+            {
+                retval.add(partition);
+            }
+        }
+        return retval;
+    }
+
+    /**
      * Inform the SiteTracker that a message was sent to a site or
      * to a set of sites. This will reset the heart-beat timer on
      * those sites

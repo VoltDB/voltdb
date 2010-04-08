@@ -68,10 +68,11 @@ public class RealVoltDB implements VoltDBInterface
             if (fault instanceof NodeFailureFault)
             {
                 NodeFailureFault node_fault = (NodeFailureFault) fault;
-                System.err.println("Host failed: " + node_fault.getHostId());
                 ArrayList<Integer> dead_sites =
                     VoltDB.instance().getCatalogContext().
                     siteTracker.getAllSitesForHost(node_fault.getHostId());
+                hostLog.warn("Host failed, host ID: " + node_fault.getHostId());
+                hostLog.warn("  Removing sites from cluster: " + dead_sites);
                 StringBuilder sb = new StringBuilder();
                 for (int site_id : dead_sites)
                 {
@@ -82,8 +83,13 @@ public class RealVoltDB implements VoltDBInterface
                     sb.append(site_path).append(" ").append("isUp false");
                     sb.append("\n");
                 }
-                System.out.println(sb.toString());
                 VoltDB.instance().clusterUpdate(sb.toString());
+                if (m_catalogContext.siteTracker.getFailedPartitions().size() != 0)
+                {
+                    hostLog.fatal("Failure of host " + node_fault.getHostId() +
+                                  " has rendered the cluster unviable.  Shutting down...");
+                    VoltDB.crashVoltDB();
+                }
             }
         }
     }

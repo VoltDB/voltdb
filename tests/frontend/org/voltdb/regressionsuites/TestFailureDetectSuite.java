@@ -47,7 +47,6 @@ public class TestFailureDetectSuite extends RegressionSuite
         for (int i = 0; i < 100; i++)
         {
             results = client.callProcedure("SelectMultiPart");
-            System.out.println(results[0].toString());
             assertEquals(1, results[0].getRowCount());
         }
     }
@@ -70,7 +69,6 @@ public class TestFailureDetectSuite extends RegressionSuite
         for (int i = 0; i < 100; i++)
         {
             results = client.callProcedure("UpdateSinglePart", 1, 200);
-            System.out.println(results[0].toString());
             assertEquals(1, results[0].getRowCount());
         }
     }

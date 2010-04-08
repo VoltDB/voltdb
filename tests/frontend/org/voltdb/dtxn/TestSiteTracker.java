@@ -230,4 +230,27 @@ public class TestSiteTracker extends TestCase
             assertTrue(site == 1 || site == 2);
         }
     }
+
+    public void testClusterViable()
+    {
+        MockVoltDB helper = new MockVoltDB();
+
+        helper.addHost(0);
+        helper.addHost(1);
+        helper.addPartition(0);
+        helper.addPartition(1);
+        helper.addSite(0, 0, 0, false, true);
+        helper.addSite(1, 0, 0, true, true);
+        helper.addSite(2, 0, 1, true, true);
+        helper.addSite(100, 1, 0, false, false);
+        helper.addSite(101, 1, 0, true, false);
+        helper.addSite(102, 1, 1, true, false);
+
+        SiteTracker tracker = helper.getCatalogContext().siteTracker;
+        assertEquals(0, tracker.getFailedPartitions().size());
+        helper.killSite(2);
+        tracker = helper.getCatalogContext().siteTracker;
+        assertEquals(1, tracker.getFailedPartitions().size());
+        assertEquals((Integer) 1, tracker.getFailedPartitions().get(0));
+    }
 }
