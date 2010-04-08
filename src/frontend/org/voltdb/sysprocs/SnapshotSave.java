@@ -48,7 +48,7 @@ import org.voltdb.catalog.Host;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltLoggerFactory;
-import org.voltdb.sysprocs.saverestore.SnapshotDigestUtil;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 @ProcInfo(singlePartition = false)
 public class SnapshotSave extends VoltSystemProcedure
@@ -206,7 +206,11 @@ public class SnapshotSave extends VoltSystemProcedure
                     {
                         tableNames.add(table.getTypeName());
                     }
-                    SnapshotDigestUtil.recordSnapshotTableList(file_path, file_nonce, tableNames);
+                    SnapshotUtil.recordSnapshotTableList(
+                            startTime,
+                            file_path,
+                            file_nonce,
+                            tableNames);
                     final AtomicInteger numTables = new AtomicInteger(tableNames.size());
                     final SnapshotRegistry.Snapshot snapshotRecord =
                         SnapshotRegistry.startSnapshot(

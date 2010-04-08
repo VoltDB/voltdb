@@ -87,9 +87,11 @@ CopyOnWriteContext::CopyOnWriteContext(Table *table, TupleSerializer *serializer
 
 bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
     boost::crc_32_type crc;
-    const std::size_t crcPosition = out->reserveBytes(4);//For CRC
+    boost::crc_32_type partitionIdCRC;
     out->writeInt(m_partitionId);
-    crc.process_bytes(out->data() + crcPosition + 4, 4);//CRC the partition ID
+    partitionIdCRC.process_bytes(out->data() + out->position() - 4, 4);
+    out->writeInt(partitionIdCRC.checksum());
+    const std::size_t crcPosition = out->reserveBytes(4);//For CRC
     int rowsSerialized = 0;
 
     TableTuple tuple(m_table->schema());

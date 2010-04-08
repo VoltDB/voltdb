@@ -116,6 +116,7 @@ public class SnapshotSiteProcessor {
         for (BBContainer c : m_snapshotBufferOrigins ) {
             c.discard();
         }
+        m_snapshotBufferOrigins.clear();
         m_availableSnapshotBuffers.clear();
     }
 

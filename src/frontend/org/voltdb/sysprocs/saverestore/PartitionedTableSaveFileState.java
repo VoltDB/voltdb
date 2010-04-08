@@ -180,7 +180,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
              * Assigning the FULL
              * workload to each site. At the actual host
              * static synchronization in the procedure will ensure the work is
-             * distributed across every ES in a meaningfull way.
+             * distributed across every ES in a meaningful way.
              */
             for (Integer site : sitesAtHost) {
                 restorePlan.add(constructDistributePartitionedTableFragment(

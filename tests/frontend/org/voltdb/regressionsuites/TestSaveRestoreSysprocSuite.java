@@ -471,6 +471,12 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         try
         {
             client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT);
+
+            while (results[0].advanceRow()) {
+                if (results[0].getString("RESULT").equals("FAILURE")) {
+                    fail(results[0].getString("ERR_MSG"));
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -551,6 +557,12 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         {
             results = client.callProcedure("@SnapshotRestore", TMPDIR,
                                            TESTNONCE, ALLOWELT);
+
+            while (results[0].advanceRow()) {
+                if (results[0].getString("RESULT").equals("FAILURE")) {
+                    fail(results[0].getString("ERR_MSG"));
+                }
+            }
         }
         catch (Exception ex)
         {

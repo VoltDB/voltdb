@@ -66,13 +66,20 @@ public class TestTableSaveFile extends TestCase {
         int headerLength = b.getInt();
         b.position(b.position() + headerLength);// at row count
         final int rowCount = b.getInt();
-        ByteBuffer chunkBuffer = ByteBuffer.allocate(b.remaining() + 12
+        ByteBuffer chunkBuffer = ByteBuffer.allocate(b.remaining() + 16
                 + target.getHeaderSize());
-        final CRC32 crc = new CRC32();
         chunkBuffer.position(target.getHeaderSize());
-        final int crcPosition = chunkBuffer.position();
-        chunkBuffer.position(chunkBuffer.position() + 4);
+        chunkBuffer.mark();
+        final CRC32 partitionIdCRC = new CRC32();
         chunkBuffer.putInt(2);
+        chunkBuffer.reset();
+        byte partitionIdBytes[] = new byte[4];
+        chunkBuffer.get(partitionIdBytes);
+        partitionIdCRC.update(partitionIdBytes);
+        chunkBuffer.putInt((int) partitionIdCRC.getValue());
+        final int crcPosition = chunkBuffer.position();
+        final CRC32 crc = new CRC32();
+        chunkBuffer.position(chunkBuffer.position() + 4);
         chunkBuffer.put(b);
         chunkBuffer.putInt(rowCount);
         chunkBuffer.position(crcPosition + 4);

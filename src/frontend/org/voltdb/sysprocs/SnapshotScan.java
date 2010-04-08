@@ -35,7 +35,7 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
-import org.voltdb.sysprocs.saverestore.SnapshotDigestUtil;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.VoltLoggerFactory;
 
 @ProcInfo(singlePartition = false)
@@ -219,7 +219,7 @@ public class SnapshotScan extends VoltSystemProcedure {
                     }
                     if (f.canRead()) {
                         try {
-                            List<String> tableNames = SnapshotDigestUtil.retrieveRelevantTableNames(f);
+                            List<String> tableNames = SnapshotUtil.retrieveRelevantTableNamesAndTime(f).getSecond();
                             final StringWriter sw = new StringWriter();
                             for (int ii = 0; ii < tableNames.size(); ii++) {
                                 sw.append(tableNames.get(ii));
@@ -622,14 +622,19 @@ public class SnapshotScan extends VoltSystemProcedure {
             }
         }
 
-        return retrieveRelevantFiles(path);
+        return retrieveRelevantFiles(path, 0);
     }
 
-    private final List<File> retrieveRelevantFiles(File f) {
+    private final List<File> retrieveRelevantFiles(File f, int recursion) {
         assert(f.isDirectory());
         assert(f.canRead());
 
         ArrayList<File> retvals = new ArrayList<File>();
+
+        if (recursion == 32) {
+            return retvals;
+        }
+
         for (File file : f.listFiles()) {
             if (file.isDirectory()) {
                 if (!file.canRead()) {
@@ -637,7 +642,7 @@ public class SnapshotScan extends VoltSystemProcedure {
                         continue;
                     }
                 }
-                retvals.addAll(retrieveRelevantFiles(file));
+                retvals.addAll(retrieveRelevantFiles(file, recursion++));
             } else {
                 if (!file.getName().endsWith(".vpt") && !file.getName().endsWith(".digest")) {
                     continue;
