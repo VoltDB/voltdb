@@ -50,4 +50,9 @@ public interface FaultDistributorInterface
      */
     public abstract void reportFault(VoltFault fault);
 
+    /**
+     * Tell the fault distributor that the server is being shut down.
+     * Prevents many false positives that prevent an orderly shutdown.
+     */
+    public abstract void shutDown();
 }

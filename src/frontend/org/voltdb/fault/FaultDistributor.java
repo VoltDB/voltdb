@@ -33,6 +33,7 @@ public class FaultDistributor implements FaultDistributorInterface
     {
         m_faultHandlers =
             new HashMap<FaultType, TreeMap<Integer, List<FaultHandler>>>();
+        m_suppressFaults = false;
     }
 
     /**
@@ -100,6 +101,11 @@ public class FaultDistributor implements FaultDistributorInterface
     // XXX-FAILURE need more error checking, default handling, and whatnot
     public synchronized void reportFault(VoltFault fault)
     {
+        if (m_suppressFaults)
+        {
+            return;
+        }
+
         TreeMap<Integer, List<FaultHandler>> handler_map =
             m_faultHandlers.get(fault.getFaultType());
         if (handler_map == null)
@@ -120,5 +126,12 @@ public class FaultDistributor implements FaultDistributorInterface
         }
     }
 
+    @Override
+    public synchronized void shutDown()
+    {
+        m_suppressFaults = true;
+    }
+
     private HashMap<FaultType, TreeMap<Integer, List<FaultHandler>>> m_faultHandlers;
+    private boolean m_suppressFaults;
 }

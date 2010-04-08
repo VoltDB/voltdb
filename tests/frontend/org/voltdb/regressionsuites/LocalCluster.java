@@ -285,13 +285,13 @@ public class LocalCluster implements VoltServerConfig {
         // issued to listener. this would require that the test didn't
         // break the cluster somehow.  Or ... just old fashioned kill?
 
-        shutDownExternal();
-
         try {
             if (m_localServer != null) m_localServer.shutdown();
         } finally {
             m_running = false;
         }
+        shutDownExternal();
+
         return null;
     }
 
