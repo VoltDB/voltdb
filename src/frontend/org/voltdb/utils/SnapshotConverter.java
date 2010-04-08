@@ -131,7 +131,7 @@ public class SnapshotConverter {
                 type = args[ii + 1];
                 if (type.equalsIgnoreCase("csv")) {
                     escaper = new CSVEscaper();
-                    delimeter = '\t';
+                    delimeter = ',';
                 } else if (type.equalsIgnoreCase("tsv")) {
                     escaper = new TSVEscaper();
                     delimeter = '\t';
@@ -300,8 +300,6 @@ public class SnapshotConverter {
         if (fail) {
             System.exit(-1);
         }
-
-        System.exit(0);
     }
 
     private static void printHelpAndQuit( int code) {

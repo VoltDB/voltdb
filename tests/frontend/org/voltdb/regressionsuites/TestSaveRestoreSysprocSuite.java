@@ -24,6 +24,7 @@
 package org.voltdb.regressionsuites;
 
 import java.io.*;
+import java.nio.ByteBuffer;
 
 import junit.framework.Test;
 
@@ -43,6 +44,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.regressionsuites.saverestore.CatalogChangeSingleProcessServer;
 import org.voltdb.regressionsuites.saverestore.SaveRestoreTestProjectBuilder;
+import org.voltdb.utils.SnapshotConverter;
 import org.voltdb.utils.SnapshotVerifier;
 
 /**
@@ -81,7 +83,11 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         {
             public boolean accept(File dir, String file)
             {
-                return file.startsWith(TESTNONCE) || file.endsWith(".vpt") || file.endsWith(".digest");
+                return file.startsWith(TESTNONCE) ||
+                file.endsWith(".vpt") ||
+                file.endsWith(".digest") ||
+                file.endsWith(".tsv") ||
+                file.endsWith(".csv");
             }
         };
 
@@ -123,19 +129,88 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
     }
 
     private VoltTable createReplicatedTable(int numberOfItems,
-                                            int indexBase)
+            int indexBase,
+            StringBuilder sb) {
+        return createReplicatedTable(numberOfItems, indexBase, sb, false);
+    }
+
+    private VoltTable createReplicatedTable(int numberOfItems,
+                                            int indexBase,
+                                            StringBuilder sb,
+                                            boolean generateCSV)
     {
         VoltTable repl_table =
             new VoltTable(new ColumnInfo("RT_ID", VoltType.INTEGER),
                           new ColumnInfo("RT_NAME", VoltType.STRING),
                           new ColumnInfo("RT_INTVAL", VoltType.INTEGER),
                           new ColumnInfo("RT_FLOATVAL", VoltType.FLOAT));
-
+        char delimeter = generateCSV ? ',' : '\t';
         for (int i = indexBase; i < numberOfItems + indexBase; i++) {
+            String stringVal = null;
+            String escapedVal = null;
+
+            if (sb != null) {
+                if (generateCSV) {
+                    int escapable = i % 5;
+                    switch (escapable) {
+                    case 0:
+                        stringVal = "name_" + i;
+                        escapedVal = "name_" + i;
+                        break;
+                    case 1:
+                        stringVal = "na,me_" + i;
+                        escapedVal = "\"na,me_" + i + "\"";
+                        break;
+                    case 2:
+                        stringVal = "na\"me_" + i;
+                        escapedVal = "\"na\"\"me_" + i + "\"";
+                        break;
+                    case 3:
+                        stringVal = "na\rme_" + i;
+                        escapedVal = "\"na\rme_" + i + "\"";
+                        break;
+                    case 4:
+                        stringVal = "na\nme_" + i;
+                        escapedVal = "\"na\nme_" + i + "\"";
+                        break;
+                    }
+                } else {
+                    int escapable = i % 5;
+                    switch (escapable) {
+                    case 0:
+                        stringVal = "name_" + i;
+                        escapedVal = "name_" + i;
+                        break;
+                    case 1:
+                        stringVal = "na\tme_" + i;
+                        escapedVal = "na\\tme_" + i;
+                        break;
+                    case 2:
+                        stringVal = "na\nme_" + i;
+                        escapedVal = "na\\nme_" + i;
+                        break;
+                    case 3:
+                        stringVal = "na\rme_" + i;
+                        escapedVal = "na\\rme_" + i;
+                        break;
+                    case 4:
+                        stringVal = "na\\me_" + i;
+                        escapedVal = "na\\\\me_" + i;
+                        break;
+                    }
+                }
+            } else {
+                stringVal = "name_" + i;
+            }
+
             Object[] row = new Object[] {i,
-                                         "name_" + i,
+                                         stringVal,
                                          i,
                                          new Double(i)};
+            if (sb != null) {
+                sb.append(i).append(delimeter).append(escapedVal).append(delimeter);
+                sb.append(i).append(delimeter).append(new Double(i).toString()).append('\n');
+            }
             repl_table.addRow(row);
         }
         return repl_table;
@@ -180,13 +255,21 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
     }
 
     private void loadLargeReplicatedTable(Client client, String tableName,
-                                          int itemsPerChunk, int numChunks)
+            int itemsPerChunk, int numChunks) {
+        loadLargeReplicatedTable(client, tableName, itemsPerChunk, numChunks, false, null);
+    }
+
+    private void loadLargeReplicatedTable(Client client, String tableName,
+                                          int itemsPerChunk, int numChunks, boolean generateCSV, StringBuilder sb)
     {
         for (int i = 0; i < numChunks; i++)
         {
             VoltTable repl_table =
-                createReplicatedTable(itemsPerChunk, i * itemsPerChunk);
+                createReplicatedTable(itemsPerChunk, i * itemsPerChunk, sb, generateCSV);
             loadTable(client, tableName, repl_table);
+        }
+        if (sb != null) {
+            sb.trimToSize();
         }
     }
 
@@ -274,6 +357,58 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
           finally {
             System.setOut(original);
         }
+    }
+
+    public void testTSVConversion() throws Exception
+    {
+        Client client = getClient();
+
+        int num_replicated_items_per_chunk = 100;
+        int num_replicated_chunks = 10;
+        int num_partitioned_items_per_chunk = 120;
+        int num_partitioned_chunks = 10;
+
+        StringBuilder sb = new StringBuilder();
+        loadLargeReplicatedTable(client, "REPLICATED_TESTER",
+                                 num_replicated_items_per_chunk,
+                                 num_replicated_chunks,
+                                 false,
+                                 sb);
+        loadLargePartitionedTable(client, "PARTITION_TESTER",
+                                  num_partitioned_items_per_chunk,
+                                  num_partitioned_chunks);
+
+        client.callProcedure("@SnapshotSave", TMPDIR,
+                                       TESTNONCE, (byte)1);
+
+        validateSnapshot(true);
+        generateAndValidateTextFile( sb, false);
+    }
+
+    public void testCSVConversion() throws Exception
+    {
+        Client client = getClient();
+
+        int num_replicated_items_per_chunk = 100;
+        int num_replicated_chunks = 10;
+        int num_partitioned_items_per_chunk = 120;
+        int num_partitioned_chunks = 10;
+
+        StringBuilder sb = new StringBuilder();
+        loadLargeReplicatedTable(client, "REPLICATED_TESTER",
+                                 num_replicated_items_per_chunk,
+                                 num_replicated_chunks,
+                                 true,
+                                 sb);
+        loadLargePartitionedTable(client, "PARTITION_TESTER",
+                                  num_partitioned_items_per_chunk,
+                                  num_partitioned_chunks);
+
+        client.callProcedure("@SnapshotSave", TMPDIR,
+                                       TESTNONCE, (byte)1);
+
+        validateSnapshot(true);
+        generateAndValidateTextFile( sb, true);
     }
 
     /*
@@ -438,6 +573,40 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         assertEquals( 0, tmp_files.length);
 
         validateSnapshot(false);
+    }
+
+    private void generateAndValidateTextFile(StringBuilder expectedText, boolean csv) throws Exception {
+        String args[] = new String[] {
+                "--name",
+                TESTNONCE,
+               "--dirs",
+               TMPDIR,
+               "--tables",
+               "REPLICATED_TESTER",
+               "--type",
+               csv ? "CSV" : "TSV",
+               "--outdir",
+               TMPDIR
+        };
+        SnapshotConverter.main(args);
+        FileInputStream fis = new FileInputStream(
+                TMPDIR + File.separator + "REPLICATED_TESTER" + (csv ? ".csv" : ".tsv"));
+        try {
+            int filesize = (int)fis.getChannel().size();
+            ByteBuffer expectedBytes = ByteBuffer.wrap(expectedText.toString().getBytes("UTF-8"));
+            ByteBuffer readBytes = ByteBuffer.allocate(filesize);
+            while (readBytes.hasRemaining()) {
+                int read = fis.getChannel().read(readBytes);
+                if (read == -1) {
+                    throw new EOFException();
+                }
+            }
+            String string = new String(readBytes.array(), "UTF-8");
+            readBytes.flip();
+            assertTrue(expectedBytes.equals(readBytes));
+        } finally {
+            fis.close();
+        }
     }
 
     public void testIdleOnlineSnapshot() throws Exception
@@ -706,7 +875,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
         Client client = getClient();
 
-        VoltTable repl_table = createReplicatedTable(num_replicated_items, 0);
+        VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
         // make a TPCC warehouse table
         VoltTable partition_table =
             createPartitionedTable(num_partitioned_items, 0);
@@ -745,7 +914,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
         for (int ii = 0; ii < iterations; ii++) {
             Client client = getClient();
-            VoltTable repl_table = createReplicatedTable(num_replicated_items, 0);
+            VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
             // make a TPCC warehouse table
             VoltTable partition_table =
                 createPartitionedTable(num_partitioned_items, 0);
@@ -790,7 +959,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         for (int ii = 0; ii < iterations; ii++) {
             Client client = getClient();
 
-            VoltTable repl_table = createReplicatedTable(num_replicated_items, 0);
+            VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
             // make a TPCC warehouse table
             VoltTable partition_table =
                 createPartitionedTable(num_partitioned_items, 0);
