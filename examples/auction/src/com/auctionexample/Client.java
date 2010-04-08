@@ -208,7 +208,7 @@ public class Client {
             }
         }
         try {
-            client.shutdown();
+            client.close();
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -281,7 +281,7 @@ public class Client {
         System.out.println("* In Boo-tiques!                      *");
         System.out.println("***************************************");
         try {
-            client.shutdown();
+            client.close();
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
