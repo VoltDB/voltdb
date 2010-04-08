@@ -59,91 +59,91 @@ public class TestFailuresSuite extends RegressionSuite {
         super(name);
     }
 
-//    public void testVoilateUniqueness() throws IOException {
-//        System.out.println("STARTING testVU");
-//        Client client = getClient();
-//
-//        VoltTable[] results = null;
-//        try {
-//            results = client.callProcedure("ViolateUniqueness", 1L, 1L, 1L);
-//            System.out.println("testVU client response received");
-//            assertEquals(results.length, 0);
-//        } catch (ProcCallException e) {
-//            try {
-//                results = client.callProcedure("InsertNewOrder", 2L, 2L, 2L);
-//            } catch (ProcCallException e1) {
-//                fail(e1.toString());
-//            } catch (IOException e1) {
-//                fail(e1.toString());
-//            }
-//            System.out.println("second client response received");
-//            assertEquals(1, results.length);
-//            assertEquals(1, results[0].asScalarLong());
-//
-//            return;
-//        } catch (IOException e) {
-//            fail(e.toString());
-//            return;
-//        }
-//        fail("testViolateUniqueness should return while catching ProcCallException");
-//    }
-//
-//    public void testVoilateUniquenessAndCatchException() throws IOException {
-//        Client client = getClient();
-//        System.out.println("STARTING testVoilateUniquenessAndCatchException");
-//        VoltTable[] results = null;
-//        try {
-//            results = client.callProcedure("ViolateUniquenessAndCatchException", 1L, 1L, 1L);
-//            assertTrue(results.length == 1);
-//            System.out.println("PASSED testVoilateUandCE");
-//        } catch (ProcCallException e) {
-//            System.out.println("FAIL(1) testVoilateUandCE");
-//            e.printStackTrace();
-//            fail("ViolateUniquenessAndCatchException should not have thrown a ProcCallException");
-//        } catch (IOException e) {
-//            System.out.println("FAIL(2) testVoilateUandCE");
-//            fail(e.toString());
-//            return;
-//        }
-//
-//        try {
-//            results = client.callProcedure("InsertNewOrder", 2L, 2L, 2L);
-//        } catch (ProcCallException e1) {
-//            fail(e1.toString());
-//        } catch (IOException e1) {
-//            fail(e1.toString());
-//        }
-//        assertEquals(1, results.length);
-//        assertEquals(1, results[0].asScalarLong());
-//
-//        return;
-//    }
-//
-//    public void testDivideByZero() throws IOException {
-//        System.out.println("STARTING DivideByZero");
-//        Client client = getClient();
-//
-//        VoltTable[] results = null;
-//        try {
-//            results = client.callProcedure("DivideByZero", 0L, 0L, 1L);
-//            System.out.println("DivideByZero client response received");
-//            assertEquals(results.length, 0);
-//        } catch (ProcCallException e) {
-//            System.out.println(e.getMessage());
-//            if (e.getMessage().contains("SQL ERROR"))
-//                return;
-//            if (isHSQL())
-//                if (e.getMessage().contains("HSQL-BACKEND ERROR"))
-//                    return;
-//        } catch (IOException e) {
-//            fail(e.toString());
-//            return;
-//        }
-//        fail("testDivideByZero should return while catching ProcCallException");
-//    }
+    public void testVoilateUniqueness() throws IOException {
+        System.out.println("STARTING testVU");
+        Client client = getClient();
+
+        VoltTable[] results = null;
+        try {
+            results = client.callProcedure("ViolateUniqueness", 1L, 1L, 1L);
+            System.out.println("testVU client response received");
+            assertEquals(results.length, 0);
+        } catch (ProcCallException e) {
+            try {
+                results = client.callProcedure("InsertNewOrder", 2L, 2L, 2L);
+            } catch (ProcCallException e1) {
+                fail(e1.toString());
+            } catch (IOException e1) {
+                fail(e1.toString());
+            }
+            System.out.println("second client response received");
+            assertEquals(1, results.length);
+            assertEquals(1, results[0].asScalarLong());
+
+            return;
+        } catch (IOException e) {
+            fail(e.toString());
+            return;
+        }
+        fail("testViolateUniqueness should return while catching ProcCallException");
+    }
+
+    public void testVoilateUniquenessAndCatchException() throws IOException {
+        Client client = getClient();
+        System.out.println("STARTING testVoilateUniquenessAndCatchException");
+        VoltTable[] results = null;
+        try {
+            results = client.callProcedure("ViolateUniquenessAndCatchException", 1L, 1L, 1L);
+            assertTrue(results.length == 1);
+            System.out.println("PASSED testVoilateUandCE");
+        } catch (ProcCallException e) {
+            System.out.println("FAIL(1) testVoilateUandCE");
+            e.printStackTrace();
+            fail("ViolateUniquenessAndCatchException should not have thrown a ProcCallException");
+        } catch (IOException e) {
+            System.out.println("FAIL(2) testVoilateUandCE");
+            fail(e.toString());
+            return;
+        }
+
+        try {
+            results = client.callProcedure("InsertNewOrder", 2L, 2L, 2L);
+        } catch (ProcCallException e1) {
+            fail(e1.toString());
+        } catch (IOException e1) {
+            fail(e1.toString());
+        }
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].asScalarLong());
+
+        return;
+    }
+
+    public void testDivideByZero() throws IOException {
+        System.out.println("STARTING DivideByZero");
+        Client client = getClient();
+
+        VoltTable[] results = null;
+        try {
+            results = client.callProcedure("DivideByZero", 0L, 0L, 1L);
+            System.out.println("DivideByZero client response received");
+            assertEquals(results.length, 0);
+        } catch (ProcCallException e) {
+            System.out.println(e.getMessage());
+            if (e.getMessage().contains("SQL ERROR"))
+                return;
+            if (isHSQL())
+                if (e.getMessage().contains("HSQL-BACKEND ERROR"))
+                    return;
+        } catch (IOException e) {
+            fail(e.toString());
+            return;
+        }
+        fail("testDivideByZero should return while catching ProcCallException");
+    }
 
     public void testMemoryOverload() throws IOException, ProcCallException {
-        if (isHSQL()) return;
+        if (isHSQL() || isValgrind()) return;
 
         final int STRLEN = 30000;
 
@@ -200,7 +200,7 @@ public class TestFailuresSuite extends RegressionSuite {
     }
 
     public void testPerPlanFragmentMemoryOverload() throws IOException, ProcCallException {
-        if (isHSQL()) return;
+        if (isHSQL() || isValgrind()) return;
 
         System.out.println("STARTING testPerPlanFragmentMemoryOverload");
         Client client = getClient();
@@ -239,50 +239,50 @@ public class TestFailuresSuite extends RegressionSuite {
         fail("Should gracefully fail from using too much temp table memory, but didn't.");
     }
 
-//    public void testQueueCleanupFailure() throws IOException, ProcCallException {
-//        System.out.println("STARTING testQueueCleanupFailure");
-//        Client client = getClient();
-//
-//        VoltTable[] results = null;
-//
-//        results = client.callProcedure("CleanupFail", 0, 0, 0);
-//        assertEquals(1, results.length);
-//        assertEquals(1, results[0].asScalarLong());
-//
-//        results = client.callProcedure("CleanupFail", 2, 2, 2);
-//        assertEquals(1, results.length);
-//        assertEquals(1, results[0].asScalarLong());
-//    }
-//
-//    public void testTooFewParamsOnSinglePartitionProc() throws IOException {
-//        System.out.println("STARTING testTooFewParamsOnSinglePartitionProc");
-//        Client client = getClient();
-//
-//        try {
-//            client.callProcedure("TooFewParams", 1);
-//            fail();
-//        } catch (ProcCallException e) {
-//            assertTrue(e.getMessage().startsWith("Error sending"));
-//        }
-//
-//        try {
-//            client.callProcedure("TooFewParams");
-//            fail();
-//        } catch (ProcCallException e) {
-//            assertTrue(e.getMessage().startsWith("Error sending"));
-//        }
-//    }
-//
-//    public void testTooFewParamsOnSQLStmt() throws IOException {
-//        System.out.println("STARTING testTooFewParamsOnSQLStmt");
-//        Client client = getClient();
-//
-//        try {
-//            client.callProcedure("TooFewParams", 1, 1);
-//            fail();
-//        } catch (ProcCallException e) {
-//        }
-//    }
+    public void testQueueCleanupFailure() throws IOException, ProcCallException {
+        System.out.println("STARTING testQueueCleanupFailure");
+        Client client = getClient();
+
+        VoltTable[] results = null;
+
+        results = client.callProcedure("CleanupFail", 0, 0, 0);
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].asScalarLong());
+
+        results = client.callProcedure("CleanupFail", 2, 2, 2);
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].asScalarLong());
+    }
+
+    public void testTooFewParamsOnSinglePartitionProc() throws IOException {
+        System.out.println("STARTING testTooFewParamsOnSinglePartitionProc");
+        Client client = getClient();
+
+        try {
+            client.callProcedure("TooFewParams", 1);
+            fail();
+        } catch (ProcCallException e) {
+            assertTrue(e.getMessage().startsWith("Error sending"));
+        }
+
+        try {
+            client.callProcedure("TooFewParams");
+            fail();
+        } catch (ProcCallException e) {
+            assertTrue(e.getMessage().startsWith("Error sending"));
+        }
+    }
+
+    public void testTooFewParamsOnSQLStmt() throws IOException {
+        System.out.println("STARTING testTooFewParamsOnSQLStmt");
+        Client client = getClient();
+
+        try {
+            client.callProcedure("TooFewParams", 1, 1);
+            fail();
+        } catch (ProcCallException e) {
+        }
+    }
 
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
