@@ -209,7 +209,7 @@ public class ClientMover {
         }
 
         try {
-            voltclient.shutdown();
+            voltclient.close();
         } catch (Exception e) {
             e.printStackTrace();
             System.exit(-1);

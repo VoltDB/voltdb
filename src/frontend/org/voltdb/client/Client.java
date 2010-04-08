@@ -154,7 +154,7 @@ public interface Client {
      * <code>finalization</code> is used to detect resource leaks.
      * @throws InterruptedException
      */
-    public void shutdown() throws InterruptedException;
+    public void close() throws InterruptedException;
 
     /**
      * Add to the list of listeners that will be notified of events

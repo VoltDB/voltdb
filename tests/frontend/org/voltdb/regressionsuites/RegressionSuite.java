@@ -84,7 +84,7 @@ public class RegressionSuite extends TestCase {
             fail(failString);
         }
         for (final Client c : m_clients) {
-            c.shutdown();
+            c.close();
         }
         synchronized (m_clientChannels) {
             for (final SocketChannel sc : m_clientChannels) {
@@ -144,7 +144,7 @@ public class RegressionSuite extends TestCase {
     public void releaseClient(Client c) throws IOException, InterruptedException {
         boolean removed = m_clients.remove(c);
         assert(removed);
-        c.shutdown();
+        c.close();
     }
 
     /**

@@ -146,7 +146,7 @@ public class ClientDelete {
         }
 
         try {
-            voltclient.shutdown();
+            voltclient.close();
         } catch (Exception e) {
             e.printStackTrace();
             System.exit(-1);

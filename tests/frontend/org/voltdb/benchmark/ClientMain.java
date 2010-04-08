@@ -204,7 +204,7 @@ public abstract class ClientMain {
                                 m_sampler.setShouldStop();
                                 m_sampler.join();
                             }
-                            m_voltClient.shutdown();
+                            m_voltClient.close();
                             if (m_checkTables) {
                                 checkTables();
                             }

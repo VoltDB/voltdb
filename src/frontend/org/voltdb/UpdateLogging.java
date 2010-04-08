@@ -83,6 +83,6 @@ public class UpdateLogging {
         reader.close();
 
         client.callProcedure("@UpdateLogging", sb.toString(), allHosts ? 1L : 0L);
-        client.shutdown();
+        client.close();
     }
 }

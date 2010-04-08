@@ -122,7 +122,7 @@ public class MockVoltClient implements Client {
     }
 
     @Override
-    public void shutdown() throws InterruptedException {
+    public void close() throws InterruptedException {
         // TODO Auto-generated method stub
 
     }

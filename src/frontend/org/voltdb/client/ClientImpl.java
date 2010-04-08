@@ -216,7 +216,7 @@ final class ClientImpl implements Client {
      * all memory resources.
      * @throws InterruptedException
      */
-    public void shutdown() throws InterruptedException {
+    public void close() throws InterruptedException {
         m_isShutdown = true;
         synchronized (m_backpressureLock) {
             m_backpressureLock.notifyAll();

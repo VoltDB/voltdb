@@ -140,7 +140,7 @@ public class MultiPartitionSpeedTimer extends TestCase {
                 i, totalCount, m_duration / 1000.0, m_duration / (double)totalCount);
 
         m_config.shutDown();
-        m_client.shutdown();
+        m_client.close();
         //}
 
 
