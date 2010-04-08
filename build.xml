@@ -1404,6 +1404,7 @@ BENCHMARKS
         <param name="duration" value="${env.BMDURATION}000"/>
         <param name="interval" value="${env.BMINTERVAL}000"/>
         <param name="txnrate" value="${env.BMRATELIMIT}"/>
+        <param name="warehouses" value="${env.BMTPCCWAREHOUSES}"/>
         <param name="volt.server.memory" value="2048"/>
         <param name="os" value="${env.MACHTYPE}"/>
     </antcall>
