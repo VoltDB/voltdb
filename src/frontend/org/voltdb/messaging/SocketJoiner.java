@@ -411,6 +411,10 @@ public class SocketJoiner extends Thread {
                 if (m_hostLog != null)
                     m_hostLog.info("Catalog checksums do not match across cluster");
                 VoltDB.crashVoltDB();
+                for (SocketChannel sock : m_sockets.values()) {
+                    sock.close();
+                }
+                return;
             }
             assert(command == COMMAND_COMPLETE);
         }
