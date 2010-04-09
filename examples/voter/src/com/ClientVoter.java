@@ -346,7 +346,7 @@ public class ClientVoter {
         System.out.printf(" -   Latency 200ms+        = %,d\n",latency_counter[8]);
 
         try {
-            voltclient.shutdown();
+            voltclient.close();
         } catch (Exception e) {
             e.printStackTrace();
             System.exit(-1);
