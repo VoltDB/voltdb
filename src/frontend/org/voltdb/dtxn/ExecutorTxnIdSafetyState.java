@@ -23,6 +23,7 @@ import java.util.Set;
 
 import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Site;
+import org.voltdb.messaging.Mailbox;
 
 public class ExecutorTxnIdSafetyState {
 
@@ -35,16 +36,22 @@ public class ExecutorTxnIdSafetyState {
     private class SiteState {
         public int siteId;
         public long newestConfirmedTxnId;
+        public long lastSentTxnId;
         public PartitionState partition;
     }
 
     LinkedHashMap<Integer, SiteState> m_stateBySite = new LinkedHashMap<Integer, SiteState>();
     LinkedHashMap<Integer, PartitionState> m_stateByPartition = new LinkedHashMap<Integer, PartitionState>();
 
-    public ExecutorTxnIdSafetyState(SiteTracker tracker) {
+    Mailbox m_mailbox = null;
+    final int m_siteId;
+
+    public ExecutorTxnIdSafetyState(int siteId, SiteTracker tracker) {
+        m_siteId = siteId;
+
         Set<Integer> execSites = tracker.getExecutionSiteIds();
-        for (int siteId : execSites) {
-            Site s = tracker.getSiteForId(siteId);
+        for (int id : execSites) {
+            Site s = tracker.getSiteForId(id);
             // ignore down sites
             if (!s.getIsup()) continue;
 
@@ -53,10 +60,11 @@ public class ExecutorTxnIdSafetyState {
             int partitionId = Integer.parseInt(p.getTypeName());
 
             SiteState ss = new SiteState();
-            ss.siteId = siteId;
+            ss.siteId = id;
             ss.newestConfirmedTxnId = DtxnConstants.DUMMY_LAST_SEEN_TXN_ID;
-            assert(m_stateBySite.get(siteId) == null);
-            m_stateBySite.put(siteId, ss);
+            ss.lastSentTxnId = DtxnConstants.DUMMY_LAST_SEEN_TXN_ID;
+            assert(m_stateBySite.get(id) == null);
+            m_stateBySite.put(id, ss);
 
             // look for partition state by id
             PartitionState ps = m_stateByPartition.get(partitionId);
@@ -82,19 +90,20 @@ public class ExecutorTxnIdSafetyState {
         }
     }
 
+    void setMailbox(Mailbox mbox) {
+        m_mailbox = mbox;
+    }
+
     public synchronized long getNewestSafeTxnIdForExecutorBySiteId(int executorSiteId) {
         SiteState ss = m_stateBySite.get(executorSiteId);
-        int x;
-        if (ss == null) {
-            x = 6;
-        }
         assert(ss != null);
         assert(ss.siteId == executorSiteId);
         PartitionState ps = ss.partition;
+        ss.lastSentTxnId = ps.newestConfirmedTxnId;
         return ps.newestConfirmedTxnId;
     }
 
-    public synchronized void updateLastSeenTxnIdFromExecutorBySiteId(int executorSiteId, long lastSeenTxnId) {
+    public synchronized void updateLastSeenTxnIdFromExecutorBySiteId(int executorSiteId, long lastSeenTxnId, boolean shouldRespond) {
         // ignore these by convention
         if (lastSeenTxnId == DtxnConstants.DUMMY_LAST_SEEN_TXN_ID)
             return;
@@ -103,24 +112,34 @@ public class ExecutorTxnIdSafetyState {
         assert(ss != null);
         assert(ss.siteId == executorSiteId);
 
-        // if no state needs changing, we're done here
-        if (ss.newestConfirmedTxnId >= lastSeenTxnId) {
-            return;
-        }
-        // state needs changing at least for this site
-        ss.newestConfirmedTxnId = lastSeenTxnId;
+        // check if state needs changing
+        if (ss.newestConfirmedTxnId < lastSeenTxnId) {
 
-        PartitionState ps = ss.partition;
-        assert(ps.sites.size() > 0);
-        long min = Long.MAX_VALUE;
-        for (SiteState s : ps.sites) {
-            assert(s != null);
-            if (s.newestConfirmedTxnId < min)
-                min = s.newestConfirmedTxnId;
-        }
-        assert(min != Long.MAX_VALUE);
+            // state needs changing at least for this site
+            ss.newestConfirmedTxnId = lastSeenTxnId;
 
-        ps.newestConfirmedTxnId = min;
+            PartitionState ps = ss.partition;
+            assert(ps.sites.size() > 0);
+            long min = Long.MAX_VALUE;
+            for (SiteState s : ps.sites) {
+                assert(s != null);
+                if (s.newestConfirmedTxnId < min)
+                    min = s.newestConfirmedTxnId;
+            }
+            assert(min != Long.MAX_VALUE);
+
+            ps.newestConfirmedTxnId = min;
+        }
+
+        // see if the sent message is out of date
+        /*if (shouldRespond) {
+            HeartbeatMessage hb = new HeartbeatMessage(m_siteId, DtxnConstants.DUMMY_LAST_SEEN_TXN_ID, ss.partition.newestConfirmedTxnId);
+            try {
+                m_mailbox.send(executorSiteId, VoltDB.DTXN_MAILBOX_ID, hb);
+            } catch (MessagingException e) {
+                throw new RuntimeException(e);
+            }
+        }*/
     }
 
     /**

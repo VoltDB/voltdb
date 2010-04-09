@@ -162,7 +162,7 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
         // update the state of seen txnids for each executor
         if (message instanceof HeartbeatResponseMessage) {
             HeartbeatResponseMessage hrm = (HeartbeatResponseMessage) message;
-            m_safetyState.updateLastSeenTxnIdFromExecutorBySiteId(hrm.getExecSiteId(), hrm.getLastReceivedTxnId());
+            m_safetyState.updateLastSeenTxnIdFromExecutorBySiteId(hrm.getExecSiteId(), hrm.getLastReceivedTxnId(), hrm.isBlocked());
             return true;
         }
 
@@ -170,14 +170,13 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
         assert(message instanceof InitiateResponseMessage);
         final InitiateResponseMessage r = (InitiateResponseMessage) message;
         // update the state of seen txnids for each executor
-        m_safetyState.updateLastSeenTxnIdFromExecutorBySiteId(r.getCoordinatorSiteId(), r.getLastReceivedTxnId());
+        m_safetyState.updateLastSeenTxnIdFromExecutorBySiteId(r.getCoordinatorSiteId(), r.getLastReceivedTxnId(), false);
 
         InFlightTxnState state;
         int sites_left = -1;
         synchronized (m_initiator)
         {
-            state =
-                m_pendingTxns.getTxn(r.getTxnId(), r.getCoordinatorSiteId());
+            state = m_pendingTxns.getTxn(r.getTxnId(), r.getCoordinatorSiteId());
             sites_left = m_pendingTxns.getTxnIdSize(r.getTxnId());
         }
 

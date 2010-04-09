@@ -48,6 +48,7 @@ import org.voltdb.dtxn.SinglePartitionTxnState;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.SiteTransactionConnection;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.dtxn.RestrictedPriorityQueue.QueueState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.exceptions.SerializableException;
@@ -395,8 +396,8 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         DumpManager.register(m_dumpId, this);
 
         m_systemProcedureContext = new SystemProcedureContext();
-        m_transactionQueue = initializeTransactionQueue(siteId);
         m_mailbox = mailbox;
+        m_transactionQueue = initializeTransactionQueue(siteId);
 
         loadProceduresFromCatalog(voltdb.getBackendTargetType());
         m_snapshotter = new SnapshotSiteProcessor();
@@ -417,7 +418,8 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             if (s.getIsexec() == false)
                 initiatorIds[index++] = Integer.parseInt(s.getTypeName());
 
-        return new RestrictedPriorityQueue(initiatorIds, siteId);
+        assert(m_mailbox != null);
+        return new RestrictedPriorityQueue(initiatorIds, siteId, m_mailbox);
     }
 
     private HsqlBackend initializeHSQLBackend()
@@ -583,7 +585,10 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             while (m_shouldContinue) {
                 TransactionState currentTxnState = m_transactionQueue.poll();
                 if (currentTxnState == null) {
+                    // poll the messaging layer for a while as this site has nothing to do
+                    // this will likely have a message/several messages immediately in a heavy workload
                     VoltMessage message = m_mailbox.recvBlocking(5);
+                    // do periodic work
                     tick();
                     if (message != null) {
                         handleMailboxMessage(message);
@@ -632,13 +637,17 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                         true, ((HeartbeatMessage) info).getLastSafeTxnId());
 
                 // respond to the initiator with the last seen transaction
-                HeartbeatResponseMessage response = new HeartbeatResponseMessage(m_siteId, lastSeenTxnFromInitiator);
+                HeartbeatResponseMessage response = new HeartbeatResponseMessage(
+                        m_siteId, lastSeenTxnFromInitiator,
+                        m_transactionQueue.getQueueState() == QueueState.BLOCKED_SAFETY);
                 try {
                     m_mailbox.send(info.getInitiatorSiteId(), VoltDB.DTXN_MAILBOX_ID, response);
                 } catch (MessagingException e) {
                     // hope this never happens... it doesn't right?
                     throw new RuntimeException(e);
                 }
+                //System.out.println("Sent response to periodic heartbeat.");
+                //System.out.flush();
 
                 // we're done here (in the case of heartbeats)
                 return;

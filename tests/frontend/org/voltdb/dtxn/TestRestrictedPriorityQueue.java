@@ -53,7 +53,7 @@ public class TestRestrictedPriorityQueue extends TestCase{
         m_initiators = new int[2];
         m_initiators[0] = 0;
         m_initiators[1] = 1;
-        m_queue = new RestrictedPriorityQueue(m_initiators, 0);
+        m_queue = new RestrictedPriorityQueue(m_initiators, 0, null);
         m_idManager = new TransactionIdManager(0);
         m_txnIds = new Vector<Long>();
         m_proc = new StoredProcedureInvocation();

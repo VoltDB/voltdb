@@ -957,6 +957,12 @@ public class ClientInterface implements DumpManager.Dumpable {
                 if (m_tickCounter % 20 == 0) {
                     checkForDeadConnections(time);
                 }
+                //System.out.printf("Sending tick after %d ms pause.\n", delta);
+                //System.out.flush();
+            }
+            else {
+                //System.out.printf("NOT sending tick after %d ms pause.\n", delta);
+                //System.out.flush();
             }
 
             // check for catalog updates

@@ -255,7 +255,7 @@ public class TestDtxnInitiatorQueue extends TestCase
     public void testNonReplicatedBasicOps()
     {
         MockInitiator initiator = new MockInitiator();
-        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(m_mockVolt.getCatalogContext().siteTracker);
+        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
         DtxnInitiatorQueue dut = new DtxnInitiatorQueue(INITIATOR_SITE_ID, safetyState);
         dut.setInitiator(initiator);
         m_testStream.reset();
@@ -293,7 +293,7 @@ public class TestDtxnInitiatorQueue extends TestCase
     public void testReplicatedBasicOps()
     {
         MockInitiator initiator = new MockInitiator();
-        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(m_mockVolt.getCatalogContext().siteTracker);
+        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
         DtxnInitiatorQueue dut = new DtxnInitiatorQueue(INITIATOR_SITE_ID, safetyState);
         dut.setInitiator(initiator);
         m_testStream.reset();
@@ -326,7 +326,7 @@ public class TestDtxnInitiatorQueue extends TestCase
     public void testInconsistentResults()
     {
         MockInitiator initiator = new MockInitiator();
-        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(m_mockVolt.getCatalogContext().siteTracker);
+        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
         DtxnInitiatorQueue dut = new DtxnInitiatorQueue(INITIATOR_SITE_ID, safetyState);
         dut.setInitiator(initiator);
         m_testStream.reset();
@@ -385,7 +385,7 @@ public class TestDtxnInitiatorQueue extends TestCase
     public void testEarlyReadWriteFailure()
     {
         MockInitiator initiator = new MockInitiator();
-        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(m_mockVolt.getCatalogContext().siteTracker);
+        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
         DtxnInitiatorQueue dut = new DtxnInitiatorQueue(INITIATOR_SITE_ID, safetyState);
         dut.setInitiator(initiator);
         m_testStream.reset();
@@ -402,7 +402,7 @@ public class TestDtxnInitiatorQueue extends TestCase
     public void testMidReadWriteFailure()
     {
         MockInitiator initiator = new MockInitiator();
-        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(m_mockVolt.getCatalogContext().siteTracker);
+        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
         DtxnInitiatorQueue dut = new DtxnInitiatorQueue(INITIATOR_SITE_ID, safetyState);
         dut.setInitiator(initiator);
         m_testStream.reset();
@@ -419,7 +419,7 @@ public class TestDtxnInitiatorQueue extends TestCase
     public void testMultipleTxnIdMidFailure()
     {
         MockInitiator initiator = new MockInitiator();
-        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(m_mockVolt.getCatalogContext().siteTracker);
+        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
         DtxnInitiatorQueue dut = new DtxnInitiatorQueue(INITIATOR_SITE_ID, safetyState);
         dut.setInitiator(initiator);
         m_testStream.reset();

@@ -113,11 +113,12 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         m_idManager = new TransactionIdManager(initiatorId);
         m_hostId = hostId;
         m_siteId = siteId;
-        m_safetyState = new ExecutorTxnIdSafetyState(context.siteTracker);
+        m_safetyState = new ExecutorTxnIdSafetyState(siteId, context.siteTracker);
         m_queue = new DtxnInitiatorQueue(siteId, m_safetyState);
         m_mailbox = messenger.createMailbox(siteId, VoltDB.DTXN_MAILBOX_ID,
                                             m_queue);
         m_queue.setInitiator(this);
+        m_safetyState.setMailbox(m_mailbox);
         m_onBackPressure = onBackPressure;
         m_offBackPressure = offBackPressure;
     }
@@ -188,24 +189,35 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         }
     }
 
+    long m_lastTickTime = 0;
+
     @Override
     public synchronized void tick(long time, long interval) {
         long txnId = m_idManager.getNextUniqueTransactionId();
 
         int[] outOfDateSites =
             VoltDB.instance().getCatalogContext().
-            siteTracker.getSitesWhichNeedAHeartbeat(time, interval);
+            //siteTracker.getSitesWhichNeedAHeartbeat(time, interval);
+            siteTracker.getUpExecutionSites();
+
+        long now = System.currentTimeMillis();
+        long duration = now - m_lastTickTime;
+        //System.out.printf("Sending tick after %d ms pause.\n", duration);
+        //System.out.flush();
+
         try {
             // loop over all the sites that need a heartbeat and send one
             for (int siteId : outOfDateSites) {
                 // tack on the last confirmed seen txn id for all sites with a particular partition
                 long newestSafeTxnId = m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(siteId);
                 HeartbeatMessage tickNotice = new HeartbeatMessage(m_siteId, txnId, newestSafeTxnId);
-                m_mailbox.send(siteId, 0, tickNotice);
+                m_mailbox.send(siteId, VoltDB.DTXN_MAILBOX_ID, tickNotice);
             }
         } catch (MessagingException e) {
             throw new RuntimeException(e);
         }
+
+        m_lastTickTime = now;
     }
 
     @Override

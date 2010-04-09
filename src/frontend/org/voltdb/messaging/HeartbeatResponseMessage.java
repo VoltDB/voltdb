@@ -24,16 +24,19 @@ public class HeartbeatResponseMessage extends VoltMessage {
 
     int m_execSiteId;
     long m_lastReceivedTxnId; // this is the largest txn acked by all partitions running the java for it
+    boolean m_siteIsBlocked;
 
     HeartbeatResponseMessage() {
         super();
         m_lastReceivedTxnId = DtxnConstants.DUMMY_LAST_SEEN_TXN_ID; // -1
         m_execSiteId = -1;
+        m_siteIsBlocked = false;
     }
 
-    public HeartbeatResponseMessage(int execSiteId, long lastSeenTxnFromInitiator) {
+    public HeartbeatResponseMessage(int execSiteId, long lastSeenTxnFromInitiator, boolean siteIsBlocked) {
         m_execSiteId = execSiteId;
         m_lastReceivedTxnId = lastSeenTxnFromInitiator;
+        m_siteIsBlocked = siteIsBlocked;
     }
 
     public int getExecSiteId() {
@@ -44,9 +47,13 @@ public class HeartbeatResponseMessage extends VoltMessage {
         return m_lastReceivedTxnId;
     }
 
+    public boolean isBlocked() {
+        return m_siteIsBlocked;
+    }
+
     @Override
     protected void flattenToBuffer(DBBPool pool) {
-        int msgsize = 4 + 8;
+        int msgsize = 4 + 8 + 1;
 
         if (m_buffer == null) {
             m_container = pool.acquire(msgsize + 1 + HEADER_SIZE);
@@ -59,6 +66,7 @@ public class HeartbeatResponseMessage extends VoltMessage {
 
         m_buffer.putInt(m_execSiteId);
         m_buffer.putLong(m_lastReceivedTxnId);
+        m_buffer.put((byte) (m_siteIsBlocked ? 1 : 0));
 
         m_buffer.limit(m_buffer.position());
     }
@@ -69,6 +77,7 @@ public class HeartbeatResponseMessage extends VoltMessage {
 
         m_execSiteId = m_buffer.getInt();
         m_lastReceivedTxnId = m_buffer.getLong();
+        m_siteIsBlocked = (m_buffer.get() == 1);
     }
 
     @Override

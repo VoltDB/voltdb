@@ -170,12 +170,17 @@ public class RealVoltDB implements VoltDBInterface
         }
     }
 
+    FiveMSThread fivems;
+
     /**
      * Initialize all the global components, then initialize all the m_sites.
      */
     public void initialize(VoltDB.Configuration config) {
         synchronized(m_startAndStopLock) {
             hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+
+            fivems = new FiveMSThread();
+            fivems.start();
 
             m_faultManager = new FaultDistributor();
             // Install a handler for NODE_FAILURE faults to update the catalog

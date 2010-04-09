@@ -83,7 +83,7 @@ public class Client {
 
         // the last three lines just round to the nearest penny (lame)
         long money = newBid.longValue();
-        newBid = ((double)money) / 100.0;
+        newBid = (money) / 100.0;
         return newBid.doubleValue();
     }
 
@@ -208,7 +208,7 @@ public class Client {
             }
         }
         try {
-            client.shutdown();
+            client.close();
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -281,7 +281,7 @@ public class Client {
         System.out.println("* In Boo-tiques!                      *");
         System.out.println("***************************************");
         try {
-            client.shutdown();
+            client.close();
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
