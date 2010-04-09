@@ -18,8 +18,8 @@
 package org.voltdb.client;
 
 /**
- * Listener that a client application can provide to a {@link Client} in order receive notifications
- * when a connection is lost connection or backpressure occurs
+ * Listener that a client application can provide to a {@link Client} in order to receive notifications
+ * when a connection is lost or backpressure occurs
  *
  */
 public interface ClientStatusListener {

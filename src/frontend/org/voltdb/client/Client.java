@@ -151,7 +151,8 @@ public interface Client {
     /**
      * Shutdown the {@link Client} closing all network connections and release all memory resources.
      * Failing to call this method before the {@link Client} is garbage collected can generate errors because
-     * <code>finalization</code> is used to detect resource leaks.
+     * <code>finalization</code> is used to detect resource leaks. A client cannot be used once it has
+     * been closed.
      * @throws InterruptedException
      */
     public void close() throws InterruptedException;

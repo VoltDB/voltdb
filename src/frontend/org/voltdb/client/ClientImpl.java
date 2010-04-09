@@ -190,6 +190,9 @@ final class ClientImpl implements Client {
         if (m_isShutdown) {
             return false;
         }
+        if (callback == null) {
+            callback = new NullCallback();
+        }
         ProcedureInvocation invocation =
             new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
 
