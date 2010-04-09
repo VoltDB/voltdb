@@ -56,6 +56,7 @@ public abstract class TransactionInitiator {
             StoredProcedureInvocation invocation,
             boolean isReadOnly,
             boolean isSinglePartition,
+            boolean isEverySite,
             int partitions[],
             int numPartitions,
             Object clientData,

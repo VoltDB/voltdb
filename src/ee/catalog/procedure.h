@@ -50,6 +50,7 @@ protected:
     CatalogMap<GroupRef> m_authGroups;
     bool m_readonly;
     bool m_singlepartition;
+    bool m_everysite;
     bool m_systemproc;
     bool m_hasjava;
     CatalogType* m_partitiontable;
@@ -76,6 +77,8 @@ public:
     bool readonly() const;
     /** GETTER: Does the stored procedure need data on more than one partition? */
     bool singlepartition() const;
+    /** GETTER: Does the stored procedure as a single procedure txn at every site? */
+    bool everysite() const;
     /** GETTER: Is this procedure an internal system procedure? */
     bool systemproc() const;
     /** GETTER: Is this a full java stored procedure or is it just a single stmt? */

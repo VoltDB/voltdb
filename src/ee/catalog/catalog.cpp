@@ -26,9 +26,7 @@
 #include <string.h>
 #include "catalog.h"
 #include "cluster.h"
-#include "common/SerializableEEException.h"
 
-using namespace voltdb;
 using namespace catalog;
 using namespace std;
 
@@ -55,8 +53,7 @@ void Catalog::execute(const string &stmts) {
     }
     std::map<std::string, UnresolvedInfo>::const_iterator iter;
     if (m_unresolved.size() > 0)
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "failed to execute catalog");
+        throw std::exception();
 }
 
 void Catalog::executeOne(const string &stmt) {
@@ -91,9 +88,7 @@ void Catalog::executeOne(const string &stmt) {
     // execute
     if (command.compare("add") == 0) {
         CatalogType *type = item->addChild(a, b);
-        if (type == NULL)
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                          "failed to add child");
+        assert(type != NULL);
         std::string path = type->path();
         if (m_unresolved.count(path) != 0) {
             //printf("catalog unresolved has a match for path: %s\n", path.c_str());
@@ -103,8 +98,7 @@ void Catalog::executeOne(const string &stmt) {
             std::list<UnresolvedInfo>::const_iterator iter;
             for (iter = lui.begin(); iter != lui.end(); iter++) {
                 UnresolvedInfo ui = *iter;
-                std::string path2 = "set " + ui.type->path() + " "
-                    + ui.field + " " + path;
+                std::string path2 = "set " + ui.type->path() + " " + ui.field + " " + path;
                 //printf("running unresolved command:\n    %s\n", path2.c_str());
                 //fflush(stdout);
                 executeOne(path2);
@@ -118,8 +112,7 @@ void Catalog::executeOne(const string &stmt) {
         item->removeChild(a, b);
     }
     else {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "command isn't 'set' or 'add'.");
+        throw string("command isn't 'set' or 'add'.");
     }
 }
 

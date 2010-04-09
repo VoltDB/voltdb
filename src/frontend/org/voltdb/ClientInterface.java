@@ -83,7 +83,7 @@ public class ClientInterface implements DumpManager.Dumpable {
     private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
 
     // Atomically allows the catalog reference to change between access
-    private AtomicReference<CatalogContext> m_catalogContext = new AtomicReference<CatalogContext>(null);
+    private final AtomicReference<CatalogContext> m_catalogContext = new AtomicReference<CatalogContext>(null);
 
     /** If this is true, update the catalog */
     private final AtomicBoolean m_shouldUpdateCatalog = new AtomicBoolean(false);
@@ -102,7 +102,7 @@ public class ClientInterface implements DumpManager.Dumpable {
     final String m_dumpId;
 
     private final QueueMonitor m_clientQueueMonitor = new QueueMonitor() {
-        private int MAX_QUEABLE = 33554432;
+        private final int MAX_QUEABLE = 33554432;
 
         private int m_queued = 0;
 
@@ -702,36 +702,26 @@ public class ClientInterface implements DumpManager.Dumpable {
         final long now = EstTime.currentTimeMillis();
         final FastDeserializer fds = new FastDeserializer(buf);
 
-        // read the stored proc invocation
-        //task = ExecutionSiteTask.createFromWireProtocol(fds);
+        // Deserialize the client's request and map to a catalog stored procedure
         final StoredProcedureInvocation task = fds.readObject(StoredProcedureInvocation.class);
-
-        // get procedure from the catalog
         final Procedure catProc = m_catalogContext.get().procedures.get(task.procName);
 
-        // For now, comment out any subset of lines below to start the sampler
-        // but you will need to rebuild and distribute voltdbfat.jar, etc...
-
-        //if (task.procName.startsWith("measureOverhead"))
-        //    VoltDB.getSingleton().startSampler();
-        //if (Character.isLowerCase(task.procName.charAt(0)))
-        //    VoltDB.getSingleton().startSampler();
-
         /*
-         * @TODO This ladder stinks. An SPI when deserialized here should be able to determine if the task is permitted by calling
-         * a method that provides an AuthUser object.
+         * @TODO This ladder stinks. An SPI when deserialized here should be
+         * able to determine if the task is permitted by calling a method that
+         * provides an AuthUser object.
          */
         if (task.procName.startsWith("@")) {
 
-            // ad-hoc queries need to be parsed and planned in another thread before they can be run
+            // AdHoc requires unique permission. Then has to plan in a separate thread.
             if (task.procName.equals("@AdHoc")) {
                 if (!handler.m_user.hasAdhocPermission()) {
                     final ClientResponseImpl errorResponse =
                         new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                            new VoltTable[0], "User does not have @AdHoc permission", task.clientHandle);
+                                               new VoltTable[0], "User does not have @AdHoc permission", task.clientHandle);
                     authLog.l7dlog(Level.INFO,
-                            LogKeys.auth_ClientInterface_LackingPermissionForAdhoc.name(),
-                            new String[] {handler.m_user.m_name}, null);
+                                   LogKeys.auth_ClientInterface_LackingPermissionForAdhoc.name(),
+                                   new String[] {handler.m_user.m_name}, null);
                     c.writeStream().enqueue(errorResponse);
                     return;
                 }
@@ -739,108 +729,82 @@ public class ClientInterface implements DumpManager.Dumpable {
                 if (task.params.m_params.length != 1) {
                     final ClientResponseImpl errorResponse =
                         new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                            new VoltTable[0],
-                            "Adhoc system procedure requires exactly one parameter, the SQL statement to execute.",
-                            task.clientHandle);
+                                               new VoltTable[0],
+                                               "Adhoc system procedure requires exactly one parameter, the SQL statement to execute.",
+                                               task.clientHandle);
                     c.writeStream().enqueue(errorResponse);
                     return;
                 }
                 String sql = (String) task.params.m_params[0];
                 m_asyncCompilerWorkThread.planSQL(
-                        sql,
-                        task.clientHandle,
-                        handler.connectionId(),
-                        handler.m_hostname,
-                        handler.sequenceId(),
-                        c);
+                                                  sql,
+                                                  task.clientHandle,
+                                                  handler.connectionId(),
+                                                  handler.m_hostname,
+                                                  handler.sequenceId(),
+                                                  c);
                 return;
             }
 
+            // All other sysprocs require the sysproc permission
+            if (!handler.m_user.hasSystemProcPermission()) {
+                authLog.l7dlog(Level.INFO,
+                               LogKeys.auth_ClientInterface_LackingPermissionForSysproc.name(),
+                               new String[] { handler.m_user.m_name, task.procName },
+                               null);
+                final ClientResponseImpl errorResponse =
+                    new ClientResponseImpl(
+                                           ClientResponseImpl.UNEXPECTED_FAILURE,
+                                           new VoltTable[0],
+                                           "User " + handler.m_user.m_name + " does not have sysproc permission",
+                                           task.clientHandle);
+                c.writeStream().enqueue(errorResponse);
+                return;
+            }
+
+            // Updating a catalog needs to divert to the catalog processing thread
             if (task.procName.equals("@UpdateApplicationCatalog")) {
-                if (!handler.m_user.hasAdhocPermission()) {
-                    final ClientResponseImpl errorResponse =
-                        new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                            new VoltTable[0], "User does not have @AdHoc permission", task.clientHandle);
-                    authLog.l7dlog(Level.INFO,
-                            LogKeys.auth_ClientInterface_LackingPermissionForAdhoc.name(),
-                            new String[] {handler.m_user.m_name}, null);
-                    c.writeStream().enqueue(errorResponse);
-                    return;
-                }
                 task.buildParameterSet();
+                // user only provides catalog URL.
                 if (task.params.m_params.length != 1) {
                     final ClientResponseImpl errorResponse =
                         new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                            new VoltTable[0],
-                            "Adhoc system procedure requires exactly one parameter, the SQL statement to execute.",
-                            task.clientHandle);
+                                               new VoltTable[0],
+                                               "UpdateApplicationCatalog system procedure requires exactly " +
+                                               "one parameter, the URL of the catalog to load",
+                                               task.clientHandle);
                     c.writeStream().enqueue(errorResponse);
                     return;
                 }
                 String catalogURL = (String) task.params.m_params[0];
-                m_asyncCompilerWorkThread.prepareCatalogUpdate(
-                        catalogURL,
-                        task.clientHandle,
-                        handler.connectionId(),
-                        handler.m_hostname,
-                        handler.sequenceId(),
-                        c);
-                return;
-            }
-
-            // dump requests are pretty direct and to the point, but only affect the local machine
-            /*if (task.procName.equals("@dump")) {
-                // currently you don't need permissions to do a dump
-                // https://hzproject.com/trac/ticket/269
-                DumpManager.requestGlobalDump(System.currentTimeMillis());
-
-                // send nothing back, but we need to do this to keep everything kosher
-                final ClientResponseImpl dumpResponse =
-                    new ClientResponseImpl(
-                            ClientResponseImpl.SUCCESS,
-                            new VoltTable[0],
-                            "Dump in progress...",
-                            task.clientHandle);
-                c.writeStream().enqueue(dumpResponse);
-                return;
-            }*/
-
-            // CONTINUE WITH STANDARD SYSPROCS FROM HERE
-            if (!handler.m_user.hasSystemProcPermission()) {
-                authLog.l7dlog(Level.INFO,
-                        LogKeys.auth_ClientInterface_LackingPermissionForSysproc.name(),
-                        new String[] { handler.m_user.m_name, task.procName },
-                        null);
-                final ClientResponseImpl errorResponse =
-                    new ClientResponseImpl(
-                            ClientResponseImpl.UNEXPECTED_FAILURE,
-                            new VoltTable[0],
-                            "User " + handler.m_user.m_name + " does not have sysproc permission",
-                            task.clientHandle);
-                c.writeStream().enqueue(errorResponse);
+                m_asyncCompilerWorkThread.prepareCatalogUpdate(catalogURL,
+                                                               task.clientHandle,
+                                                               handler.connectionId(),
+                                                               handler.m_hostname,
+                                                               handler.sequenceId(),
+                                                               c);
                 return;
             }
         } else if (!handler.m_user.hasPermission(catProc)) {
             authLog.l7dlog(Level.INFO,
-                    LogKeys.auth_ClientInterface_LackingPermissionForProcedure.name(),
-                    new String[] { handler.m_user.m_name, task.procName }, null);
+                           LogKeys.auth_ClientInterface_LackingPermissionForProcedure.name(),
+                           new String[] { handler.m_user.m_name, task.procName }, null);
             final ClientResponseImpl errorResponse =
-                new ClientResponseImpl(
-                        ClientResponseImpl.UNEXPECTED_FAILURE,
-                        new VoltTable[0],
-                        "User does not have permission to invoke " + catProc.getTypeName(),
-                        task.clientHandle);
+                new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                       new VoltTable[0],
+                                       "User does not have permission to invoke " + catProc.getTypeName(),
+                                       task.clientHandle);
             c.writeStream().enqueue(errorResponse);
             return;
         }
 
         if (catProc != null) {
-            boolean isReadOnly = catProc.getReadonly();
-
             int[] involvedPartitions = null;
-            if (catProc.getSinglepartition() == false) {
-                // multi-partition txns share an execution site task instance
-                // create a fully formed, final task with deserialized parameters
+            if (catProc.getEverysite() == true) {
+                involvedPartitions = m_allPartitions;
+                task.buildParameterSet();
+            }
+            else if (catProc.getSinglepartition() == false) {
                 involvedPartitions = m_allPartitions;
                 task.buildParameterSet();
             }
@@ -865,9 +829,12 @@ public class ClientInterface implements DumpManager.Dumpable {
 
             if (involvedPartitions != null) {
                 // initiate the transaction
-                m_initiator.createTransaction(handler.connectionId(), handler.m_hostname, task, isReadOnly,
+                m_initiator.createTransaction(handler.connectionId(), handler.m_hostname, task,
+                                              catProc.getReadonly(),
                                               catProc.getSinglepartition(),
-                                              involvedPartitions, involvedPartitions.length, c, buf.capacity(),
+                                              catProc.getEverysite(),
+                                              involvedPartitions, involvedPartitions.length,
+                                              c, buf.capacity(),
                                               now);
             }
         }
@@ -904,7 +871,7 @@ public class ClientInterface implements DumpManager.Dumpable {
 
                     // initiate the transaction
                     m_initiator.createTransaction(plannedStmt.connectionId, plannedStmt.hostname,
-                                                  task, false, false, m_allPartitions,
+                                                  task, false, false, false, m_allPartitions,
                                                   m_allPartitions.length, plannedStmt.clientData, 0, 0);
                 }
                 else if (result instanceof CatalogChangeResult) {
@@ -919,9 +886,10 @@ public class ClientInterface implements DumpManager.Dumpable {
                     };
                     task.clientHandle = changeResult.clientHandle;
 
-                    // initiate the transaction
+                    // initiate the transaction. These hard-coded values from catalog
+                    // procedure are horrible, horrible, horrible.
                     m_initiator.createTransaction(changeResult.connectionId, changeResult.hostname,
-                                                  task, false, false, m_allPartitions,
+                                                  task, false, false, false, m_allPartitions,
                                                   m_allPartitions.length, changeResult.clientData, 0, 0);
                 }
                 else {
@@ -1082,7 +1050,7 @@ public class ClientInterface implements DumpManager.Dumpable {
            spi.params.setParameters(invocation.getSecond());
             // initiate the transaction
            m_initiator.createTransaction(-1, "SnapshotDaemon", spi, catProc.getReadonly(),
-                                         catProc.getSinglepartition(),
+                                         catProc.getSinglepartition(), catProc.getEverysite(),
                                          m_allPartitions, m_allPartitions.length, m_snapshotDaemonAdapter, 0, 0);
        }
     }

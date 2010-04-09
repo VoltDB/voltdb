@@ -31,6 +31,7 @@ public class Procedure extends CatalogType {
     CatalogMap<GroupRef> m_authGroups;
     boolean m_readonly;
     boolean m_singlepartition;
+    boolean m_everysite;
     boolean m_systemproc;
     boolean m_hasjava;
     int m_partitionparameter;
@@ -47,6 +48,7 @@ public class Procedure extends CatalogType {
         m_childCollections.put("authGroups", m_authGroups);
         m_fields.put("readonly", m_readonly);
         m_fields.put("singlepartition", m_singlepartition);
+        m_fields.put("everysite", m_everysite);
         m_fields.put("systemproc", m_systemproc);
         m_fields.put("hasjava", m_hasjava);
         m_fields.put("partitiontable", null);
@@ -64,6 +66,7 @@ public class Procedure extends CatalogType {
         m_classname = (String) m_fields.get("classname");
         m_readonly = (Boolean) m_fields.get("readonly");
         m_singlepartition = (Boolean) m_fields.get("singlepartition");
+        m_everysite = (Boolean) m_fields.get("everysite");
         m_systemproc = (Boolean) m_fields.get("systemproc");
         m_hasjava = (Boolean) m_fields.get("hasjava");
         m_partitionparameter = (Integer) m_fields.get("partitionparameter");
@@ -92,6 +95,11 @@ public class Procedure extends CatalogType {
     /** GETTER: Does the stored procedure need data on more than one partition? */
     public boolean getSinglepartition() {
         return m_singlepartition;
+    }
+
+    /** GETTER: Does the stored procedure as a single procedure txn at every site? */
+    public boolean getEverysite() {
+        return m_everysite;
     }
 
     /** GETTER: Is this procedure an internal system procedure? */
@@ -163,6 +171,11 @@ public class Procedure extends CatalogType {
     /** SETTER: Does the stored procedure need data on more than one partition? */
     public void setSinglepartition(boolean value) {
         m_singlepartition = value; m_fields.put("singlepartition", value);
+    }
+
+    /** SETTER: Does the stored procedure as a single procedure txn at every site? */
+    public void setEverysite(boolean value) {
+        m_everysite = value; m_fields.put("everysite", value);
     }
 
     /** SETTER: Is this procedure an internal system procedure? */

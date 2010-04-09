@@ -43,6 +43,7 @@ Procedure::Procedure(Catalog *catalog, CatalogType *parent, const string &path, 
     m_childCollections["authGroups"] = &m_authGroups;
     m_fields["readonly"] = value;
     m_fields["singlepartition"] = value;
+    m_fields["everysite"] = value;
     m_fields["systemproc"] = value;
     m_fields["hasjava"] = value;
     m_fields["partitiontable"] = value;
@@ -57,6 +58,7 @@ void Procedure::update() {
     m_classname = m_fields["classname"].strValue.c_str();
     m_readonly = m_fields["readonly"].intValue;
     m_singlepartition = m_fields["singlepartition"].intValue;
+    m_everysite = m_fields["everysite"].intValue;
     m_systemproc = m_fields["systemproc"].intValue;
     m_hasjava = m_fields["hasjava"].intValue;
     m_partitiontable = m_fields["partitiontable"].typeValue;
@@ -145,6 +147,10 @@ bool Procedure::readonly() const {
 
 bool Procedure::singlepartition() const {
     return m_singlepartition;
+}
+
+bool Procedure::everysite() const {
+    return m_everysite;
 }
 
 bool Procedure::systemproc() const {
