@@ -152,6 +152,25 @@ public class SiteTracker {
     }
 
     /**
+     * @return the lowest site ID across the live non-execution sites in the
+     *         cluster
+     */
+    public int getLowestLiveNonExecSiteId()
+    {
+        int lowestNonExecSiteId = -1;
+        for (Site site : getUpSites()) {
+            if (!site.getIsexec()) {
+                if (lowestNonExecSiteId == -1) {
+                    lowestNonExecSiteId = Integer.parseInt(site.getTypeName());
+                } else {
+                    lowestNonExecSiteId = Math.min(lowestNonExecSiteId, Integer.parseInt(site.getTypeName()));
+                }
+            }
+        }
+        return lowestNonExecSiteId;
+    }
+
+    /**
      * Get a site that contains a copy of the given partition.  The site ID
      * returned may correspond to a site that is currently down.
      *

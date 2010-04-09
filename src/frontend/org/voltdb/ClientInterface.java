@@ -675,6 +675,13 @@ public class ClientInterface implements DumpManager.Dumpable {
 
         m_acceptor = new ClientAcceptor(port, network);
         m_snapshotDaemon = new SnapshotDaemon(schedule);
+        // if this ClientInterface's site ID is the lowest non-execution site ID
+        // in the cluster, make our SnapshotDaemon responsible for snapshots
+        if (siteId ==
+            m_catalogContext.get().siteTracker.getLowestLiveNonExecSiteId())
+        {
+            m_snapshotDaemon.makeActive();
+        }
     }
 
     /**

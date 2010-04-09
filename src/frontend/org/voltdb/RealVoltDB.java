@@ -229,22 +229,8 @@ public class RealVoltDB implements VoltDBInterface
             Catalog catalog = new Catalog();
             catalog.execute(serializedCatalog);
             m_catalogContext = new CatalogContext(catalog, m_config.m_pathToCatalog);
-            final SnapshotSchedule schedule = m_catalogContext.database.getSnapshotschedule().get("default");
-
-            /*
-             * The lowest non-exec siteId (ClientInterface) is tasked with
-             * running a SnapshotDaemon.
-             */
-            int lowestNonExecSiteId = -1;
-            for (Site site : m_catalogContext.siteTracker.getUpSites()) {
-                if (!site.getIsexec()) {
-                    if (lowestNonExecSiteId == -1) {
-                        lowestNonExecSiteId = Integer.parseInt(site.getTypeName());
-                    } else {
-                        lowestNonExecSiteId = Math.min(lowestNonExecSiteId, Integer.parseInt(site.getTypeName()));
-                    }
-                }
-            }
+            final SnapshotSchedule schedule =
+                m_catalogContext.database.getSnapshotschedule().get("default");
 
             // Initialize the complex partitioning scheme
             TheHashinator.initialize(catalog);
@@ -392,7 +378,7 @@ public class RealVoltDB implements VoltDBInterface
                                                currSiteId,
                                                site.getInitiatorid(),
                                                config.m_port + portOffset++,
-                                               currSiteId == lowestNonExecSiteId ? schedule : null);
+                                               schedule);
                     m_clientInterfaces.add(ci);
                     try {
                         ci.startAcceptingConnections();
