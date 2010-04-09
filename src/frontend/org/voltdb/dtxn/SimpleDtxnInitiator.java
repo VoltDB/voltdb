@@ -230,8 +230,6 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
             siteTracker.getLiveSitesForEachPartitionAsList(partitions);
         }
 
-        System.out.println("creating single p. txn for sites: " + site_ids + " for " + invocation.getProcName());
-
         increaseBackpressure(messageSize);
 
         // create and register each replicated transaction with the pending
