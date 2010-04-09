@@ -1304,9 +1304,9 @@ BENCHMARKS
         <param name="hostcount" value="1"/>
         <param name="sitesperhost" value="12"/>
         <param name="clientcount" value="1"/>
-        <param name="processesperclient" value="6"/>
+        <param name="processesperclient" value="1"/>
         <param name="warehouses" value="12"/>
-        <param name="volt.server.memory" value="5096"/>
+        <param name="volt.server.memory" value="2048"/>
     </antcall>
 </target>
 
