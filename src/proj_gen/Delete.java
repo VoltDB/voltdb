@@ -23,13 +23,13 @@ import org.voltdb.*;
 )
 public class Delete extends VoltProcedure {
 
-    public final SQLStmt insertItem =
+    public final SQLStmt deleteItem =
       new SQLStmt("DELETE FROM ##upper_project_name## " +
                   "WHERE ##upper_project_name##_ID = ?");
 
     public long run( long ##upper_project_name##_ID ) throws VoltAbortException {
         // Add a SQL statement to the execution queue.
-        voltQueueSQL( insertItem, ##upper_project_name##_ID );
+        voltQueueSQL( deleteItem, ##upper_project_name##_ID );
 
         // Run all queued queries.
         // Passing true parameter since this is the last voltExecuteSQL for this procedure.
