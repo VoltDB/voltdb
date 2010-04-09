@@ -969,6 +969,14 @@ public class ClientInterface implements DumpManager.Dumpable {
             if (m_shouldUpdateCatalog.compareAndSet(true, false)) {
                 m_catalogContext.set(VoltDB.instance().getCatalogContext());
                 m_asyncCompilerWorkThread.notifyShouldUpdateCatalog();
+                // When the catalog updates, check to see if we're now
+                // responsible for snapshots since a node failure might have
+                // caused this
+                if (m_siteId ==
+                    m_catalogContext.get().siteTracker.getLowestLiveNonExecSiteId())
+                {
+                    m_snapshotDaemon.makeActive();
+                }
             }
 
             // poll planner queue
