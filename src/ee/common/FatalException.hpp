@@ -36,8 +36,9 @@ public:
     FatalException(std::string message, const char *filename, unsigned long lineno) :
         m_reason(message), m_filename(filename), m_lineno(lineno) {
         void *traces[128];
+        for (int i=0; i < 128; i++) traces[i] = NULL; // silence valgrind
         const int numTraces = backtrace( traces, 128);
-        boost::scoped_array<char*> traceSymbols(backtrace_symbols( traces, 128));
+        char** traceSymbols = backtrace_symbols( traces, numTraces);
         for (int ii = 0; ii < numTraces; ii++) {
             std::size_t sz = 200;
             char *function = static_cast<char*>(malloc(sz));
@@ -74,6 +75,7 @@ public:
             }
             free(function);
         }
+        free(traceSymbols);
     }
     const std::string m_reason;
     const char *m_filename;
