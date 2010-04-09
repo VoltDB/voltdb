@@ -86,8 +86,9 @@ public class AdHoc extends VoltSystemProcedure {
         return new DependencyPair(outputDepId, table);
     }
 
-    public VoltTable[] run(String aggregatorFragment, String collectorFragment,
-                           String sql, int isReplicatedTableDML) {
+    public VoltTable[] run(SystemProcedureExecutionContext ctx,
+            String aggregatorFragment, String collectorFragment,
+            String sql, int isReplicatedTableDML) {
 
         boolean replicatedTableDML = isReplicatedTableDML == 1;
 

@@ -438,6 +438,10 @@ public abstract class VoltProcedure {
             return null;
         }
 
+        if (param instanceof ExecutionSite.SystemProcedureExecutionContext) {
+            return param;
+        }
+
         Class<?> pclass = param.getClass();
         boolean slotIsArray = paramTypeIsArray[paramTypeIndex];
         if (slotIsArray != pclass.isArray())

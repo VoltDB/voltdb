@@ -244,7 +244,15 @@ public class SiteTracker {
      * @return An array of VoltDB site ids.
      */
     public int[] getAllSitesForEachPartition(int[] partitions) {
-        ArrayList<Integer> all_sites = getAllSitesForEachPartitionAsList(partitions);
+        ArrayList<Integer> all_sites = new ArrayList<Integer>();
+        for (int p : partitions) {
+            ArrayList<Integer> sites = getAllSitesForPartition(p);
+            for (int site : sites)
+            {
+                all_sites.add(site);
+            }
+        }
+
         int[] retval = new int[all_sites.size()];
         for (int i = 0; i < all_sites.size(); i++)
         {
@@ -259,10 +267,10 @@ public class SiteTracker {
      * @param partitions as ArrayList
      * @return
      */
-    public ArrayList<Integer> getAllSitesForEachPartitionAsList(int[]  partitions) {
+    public ArrayList<Integer> getLiveSitesForEachPartitionAsList(int[]  partitions) {
         ArrayList<Integer> all_sites = new ArrayList<Integer>();
         for (int p : partitions) {
-            ArrayList<Integer> sites = getAllSitesForPartition(p);
+            ArrayList<Integer> sites = getLiveSitesForPartition(p);
             for (int site : sites)
             {
                 all_sites.add(site);

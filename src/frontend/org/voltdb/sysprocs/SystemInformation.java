@@ -119,7 +119,7 @@ public class SystemInformation extends VoltSystemProcedure {
         return null;
     }
 
-    public VoltTable[] run() {
+    public VoltTable[] run(SystemProcedureExecutionContext ctx) {
         SynthesizedPlanFragment spf[] = new SynthesizedPlanFragment[2];
         spf[0] = new SynthesizedPlanFragment();
         spf[0].fragmentId = SysProcFragmentId.PF_systemInformation_distribute;

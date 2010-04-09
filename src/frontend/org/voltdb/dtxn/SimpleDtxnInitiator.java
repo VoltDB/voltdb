@@ -138,7 +138,6 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
 
         if (isSinglePartition || isEveryPartition)
         {
-            assert(numPartitions == 1);
             createSinglePartitionTxn(connectionId, connectionHostname, invocation, isReadOnly,
                                      partitions, clientData, messageSize, now);
             return;
@@ -210,7 +209,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                              final String connectionHostname,
                              StoredProcedureInvocation invocation,
                              boolean isReadOnly,
-                             int[] partition,
+                             int[] partitions,
                              Object clientData,
                              int messageSize,
                              long now)
@@ -221,15 +220,17 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         ArrayList<InFlightTxnState> txn_states = new ArrayList<InFlightTxnState>();
 
         // Special case the common 1 partition case -- cheap via SiteTracker
-        if (partition.length == 1) {
+        if (partitions.length == 1) {
             site_ids = VoltDB.instance().getCatalogContext().
-            siteTracker.getLiveSitesForPartition(partition[0]);
+            siteTracker.getLiveSitesForPartition(partitions[0]);
         }
         // need all sites for a set of partitions -- a little more expensive
         else {
             site_ids = VoltDB.instance().getCatalogContext().
-            siteTracker.getAllSitesForEachPartitionAsList(partition);
+            siteTracker.getLiveSitesForEachPartitionAsList(partitions);
         }
+
+        System.out.println("creating single p. txn for sites: " + site_ids + " for " + invocation.getProcName());
 
         increaseBackpressure(messageSize);
 

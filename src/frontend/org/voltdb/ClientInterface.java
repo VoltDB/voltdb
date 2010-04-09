@@ -889,7 +889,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                     // initiate the transaction. These hard-coded values from catalog
                     // procedure are horrible, horrible, horrible.
                     m_initiator.createTransaction(changeResult.connectionId, changeResult.hostname,
-                                                  task, false, false, false, m_allPartitions,
+                                                  task, false, true, true, m_allPartitions,
                                                   m_allPartitions.length, changeResult.clientData, 0, 0);
                 }
                 else {

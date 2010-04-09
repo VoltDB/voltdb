@@ -56,7 +56,7 @@ public class StartSampler extends VoltSystemProcedure {
         return new DependencyPair(DEP_ID, table);
     }
 
-    public VoltTable[] run() {
+    public VoltTable[] run(SystemProcedureExecutionContext ctx) {
 
         SynthesizedPlanFragment spf = new SynthesizedPlanFragment();
         spf.fragmentId = SysProcFragmentId.PF_startSampler;

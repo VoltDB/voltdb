@@ -84,7 +84,7 @@ public class Quiesce extends VoltSystemProcedure {
         return null;
     }
 
-    public VoltTable[] run() {
+    public VoltTable[] run(SystemProcedureExecutionContext ctx) {
             VoltTable[] result = null;
 
             SynthesizedPlanFragment pfs1[] = new SynthesizedPlanFragment[2];

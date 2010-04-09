@@ -1232,8 +1232,18 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         final InitiateResponseMessage response = new InitiateResponseMessage(itask);
 
         try {
-            final ClientResponseImpl cr = wrapper.call(txnState, itask.getParameters());
-            response.setResults(cr, itask);
+            if (wrapper instanceof VoltSystemProcedure) {
+                Object[] callerParams = itask.getParameters();
+                Object[] combinedParams = new Object[callerParams.length + 1];
+                combinedParams[0] = m_systemProcedureContext;
+                for (int i=0; i < callerParams.length; ++i) combinedParams[i+1] = callerParams[i];
+                final ClientResponseImpl cr = wrapper.call(txnState, combinedParams);
+                response.setResults(cr, itask);
+            }
+            else {
+                final ClientResponseImpl cr = wrapper.call(txnState, itask.getParameters());
+                response.setResults(cr, itask);
+            }
         }
         catch (final ExpectedProcedureException e) {
             log.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_ExpectedProcedureException.name(), e);

@@ -89,7 +89,8 @@ public class LoadMultipartitionTable extends VoltSystemProcedure {
         return null;
     }
 
-    public VoltTable[] run(String tableName, VoltTable table, int allowELT)
+    public VoltTable[] run(SystemProcedureExecutionContext ctx,
+            String tableName, VoltTable table, int allowELT)
     throws VoltAbortException
     {
         VoltTable[] results;

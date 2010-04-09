@@ -108,10 +108,6 @@ public class SysProcFragmentId
     public static final long PF_snapshotDelete = 130;
     public static final long PF_snapshotDeleteResults = 131;
 
-    // @UpdateApplicationCatalog
-    public static final long PF_catalogUpdateGlobal = 140;
-    public static final long PF_catalogUptateExecSite = 141;
-
     // @InstanceId
     public static final long PF_retrieveInstanceId = 160;
     public static final long PF_retrieveInstanceIdAggregator = 161;

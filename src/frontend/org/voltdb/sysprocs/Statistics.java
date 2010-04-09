@@ -29,6 +29,7 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.utils.Pair;
 import org.voltdb.utils.VoltLoggerFactory;
@@ -281,7 +282,9 @@ public class Statistics extends VoltSystemProcedure {
         new ColumnInfo( "MESSAGES_WRITTEN", VoltType.BIGINT)
     };
 
-    public VoltTable[] run(String selector, long interval) throws VoltAbortException {
+    public VoltTable[] run(SystemProcedureExecutionContext ctx,
+            String selector, long interval) throws VoltAbortException
+    {
         VoltTable[] results;
         final long now = System.currentTimeMillis();
         if (selector.toUpperCase().equals(SysProcSelector.TABLE.name())) {

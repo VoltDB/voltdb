@@ -533,19 +533,33 @@ public class RealVoltDB implements VoltDBInterface
         }
     }
 
+    /** Last transaction ID at which the catalog updated. */
+    private static long lastCatalogUpdate_txnId = 0;
     @Override
-    public void catalogUpdate(String diffCommands,
-            String newCatalogURL, int expectedCatalogVersion)
+    public void catalogUpdate(
+            String diffCommands,
+            String newCatalogURL,
+            int expectedCatalogVersion,
+            long currentTxnId)
     {
         synchronized(m_catalogUpdateLock) {
-            if (m_catalogContext.catalog.getSubTreeVersion() != expectedCatalogVersion)
+            // another site already did this work.
+            if (currentTxnId == lastCatalogUpdate_txnId) {
+                return;
+            }
+            else if (currentTxnId < lastCatalogUpdate_txnId) {
+                throw new RuntimeException("Trying to update main catalog context with an old transaction.");
+            }
+            else if (m_catalogContext.catalog.getSubTreeVersion() != expectedCatalogVersion) {
                 throw new RuntimeException("Trying to update main catalog context with diff " +
                 "commands generated for an out-of date catalog.");
+            }
+            System.out.println("Updating RealVoltDB catalog context from txnid: " + lastCatalogUpdate_txnId + " to " + currentTxnId);
+            lastCatalogUpdate_txnId = currentTxnId;
             m_catalogContext = m_catalogContext.update(newCatalogURL, diffCommands);
+            for (ClientInterface ci : m_clientInterfaces)
+                ci.notifyOfCatalogUpdate();
         }
-
-        for (ClientInterface ci : m_clientInterfaces)
-            ci.notifyOfCatalogUpdate();
     }
 
     @Override
