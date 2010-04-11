@@ -46,10 +46,9 @@ CatalogType * Index::addChild(const std::string &collectionName, const std::stri
     if (collectionName.compare("columns") == 0) {
         CatalogType *exists = m_columns.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_columns.add(childName);
     }
-    throw std::string("Trying to add to an unknown child collection.");
     return NULL;
 }
 

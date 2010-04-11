@@ -64,10 +64,9 @@ CatalogType * Column::addChild(const std::string &collectionName, const std::str
     if (collectionName.compare("constraints") == 0) {
         CatalogType *exists = m_constraints.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_constraints.add(childName);
     }
-    throw std::string("Trying to add to an unknown child collection.");
     return NULL;
 }
 

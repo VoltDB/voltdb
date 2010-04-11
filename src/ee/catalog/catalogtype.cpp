@@ -24,7 +24,9 @@
 #include "catalogtype.h"
 #include "catalogmap.h"
 #include "catalog.h"
+#include "common/SerializableEEException.h"
 
+using namespace voltdb;
 using namespace std;
 using namespace catalog;
 
@@ -74,7 +76,8 @@ void CatalogType::set(const string &field, const string &value) {
         val.intValue = atoi(value.c_str());
     else {
         string msg = "Invalid value '" + value + "' for field '" + field + "'";
-        throw string(msg.c_str());
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      msg.c_str());
     }
 
     m_fields[field] = val;

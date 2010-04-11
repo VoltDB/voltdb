@@ -47,10 +47,9 @@ CatalogType * MaterializedViewInfo::addChild(const std::string &collectionName, 
     if (collectionName.compare("groupbycols") == 0) {
         CatalogType *exists = m_groupbycols.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_groupbycols.add(childName);
     }
-    throw std::string("Trying to add to an unknown child collection.");
     return NULL;
 }
 

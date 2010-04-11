@@ -371,9 +371,8 @@ def gencpp( classes, prepath, postpath ):
                 pubname = field.name
                 write ( interp( '    if (collectionName.compare("$pubname") == 0) {', locals() ) )
                 write ( interp( '        CatalogType *exists = $privname.get(childName);', locals() ) )
-                write ( '        if (exists)\n            throw std::string("trying to add a duplicate value.");' )
+                write ( '        if (exists)\n            return NULL;' )
                 write ( interp( '        return $privname.add(childName);\n    }', locals() ) )
-        write ( '    throw std::string("Trying to add to an unknown child collection.");')
         write ( '    return NULL;\n}\n' )
 
         # write getChild(...)

@@ -70,34 +70,33 @@ CatalogType * Procedure::addChild(const std::string &collectionName, const std::
     if (collectionName.compare("authUsers") == 0) {
         CatalogType *exists = m_authUsers.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_authUsers.add(childName);
     }
     if (collectionName.compare("authGroups") == 0) {
         CatalogType *exists = m_authGroups.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_authGroups.add(childName);
     }
     if (collectionName.compare("authPrograms") == 0) {
         CatalogType *exists = m_authPrograms.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_authPrograms.add(childName);
     }
     if (collectionName.compare("statements") == 0) {
         CatalogType *exists = m_statements.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_statements.add(childName);
     }
     if (collectionName.compare("parameters") == 0) {
         CatalogType *exists = m_parameters.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_parameters.add(childName);
     }
-    throw std::string("Trying to add to an unknown child collection.");
     return NULL;
 }
 

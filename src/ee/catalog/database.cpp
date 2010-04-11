@@ -56,46 +56,45 @@ CatalogType * Database::addChild(const std::string &collectionName, const std::s
     if (collectionName.compare("users") == 0) {
         CatalogType *exists = m_users.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_users.add(childName);
     }
     if (collectionName.compare("groups") == 0) {
         CatalogType *exists = m_groups.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_groups.add(childName);
     }
     if (collectionName.compare("tables") == 0) {
         CatalogType *exists = m_tables.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_tables.add(childName);
     }
     if (collectionName.compare("programs") == 0) {
         CatalogType *exists = m_programs.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_programs.add(childName);
     }
     if (collectionName.compare("procedures") == 0) {
         CatalogType *exists = m_procedures.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_procedures.add(childName);
     }
     if (collectionName.compare("connectors") == 0) {
         CatalogType *exists = m_connectors.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_connectors.add(childName);
     }
     if (collectionName.compare("snapshotSchedule") == 0) {
         CatalogType *exists = m_snapshotSchedule.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_snapshotSchedule.add(childName);
     }
-    throw std::string("Trying to add to an unknown child collection.");
     return NULL;
 }
 
