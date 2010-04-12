@@ -45,7 +45,9 @@
 #include <netinet/tcp.h>
 
 
-
+// Please don't make this different from the JNI result buffer size.
+// This determines the size of the EE results buffer and it's nice
+// if IPC and JNI are matched.
 #define MAX_MSG_SZ (1024*1024*10)
 
 using namespace std;
