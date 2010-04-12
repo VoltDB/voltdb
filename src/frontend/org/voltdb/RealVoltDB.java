@@ -22,6 +22,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.io.StringReader;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -31,6 +32,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.apache.log4j.xml.DOMConfigurator;
+import org.apache.log4j.LogManager;
+
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Site;
 import org.voltdb.catalog.SnapshotSchedule;
@@ -535,6 +539,31 @@ public class RealVoltDB implements VoltDBInterface
             // probably unnecessary
             System.gc();
             m_isRunning = false;
+        }
+    }
+
+    /** Last transaction ID at which the logging config updated.
+     * Also, use the intrinsic lock to safeguard access from multiple
+     * execution site threads */
+    private static Long lastLogUpdate_txnId = 0L;
+    @Override
+    public void logUpdate(String xmlConfig, long currentTxnId)
+    {
+        synchronized(lastLogUpdate_txnId)
+        {
+            // another site already did this work.
+            if (currentTxnId == lastLogUpdate_txnId) {
+                return;
+            }
+            else if (currentTxnId < lastLogUpdate_txnId) {
+                throw new RuntimeException("Trying to update logging config with an old transaction.");
+            }
+            System.out.println("Updating RealVoltDB logging config from txnid: " +
+                               lastLogUpdate_txnId + " to " + currentTxnId);
+            lastLogUpdate_txnId = currentTxnId;
+            DOMConfigurator configurator = new DOMConfigurator();
+            StringReader sr = new StringReader(xmlConfig);
+            configurator.doConfigure(sr, LogManager.getLoggerRepository());
         }
     }
 

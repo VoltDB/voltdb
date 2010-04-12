@@ -33,7 +33,6 @@ public class UpdateLogging {
     public static void main(String args[]) throws Exception {
         String host = "localhost";
         String configFilePath = null;
-        boolean allHosts = true;
         String username = "";
         String password = "";
         final Client client = ClientFactory.createClient();
@@ -50,8 +49,6 @@ public class UpdateLogging {
             }
             else if (parts[0].equalsIgnoreCase("config")) {
                 configFilePath = parts[1];
-            } else if (parts[0].equalsIgnoreCase("allHosts")) {
-                allHosts = Boolean.parseBoolean(parts[1]);
             } else if (parts[0].equalsIgnoreCase("user")) {
                 username = parts[1];
             }
@@ -82,7 +79,7 @@ public class UpdateLogging {
         }
         reader.close();
 
-        client.callProcedure("@UpdateLogging", sb.toString(), allHosts ? 1L : 0L);
+        client.callProcedure("@UpdateLogging", sb.toString());
         client.close();
     }
 }

@@ -342,4 +342,11 @@ public class MockVoltDB implements VoltDBInterface
 
     }
 
+    @Override
+    public void logUpdate(String xmlConfig, long currentTxnId)
+    {
+        // TODO Auto-generated method stub
+
+    }
+
 }

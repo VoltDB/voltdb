@@ -67,14 +67,23 @@ public interface VoltDBInterface
     public FaultDistributorInterface getFaultDistributor();
     public BackendTarget getBackendTargetType();
 
-   /**
-    * Updates the catalog context stored by this VoltDB without destroying the old one,
-    * in case anything still links to it.
-    *
-    * @param newCatalogURL A URL for the new catalog (http: or file:).
-    * @param diffCommands The commands to update the current catalog to the new one.
-    * @param expectedCatalogVersion The version of the catalog the commands are targeted for.
-    */
+    /**
+     * Update the global logging context in the server.
+     *
+     * @param xmlConfig The xml string containing the new logging configuration
+     * @param currentTxnId  The transaction ID at which this method is called
+     */
+    void logUpdate(String xmlConfig, long currentTxnId);
+
+    /**
+     * Updates the catalog context stored by this VoltDB without destroying the old one,
+     * in case anything still links to it.
+     *
+     * @param newCatalogURL A URL for the new catalog (http: or file:).
+     * @param diffCommands The commands to update the current catalog to the new one.
+     * @param expectedCatalogVersion The version of the catalog the commands are targeted for.
+     * @param currentTxnId  The transaction ID at which this method is called
+     */
    public void catalogUpdate(String diffCommands, String newCatalogURL,
            int expectedCatalogVersion, long currentTxnId);
 

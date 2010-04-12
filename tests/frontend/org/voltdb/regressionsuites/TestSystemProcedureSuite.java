@@ -82,19 +82,10 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             "</root>" +
         "</log4j:configuration>";
 
-    public void testUpdateLoggingLocal() throws Exception {
+    public void testUpdateLogging() throws Exception {
         Client client = getClient();
         VoltTable results[] = null;
-        results = client.callProcedure("@UpdateLogging", m_loggingConfig, 0L);
-        for (VoltTable result : results) {
-            assertEquals( 0, result.asScalarLong());
-        }
-    }
-
-    public void testUpdateLoggingMultiNode() throws Exception {
-        Client client = getClient();
-        VoltTable results[] = null;
-        results = client.callProcedure("@UpdateLogging", m_loggingConfig, 1L);
+        results = client.callProcedure("@UpdateLogging", m_loggingConfig);
         for (VoltTable result : results) {
             assertEquals( 0, result.asScalarLong());
         }
