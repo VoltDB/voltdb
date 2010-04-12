@@ -48,8 +48,7 @@ public class Vote extends VoltProcedure {
     public VoltTable[] run(
             long phoneNumber,
             byte contestantNumber,
-            long maxVotesPerPhoneNumber,
-            long called_time_milliseconds
+            long maxVotesPerPhoneNumber
     ) {
         boolean validVoter = false;
         boolean validContestant = false;
@@ -86,10 +85,9 @@ public class Vote extends VoltProcedure {
         //   column return_value : 0 = successful vote
         //                         1 = invalid contestant number
         //                         2 = voter over vote limit
-        VoltTable vtLoad = new VoltTable(new VoltTable.ColumnInfo("return_value",VoltType.INTEGER),new VoltTable.ColumnInfo("called_time_milliseconds",VoltType.BIGINT));
-        Object row[] = new Object[2];
+        VoltTable vtLoad = new VoltTable(new VoltTable.ColumnInfo("return_value",VoltType.INTEGER));
+        Object row[] = new Object[1];
         row[0] = returnValue;
-        row[1] = called_time_milliseconds;
         vtLoad.addRow(row);
 
         final VoltTable[] vtReturn = {vtLoad};

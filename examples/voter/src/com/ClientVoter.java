@@ -71,20 +71,17 @@ public class ClientVoter {
                 System.exit(-1);
             } else {
                 tot_executions++;
-                pClientCallback(clientResponse.getResults());
+                pClientCallback(clientResponse.getResults(), clientResponse.getClientRoundtrip());
             }
         }
         
-        protected void pClientCallback(VoltTable[] vtResults) {
+        protected void pClientCallback(VoltTable[] vtResults, int clientRoundtrip) {
             int vote_result = (int) vtResults[0].fetchRow(0).getLong(0);
 
             vote_result_counter[vote_result]++;
 
             if (checkLatency) {
-                long called_time_milliseconds = vtResults[0].fetchRow(0).getLong(1);
-
-                long current_time_milliseconds = System.currentTimeMillis();
-                long execution_time = current_time_milliseconds - called_time_milliseconds;
+                long execution_time =  (long) clientRoundtrip;
 
                 tot_executions_latency++;
                 tot_execution_milliseconds += execution_time;
@@ -156,7 +153,6 @@ public class ClientVoter {
         long transactions_this_second = 0;
         long last_millisecond = System.currentTimeMillis();
         long this_millisecond = System.currentTimeMillis();
-        long callTimeMillis;
   
         final org.voltdb.client.Client voltclient = ClientFactory.createClient();
 
@@ -211,9 +207,7 @@ public class ClientVoter {
             try {
                 boolean queued = false;
                 while (!queued) {
-                    callTimeMillis = System.currentTimeMillis();
-
-                    queued = voltclient.callProcedure(callBack, "Vote", phoneNumber, contestantNumber, maxVotesPerPhoneNumber, callTimeMillis);
+                    queued = voltclient.callProcedure(callBack, "Vote", phoneNumber, contestantNumber, maxVotesPerPhoneNumber);
 
                     if (!queued) {
                         try {
