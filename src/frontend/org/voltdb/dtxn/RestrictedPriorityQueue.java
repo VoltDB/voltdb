@@ -17,12 +17,18 @@
 
 package org.voltdb.dtxn;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.PriorityQueue;
 import java.util.Map.Entry;
 
 import org.voltdb.TransactionIdManager;
+import org.voltdb.VoltDB;
 import org.voltdb.debugstate.ExecutorContext;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
+import org.voltdb.messaging.HeartbeatResponseMessage;
+import org.voltdb.messaging.Mailbox;
+import org.voltdb.messaging.MessagingException;
 
 /**
  * <p>Extends a PriorityQueue such that is only stores transaction state
@@ -39,22 +45,42 @@ import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
 public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
     private static final long serialVersionUID = 1L;
 
-    final LinkedHashMap<Integer, Long> m_lastTxnFromEachInitiator = new LinkedHashMap<Integer, Long>();
+    public enum QueueState {
+        UNBLOCKED,
+        BLOCKED_EMPTY,
+        BLOCKED_ORDERING,
+        BLOCKED_SAFETY;
+    }
 
-    long m_newestSafeTransaction = -1;
+    class LastInitiatorData {
+        LastInitiatorData() {
+            m_lastSeenTxnId = DtxnConstants.DUMMY_LAST_SEEN_TXN_ID; // -1
+            m_lastSafeTxnId = DtxnConstants.DUMMY_LAST_SEEN_TXN_ID; // -1
+        }
+
+        long m_lastSeenTxnId;
+        long m_lastSafeTxnId;
+    }
+
+    final LinkedHashMap<Integer, LastInitiatorData> m_initiatorData = new LinkedHashMap<Integer, LastInitiatorData>();
+
+    long m_newestCandidateTransaction = -1;
     final int m_siteId;
     long m_txnsPopped = 0;
     long m_lastTxnPopped = 0;
+    QueueState m_state = QueueState.BLOCKED_EMPTY;
+    final Mailbox m_mailbox;
 
     /**
      * Tell this queue about all initiators. If any initiators
      * are later referenced that aren't in this list, trip
      * an assertion.
      */
-    public RestrictedPriorityQueue(int[] initiatorSiteIds, int siteId) {
+    public RestrictedPriorityQueue(int[] initiatorSiteIds, int siteId, Mailbox mbox) {
         m_siteId = siteId;
+        m_mailbox = mbox;
         for (int id : initiatorSiteIds)
-            m_lastTxnFromEachInitiator.put(id, -1L);
+            m_initiatorData.put(id, new LastInitiatorData());
     }
 
     /**
@@ -62,14 +88,17 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
      */
     @Override
     public TransactionState poll() {
-        TransactionState retval = super.peek();
-        if ((retval != null) && (retval.txnId <= m_newestSafeTransaction)) {
+        TransactionState retval = null;
+        if (m_state == QueueState.UNBLOCKED) {
+            assert(checkQueueState() == QueueState.UNBLOCKED);
+            retval = super.poll();
+            assert(retval != null);
             m_txnsPopped++;
             m_lastTxnPopped = retval.txnId;
-            return super.poll();
+            // call this again to check
+            checkQueueState();
         }
-
-        return null;
+        return retval;
     }
 
     /**
@@ -77,14 +106,13 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
      */
     @Override
     public TransactionState peek() {
-        TransactionState retval = super.peek();
-        if ((retval != null) && (retval.txnId <= m_newestSafeTransaction)) {
-            m_txnsPopped++;
-            m_lastTxnPopped = retval.txnId;
-            return retval;
+        TransactionState retval = null;
+        if (m_state == QueueState.UNBLOCKED) {
+            assert(checkQueueState() == QueueState.UNBLOCKED);
+            retval = super.peek();
+            assert(retval != null);
         }
-
-        return null;
+        return retval;
     }
 
     /**
@@ -92,43 +120,70 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
      */
     @Override
     public boolean add(TransactionState txnState) {
-        if (m_lastTxnFromEachInitiator.containsKey(txnState.initiatorSiteId)) {
-            return super.add(txnState);
+        if (m_initiatorData.containsKey(txnState.initiatorSiteId) == false) {
+            return false;
         }
-        return false;
+        boolean retval = super.add(txnState);
+        // update the queue state
+        if (retval) checkQueueState();
+        return retval;
+    }
+
+    @Override
+    public boolean remove(Object txnState) {
+        boolean retval = super.remove(txnState);
+        checkQueueState();
+        return retval;
     }
 
     /**
      * Update the information stored about the latest transaction
      * seen from each initiator. Compute the newest safe transaction id.
      */
-    public void gotTransaction(int initiatorId, long txnId, boolean isHeartbeat)
+    public long noteTransactionRecievedAndReturnLastSeen(int initiatorSiteId, long txnId, boolean isHeartbeat, long lastSafeTxnIdFromInitiator)
     {
+        // this doesn't exclude dummy txnid but is also a sanity check
+        assert(txnId != 0);
+
         // Drop old data from already-failed initiators.
-        if (m_lastTxnFromEachInitiator.containsKey(initiatorId)) {
-            if (m_lastTxnPopped > txnId) {
-                StringBuilder msg = new StringBuilder();
-                msg.append("Txn ordering deadlock (QUEUE) at site ").append(m_siteId).append(":\n");
-                msg.append("   txn ").append(m_lastTxnPopped).append(" (");
-                msg.append(TransactionIdManager.toString(m_lastTxnPopped)).append(" HB: ?) before\n");
-                msg.append("   txn ").append(txnId).append(" (");
-                msg.append(TransactionIdManager.toString(txnId)).append(" HB:");
-                msg.append(isHeartbeat).append(").\n");
-                throw new RuntimeException(msg.toString());
-            }
+        if (m_initiatorData.containsKey(initiatorSiteId) == false)
+            return DtxnConstants.DUMMY_LAST_SEEN_TXN_ID;
 
-            // update the latest transaction for the specified initiator
-            long prevTxnId = m_lastTxnFromEachInitiator.get(initiatorId);
-            if (prevTxnId < txnId)
-                m_lastTxnFromEachInitiator.put(initiatorId, txnId);
-            // find the minimum value across all latest transactions
-            long min = Long.MAX_VALUE;
-            for (long l : m_lastTxnFromEachInitiator.values())
-                if (l < min) min = l;
-
-            // this minimum is the newest safe transaction to run
-            m_newestSafeTransaction = min;
+        // we've decided that this can happen, and it's fine... just ignore it
+        if (m_lastTxnPopped > txnId) {
+            StringBuilder msg = new StringBuilder();
+            msg.append("Txn ordering deadlock (QUEUE) at site ").append(m_siteId).append(":\n");
+            msg.append("   txn ").append(m_lastTxnPopped).append(" (");
+            msg.append(TransactionIdManager.toString(m_lastTxnPopped)).append(" HB: ?) before\n");
+            msg.append("   txn ").append(txnId).append(" (");
+            msg.append(TransactionIdManager.toString(txnId)).append(" HB:");
+            msg.append(isHeartbeat).append(").\n");
+            System.err.print(msg.toString());
         }
+
+        // update the latest transaction for the specified initiator
+        LastInitiatorData lid = m_initiatorData.get(initiatorSiteId);
+        if (lid.m_lastSeenTxnId < txnId)
+            lid.m_lastSeenTxnId = txnId;
+        if (lid.m_lastSafeTxnId < lastSafeTxnIdFromInitiator)
+            lid.m_lastSafeTxnId = lastSafeTxnIdFromInitiator;
+
+        // find the minimum value across all latest transactions
+        long min = Long.MAX_VALUE;
+        for (LastInitiatorData l : m_initiatorData.values())
+            if (l.m_lastSeenTxnId < min) min = l.m_lastSeenTxnId;
+
+        // this minimum is the newest safe transaction to run
+        // but you still need to check if a transaction has been confirmed
+        //  by its initiator
+        //  (note: this check is done when peeking/polling from the queue)
+        m_newestCandidateTransaction = min;
+
+        // this will update the state of the queue if needed
+        checkQueueState();
+
+        // return the last seen id for the originating initiator
+        return lid.m_lastSeenTxnId;
     }
 
     /**
@@ -138,10 +193,10 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
      */
     public void gotFaultForInitiator(int initiatorId) {
         // calculate the next minimum transaction w/o our dead friend
-        gotTransaction(initiatorId, Long.MAX_VALUE, true);
+        noteTransactionRecievedAndReturnLastSeen(initiatorId, Long.MAX_VALUE, true, DtxnConstants.DUMMY_LAST_SEEN_TXN_ID);
 
         // remove initiator from minimum. txnid scoreboard
-        Long remove = m_lastTxnFromEachInitiator.remove(initiatorId);
+        LastInitiatorData remove = m_initiatorData.remove(initiatorId);
         assert(remove != null);
     }
 
@@ -153,7 +208,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
      * @return The id of the newest safe transaction to run.
      */
     long getNewestSafeTransaction() {
-        return m_newestSafeTransaction;
+        return m_newestCandidateTransaction;
     }
 
     /**
@@ -174,18 +229,18 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
         for (TransactionState txnState : this) {
             assert(txnState != null);
             context.queuedTransactions[i] = txnState.getDumpContents();
-            context.queuedTransactions[i].ready = (txnState.txnId <= m_newestSafeTransaction);
+            context.queuedTransactions[i].ready = (txnState.txnId <= m_newestCandidateTransaction);
             i++;
         }
         Arrays.sort(context.queuedTransactions);
 
         // store the contact history
-        context.contactHistory = new ExecutorContext.InitiatorContactHistory[m_lastTxnFromEachInitiator.size()];
+        context.contactHistory = new ExecutorContext.InitiatorContactHistory[m_initiatorData.size()];
         i = 0;
-        for (Entry<Integer, Long> e : m_lastTxnFromEachInitiator.entrySet()) {
+        for (Entry<Integer, LastInitiatorData> e : m_initiatorData.entrySet()) {
             context.contactHistory[i] = new ExecutorContext.InitiatorContactHistory();
             context.contactHistory[i].initiatorSiteId = e.getKey();
-            context.contactHistory[i].transactionId = e.getValue();
+            context.contactHistory[i].transactionId = e.getValue().m_lastSeenTxnId;
             i++;
         }
     }
@@ -193,4 +248,73 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
     public void shutdown() throws InterruptedException {
     }
 
+    public QueueState getQueueState() {
+        return m_state;
+    }
+
+    long m_blockTime = 0;
+
+    QueueState checkQueueState() {
+        QueueState newState = QueueState.UNBLOCKED;
+        TransactionState ts = super.peek();
+        LastInitiatorData lid = null;
+        if (ts == null) {
+            newState = QueueState.BLOCKED_EMPTY;
+        }
+        else {
+            if (ts.txnId > m_newestCandidateTransaction) {
+                newState = QueueState.BLOCKED_ORDERING;
+            }
+            else {
+                lid = m_initiatorData.get(ts.initiatorSiteId);
+                if ((lid != null) && (ts.txnId > lid.m_lastSafeTxnId)) {
+                    newState = QueueState.BLOCKED_SAFETY;
+                }
+            }
+        }
+        if (newState != m_state) {
+            // THIS CODE IS HERE TO HANDLE A STATE CHANGE
+
+            // note if we get non-empty but blocked
+            if ((newState == QueueState.BLOCKED_ORDERING) || (newState == QueueState.BLOCKED_SAFETY)) {
+                m_blockTime = System.currentTimeMillis();
+            }
+            /*if (newState == QueueState.UNBLOCKED) {
+                if ((m_state == QueueState.BLOCKED_ORDERING) || (m_state == QueueState.BLOCKED_SAFETY)) {
+                    long blockedFor = System.currentTimeMillis() - m_blockTime;
+                    System.out.printf("Queue unblocked. Was blocked for %d ms\n", blockedFor);
+                    System.out.flush();
+                }
+            }*/
+            if ((m_state == QueueState.BLOCKED_ORDERING) || (m_state == QueueState.BLOCKED_SAFETY)) {
+                assert(m_state != QueueState.BLOCKED_EMPTY);
+            }
+
+            // if now blocked, send a heartbeat response
+            if (newState == QueueState.BLOCKED_SAFETY) {
+                assert(ts != null);
+                assert(lid != null);
+                sendHearbeatResponse(ts, lid);
+            }
+
+            m_state = newState;
+        }
+        return m_state;
+    }
+
+    private void sendHearbeatResponse(TransactionState ts, LastInitiatorData lid) {
+        // mailbox might be null in testing
+        if (m_mailbox == null) return;
+
+        HeartbeatResponseMessage hbr = new HeartbeatResponseMessage(m_siteId, lid.m_lastSeenTxnId, true);
+        try {
+            m_mailbox.send(ts.initiatorSiteId, VoltDB.DTXN_MAILBOX_ID, hbr);
+        } catch (MessagingException e) {
+            // I really hope this doesn't happen
+            throw new RuntimeException(e);
+        }
+
+        //System.out.println("Sent response based on queue block.");
+        //System.out.flush();
+    }
 }

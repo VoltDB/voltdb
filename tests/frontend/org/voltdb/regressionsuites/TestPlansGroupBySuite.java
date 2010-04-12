@@ -35,6 +35,7 @@ import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.planner.TestPlansGroupBy;
 
@@ -55,12 +56,12 @@ public class TestPlansGroupBySuite extends RegressionSuite {
     private int loaderNxN(Client client, int pkey) throws ProcCallException,
     IOException, NoConnectionsException {
         VoltTable vt;
-        String qs;
+        //String qs;
         // Insert some known data. Insert {1, 2, 2, 3, 3, 3, ... }
         for (int i = 1; i <= 10; i++) {
             for (int j = 0; j < i; j++) {
-                qs = "INSERT INTO T1 VALUES (" + pkey++ + ", " + i + ");";
-                vt = client.callProcedure("@AdHoc", qs)[0];
+                //qs = "INSERT INTO T1 VALUES (" + pkey++ + ", " + i + ");";
+                vt = client.callProcedure("T1Insert", pkey++, i)[0];
                 assertTrue(vt.getRowCount() == 1);
                 // assertTrue(vt.asScalarLong() == 1);
             }
@@ -75,10 +76,15 @@ public class TestPlansGroupBySuite extends RegressionSuite {
         return pkey;
     }
 
-    /** load known data to F without loading the Dimension tables */
+    /** load known data to F without loading the Dimension tables
+     * @throws InterruptedException */
     private int loadF(Client client, int pkey) throws NoConnectionsException,
-    ProcCallException, IOException {
+    ProcCallException, IOException, InterruptedException {
         VoltTable vt;
+
+        // if you want to test synchronous latency, this
+        //  is a good variable to change
+        boolean async = true;
 
         // val1 = constant value 2
         // val2 = i * 10
@@ -90,11 +96,20 @@ public class TestPlansGroupBySuite extends RegressionSuite {
             int f_d2 = i % 50; // 50 unique dim2s
             int f_d3 = i % 100; // 100 unique dim3s
 
-            vt = client.callProcedure("InsertF", pkey++, f_d1, f_d2, f_d3,
-                    2, (i * 10), (i % 2))[0];
-            assertTrue(vt.getRowCount() == 1);
-            // assertTrue(vt.asScalarLong() == 1);
+            SyncCallback cb = new SyncCallback();
+            client.callProcedure(cb, "InsertF", pkey++, f_d1, f_d2, f_d3,
+                    2, (i * 10), (i % 2));
+
+            if (!async) {
+                cb.waitForResponse();
+                vt = cb.getResponse().getResults()[0];
+                assertTrue(vt.getRowCount() == 1);
+                // assertTrue(vt.asScalarLong() == 1);
+            }
         }
+
+        client.drain();
+
         return pkey;
     }
 
@@ -257,8 +272,9 @@ public class TestPlansGroupBySuite extends RegressionSuite {
     /**
      * distributed sums of a partitioned table
      * select sum(F_VAL1), sum(F_VAL2), sum(F_VAL3) from F
+     * @throws InterruptedException
      */
-    public void testDistributedSum() throws IOException, ProcCallException {
+    public void testDistributedSum() throws IOException, ProcCallException, InterruptedException {
         VoltTable vt;
         Client client = getClient();
         loadF(client, 0);
@@ -281,8 +297,9 @@ public class TestPlansGroupBySuite extends RegressionSuite {
     /**
      * distributed sums of a view
      * select sum(V.SUM_V1), sum(V.SUM_V2), sum(V.SUM_V3) from V
+     * @throws InterruptedException
      */
-    public void testDistributedSum_View() throws IOException, ProcCallException {
+    public void testDistributedSum_View() throws IOException, ProcCallException, InterruptedException {
         VoltTable vt;
         Client client = getClient();
         loadF(client, 0);
@@ -306,9 +323,10 @@ public class TestPlansGroupBySuite extends RegressionSuite {
      * distributed sums of a view (REDUNDANT GROUP BY)
      * select V.D1_PKEY, sum(V.SUM_V1), sum(V.SUM_V2), sum(V.SUM_V3)
      * from V group by V.V_D1_PKEY
+     * @throws InterruptedException
      */
     public void testDistributedSumAndGroup() throws NoConnectionsException,
-    ProcCallException, IOException {
+    ProcCallException, IOException, InterruptedException {
         VoltTable vt;
         Client client = getClient();
         loadF(client, 0);
@@ -351,9 +369,10 @@ public class TestPlansGroupBySuite extends RegressionSuite {
      * (REDUNDANT GROUP BY)
      * select D1.D1_NAME, sum(V.SUM_V1), sum(V.SUM_V2), sum(V.SUM_V3)
      * from D1, V where D1.D1_PKEY = V.V_D1_PKEY group by D1.D1_NAME
+     * @throws InterruptedException
      */
     public void testDistributedSumGroupSingleJoin()
-    throws NoConnectionsException, ProcCallException, IOException {
+    throws NoConnectionsException, ProcCallException, IOException, InterruptedException {
         VoltTable vt;
         Client client = getClient();
 
@@ -387,9 +406,10 @@ public class TestPlansGroupBySuite extends RegressionSuite {
      * select D1.D1_NAME, sum(V.SUM_V1), sum(V.SUM_V2), sum(V.SUM_V3)
      * from D1, V where D1.D1_PKEY = V.V_D1_PKEY and D1.D1_PKEY = ?
      * group by D1_NAME
+     * @throws InterruptedException
      */
     public void testDistributedSumGroupSingleJoinOneDim() throws IOException,
-    ProcCallException {
+    ProcCallException, InterruptedException {
         VoltTable vt;
         Client client = getClient();
         loadF(client, 0);
@@ -421,10 +441,11 @@ public class TestPlansGroupBySuite extends RegressionSuite {
      * select D1.D1_NAME, D2.D2_NAME, sum(V.SUM_V1), sum(V.SUM_V2), sum(V.SUM_V3)
      * from D1, D2, V where V.V_D1_PKEY = D1.D1_PKEY and V.V_D2_PKEY = D2.D2_PKEY
      * group by D1_NAME, D2_NAME
+     * @throws InterruptedException
      */
     @SuppressWarnings("unchecked")
     public void testDistributedSumGroupMultiJoin() throws IOException,
-    ProcCallException {
+    ProcCallException, InterruptedException {
         VoltTable vt;
         Client client = getClient();
         loadF(client, 0);
@@ -479,10 +500,11 @@ public class TestPlansGroupBySuite extends RegressionSuite {
      * sum(V.SUM_V2), sum(V.SUM_V3) from D1, D2, V where V.V_D1_PKEY =
      * D1.D1_PKEY and V.V_D2_PKEY = D2.D2_PKEY and D1.D1_PKEY = ?
      * group by D1_NAME, D2_NAME
+     * @throws InterruptedException
      */
     @SuppressWarnings("unchecked")
     public void testDistributedSumGroupMultiJoinOneDim() throws IOException,
-    ProcCallException {
+    ProcCallException, InterruptedException {
         VoltTable vt;
         Client client = getClient();
         loadF(client, 0);
@@ -532,8 +554,9 @@ public class TestPlansGroupBySuite extends RegressionSuite {
      * select D1.D1_NAME, D2.D2_NAME, sum(V.SUM_V1), sum(V.SUM_V2), sum(V.SUM_V3)
      * from D1, D2, V where V.V_D1_PKEY = D1.D1_PKEY and V.V_D2_PKEY = D2.D2_PKEY
      * and D1.D1_PKEY = ? and D2.D2_PKEY = ? group by D1_NAME, D2_NAME
+     * @throws InterruptedException
      */
-    public void testDistributedSumGroupMultiJoinTwoDims() throws IOException, ProcCallException {
+    public void testDistributedSumGroupMultiJoinTwoDims() throws IOException, ProcCallException, InterruptedException {
         VoltTable vt;
         Client client = getClient();
         loadF(client, 0);
@@ -589,6 +612,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
         project.addPartitionInfo("T1", "PKEY");
         project.addPartitionInfo("F", "F_PKEY");
         project.addProcedures(PROCEDURES);
+        project.addStmtProcedure("T1Insert", "INSERT INTO T1 VALUES (?, ?);");
 
         // config = new LocalSingleProcessServer("plansgroupby-ipc.jar", 1, BackendTarget.NATIVE_EE_IPC);
         // config.compile(project);

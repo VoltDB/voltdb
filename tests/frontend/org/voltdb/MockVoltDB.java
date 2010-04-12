@@ -56,6 +56,25 @@ public class MockVoltDB implements VoltDBInterface
         m_catalog.execute("add / clusters " + m_clusterName);
         m_catalog.execute("add " + m_catalog.getClusters().get(m_clusterName).getPath() + " databases " +
                           m_databaseName);
+        Cluster cluster = m_catalog.getClusters().get(m_clusterName);
+        assert(cluster != null);
+
+        /*Host host = cluster.getHosts().add("0");
+        Site execSite = cluster.getSites().add("1");
+        Site initSite = cluster.getSites().add("0");
+        Partition partition = cluster.getPartitions().add("0");
+
+        host.setIpaddr("localhost");
+
+        initSite.setHost(host);
+        initSite.setIsexec(false);
+        initSite.setInitiatorid(0);
+        initSite.setIsup(true);
+
+        execSite.setHost(host);
+        execSite.setIsexec(true);
+        execSite.setIsup(true);
+        execSite.setPartition(partition);*/
 
         m_statsAgent = new StatsAgent();
     }

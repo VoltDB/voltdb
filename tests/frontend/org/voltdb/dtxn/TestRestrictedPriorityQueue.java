@@ -53,40 +53,40 @@ public class TestRestrictedPriorityQueue extends TestCase{
         m_initiators = new int[2];
         m_initiators[0] = 0;
         m_initiators[1] = 1;
-        m_queue = new RestrictedPriorityQueue(m_initiators, 0);
+        m_queue = new RestrictedPriorityQueue(m_initiators, 0, null);
         m_idManager = new TransactionIdManager(0);
         m_txnIds = new Vector<Long>();
         m_proc = new StoredProcedureInvocation();
 
-        m_task = new InitiateTaskMessage(0, 0, m_idManager.getNextUniqueTransactionId(),
-                true, true, m_proc, Long.MAX_VALUE);
+        long txnId = m_idManager.getNextUniqueTransactionId();
+        m_task = new InitiateTaskMessage(0, 0, txnId, true, true, m_proc, txnId);
         m_txnIds.add(m_task.getTxnId());
         m_state1 = new SinglePartitionTxnState(null, null, m_task);
         m_states[0] = m_state1;
 
-        m_task = new InitiateTaskMessage(1, 1, m_idManager.getNextUniqueTransactionId(),
-                true, true, m_proc, Long.MAX_VALUE);
+        txnId = m_idManager.getNextUniqueTransactionId();
+        m_task = new InitiateTaskMessage(1, 1, txnId, true, true, m_proc, txnId);
         assertTrue(m_txnIds.lastElement() < m_task.getTxnId());
         m_txnIds.add(m_task.getTxnId());
         m_state2 = new SinglePartitionTxnState(null, null, m_task);
         m_states[1] = m_state2;
 
-        m_task = new InitiateTaskMessage(0, 0, m_idManager.getNextUniqueTransactionId(),
-                true, true, m_proc, Long.MAX_VALUE);
+        txnId = m_idManager.getNextUniqueTransactionId();
+        m_task = new InitiateTaskMessage(0, 0, txnId, true, true, m_proc, txnId);
         assertTrue(m_txnIds.lastElement() < m_task.getTxnId());
         m_txnIds.add(m_task.getTxnId());
         m_state3 = new SinglePartitionTxnState(null, null, m_task);
         m_states[2] = m_state3;
 
-        m_task = new InitiateTaskMessage(1, 1, m_idManager.getNextUniqueTransactionId(),
-                true, true, m_proc, Long.MAX_VALUE);
+        txnId = m_idManager.getNextUniqueTransactionId();
+        m_task = new InitiateTaskMessage(1, 1, txnId, true, true, m_proc, txnId);
         assertTrue(m_txnIds.lastElement() < m_task.getTxnId());
         m_txnIds.add(m_task.getTxnId());
         m_state4 = new SinglePartitionTxnState(null, null, m_task);
         m_states[3] = m_state4;
 
-        m_task = new InitiateTaskMessage(0, 0, m_idManager.getNextUniqueTransactionId(),
-                true, true, m_proc, Long.MAX_VALUE);
+        txnId = m_idManager.getNextUniqueTransactionId();
+        m_task = new InitiateTaskMessage(0, 0, txnId, true, true, m_proc, txnId);
         assertTrue(m_txnIds.lastElement() < m_task.getTxnId());
         m_txnIds.add(m_task.getTxnId());
         m_state5 = new SinglePartitionTxnState(null, null, m_task);
@@ -95,8 +95,8 @@ public class TestRestrictedPriorityQueue extends TestCase{
         // Create an additional transaction to add to the priority queue but
         // don't add it to m_txnIds.  This additional transaction allows us
         // to iterate through all of m_txnIds safely.
-        m_task = new InitiateTaskMessage(1, 1, m_idManager.getNextUniqueTransactionId(),
-                true, true, m_proc, Long.MAX_VALUE);
+        txnId = m_idManager.getNextUniqueTransactionId();
+        m_task = new InitiateTaskMessage(1, 1, txnId, true, true, m_proc, txnId);
         assertTrue(m_txnIds.lastElement() < m_task.getTxnId());
         m_state6 = new SinglePartitionTxnState(null, null, m_task);
         m_states[5] = m_state6;
@@ -106,7 +106,7 @@ public class TestRestrictedPriorityQueue extends TestCase{
 
     private void addTxnToQueue(TransactionState state)
     {
-        m_queue.gotTransaction(state.initiatorSiteId, state.txnId, false);
+        m_queue.noteTransactionRecievedAndReturnLastSeen(state.initiatorSiteId, state.txnId, false, state.txnId);
         m_queue.add(state);
     }
 
@@ -132,6 +132,10 @@ public class TestRestrictedPriorityQueue extends TestCase{
         }
         assertEquals(m_queue.size(), 6);
 
+        long safeTxnId = m_idManager.getLastTxnId();
+        m_queue.noteTransactionRecievedAndReturnLastSeen(0, m_idManager.getNextUniqueTransactionId(), true, safeTxnId);
+        m_queue.noteTransactionRecievedAndReturnLastSeen(1, m_idManager.getNextUniqueTransactionId(), true, safeTxnId);
+
         for (long txnId : m_txnIds) {
             checkNextStateValid(txnId);
         }
@@ -149,17 +153,25 @@ public class TestRestrictedPriorityQueue extends TestCase{
         // ID 1 should still be blocking us
         checkNextStateNull();
 
+        // This test is totally broken by what's added for the new release stuff :(
+
         // now trickle in ID 1's txns and make sure that the right things
         // happen
         addTxnToQueue(m_state2);
+        m_queue.noteTransactionRecievedAndReturnLastSeen(0, m_state2.txnId, true, m_state2.txnId);
+        m_queue.noteTransactionRecievedAndReturnLastSeen(1, m_state2.txnId, true, m_state2.txnId);
         checkNextStateValid(m_state1.txnId);
         checkNextStateValid(m_state2.txnId);
         checkNextStateNull();
         addTxnToQueue(m_state4);
+        m_queue.noteTransactionRecievedAndReturnLastSeen(0, m_state4.txnId, true, m_state4.txnId);
+        m_queue.noteTransactionRecievedAndReturnLastSeen(1, m_state4.txnId, true, m_state4.txnId);
         checkNextStateValid(m_state3.txnId);
         checkNextStateValid(m_state4.txnId);
         checkNextStateNull();
         addTxnToQueue(m_state6);
+        m_queue.noteTransactionRecievedAndReturnLastSeen(0, m_state5.txnId, true, m_state5.txnId);
+        m_queue.noteTransactionRecievedAndReturnLastSeen(1, m_state5.txnId, true, m_state5.txnId);
         checkNextStateValid(m_state5.txnId);
         checkNextStateNull();
     }
@@ -189,6 +201,7 @@ public class TestRestrictedPriorityQueue extends TestCase{
         for (int i=0; i < m_states.length; ++i) {
             addTxnToQueue(m_states[i]);
         }
+
         assertEquals(m_queue.size(), 6);
         checkNextStateValid(m_txnIds.get(0));
 

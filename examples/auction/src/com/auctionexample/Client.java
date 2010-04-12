@@ -83,7 +83,7 @@ public class Client {
 
         // the last three lines just round to the nearest penny (lame)
         long money = newBid.longValue();
-        newBid = ((double)money) / 100.0;
+        newBid = (money) / 100.0;
         return newBid.doubleValue();
     }
 

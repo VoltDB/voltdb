@@ -111,7 +111,7 @@ public class SimpleDtxnInitiatorTest extends TestCase {
         }
     }
 
-    @Override
+    /*@Override
     public void setUp() {
         m_messenger = new MockMessenger();
         onBackPressure = new WasRun();
@@ -127,7 +127,7 @@ public class SimpleDtxnInitiatorTest extends TestCase {
         partitions0And1[numPartitions0And1++] = 0;
 
         work.setProcName("foo");
-    }
+    }*/
 
     @SuppressWarnings("unused")
     private final class DummyConnection implements Connection {

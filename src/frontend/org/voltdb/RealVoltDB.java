@@ -170,6 +170,8 @@ public class RealVoltDB implements VoltDBInterface
         }
     }
 
+    PeriodicWorkTimerThread fivems;
+
     /**
      * Initialize all the global components, then initialize all the m_sites.
      */
@@ -236,14 +238,14 @@ public class RealVoltDB implements VoltDBInterface
             TheHashinator.initialize(catalog);
 
             // Prepare the network socket manager for work
-            m_network = new VoltNetwork( new Runnable[] { new Runnable() {
+            m_network = new VoltNetwork(/* new Runnable[] { new Runnable() {
                 @Override
                 public void run() {
                     for (final ClientInterface ci : m_clientInterfaces) {
                         ci.processPeriodicWork();
                     }
                 }
-            }});
+            }}*/);
 
             // Let the ELT system read its configuration from the catalog.
             try {
@@ -395,6 +397,9 @@ public class RealVoltDB implements VoltDBInterface
 
             m_messenger.sendReadyMessage();
             m_messenger.waitForAllHostsToBeReady();
+
+            fivems = new PeriodicWorkTimerThread(m_clientInterfaces);
+            fivems.start();
 
             hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null);
         }
