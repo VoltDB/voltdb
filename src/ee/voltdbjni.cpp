@@ -218,7 +218,7 @@ void signalHandler(int signum, siginfo_t *info, void *context) {
 #endif
 
     JNIEnv *env;
-    if (currentVM->AttachCurrentThread((void **)&env, NULL) != 0)
+    if (currentVM->AttachCurrentThread((void **)(void *)&env, NULL) != 0)
         exit(-1);
     Topend *topend = static_cast<JNITopend*>(currentEngine->getTopend())->updateJNIEnv(env);
     topend->crashVoltDB(e);
