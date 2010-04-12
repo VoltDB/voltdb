@@ -90,7 +90,13 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         //exceptionBuffer.order(ByteOrder.nativeOrder());
         System.out.println("Creating Execution Engine on clusterIndex=" + clusterIndex
                 + ", site_id = " + siteId + "...");
-        pointer = nativeCreate();
+        /*
+         * (Ning): The reason I'm testing if we're running in Sun's JVM is that
+         * EE needs this info in order to decide whether it's safe to install
+         * the signal handler or not.
+         */
+        pointer = nativeCreate(System.getProperty("java.vm.vendor")
+                               .toLowerCase().contains("sun microsystems"));
         nativeSetLogLevels(pointer, EELoggers.getLogLevels());
         int errorCode =
             nativeInitialize(

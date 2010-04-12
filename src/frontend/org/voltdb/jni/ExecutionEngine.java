@@ -410,7 +410,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * This does strictly nothing so that this method never throws an exception.
      * @return the created VoltDBEngine pointer casted to jlong.
     */
-    protected native long nativeCreate();
+    protected native long nativeCreate(boolean isSunJVM);
     /**
      * Releases all resources held in the execution engine.
      * @param pointer the VoltDBEngine pointer to be destroyed

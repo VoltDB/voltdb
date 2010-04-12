@@ -1006,9 +1006,11 @@ void VoltDBIPC::cowSerializeMore(struct ipc_command *cmd) {
 #endif
 
 void VoltDBIPC::signalHandler(int signum, siginfo_t *info, void *context) {
-    VOLT_ERROR("SIGSEGV caught: signal number %d, error value %d,"
-               " signal code %d", info->si_signo, info->si_errno, info->si_code);
-    std::string message = m_engine->debug();
+    char err_msg[128];
+    sprintf(err_msg, "SIGSEGV caught: signal number %d, error value %d, signal"
+            " code %d\n\n", info->si_signo, info->si_errno, info->si_code);
+    std::string message = err_msg;
+    message.append(m_engine->debug());
     FatalException e = FatalException(message.c_str(), __FILE__, __LINE__);
 
 #ifndef SIGSEGV_NOSTACK

@@ -151,9 +151,11 @@ void signalHandler(int signum, siginfo_t *info, void *context) {
     if (currentVM == NULL || currentEngine == NULL)
         return;
 
-    VOLT_ERROR("SIGSEGV caught: signal number %d, error value %d,"
-               " signal code %d", info->si_signo, info->si_errno, info->si_code);
-    std::string message = currentEngine->debug();
+    char err_msg[128];
+    sprintf(err_msg, "SIGSEGV caught: signal number %d, error value %d, signal"
+            " code %d\n\n", info->si_signo, info->si_errno, info->si_code);
+    std::string message = err_msg;
+    message.append(currentEngine->debug());
     FatalException e = FatalException(message.c_str(), __FILE__, __LINE__);
 
 #ifndef SIGSEGV_NOSTACK
@@ -232,6 +234,13 @@ void setupSigHandler(void) {
     action.sa_flags = SA_SIGINFO;
     if(sigaction(SIGSEGV, &action, &orig_action) < 0)
         return;
+    /*
+     * This detects if we are running in Sun's JVM and libjsig.so is loaded. The
+     * trick is that the interposed version of sigaction() returns the same
+     * signal handler as the one we passed in, the original version of
+     * sigaction() returns the old signal handler in place before we put in
+     * ours. So here we check if the returned one is ours.
+     */
     if (orig_action.sa_sigaction != NULL
         && orig_action.sa_sigaction != signalHandler)
         sigaction(SIGSEGV, &orig_action, NULL);
@@ -248,7 +257,7 @@ void setupSigHandler(void) {
  * This does strictly nothing so that this method never throws an exception.
  * @return the created VoltDBEngine pointer casted to jlong.
 */
-SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeCreate(JNIEnv *env, jobject obj) {
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeCreate(JNIEnv *env, jobject obj, jboolean isSunJVM) {
     // obj is the instance pointer of the ExecutionEngineJNI instance
     // that is creating this native EE. Turn this into a global reference
     // and only use that global reference for calling back to Java.
@@ -269,7 +278,8 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeCrea
     JavaVM *vm;
     env->GetJavaVM(&vm);
     currentVM = vm;
-    setupSigHandler();
+    if (isSunJVM == JNI_TRUE)
+        setupSigHandler();
     JNITopend *topend = NULL;
     VoltDBEngine *engine = NULL;
     try {
