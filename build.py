@@ -52,7 +52,7 @@ if gcc_major == 4 and gcc_minor >= 3:
     CTX.CPPFLAGS += " -Wno-ignored-qualifiers -fno-strict-aliasing"
 
 # linker flags
-CTX.LDFLAGS = """ -g3 -rdynamic"""
+CTX.LDFLAGS = """ -g3 -rdynamic -ldl"""
 if CTX.COVERAGE:
     CTX.LDFLAGS += " -ftest-coverage -fprofile-arcs"
 # for the google perftools profiler and the recommended stack unwinder
