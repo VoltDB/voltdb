@@ -48,6 +48,10 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         m_currentTxnState = txnState;
     }
 
+    public TransactionState getTransactionState() {
+        return m_currentTxnState;
+    }
+
     /** Bundles the data needed to describe a plan fragment. */
     public static class SynthesizedPlanFragment {
         public int siteId = -1;

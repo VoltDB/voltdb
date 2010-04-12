@@ -33,7 +33,8 @@ public abstract class ClientFactory {
      * to saturate bonded gigabit connections. Only set to true if you have at least 2 bonded links
      * and intend to saturate them using this client instance. When set to false it can still saturate a gigabit
      * connection. Arena sizes are ignored when heavyweight is set. This is ignored on systems with < 4 cores.
-     * @param statsSettings Settings for uploading statistical information via JDBC
+     * @param statsSettings Settings for uploading statistical information via JDBC. Can be null in which
+     * case stats will not be uploaded.
      * @return Newly constructed {@link Client}
      * @see Client
      */

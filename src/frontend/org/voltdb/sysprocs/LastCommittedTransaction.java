@@ -20,6 +20,7 @@ package org.voltdb.sysprocs;
 import java.util.HashMap;
 import java.util.List;
 import org.voltdb.*;
+import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.DtxnConstants;
@@ -84,7 +85,7 @@ public class LastCommittedTransaction extends VoltSystemProcedure {
         return null;
     }
 
-    public VoltTable[] run() {
+    public VoltTable[] run(SystemProcedureExecutionContext ctx) {
         System.out.println("SYSPROC: LastCommittedTransaction.run().");
         VoltTable[] results;
 

@@ -911,52 +911,59 @@ public class VoltCompiler {
         assert (catalog != null);
         assert(database != null);
 
-        // if adding a new procedure, just add class name to this list.
-        final String[] procedures = new String[] {
-            "org.voltdb.sysprocs.AdHoc",
-            "org.voltdb.sysprocs.LastCommittedTransaction",
-            "org.voltdb.sysprocs.LoadMultipartitionTable",
-            "org.voltdb.sysprocs.Quiesce",
-            "org.voltdb.sysprocs.SnapshotSave",
-            "org.voltdb.sysprocs.SnapshotRestore",
-            "org.voltdb.sysprocs.SnapshotStatus",
-            "org.voltdb.sysprocs.SnapshotScan",
-            "org.voltdb.sysprocs.SnapshotDelete",
-            "org.voltdb.sysprocs.Shutdown",
-            "org.voltdb.sysprocs.StartSampler",
-            "org.voltdb.sysprocs.Statistics",
-            "org.voltdb.sysprocs.SystemInformation",
-            "org.voltdb.sysprocs.UpdateApplicationCatalog",
-            "org.voltdb.sysprocs.UpdateLogging"
+        // Table of sysproc metadata.
+        final String[][] procedures =
+        {
+         // package.classname                                readonly    everysite
+         {"org.voltdb.sysprocs.AdHoc",                        "false",    "false"},
+         {"org.voltdb.sysprocs.LastCommittedTransaction",     "true",     "false"},
+         {"org.voltdb.sysprocs.LoadMultipartitionTable",      "false",    "false"},
+         {"org.voltdb.sysprocs.Quiesce",                      "false",    "false"},
+         {"org.voltdb.sysprocs.SnapshotSave",                 "false",    "false"},
+         {"org.voltdb.sysprocs.SnapshotRestore",              "false",    "false"},
+         {"org.voltdb.sysprocs.SnapshotStatus",               "false",    "false"},
+         {"org.voltdb.sysprocs.SnapshotScan",                 "false",    "false"},
+         {"org.voltdb.sysprocs.SnapshotDelete",               "false",    "false"},
+         {"org.voltdb.sysprocs.Shutdown",                     "false",    "false"},
+         {"org.voltdb.sysprocs.StartSampler",                 "false",    "false"},
+         {"org.voltdb.sysprocs.Statistics",                   "true",     "false"},
+         {"org.voltdb.sysprocs.SystemInformation",            "true",     "false"},
+         {"org.voltdb.sysprocs.UpdateApplicationCatalog",     "false",    "false"},
+         {"org.voltdb.sysprocs.UpdateLogging",                "false",    "false"}
         };
 
-        for (final String className : procedures) {
+        for (int ii=0; ii < procedures.length; ++ii) {
+            String classname = procedures[ii][0];
+            boolean readonly = Boolean.parseBoolean(procedures[ii][1]);
+            boolean everysite = Boolean.parseBoolean(procedures[ii][2]);
+
             Class<?> procClass = null;
             try {
-                procClass = Class.forName(className);
+                procClass = Class.forName(classname);
             }
             catch (final ClassNotFoundException e) {
-                final String msg = "Cannot load sysproc " + className;
+                final String msg = "Cannot load sysproc " + classname;
                 throw new VoltCompilerException(msg);
             }
+
             // short name is "@ClassName" without package
-            final String[] parts = className.split("\\.");
+            final String[] parts = classname.split("\\.");
             final String shortName = "@" + parts[parts.length - 1];
 
-            // add an entry to the catalog
-            final Procedure procedure = database.getProcedures().add(shortName);
-            procedure.setClassname(className);
-            procedure.setSystemproc(true);
-            // assume all sysprocs can write
-            // (slower, but safer)
-            procedure.setReadonly(false);
-            procedure.setHasjava(true);
-
+            // read annotations
             final ProcInfo info = procClass.getAnnotation(ProcInfo.class);
             if (info == null) {
                 throw new VoltCompilerException("Sysproc " + shortName + " is missing annotation.");
             }
+
+            // add an entry to the catalog
+            final Procedure procedure = database.getProcedures().add(shortName);
+            procedure.setClassname(classname);
+            procedure.setReadonly(readonly);
+            procedure.setSystemproc(true);
+            procedure.setHasjava(true);
             procedure.setSinglepartition(info.singlePartition());
+            procedure.setEverysite(everysite);
 
             // Stored procedure sysproc classes are present in VoltDB.jar
             // and not duplicated in the catalog. This was decided

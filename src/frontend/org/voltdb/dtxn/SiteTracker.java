@@ -154,6 +154,25 @@ public class SiteTracker {
     }
 
     /**
+     * @return the lowest site ID across the live non-execution sites in the
+     *         cluster
+     */
+    public int getLowestLiveNonExecSiteId()
+    {
+        int lowestNonExecSiteId = -1;
+        for (Site site : getUpSites()) {
+            if (!site.getIsexec()) {
+                if (lowestNonExecSiteId == -1) {
+                    lowestNonExecSiteId = Integer.parseInt(site.getTypeName());
+                } else {
+                    lowestNonExecSiteId = Math.min(lowestNonExecSiteId, Integer.parseInt(site.getTypeName()));
+                }
+            }
+        }
+        return lowestNonExecSiteId;
+    }
+
+    /**
      * Get a site that contains a copy of the given partition.  The site ID
      * returned may correspond to a site that is currently down.
      *
@@ -235,12 +254,31 @@ public class SiteTracker {
                 all_sites.add(site);
             }
         }
+
         int[] retval = new int[all_sites.size()];
         for (int i = 0; i < all_sites.size(); i++)
         {
             retval[i] = all_sites.get(i);
         }
         return retval;
+    }
+
+    /**
+     * Get the ids of all sites that contain a copy of ANY of
+     * the given partitions.
+     * @param partitions as ArrayList
+     * @return
+     */
+    public ArrayList<Integer> getLiveSitesForEachPartitionAsList(int[]  partitions) {
+        ArrayList<Integer> all_sites = new ArrayList<Integer>();
+        for (int p : partitions) {
+            ArrayList<Integer> sites = getLiveSitesForPartition(p);
+            for (int site : sites)
+            {
+                all_sites.add(site);
+            }
+        }
+        return all_sites;
     }
 
     /**

@@ -66,22 +66,21 @@ CatalogType * Statement::addChild(const std::string &collectionName, const std::
     if (collectionName.compare("parameters") == 0) {
         CatalogType *exists = m_parameters.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_parameters.add(childName);
     }
     if (collectionName.compare("fragments") == 0) {
         CatalogType *exists = m_fragments.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_fragments.add(childName);
     }
     if (collectionName.compare("output_columns") == 0) {
         CatalogType *exists = m_output_columns.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_output_columns.add(childName);
     }
-    throw std::string("Trying to add to an unknown child collection.");
     return NULL;
 }
 

@@ -57,28 +57,27 @@ CatalogType * Table::addChild(const std::string &collectionName, const std::stri
     if (collectionName.compare("columns") == 0) {
         CatalogType *exists = m_columns.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_columns.add(childName);
     }
     if (collectionName.compare("indexes") == 0) {
         CatalogType *exists = m_indexes.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_indexes.add(childName);
     }
     if (collectionName.compare("constraints") == 0) {
         CatalogType *exists = m_constraints.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_constraints.add(childName);
     }
     if (collectionName.compare("views") == 0) {
         CatalogType *exists = m_views.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_views.add(childName);
     }
-    throw std::string("Trying to add to an unknown child collection.");
     return NULL;
 }
 

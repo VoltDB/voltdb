@@ -169,7 +169,7 @@ public class SnapshotStatus extends VoltSystemProcedure {
         return new VoltTable(result_columns);
     }
 
-    public VoltTable[] run() throws VoltAbortException
+    public VoltTable[] run(SystemProcedureExecutionContext ctx) throws VoltAbortException
     {
         VoltTable scanResults = performScanWork()[0];
         VoltTable clientResults = constructClientResultsTable();

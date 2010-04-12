@@ -52,10 +52,9 @@ CatalogType * Constraint::addChild(const std::string &collectionName, const std:
     if (collectionName.compare("foreignkeycols") == 0) {
         CatalogType *exists = m_foreignkeycols.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_foreignkeycols.add(childName);
     }
-    throw std::string("Trying to add to an unknown child collection.");
     return NULL;
 }
 

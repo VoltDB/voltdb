@@ -142,14 +142,18 @@ public class TestFailuresSuite extends RegressionSuite {
         fail("testDivideByZero should return while catching ProcCallException");
     }
 
+    /*
+     * Note: this test looks like it should be testing the 10MB buffer serialization
+     * limit between the EE and Java but watching it run, it really fails on max
+     * temp table serialization sizes. This needs more investigation.
+     */
     public void testMemoryOverload() throws IOException, ProcCallException {
         if (isHSQL() || isValgrind()) return;
 
         final int STRLEN = 30000;
 
         int totalBytes = 0;
-        int expectedMaxSuccessBytes = 10000000;
-
+        int expectedMaxSuccessBytes = 10000000; // less than the 10*1024*1024 limit.
         int expectedRows = 0;
 
         System.out.println("STARTING testMemoryOverload");
@@ -176,7 +180,8 @@ public class TestFailuresSuite extends RegressionSuite {
         assertEquals(expectedRows, results[0].getRowCount());
         totalBytes += STRLEN;
 
-        while (totalBytes < (expectedMaxSuccessBytes + 1024 * 1024)) {
+        // 11MB exceeds the response buffer limit.
+        while (totalBytes < (11 * 1024 * 1024)) {
             results = client.callProcedure("InsertBigString", expectedRows++, longString);
             assertEquals(1, results.length);
             assertEquals(1, results[0].asScalarLong());

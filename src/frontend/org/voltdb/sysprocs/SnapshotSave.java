@@ -419,7 +419,8 @@ public class SnapshotSave extends VoltSystemProcedure
         return null;
     }
 
-    public VoltTable[] run(String path, String nonce, long block) throws VoltAbortException
+    public VoltTable[] run(SystemProcedureExecutionContext ctx,
+            String path, String nonce, long block) throws VoltAbortException
     {
         final long startTime = System.currentTimeMillis();
         HOST_LOG.info("Saving database to path: " + path + ", ID: " + nonce + " at " + System.currentTimeMillis());

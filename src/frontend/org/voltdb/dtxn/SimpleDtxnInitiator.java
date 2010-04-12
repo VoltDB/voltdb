@@ -130,6 +130,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                   StoredProcedureInvocation invocation,
                                   boolean isReadOnly,
                                   boolean isSinglePartition,
+                                  boolean isEveryPartition,
                                   int partitions[],
                                   int numPartitions,
                                   Object clientData,
@@ -140,11 +141,10 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         assert(partitions != null);
         assert(numPartitions >= 1);
 
-        if (isSinglePartition)
+        if (isSinglePartition || isEveryPartition)
         {
-            assert(numPartitions == 1);
             createSinglePartitionTxn(connectionId, connectionHostname, invocation, isReadOnly,
-                                     partitions[0], clientData, messageSize, now);
+                                     partitions, clientData, messageSize, now);
             return;
         }
         else
@@ -230,18 +230,26 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                              final String connectionHostname,
                              StoredProcedureInvocation invocation,
                              boolean isReadOnly,
-                             int partition,
+                             int[] partitions,
                              Object clientData,
                              int messageSize,
                              long now)
     {
         long txnId = m_idManager.getNextUniqueTransactionId();
 
-        // split the list of partitions into coordinator and the set of participants
-        ArrayList<Integer> site_ids =
-            VoltDB.instance().getCatalogContext().
-            siteTracker.getLiveSitesForPartition(partition);
+        ArrayList<Integer> site_ids;
         ArrayList<InFlightTxnState> txn_states = new ArrayList<InFlightTxnState>();
+
+        // Special case the common 1 partition case -- cheap via SiteTracker
+        if (partitions.length == 1) {
+            site_ids = VoltDB.instance().getCatalogContext().
+            siteTracker.getLiveSitesForPartition(partitions[0]);
+        }
+        // need all sites for a set of partitions -- a little more expensive
+        else {
+            site_ids = VoltDB.instance().getCatalogContext().
+            siteTracker.getLiveSitesForEachPartitionAsList(partitions);
+        }
 
         increaseBackpressure(messageSize);
 

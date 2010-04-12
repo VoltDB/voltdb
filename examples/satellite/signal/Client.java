@@ -82,7 +82,7 @@ public class Client {
             pause(.1);
         }
         try {
-            db.shutdown();
+            db.close();
         } catch (InterruptedException e) {
             e.printStackTrace();
         }

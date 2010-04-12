@@ -72,7 +72,9 @@ public class UpdateLogging extends VoltSystemProcedure {
         return new DependencyPair(allHosts ? DEP_loggersUpdated | DtxnConstants.MULTINODE_DEPENDENCY : DEP_loggersUpdated, t);
     }
 
-    public VoltTable[] run(String xmlConfig, long allHostsLong) {
+    public VoltTable[] run(SystemProcedureExecutionContext ctx,
+            String xmlConfig, long allHostsLong)
+    {
         SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[1];
 
         int depId = DEP_loggersUpdated;

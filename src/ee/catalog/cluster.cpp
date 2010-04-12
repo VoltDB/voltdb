@@ -54,28 +54,27 @@ CatalogType * Cluster::addChild(const std::string &collectionName, const std::st
     if (collectionName.compare("databases") == 0) {
         CatalogType *exists = m_databases.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_databases.add(childName);
     }
     if (collectionName.compare("hosts") == 0) {
         CatalogType *exists = m_hosts.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_hosts.add(childName);
     }
     if (collectionName.compare("sites") == 0) {
         CatalogType *exists = m_sites.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_sites.add(childName);
     }
     if (collectionName.compare("partitions") == 0) {
         CatalogType *exists = m_partitions.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_partitions.add(childName);
     }
-    throw std::string("Trying to add to an unknown child collection.");
     return NULL;
 }
 

@@ -48,6 +48,9 @@ class SnapshotDaemon {
 
     private final SimpleDateFormat m_dateFormat = new SimpleDateFormat("'_'yyyy.MM.dd.HH.mm.ss");
 
+    // true if this SnapshotDaemon is the one responsible for generating
+    // snapshots
+    private boolean m_isActive = false;
     private long m_nextSnapshotTime = System.currentTimeMillis();
 
     /**
@@ -139,6 +142,14 @@ class SnapshotDaemon {
         }
     }
 
+    /**
+     * Make this SnapshotDaemon responsible for generating snapshots
+     */
+    public void makeActive()
+    {
+        m_isActive = true;
+    }
+
     private class Snapshot implements Comparable<Snapshot> {
         private final String path;
         private final String nonce;
@@ -165,6 +176,11 @@ class SnapshotDaemon {
      * @return null if there is no work to do or a sysproc with parameters if there is work
      */
     synchronized Pair<String, Object[]> processPeriodicWork(final long now) {
+        if (!m_isActive)
+        {
+            return null;
+        }
+
         if (m_frequencyUnit == null) {
             return null;
         }

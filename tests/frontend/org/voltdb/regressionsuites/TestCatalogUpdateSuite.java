@@ -158,7 +158,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         // this is a do nothing change... shouldn't affect anything
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.jar");
         results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
-        assertTrue(results.length == 0);
+        assertTrue(results.length == 1);
 
         client.drain();
 
@@ -205,7 +205,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         // change the insert new order procedure
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-conflict.jar");
         results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
-        assertTrue(results.length == 0);
+        assertTrue(results.length == 1);
 
         // call the new proc and make sure the one we want gets run
         results = client.callProcedure(InsertNewOrder.class.getSimpleName(), 100, 100, 100, 100, 100, 100, 1.0, "a");
@@ -215,7 +215,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         // load a big catalog change just to make sure nothing fails horribly
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-many.jar");
         results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
-        assertTrue(results.length == 0);
+        assertTrue(results.length == 1);
 
         loadSomeData(client, 65, 5);
 

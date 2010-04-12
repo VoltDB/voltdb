@@ -57,7 +57,6 @@ CatalogType * Connector::addChild(const std::string &collectionName, const std::
             return NULL;
         return m_destInfo.add(childName);
     }
-
     return NULL;
 }
 

@@ -45,7 +45,6 @@ void StmtParameter::update() {
 }
 
 CatalogType * StmtParameter::addChild(const std::string &collectionName, const std::string &childName) {
-    throw std::string("Trying to add to an unknown child collection.");
     return NULL;
 }
 

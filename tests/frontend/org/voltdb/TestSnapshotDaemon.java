@@ -168,6 +168,7 @@ public class TestSnapshotDaemon {
     public void testFailedScan() throws Exception {
 
         SnapshotDaemon daemon = getBasicDaemon();
+        daemon.makeActive();
 
         Pair<String, Object[]>  work = daemon.processPeriodicWork(0);
         assertTrue("@SnapshotScan".equals(work.getFirst()));
@@ -181,6 +182,7 @@ public class TestSnapshotDaemon {
         assertNull(daemon.processClientResponse(null));
 
         daemon = getBasicDaemon();
+        daemon.makeActive();
         work = daemon.processPeriodicWork(0);
 
         daemon.processClientResponse(getErrMsgResponse());
@@ -300,6 +302,7 @@ public class TestSnapshotDaemon {
     @Test
     public void testSuccessfulScan() throws Exception {
         SnapshotDaemon daemon = getBasicDaemon();
+        daemon.makeActive();
 
         Pair<String, Object[]>  work = daemon.processPeriodicWork(0);
 
@@ -307,6 +310,7 @@ public class TestSnapshotDaemon {
         assertNull(work);
 
         daemon = getBasicDaemon();
+        daemon.makeActive();
         daemon.processPeriodicWork(0);
 
         work = daemon.processClientResponse(getSuccessfulScanThreeResults());
@@ -322,6 +326,7 @@ public class TestSnapshotDaemon {
         assertEquals(daemon.getState(), SnapshotDaemon.State.FAILURE);
 
         daemon = getBasicDaemon();
+        daemon.makeActive();
         daemon.processPeriodicWork(0);
         work = daemon.processClientResponse(getSuccessfulScanThreeResults());
         daemon.processClientResponse(getErrMsgResponse());
@@ -331,6 +336,7 @@ public class TestSnapshotDaemon {
     @Test
     public void testDoSnapshot() throws Exception {
         SnapshotDaemon daemon = getBasicDaemon();
+        daemon.makeActive();
         long startTime = System.currentTimeMillis();
         Pair<String, Object[]>  work = daemon.processPeriodicWork(startTime);
         work = daemon.processClientResponse(getSuccessfulScanOneResult());
@@ -347,6 +353,7 @@ public class TestSnapshotDaemon {
         assertEquals(SnapshotDaemon.State.FAILURE, daemon.getState());
 
         daemon = getBasicDaemon();
+        daemon.makeActive();
         startTime = System.currentTimeMillis();
         assertNotNull(daemon.processPeriodicWork(startTime));
         assertNull(daemon.processClientResponse(getSuccessfulScanOneResult()));
@@ -355,6 +362,7 @@ public class TestSnapshotDaemon {
         assertEquals(daemon.getState(), SnapshotDaemon.State.WAITING);
 
         daemon = getBasicDaemon();
+        daemon.makeActive();
         startTime = System.currentTimeMillis();
         assertNotNull(daemon.processPeriodicWork(startTime));
         assertNotNull(daemon.processClientResponse(getSuccessfulScanThreeResults()));

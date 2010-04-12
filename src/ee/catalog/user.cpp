@@ -48,10 +48,9 @@ CatalogType * User::addChild(const std::string &collectionName, const std::strin
     if (collectionName.compare("groups") == 0) {
         CatalogType *exists = m_groups.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_groups.add(childName);
     }
-    throw std::string("Trying to add to an unknown child collection.");
     return NULL;
 }
 

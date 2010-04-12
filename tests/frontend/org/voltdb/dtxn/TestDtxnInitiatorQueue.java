@@ -176,6 +176,7 @@ public class TestDtxnInitiatorQueue extends TestCase
                                       StoredProcedureInvocation invocation,
                                       boolean isReadOnly,
                                       boolean isSinglePartition,
+                                      boolean isEveryPartition,
                                       int[] partitions, int numPartitions,
                                       Object clientData, int messageSize,
                                       long now)

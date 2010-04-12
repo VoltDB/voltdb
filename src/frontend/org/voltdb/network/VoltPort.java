@@ -148,7 +148,7 @@ public class VoltPort implements Callable<VoltPort>, Connection
             drainWriteStream(pool);
         } finally {
             synchronized(m_lock) {
-                assert m_running = true;
+                assert(m_running == true);
                 m_running = false;
             }
         }

@@ -290,6 +290,7 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/client/ProcCallException.java" />
             <include name="src/frontend/org/voltdb/client/ClientStatusListener.java" />
             <include name="src/frontend/org/voltdb/client/ClientResponse.java" />
+            <include name="src/frontend/org/voltdb/client/StatsUploaderSettings.java" />
         </fileset>
     </javadoc>
 
@@ -1301,18 +1302,19 @@ BENCHMARKS
     description="Call the standard benchmark target configured to use one node of the test cluster.">
     <antcall target="benchmark" inheritAll='true'>
         <param name="hostcount" value="1"/>
-        <param name="sitesperhost" value="6"/>
+        <param name="sitesperhost" value="12"/>
         <param name="clientcount" value="1"/>
         <param name="processesperclient" value="1"/>
-        <param name="warehouses" value="6"/>
-        <param name="volt.server.memory" value="4096"/>
+        <param name="warehouses" value="12"/>
+        <param name="volt.server.memory" value="2048"/>
     </antcall>
 </target>
 
 <target name='benchmark'
     description="Compile VoltDB and run a benchmark">
     <java fork="true" failonerror="true"
-        classname="org.voltdb.benchmark.BenchmarkController">
+        classname="org.voltdb.benchmark.BenchmarkController"
+        jvm="/opt/jdk/bin/java" >
         <classpath refid='project.classpath' />
         <jvmarg value="-Xmx512m" />
         <jvmarg value="-Djava.library.path=${build.dir}/nativelibs" />

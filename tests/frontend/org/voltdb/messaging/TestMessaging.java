@@ -340,8 +340,8 @@ public class TestMessaging extends TestCase {
         msg2.waitForGroupJoin();
         System.out.println("Finished socket joiner for msg2");
 
-        assertTrue(msg1.getHostId() == 0);
-        assertTrue(msg2.getHostId() == 1);
+        assertEquals(msg1.getHostId(), 0);
+        assertEquals(msg2.getHostId(), 1);
 
         int siteId1 = msg1.getHostId() * VoltDB.SITES_TO_HOST_DIVISOR + 1;
         int siteId2 = msg2.getHostId() * VoltDB.SITES_TO_HOST_DIVISOR + 2;

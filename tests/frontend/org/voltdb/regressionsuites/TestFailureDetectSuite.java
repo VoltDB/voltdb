@@ -113,6 +113,12 @@ public class TestFailureDetectSuite extends RegressionSuite
         config.compile(project);
         builder.addServerConfig(config);
 
+        // CLUSTER, three hosts, each with two sites, replication of 2
+        config = new LocalCluster("replication-2-cluster.jar", 2, 3,
+                                  2, BackendTarget.NATIVE_EE_JNI);
+        config.compile(project);
+        builder.addServerConfig(config);
+
 //        // CLUSTER, four hosts, each with three sites, replication of 2
 //        config = new LocalCluster("replication-2-cluster.jar", 3, 4,
 //                                  2, BackendTarget.NATIVE_EE_JNI);

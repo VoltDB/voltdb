@@ -75,7 +75,8 @@ public interface VoltDBInterface
     * @param diffCommands The commands to update the current catalog to the new one.
     * @param expectedCatalogVersion The version of the catalog the commands are targeted for.
     */
-   public void catalogUpdate(String diffCommands, String newCatalogURL, int expectedCatalogVersion);
+   public void catalogUpdate(String diffCommands, String newCatalogURL,
+           int expectedCatalogVersion, long currentTxnId);
 
    /**
     * Updates the physical cluster configuration stored in the catalog at this server.

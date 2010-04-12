@@ -463,6 +463,9 @@ import org.voltdb.utils.Pair;
         final ArrayList<Runnable> generatedTasks = new ArrayList<Runnable>();
         for(SelectionKey key : selectedKeys) {
             final VoltPort port = (VoltPort) key.attachment();
+            if (port == null) {
+                continue;
+            }
             try {
                 port.lockForHandlingWork();
                 key.interestOps(0);
@@ -492,6 +495,7 @@ import org.voltdb.utils.Pair;
                 }
             }
             catch (CancelledKeyException e) {
+                e.printStackTrace();
                 // no need to do anything here until
                 // shutdown makes more sense
             }

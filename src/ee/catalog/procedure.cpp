@@ -43,6 +43,7 @@ Procedure::Procedure(Catalog *catalog, CatalogType *parent, const string &path, 
     m_childCollections["authGroups"] = &m_authGroups;
     m_fields["readonly"] = value;
     m_fields["singlepartition"] = value;
+    m_fields["everysite"] = value;
     m_fields["systemproc"] = value;
     m_fields["hasjava"] = value;
     m_fields["partitiontable"] = value;
@@ -57,6 +58,7 @@ void Procedure::update() {
     m_classname = m_fields["classname"].strValue.c_str();
     m_readonly = m_fields["readonly"].intValue;
     m_singlepartition = m_fields["singlepartition"].intValue;
+    m_everysite = m_fields["everysite"].intValue;
     m_systemproc = m_fields["systemproc"].intValue;
     m_hasjava = m_fields["hasjava"].intValue;
     m_partitiontable = m_fields["partitiontable"].typeValue;
@@ -68,34 +70,33 @@ CatalogType * Procedure::addChild(const std::string &collectionName, const std::
     if (collectionName.compare("authUsers") == 0) {
         CatalogType *exists = m_authUsers.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_authUsers.add(childName);
     }
     if (collectionName.compare("authGroups") == 0) {
         CatalogType *exists = m_authGroups.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_authGroups.add(childName);
     }
     if (collectionName.compare("authPrograms") == 0) {
         CatalogType *exists = m_authPrograms.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_authPrograms.add(childName);
     }
     if (collectionName.compare("statements") == 0) {
         CatalogType *exists = m_statements.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_statements.add(childName);
     }
     if (collectionName.compare("parameters") == 0) {
         CatalogType *exists = m_parameters.get(childName);
         if (exists)
-            throw std::string("trying to add a duplicate value.");
+            return NULL;
         return m_parameters.add(childName);
     }
-    throw std::string("Trying to add to an unknown child collection.");
     return NULL;
 }
 
@@ -145,6 +146,10 @@ bool Procedure::readonly() const {
 
 bool Procedure::singlepartition() const {
     return m_singlepartition;
+}
+
+bool Procedure::everysite() const {
+    return m_everysite;
 }
 
 bool Procedure::systemproc() const {

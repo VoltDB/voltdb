@@ -218,10 +218,11 @@ CatalogType *Catalog::addChild(const string &collectionName, const string &child
     if (collectionName.compare("clusters") == 0) {
         CatalogType *exists = m_clusters.get(childName);
         if (exists)
-            throw string("trying to add a duplicate value.");
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                          "trying to add a duplicate value.");
         return m_clusters.add(childName);
     }
-    throw std::string("Trying to add to an unknown child collection.");
+
     return NULL;
 }
 

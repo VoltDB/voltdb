@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 
 import org.voltdb.*;
+import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.DtxnConstants;
@@ -80,7 +81,7 @@ public class Shutdown extends VoltSystemProcedure {
         return null;
     }
 
-    public VoltTable[] run() {
+    public VoltTable[] run(SystemProcedureExecutionContext ctx) {
         SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[1];
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_shutdownCommand;

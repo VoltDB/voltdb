@@ -21,7 +21,7 @@ import org.voltdb.catalog.Statement;
 
 /**
  * <p>A simple wrapper of a parameterized SQL statement. VoltDB uses this instead of
- * a Java String type for performance reasons and to cache statrment meta-data like
+ * a Java String type for performance reasons and to cache statement meta-data like
  * result schema, etc..</p>
  *
  * <p>SQLStmts are used exclusively in subclasses of {@link VoltProcedure}</p>
@@ -34,7 +34,7 @@ public class SQLStmt {
     /**
      * Construct a SQLStmt instance from a SQL statement.
      *
-     * @param sqlText Valid VoltDB complient SQL with question marks as parameter
+     * @param sqlText Valid VoltDB compliant SQL with question marks as parameter
      * place holders.
      */
     public SQLStmt(String sqlText) {

@@ -231,22 +231,8 @@ public class RealVoltDB implements VoltDBInterface
             Catalog catalog = new Catalog();
             catalog.execute(serializedCatalog);
             m_catalogContext = new CatalogContext(catalog, m_config.m_pathToCatalog);
-            final SnapshotSchedule schedule = m_catalogContext.database.getSnapshotschedule().get("default");
-
-            /*
-             * The lowest non-exec siteId (ClientInterface) is tasked with
-             * running a SnapshotDaemon.
-             */
-            int lowestNonExecSiteId = -1;
-            for (Site site : m_catalogContext.siteTracker.getUpSites()) {
-                if (!site.getIsexec()) {
-                    if (lowestNonExecSiteId == -1) {
-                        lowestNonExecSiteId = Integer.parseInt(site.getTypeName());
-                    } else {
-                        lowestNonExecSiteId = Math.min(lowestNonExecSiteId, Integer.parseInt(site.getTypeName()));
-                    }
-                }
-            }
+            final SnapshotSchedule schedule =
+                m_catalogContext.database.getSnapshotschedule().get("default");
 
             // Initialize the complex partitioning scheme
             TheHashinator.initialize(catalog);
@@ -394,7 +380,7 @@ public class RealVoltDB implements VoltDBInterface
                                                currSiteId,
                                                site.getInitiatorid(),
                                                config.m_port + portOffset++,
-                                               currSiteId == lowestNonExecSiteId ? schedule : null);
+                                               schedule);
                     m_clientInterfaces.add(ci);
                     try {
                         ci.startAcceptingConnections();
@@ -552,19 +538,33 @@ public class RealVoltDB implements VoltDBInterface
         }
     }
 
+    /** Last transaction ID at which the catalog updated. */
+    private static long lastCatalogUpdate_txnId = 0;
     @Override
-    public void catalogUpdate(String diffCommands,
-            String newCatalogURL, int expectedCatalogVersion)
+    public void catalogUpdate(
+            String diffCommands,
+            String newCatalogURL,
+            int expectedCatalogVersion,
+            long currentTxnId)
     {
         synchronized(m_catalogUpdateLock) {
-            if (m_catalogContext.catalog.getSubTreeVersion() != expectedCatalogVersion)
+            // another site already did this work.
+            if (currentTxnId == lastCatalogUpdate_txnId) {
+                return;
+            }
+            else if (currentTxnId < lastCatalogUpdate_txnId) {
+                throw new RuntimeException("Trying to update main catalog context with an old transaction.");
+            }
+            else if (m_catalogContext.catalog.getSubTreeVersion() != expectedCatalogVersion) {
                 throw new RuntimeException("Trying to update main catalog context with diff " +
                 "commands generated for an out-of date catalog.");
+            }
+            System.out.println("Updating RealVoltDB catalog context from txnid: " + lastCatalogUpdate_txnId + " to " + currentTxnId);
+            lastCatalogUpdate_txnId = currentTxnId;
             m_catalogContext = m_catalogContext.update(newCatalogURL, diffCommands);
+            for (ClientInterface ci : m_clientInterfaces)
+                ci.notifyOfCatalogUpdate();
         }
-
-        for (ClientInterface ci : m_clientInterfaces)
-            ci.notifyOfCatalogUpdate();
     }
 
     @Override
