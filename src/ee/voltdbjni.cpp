@@ -54,6 +54,8 @@
 
 #include <string>
 #include <vector>
+#include <signal.h>
+#include <dlfcn.h>
 #ifdef LINUX
 #include <sys/types.h>
 #include <sys/sysinfo.h>
@@ -101,9 +103,140 @@
 using namespace std;
 using namespace voltdb;
 
-#define castToEngine(x) reinterpret_cast<VoltDBEngine*>((x));
+#define castToEngine(x) reinterpret_cast<VoltDBEngine*>((x));\
+    currentEngine = reinterpret_cast<VoltDBEngine*>((x))
 #define updateJNILogProxy(x) const_cast<JNILogProxy*>(dynamic_cast<const JNILogProxy*>(x->getLogManager()->getLogProxy()))->setJNIEnv(env)
 
+/*
+ * Yes, I know. This is ugly. But in order to get some useful information and
+ * properly call crashVoltDB when a signal is caught, I cannot think of a
+ * different way.
+ */
+static VoltDBEngine *currentEngine = NULL;
+static JavaVM *currentVM = NULL;
+
+/**
+ * The following code is for handling signals. A stack trace will be printed
+ * when a SIGSEGV is caught.
+ *
+ * The code is modified based on the original code found at
+ * http://tlug.up.ac.za/wiki/index.php/Obtaining_a_stack_trace_in_C_upon_SIGSEGV
+ *
+ * This source file is used to print out a stack-trace when your program
+ * segfaults. It is relatively reliable and spot-on accurate.
+ *
+ * This code is in the public domain. Use it as you see fit, some credit
+ * would be appreciated, but is not a prerequisite for usage. Feedback
+ * on it's use would encourage further development and maintenance.
+ *
+ * Due to a bug in gcc-4.x.x you currently have to compile as C++ if you want
+ * demangling to work.
+ *
+ * Please note that it's been ported into my ULS library, thus the check for
+ * HAS_ULSLIB and the use of the sigsegv_outp macro based on that define.
+ *
+ * Author: Jaco Kroon <jaco@kroon.co.za>
+ *
+ * Copyright (C) 2005 - 2010 Jaco Kroon
+ */
+#if defined(REG_RIP)
+# define SIGSEGV_STACK_IA64
+#elif defined(REG_EIP)
+# define SIGSEGV_STACK_X86
+#else
+# define SIGSEGV_STACK_GENERIC
+#endif
+
+void signalHandler(int signum, siginfo_t *info, void *context) {
+    if (currentVM == NULL || currentEngine == NULL)
+        return;
+
+    VOLT_ERROR("SIGSEGV caught: signal number %d, error value %d,"
+               " signal code %d", info->si_signo, info->si_errno, info->si_code);
+    std::string message = currentEngine->debug();
+    FatalException e = FatalException(message.c_str(), __FILE__, __LINE__);
+
+#ifndef SIGSEGV_NOSTACK
+#if defined(SIGSEGV_STACK_IA64) || defined(SIGSEGV_STACK_X86)
+
+    ucontext_t *ucontext = (ucontext_t *)context;
+    int f = 0;
+    Dl_info dlinfo;
+    void **bp = 0;
+    void *ip = 0;
+    std::vector<std::string> traces;
+
+#if defined(SIGSEGV_STACK_IA64)
+    ip = (void*)ucontext->uc_mcontext.gregs[REG_RIP];
+    bp = (void**)ucontext->uc_mcontext.gregs[REG_RBP];
+#elif defined(SIGSEGV_STACK_X86)
+    ip = (void*)ucontext->uc_mcontext.gregs[REG_EIP];
+    bp = (void**)ucontext->uc_mcontext.gregs[REG_EBP];
+#endif
+
+    if (!bp || !ip) {
+        e.m_traces = traces;
+    }
+
+    while(bp && ip) {
+        if(!dladdr(ip, &dlinfo))
+            break;
+
+        const char *symname = dlinfo.dli_sname;
+        char trace[1024];
+
+#ifndef NO_CPP_DEMANGLE
+        int status;
+        char * tmp = abi::__cxa_demangle(symname, NULL, 0, &status);
+
+        if (status == 0 && tmp)
+            symname = tmp;
+#endif
+
+        sprintf(trace, "% 2d: %p <%s+%lu> (%s)\n",
+                ++f,
+                ip,
+                symname,
+                (unsigned long)ip - (unsigned long)dlinfo.dli_saddr,
+                dlinfo.dli_fname);
+        traces.push_back(std::string(trace));
+
+#ifndef NO_CPP_DEMANGLE
+        if (tmp)
+            free(tmp);
+#endif
+
+        if(dlinfo.dli_sname && !strcmp(dlinfo.dli_sname, "main"))
+            break;
+
+        ip = bp[1];
+        bp = (void**)bp[0];
+    }
+#endif
+#endif
+
+    JNIEnv *env;
+    if (currentVM->AttachCurrentThread((void **)&env, NULL) != 0)
+        exit(-1);
+    Topend *topend = static_cast<JNITopend*>(currentEngine->getTopend())->updateJNIEnv(env);
+    topend->crashVoltDB(e);
+    currentVM->DetachCurrentThread();
+}
+
+void setupSigHandler(void) {
+#ifdef __linux__
+    struct sigaction action;
+    struct sigaction orig_action;
+    memset(&action, 0, sizeof(action));
+    action.sa_sigaction = signalHandler;
+    action.sa_flags = SA_SIGINFO;
+    if(sigaction(SIGSEGV, &action, &orig_action) < 0)
+        return;
+    if (orig_action.sa_sigaction != NULL
+        && orig_action.sa_sigaction != signalHandler)
+        sigaction(SIGSEGV, &orig_action, NULL);
+#endif
+}
 
 ////////////////////////////////////////////////////////////////////////////
 // Create / Destroy
@@ -135,6 +268,8 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeCrea
     }
     JavaVM *vm;
     env->GetJavaVM(&vm);
+    currentVM = vm;
+    setupSigHandler();
     JNITopend *topend = NULL;
     VoltDBEngine *engine = NULL;
     try {

@@ -252,6 +252,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         // Debug functions
         // -------------------------------------------------
+        std::string debug(void) const;
 
         /** Counts tuples modified by a plan fragment */
         int64_t m_tuplesModified;

@@ -18,6 +18,7 @@
 #ifndef VOLTDBIPC_H_
 #define VOLTDBIPC_H_
 
+#include <signal.h>
 #include <vector>
 #include "common/ids.h"
 #include "logging/LogDefs.h"
@@ -121,6 +122,10 @@ private:
 
     int8_t activateCopyOnWrite(struct ipc_command *cmd);
     void  cowSerializeMore(struct ipc_command *cmd);
+
+    void signalHandler(int signum, siginfo_t *info, void *context);
+    static void signalDispatcher(int signum, siginfo_t *info, void *context);
+    void setupSigHandler(void) const;
 
     int m_fd;
     char *m_reusedResultBuffer;

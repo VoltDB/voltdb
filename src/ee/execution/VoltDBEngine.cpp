@@ -1081,6 +1081,27 @@ void VoltDBEngine::quiesce(int64_t lastCommittedTxnId) {
     }
 }
 
+std::string VoltDBEngine::debug(void) const {
+    std::stringstream output(std::stringstream::in | std::stringstream::out);
+    std::map<int64_t, boost::shared_ptr<ExecutorVector> >::const_iterator iter;
+    std::vector<AbstractExecutor*>::const_iterator executorIter;
+
+    for (iter = m_executorMap.begin(); iter != m_executorMap.end(); iter++) {
+        output << "Fragment ID: " << iter->first << ", "
+               << "Executor list size: " << iter->second->list.size() << ", "
+               << "Temp table memory in bytes: "
+               << iter->second->tempTableMemoryInBytes << endl;
+
+        for (executorIter = iter->second->list.begin();
+             executorIter != iter->second->list.end();
+             executorIter++) {
+            output << (*executorIter)->getPlanNode()->debug(" ") << endl;
+        }
+    }
+
+    return output.str();
+}
+
 voltdb::StatsAgent& VoltDBEngine::getStatsManager() {
     return m_statsManager;
 }
