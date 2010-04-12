@@ -32,6 +32,8 @@ TupleSchema* TupleSchema::createTupleSchema(const std::vector<ValueType> columnT
     const uint16_t columnCount = static_cast<uint16_t>(columnTypes.size());
     // big enough for any data members plus big enough for tupleCount + 1 "ColumnInfo"
     //  fields. We need CI+1 because we get the length of a column by offset subtraction
+    // Also allocate space for an int16_t for each uninlineable object column so that
+    // the indices of uninlineable columns can be stored at the front and aid in iteration
     int memSize = (int)(sizeof(TupleSchema) +
                         (sizeof(ColumnInfo) * (columnCount + 1)) +
                         (uninlineableObjectColumnCount * sizeof(int16_t)));
@@ -146,7 +148,7 @@ void TupleSchema::freeTupleSchema(TupleSchema *schema) {
 void TupleSchema::setColumnMetaData(uint16_t index, ValueType type, const int32_t length, bool allowNull,
                                     uint16_t &uninlinedObjectColumnIndex)
 {
-    assert(length < 8388608);
+    assert(length <= 1048576);
     uint32_t offset = 0;
 
     // set the type
@@ -157,11 +159,11 @@ void TupleSchema::setColumnMetaData(uint16_t index, ValueType type, const int32_
     if (type == VALUE_TYPE_VARCHAR ) {
         if (length < UNINLINEABLE_OBJECT_LENGTH && m_allowInlinedObjects) {
             /*
-             * Inline the string if it is less then 255 chars.
+             * Inline the string if it is less then UNINLINEABLE_OBJECT_LENGTH bytes.
              */
             columnInfo->inlined = true;
             // One byte to store the size
-            offset = static_cast<uint32_t>(length + 1);
+            offset = static_cast<uint32_t>(length + SHORT_OBJECT_LENGTHLENGTH);
         } else {
             /*
              * Set the length to the size of a String pointer since it won't be inlined.

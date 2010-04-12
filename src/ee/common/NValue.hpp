@@ -42,8 +42,16 @@
 #define CHECK_FPE( x ) ( std::isinf(x) || std::isnan(x) )
 namespace voltdb {
 
-#define SHORT_OBJECT_LENGTHLENGTH 1
-#define LONG_OBJECT_LENGTHLENGTH 4
+/*
+ * Objects are length preceded with a short length value or a long length value
+ * depending on how many bytes are needed to represent the length. These
+ * define how many bytes are used for the short value vs. the long value.
+ */
+#define SHORT_OBJECT_LENGTHLENGTH static_cast<char>(1)
+#define LONG_OBJECT_LENGTHLENGTH static_cast<char>(4)
+#define OBJECT_NULL_BIT static_cast<char>(1 << 6)
+#define OBJECT_CONTINUATION_BIT static_cast<char>(1 << 7)
+#define OBJECT_MAX_LENGTH_SHORT_LENGTH 63
 
 //The int used for storage and return values
 typedef ttmath::Int<2> TTInt;
@@ -319,7 +327,7 @@ class NValue {
      * that will be stored in this instance
      */
     NValue(const ValueType type) {
-        ::memset( m_data, 0, 17);
+        ::memset( m_data, 0, 16);
         setValueType(type);
     }
 
@@ -343,7 +351,9 @@ class NValue {
     /**
      * An Object is something like a String that has a variable length
      * (thus it is length preceded) and can potentially have indirect
-     * storage (will always be indirect when referenced via an NValue)
+     * storage (will always be indirect when referenced via an NValue).
+     * NValues cache a decoded version of the length preceding value
+     * in their data area after the pointer to the object storage area.
      *
      * Leverage private access and enforce strict requirements on
      * calling correctness.
@@ -366,17 +376,45 @@ class NValue {
         return *reinterpret_cast<const int32_t *>(&m_data[8]);
     }
 
-    static int32_t getPersistentObjectLengthFromLocation(const char *location) {
+    void setObjectLength(int32_t length) {
+        *reinterpret_cast<int32_t *>(&m_data[8]) = length;
+    }
+
+    /**
+     * -1 is returned for the length of a NULL object. If a string
+     * is inlined in its storage location there will be no pointer to
+     * check for NULL. The length preceding value must be used instead.
+     *
+     * The format for a length preceding value is a 1-byte short representation
+     * with the the 7th bit used to indicate a null value and the 8th bit used
+     * to indicate that this is part of a long representation and that 3 bytes
+     * follow. 6 bits are available to represent length for a maximum length
+     * of 63 bytes representable with a single byte length. 30 bits are available
+     * when the continuation bit is set and 3 bytes follow.
+     *
+     * The value is converted to network byte order so that the code
+     * will always know which byte contains the most signficant digits.
+     */
+    static int32_t getObjectLengthFromLocation(const char *location) {
+        /*
+         * Location will be NULL if the NValue is operating on storage that is not
+         * inlined and thus can contain a NULL pointer
+         */
         if (location == NULL) {
             return -1;
         }
         char firstByte = location[0];
-        const char premask = static_cast<char>(3 << 6);
+        const char premask = static_cast<char>(OBJECT_NULL_BIT | OBJECT_CONTINUATION_BIT);
+
+        /*
+         * Generated mask that removes the null and continuation bits
+         * from a single byte length value
+         */
         const char mask = ~premask;
         int32_t decodedNumber = 0;
-        if ((firstByte & (1 << 6)) != 0) {
+        if ((firstByte & OBJECT_NULL_BIT) != 0) {
             return -1;
-        } else if ((firstByte & (1 << 7)) != 0) {
+        } else if ((firstByte & OBJECT_CONTINUATION_BIT) != 0) {
             char numberBytes[4];
             numberBytes[0] = static_cast<char>(location[0] & mask);
             numberBytes[1] = location[1];
@@ -389,24 +427,63 @@ class NValue {
         return decodedNumber;
     }
 
-    static void setPersistentObjectLengthToLocation(int32_t length, char *location) {
+    /*
+     * Retrieve the number of bytes used by the length preceding value
+     * in the object's storage area. This value
+     * is cached in the NValue's 13th byte.
+     */
+    int8_t getObjectLengthLength() const {
+        return m_data[12];
+    }
+
+    /*
+     * Set the objects length preceding values length to
+     * the specified value
+     */
+    void setObjectLengthLength(int8_t length) {
+        m_data[12] = length;
+    }
+
+    /*
+     * Based on the objects actual length value get the length of the
+     * length preceding value to the appropriate length
+     */
+    static int8_t getAppropriateObjectLengthLength(int32_t length) {
+        if (length <= OBJECT_MAX_LENGTH_SHORT_LENGTH) {
+            return SHORT_OBJECT_LENGTHLENGTH;
+        } else {
+            return LONG_OBJECT_LENGTHLENGTH;
+        }
+    }
+
+    /*
+     * Set the length preceding value using the short or long representation depending
+     * on what is necessary to represent the length.
+     */
+    static void setObjectLengthToLocation(int32_t length, char *location) {
         int32_t beNumber = htonl(length);
         if (length < -1) {
             throwFatalException("Object length cannot be < -1");
         } else if (length == -1) {
-            location[0] = 64;
-        } if (length < 64) {
+            location[0] = OBJECT_NULL_BIT;
+        } if (length <= OBJECT_MAX_LENGTH_SHORT_LENGTH) {
             location[0] = reinterpret_cast<char*>(&beNumber)[3];
-            location[0] = static_cast<char>(location[0] & ~(1 << 7));
-            location[0] = static_cast<char>(location[0] & ~(1 << 6));
         } else {
             char *pointer = reinterpret_cast<char*>(&beNumber);
             location[0] = pointer[0];
-            location[0] |= static_cast<char>(1 << 7);
+            location[0] |= OBJECT_CONTINUATION_BIT;
             location[1] = pointer[1];
             location[2] = pointer[2];
             location[3] = pointer[3];
         }
+    }
+
+    /*
+     * Not truly symmetrical with getObjectValue which returns the actual object past
+     * the length preceding value
+     */
+    void setObjectValue(char *object) {
+        *reinterpret_cast<char**>(m_data) = object;
     }
 
     /**
@@ -418,7 +495,7 @@ class NValue {
         } else if(*reinterpret_cast<const int32_t*>(&m_data[8]) == OBJECTLENGTH_NULL) {
             return NULL;
         } else {
-            void * value = *reinterpret_cast<char* const*>(m_data) + m_data[12];
+            void * value = *reinterpret_cast<char* const*>(m_data) + getObjectLengthLength();
             return value;
         }
     }
@@ -877,7 +954,11 @@ class NValue {
      */
     void inlineCopyObject(void *storage, int32_t maxLength) const {
         if (isNull()) {
-            *reinterpret_cast<char*>(storage) = 64;//null bit
+            /*
+             * The 7th bit of the length preceding value
+             * is used to indicate that the object is null.
+             */
+            *reinterpret_cast<char*>(storage) = OBJECT_NULL_BIT;
         }
         else {
             const int32_t objectLength = getObjectLength();
@@ -887,8 +968,7 @@ class NValue {
                 throw SQLException(SQLException::data_exception_string_data_length_mismatch,
                                    msg);
             }
-            ::memcpy( storage, *reinterpret_cast<char *const *>(m_data), m_data[12] + objectLength);
-            *reinterpret_cast<int8_t*>(storage) = static_cast<int8_t>(objectLength);
+            ::memcpy( storage, *reinterpret_cast<char *const *>(m_data), getObjectLengthLength() + objectLength);
         }
 
     }
@@ -1297,18 +1377,14 @@ class NValue {
     static NValue getStringValue(std::string value) {
         NValue retval(VALUE_TYPE_VARCHAR);
         const int32_t length = static_cast<int32_t>(value.length());
-        const int8_t lengthLength =
-                static_cast<int8_t>(
-                        length < 64 ?
-                                SHORT_OBJECT_LENGTHLENGTH :
-                                LONG_OBJECT_LENGTHLENGTH);
+        const int8_t lengthLength = getAppropriateObjectLengthLength(length);
         const std::size_t minLength = value.length() + lengthLength;
         char *storage = new char[minLength];
-        setPersistentObjectLengthToLocation(length, storage);
+        setObjectLengthToLocation(length, storage);
         ::memcpy( storage + lengthLength, value.c_str(), length);
-        *reinterpret_cast<char**>(retval.m_data) = storage;
-        *reinterpret_cast<int32_t*>(&retval.m_data[8]) = length;
-        *reinterpret_cast<int8_t*>(&retval.m_data[12]) = lengthLength;
+        retval.setObjectValue(storage);
+        retval.setObjectLength(length);
+        retval.setObjectLengthLength(lengthLength);
         return retval;
     }
 
@@ -1596,13 +1672,9 @@ inline const NValue NValue::deserializeFromTupleStorage(const void *storage,
                 //containing the string.
                 memcpy( retval.m_data, storage, sizeof(void*));
             }
-            const int32_t length = getPersistentObjectLengthFromLocation(*reinterpret_cast<char**>(retval.m_data));
-            *reinterpret_cast<int32_t*>(&retval.m_data[8]) = length;
-            if (length < 64) {
-                retval.m_data[12] = SHORT_OBJECT_LENGTHLENGTH;
-            } else {
-                retval.m_data[12] = LONG_OBJECT_LENGTHLENGTH;
-            }
+            const int32_t length = getObjectLengthFromLocation(*reinterpret_cast<char**>(retval.m_data));
+            retval.setObjectLength(length);
+            retval.setObjectLengthLength(getAppropriateObjectLengthLength(length));
             break;
           }
           default:
@@ -1656,10 +1728,7 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
             }
             else {
                 length = getObjectLength();
-                const int8_t lengthLength = static_cast<int8_t>(
-                        length < 64 ?
-                                SHORT_OBJECT_LENGTHLENGTH :
-                                LONG_OBJECT_LENGTHLENGTH);
+                const int8_t lengthLength = getObjectLengthLength();
                 const size_t minlength = lengthLength + length;
                 char *copy = NULL;
                 if (length > maxLength) {
@@ -1676,8 +1745,8 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
                 } else {
                     copy = new char[minlength];
                 }
-                setPersistentObjectLengthToLocation(length, copy);
-                ::memcpy(copy + lengthLength,getObjectValue(), length);
+                setObjectLengthToLocation(length, copy);
+                ::memcpy(copy + lengthLength, getObjectValue(), length);
                 *reinterpret_cast<char**>(storage) = copy;
             }
         }
@@ -1779,13 +1848,10 @@ inline void NValue::deserializeFrom(SerializeInput &input, const ValueType type,
         break;
       case VALUE_TYPE_VARCHAR: {
           const int32_t length = input.readInt();
-          const int8_t lengthLength = static_cast<int8_t>(
-                  length < 64 ?
-                          SHORT_OBJECT_LENGTHLENGTH :
-                          LONG_OBJECT_LENGTHLENGTH);
+          const int8_t lengthLength = getAppropriateObjectLengthLength(length);
           // the NULL SQL string is a NULL C pointer
           if (isInlined) {
-              setPersistentObjectLengthToLocation(length, storage);
+              setObjectLengthToLocation(length, storage);
               if (length == OBJECTLENGTH_NULL) {
                   break;
               }
@@ -1804,7 +1870,7 @@ inline void NValue::deserializeFrom(SerializeInput &input, const ValueType type,
               } else {
                   copy = new char[minlength];
               }
-              setPersistentObjectLengthToLocation( length, copy);
+              setObjectLengthToLocation( length, copy);
               ::memcpy(copy + lengthLength, data, length);
               *reinterpret_cast<char**>(storage) = copy;
           }
@@ -1855,10 +1921,7 @@ inline const NValue NValue::deserializeFromAllocateForStorage(SerializeInput &in
         break;
       case VALUE_TYPE_VARCHAR: {
           const int32_t length = input.readInt();
-          const int8_t lengthLength = static_cast<int8_t>(
-                  length < 64 ?
-                          SHORT_OBJECT_LENGTHLENGTH :
-                          LONG_OBJECT_LENGTHLENGTH);
+          const int8_t lengthLength = getAppropriateObjectLengthLength(length);
           // the NULL SQL string is a NULL C pointer
           if (length == OBJECTLENGTH_NULL) {
               retval.setNull();
@@ -1872,11 +1935,11 @@ inline const NValue NValue::deserializeFromAllocateForStorage(SerializeInput &in
           } else {
               copy = new char[minlength];
           }
-          retval.setPersistentObjectLengthToLocation( length, copy);
+          retval.setObjectLengthToLocation( length, copy);
           ::memcpy(copy + lengthLength, str, length);
-          *reinterpret_cast<char**>(retval.m_data) = copy;
-          *reinterpret_cast<int32_t*>(&retval.m_data[8]) = length;
-          retval.m_data[12] = lengthLength;
+          retval.setObjectValue(copy);
+          retval.setObjectLength(length);
+          retval.setObjectLengthLength(lengthLength);
           break;
       }
       case VALUE_TYPE_DECIMAL: {

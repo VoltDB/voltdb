@@ -628,7 +628,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         client.callProcedure("@SnapshotSave", TMPDIR,
                                        TESTNONCE, (byte)0);
 
-        Thread.sleep(300);
+        Thread.sleep(700);
 
         /*
          * Check that snapshot status returns a reasonable result
