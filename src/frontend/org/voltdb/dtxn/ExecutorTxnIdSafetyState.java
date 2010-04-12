@@ -36,6 +36,7 @@ public class ExecutorTxnIdSafetyState {
     private class SiteState {
         public int siteId;
         public long newestConfirmedTxnId;
+        @SuppressWarnings("unused")
         public long lastSentTxnId;
         public PartitionState partition;
     }

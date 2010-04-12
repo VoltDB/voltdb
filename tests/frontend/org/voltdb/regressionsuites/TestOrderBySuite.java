@@ -33,6 +33,7 @@ import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.orderbyprocs.InsertO1;
 import org.voltdb.regressionsuites.orderbyprocs.InsertO3;
@@ -87,12 +88,17 @@ public class TestOrderBySuite extends RegressionSuite {
                                     "ABCDEFGHIJ" +
                                     "ABCDEFGHIJ";
 
-    /** add 20 shuffled rows */
-    private void load(Client client) throws NoConnectionsException, ProcCallException, IOException {
+    /** add 20 shuffled rows
+     * @throws InterruptedException */
+    private void load(Client client) throws NoConnectionsException, ProcCallException, IOException, InterruptedException {
         int pkey = 0;
         a_int.clear();
         a_inline_str.clear();
         a_pool_str.clear();
+
+        // if you want to test synchronous latency, this
+        //  is a good variable to change
+        boolean async = true;
 
         for (int i=0; i < 20; i++) {
             a_int.add(i);
@@ -105,53 +111,65 @@ public class TestOrderBySuite extends RegressionSuite {
         Collections.shuffle(a_pool_str);
 
         for (int i=0; i < 20; i++) {
-            final VoltTable vt = client.callProcedure("InsertO1",
+            SyncCallback cb = new SyncCallback();
+            client.callProcedure(cb,
+                    "InsertO1",
                     pkey++,
                     a_int.get(i),
                     a_inline_str.get(i),
-                    a_pool_str.get(i))[0];
-            assertTrue(vt.getRowCount() == 1);
+                    a_pool_str.get(i));
+
+            if (!async) {
+                cb.waitForResponse();
+                VoltTable vt = cb.getResponse().getResults()[0];
+                assertTrue(vt.getRowCount() == 1);
+            }
         }
+
+        client.drain();
     }
 
     private void loadInOrder(Client client) throws NoConnectionsException,
                                            ProcCallException,
-                                           IOException {
+                                           IOException, InterruptedException {
+        // if you want to test synchronous latency, this
+        //  is a good variable to change
+        boolean async = true;
+
         for (int i = 0; i < 100; i++) {
-            final VoltTable vt = client.callProcedure("InsertO3", 3, i, i, i)[0];
-            assertTrue(vt.getRowCount() == 1);
+            SyncCallback cb = new SyncCallback();
+            client.callProcedure(cb, "InsertO3", 3, i, i, i);
+
+            if (!async) {
+                cb.waitForResponse();
+                VoltTable vt = cb.getResponse().getResults()[0];
+                assertTrue(vt.getRowCount() == 1);
+            }
         }
     }
 
     private void loadWithDupes(Client client) throws NoConnectionsException, ProcCallException, IOException {
-        VoltTable vt;
-        vt = client.callProcedure("InsertO1", new Long(1), new Long(1), "Alice", "AlphaBitters")[0];
-        assertTrue(vt.getRowCount() == 1);
-        vt = client.callProcedure("InsertO1", new Long(2), new Long(2), "Alice", "CrunchTubers")[0];
-        assertTrue(vt.getRowCount() == 1);
-        vt = client.callProcedure("InsertO1", new Long(3), new Long(3), "Alice", "BetaBuildingBlocks")[0];
-        assertTrue(vt.getRowCount() == 1);
+        client.callProcedure(new SyncCallback(), "InsertO1", new Long(1), new Long(1), "Alice", "AlphaBitters");
+        client.callProcedure(new SyncCallback(), "InsertO1", new Long(2), new Long(2), "Alice", "CrunchTubers");
+        client.callProcedure(new SyncCallback(), "InsertO1", new Long(3), new Long(3), "Alice", "BetaBuildingBlocks");
 
-        vt = client.callProcedure("InsertO1", new Long(4), new Long(1), "Betty", "CrunchTubers")[0];
-        assertTrue(vt.getRowCount() == 1);
-        vt = client.callProcedure("InsertO1", new Long(5), new Long(2), "Betty", "AlphaBitters")[0];
-        assertTrue(vt.getRowCount() == 1);
-        vt = client.callProcedure("InsertO1", new Long(6), new Long(3), "Betty", "BetaBuildingBlocks")[0];
-        assertTrue(vt.getRowCount() == 1);
+        client.callProcedure(new SyncCallback(), "InsertO1", new Long(4), new Long(1), "Betty", "CrunchTubers");
+        client.callProcedure(new SyncCallback(), "InsertO1", new Long(5), new Long(2), "Betty", "AlphaBitters");
+        client.callProcedure(new SyncCallback(), "InsertO1", new Long(6), new Long(3), "Betty", "BetaBuildingBlocks");
 
-        vt = client.callProcedure("InsertO1", new Long(7), new Long(1), "Chris", "BetaBuildingBlocks")[0];
-        assertTrue(vt.getRowCount() == 1);
-        vt = client.callProcedure("InsertO1", new Long(8), new Long(2), "Chris", "CrunchTubers")[0];
-        assertTrue(vt.getRowCount() == 1);
-        vt = client.callProcedure("InsertO1", new Long(9), new Long(3), "Chris", "AlphaBitters")[0];
-        assertTrue(vt.getRowCount() == 1);
+        client.callProcedure(new SyncCallback(), "InsertO1", new Long(7), new Long(1), "Chris", "BetaBuildingBlocks");
+        client.callProcedure(new SyncCallback(), "InsertO1", new Long(8), new Long(2), "Chris", "CrunchTubers");
+        client.callProcedure(new SyncCallback(), "InsertO1", new Long(9), new Long(3), "Chris", "AlphaBitters");
+
+        client.drain();
     }
 
     /** select * from T order by A ASC
      * @throws IOException
      * @throws ProcCallException
-     * @throws NoConnectionsException */
-    public void testOrderBySingleColumnAscending() throws NoConnectionsException, ProcCallException, IOException {
+     * @throws NoConnectionsException
+     * @throws InterruptedException */
+    public void testOrderBySingleColumnAscending() throws NoConnectionsException, ProcCallException, IOException, InterruptedException {
         VoltTable vt;
         Client client = this.getClient();
         load(client);
@@ -216,7 +234,7 @@ public class TestOrderBySuite extends RegressionSuite {
         }
     }
 
-    public void testOrderBySingleColumnDescending() throws NoConnectionsException, ProcCallException, IOException {
+    public void testOrderBySingleColumnDescending() throws NoConnectionsException, ProcCallException, IOException, InterruptedException {
         VoltTable vt;
         Client client = this.getClient();
         load(client);
@@ -367,7 +385,7 @@ public class TestOrderBySuite extends RegressionSuite {
 
     public void testOrderByUseIndex() throws NoConnectionsException,
                                      ProcCallException,
-                                     IOException {
+                                     IOException, InterruptedException {
         @SuppressWarnings("unused")
         long start, elapsed;
         //long base;

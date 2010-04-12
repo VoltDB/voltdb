@@ -21,22 +21,22 @@ import java.util.ArrayList;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 
-public class FiveMSThread extends Thread {
+public class PeriodicWorkTimerThread extends Thread {
 
     ArrayList<ClientInterface> m_clientInterfaces;
 
-    public FiveMSThread(ArrayList<ClientInterface> clientInterfaces) {
+    public PeriodicWorkTimerThread(ArrayList<ClientInterface> clientInterfaces) {
         m_clientInterfaces = clientInterfaces;
     }
 
     @Override
     public void run() {
-        //Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
+        Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
         Thread.currentThread().setName("FiveMS");
 
         LinkedBlockingDeque<Object> foo = new LinkedBlockingDeque<Object>();
         while(true) {
-            long beforeTime = System.nanoTime();
+            //long beforeTime = System.nanoTime();
             try {
                 foo.poll(5, TimeUnit.MILLISECONDS);
             } catch (InterruptedException e) {
@@ -45,8 +45,8 @@ public class FiveMSThread extends Thread {
             for (ClientInterface ci : m_clientInterfaces) {
                 ci.processPeriodicWork();
             }
-            long duration = System.nanoTime() - beforeTime;
-            double millis = duration / 1000000.0;
+            //long duration = System.nanoTime() - beforeTime;
+            //double millis = duration / 1000000.0;
             //System.out.printf("TICK %.2f\n", millis);
             //System.out.flush();
         }

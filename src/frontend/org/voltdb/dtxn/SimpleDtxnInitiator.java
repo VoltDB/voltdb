@@ -201,7 +201,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
             siteTracker.getUpExecutionSites();
 
         long now = System.currentTimeMillis();
-        long duration = now - m_lastTickTime;
+        //long duration = now - m_lastTickTime;
         //System.out.printf("Sending tick after %d ms pause.\n", duration);
         //System.out.flush();
 

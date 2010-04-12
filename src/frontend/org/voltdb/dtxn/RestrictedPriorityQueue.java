@@ -267,23 +267,25 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
             }
             else {
                 lid = m_initiatorData.get(ts.initiatorSiteId);
-                if (ts.txnId > lid.m_lastSafeTxnId) {
+                if ((lid != null) && (ts.txnId > lid.m_lastSafeTxnId)) {
                     newState = QueueState.BLOCKED_SAFETY;
                 }
             }
         }
         if (newState != m_state) {
+            // THIS CODE IS HERE TO HANDLE A STATE CHANGE
+
             // note if we get non-empty but blocked
             if ((newState == QueueState.BLOCKED_ORDERING) || (newState == QueueState.BLOCKED_SAFETY)) {
                 m_blockTime = System.currentTimeMillis();
             }
-            if (newState == QueueState.UNBLOCKED) {
+            /*if (newState == QueueState.UNBLOCKED) {
                 if ((m_state == QueueState.BLOCKED_ORDERING) || (m_state == QueueState.BLOCKED_SAFETY)) {
                     long blockedFor = System.currentTimeMillis() - m_blockTime;
-                    //System.out.printf("Queue unblocked. Was blocked for %d ms\n", blockedFor);
-                    //System.out.flush();
+                    System.out.printf("Queue unblocked. Was blocked for %d ms\n", blockedFor);
+                    System.out.flush();
                 }
-            }
+            }*/
             if ((m_state == QueueState.BLOCKED_ORDERING) || (m_state == QueueState.BLOCKED_SAFETY)) {
                 assert(m_state != QueueState.BLOCKED_EMPTY);
             }

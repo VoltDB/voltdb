@@ -106,7 +106,7 @@ public class TestRestrictedPriorityQueue extends TestCase{
 
     private void addTxnToQueue(TransactionState state)
     {
-        m_queue.noteTransactionRecievedAndReturnLastSeen(state.initiatorSiteId, state.txnId, false, DtxnConstants.DUMMY_LAST_SEEN_TXN_ID);
+        m_queue.noteTransactionRecievedAndReturnLastSeen(state.initiatorSiteId, state.txnId, false, state.txnId);
         m_queue.add(state);
     }
 
@@ -201,6 +201,7 @@ public class TestRestrictedPriorityQueue extends TestCase{
         for (int i=0; i < m_states.length; ++i) {
             addTxnToQueue(m_states[i]);
         }
+
         assertEquals(m_queue.size(), 6);
         checkNextStateValid(m_txnIds.get(0));
 
