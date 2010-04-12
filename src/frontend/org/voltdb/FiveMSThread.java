@@ -47,8 +47,8 @@ public class FiveMSThread extends Thread {
             }
             long duration = System.nanoTime() - beforeTime;
             double millis = duration / 1000000.0;
-            System.out.printf("TICK %.2f\n", millis);
-            System.out.flush();
+            //System.out.printf("TICK %.2f\n", millis);
+            //System.out.flush();
         }
     }
 

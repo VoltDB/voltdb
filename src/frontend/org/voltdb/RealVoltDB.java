@@ -179,9 +179,6 @@ public class RealVoltDB implements VoltDBInterface
         synchronized(m_startAndStopLock) {
             hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
 
-            fivems = new FiveMSThread();
-            fivems.start();
-
             m_faultManager = new FaultDistributor();
             // Install a handler for NODE_FAILURE faults to update the catalog
             // This should be the first handler to run when a node fails
@@ -414,6 +411,9 @@ public class RealVoltDB implements VoltDBInterface
 
             m_messenger.sendReadyMessage();
             m_messenger.waitForAllHostsToBeReady();
+
+            fivems = new FiveMSThread(m_clientInterfaces);
+            fivems.start();
 
             hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null);
         }
