@@ -212,10 +212,15 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
     }
 
     /**
-     * TODO: implement this functionality.
-     * @param context
+     * Return the largest confirmed txn id for the initiator given.
+     * Used to figure out what to do after an initiator fails.
+     * @param initiatorId The id of the initiator that has failed.
      */
     public long getNewestSafeTransactionForInitiator(int initiatorId) {
+        /*LastInitiatorData lid = m_initiatorData.get(initiatorId);
+        if (lid == null)
+            return Long.MIN_VALUE;
+        return lid.m_lastSafeTxnId;*/
         return Long.MAX_VALUE;
     }
 

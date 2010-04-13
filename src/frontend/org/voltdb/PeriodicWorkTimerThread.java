@@ -21,6 +21,12 @@ import java.util.ArrayList;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * This thread fires a timer every five milliseconds
+ * which ultimately fires the tick to each execution
+ * site in the cluster.
+ *
+ */
 public class PeriodicWorkTimerThread extends Thread {
 
     ArrayList<ClientInterface> m_clientInterfaces;
@@ -32,7 +38,7 @@ public class PeriodicWorkTimerThread extends Thread {
     @Override
     public void run() {
         Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
-        Thread.currentThread().setName("FiveMS");
+        Thread.currentThread().setName("PeriodicWork");
 
         LinkedBlockingDeque<Object> foo = new LinkedBlockingDeque<Object>();
         while(true) {
