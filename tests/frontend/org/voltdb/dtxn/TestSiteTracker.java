@@ -174,7 +174,6 @@ public class TestSiteTracker extends TestCase
         assertFalse(up_sites.contains(helper.getSite(101)));
         assertFalse(up_sites.contains(helper.getSite(102)));
 
-        assertEquals(1, tracker.getLiveInitiatorCount());
         assertEquals(2, tracker.getLiveSiteCount());
     }
 

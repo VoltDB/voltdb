@@ -137,16 +137,6 @@ public class SiteTracker {
     }
 
     /**
-     * @return The number of live non-exec sites currently in the cluster.
-     *         Right now, this corresponds to the number of hosts and the
-     *         number of initiators in the cluster.
-     */
-    public int getLiveInitiatorCount()
-    {
-        return m_liveInitiatorCount;
-    }
-
-    /**
      * @return The number of live executions sites currently in the cluster.
      */
     public int getLiveSiteCount()

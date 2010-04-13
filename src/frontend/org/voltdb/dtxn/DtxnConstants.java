@@ -22,9 +22,6 @@ public abstract class DtxnConstants {
     /** If the txn id is this, do a dump from the ExecSite */
     public static final long DUMP_REQUEST_TXNID = -101;
 
-    /** Dtxn requires 1 dependency response per node */
-    public static final int MULTINODE_DEPENDENCY = 0x80000000;
-
     /** Dtxn requires 1 dependency response per partition */
     public static final int MULTIPARTITION_DEPENDENCY = 0x40000000;
 

@@ -134,10 +134,6 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
             {
                 assert((pf.outputDepId & DtxnConstants.MULTIPARTITION_DEPENDENCY) == DtxnConstants.MULTIPARTITION_DEPENDENCY);
             }
-            if (pf.nonExecSites)
-            {
-                assert((pf.outputDepId & DtxnConstants.MULTINODE_DEPENDENCY) == DtxnConstants.MULTINODE_DEPENDENCY);
-            }
 
             // serialize parameters
             ByteBuffer parambytes = null;

@@ -257,9 +257,6 @@ class WorkUnit
                         expected_sites.add(site_id);
                     }
                 }
-                else if ((dependency & DtxnConstants.MULTINODE_DEPENDENCY) != 0) {
-                    depsToExpect = siteTracker.getLiveInitiatorCount();
-                }
                 m_dependencies.put(dependency,
                                    new DependencyTracker(dependency,
                                                          depsToExpect,
