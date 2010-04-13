@@ -867,6 +867,22 @@ TEST CASES
             </fileset>
         </tests>
     </run_junit>
+
+    <!-- Generate unit test reports. -->
+    <mkdir dir='${build.testoutput.dir}/report' />
+    <junitreport todir="${build.testoutput.dir}">
+        <fileset dir='${build.testoutput.dir}'>
+            <include name="*.xml" />
+            <exclude name='TESTS-TestSuites.xml' />
+        </fileset>
+        <report format="noframes" todir="${build.testoutput.dir}/report"/>
+        <report
+            styledir="tools"
+            format="noframes"
+            todir="${build.testoutput.dir}"
+        />
+    </junitreport>
+
     <!-- Fail the build if there were any problems.
         This runs all the tests before failing. -->
     <fail
