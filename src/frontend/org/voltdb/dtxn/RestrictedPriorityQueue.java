@@ -217,11 +217,12 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
      * @param initiatorId The id of the initiator that has failed.
      */
     public long getNewestSafeTransactionForInitiator(int initiatorId) {
-        /*LastInitiatorData lid = m_initiatorData.get(initiatorId);
-        if (lid == null)
+        LastInitiatorData lid = m_initiatorData.get(initiatorId);
+        if (lid == null) {
+            assert(false) : "No initiator data during failure processing.";
             return Long.MIN_VALUE;
-        return lid.m_lastSafeTxnId;*/
-        return Long.MAX_VALUE;
+        }
+        return lid.m_lastSafeTxnId;
     }
 
     public void getDumpContents(ExecutorContext context) {

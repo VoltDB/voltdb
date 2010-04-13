@@ -355,12 +355,18 @@ public class TestExecutionSite extends TestCase {
         TestExecutionSite.MockMPVoltProcedure.
         simulate_coordinator_dies_during_commit = true;
 
-        // Want the participant to commit
-        m_sites[site1].lastCommittedTxnId = 50000;
-        m_sites[site2].lastCommittedTxnId = 50000;
+        // The initiator's global commit point will be -1 because
+        // the restricted priority queue is never fed by this testcase.
+        // TxnIds in this testcase are chosen to make -1 a valid
+        // global commit point. (Where -1 is DUMMY_LAST_SEEN...)
+
+        // Want to commit this participant. Global commit pt must
+        // be GT than the running txnid.
+        m_sites[site1].lastCommittedTxnId = DtxnConstants.DUMMY_LAST_SEEN_TXN_ID + 1;
+        m_sites[site2].lastCommittedTxnId = DtxnConstants.DUMMY_LAST_SEEN_TXN_ID + 1;
 
         boolean test_rollback = false;
-        multipartitionNodeFailure(test_rollback, 50000);
+        multipartitionNodeFailure(test_rollback, DtxnConstants.DUMMY_LAST_SEEN_TXN_ID);
     }
 
     public
@@ -371,12 +377,18 @@ public class TestExecutionSite extends TestCase {
         TestExecutionSite.MockMPVoltProcedure.
         simulate_coordinator_dies_during_commit = true;
 
-        // Want the participant to rollback
-        m_sites[site1].lastCommittedTxnId = 50000;
-        m_sites[site2].lastCommittedTxnId = 50000;
+        // The initiator's global commit point will be -1 because
+        // the restricted priority queue is never fed by this testcase.
+        // TxnIds in this testcase are chosen to make -1 a valid
+        // global commit point. (Where -1 is DUMMY_LAST_SEEN...)
+
+        // Want to NOT commit this participant. Global commit pt must
+        // be LT than the running txnid.
+        m_sites[site1].lastCommittedTxnId =  DtxnConstants.DUMMY_LAST_SEEN_TXN_ID - 1;
+        m_sites[site2].lastCommittedTxnId =  DtxnConstants.DUMMY_LAST_SEEN_TXN_ID - 1;
 
         boolean test_rollback = true;
-        multipartitionNodeFailure(test_rollback, 50001);
+        multipartitionNodeFailure(test_rollback, DtxnConstants.DUMMY_LAST_SEEN_TXN_ID);
     }
 
     /*
@@ -444,7 +456,7 @@ public class TestExecutionSite extends TestCase {
     }
 
     /*
-     * Create a multipartition work unit just test the removal of non-coordinator
+     * Create a multipartition work unit to test the removal of non-coordinator
      * site ids on failure. A little out of place in this file but the configured
      * ExecutionSite and Mailbox are necessary to construct a MP txn state.
      */
@@ -514,15 +526,19 @@ public class TestExecutionSite extends TestCase {
         tx1_spi.setProcName("org.voltdb.TestExecutionSite$MockMPVoltProcedure");
         tx1_spi.setParams(new Integer(0));
 
-        // site 1 is the coordinator
+        // site 1 is the coordinator. Use the txn id (DUMMY...) that the R.P.Q.
+        // thinks is a valid safe-to-run txnid.
         final InitiateTaskMessage tx1_mn_1 =
-            new InitiateTaskMessage(initiator1, site1, 1000, readOnly, singlePartition, tx1_spi, Long.MAX_VALUE);
+            new InitiateTaskMessage(initiator1,
+                                    site1,
+                                    DtxnConstants.DUMMY_LAST_SEEN_TXN_ID,
+                                    readOnly, singlePartition, tx1_spi, Long.MAX_VALUE);
         tx1_mn_1.setNonCoordinatorSites(new int[] {site2});
 
         final MultiPartitionParticipantTxnState tx1_1 =
             new MultiPartitionParticipantTxnState(m_mboxes[site1], m_sites[site1], tx1_mn_1);
 
-        // Site 2 won't exist, we'll claim it fails
+        // Site 2 won't exist; we'll claim it fails.
 
         // pre-conditions
         int callcheck = MockMPVoltProcedure.m_called;
