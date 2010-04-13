@@ -583,7 +583,6 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[0].outputDepId = DEP_saveTest;
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
-        pfs[0].nonExecSites = false;
         ParameterSet params = new ParameterSet();
         params.setParameters(filePath, fileNonce);
         pfs[0].parameters = params;
@@ -594,7 +593,6 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[1].outputDepId = DEP_saveTestResults;
         pfs[1].inputDepIds = new int[] { DEP_saveTest };
         pfs[1].multipartition = false;
-        pfs[1].nonExecSites = false;
         pfs[1].parameters = new ParameterSet();
 
         VoltTable[] results;
@@ -616,7 +614,6 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[0].outputDepId = DEP_createSnapshotTargets;
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
-        pfs[0].nonExecSites = false;
         ParameterSet params = new ParameterSet();
         params.setParameters(filePath, fileNonce, startTime, block);
         pfs[0].parameters = params;
@@ -627,7 +624,6 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[1].outputDepId = DEP_createSnapshotTargetsResults;
         pfs[1].inputDepIds = new int[] { DEP_createSnapshotTargets };
         pfs[1].multipartition = false;
-        pfs[1].nonExecSites = false;
         pfs[1].parameters = new ParameterSet();
 
         VoltTable[] results;

@@ -143,7 +143,6 @@ public class SystemInformation extends VoltSystemProcedure {
         spf[0].outputDepId = DEP_DISTRIBUTE;
         spf[0].inputDepIds = new int[] {};
         spf[0].multipartition = true;
-        spf[0].nonExecSites = false;
         spf[0].parameters = new ParameterSet();
 
         spf[1] = new SynthesizedPlanFragment();
@@ -152,7 +151,6 @@ public class SystemInformation extends VoltSystemProcedure {
         spf[1].outputDepId = DEP_AGGREGATE;
         spf[1].inputDepIds = new int[] { DEP_DISTRIBUTE };
         spf[1].multipartition = false;
-        spf[1].nonExecSites = false;
         spf[1].parameters = new ParameterSet();
 
         return executeSysProcPlanFragments(spf, DEP_AGGREGATE);

@@ -97,7 +97,6 @@ public class LastCommittedTransaction extends VoltSystemProcedure {
         pfs[1].outputDepId = DEP_lastCommittedScan;
         pfs[1].inputDepIds = new int[]{};
         pfs[1].multipartition = true;
-        pfs[1].nonExecSites = false;
         pfs[1].parameters = new ParameterSet();
 
         // create a work fragment to aggregate the results.
@@ -107,7 +106,6 @@ public class LastCommittedTransaction extends VoltSystemProcedure {
         pfs[0].outputDepId = DEP_lastCommittedResults;
         pfs[0].inputDepIds = new int[]{ DEP_lastCommittedScan };
         pfs[0].multipartition = false;
-        pfs[0].nonExecSites = false;
         pfs[0].parameters = new ParameterSet();
 
         // distribute and execute these fragments providing pfs and id of the

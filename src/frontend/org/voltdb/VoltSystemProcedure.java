@@ -60,7 +60,6 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         public int inputDepIds[] = null;
         public ParameterSet parameters = null;
         public boolean multipartition = false;   /** true if distributes to all executable partitions */
-        public boolean nonExecSites = false;     /** true if distributes once to each node */
         /**
          * Used to tell the DTXN to suppress duplicate results from sites that replicate
          * a partition.  Most system procedures don't want this, but, for example,
@@ -125,8 +124,6 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
     protected void executeSysProcPlanFragmentsAsync(SynthesizedPlanFragment pfs[])
     {
         for (SynthesizedPlanFragment pf : pfs) {
-            // check mutually exclusive flags
-            assert(!(pf.multipartition && pf.nonExecSites));
             assert(pf.parameters != null);
 
             // check the output dep id makes sense given the number of sites to run this on
@@ -171,24 +168,6 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
             if (pf.multipartition) {
                 // create a workunit for every execution site
                 m_currentTxnState.createAllParticipatingFragmentWork(task);
-            }
-            else if (pf.nonExecSites) {
-                // create a workunit for one arbitrary site on each host.
-                final HashMap<Host,String> foundHosts = new HashMap<Host,String>();
-                final ArrayList<Integer> sites = new ArrayList<Integer>();
-                for (Site site : VoltDB.instance().getCatalogContext().siteTracker.getUpSites())
-                {
-                    if (site.getIsexec() && (foundHosts.containsKey(site.getHost()) == false)) {
-                        foundHosts.put(site.getHost(), site.getTypeName());
-                        int siteId = Integer.parseInt(site.getTypeName());
-                        sites.add(siteId);
-                    }
-                }
-                int[] destinations = new int[sites.size()];
-                for (int i = 0; i < sites.size(); i++)
-                    destinations[i] = sites.get(i);
-
-                m_currentTxnState.createFragmentWork(destinations, task);
             }
             else {
                 // create one workunit for the current site

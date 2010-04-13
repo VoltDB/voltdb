@@ -351,7 +351,6 @@ public class Statistics extends VoltSystemProcedure {
         pfs[1].outputDepId = DEP_ioData;
         pfs[1].inputDepIds = new int[]{};
         pfs[1].multipartition = true;
-        pfs[1].nonExecSites = false;
         pfs[1].parameters = new ParameterSet();
         pfs[1].parameters.setParameters((byte)interval, now);
 
@@ -362,7 +361,6 @@ public class Statistics extends VoltSystemProcedure {
         pfs[0].outputDepId = DEP_ioDataAggregator;
         pfs[0].inputDepIds = new int[]{DEP_ioData};
         pfs[0].multipartition = false;
-        pfs[0].nonExecSites = false;
         pfs[0].parameters = new ParameterSet();
 
         // distribute and execute these fragments providing pfs and id of the
@@ -381,7 +379,6 @@ public class Statistics extends VoltSystemProcedure {
         pfs[0].outputDepId = DEP_partitionCount;
         pfs[0].inputDepIds = new int[]{};
         pfs[0].multipartition = false;
-        pfs[0].nonExecSites = false;
         pfs[0].parameters = new ParameterSet();
 
         results =
@@ -398,7 +395,6 @@ public class Statistics extends VoltSystemProcedure {
         pfs[1].outputDepId = DEP_initiatorData;
         pfs[1].inputDepIds = new int[]{};
         pfs[1].multipartition = true;
-        pfs[1].nonExecSites = false;
         pfs[1].parameters = new ParameterSet();
         pfs[1].parameters.setParameters((byte)interval, now);
 
@@ -409,7 +405,6 @@ public class Statistics extends VoltSystemProcedure {
         pfs[0].outputDepId = DEP_initiatorAggregator;
         pfs[0].inputDepIds = new int[]{DEP_initiatorData};
         pfs[0].multipartition = false;
-        pfs[0].nonExecSites = false;
         pfs[0].parameters = new ParameterSet();
 
         // distribute and execute these fragments providing pfs and id of the
@@ -428,7 +423,6 @@ public class Statistics extends VoltSystemProcedure {
         pfs[1].outputDepId = DEP_procedureData;
         pfs[1].inputDepIds = new int[]{};
         pfs[1].multipartition = true;
-        pfs[1].nonExecSites = false;
         pfs[1].parameters = new ParameterSet();
         pfs[1].parameters.setParameters((byte)interval, now);
 
@@ -439,7 +433,6 @@ public class Statistics extends VoltSystemProcedure {
         pfs[0].outputDepId = DEP_procedureAggregator;
         pfs[0].inputDepIds = new int[]{DEP_procedureData};
         pfs[0].multipartition = false;
-        pfs[0].nonExecSites = false;
         pfs[0].parameters = new ParameterSet();
 
         // distribute and execute these fragments providing pfs and id of the
@@ -458,7 +451,6 @@ public class Statistics extends VoltSystemProcedure {
         pfs[1].outputDepId = DEP_tableData;
         pfs[1].inputDepIds = new int[]{};
         pfs[1].multipartition = true;
-        pfs[1].nonExecSites = false;
         pfs[1].parameters = new ParameterSet();
         pfs[1].parameters.setParameters((byte)interval, now);
 
@@ -469,7 +461,6 @@ public class Statistics extends VoltSystemProcedure {
         pfs[0].outputDepId = DEP_tableAggregator;
         pfs[0].inputDepIds = new int[]{DEP_tableData};
         pfs[0].multipartition = false;
-        pfs[0].nonExecSites = false;
         pfs[0].parameters = new ParameterSet();
 
         // distribute and execute these fragments providing pfs and id of the

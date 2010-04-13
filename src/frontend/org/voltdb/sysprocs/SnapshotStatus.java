@@ -221,7 +221,6 @@ public class SnapshotStatus extends VoltSystemProcedure {
         pfs[0].outputDepId = DEP_scanSnapshotRegistries;
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
-        pfs[0].nonExecSites = false;
         ParameterSet params = new ParameterSet();
         params.setParameters();
         pfs[0].parameters = params;
@@ -231,7 +230,6 @@ public class SnapshotStatus extends VoltSystemProcedure {
         pfs[1].outputDepId = DEP_scanSnapshotRegistriesResults;
         pfs[1].inputDepIds = new int[] { DEP_scanSnapshotRegistries };
         pfs[1].multipartition = false;
-        pfs[1].nonExecSites = false;
         pfs[1].parameters = new ParameterSet();
 
 

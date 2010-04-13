@@ -101,7 +101,6 @@ public class Quiesce extends VoltSystemProcedure {
             pfs1[0].outputDepId = DEP_SITES;
             pfs1[0].inputDepIds = new int[]{};
             pfs1[0].multipartition = true;
-            pfs1[0].nonExecSites = false;
             pfs1[0].parameters = new ParameterSet();
 
             pfs1[1] = new SynthesizedPlanFragment();
@@ -109,7 +108,6 @@ public class Quiesce extends VoltSystemProcedure {
             pfs1[1].outputDepId = DEP_PROCESSED_SITES;
             pfs1[1].inputDepIds = new int[] { DEP_SITES };
             pfs1[1].multipartition = false;
-            pfs1[1].nonExecSites = false;
             pfs1[1].parameters = new ParameterSet();
 
             try {
@@ -125,7 +123,6 @@ public class Quiesce extends VoltSystemProcedure {
             pfs2[0].outputDepId = DEP_NODES;
             pfs2[0].inputDepIds = new int[]{};
             pfs2[0].multipartition = true;
-            pfs2[0].nonExecSites = false;
             pfs2[0].parameters = new ParameterSet();
 
             pfs2[1] = new SynthesizedPlanFragment();
@@ -133,7 +130,6 @@ public class Quiesce extends VoltSystemProcedure {
             pfs2[1].outputDepId = DEP_PROCESSED_NODES;
             pfs2[1].inputDepIds = new int[] { DEP_NODES };
             pfs2[1].multipartition = false;
-            pfs2[1].nonExecSites = false;
             pfs2[1].parameters = new ParameterSet();
 
             try {

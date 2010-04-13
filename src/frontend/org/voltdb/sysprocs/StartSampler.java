@@ -63,7 +63,6 @@ public class StartSampler extends VoltSystemProcedure {
         spf.outputDepId = DEP_ID;
         spf.inputDepIds = new int[] {};
         spf.multipartition = true;
-        spf.nonExecSites = false;
         spf.parameters = new ParameterSet();
 
         // distribute and execute these fragments providing pfs and id of the

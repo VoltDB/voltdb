@@ -719,7 +719,6 @@ public class SnapshotRestore extends VoltSystemProcedure
         pfs[0].outputDepId = DEP_restoreScan;
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
-        pfs[0].nonExecSites = false;
         ParameterSet params = new ParameterSet();
         params.setParameters(filePath, fileNonce);
         pfs[0].parameters = params;
@@ -730,7 +729,6 @@ public class SnapshotRestore extends VoltSystemProcedure
         pfs[1].outputDepId = DEP_restoreScanResults;
         pfs[1].inputDepIds = new int[] { DEP_restoreScan };
         pfs[1].multipartition = false;
-        pfs[1].nonExecSites = false;
         pfs[1].parameters = new ParameterSet();
 
         VoltTable[] results;
@@ -903,7 +901,6 @@ public class SnapshotRestore extends VoltSystemProcedure
             pfs[0].outputDepId = result_dependency_id;
             pfs[0].inputDepIds = new int[] {};
             pfs[0].multipartition = false;
-            pfs[0].nonExecSites = false;
             ParameterSet params = new ParameterSet();
             params.setParameters(tableName, result_dependency_id, table, allowELT);
             pfs[0].parameters = params;
@@ -915,7 +912,6 @@ public class SnapshotRestore extends VoltSystemProcedure
             pfs[1].outputDepId = final_dependency_id;
             pfs[1].inputDepIds = new int[] { result_dependency_id };
             pfs[1].multipartition = false;
-            pfs[1].nonExecSites = false;
             ParameterSet result_params = new ParameterSet();
             result_params.setParameters(final_dependency_id);
             pfs[1].parameters = result_params;
@@ -1039,7 +1035,6 @@ public class SnapshotRestore extends VoltSystemProcedure
                     SysProcFragmentId.PF_restoreSendPartitionedTable;
                 pfs[pfs_index].siteId = site_id;
                 pfs[pfs_index].multipartition = false;
-                pfs[pfs_index].nonExecSites = false;
                 pfs[pfs_index].outputDepId = dependencyIds[pfs_index];
                 pfs[pfs_index].inputDepIds = new int [] {};
                 ParameterSet params = new ParameterSet();
@@ -1055,7 +1050,6 @@ public class SnapshotRestore extends VoltSystemProcedure
             pfs[sites_to_partitions.size()].fragmentId =
                 SysProcFragmentId.PF_restoreSendPartitionedTableResults;
             pfs[sites_to_partitions.size()].multipartition = false;
-            pfs[sites_to_partitions.size()].nonExecSites = false;
             pfs[sites_to_partitions.size()].outputDepId = result_dependency_id;
             pfs[sites_to_partitions.size()].inputDepIds = dependencyIds;
             ParameterSet params = new ParameterSet();

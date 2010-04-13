@@ -99,7 +99,6 @@ public class Shutdown extends VoltSystemProcedure {
         pfs[0].outputDepId = (int) SysProcFragmentId.PF_procedureDone | DtxnConstants.MULTIPARTITION_DEPENDENCY;
         pfs[0].inputDepIds = new int[]{};
         pfs[0].multipartition = true;
-        pfs[0].nonExecSites = false;
         pfs[0].parameters = new ParameterSet();
 
         executeSysProcPlanFragments(pfs,

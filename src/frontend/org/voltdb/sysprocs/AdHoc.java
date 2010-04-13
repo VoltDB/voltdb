@@ -103,7 +103,6 @@ public class AdHoc extends VoltSystemProcedure {
             pfs[0].fragmentId = SysProcFragmentId.PF_runAdHocFragment;
             pfs[0].outputDepId = AGG_DEPID;
             pfs[0].multipartition = false;
-            pfs[0].nonExecSites = false;
             params = new ParameterSet();
             params.setParameters(AGG_DEPID, "", sql);
             pfs[0].parameters = params;
@@ -119,7 +118,6 @@ public class AdHoc extends VoltSystemProcedure {
                 pfs[1].fragmentId = SysProcFragmentId.PF_runAdHocFragment;
                 pfs[1].outputDepId = COLLECT_DEPID;
                 pfs[1].multipartition = true;
-                pfs[1].nonExecSites = false;
                 params = new ParameterSet();
                 params.setParameters(COLLECT_DEPID, collectorFragment, sql);
                 pfs[1].parameters = params;
@@ -136,7 +134,6 @@ public class AdHoc extends VoltSystemProcedure {
                 pfs[0].inputDepIds = new int[] { COLLECT_DEPID };
             pfs[0].multipartition = false;
             pfs[0].suppressDuplicates = true;
-            pfs[0].nonExecSites = false;
             params = new ParameterSet();
             params.setParameters(AGG_DEPID, aggregatorFragment, sql);
             pfs[0].parameters = params;

@@ -115,7 +115,6 @@ public class LoadMultipartitionTable extends VoltSystemProcedure {
             pfs[1].outputDepId = DEP_distribute;
             pfs[1].inputDepIds = new int[] {};
             pfs[1].multipartition = true;
-            pfs[1].nonExecSites = false;
             ParameterSet params = new ParameterSet();
             params.setParameters(tableName, table, allowELT);
             pfs[1].parameters = params;
@@ -127,7 +126,6 @@ public class LoadMultipartitionTable extends VoltSystemProcedure {
             pfs[0].outputDepId = DEP_aggregate;
             pfs[0].inputDepIds = new int[] { DEP_distribute };
             pfs[0].multipartition = false;
-            pfs[0].nonExecSites = false;
             pfs[0].parameters = new ParameterSet();
 
             // distribute and execute the fragments providing pfs and id
@@ -179,7 +177,6 @@ public class LoadMultipartitionTable extends VoltSystemProcedure {
                 pfs[site_index].outputDepId = DEP_distribute;
                 pfs[site_index].inputDepIds = new int[] {};
                 pfs[site_index].multipartition = false;
-                pfs[site_index].nonExecSites = false;
                 pfs[site_index].siteId = Integer.valueOf(site.getTypeName());
                 pfs[site_index].parameters = params;
                 site_index++;
@@ -190,7 +187,6 @@ public class LoadMultipartitionTable extends VoltSystemProcedure {
             pfs[num_exec_sites].inputDepIds = new int[] { DEP_distribute };
             pfs[num_exec_sites].outputDepId = DEP_aggregate;
             pfs[num_exec_sites].multipartition = false;
-            pfs[num_exec_sites].nonExecSites = false;
             pfs[num_exec_sites].parameters = new ParameterSet();
 
             // send these forth in to the world .. and wait

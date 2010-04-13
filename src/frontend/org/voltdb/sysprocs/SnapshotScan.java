@@ -692,7 +692,6 @@ public class SnapshotScan extends VoltSystemProcedure {
         pfs[0].fragmentId = SysProcFragmentId.PF_snapshotScan;
         pfs[0].outputDepId = DEP_snapshotScan;
         pfs[0].multipartition = true;
-        pfs[0].nonExecSites = false;
         ParameterSet params = new ParameterSet();
         params.setParameters(path);
         pfs[0].parameters = params;
@@ -702,7 +701,6 @@ public class SnapshotScan extends VoltSystemProcedure {
         pfs[1].outputDepId = DEP_snapshotScanResults;
         pfs[1].inputDepIds  = new int[] { DEP_snapshotScan };
         pfs[1].multipartition = false;
-        pfs[1].nonExecSites = false;
         pfs[1].parameters = new ParameterSet();
 
 
@@ -719,7 +717,6 @@ public class SnapshotScan extends VoltSystemProcedure {
         pfs[0].fragmentId = SysProcFragmentId.PF_snapshotDigestScan;
         pfs[0].outputDepId = DEP_snapshotDigestScan;
         pfs[0].multipartition = true;
-        pfs[0].nonExecSites = false;
         ParameterSet params = new ParameterSet();
         params.setParameters(path);
         pfs[0].parameters = params;
@@ -729,7 +726,6 @@ public class SnapshotScan extends VoltSystemProcedure {
         pfs[1].outputDepId = DEP_snapshotDigestScanResults;
         pfs[1].inputDepIds  = new int[] { DEP_snapshotDigestScan };
         pfs[1].multipartition = false;
-        pfs[1].nonExecSites = false;
         pfs[1].parameters = new ParameterSet();
 
 
@@ -746,7 +742,6 @@ public class SnapshotScan extends VoltSystemProcedure {
         pfs[0].fragmentId = SysProcFragmentId.PF_hostDiskFreeScan;
         pfs[0].outputDepId = DEP_hostDiskFreeScan;
         pfs[0].multipartition = true;
-        pfs[0].nonExecSites = false;
         ParameterSet params = new ParameterSet();
         params.setParameters(path);
         pfs[0].parameters = params;
@@ -756,7 +751,6 @@ public class SnapshotScan extends VoltSystemProcedure {
         pfs[1].outputDepId = DEP_hostDiskFreeScanResults;
         pfs[1].inputDepIds  = new int[] { DEP_hostDiskFreeScan };
         pfs[1].multipartition = false;
-        pfs[1].nonExecSites = false;
         pfs[1].parameters = new ParameterSet();
 
 
