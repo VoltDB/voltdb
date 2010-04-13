@@ -105,12 +105,6 @@ public class TestReplicationSuite extends RegressionSuite
         project.addStmtProcedure("UpdateMultiPartRepl",
                                  "UPDATE R1 SET R1.NUM = ?");
 
-        // JNI, two sites on one host, replication of 1
-        config = new LocalSingleProcessServer("replication-twosites.jar", 4, 1,
-                                              BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
-        builder.addServerConfig(config);
-
         // CLUSTER, two hosts, each with two sites, replication of 1
         config = new LocalCluster("replication-1-cluster.jar", 2, 2,
                                   1, BackendTarget.NATIVE_EE_JNI);
@@ -120,6 +114,12 @@ public class TestReplicationSuite extends RegressionSuite
         // CLUSTER, four hosts, each with three sites, replication of 2
         config = new LocalCluster("replication-2-cluster.jar", 3, 4,
                                   2, BackendTarget.NATIVE_EE_JNI);
+        config.compile(project);
+        builder.addServerConfig(config);
+
+        // CLUSTER, 3 hosts, each with two sites, replication of 1
+        config = new LocalCluster("replication-offset-cluster.jar", 2, 3,
+                                  1, BackendTarget.NATIVE_EE_JNI);
         config.compile(project);
         builder.addServerConfig(config);
 

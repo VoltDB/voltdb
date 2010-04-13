@@ -53,4 +53,26 @@ public class TestClusterCompiler extends TestCase
             }
         }
     }
+
+    public void testSufficientHostsToReplicate()
+    {
+        // 2 hosts, 6 sites per host, 2 copies of each partition.
+        // there are sufficient execution sites, but insufficient hosts
+        ClusterConfig config = new ClusterConfig(2, 6, 2, "localhost");
+        Catalog catalog = new Catalog();
+        catalog.execute("add / clusters cluster");
+        boolean caught = false;
+        try
+        {
+            ClusterCompiler.compile(catalog, config);
+        }
+        catch (RuntimeException e)
+        {
+            if (e.getMessage().contains("Insufficient hosts"))
+            {
+                caught = true;
+            }
+        }
+        assertTrue(caught);
+    }
 }

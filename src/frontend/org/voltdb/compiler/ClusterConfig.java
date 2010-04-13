@@ -70,9 +70,15 @@ public class ClusterConfig
             m_errorMsg = "The number of sites per host must be > 0.";
             return false;
         }
+        if (m_hostCount <= m_replicationFactor)
+        {
+            m_errorMsg = String.format("Insufficient hosts (%d) to support K-safety of %d",
+                                       m_hostCount, m_replicationFactor);
+            return false;
+        }
         if (getPartitionCount() == 0)
         {
-            m_errorMsg = String.format("Unable to achieve K-safety of %d",
+            m_errorMsg = String.format("Insufficient execution site count to achieve K-safety of %d",
                                        m_replicationFactor);
             return false;
         }
