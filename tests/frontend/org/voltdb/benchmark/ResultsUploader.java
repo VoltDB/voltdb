@@ -23,7 +23,10 @@
 
 package org.voltdb.benchmark;
 
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Map.Entry;
 
@@ -90,8 +93,7 @@ public class ResultsUploader implements BenchmarkController.BenchmarkInterest {
 
         // connect to the server
         try {
-            m_conn =  DriverManager.getConnection("jdbc:mysql://hzproject.com/voltdb?" +
-                                                  "user=voltuser&password=Y6d8jbcFAAemxNCJ");
+            m_conn =  DriverManager.getConnection(m_config.resultsDatabaseURL);
             m_stmt = m_conn.createStatement();
         }
         catch (SQLException ex) {

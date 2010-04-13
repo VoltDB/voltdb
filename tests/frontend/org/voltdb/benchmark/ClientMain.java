@@ -32,7 +32,6 @@ import java.io.InputStreamReader;
 import java.lang.reflect.Constructor;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.sql.SQLException;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -471,8 +470,9 @@ public abstract class ClientMain {
                             getApplicationName(),
                             getSubApplicationName(),
                             statsPollInterval);
-            } catch (SQLException e) {
-                e.printStackTrace();
+            } catch (Exception e) {
+                System.err.println(e.getMessage());
+                //e.printStackTrace();
                 statsSettings = null;
             }
         }

@@ -18,9 +18,19 @@ package org.voltdb;
 
 
 import java.io.IOException;
-import java.sql.*;
-import java.util.*;
-import org.voltdb.client.*;
+import java.sql.CallableStatement;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Timestamp;
+import java.sql.Types;
+import java.util.ArrayList;
+
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientFactory;
 
 /**
  * Polls a Volt cluster via the statistics sysproc and ELTs the results to a database via JDBC.
@@ -169,19 +179,26 @@ public class ClusterMonitor {
             System.exit(-1);
         }
 
-        final ClusterMonitor cm = new ClusterMonitor(
-                application,
-                subApplication,
-                tag,
-                hosts,
-                partitionsPerHost,
-                totalPartitions,
-                kFactor,
-                voltHosts,
-                voltUsername,
-                voltPassword,
-                databaseURL,
-                pollInterval);
+        final ClusterMonitor cm;
+        try {
+            cm = new ClusterMonitor(
+                    application,
+                    subApplication,
+                    tag,
+                    hosts,
+                    partitionsPerHost,
+                    totalPartitions,
+                    kFactor,
+                    voltHosts,
+                    voltUsername,
+                    voltPassword,
+                    databaseURL,
+                    pollInterval);
+        }
+        catch (Exception e) {
+            System.err.printf(e.getMessage());
+            return;
+        }
 
         cm.start();
         cm.m_loadThread.join();
@@ -209,6 +226,25 @@ public class ClusterMonitor {
             String voltPassword,
             String databaseURL,
             long pollInterval) throws SQLException {
+
+        if ((databaseURL == null) || (databaseURL.isEmpty())) {
+            String msg = "Not connecting to SQL reporting server as connection URL is null or missing.";
+            throw new RuntimeException(msg);
+        }
+
+        try {
+            m_conn =  DriverManager.getConnection(databaseURL);
+            // safest thing possible
+            m_conn.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
+            // commit everything or nothing
+            m_conn.setAutoCommit(false);
+        }
+        catch (Exception e) {
+            String msg = "Failed to connect to SQL reporting server with message:\n    ";
+            msg += e.getMessage();
+            throw new RuntimeException(msg);
+        }
+
         m_pollInterval = pollInterval;
         m_client = ClientFactory.createClient();
         int successfulConnections = 0;
@@ -228,12 +264,6 @@ public class ClusterMonitor {
         if (versionString.equals("?revision=")) {
             versionString = null;
         }
-
-        m_conn =  DriverManager.getConnection(databaseURL);
-        // safest thing possible
-        m_conn.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
-        // commit everything or nothing
-        m_conn.setAutoCommit(false);
 
         int instanceId = -1;
 

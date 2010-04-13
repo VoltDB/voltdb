@@ -23,7 +23,9 @@
 
 package org.voltdb.benchmark;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.UnknownHostException;
@@ -39,9 +41,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.voltdb.ClusterMonitor;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
-import org.voltdb.ClusterMonitor;
 import org.voltdb.benchmark.BenchmarkResults.Result;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -367,11 +369,12 @@ public class BenchmarkController {
                     new ArrayList<String>(java.util.Arrays.asList(m_config.hosts)),
                     "",
                     "",
-                    m_config.databaseURL,
+                    m_config.statsDatabaseURL,
                     m_config.interval);
             m_clusterMonitor.start();
-        } catch (java.sql.SQLException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            //System.err.println(e.getMessage());
+            m_clusterMonitor = null;
         }
 
         if (m_loaderClass != null) {
@@ -407,9 +410,9 @@ public class BenchmarkController {
                 localArgs.add("HOST=" + host + ":" + port);
             }
 
-            loaderCommand.append(" STATSDATABASEURL=" + m_config.databaseURL + " ");
+            loaderCommand.append(" STATSDATABASEURL=" + m_config.statsDatabaseURL + " ");
             loaderCommand.append(" STATSPOLLINTERVAL=" + m_config.interval + " ");
-            localArgs.add(" STATSDATABASEURL=" + m_config.databaseURL + " ");
+            localArgs.add(" STATSDATABASEURL=" + m_config.statsDatabaseURL + " ");
             localArgs.add(" STATSPOLLINTERVAL=" + m_config.interval + " ");
 
             StringBuffer userParams = new StringBuffer(4096);
@@ -476,7 +479,7 @@ public class BenchmarkController {
 
         clArgs.add("CHECKTRANSACTION=" + m_config.checkTransaction);
         clArgs.add("CHECKTABLES=" + m_config.checkTables);
-        clArgs.add("STATSDATABASEURL=" + m_config.databaseURL);
+        clArgs.add("STATSDATABASEURL=" + m_config.statsDatabaseURL);
         clArgs.add("STATSPOLLINTERVAL=" + m_config.interval);
 
         for (String host : m_config.hosts)
@@ -683,6 +686,59 @@ public class BenchmarkController {
         }
     }
 
+    /**
+     * Read a MySQL connection URL from a file named "mysqlp".
+     * Look for the file in a few places, then try to read the first,
+     * and hopefully only, line from the file.
+     *
+     * @param remotePath Path to the volt binary files.
+     * @return Two connection string URLs (can't be null).
+     * @throws RuntimeException with an error message on failure.
+     */
+    static String[] readConnectionStringFromFile(String remotePath) {
+        String filename = "mysqlp";
+        // try the current dir
+        File f = new File(filename);
+        if (f.isFile() == false) {
+            // try voltbin from the current dir
+            f = new File(remotePath + filename);
+            if (f.isFile() == false) {
+                // try the home voltbin
+                String path = System.getProperty("user.home");
+                path += "/" + remotePath + filename;
+                f = new File(path);
+            }
+        }
+        if (f.isFile() == false) {
+            String msg = "Cannot find suitable reporting database connection string file";
+            throw new RuntimeException(msg);
+        }
+        if (f.canRead() == false) {
+            String msg = "Reporting database connection string file at \"" +
+                f.getPath() + "\" cannot be read (permissions).";
+            throw new RuntimeException(msg);
+        }
+
+        String[] retval = new String[2];
+        try {
+            FileReader fr = new FileReader(f);
+            BufferedReader br = new BufferedReader(fr);
+            retval[0] = br.readLine().trim();
+            retval[1] = br.readLine().trim();
+        } catch (IOException e) {
+            String msg = "Reporting database connection string file at \"" +
+                f.getPath() + "\" cannot be read (read error).";
+            throw new RuntimeException(msg);
+        }
+        if ((retval[0].length() == 0) || (retval[1].length() == 0)){
+            String msg = "Reporting database connection string file at \"" +
+                f.getPath() + "\" seems to be (partly) empty.";
+            throw new RuntimeException(msg);
+        }
+
+        return retval;
+    }
+
     public static void main(final String[] vargs) {
         long interval = 10000;
         long duration = 60000;
@@ -706,11 +762,22 @@ public class BenchmarkController {
         int snapshotRetain = -1;
         float checkTransaction = 0;
         boolean checkTables = false;
-        String databaseURL = "jdbc:mysql://hzproject.com/monitoring_agent?" +
-            "user=monitoring_agent\\&password=n7s4JTchAhcMjPM7";
         String statsTag = null;
         String applicationName = null;
         String subApplicationName = null;
+
+        // try to read connection string for reporting database
+        // from a "mysqlp" file
+        // set value to null on failure
+        String[] databaseURL = null;
+        try {
+            databaseURL = readConnectionStringFromFile(remotePath);
+            assert(databaseURL.length == 2);
+        }
+        catch (RuntimeException e) {
+            databaseURL = new String[2];
+            System.out.println(e.getMessage());
+        }
 
         LinkedHashMap<String, String> clientParams = new LinkedHashMap<String, String>();
         for (String arg : vargs) {
@@ -821,7 +888,7 @@ public class BenchmarkController {
             } else if (parts[0].equals("NUMCONNECTIONS")) {
                 clientParams.put(parts[0], parts[1]);
             } else if (parts[0].equals("STATSDATABASEURL")) {
-                databaseURL = parts[1];
+                databaseURL[0] = parts[1];
             } else if (parts[0].equals("STATSTAG")) {
                 statsTag = parts[1];
             } else if (parts[0].equals("APPLICATIONNAME")) {
@@ -906,8 +973,8 @@ public class BenchmarkController {
                 sitesPerHost, k_factor, clientNames, processesPerClient, interval, duration,
                 remotePath, remoteUser, listenForDebugger, serverHeapSize, clientHeapSize,
                 localmode, useProfile, checkTransaction, checkTables, snapshotPath, snapshotPrefix,
-                snapshotFrequency, snapshotRetain, databaseURL, statsTag, applicationName,
-                subApplicationName);
+                snapshotFrequency, snapshotRetain, databaseURL[0], databaseURL[1], statsTag,
+                applicationName, subApplicationName);
         config.parameters.putAll(clientParams);
 
         // ACTUALLY RUN THE BENCHMARK

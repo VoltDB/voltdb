@@ -50,15 +50,11 @@ public class StatsUploaderSettings {
             String databaseURL,
             String applicationName,
             String subApplicationName,
-            int pollInterval) throws SQLException {
+            int pollInterval) {
         this.databaseURL = databaseURL;
         this.applicationName = applicationName;
         this.subApplicationName = subApplicationName;
         this.pollInterval = pollInterval;
-
-        if (databaseURL == null || databaseURL.isEmpty()) {
-            throw new IllegalArgumentException("Database URL is null or empty");
-        }
 
         if (applicationName == null || applicationName.isEmpty()) {
             throw new IllegalArgumentException("Application name is null or empty");
@@ -67,8 +63,21 @@ public class StatsUploaderSettings {
         if (pollInterval < 1000) {
             throw new IllegalArgumentException("Polling more then once per second is excessive");
         }
-        conn = DriverManager.getConnection(databaseURL);
-        conn.setAutoCommit(false);
-        conn.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
+
+        if ((databaseURL == null) || (databaseURL.isEmpty())) {
+            String msg = "Not connecting to SQL reporting server as connection URL is null or missing.";
+            throw new RuntimeException(msg);
+        }
+
+        try {
+            conn = DriverManager.getConnection(databaseURL);
+            conn.setAutoCommit(false);
+            conn.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
+        }
+        catch (Exception e) {
+            String msg = "Failed to connect to SQL reporting server with message:\n    ";
+            msg += e.getMessage();
+            throw new RuntimeException(msg);
+        }
     }
 }
