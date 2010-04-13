@@ -152,8 +152,9 @@ void signalHandler(int signum, siginfo_t *info, void *context) {
         return;
 
     char err_msg[128];
-    sprintf(err_msg, "SIGSEGV caught: signal number %d, error value %d, signal"
-            " code %d\n\n", info->si_signo, info->si_errno, info->si_code);
+    snprintf(err_msg, 128, "SIGSEGV caught: signal number %d, error value %d,"
+             " signal code %d\n\n", info->si_signo, info->si_errno,
+             info->si_code);
     std::string message = err_msg;
     message.append(currentEngine->debug());
     FatalException e = FatalException(message.c_str(), __FILE__, __LINE__);
