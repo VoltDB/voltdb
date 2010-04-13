@@ -48,18 +48,18 @@ public class SnapshotScan extends VoltSystemProcedure {
         Logger.getLogger("HOST", VoltLoggerFactory.instance());
 
     private static final int DEP_snapshotDigestScan = (int)
-        SysProcFragmentId.PF_snapshotDigestScan | DtxnConstants.MULTINODE_DEPENDENCY;
+        SysProcFragmentId.PF_snapshotDigestScan | DtxnConstants.MULTIPARTITION_DEPENDENCY;
     private static final int DEP_snapshotDigestScanResults = (int)
         SysProcFragmentId.PF_snapshotDigestScanResults;
 
     private static final int DEP_snapshotScan = (int)
-        SysProcFragmentId.PF_snapshotScan | DtxnConstants.MULTINODE_DEPENDENCY;
+        SysProcFragmentId.PF_snapshotScan | DtxnConstants.MULTIPARTITION_DEPENDENCY;
 
     private static final int DEP_snapshotScanResults = (int)
         SysProcFragmentId.PF_snapshotScanResults;
 
     private static final int DEP_hostDiskFreeScan = (int)
-        SysProcFragmentId.PF_hostDiskFreeScan | DtxnConstants.MULTINODE_DEPENDENCY;
+        SysProcFragmentId.PF_hostDiskFreeScan | DtxnConstants.MULTIPARTITION_DEPENDENCY;
 
     private static final int DEP_hostDiskFreeScanResults = (int)
         SysProcFragmentId.PF_hostDiskFreeScanResults;
@@ -93,91 +93,100 @@ public class SnapshotScan extends VoltSystemProcedure {
         if (fragmentId == SysProcFragmentId.PF_snapshotScan)
         {
             final VoltTable results = constructFragmentResultsTable();
-            assert(params.toArray()[0] != null);
-            assert(params.toArray()[0] instanceof String);
-            final String path = (String)params.toArray()[0];
-            List<File> relevantFiles = retrieveRelevantFiles(path);
-            if (relevantFiles == null) {
-                results.addRow(
-                        context.getSite().getHost().getTypeName(),
-                        hostname,
-                        "",
-                        "",
-                        0,
-                        "",
-                        "FALSE",
-                        0,
-                        "",
-                        "",
-                        0,
-                        "",
-                        "FAILURE",
-                        errorString);
-            } else {
-                for (final File f : relevantFiles) {
-                    if (f.getName().endsWith(".digest")) {
-                        continue;
-                    }
-                    if (f.canRead()) {
-                        try {
-                            FileInputStream savefile_input = new FileInputStream(f);
+            // Choose the lowest site ID on this host to do the file scan
+            // All other sites should just return empty results tables.
+            int host_id = context.getExecutionSite().getCorrespondingHostId();
+            Integer lowest_site_id =
+                VoltDB.instance().getCatalogContext().siteTracker.
+                getLowestLiveExecSiteIdForHost(host_id);
+            if (context.getExecutionSite().getSiteId() == lowest_site_id)
+            {
+                assert(params.toArray()[0] != null);
+                assert(params.toArray()[0] instanceof String);
+                final String path = (String)params.toArray()[0];
+                List<File> relevantFiles = retrieveRelevantFiles(path);
+                if (relevantFiles == null) {
+                    results.addRow(
+                                   context.getSite().getHost().getTypeName(),
+                                   hostname,
+                                   "",
+                                   "",
+                                   0,
+                                   "",
+                                   "FALSE",
+                                   0,
+                                   "",
+                                   "",
+                                   0,
+                                   "",
+                                   "FAILURE",
+                                   errorString);
+                } else {
+                    for (final File f : relevantFiles) {
+                        if (f.getName().endsWith(".digest")) {
+                            continue;
+                        }
+                        if (f.canRead()) {
                             try {
-                                TableSaveFile savefile =
-                                    new TableSaveFile(
-                                            savefile_input.getChannel(),
-                                            1,
-                                            null);
-                                String partitions = "";
+                                FileInputStream savefile_input = new FileInputStream(f);
+                                try {
+                                    TableSaveFile savefile =
+                                        new TableSaveFile(
+                                                          savefile_input.getChannel(),
+                                                          1,
+                                                          null);
+                                    String partitions = "";
 
-                                for (int partition : savefile.getPartitionIds()) {
-                                    partitions = partitions + "," + partition;
+                                    for (int partition : savefile.getPartitionIds()) {
+                                        partitions = partitions + "," + partition;
+                                    }
+
+                                    if (partitions.startsWith(",")) {
+                                        partitions = partitions.substring(1);
+                                    }
+
+                                    results.addRow(
+                                                   context.getSite().getHost().getTypeName(),
+                                                   hostname,
+                                                   f.getParent(),
+                                                   f.getName(),
+                                                   savefile.getCreateTime(),
+                                                   savefile.getTableName(),
+                                                   savefile.getCompleted() ? "TRUE" : "FALSE",
+                                                                           f.length(),
+                                                                           savefile.isReplicated() ? "TRUE" : "FALSE",
+                                                                                                   partitions,
+                                                                                                   savefile.getTotalPartitions(),
+                                                                                                   f.canRead() ? "TRUE" : "FALSE",
+                                                                                                               "SUCCESS",
+                                                                                                               ""
+                                    );
+                                } catch (IOException e) {
+                                    HOST_LOG.warn(e);
+                                } finally {
+                                    savefile_input.close();
                                 }
-
-                                if (partitions.startsWith(",")) {
-                                    partitions = partitions.substring(1);
-                                }
-
-                                results.addRow(
-                                        context.getSite().getHost().getTypeName(),
-                                        hostname,
-                                        f.getParent(),
-                                        f.getName(),
-                                        savefile.getCreateTime(),
-                                        savefile.getTableName(),
-                                        savefile.getCompleted() ? "TRUE" : "FALSE",
-                                        f.length(),
-                                        savefile.isReplicated() ? "TRUE" : "FALSE",
-                                        partitions,
-                                        savefile.getTotalPartitions(),
-                                        f.canRead() ? "TRUE" : "FALSE",
-                                        "SUCCESS",
-                                        ""
-                                        );
                             } catch (IOException e) {
                                 HOST_LOG.warn(e);
-                            } finally {
-                                savefile_input.close();
                             }
-                        } catch (IOException e) {
-                            HOST_LOG.warn(e);
+                        } else {
+                            results.addRow(
+                                           context.getSite().getHost().getTypeName(),
+                                           hostname,
+                                           f.getParent(),
+                                           f.getName(),
+                                           f.lastModified(),
+                                           "",
+                                           "FALSE",
+                                           f.length(),
+                                           "FALSE",
+                                           "",
+                                           -1,
+                                           f.canRead() ? "TRUE" : "FALSE",
+                                                       "SUCCESS",
+                                                       ""
+                            );
                         }
-                    } else {
-                        results.addRow(
-                                context.getSite().getHost().getTypeName(),
-                                hostname,
-                                f.getParent(),
-                                f.getName(),
-                                f.lastModified(),
-                                "",
-                                "FALSE",
-                                f.length(),
-                                "FALSE",
-                                "",
-                                -1,
-                                f.canRead() ? "TRUE" : "FALSE",
-                                "SUCCESS",
-                                ""
-                                );
                     }
                 }
             }
@@ -197,44 +206,53 @@ public class SnapshotScan extends VoltSystemProcedure {
             }
             return new
                 DependencyPair( DEP_snapshotScanResults, results);
-        } if (fragmentId == SysProcFragmentId.PF_snapshotDigestScan)
+        } else if (fragmentId == SysProcFragmentId.PF_snapshotDigestScan)
         {
             final VoltTable results = constructDigestResultsTable();
-            assert(params.toArray()[0] != null);
-            assert(params.toArray()[0] instanceof String);
-            final String path = (String)params.toArray()[0];
-            List<File> relevantFiles = retrieveRelevantFiles(path);
-            if (relevantFiles == null) {
-                results.addRow(
-                        context.getSite().getHost().getTypeName(),
-                        "",
-                        "",
-                        "",
-                        "FAILURE",
-                        errorString);
-            } else {
-                for (final File f : relevantFiles) {
-                    if (f.getName().endsWith(".vpt")) {
-                        continue;
-                    }
-                    if (f.canRead()) {
-                        try {
-                            List<String> tableNames = SnapshotUtil.retrieveRelevantTableNamesAndTime(f).getSecond();
-                            final StringWriter sw = new StringWriter();
-                            for (int ii = 0; ii < tableNames.size(); ii++) {
-                                sw.append(tableNames.get(ii));
-                                if (ii != tableNames.size() - 1) {
-                                    sw.append(',');
+            // Choose the lowest site ID on this host to do the file scan
+            // All other sites should just return empty results tables.
+            int host_id = context.getExecutionSite().getCorrespondingHostId();
+            Integer lowest_site_id =
+                VoltDB.instance().getCatalogContext().siteTracker.
+                getLowestLiveExecSiteIdForHost(host_id);
+            if (context.getExecutionSite().getSiteId() == lowest_site_id)
+            {
+                assert(params.toArray()[0] != null);
+                assert(params.toArray()[0] instanceof String);
+                final String path = (String)params.toArray()[0];
+                List<File> relevantFiles = retrieveRelevantFiles(path);
+                if (relevantFiles == null) {
+                    results.addRow(
+                                   context.getSite().getHost().getTypeName(),
+                                   "",
+                                   "",
+                                   "",
+                                   "FAILURE",
+                                   errorString);
+                } else {
+                    for (final File f : relevantFiles) {
+                        if (f.getName().endsWith(".vpt")) {
+                            continue;
+                        }
+                        if (f.canRead()) {
+                            try {
+                                List<String> tableNames = SnapshotUtil.retrieveRelevantTableNamesAndTime(f).getSecond();
+                                final StringWriter sw = new StringWriter();
+                                for (int ii = 0; ii < tableNames.size(); ii++) {
+                                    sw.append(tableNames.get(ii));
+                                    if (ii != tableNames.size() - 1) {
+                                        sw.append(',');
+                                    }
                                 }
+                                results.addRow(context.getSite().getHost().getTypeName(),
+                                               path,
+                                               f.getName(),
+                                               sw.toString(),
+                                               "SUCCESS",
+                                "");
+                            } catch (Exception e) {
+                                HOST_LOG.warn(e);
                             }
-                            results.addRow(context.getSite().getHost().getTypeName(),
-                                    path,
-                                    f.getName(),
-                                    sw.toString(),
-                                    "SUCCESS",
-                                    "");
-                        } catch (Exception e) {
-                            HOST_LOG.warn(e);
                         }
                     }
                 }
@@ -257,35 +275,44 @@ public class SnapshotScan extends VoltSystemProcedure {
                 DependencyPair( DEP_snapshotDigestScanResults, results);
         } else if (fragmentId == SysProcFragmentId.PF_hostDiskFreeScan)
         {
-            assert(params.toArray()[0] != null);
-            assert(params.toArray()[0] instanceof String);
-            final String path = (String)params.toArray()[0];
             final VoltTable results = constructDiskFreeResultsTable();
-            File dir = new File(path);
+            // Choose the lowest site ID on this host to do the file scan
+            // All other sites should just return empty results tables.
+            int host_id = context.getExecutionSite().getCorrespondingHostId();
+            Integer lowest_site_id =
+                VoltDB.instance().getCatalogContext().siteTracker.
+                getLowestLiveExecSiteIdForHost(host_id);
+            if (context.getExecutionSite().getSiteId() == lowest_site_id)
+            {
+                assert(params.toArray()[0] != null);
+                assert(params.toArray()[0] instanceof String);
+                final String path = (String)params.toArray()[0];
+                File dir = new File(path);
 
-            if (dir.isDirectory()) {
-                final long free = dir.getUsableSpace();
-                final long total = dir.getTotalSpace();
-                final long used = total - free;
-                results.addRow(
-                        context.getSite().getHost().getTypeName(),
-                        hostname,
-                        path,
-                        total,
-                        free,
-                        used,
-                        "SUCCESS",
-                        "");
-            } else {
-                results.addRow(
-                        context.getSite().getHost().getTypeName(),
-                        hostname,
-                        path,
-                        0,
-                        0,
-                        0,
-                        "FAILURE",
-                        "Path is not a directory");
+                if (dir.isDirectory()) {
+                    final long free = dir.getUsableSpace();
+                    final long total = dir.getTotalSpace();
+                    final long used = total - free;
+                    results.addRow(
+                                   context.getSite().getHost().getTypeName(),
+                                   hostname,
+                                   path,
+                                   total,
+                                   free,
+                                   used,
+                                   "SUCCESS",
+                    "");
+                } else {
+                    results.addRow(
+                                   context.getSite().getHost().getTypeName(),
+                                   hostname,
+                                   path,
+                                   0,
+                                   0,
+                                   0,
+                                   "FAILURE",
+                    "Path is not a directory");
+                }
             }
             return new DependencyPair( DEP_hostDiskFreeScan, results);
         } else if (fragmentId == SysProcFragmentId.PF_hostDiskFreeScanResults) {
@@ -664,8 +691,8 @@ public class SnapshotScan extends VoltSystemProcedure {
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_snapshotScan;
         pfs[0].outputDepId = DEP_snapshotScan;
-        pfs[0].multipartition = false;
-        pfs[0].nonExecSites = true;
+        pfs[0].multipartition = true;
+        pfs[0].nonExecSites = false;
         ParameterSet params = new ParameterSet();
         params.setParameters(path);
         pfs[0].parameters = params;
@@ -691,8 +718,8 @@ public class SnapshotScan extends VoltSystemProcedure {
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_snapshotDigestScan;
         pfs[0].outputDepId = DEP_snapshotDigestScan;
-        pfs[0].multipartition = false;
-        pfs[0].nonExecSites = true;
+        pfs[0].multipartition = true;
+        pfs[0].nonExecSites = false;
         ParameterSet params = new ParameterSet();
         params.setParameters(path);
         pfs[0].parameters = params;
@@ -718,8 +745,8 @@ public class SnapshotScan extends VoltSystemProcedure {
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_hostDiskFreeScan;
         pfs[0].outputDepId = DEP_hostDiskFreeScan;
-        pfs[0].multipartition = false;
-        pfs[0].nonExecSites = true;
+        pfs[0].multipartition = true;
+        pfs[0].nonExecSites = false;
         ParameterSet params = new ParameterSet();
         params.setParameters(path);
         pfs[0].parameters = params;

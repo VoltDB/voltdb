@@ -43,7 +43,7 @@ public class SnapshotStatus extends VoltSystemProcedure {
                          VoltLoggerFactory.instance());
 
     private static final int DEP_scanSnapshotRegistries = (int)
-        SysProcFragmentId.PF_scanSnapshotRegistries | DtxnConstants.MULTINODE_DEPENDENCY;
+        SysProcFragmentId.PF_scanSnapshotRegistries | DtxnConstants.MULTIPARTITION_DEPENDENCY;
 
     private static final int DEP_scanSnapshotRegistriesResults = (int)
         SysProcFragmentId.PF_scanSnapshotRegistriesResults;
@@ -72,24 +72,33 @@ public class SnapshotStatus extends VoltSystemProcedure {
         final VoltTable results = constructFragmentResultsTable();
         if (fragmentId == SysProcFragmentId.PF_scanSnapshotRegistries)
         {
-            TreeSet<Snapshot> snapshots = SnapshotRegistry.getSnapshotHistory();
-            for (final Snapshot s : snapshots) {
-                s.iterateTables(new TableIterator() {
-                    @Override
-                    public void next(Table t) {
-                        results.addRow(
-                                context.getSite().getHost().getTypeName(),
-                                hostname,
-                                t.name,
-                                s.path,
-                                s.nonce,
-                                t.timeCreated,
-                                t.timeClosed,
-                                t.size,
-                                t.error == null ? "SUCCESS" : "FAILURE",
-                                t.error != null ? t.error.toString() : "");
-                    }
-                });
+            // Choose the lowest site ID on this host to do the file scan
+            // All other sites should just return empty results tables.
+            int host_id = context.getExecutionSite().getCorrespondingHostId();
+            Integer lowest_site_id =
+                VoltDB.instance().getCatalogContext().siteTracker.
+                getLowestLiveExecSiteIdForHost(host_id);
+            if (context.getExecutionSite().getSiteId() == lowest_site_id)
+            {
+                TreeSet<Snapshot> snapshots = SnapshotRegistry.getSnapshotHistory();
+                for (final Snapshot s : snapshots) {
+                    s.iterateTables(new TableIterator() {
+                        @Override
+                        public void next(Table t) {
+                            results.addRow(
+                                           context.getSite().getHost().getTypeName(),
+                                           hostname,
+                                           t.name,
+                                           s.path,
+                                           s.nonce,
+                                           t.timeCreated,
+                                           t.timeClosed,
+                                           t.size,
+                                           t.error == null ? "SUCCESS" : "FAILURE",
+                                                           t.error != null ? t.error.toString() : "");
+                        }
+                    });
+                }
             }
             return new DependencyPair( DEP_scanSnapshotRegistries, results);
         } else if (fragmentId == SysProcFragmentId.PF_scanSnapshotRegistriesResults) {
@@ -211,8 +220,8 @@ public class SnapshotStatus extends VoltSystemProcedure {
         pfs[0].fragmentId = SysProcFragmentId.PF_scanSnapshotRegistries;
         pfs[0].outputDepId = DEP_scanSnapshotRegistries;
         pfs[0].inputDepIds = new int[] {};
-        pfs[0].multipartition = false;
-        pfs[0].nonExecSites = true;
+        pfs[0].multipartition = true;
+        pfs[0].nonExecSites = false;
         ParameterSet params = new ParameterSet();
         params.setParameters();
         pfs[0].parameters = params;

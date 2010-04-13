@@ -56,6 +56,17 @@ public class Shutdown extends VoltSystemProcedure {
                                            ExecutionSite.SystemProcedureExecutionContext context)
     {
         if (fragmentId == SysProcFragmentId.PF_shutdownCommand) {
+            // Choose the lowest site ID on this host to do the global
+            // shutdown.  all other sites should just bail out (for now)
+            int host_id = context.getExecutionSite().getCorrespondingHostId();
+            Integer lowest_site_id =
+                VoltDB.instance().getCatalogContext().siteTracker.
+                getLowestLiveExecSiteIdForHost(host_id);
+            if (context.getExecutionSite().getSiteId() != lowest_site_id)
+            {
+                return null;
+            }
+
             ProcedureProfiler.flushProfile();
             try {
                 Thread.sleep(1000);
@@ -85,10 +96,10 @@ public class Shutdown extends VoltSystemProcedure {
         SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[1];
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_shutdownCommand;
-        pfs[0].outputDepId = (int) SysProcFragmentId.PF_procedureDone | DtxnConstants.MULTINODE_DEPENDENCY;
+        pfs[0].outputDepId = (int) SysProcFragmentId.PF_procedureDone | DtxnConstants.MULTIPARTITION_DEPENDENCY;
         pfs[0].inputDepIds = new int[]{};
-        pfs[0].multipartition = false;
-        pfs[0].nonExecSites = true;
+        pfs[0].multipartition = true;
+        pfs[0].nonExecSites = false;
         pfs[0].parameters = new ParameterSet();
 
         executeSysProcPlanFragments(pfs,

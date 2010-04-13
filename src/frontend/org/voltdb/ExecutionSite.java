@@ -1049,6 +1049,11 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     }
 
     @Override
+    public int getCorrespondingHostId() {
+        return Integer.valueOf(getCatalogSite().getHost().getTypeName());
+    }
+
+    @Override
     public void loadTable(
             long txnId,
             String clusterName,

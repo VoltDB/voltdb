@@ -201,6 +201,8 @@ public class TestSiteTracker extends TestCase
         assertFalse(exec_sites.contains(100));
         assertTrue(exec_sites.contains(101));
         assertTrue(exec_sites.contains(102));
+        assertEquals((Integer) 1, tracker.getLowestLiveExecSiteIdForHost(0));
+        assertEquals((Integer) 101, tracker.getLowestLiveExecSiteIdForHost(1));
     }
 
     public void testLiveSitesForPartitions()

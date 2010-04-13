@@ -54,6 +54,10 @@ public interface SiteProcedureConnection {
      */
     public int getCorrespondingPartitionId();
 
+    /**
+     * Get the catalog host id for the corresponding SiteProcedureConnection
+     */
+    public int getCorrespondingHostId();
 
     public void loadTable(
             long txnId,

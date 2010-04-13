@@ -19,6 +19,7 @@ package org.voltdb.dtxn;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -416,6 +417,16 @@ public class SiteTracker {
             }
         }
         return retval;
+    }
+
+    /**
+     * @param hostId
+     * @return the ID of the lowest execution site on the given hostId
+     */
+    public Integer getLowestLiveExecSiteIdForHost(int hostId)
+    {
+        ArrayList<Integer> sites = getLiveExecutionSitesForHost(hostId);
+        return Collections.min(sites);
     }
 
     /**

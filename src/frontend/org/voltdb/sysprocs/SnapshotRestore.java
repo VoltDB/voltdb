@@ -65,7 +65,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         Logger.getLogger("HOST", VoltLoggerFactory.instance());
 
     private static final int DEP_restoreScan = (int)
-        SysProcFragmentId.PF_restoreScan | DtxnConstants.MULTINODE_DEPENDENCY;
+        SysProcFragmentId.PF_restoreScan | DtxnConstants.MULTIPARTITION_DEPENDENCY;
     private static final int DEP_restoreScanResults = (int)
         SysProcFragmentId.PF_restoreScanResults;
 
@@ -184,63 +184,72 @@ public class SnapshotRestore extends VoltSystemProcedure
         {
             assert(params.toArray()[0] != null);
             assert(params.toArray()[1] != null);
-            m_initializedTableSaveFiles.clear();
-            m_filePath = (String) params.toArray()[0];
-            m_fileNonce = (String) params.toArray()[1];
-            TRACE_LOG.trace("Checking saved table state for restore of: "
-                     + m_filePath + ", " + m_fileNonce);
             VoltTable result = ClusterSaveFileState.constructEmptySaveFileStateVoltTable();
-            File[] savefiles = retrieveRelevantFiles(m_filePath, m_fileNonce);
-            for (File file : savefiles)
+            // Choose the lowest site ID on this host to do the file scan
+            // All other sites should just return empty results tables.
+            int host_id = context.getExecutionSite().getCorrespondingHostId();
+            Integer lowest_site_id =
+                VoltDB.instance().getCatalogContext().siteTracker.
+                getLowestLiveExecSiteIdForHost(host_id);
+            if (context.getExecutionSite().getSiteId() == lowest_site_id)
             {
-                TableSaveFile savefile = null;
-                try
+                m_initializedTableSaveFiles.clear();
+                m_filePath = (String) params.toArray()[0];
+                m_fileNonce = (String) params.toArray()[1];
+                TRACE_LOG.trace("Checking saved table state for restore of: "
+                                + m_filePath + ", " + m_fileNonce);
+                File[] savefiles = retrieveRelevantFiles(m_filePath, m_fileNonce);
+                for (File file : savefiles)
                 {
-                    savefile = getTableSaveFile(file, 1, null);
-                    try {
+                    TableSaveFile savefile = null;
+                    try
+                    {
+                        savefile = getTableSaveFile(file, 1, null);
+                        try {
 
-                        if (!savefile.getCompleted()) {
-                            continue;
-                        }
+                            if (!savefile.getCompleted()) {
+                                continue;
+                            }
 
-                        String is_replicated = "FALSE";
-                        if (savefile.isReplicated())
-                        {
-                            is_replicated = "TRUE";
+                            String is_replicated = "FALSE";
+                            if (savefile.isReplicated())
+                            {
+                                is_replicated = "TRUE";
+                            }
+                            int partitionIds[] = savefile.getPartitionIds();
+                            for (int pid : partitionIds) {
+                                result.addRow(m_hostId,
+                                              hostname,
+                                              savefile.getHostId(),
+                                              savefile.getHostname(),
+                                              savefile.getClusterName(),
+                                              savefile.getDatabaseName(),
+                                              savefile.getTableName(),
+                                              is_replicated,
+                                              pid,
+                                              savefile.getTotalPartitions());
+                            }
+                        } finally {
+                            savefile.close();
                         }
-                        int partitionIds[] = savefile.getPartitionIds();
-                        for (int pid : partitionIds) {
-                            result.addRow(m_hostId,
-                                             hostname,
-                                             savefile.getHostId(),
-                                             savefile.getHostname(),
-                                             savefile.getClusterName(),
-                                             savefile.getDatabaseName(),
-                                             savefile.getTableName(),
-                                             is_replicated,
-                                             pid,
-                                             savefile.getTotalPartitions());
-                        }
-                    } finally {
-                        savefile.close();
                     }
-                }
-                catch (FileNotFoundException e)
-                {
-                    // retrieveRelevantFiles should always generate a list
-                    // of valid present files in m_filePath, so if we end up
-                    // getting here, something has gone very weird.
-                    e.printStackTrace();
-                }
-                catch (IOException e)
-                {
-                    // For the time being I'm content to treat this as a
-                    // missing file and let the coordinator complain if
-                    // it discovers that it can't build a consistent
-                    // database out of the files it sees available.
-                    //
-                    // Maybe just a log message?  Later.
-                    e.printStackTrace();
+                    catch (FileNotFoundException e)
+                    {
+                        // retrieveRelevantFiles should always generate a list
+                        // of valid present files in m_filePath, so if we end up
+                        // getting here, something has gone very weird.
+                        e.printStackTrace();
+                    }
+                    catch (IOException e)
+                    {
+                        // For the time being I'm content to treat this as a
+                        // missing file and let the coordinator complain if
+                        // it discovers that it can't build a consistent
+                        // database out of the files it sees available.
+                        //
+                        // Maybe just a log message?  Later.
+                        e.printStackTrace();
+                    }
                 }
             }
             return new DependencyPair(DEP_restoreScan, result);
@@ -709,8 +718,8 @@ public class SnapshotRestore extends VoltSystemProcedure
         pfs[0].fragmentId = SysProcFragmentId.PF_restoreScan;
         pfs[0].outputDepId = DEP_restoreScan;
         pfs[0].inputDepIds = new int[] {};
-        pfs[0].multipartition = false;
-        pfs[0].nonExecSites = true;
+        pfs[0].multipartition = true;
+        pfs[0].nonExecSites = false;
         ParameterSet params = new ParameterSet();
         params.setParameters(filePath, fileNonce);
         pfs[0].parameters = params;

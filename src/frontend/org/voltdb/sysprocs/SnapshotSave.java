@@ -61,7 +61,7 @@ public class SnapshotSave extends VoltSystemProcedure
         Logger.getLogger("HOST", VoltLoggerFactory.instance());
 
     private static final int DEP_saveTest = (int)
-        SysProcFragmentId.PF_saveTest | DtxnConstants.MULTINODE_DEPENDENCY;
+        SysProcFragmentId.PF_saveTest | DtxnConstants.MULTIPARTITION_DEPENDENCY;
     private static final int DEP_saveTestResults = (int)
         SysProcFragmentId.PF_saveTestResults;
     private static final int DEP_createSnapshotTargets = (int)
@@ -109,58 +109,67 @@ public class SnapshotSave extends VoltSystemProcedure
             assert(params.toArray()[1] != null);
             String file_path = (String) params.toArray()[0];
             String file_nonce = (String) params.toArray()[1];
-            TRACE_LOG.trace("Checking feasibility of save with path and nonce: "
-                     + file_path + ", " + file_nonce);
             VoltTable result = constructNodeResultsTable();
-
-            if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() != -1) {
-                result.addRow(
-                        context.getSite().getHost().getTypeName(),
-                        hostname,
-                        "",
-                        "FAILURE",
-                        "SNAPSHOT IN PROGRESS");
-                return new DependencyPair( DEP_saveTest, result);
-            }
-
-            for (Table table : getTablesToSave(context))
+            // Choose the lowest site ID on this host to do the file scan
+            // All other sites should just return empty results tables.
+            int host_id = context.getExecutionSite().getCorrespondingHostId();
+            Integer lowest_site_id =
+                VoltDB.instance().getCatalogContext().siteTracker.
+                getLowestLiveExecSiteIdForHost(host_id);
+            if (context.getExecutionSite().getSiteId() == lowest_site_id)
             {
-                File saveFilePath =
-                    constructFileForTable(table, file_path, file_nonce,
-                                          context.getSite().getHost().getTypeName());
-                TRACE_LOG.trace("Host ID " + context.getSite().getHost().getTypeName() +
-                         " table: " + table.getTypeName() +
-                         " to path: " + saveFilePath);
-                String file_valid = "SUCCESS";
-                String err_msg = "";
-                if (saveFilePath.exists())
-                {
-                    file_valid = "FAILURE";
-                    err_msg = "SAVE FILE ALREADY EXISTS: " + saveFilePath;
+                TRACE_LOG.trace("Checking feasibility of save with path and nonce: "
+                                + file_path + ", " + file_nonce);
+
+                if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() != -1) {
+                    result.addRow(
+                                  context.getSite().getHost().getTypeName(),
+                                  hostname,
+                                  "",
+                                  "FAILURE",
+                    "SNAPSHOT IN PROGRESS");
+                    return new DependencyPair( DEP_saveTest, result);
                 }
-                else if (!saveFilePath.getParentFile().canWrite())
+
+                for (Table table : getTablesToSave(context))
                 {
-                    file_valid = "FAILURE";
-                    err_msg = "FILE LOCATION UNWRITABLE: " + saveFilePath;
-                }
-                else
-                {
-                    try
-                    {
-                        saveFilePath.createNewFile();
-                    }
-                    catch (IOException ex)
+                    File saveFilePath =
+                        constructFileForTable(table, file_path, file_nonce,
+                                              context.getSite().getHost().getTypeName());
+                    TRACE_LOG.trace("Host ID " + context.getSite().getHost().getTypeName() +
+                                    " table: " + table.getTypeName() +
+                                    " to path: " + saveFilePath);
+                    String file_valid = "SUCCESS";
+                    String err_msg = "";
+                    if (saveFilePath.exists())
                     {
                         file_valid = "FAILURE";
-                        err_msg = "FILE CREATION OF " + saveFilePath +
-                        "RESULTED IN IOException: " + ex.getMessage();
+                        err_msg = "SAVE FILE ALREADY EXISTS: " + saveFilePath;
                     }
+                    else if (!saveFilePath.getParentFile().canWrite())
+                    {
+                        file_valid = "FAILURE";
+                        err_msg = "FILE LOCATION UNWRITABLE: " + saveFilePath;
+                    }
+                    else
+                    {
+                        try
+                        {
+                            saveFilePath.createNewFile();
+                        }
+                        catch (IOException ex)
+                        {
+                            file_valid = "FAILURE";
+                            err_msg = "FILE CREATION OF " + saveFilePath +
+                            "RESULTED IN IOException: " + ex.getMessage();
+                        }
+                    }
+                    result.addRow(context.getSite().getHost().getTypeName(),
+                                  hostname,
+                                  table.getTypeName(),
+                                  file_valid,
+                                  err_msg);
                 }
-                result.addRow(context.getSite().getHost().getTypeName(),
-                                 hostname,
-                                 table.getTypeName(),
-                                 file_valid,
-                                 err_msg);
             }
             return new DependencyPair(DEP_saveTest, result);
         }
@@ -573,8 +582,8 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[0].fragmentId = SysProcFragmentId.PF_saveTest;
         pfs[0].outputDepId = DEP_saveTest;
         pfs[0].inputDepIds = new int[] {};
-        pfs[0].multipartition = false;
-        pfs[0].nonExecSites = true;
+        pfs[0].multipartition = true;
+        pfs[0].nonExecSites = false;
         ParameterSet params = new ParameterSet();
         params.setParameters(filePath, fileNonce);
         pfs[0].parameters = params;

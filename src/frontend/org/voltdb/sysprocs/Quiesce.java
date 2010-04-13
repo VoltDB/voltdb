@@ -32,7 +32,7 @@ import org.voltdb.dtxn.DtxnConstants;
 public class Quiesce extends VoltSystemProcedure {
 
     static final int DEP_SITES = (int) SysProcFragmentId.PF_quiesce_sites | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-    static final int DEP_NODES = (int) SysProcFragmentId.PF_quiesce_nodes | DtxnConstants.MULTINODE_DEPENDENCY;
+    static final int DEP_NODES = (int) SysProcFragmentId.PF_quiesce_nodes | DtxnConstants.MULTIPARTITION_DEPENDENCY;
     static final int DEP_PROCESSED_SITES = (int) SysProcFragmentId.PF_quiesce_processed_sites;
     static final int DEP_PROCESSED_NODES = (int) SysProcFragmentId.PF_quiesce_processed_nodes;
 
@@ -66,8 +66,16 @@ public class Quiesce extends VoltSystemProcedure {
             }
 
             else if (fragmentId == SysProcFragmentId.PF_quiesce_nodes) {
-                // tell each node to quiesce
-                VoltDB.quiesce();
+                // Choose the lowest site ID on this host to do the global
+                // quiesce.  All other sites should just claim 'okay'
+                int host_id = context.getExecutionSite().getCorrespondingHostId();
+                Integer lowest_site_id =
+                    VoltDB.instance().getCatalogContext().siteTracker.
+                    getLowestLiveExecSiteIdForHost(host_id);
+                if (context.getExecutionSite().getSiteId() == lowest_site_id)
+                {
+                    VoltDB.quiesce();
+                }
                 VoltTable dummy = new VoltTable(new ColumnInfo("status", VoltType.STRING));
                 dummy.addRow("okay");
                 return new DependencyPair(DEP_NODES, dummy);
@@ -116,8 +124,8 @@ public class Quiesce extends VoltSystemProcedure {
             pfs2[0].fragmentId = SysProcFragmentId.PF_quiesce_nodes;
             pfs2[0].outputDepId = DEP_NODES;
             pfs2[0].inputDepIds = new int[]{};
-            pfs2[0].multipartition = false;
-            pfs2[0].nonExecSites = true;
+            pfs2[0].multipartition = true;
+            pfs2[0].nonExecSites = false;
             pfs2[0].parameters = new ParameterSet();
 
             pfs2[1] = new SynthesizedPlanFragment();

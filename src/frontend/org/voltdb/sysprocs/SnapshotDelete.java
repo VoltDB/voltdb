@@ -43,7 +43,7 @@ public class SnapshotDelete extends VoltSystemProcedure {
                          VoltLoggerFactory.instance());
 
     private static final int DEP_snapshotDelete = (int)
-        SysProcFragmentId.PF_snapshotDelete | DtxnConstants.MULTINODE_DEPENDENCY;
+        SysProcFragmentId.PF_snapshotDelete | DtxnConstants.MULTIPARTITION_DEPENDENCY;
 
     private static final int DEP_snapshotDeleteResults = (int)
         SysProcFragmentId.PF_snapshotDeleteResults;
@@ -74,44 +74,53 @@ public class SnapshotDelete extends VoltSystemProcedure {
         VoltTable result = constructFragmentResultsTable();
         if (fragmentId == SysProcFragmentId.PF_snapshotDelete)
         {
-            assert(params.toArray()[0] != null);
-            assert(params.toArray()[0] instanceof String[]);
-            assert(((String[])params.toArray()[0]).length > 0);
-            assert(params.toArray()[1] != null);
-            assert(params.toArray()[1] instanceof String[]);
-            assert(((String[])params.toArray()[1]).length > 0);
-            assert(((String[])params.toArray()[0]).length == ((String[])params.toArray()[1]).length);
+            // Choose the lowest site ID on this host to do the deletion.
+            // All other sites should just return empty results tables.
+            int host_id = context.getExecutionSite().getCorrespondingHostId();
+            Integer lowest_site_id =
+                VoltDB.instance().getCatalogContext().siteTracker.
+                getLowestLiveExecSiteIdForHost(host_id);
+            if (context.getExecutionSite().getSiteId() == lowest_site_id)
+            {
+                assert(params.toArray()[0] != null);
+                assert(params.toArray()[0] instanceof String[]);
+                assert(((String[])params.toArray()[0]).length > 0);
+                assert(params.toArray()[1] != null);
+                assert(params.toArray()[1] instanceof String[]);
+                assert(((String[])params.toArray()[1]).length > 0);
+                assert(((String[])params.toArray()[0]).length == ((String[])params.toArray()[1]).length);
 
-            final String paths[] = (String[])params.toArray()[0];
-            final String nonces[] = (String[])params.toArray()[1];
-            for (int ii = 0; ii < paths.length; ii++) {
-                List<File> relevantFiles = retrieveRelevantFiles(paths[ii], nonces[ii]);
-                if (relevantFiles == null) {
-                    result.addRow(
-                            context.getSite().getHost().getTypeName(),
-                            hostname,
-                            paths[ii],
-                            nonces[ii],
-                            "",
-                            0,
-                            "FALSE",
-                            "FAILURE",
-                            errorString);
-                } else {
-                    for (final File f : relevantFiles) {
-                        long size = f.length();
-                        boolean deleted = f.delete();
+                final String paths[] = (String[])params.toArray()[0];
+                final String nonces[] = (String[])params.toArray()[1];
+                for (int ii = 0; ii < paths.length; ii++) {
+                    List<File> relevantFiles = retrieveRelevantFiles(paths[ii], nonces[ii]);
+                    if (relevantFiles == null) {
                         result.addRow(
-                                context.getSite().getHost().getTypeName(),
-                                hostname,
-                                paths[ii],
-                                nonces[ii],
-                                f.getName(),
-                                size,
-                                deleted ? "TRUE": "FALSE",
-                                "SUCESS",
-                                "");
+                                      context.getSite().getHost().getTypeName(),
+                                      hostname,
+                                      paths[ii],
+                                      nonces[ii],
+                                      "",
+                                      0,
+                                      "FALSE",
+                                      "FAILURE",
+                                      errorString);
+                    } else {
+                        for (final File f : relevantFiles) {
+                            long size = f.length();
+                            boolean deleted = f.delete();
+                            result.addRow(
+                                          context.getSite().getHost().getTypeName(),
+                                          hostname,
+                                          paths[ii],
+                                          nonces[ii],
+                                          f.getName(),
+                                          size,
+                                          deleted ? "TRUE": "FALSE",
+                                                  "SUCESS",
+                            "");
 
+                        }
                     }
                 }
             }
@@ -268,8 +277,8 @@ public class SnapshotDelete extends VoltSystemProcedure {
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_snapshotDelete;
         pfs[0].outputDepId = DEP_snapshotDelete;
-        pfs[0].multipartition = false;
-        pfs[0].nonExecSites = true;
+        pfs[0].multipartition = true;
+        pfs[0].nonExecSites = false;
         ParameterSet params = new ParameterSet();
         params.setParameters(paths, nonceWithSeparators);
         pfs[0].parameters = params;

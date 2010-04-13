@@ -54,12 +54,12 @@ public class Statistics extends VoltSystemProcedure {
         SysProcFragmentId.PF_procedureAggregator;
 
     static final int DEP_initiatorData = (int)
-        SysProcFragmentId.PF_initiatorData | DtxnConstants.MULTINODE_DEPENDENCY;
+        SysProcFragmentId.PF_initiatorData | DtxnConstants.MULTIPARTITION_DEPENDENCY;
     static final int DEP_initiatorAggregator = (int)
         SysProcFragmentId.PF_initiatorAggregator;
 
     static final int DEP_ioData = (int)
-        SysProcFragmentId.PF_ioData | DtxnConstants.MULTINODE_DEPENDENCY;
+        SysProcFragmentId.PF_ioData | DtxnConstants.MULTIPARTITION_DEPENDENCY;
     static final int DEP_ioDataAggregator = (int)
         SysProcFragmentId.PF_ioDataAggregator;
 
@@ -193,11 +193,24 @@ public class Statistics extends VoltSystemProcedure {
             ArrayList<Integer> catalogIds = new ArrayList<Integer>();
             catalogIds.add(0);
             VoltTable result = VoltDB.instance().
-                    getStatsAgent().getStats(
-                            SysProcSelector.INITIATOR,
-                            catalogIds,
-                            interval,
-                            now);
+            getStatsAgent().getStats(
+                                     SysProcSelector.INITIATOR,
+                                     catalogIds,
+                                     interval,
+                                     now);
+
+            // Choose the lowest site ID on this host to do the scan
+            // All other sites should just return empty results tables.
+            int host_id = context.getExecutionSite().getCorrespondingHostId();
+            Integer lowest_site_id =
+                VoltDB.instance().getCatalogContext().siteTracker.
+                getLowestLiveExecSiteIdForHost(host_id);
+            if (context.getExecutionSite().getSiteId() != lowest_site_id)
+            {
+                // Hacky way to generate an empty table with the correct
+                // schema
+                result.clearRowData();
+            }
             return new DependencyPair(DEP_initiatorData, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_initiatorAggregator) {
@@ -228,31 +241,40 @@ public class Statistics extends VoltSystemProcedure {
             result.addRow(context.getCluster().getPartitions().size());
             return new DependencyPair(DEP_partitionCount, result);
         } else if (fragmentId == SysProcFragmentId.PF_ioData) {
-            assert(params.toArray() != null);
-            assert(params.toArray().length == 2);
-            final boolean interval =
-                ((Byte)params.toArray()[0]).byteValue() == 0 ? false : true;
-            final Long now = (Long)params.toArray()[1];
             final VoltTable result = new VoltTable(ioColumnInfo);
-            final Map<Long, Pair<String,long[]>> stats =
-                 VoltDB.instance().getNetwork().getIOStats(interval);
+            // Choose the lowest site ID on this host to do the scan
+            // All other sites should just return empty results tables.
+            int host_id = context.getExecutionSite().getCorrespondingHostId();
+            Integer lowest_site_id =
+                VoltDB.instance().getCatalogContext().siteTracker.
+                getLowestLiveExecSiteIdForHost(host_id);
+            if (context.getExecutionSite().getSiteId() == lowest_site_id)
+            {
+                assert(params.toArray() != null);
+                assert(params.toArray().length == 2);
+                final boolean interval =
+                    ((Byte)params.toArray()[0]).byteValue() == 0 ? false : true;
+                final Long now = (Long)params.toArray()[1];
+                final Map<Long, Pair<String,long[]>> stats =
+                    VoltDB.instance().getNetwork().getIOStats(interval);
 
-            final Integer hostId = VoltDB.instance().getHostMessenger().getHostId();
-            final String hostname = VoltDB.instance().getHostMessenger().getHostname();
-            for (Map.Entry<Long, Pair<String, long[]>> e : stats.entrySet()) {
-                final Long connectionId = e.getKey();
-                final String remoteHostname = e.getValue().getFirst();
-                final long counters[] = e.getValue().getSecond();
-                result.addRow(
-                        now,
-                        hostId,
-                        hostname,
-                        connectionId,
-                        remoteHostname,
-                        counters[0],
-                        counters[1],
-                        counters[2],
-                        counters[3]);
+                final Integer hostId = VoltDB.instance().getHostMessenger().getHostId();
+                final String hostname = VoltDB.instance().getHostMessenger().getHostname();
+                for (Map.Entry<Long, Pair<String, long[]>> e : stats.entrySet()) {
+                    final Long connectionId = e.getKey();
+                    final String remoteHostname = e.getValue().getFirst();
+                    final long counters[] = e.getValue().getSecond();
+                    result.addRow(
+                                  now,
+                                  hostId,
+                                  hostname,
+                                  connectionId,
+                                  remoteHostname,
+                                  counters[0],
+                                  counters[1],
+                                  counters[2],
+                                  counters[3]);
+                }
             }
             return new DependencyPair(DEP_ioData, result);
         } else if (fragmentId == SysProcFragmentId.PF_ioDataAggregator) {
@@ -328,8 +350,8 @@ public class Statistics extends VoltSystemProcedure {
         pfs[1].fragmentId = SysProcFragmentId.PF_ioData;
         pfs[1].outputDepId = DEP_ioData;
         pfs[1].inputDepIds = new int[]{};
-        pfs[1].multipartition = false;
-        pfs[1].nonExecSites = true;
+        pfs[1].multipartition = true;
+        pfs[1].nonExecSites = false;
         pfs[1].parameters = new ParameterSet();
         pfs[1].parameters.setParameters((byte)interval, now);
 
@@ -375,8 +397,8 @@ public class Statistics extends VoltSystemProcedure {
         pfs[1].fragmentId = SysProcFragmentId.PF_initiatorData;
         pfs[1].outputDepId = DEP_initiatorData;
         pfs[1].inputDepIds = new int[]{};
-        pfs[1].multipartition = false;
-        pfs[1].nonExecSites = true;
+        pfs[1].multipartition = true;
+        pfs[1].nonExecSites = false;
         pfs[1].parameters = new ParameterSet();
         pfs[1].parameters.setParameters((byte)interval, now);
 

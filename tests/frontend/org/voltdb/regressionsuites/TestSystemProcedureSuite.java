@@ -112,6 +112,15 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         System.out.println("Test procedures table: " + results[0].toString());
     }
 
+    public void testStatistics_iostats() throws Exception {
+        Client client  = getClient();
+        VoltTable results[] = null;
+        results = client.callProcedure("@Statistics", "iostats", 0);
+        // one aggregate table returned
+        assertTrue(results.length == 1);
+        System.out.println("Test iostats table: " + results[0].toString());
+    }
+
     public void testStatistics_Initiator() throws Exception {
         Client client  = getClient();
         VoltTable results[] = null;

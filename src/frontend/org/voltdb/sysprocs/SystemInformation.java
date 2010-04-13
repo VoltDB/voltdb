@@ -36,7 +36,7 @@ import org.voltdb.dtxn.DtxnConstants;
 @ProcInfo(singlePartition = false)
 
 public class SystemInformation extends VoltSystemProcedure {
-    static final int DEP_DISTRIBUTE = 1 | DtxnConstants.MULTINODE_DEPENDENCY;
+    static final int DEP_DISTRIBUTE = 1 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
     static final int DEP_AGGREGATE = 2;
 
     /**
@@ -91,7 +91,24 @@ public class SystemInformation extends VoltSystemProcedure {
             ParameterSet params, SystemProcedureExecutionContext context) {
 
         if (fragmentId == SysProcFragmentId.PF_systemInformation_distribute) {
-            VoltTable result = populateTable(context);
+            VoltTable result = null;
+            // Choose the lowest site ID on this host to do the info gathering
+            // All other sites should just return empty results tables.
+            int host_id = context.getExecutionSite().getCorrespondingHostId();
+            Integer lowest_site_id =
+                VoltDB.instance().getCatalogContext().siteTracker.
+                getLowestLiveExecSiteIdForHost(host_id);
+            if (context.getExecutionSite().getSiteId() == lowest_site_id)
+            {
+                result = populateTable(context);
+            }
+            else
+            {
+                result = new VoltTable(
+                                       new ColumnInfo("node_id", VoltType.INTEGER),
+                                       new ColumnInfo("key", VoltType.STRING),
+                                       new ColumnInfo("value", VoltType.STRING));
+            }
             return new DependencyPair(DEP_DISTRIBUTE, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_systemInformation_aggregate) {
@@ -125,8 +142,8 @@ public class SystemInformation extends VoltSystemProcedure {
         spf[0].fragmentId = SysProcFragmentId.PF_systemInformation_distribute;
         spf[0].outputDepId = DEP_DISTRIBUTE;
         spf[0].inputDepIds = new int[] {};
-        spf[0].multipartition = false;      // not every site
-        spf[0].nonExecSites = true;         // but one site per host
+        spf[0].multipartition = true;
+        spf[0].nonExecSites = false;
         spf[0].parameters = new ParameterSet();
 
         spf[1] = new SynthesizedPlanFragment();
