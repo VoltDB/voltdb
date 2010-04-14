@@ -177,6 +177,12 @@ bool PersistentTable::insertTuple(TableTuple &source) {
     m_tmpTarget1.isDirty();
 
     if (!tryInsertOnAllIndexes(&m_tmpTarget1)) {
+        // Delete the strings.
+        for (int ii = 0; ii < m_schema->getUninlinedObjectColumnCount(); ii++) {
+            delete [] *reinterpret_cast<char**>
+                (m_tmpTarget1.getDataPtr(m_schema->getUninlinedObjectColumnInfoIndex(ii)));
+        }
+
         deleteTupleStorage(m_tmpTarget1);
         throw ConstraintFailureException(this, m_id, source, TableTuple(),
                                          voltdb::CONSTRAINT_TYPE_UNIQUE);
