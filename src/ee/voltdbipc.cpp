@@ -97,7 +97,7 @@ typedef struct {
     int64_t undoToken;
     int32_t outputDepId;
     int32_t inputDepId;
-    int16_t length;
+    int32_t length;
     char data[0];
 }__attribute__((packed)) customplanfrag;
 
@@ -602,7 +602,7 @@ void VoltDBIPC::executeCustomPlanFragmentAndGetResults(struct ipc_command *cmd) 
     m_engine->setUndoToken(ntohll(plan->undoToken));
 
     // data as fast serialized string
-    int16_t len = ntohs(plan->length);
+    int32_t len = ntohl(plan->length);
     string plan_str = string(plan->data, len);
 
     // deps info
