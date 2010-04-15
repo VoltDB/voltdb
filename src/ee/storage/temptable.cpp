@@ -109,14 +109,37 @@ void TempTable::loadTuplesFrom(bool, SerializeInput &serialize_io,
     int16_t colcount = serialize_io.readShort();
     assert(colcount >= 0);
 
+    // Store the following information so that we can provide them to the user
+    // on failure
+    ValueType types[colcount];
+    std::string names[colcount];
+
     // skip the column types
     for (int i = 0; i < colcount; ++i) {
-        serialize_io.readEnumInSingleByte();
+        types[i] = (ValueType) serialize_io.readEnumInSingleByte();
     }
 
     // skip the column names
     for (int i = 0; i < colcount; ++i) {
-        serialize_io.readTextString();
+        names[i] = serialize_io.readTextString();
+    }
+
+    // Check if the column count matches what the temp table is expecting
+    if (colcount != m_schema->columnCount()) {
+        std::stringstream message(std::stringstream::in
+                                  | std::stringstream::out);
+        message << "Column count mismatch. Expecting "
+                << m_schema->columnCount()
+                << ", but " << colcount << " given" << std::endl;
+        message << "Expecting the following columns:" << std::endl;
+        message << debug() << std::endl;
+        message << "The following columns are given:" << std::endl;
+        for (int i = 0; i < colcount; i++) {
+            message << "column " << i << ": " << names[i]
+                    << ", type = " << getTypeName(types[i]) << std::endl;
+        }
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      message.str().c_str());
     }
 
     int tupleCount = serialize_io.readInt();
