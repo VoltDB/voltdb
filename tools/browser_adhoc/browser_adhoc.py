@@ -242,6 +242,11 @@ class HTTPHandler(BaseHTTPRequestHandler):
                     self.wfile.write('</table>\n');
                     self.wfile.write('<br />' + str(rowsDisplayed) + ' Row(s) Displayed.\n');
 
+                # In case of error from the server
+                if response.status != 1:
+                    self.wfile.write(cgi.escape(str(response))\
+                                         .replace("\n", "<br />\n"))
+
             except IOError, e:
                 print e
                 self.wfile.write("Error: %s<br>\n" % (e))
