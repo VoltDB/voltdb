@@ -43,16 +43,16 @@ SELECT ma_instances.instanceId AS id,
        DATE(ma_initiators.tsEvent) as time
 FROM ma_instances, ma_initiators
 WHERE ma_instances.instanceId = ma_initiators.instanceId
-      AND ma_instances.startTime >= '{0}'
+      AND ma_instances.startTime >= '%s'
       AND ma_instances.applicationName = 'org.voltdb.benchmark.tpcc.TPCCClient'
-      AND ma_initiators.procedureName NOT LIKE '@%'
+      AND ma_initiators.procedureName NOT LIKE '@%%'
 GROUP BY hosts, time
 ORDER BY ma_instances.startTime DESC
-LIMIT {1}
+LIMIT %u
 """
 
     def get_latencies(self, start_time, count):
-        self.cursor.execute(self.LATENCIES.format(start_time, count))
+        self.cursor.execute(self.LATENCIES % (start_time, count))
         return self.cursor.fetchall()
 
 class ThroughputStat(Stat):
@@ -62,21 +62,21 @@ SELECT resultid as id,
        DATE(time) as time,
        MAX(txnpersecond) as tps
 FROM results
-WHERE time >= '{0}'
+WHERE time >= '%s'
       AND benchmarkname = 'org.voltdb.benchmark.tpcc.TPCCClient'
 GROUP BY hostcount, DATE(time)
 ORDER BY time DESC
-LIMIT {1}
+LIMIT %u
 """
 
     def get_throughputs(self, time, count):
         throughput_map = {}
 
-        self.cursor.execute(self.THROUGHPUT.format(time, count))
+        self.cursor.execute(self.THROUGHPUT % (time, count))
         return self.cursor.fetchall()
 
 class Plot:
-    DPI = 100
+    DPI = 100.0
 
     def __init__(self, title, xlabel, ylabel, filename, w, h):
         self.filename = filename
@@ -98,7 +98,7 @@ class Plot:
     def close(self):
         formatter = matplotlib.dates.DateFormatter("%b %d")
         self.ax.xaxis.set_major_formatter(formatter)
-        plt.legend(loc=0, ncol=2)
+        plt.legend(loc=0)
         plt.savefig(self.filename, format="png", transparent=False,
                     bbox_inches="tight", pad_inches=0.2)
 
