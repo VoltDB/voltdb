@@ -294,8 +294,9 @@ public class QueryPlanner {
         // split up the plan everywhere we see send/recieve into multiple plan fragments
         bestPlan = Fragmentizer.fragmentize(bestPlan, m_db);
 
+        // DTXN/EE can't handle plans that have more than 2 fragments yet.
         if (bestPlan.fragments.size() > 2) {
-            m_recentErrorMsg = "Unable to plan for statment. Likely statement is "+
+            m_recentErrorMsg = "Unable to plan for statement. Likely statement is "+
                 "joining two partitioned tables in a multi-partition stamtent. " +
                 "This is not supported at this time.";
             return null;
