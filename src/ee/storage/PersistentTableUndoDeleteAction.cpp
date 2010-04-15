@@ -38,14 +38,7 @@ void PersistentTableUndoDeleteAction::release() {
      * Persistent tables are responsible for managing the life of
      * strings stored in the table.
      */
-    const voltdb::TupleSchema *schema = m_tuple.getSchema();
-    const int uninlinedObjectColumnCount = schema->getUninlinedObjectColumnCount();
-    if (uninlinedObjectColumnCount > 0) {
-        for (int ii = 0; ii < uninlinedObjectColumnCount; ii++) {
-            const uint16_t objectColumnIndex = schema->getUninlinedObjectColumnInfoIndex(ii);
-            delete [] *reinterpret_cast<char**>(m_tuple.getDataPtr(objectColumnIndex));
-        }
-    }
+    m_tuple.freeObjectColumns();
 }
 
 PersistentTableUndoDeleteAction::~PersistentTableUndoDeleteAction() {

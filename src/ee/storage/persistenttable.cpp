@@ -89,12 +89,11 @@ PersistentTable::~PersistentTable() {
     // delete all tuples to free strings
     voltdb::TableIterator ti(this);
     voltdb::TableTuple tuple(m_schema);
+
     while (ti.next(tuple)) {
-        // indexs aren't released as they don't have ownership of strings
-        for (int ii = 0; ii < m_schema->getUninlinedObjectColumnCount(); ii++) {
-            delete [] *reinterpret_cast<char**>(tuple.getDataPtr(m_schema->getUninlinedObjectColumnInfoIndex(ii)));
-        }
-        tuple.setDeletedTrue(); // this DOES NOT  free strings
+        // indexes aren't released as they don't have ownership of strings
+        tuple.freeObjectColumns();
+        tuple.setDeletedTrue();
     }
     for (int i = 0; i < m_indexCount; ++i) {
         TableIndex *index = m_indexes[i];
@@ -177,12 +176,8 @@ bool PersistentTable::insertTuple(TableTuple &source) {
     m_tmpTarget1.isDirty();
 
     if (!tryInsertOnAllIndexes(&m_tmpTarget1)) {
-        // Delete the strings.
-        for (int ii = 0; ii < m_schema->getUninlinedObjectColumnCount(); ii++) {
-            delete [] *reinterpret_cast<char**>
-                (m_tmpTarget1.getDataPtr(m_schema->getUninlinedObjectColumnInfoIndex(ii)));
-        }
-
+        // Careful to delete allocated objects
+        m_tmpTarget1.freeObjectColumns();
         deleteTupleStorage(m_tmpTarget1);
         throw ConstraintFailureException(this, m_id, source, TableTuple(),
                                          voltdb::CONSTRAINT_TYPE_UNIQUE);
@@ -482,12 +477,8 @@ void PersistentTable::deleteTupleForUndo(voltdb::TableTuple &tupleCopy, size_t w
         // Just like insert, we want to remove this tuple from all of our indexes
         deleteFromAllIndexes(&target);
 
-        // Delete the strings.
-        for (int ii = 0; ii < m_schema->getUninlinedObjectColumnCount(); ii++) {
-            delete [] *reinterpret_cast<char**>
-                (target.getDataPtr(m_schema->getUninlinedObjectColumnInfoIndex(ii)));
-        }
-
+        // Delete the strings/objects
+        target.freeObjectColumns();
         deleteTupleStorage(target);
     }
 }
