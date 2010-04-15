@@ -5,16 +5,15 @@ is managed at https://voltdb.com/.
 
 What is VoltDB?
 ====================
-
-VoltDB is an in-memory online transaction processing (OLTP)
-database designed from the ground up to be the fastest most scalable
-OLTP system in the world.
+VoltDB is an in-memory online transaction processing (OLTP) database
+designed from the ground up to be the fastest most scalable OLTP
+system in the world.
 
 
 What it is not?
 ===============
-VoltDB is not a general purpose database like MySQL or
-PostgreSQL, for example. 
+VoltDB is not a general purpose database like MySQL or PostgreSQL, for
+example.
 
 
 Getting Started
@@ -26,7 +25,7 @@ Getting Started
 'ant dist'       Create a .tar.gz distribution with example apps
                  in obj/release/volt-version.tar.gz.
 
-There are three example projects which can be compiled and run.  See 
+There are three example projects which can be compiled and run.  See
 https://voltdb.com/svn/repos/build/newtrunk/examples/README for details.
 
 
@@ -36,7 +35,7 @@ doc/user_guide         Getting started using VoltDB.
 
 doc/developer_guide    Design overview and how to contribute.
 
-doc/developer_tools    Help using Eclipse, KDevelop, debugging... 
+doc/developer_tools    Help using Eclipse, KDevelop, debugging...
 
 Additional documentation is available in SVN at:
 TODO: need documentation source.
