@@ -702,7 +702,7 @@ class VoltException:
             return
 
         self.message = []
-        self.message_len = fser.readInt16()
+        self.message_len = fser.readInt32()
         for i in xrange(0, self.message_len):
             self.message.append(chr(fser.readByte()))
         self.message = ''.join(self.message)
