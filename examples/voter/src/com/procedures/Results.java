@@ -42,10 +42,11 @@ public class Results extends VoltProcedure {
                                                   "from v_votes_by_contestant_number b, " +
                                                   "     contestants a " +
                                                   "where a.contestant_number = b.contestant_number " +
-                                                  "group by a.contestant_name;");
+                                                  "group by a.contestant_name " +
+                                                  "order by a.contestant_name;");
 
     public VoltTable[] run() {
         voltQueueSQL(getResults);
         return voltExecuteSQL(true);
     }
-} 
+}

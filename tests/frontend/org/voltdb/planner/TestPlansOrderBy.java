@@ -130,4 +130,14 @@ public class TestPlansOrderBy extends TestCase {
             assertFalse(pn.findAllNodesOfType(PlanNodeType.ORDERBY).isEmpty());
         }
     }
+
+    public void testEng450()
+    {
+        AbstractPlanNode pn = null;
+        pn = compile("select T.T_PKEY, " +
+                     "sum(T.T_D1) " +
+                     "from T " +
+                     "group by T.T_PKEY " +
+                     "order by T.T_PKEY;", 0);
+    }
 }

@@ -880,11 +880,10 @@ public class PlanAssembler {
         // the offset into the input column array.
         for (ParsedSelectStmt.ParsedColInfo outputCol : m_parsedSelect.displayColumns) {
             assert(outputCol.expression != null);
-            outputCol = removeAggregation(outputCol);
             try {
                 AbstractExpression expressionWithRealOffsets =
-                    (AbstractExpression) outputCol.expression.clone();
-                calculateTupleValueColumnIndexes(expressionWithRealOffsets, rootNode.m_outputColumns);
+                    generateProjectionColumnExpression(outputCol,
+                                                     rootNode.m_outputColumns);
                 colInfo = m_context.getPlanColumn(expressionWithRealOffsets, outputCol.alias);
                 projectionNode.appendOutputColumn(colInfo);
             } catch (CloneNotSupportedException ex) {
@@ -903,21 +902,62 @@ public class PlanAssembler {
     }
 
     /**
-     * Walk expression and calculate the right columnIndex (offset)
-     * into sourceColumns for each tupleValueExpression.
-     * @param expression
+     * Generate the AbstractExpression that should be used to produce
+     * this output column for the projection.  In general, it
+     * walk expression and calculate the right columnIndex (offset)
+     * into sourceColumns for each tupleValueExpression, but there
+     * are currently ugly special-cases for projection columns that are
+     * aggregates
+     * @param outputCol the ParsedColInfo from the parsed select statement
      * @param sourceColumns
+     * @return The AbstractExpression that should be used for this projection
+     * @throws CloneNotSupportedException
      */
-    private void calculateTupleValueColumnIndexes(
-            AbstractExpression expression,
-            ArrayList<Integer> sourceColumns)
+    private AbstractExpression generateProjectionColumnExpression(
+            ParsedSelectStmt.ParsedColInfo outputCol,
+            ArrayList<Integer> sourceColumns) throws CloneNotSupportedException
     {
         Stack<AbstractExpression> stack = new Stack<AbstractExpression>();
+        AbstractExpression expression = (AbstractExpression) outputCol.expression.clone();
         AbstractExpression currExp = expression;
         while (currExp != null) {
 
+            // Found an aggregate expression.  This is already computed by
+            // an earlier plannode and the column should be directly in
+            // the output columns.  Look it up by the column alias.
+            // We don't actually need to do the work in this if but this
+            // allows the planner to barf if the aggregate column doesn't
+            // exist.
+            if (currExp instanceof AggregateExpression)
+            {
+                boolean found = false;
+                int offset = 0;
+                for (Integer colguid : sourceColumns) {
+                    PlanColumn plancol = m_context.get(colguid);
+                    /* System.out.printf("Expression: %s/%s. Candidate column: %s/%s\n",
+                            tve.getColumnAlias(), tve.getTableName(),
+                            plancol.originColumnName(), plancol.originTableName()); */
+                    if (outputCol.alias.equals(plancol.displayName()))
+                    {
+                        found = true;
+                        expression = (AbstractExpression) plancol.m_expression.clone();
+                        assert(expression instanceof TupleValueExpression);
+                        TupleValueExpression tve = (TupleValueExpression) expression;
+                        tve.setColumnIndex(offset);
+                        break;
+                    }
+                    ++offset;
+                }
+                if (!found) {
+                    System.out.println("PLANNER ERROR: could not match aggregate column alias");
+                    System.out.println(getSQLText());
+                    throw new RuntimeException("Could not match aggregate column alias.");
+                }
+                break;
+            }
+
             // found a TVE - calculate its offset into the sourceColumns
-            if (currExp instanceof TupleValueExpression) {
+            else if (currExp instanceof TupleValueExpression) {
                 TupleValueExpression tve = (TupleValueExpression)currExp;
                 boolean found = false;
                 int offset = 0;
@@ -926,8 +966,8 @@ public class PlanAssembler {
                     /* System.out.printf("Expression: %s/%s. Candidate column: %s/%s\n",
                             tve.getColumnAlias(), tve.getTableName(),
                             plancol.originColumnName(), plancol.originTableName()); */
-                    if (plancol.originColumnName().equals(tve.getColumnName()) &&
-                        plancol.originTableName().equals(tve.getTableName()))
+                    if (tve.getColumnName().equals(plancol.originColumnName()) &&
+                        tve.getTableName().equals(plancol.originTableName()))
                     {
                         tve.setColumnIndex(offset);
                         found = true;
@@ -940,7 +980,7 @@ public class PlanAssembler {
                     // for now - make this error obvious at least.
                     System.out.println("PLANNER ERROR: could not match tve column alias");
                     System.out.println(getSQLText());
-                    // throw new RuntimeException("Could not match TVE column alias.");
+                    throw new RuntimeException("Could not match TVE column alias.");
                 }
             }
 
@@ -954,6 +994,7 @@ public class PlanAssembler {
                     currExp = stack.pop();
             }
         }
+        return expression;
     }
 
     AbstractPlanNode addOrderBy(AbstractPlanNode root) {
@@ -1063,7 +1104,22 @@ public class PlanAssembler {
                     aggNode.getAggregateColumnGuids().add(aggregateColumn.guid());
                     aggNode.getAggregateColumnNames().add(aggregateColumn.displayName());
                     aggNode.getAggregateTypes().add(agg_expression_type);
-                    PlanColumn colInfo = m_context.getPlanColumn(rootExpr, col.alias);
+
+                    // A bit of a hack: ProjectionNodes using PlanColumns after the
+                    // aggregate node need the output columns here to
+                    // contain TupleValueExpressions (effectively on a temp table).
+                    // So we construct one based on the output of the
+                    // aggregate expression, the column alias provided by HSQL,
+                    // and the offset into the output table schema for the
+                    // aggregate node that we're computing.
+                    TupleValueExpression tve = new TupleValueExpression();
+                    tve.setValueType(rootExpr.getValueType());
+                    tve.setValueSize(rootExpr.getValueSize());
+                    tve.setColumnIndex(outputColumnIndex);
+                    tve.setColumnName("");
+                    tve.setColumnAlias(col.alias);
+                    tve.setTableName("VOLT_AGGREGATE_NODE_TEMP_TABLE");
+                    PlanColumn colInfo = m_context.getPlanColumn(tve, col.alias);
                     aggNode.appendOutputColumn(colInfo);
                     aggNode.getAggregateOutputColumns().add(outputColumnIndex);
                 }

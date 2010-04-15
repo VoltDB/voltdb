@@ -420,6 +420,27 @@ public class TestOrderBySuite extends RegressionSuite {
         }
     }
 
+    public void testAggOrderByGroupBy() throws IOException, ProcCallException, InterruptedException
+    {
+        VoltTable vt;
+        Client client = this.getClient();
+        loadWithDupes(client);
+        vt =  client.callProcedure("@AdHoc", "select sum(A_INT), A_INLINE_STR, sum(PKEY) from O1 group by A_INLINE_STR order by A_INLINE_STR" )[0];
+        System.out.println(vt.toString());
+        vt.advanceRow();
+        assertEquals(6, vt.get(0, VoltType.INTEGER));
+        assertEquals("Alice", vt.get(1, VoltType.STRING));
+        assertEquals(6, vt.get(2, VoltType.INTEGER));
+        vt.advanceRow();
+        assertEquals(6, vt.get(0, VoltType.INTEGER));
+        assertEquals("Betty", vt.get(1, VoltType.STRING));
+        assertEquals(15, vt.get(2, VoltType.INTEGER));
+        vt.advanceRow();
+        assertEquals(6, vt.get(0, VoltType.INTEGER));
+        assertEquals("Chris", vt.get(1, VoltType.STRING));
+        assertEquals(24, vt.get(2, VoltType.INTEGER));
+    }
+
     //
     // Suite builder boilerplate
     //
