@@ -1244,11 +1244,14 @@ public abstract class VoltProcedure {
 
         String exMsg = e.getMessage();
         if (exMsg == null)
-            if (e.getClass() == NullPointerException.class)
+            if (e.getClass() == NullPointerException.class) {
                 exMsg = "Null Pointer Exception";
-            else
-                exMsg = "Possible Null Pointer Exception";
-
+            }
+            else {
+                exMsg = "Possible Null Pointer Exception (";
+                exMsg += e.getClass().getSimpleName() + ")";
+                e.printStackTrace();
+            }
 
         msg.append("  ").append(exMsg);
 

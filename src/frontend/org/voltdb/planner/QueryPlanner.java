@@ -26,7 +26,8 @@ import org.hsqldb.HSQLInterface;
 import org.hsqldb.HSQLInterface.HSQLParseException;
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.voltdb.catalog.*;
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
@@ -292,6 +293,13 @@ public class QueryPlanner {
 
         // split up the plan everywhere we see send/recieve into multiple plan fragments
         bestPlan = Fragmentizer.fragmentize(bestPlan, m_db);
+
+        if (bestPlan.fragments.size() > 2) {
+            m_recentErrorMsg = "Unable to plan for statment. Likely statement is "+
+                "joining two partitioned tables in a multi-partition stamtent. " +
+                "This is not supported at this time.";
+            return null;
+        }
 
         return bestPlan;
     }

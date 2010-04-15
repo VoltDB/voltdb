@@ -85,15 +85,15 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
     }
 
-    /**
-     * Regression test for broken SQL of the variety:
-     *
-     * select * from TABLE where (TABLE.ID = value) and
-     *          (TABLE.col1 compared_to TABLE.col2)
-     *
-     * which would return results any time TABLE.ID = value was true,
-     * regardless of whether the second expression was true.
-     */
+    //
+    // Regression test for broken SQL of the variety:
+    //
+    // select * from TABLE where (TABLE.ID = value) and
+    //          (TABLE.col1 compared_to TABLE.col2)
+    //
+    // which would return results any time TABLE.ID = value was true,
+    // regardless of whether the second expression was true.
+    //
     public void testAndExpressionComparingSameTableColumns()
     throws IOException, ProcCallException
     {
@@ -125,18 +125,18 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
     }
 
-    /**
-     * Regression test for broken SQL of the variety:
-     *
-     * select * from replicated_table where (predicate) LIMIT n
-     *
-     * For replicated tables, LIMIT is inlined in seqscan; the tuple count was
-     * being incremented for each input tuple regardless of the predicate
-     * result, which was resulting in the wrong number of rows returned in some
-     * cases.
-     * @throws IOException
-     * @throws ProcCallException
-     */
+    //
+    // Regression test for broken SQL of the variety:
+    //
+    // select * from replicated_table where (predicate) LIMIT n
+    //
+    // For replicated tables, LIMIT is inlined in seqscan; the tuple count was
+    // being incremented for each input tuple regardless of the predicate
+    // result, which was resulting in the wrong number of rows returned in some
+    // cases.
+    // @throws IOException
+    // @throws ProcCallException
+    //
     public void testSeqScanFailedPredicateDoesntCountAgainstLimit()
     throws IOException, ProcCallException
     {
@@ -158,19 +158,19 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
     }
 
-    /**
-     * Regression test for broken SQL of the variety:
-     *
-     * select (non-aggregating expression) from table
-     * e.g. select col1 + col2 from table
-     *
-     * PlanAssembler extracts the left side of the expression to discard
-     * aggregation-type expressions from the parsed SQL, but was basically
-     * assuming that anything not a VALUE_TUPLE was an aggregate.
-     *
-     * Note: Adding 5.5 in the third test here also tests a "fix" in
-     * HSQL where we coerce the type of numeric literals from NUMERIC to DOUBLE
-     */
+    //
+    // Regression test for broken SQL of the variety:
+    //
+    // select (non-aggregating expression) from table
+    // e.g. select col1 + col2 from table
+    //
+    // PlanAssembler extracts the left side of the expression to discard
+    // aggregation-type expressions from the parsed SQL, but was basically
+    // assuming that anything not a VALUE_TUPLE was an aggregate.
+    //
+    // Note: Adding 5.5 in the third test here also tests a "fix" in
+    // HSQL where we coerce the type of numeric literals from NUMERIC to DOUBLE
+    //
     public void testSelectExpression()
     throws IOException, ProcCallException
     {
@@ -202,16 +202,16 @@ public class TestFixedSQLSuite extends RegressionSuite {
     }
 
 
-    /**
-     * Regression test for broken SQL of the variety:
-     *
-     * trac #166
-     *
-     * When evaluating the nest loop join predicate, insufficient
-     * information was available to tuplevalue expression nodes to
-     * understand which column(s) needed to be evaluated by the TVE's
-     * operators.
-     */
+    //
+    // Regression test for broken SQL of the variety:
+    //
+    // trac #166
+    //
+    // When evaluating the nest loop join predicate, insufficient
+    // information was available to tuplevalue expression nodes to
+    // understand which column(s) needed to be evaluated by the TVE's
+    // operators.
+    //
     public void testNestLoopJoinPredicates()
     throws IOException, ProcCallException
     {
@@ -275,14 +275,14 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
     }
 
-    /**
-     * Regression test for broken SQL of the variety:
-     *
-     * trac #125.  (verification in addition to testNestLoopJoinPredicates).
-     *
-     * Select a complex expression (not just a TupleValueExpression)
-     * to verify that non-root TVEs are correctly offset.
-     */
+    //
+    // Regression test for broken SQL of the variety:
+    //
+    // trac #125.  (verification in addition to testNestLoopJoinPredicates).
+    //
+    // Select a complex expression (not just a TupleValueExpression)
+    // to verify that non-root TVEs are correctly offset.
+    //
     public void testNestLoopJoinPredicatesWithExpressions()
     throws IOException, ProcCallException
     {
@@ -324,13 +324,13 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
     }
 
-    /**
-     * Regression test for broken SQL of the variety:
-     *
-     * trac #125. (additional verification).
-     *
-     * Select columns and expressions with aliases.
-     */
+    //
+    // Regression test for broken SQL of the variety:
+    //
+    // trac #125. (additional verification).
+    //
+    // Select columns and expressions with aliases.
+    //
     public void testNestLoopJoinPredicatesWithAliases()
     throws IOException, ProcCallException
     {
@@ -374,15 +374,15 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
 
 
-    /**
-     * Regression test for broken SQL of the sort
-     *
-     * select * from TABLE where COL_WITH_ORDERED_INDEX > n
-     *
-     * The bug is that indexscanexecutor and indexes treat > as >=
-     * @throws IOException
-     * @throws ProcCallException
-     */
+    //
+    // Regression test for broken SQL of the sort
+    //
+    // select * from TABLE where COL_WITH_ORDERED_INDEX > n
+    //
+    // The bug is that indexscanexecutor and indexes treat > as >=
+    // @throws IOException
+    // @throws ProcCallException
+    //
     public void testGreaterThanOnOrderedIndex()
     throws IOException, ProcCallException
     {
@@ -644,9 +644,9 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
     }
 
-    /*
-     * At first pass, HSQL barfed on decimal in sql-coverage. Debug/test that here.
-     */
+    //
+    // At first pass, HSQL barfed on decimal in sql-coverage. Debug/test that here.
+    //
     public void testForHSQLDecimalFailures() throws IOException, ProcCallException
     {
         Client client = getClient();
@@ -901,6 +901,19 @@ public class TestFixedSQLSuite extends RegressionSuite {
         assertTrue(caught);
     }
 
+    // RE-ENABLE ONCE ENG-490 IS FIXED
+    /*public void testTicketEng490() throws IOException, ProcCallException {
+        Client client = getClient();
+
+        VoltTable[] results = client.callProcedure("Eng490Select");
+        assertEquals(1, results.length);
+
+        String query = "SELECT  A.ASSET_ID,  A.OBJECT_DETAIL_ID,  OD.OBJECT_DETAIL_ID " +
+            "FROM   ASSET A,  OBJECT_DETAIL OD WHERE   A.OBJECT_DETAIL_ID = OD.OBJECT_DETAIL_ID";
+        results = client.callProcedure("@AdHoc", query);
+        assertEquals(1, results.length);
+    }*/
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -918,8 +931,11 @@ public class TestFixedSQLSuite extends RegressionSuite {
         project.addSchema(Insert.class.getResource("fixed-sql-ddl.sql"));
         project.addPartitionInfo("P1", "ID");
         project.addPartitionInfo("P2", "ID");
+        project.addPartitionInfo("ASSET", "ASSET_ID");
+        project.addPartitionInfo("OBJECT_DETAIL", "OBJECT_DETAIL_ID");
         project.addProcedures(PROCEDURES);
         project.addStmtProcedure("Eng397Limit1", "Select P1.NUM from P1 order by P1.NUM limit ?;");
+        //project.addStmtProcedure("Eng490Select", "SELECT A.ASSET_ID, A.OBJECT_DETAIL_ID,  OD.OBJECT_DETAIL_ID FROM ASSET A, OBJECT_DETAIL OD WHERE A.OBJECT_DETAIL_ID = OD.OBJECT_DETAIL_ID;");
 
         // CONFIG #1: Local Site/Partitions running on IPC backend
         // config = new LocalSingleProcessServer("sqltypes-onesite.jar", 1, BackendTarget.NATIVE_EE_IPC);

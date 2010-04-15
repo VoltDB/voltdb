@@ -400,7 +400,7 @@ public class VoltCompiler {
         } catch (final VoltCompilerException e) {
             compilerLog.l7dlog( Level.ERROR, LogKeys.compiler_VoltCompiler_FailedToCompileXML.name(), null);
             compilerLog.error(e.getMessage());
-            e.printStackTrace();
+            //e.printStackTrace();
             return null;
         }
         assert(m_catalog != null);
