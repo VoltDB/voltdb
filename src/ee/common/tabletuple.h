@@ -245,7 +245,6 @@ public:
 
     /** this does set NULL in addition to clear string count.*/
     void setAllNulls();
-    void setNull(int columnInde);
 
     bool equals(const TableTuple &other) const;
     bool equalsNoSchemaCheck(const TableTuple &other) const;
@@ -587,8 +586,7 @@ inline void TableTuple::setAllNulls() {
     assert(m_data);
 
     for (int ii = 0; ii < m_schema->columnCount(); ++ii) {
-        NValue value = getNValue(ii);
-        value.setNull();
+        NValue value = NValue::getNullValue(m_schema->columnType(ii));
         setNValue(ii, value);
     }
 }

@@ -114,11 +114,8 @@ class NValue {
     /* Create a boolean false NValue */
     static NValue getFalse();
 
-    /* Create an NValue with the minimum value for type */
-    static NValue getMinValue(ValueType);
-
-    /* Create an NValue with the maximum value for type */
-    static NValue getMaxValue(ValueType);
+    /* Create an NValue with the null representation for valueType */
+    static NValue getNullValue(ValueType);
 
     /* Create an NValue promoted/demoted to type */
     NValue castAs(ValueType type) const;
@@ -2140,43 +2137,9 @@ inline NValue NValue::op_min(const NValue rhs) const {
         }
 }
 
-inline NValue NValue::getMinValue(ValueType type) {
+inline NValue NValue::getNullValue(ValueType type) {
     NValue retval(type);
-    switch(type) {
-      case VALUE_TYPE_TINYINT:
-        retval.getTinyInt() = std::numeric_limits<int8_t>::min(); break;
-      case VALUE_TYPE_SMALLINT:
-        retval.getSmallInt() = std::numeric_limits<int16_t>::min(); break;
-      case VALUE_TYPE_INTEGER:
-        retval.getInteger() = std::numeric_limits<int32_t>::min(); break;
-      case VALUE_TYPE_BIGINT:
-      case VALUE_TYPE_TIMESTAMP:
-        retval.getBigInt() = std::numeric_limits<int64_t>::min(); break;
-      case VALUE_TYPE_DOUBLE:
-        retval.getDouble() = std::numeric_limits<double>::min(); break;
-      default:
-          throwFatalException ("No configured min value for type %d", (int) type);
-    }
-    return retval;
-}
-
-inline NValue NValue::getMaxValue(ValueType type) {
-    NValue retval(type);
-    switch(type) {
-      case VALUE_TYPE_TINYINT:
-        retval.getTinyInt() = std::numeric_limits<int8_t>::max(); break;
-      case VALUE_TYPE_SMALLINT:
-        retval.getSmallInt() = std::numeric_limits<int16_t>::max(); break;
-      case VALUE_TYPE_INTEGER:
-        retval.getInteger() = std::numeric_limits<int32_t>::max(); break;
-      case VALUE_TYPE_BIGINT:
-      case VALUE_TYPE_TIMESTAMP:
-        retval.getBigInt() = std::numeric_limits<int64_t>::max(); break;
-      case VALUE_TYPE_DOUBLE:
-        retval.getDouble() = std::numeric_limits<double>::max(); break;
-      default:
-          throwFatalException ("No configured max value for type %d", (int) type);
-    }
+    retval.setNull();
     return retval;
 }
 

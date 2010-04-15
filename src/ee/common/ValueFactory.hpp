@@ -56,6 +56,7 @@ public:
         return NValue::getNullStringValue();
     }
 
+    /** Returns valuetype = VALUE_TYPE_NULL. Careful with this! */
     static inline NValue getNullValue() {
         return NValue::getNullValue();
     }
