@@ -47,6 +47,7 @@ PRIMARY ENTRY POINTS
         <jvmarg value="-Djava.library.path=##voltdb_lib_path##" />
         <jvmarg value="-server" />
         <jvmarg value="-Xmx512m" />
+        <jvmarg value="-XX:-ReduceInitialCardMarks" />
         <classpath refid='project.classpath' />
         <assertions><disable /></assertions>
     </java>
