@@ -1422,7 +1422,14 @@ BENCHMARKS
         <param name="txnrate" value="${env.BMRATELIMIT}"/>
         <param name="warehouses" value="${env.BMTPCCWAREHOUSES}"/>
         <param name="volt.server.memory" value="2048"/>
+        <param name="kfactor" value="${env.BMKFACTOR}"/>
         <param name="os" value="${env.MACHTYPE}"/>
+
+        <!-- all four of these have to be set for it to do anything -->
+        <param name="snapshotPath" value="/tmp"/>
+        <param name="snapshotFrequency" value="{env.BMSNAPSHOTFREQUENCY}"/>
+        <param name="snapshotPrefix" value="volt_snapshot"/>
+        <param name="snapshotRetain" value="${env.BMSNAPSHOTRETAIN}"/>
     </antcall>
 </target>
 
