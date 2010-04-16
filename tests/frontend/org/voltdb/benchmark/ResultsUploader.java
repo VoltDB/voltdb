@@ -41,6 +41,7 @@ public class ResultsUploader implements BenchmarkController.BenchmarkInterest {
     final String m_benchmarkName;
     String m_benchmarkOptions;
     final HashMap<String, String> m_hostIdCache = new HashMap<String, String>();
+    final HashMap<String, String[]> m_hostDistroCache = new HashMap<String, String[]>();
     final HashMap<String, String> m_clientArgs = new HashMap<String, String>();
     final HashMap<String, String> m_hostArgs = new HashMap<String, String>();
 
@@ -145,11 +146,14 @@ public class ResultsUploader implements BenchmarkController.BenchmarkInterest {
                 String args = m_hostArgs.get(host);
                 if (args == null) args = "";
                 addToHostsTableIfMissing(host);
+                String distro[] = getHostDistroForHostName(host);
 
                 sql = new StringBuilder();
-                sql.append("INSERT INTO participants (`resultid`, `hostid`, `role`, `commandline`) values (");
+                sql.append("INSERT INTO participants (`resultid`, `hostid`, `distributor`, `release`, `role`, `commandline`) values (");
                 sql.append(String.valueOf(resultid)).append(", ");
                 sql.append("'").append(getHostIdForHostName(host)).append("', ");
+                sql.append("'").append(distro[0]).append("', ");
+                sql.append("'").append(distro[1]).append("', ");
                 sql.append("'SERVER', ");
                 sql.append("'").append(args).append("');");
                 m_stmt.executeUpdate(sql.toString());
@@ -255,6 +259,28 @@ public class ResultsUploader implements BenchmarkController.BenchmarkInterest {
             m_hostIdCache.put(hostname, mac);
         }
         return mac;
+    }
+
+    public String[] getHostDistroForHostName(String hostname) {
+        String[] retval = m_hostDistroCache.get(hostname);
+
+        if (retval != null)
+            return retval;
+
+        retval = new String[2];
+        String distro = SSHTools.cmd(m_config.remoteUser, hostname,
+                                     m_config.remotePath, "lsb_release -ir");
+        String[] lines = distro.trim().split("\n");
+        for (String l : lines) {
+            String[] kv = l.split(":");
+            if (kv[0].startsWith("Distributor"))
+                retval[0] = kv[1].trim();
+            else if (kv[0].startsWith("Release"))
+                retval[1] = kv[1].trim();
+        }
+        m_hostDistroCache.put(hostname, retval);
+
+        return retval;
     }
 
     public String getCurrentUserId() {
