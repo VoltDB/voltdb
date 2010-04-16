@@ -165,15 +165,18 @@ public class ResultsUploader implements BenchmarkController.BenchmarkInterest {
                 String[] clientParts = clientName.split(":");
                 String clientHostId = getHostIdForHostName(clientParts[0].trim());
                 String processIndex = clientParts[1].trim();
+                String distro[] = getHostDistroForHostName(clientParts[0].trim());
 
                 String args = m_clientArgs.get(clientName);
                 if (args == null) args = "";
                 addToHostsTableIfMissing(clientParts[0].trim());
 
                 sql = new StringBuilder();
-                sql.append("INSERT INTO participants (`resultid`, `hostid`, `processindex`, `role`, `commandline`) values (");
+                sql.append("INSERT INTO participants (`resultid`, `hostid`, `distributor`, `release`, `processindex`, `role`, `commandline`) values (");
                 sql.append(String.valueOf(resultid)).append(", ");
                 sql.append("'").append(clientHostId).append("', ");
+                sql.append("'").append(distro[0]).append("', ");
+                sql.append("'").append(distro[1]).append("', ");
                 sql.append(processIndex).append(", ");
                 sql.append("'CLIENT', ");
                 sql.append("'").append(args).append("');");
