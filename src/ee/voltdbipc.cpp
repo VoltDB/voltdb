@@ -1081,12 +1081,14 @@ void VoltDBIPC::signalDispatcher(int signum, siginfo_t *info, void *context) {
 }
 
 void VoltDBIPC::setupSigHandler(void) const {
+#if !defined(MEMCHECK) && !defined(MEMCHECK_NOFREELIST)
     struct sigaction action;
     memset(&action, 0, sizeof(action));
     action.sa_sigaction = VoltDBIPC::signalDispatcher;
     action.sa_flags = SA_SIGINFO;
     if(sigaction(SIGSEGV, &action, NULL) < 0)
         perror("Failed to setup signal handler for SIGSEGV");
+#endif
 }
 
 int main(int argc, char **argv) {
