@@ -45,10 +45,10 @@ public class Insert extends VoltProcedure {
     ("INSERT INTO ALLOW_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     public final SQLStmt i_with_defaults = new SQLStmt
-    ("INSERT INTO WITH_DEFAULTS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    ("INSERT INTO WITH_DEFAULTS (PKEY) VALUES (?)");
 
     public final SQLStmt i_with_null_defaults = new SQLStmt
-    ("INSERT INTO WITH_NULL_DEFAULTS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    ("INSERT INTO WITH_NULL_DEFAULTS (PKEY) VALUES (?)");
 
     public final SQLStmt i_expressions_with_nulls = new SQLStmt
     ("INSERT INTO EXPRESSIONS_WITH_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");

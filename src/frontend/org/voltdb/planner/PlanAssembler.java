@@ -36,6 +36,7 @@ import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
+import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -698,25 +699,26 @@ public class PlanAssembler {
             // get the expression for the column
             AbstractExpression expr = m_parsedInsert.columns.get(column);
 
-            // if there's no expression, make sure the column is nullable
+            // if there's no expression, make sure the column has
+            // some supported default value
             if (expr == null) {
-                // XXX HACK TEMPORARY WORKAROUND FOR TICKET #169
-                // Rather than checking to see if this column is nullable we'll
-                // just always throw the runtime exception if we get here.
-                // I'm leaving the original code commented out here
-                // --izzy 8-27-2009
-                //// if it's not nullable we have a problem
-                //if (column.getNullable() == false)
-                //    throw new RuntimeException("Column " + column.getName()
-                //            + " is not nullable.");
-                //expr = new NullValueExpression();
-                throw new PlanningErrorException("INSERT statements which only " +
-                                                 "insert a subset of the columns " +
-                                                 "are currently unsupported.");
-
-                // rtb: if there is no expression, isn't it as simple as
-                // making a constant value expression where
-                // (constant == (default ? default : null).
+                // if it's not nullable or defaulted we have a problem
+                if (column.getNullable() == false && column.getDefaulttype() == 0)
+                {
+                    throw new PlanningErrorException("Column " + column.getName()
+                            + " has no default and is not nullable.");
+                }
+                ConstantValueExpression const_expr =
+                    new ConstantValueExpression();
+                expr = const_expr;
+                if (column.getDefaulttype() != 0)
+                {
+                    const_expr.setValue(column.getDefaultvalue());
+                }
+                else
+                {
+                    const_expr.setValue("NULL");
+                }
             }
             // set the expression type to match the corresponding Column.
             // in reality, the expression will cast its resulting NValue to

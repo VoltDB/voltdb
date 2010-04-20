@@ -262,6 +262,16 @@ constantValueFactory(json_spirit::Object &obj,
                                       " VALUE value");
     }
 
+    if (valueValue.type() == json_spirit::str_type)
+    {
+        std::string nullcheck = valueValue.get_str();
+        if (nullcheck == "NULL")
+        {
+            newvalue = NValue::getNullValue(vt);
+            return constantValueFactory(newvalue);
+        }
+    }
+
     switch (vt) {
     case VALUE_TYPE_INVALID:
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,

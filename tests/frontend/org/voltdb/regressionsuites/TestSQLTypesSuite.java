@@ -83,40 +83,57 @@ public class TestSQLTypesSuite extends RegressionSuite {
         case TINYINT:
             final Byte b1 = (Byte)lhs;
             final Byte b2 = (Byte)rhs;
-            // System.out.println("\tComparing " + b1 + " == " + b2);
+            //System.out.println("\tComparing " + b1 + " == " + b2);
             return b1.byteValue() == b2.byteValue();
         case SMALLINT:
             final Short s1 = (Short)lhs;
             final Short s2 = (Short)rhs;
-            // System.out.println("\tComparing " + s1 + " == " + s2);
+            //System.out.println("\tComparing " + s1 + " == " + s2);
             return s1.shortValue() == s2.shortValue();
         case INTEGER:
             final Integer i1 = (Integer)lhs;
             final Integer i2 = (Integer)rhs;
-            // System.out.println("\tComparing " + i1 + " == " + i2);
+            //System.out.println("\tComparing " + i1 + " == " + i2);
             return i1.intValue() == i2.intValue();
         case BIGINT:
             final Long l1 = (Long)lhs;
             final Long l2 = (Long)rhs;
-            // System.out.println("\tComparing " + l1 + " == " + l2);
+            //System.out.println("\tComparing " + l1 + " == " + l2);
             return l1.longValue() == l2.longValue();
         case FLOAT:
             final Double d1 = (Double)lhs;
             final Double d2 = (Double)rhs;
-            // System.out.println("\tComparing " + d1 + " == " + d2);
+            //System.out.println("\tComparing " + d1 + " == " + d2);
+            // Handle the screwy null double value (isn't quite min double)
+            if (((d1 == VoltType.NULL_FLOAT) && (d2 <= d1)) ||
+                ((d2 == VoltType.NULL_FLOAT) && (d1 <= d2)))
+            {
+                return true;
+            }
             return (d1.compareTo(d2) == 0);
         case STRING:
-            // System.out.println("\tComparing " + (String)lhs + " == " + (String)rhs);
-            if (lhs == null && rhs == null) return true;
+            //System.out.println("\tComparing " + lhs + " == " + rhs);
+            if ((lhs == null || lhs == VoltType.NULL_STRING) &&
+                (rhs == null || rhs == VoltType.NULL_STRING))
+            {
+                return true;
+            }
             return ((String)lhs).equals(rhs);
         case TIMESTAMP:
-            // System.out.println("\tComparing " + lhs + " == " + rhs);
-            if (lhs == null && rhs == null) return true;
+            //System.out.println("\tComparing " + lhs + " == " + rhs);
+            if ((lhs == null || lhs == VoltType.NULL_TIMESTAMP) &&
+                (rhs == null || rhs == VoltType.NULL_TIMESTAMP))
+            {
+                return true;
+            }
             return ((TimestampType)lhs).equals(rhs);
         case DECIMAL:
-            // System.out.println("\tComparing " + lhs + " == " + rhs);
-            if (lhs == null && rhs == null) return true;
-            if (lhs == null || rhs == null) return false;
+            //System.out.println("\tComparing " + lhs + " == " + rhs);
+            if ((lhs == null || lhs == VoltType.NULL_DECIMAL) &&
+                (rhs == null || rhs == VoltType.NULL_DECIMAL))
+            {
+                return true;
+            }
             return ((BigDecimal)lhs).equals(rhs);
         }
 
@@ -267,6 +284,22 @@ public class TestSQLTypesSuite extends RegressionSuite {
       new String(byteArray(1, OO)),
       new String(byteArray(1, OO)),
       new BigDecimal(new BigInteger("-99999999999999999999999999999999999999")).scaleByPowerOfTen(-1 * VoltDecimalHelper.kDefaultScale)
+      // UPDATE WHEN ADDING NEW TYPE
+    };
+
+    // default (defined in DDL) value for each type
+    public Object[] m_defaultValues = {
+      new Byte((byte)(1)),
+      new Short((short)(2)),
+      3,
+      4L,
+      5.1,
+      new TimestampType(600000),
+      new String("abcd"),
+      new String("abcdefghij"),
+      new String("abcdefghijklmnopqrstuvwxyz"),
+      new String("abcdefghijklmnopqrstuvwxyz"),
+      new BigDecimal(new BigInteger("6000000000000")).scaleByPowerOfTen(-1 * VoltDecimalHelper.kDefaultScale)
       // UPDATE WHEN ADDING NEW TYPE
     };
 
@@ -693,49 +726,69 @@ public class TestSQLTypesSuite extends RegressionSuite {
         }
      }
 
-//
-// Fails on account of ticket #169
-//
-//    public void testMissingAttributeInsert_No_Defaults()
-//    throws NoConnectionsException, ProcCallException, IOException
-//    {
-//        Client client = this.getClient();
-//
-//        Object params[] = new Object[COLS + 2];
-//
-//        params[0] = "WITH_DEFAULTS";
-//        params[1] = pkey.incrementAndGet();
-//        for (int i = 0; i < COLS; i++) {
-//            params[i+2] = m_midValues[i];
-//            assert(params[i+2] != null);
-//        }
-//
-//        try {
-//            client.callProcedure("Insert", params);
-//        } catch (ProcCallException e) {
-//            e.printStackTrace();
-//            fail();
-//        } catch (NoConnectionsException e) {
-//            e.printStackTrace();
-//            fail();
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//            fail();
-//        }
-//
-//        VoltTable[] result = client.callProcedure("Select", "WITH_DEFAULTS", pkey.get());
-//        Row row = result[0].fetchRow(0);
-//        for (int i=0; i < COLS; ++i) {
-//            Object obj = row.get(i+1, m_types[i]);
-//            assertTrue( comparisonHelper(obj, params[i+2], m_types[i]) );
-//        }
-//    }
+    public void testMissingAttributeInsert_With_Defaults()
+    throws NoConnectionsException, ProcCallException, IOException
+    {
+        Client client = this.getClient();
 
-    /*
-     public testMissingAttributeInsert_Defaults() {
-     }
-     */
+        Object params[] = new Object[COLS + 2];
 
+        params[0] = "WITH_DEFAULTS";
+        params[1] = pkey.incrementAndGet();
+        for (int i = 0; i < COLS; i++) {
+            params[i+2] = m_defaultValues[i];
+            assert(params[i+2] != null);
+        }
+
+        try {
+            client.callProcedure("Insert", params);
+        } catch (ProcCallException e) {
+            e.printStackTrace();
+            fail();
+        } catch (NoConnectionsException e) {
+            e.printStackTrace();
+            fail();
+        }
+
+        VoltTable[] result = client.callProcedure("Select", "WITH_DEFAULTS", pkey.get());
+        VoltTableRow row = result[0].fetchRow(0);
+        for (int i=0; i < COLS; ++i) {
+            Object obj = row.get(i+1, m_types[i]);
+            assertTrue( comparisonHelper(obj, params[i+2], m_types[i]) );
+        }
+    }
+
+    public void testMissingAttributeInsert_With_Null_Defaults()
+    throws NoConnectionsException, ProcCallException, IOException
+    {
+        Client client = this.getClient();
+
+        Object params[] = new Object[COLS + 2];
+
+        params[0] = "WITH_NULL_DEFAULTS";
+        params[1] = pkey.incrementAndGet();
+        for (int i = 0; i < COLS; i++) {
+            params[i+2] = m_nullValues[i];
+            assert(params[i+2] != null);
+        }
+
+        try {
+            client.callProcedure("Insert", params);
+        } catch (ProcCallException e) {
+            e.printStackTrace();
+            fail();
+        } catch (NoConnectionsException e) {
+            e.printStackTrace();
+            fail();
+        }
+
+        VoltTable[] result = client.callProcedure("Select", "WITH_NULL_DEFAULTS", pkey.get());
+        VoltTableRow row = result[0].fetchRow(0);
+        for (int i=0; i < COLS; ++i) {
+            Object obj = row.get(i+1, m_types[i]);
+            assertTrue( comparisonHelper(obj, params[i+2], m_types[i]) );
+        }
+    }
 
     /**
      * Round trip the maximum value

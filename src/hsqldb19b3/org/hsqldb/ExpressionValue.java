@@ -32,6 +32,7 @@
 package org.hsqldb;
 
 import org.hsqldb.HSQLInterface.HSQLParseException;
+import org.hsqldb.types.TimestampData;
 import org.hsqldb.types.Type;
 
 /**
@@ -129,7 +130,26 @@ public class ExpressionValue extends Expression {
             } else {
                 String value = "NULL";
                 if (valueData != null)
-                    value = valueData.toString();
+                {
+                    if (valueData instanceof TimestampData)
+                    {
+                        // When we get the default from the DDL,
+                        // it gets jammed into a TimestampData object.  If we
+                        // don't do this, we get a Java class/reference
+                        // string in the output schema for the DDL.
+                        // EL HACKO: I'm just adding in the timezone seconds
+                        // at the moment, hope this is right --izzy
+                        TimestampData time = (TimestampData) valueData;
+                        value =
+                            Long.toString(Math.round((time.getSeconds() +
+                                                      time.getZone()) * 1e6) +
+                                                     time.getNanos() / 1000);
+                    }
+                    else
+                    {
+                        value = valueData.toString();
+                    }
+                }
                 sb.append("value=\"").append(value).append("\" ");
             }
 

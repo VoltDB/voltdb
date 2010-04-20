@@ -34,6 +34,7 @@ public class ConstantValueExpression extends AbstractValueExpression {
     }
 
     protected String m_value = null;
+    protected boolean m_isNull = true;
 
     public ConstantValueExpression() {
         super(ExpressionType.VALUE_CONSTANT);
@@ -48,6 +49,7 @@ public class ConstantValueExpression extends AbstractValueExpression {
     public Object clone() throws CloneNotSupportedException {
         ConstantValueExpression clone = (ConstantValueExpression)super.clone();
         clone.m_value = m_value;
+        clone.m_isNull = m_isNull;
         return clone;
     }
 
@@ -56,9 +58,10 @@ public class ConstantValueExpression extends AbstractValueExpression {
         super.validate();
 
         // Make sure our value is not null
-        if (m_value == null) {
-            throw new Exception("ERROR: The constant value for '" + this + "' is NULL");
-
+        if (m_value == null && !m_isNull)
+        {
+            throw new Exception("ERROR: The constant value for '" + this +
+                                "' is inconsistently null");
         // Make sure the value type is something we support here
         } else if (m_valueType == VoltType.NULL ||
                    m_valueType == VoltType.VOLTTABLE) {
@@ -78,6 +81,11 @@ public class ConstantValueExpression extends AbstractValueExpression {
      */
     public void setValue(String value) {
         m_value = value;
+        m_isNull = false;
+        if (m_value == null || m_value.equals("NULL"))
+        {
+            m_isNull = true;
+        }
     }
 
     @Override
@@ -85,12 +93,18 @@ public class ConstantValueExpression extends AbstractValueExpression {
         if (obj instanceof ConstantValueExpression == false) return false;
         ConstantValueExpression expr = (ConstantValueExpression) obj;
 
-        if ((expr.m_value == null) != (m_value == null))
-            return false;
+        if (expr.m_isNull && m_isNull)
+        {
+            return true;
+        }
 
-        if (expr.m_value != null)
-            if (expr.m_value.equals(m_value) == false)
-                return false;
+        if (expr.m_isNull != m_isNull)
+        {
+            return false;
+        }
+
+        if (expr.m_value.equals(m_value) == false)
+            return false;
 
         // if all seems well, defer to the superclass, which checks kids
         return super.equals(obj);
@@ -100,37 +114,45 @@ public class ConstantValueExpression extends AbstractValueExpression {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         stringer.key(Members.VALUE.name());
-        switch (m_valueType) {
-        case INVALID:
-            throw new JSONException("ConstantValueExpression.toJSONString(): value_type should never be VoltType.INVALID");
-        case NULL:
-            throw new JSONException("ConstantValueExpression.toJSONString(): And they should be never be this either! VoltType.NULL");
-        case TINYINT:
-            stringer.value(Long.valueOf(m_value));
-            break;
-        case SMALLINT:
-            stringer.value(Long.valueOf(m_value));
-            break;
-        case INTEGER:
-            stringer.value(Long.valueOf(m_value));
-            break;
-        case BIGINT:
-            stringer.value(Long.valueOf(m_value));
-            break;
-        case FLOAT:
-            stringer.value(Double.valueOf(m_value));
-            break;
-        case STRING:
-            stringer.value(m_value);
-            break;
-        case TIMESTAMP:
-            stringer.value(Long.valueOf(m_value));
-            break;
-        case DECIMAL:
-            stringer.value(m_value);
-            break;
-        default:
-            throw new JSONException("ConstantValueExpression.toJSONString(): Unrecognized value_type " + m_valueType);
+        if (m_isNull)
+        {
+            stringer.value("NULL");
+        }
+        else
+        {
+            switch (m_valueType)
+            {
+            case INVALID:
+                throw new JSONException("ConstantValueExpression.toJSONString(): value_type should never be VoltType.INVALID");
+            case NULL:
+                throw new JSONException("ConstantValueExpression.toJSONString(): And they should be never be this either! VoltType.NULL");
+            case TINYINT:
+                stringer.value(Long.valueOf(m_value));
+                break;
+            case SMALLINT:
+                stringer.value(Long.valueOf(m_value));
+                break;
+            case INTEGER:
+                stringer.value(Long.valueOf(m_value));
+                break;
+            case BIGINT:
+                stringer.value(Long.valueOf(m_value));
+                break;
+            case FLOAT:
+                stringer.value(Double.valueOf(m_value));
+                break;
+            case STRING:
+                stringer.value(m_value);
+                break;
+            case TIMESTAMP:
+                stringer.value(Long.valueOf(m_value));
+                break;
+            case DECIMAL:
+                stringer.value(m_value);
+                break;
+            default:
+                throw new JSONException("ConstantValueExpression.toJSONString(): Unrecognized value_type " + m_valueType);
+            }
         }
     }
 
