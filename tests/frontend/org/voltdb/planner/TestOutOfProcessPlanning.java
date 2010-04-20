@@ -26,18 +26,20 @@ package org.voltdb.planner;
 import junit.framework.TestCase;
 
 import org.voltdb.compiler.PlannerTool;
+import org.voltdb.utils.CatalogUtil;
 
 public class TestOutOfProcessPlanning extends TestCase {
 
     public void testSimple() {
-        PlannerTool pt = PlannerTool.createPlannerToolProcess("tpcc.jar");
-        /*try {
-            String[] plans = pt.planSql("select * from warehouse;");
-        }
-        catch (Exception e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }*/
+        String serializedCatalog = CatalogUtil.loadCatalogFromJar("tpcc.jar", null);
+
+        PlannerTool pt = PlannerTool.createPlannerToolProcess(serializedCatalog);
+        PlannerTool.Result result = null;
+        result = pt.planSql("select * from warehouse;");
+        System.out.println(result);
+
+        result = pt.planSql("ryan like the yankees");
+        System.out.println(result);
     }
 
 }

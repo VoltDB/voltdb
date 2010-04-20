@@ -18,10 +18,13 @@
 package org.voltdb.compiler;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.util.ArrayList;
+import java.util.Date;
 
 import org.hsqldb.HSQLInterface;
 import org.hsqldb.HSQLInterface.HSQLParseException;
@@ -33,7 +36,6 @@ import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.TrivialCostModel;
 import org.voltdb.planner.CompiledPlan.Fragment;
 import org.voltdb.plannodes.PlanNodeList;
-import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
 /**
@@ -45,6 +47,25 @@ public class PlannerTool {
     Process m_process;
     OutputStreamWriter m_in;
 
+    public static class Result {
+        String onePlan = null;
+        String allPlan = null;
+        String errors = null;
+        boolean replicatedDML = false;
+
+        @Override
+        public String toString() {
+            StringBuilder sb = new StringBuilder();
+            sb.append("RESULT {\n");
+            sb.append("  ONE: ").append(onePlan == null ? "null" : onePlan).append("\n");
+            sb.append("  ALL: ").append(allPlan == null ? "null" : allPlan).append("\n");
+            sb.append("  ERR: ").append(errors == null ? "null" : errors).append("\n");
+            sb.append("  RTD: ").append(replicatedDML ? "true" : "false").append("\n");
+            sb.append("}");
+            return sb.toString();
+        }
+    }
+
     PlannerTool(Process process, OutputStreamWriter in) {
         assert(process != null);
         assert(in != null);
@@ -53,102 +74,82 @@ public class PlannerTool {
         m_in = in;
     }
 
-    public synchronized void kill() {
+    public void kill() {
         m_process.destroy();
     }
 
-    public synchronized String[] planSql(String sql) throws Exception {
-        String[] retval = null;
+    public synchronized Result planSql(String sql) {
+        Result retval = new Result();
+        retval.errors = "";
 
         if ((sql == null) || (sql.length() == 0)) {
-            retval = new String[1];
-            retval[0] = "ERROR: Can't plan empty or null SQL.";
+            retval.errors = "Can't plan empty or null SQL.";
             return retval;
         }
         // remove any spaces or newlines
         sql = sql.trim();
-        m_in.write(sql + "\n");
-        m_in.flush();
+        try {
+            m_in.write(sql + "\n");
+            m_in.flush();
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
 
-        String line1 = readLineFromProcess(m_process, 3000);
-        assert(line1 != null);
-        String line2 = null;
-        if (line1.startsWith("ERROR: ")) {
-            // get rid of "ERROR: "
-            line1 = line1.substring(7);
-            throw new IOException(line1);
-        }
-        else if (line1.startsWith("PLAN-ONE: ")) {
-            // valid case
-        }
-        else if (line1.startsWith("PLAN-ALL: ")) {
-            line2 = readLineFromProcess(m_process, 500);
-            assert(line2 != null);
-            if (line2.startsWith("ERROR: ")) {
-                // get rid of "ERROR: "
-                line2 = line2.substring(7);
-                throw new IOException(line2);
-            }
-            if (line2.startsWith("PLAN-ONE: ") == false) {
-                throw new IOException("Unintelligble output from planner process.");
-            }
-            // trim PLAN-TWO: from the front
-            line2 = line1.substring(10);
-        }
-        else {
-            throw new IOException("Unintelligble output from planner process.");
-        }
-        // trim PLAN-XYZ: from the front
-        line1 = line1.substring(10);
+        BufferedReader r = new BufferedReader(new InputStreamReader(m_process.getInputStream()));
 
-        retval = (line2 == null) ? new String[1] : new String[2];
-        retval[0] = line1;
-        if (line2 != null) retval[1] = line2;
+        ArrayList<String> output = new ArrayList<String>();
+
+        // read all the lines of output until a newline
+        while (true) {
+            String line = null;
+            try {
+                line = r.readLine();
+            }
+            catch (Exception e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+            if (line == null)
+                continue;
+            line = line.trim();
+            if (line.length() == 0)
+                break;
+            //System.err.println(line);
+            output.add(line);
+        }
+
+        // bucket and process the lines into a response
+        for (String line : output) {
+            if (line.startsWith("PLAN-ONE: ")) {
+                // trim PLAN-ONE: from the front
+                assert(retval.onePlan == null);
+                retval.onePlan = line.substring(10);
+            }
+            else if (line.startsWith("PLAN-ALL: ")) {
+                // trim PLAN-ALL: from the front
+                assert(retval.allPlan == null);
+                retval.allPlan = line.substring(10);
+            }
+            else if (line.startsWith("REPLICATED-DML: ")) {
+                retval.replicatedDML = true;
+            }
+            else {
+                // assume error output
+                retval.errors += line.substring(7) + "\n";
+            }
+        }
+
+        // post-process errors
+        // removes newlines
+        retval.errors = retval.errors.trim();
+        // no errors => null
+        if (retval.errors.length() == 0) retval.errors = null;
 
         return retval;
     }
 
-    /**
-     * Try to read a line of output from stdout of the process. Wait a specified
-     * amount of time before failing. Under timeout or any error scenario, throw
-     * an exception.
-     *
-     * @param p The process to read output from.
-     * @param timeoutInMillis How long to wait for the output.
-     * @return One line of text from process stdout.
-     * @throws InterruptedException
-     * @throws IOException
-     */
-    private static String readLineFromProcess(Process p, long timeoutInMillis) throws IOException, InterruptedException {
-        StringBuilder line = new StringBuilder();
-        InputStreamReader isr = new InputStreamReader(p.getInputStream());
-
-        long timeout = 100;
-        if ((timeout * 2) > timeoutInMillis)
-            timeout = timeoutInMillis / 2;
-
-        long start = System.nanoTime();
-        long now = start;
-        char c = ' ';
-        while (c != '\n') {
-            if (p.getInputStream().available() > 0) {
-                c = (char) isr.read();
-                if (c == '\n') break;
-                else line.append(c);
-            }
-            else {
-                now = System.nanoTime();
-                System.out.printf("Blocked for %d ms\n", (now - start) / 1000000);
-                if ((now - start) > (timeoutInMillis * 1000000))
-                    throw new InterruptedException("Timeout while reading output from process");
-                Thread.sleep(timeout);
-            }
-        }
-
-        return line.toString();
-    }
-
-    public static PlannerTool createPlannerToolProcess(String pathToCatalog) {
+    public static PlannerTool createPlannerToolProcess(String serializedCatalog) {
         String classpath = System.getProperty("java.class.path");
         assert(classpath != null);
 
@@ -171,8 +172,32 @@ public class PlannerTool {
         }
         OutputStreamWriter in = new OutputStreamWriter(process.getOutputStream());
 
+        String encodedCatalog = Encoder.compressAndBase64Encode(serializedCatalog);
+
+        try {
+            in.write(encodedCatalog + "\n");
+            in.flush();
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+
         return new PlannerTool(process, in);
     }
+
+    static void log(String str) {
+        try {
+            FileWriter log = new FileWriter(m_logfile, true);
+            log.write(str + "\n");
+            log.flush();
+            log.close();
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+    }
+
+    static File m_logfile;
 
     /**
      * @param args
@@ -182,26 +207,38 @@ public class PlannerTool {
         // PARSE COMMAND LINE ARGS
         //////////////////////
 
-        if (args.length != 1) {
-            // need usage here
-            return;
-        }
+        m_logfile = new File("plannerlog.txt");
 
-        String pathToCatalog = args[0];
+        log("\ngetting started at: " + new Date().toString());
 
         //////////////////////
         // LOAD THE CATALOG
         //////////////////////
 
-        final String serializedCatalog = CatalogUtil.loadCatalogFromJar(pathToCatalog, null);
+        BufferedReader br = null;
+        final int TEN_MEGS = 10 * 1024 * 1024;
+        br = new BufferedReader(new InputStreamReader(System.in), TEN_MEGS);
+        String encodedSerializedCatalog = null;
+        try {
+            encodedSerializedCatalog = br.readLine();
+        } catch (IOException e2) {
+            log("Couldn't read catalog");
+            // TODO Auto-generated catch block
+            e2.printStackTrace();
+        }
+
+        final String serializedCatalog = Encoder.decodeBase64AndDecompress(encodedSerializedCatalog);
         if ((serializedCatalog == null) || (serializedCatalog.length() == 0)) {
+            log("Catalog is null or empty");
             // need real error path
-            return;
+            System.exit(28);
         }
         Catalog catalog = new Catalog();
         catalog.execute(serializedCatalog);
         Cluster cluster = catalog.getClusters().get("cluster");
         Database db = cluster.getDatabases().get("database");
+
+        log("catalog loaded");
 
         //////////////////////
         // LOAD HSQL
@@ -219,18 +256,19 @@ public class PlannerTool {
                 hsql.runDDLCommand(command);
             } catch (HSQLParseException e) {
                 // need a good error message here
+                log("Error creating hsql: " + e.getMessage());
                 e.printStackTrace();
                 return;
             }
         }
+
+        log("hsql loaded");
 
         //////////////////////
         // BEGIN THE MAIN INPUT LOOP
         //////////////////////
 
         String inputLine = "";
-        InputStreamReader isr = new InputStreamReader(System.in);
-        BufferedReader in = new BufferedReader(isr);
 
         while (true) {
 
@@ -239,17 +277,19 @@ public class PlannerTool {
             //////////////////////
 
             try {
-                inputLine = in.readLine();
+                inputLine = br.readLine();
             } catch (IOException e1) {
                 // TODO Auto-generated catch block
                 e1.printStackTrace();
             }
             // check the input
             if (inputLine.length() == 0) {
-                // need error output here
+                log("got a zero-length sql statement");
                 continue;
             }
             inputLine = inputLine.trim();
+
+            log("recieved sql stmt: " + inputLine);
 
             //////////////////////
             // PLAN THE STMT
@@ -263,9 +303,15 @@ public class PlannerTool {
                 plan = planner.compilePlan(
                         costModel, inputLine, "PlannerTool", "PlannerToolProc", false, null);
             } catch (Exception e) {
-                // need a good error path here
-                e.printStackTrace();
-                return;
+                log("Error creating planner: " + e.getMessage());
+                String plannerMsg = e.getMessage();
+                if (plannerMsg != null) {
+                    System.out.println("ERROR: " + plannerMsg + "\n");
+                }
+                else {
+                    System.out.println("ERROR: UNKNOWN PLANNING ERROR\n");
+                }
+                continue;
             }
             if (plan == null) {
                 String plannerMsg = planner.getErrorMessage();
@@ -278,6 +324,8 @@ public class PlannerTool {
                 continue;
             }
 
+            log("finished planning stmt");
+
             assert(plan.fragments.size() <= 2);
 
             //////////////////////
@@ -285,33 +333,30 @@ public class PlannerTool {
             //////////////////////
 
             // print out the run-at-every-partition fragment
-            boolean found = false;
             for (int i = 0; i < plan.fragments.size(); i++) {
                 Fragment frag = plan.fragments.get(i);
+                PlanNodeList planList = new PlanNodeList(frag.planGraph);
+                String serializedPlan = planList.toJSONString();
+                String encodedPlan = serializedPlan; //Encoder.compressAndBase64Encode(serializedPlan);
                 if (frag.multiPartition) {
-                    PlanNodeList planList = new PlanNodeList(frag.planGraph);
-                    String serializedPlan = planList.toJSONString();
-                    System.out.println("PLAN-ALL: " + serializedPlan);
-                    found = true;
-                    break;
+                    log("PLAN-ALL: " + encodedPlan);
+                    System.out.println("PLAN-ALL: " + encodedPlan);
+                }
+                else {
+                    log("PLAN-ONE: " + encodedPlan);
+                    System.out.println("PLAN-ONE: " + encodedPlan);
                 }
             }
-            if (plan.fragments.size() > 1) assert(found == true);
 
-            // print the run-at-coordinator fragment
-            // (or only frag if using replicated tables)
-            found = false;
-            for (int i = 0; i < plan.fragments.size(); i++) {
-                Fragment frag = plan.fragments.get(i);
-                if (frag.multiPartition == false) {
-                    PlanNodeList planList = new PlanNodeList(frag.planGraph);
-                    String serializedPlan = planList.toJSONString();
-                    System.out.println("PLAN-ONE: " + serializedPlan);
-                    found = true;
-                    break;
-                }
+            if (plan.replicatedTableDML) {
+                System.out.println("REPLICATED-DML: true");
             }
-            assert(found == true);
+
+            log("finished loop");
+
+            // print a newline to delimit
+            System.out.println();
+            System.out.flush();
         }
     }
 

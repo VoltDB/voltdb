@@ -46,7 +46,8 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
 
     LinkedBlockingQueue<AsyncCompilerWork> m_work = new LinkedBlockingQueue<AsyncCompilerWork>();
     final ArrayDeque<AsyncCompilerResult> m_finished = new ArrayDeque<AsyncCompilerResult>();
-    HSQLInterface m_hsql;
+    //HSQLInterface m_hsql;
+    PlannerTool m_ptool;
     int counter = 0;
     final int m_siteId;
     boolean m_isLoaded = false;
@@ -62,7 +63,8 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
     private static final Logger ahpLog = Logger.getLogger("ADHOCPLANNERTHREAD", VoltLoggerFactory.instance());
 
     public AsyncCompilerWorkThread(CatalogContext context, int siteId) {
-        m_hsql = null;
+        m_ptool = null;
+        //m_hsql = null;
         m_siteId = siteId;
         m_context = context;
 
@@ -72,25 +74,10 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
         DumpManager.register(m_dumpId, this);
     }
 
-    public synchronized void ensureLoadedHSQL() {
+    public synchronized void ensureLoadedPlanner() {
         if (m_isLoaded == true)
             return;
-        m_hsql = HSQLInterface.loadHsqldb();
-
-        String hexDDL = m_context.database.getSchema();
-        String ddl = Encoder.hexDecodeToString(hexDDL);
-        String[] commands = ddl.split(";");
-        for (String command : commands) {
-            command = command.trim();
-            if (command.length() == 0)
-                continue;
-            try {
-                m_hsql.runDDLCommand(command);
-            } catch (HSQLParseException e) {
-                ahpLog.l7dlog(Level.FATAL, LogKeys.host_Initialiazion_InvalidDDL.name(), e);
-                VoltDB.crashVoltDB();
-            }
-        }
+        m_ptool = PlannerTool.createPlannerToolProcess(m_context.catalog.serialize());
         m_isLoaded = true;
     }
 
@@ -124,7 +111,7 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
             String hostname,
             int sequenceNumber,
             Object clientData) {
-        ensureLoadedHSQL();
+        ensureLoadedPlanner();
 
         AdHocPlannerWork work = new AdHocPlannerWork();
         work.clientHandle = clientHandle;
@@ -196,8 +183,8 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
                 e.printStackTrace();
             }
         }
-        if (m_hsql != null)
-            m_hsql.close();
+        if (m_ptool != null)
+            m_ptool.kill();
     }
 
     public void notifyShouldUpdateCatalog() {
@@ -245,60 +232,20 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
     }
 
     private AsyncCompilerResult compileAdHocPlan(AdHocPlannerWork work) {
-        TrivialCostModel costModel = new TrivialCostModel();
-        CatalogContext context = VoltDB.instance().getCatalogContext();
-        QueryPlanner planner =
-            new QueryPlanner(context.cluster, context.database, m_hsql,
-                             new DatabaseEstimates(), false,
-                             VoltDB.getQuietAdhoc());
-        CompiledPlan plan = null;
         AdHocPlannedStmt plannedStmt = new AdHocPlannedStmt();
         plannedStmt.clientHandle = work.clientHandle;
         plannedStmt.connectionId = work.connectionId;
         plannedStmt.hostname = work.hostname;
         plannedStmt.clientData = work.clientData;
-        String error_msg = null;
-        try {
-            plan = planner.compilePlan(costModel, work.sql, "adhocsql-" + String.valueOf(counter++), "adhocproc", false, null);
-            error_msg = planner.getErrorMessage();
-        } catch (Exception e) {
-            plan = null;
-            error_msg = e.getMessage();
-        }
-        if (plan != null)
-        {
-            plan.sql = work.sql;
-        }
-        else
-        {
-            plannedStmt.errorMsg =
-                "Failed to ad-hoc-plan for stmt: " + work.sql;
-            plannedStmt.errorMsg += " with error: " + error_msg;
-        }
 
-        if (plan != null) {
-            assert(plan.fragments.size() <= 2);
-            for (int i = 0; i < plan.fragments.size(); i++) {
+        PlannerTool.Result result = m_ptool.planSql(work.sql);
 
-                Fragment frag = plan.fragments.get(i);
-                PlanNodeList planList = new PlanNodeList(frag.planGraph);
-                String serializedPlan = planList.toJSONString();
+        plannedStmt.aggregatorFragment = result.onePlan;
+        plannedStmt.collectorFragment = result.allPlan;
 
-                // assume multipartition is the collector fragment
-                if (frag.multiPartition) {
-                    plannedStmt.collectorFragment = serializedPlan;
-                }
-                // assume non-multi is the aggregator fragment
-                else {
-                    plannedStmt.aggregatorFragment = serializedPlan;
-                }
-
-            }
-
-            // fill in stuff for the whole sql stmt
-            plannedStmt.isReplicatedTableDML = plan.replicatedTableDML;
-            plannedStmt.sql = plan.sql;
-        }
+        plannedStmt.isReplicatedTableDML = result.replicatedDML;
+        plannedStmt.sql = work.sql;
+        plannedStmt.errorMsg = result.errors;
 
         return plannedStmt;
     }
