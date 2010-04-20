@@ -25,6 +25,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.hsqldb.HSQLInterface;
 import org.hsqldb.HSQLInterface.HSQLParseException;
@@ -46,6 +47,7 @@ public class PlannerTool {
 
     Process m_process;
     OutputStreamWriter m_in;
+    AtomicLong m_timeOfLastPlannerCall = new AtomicLong(0);
 
     public static class Result {
         String onePlan = null;
@@ -88,11 +90,26 @@ public class PlannerTool {
         return false;
     }
 
+    public boolean perhapsIsHung(long msTimeout) {
+        long start = m_timeOfLastPlannerCall.get();
+        if (start == 0) return false;
+        long duration = System.currentTimeMillis() - start;
+        if (duration > msTimeout) return true;
+        return false;
+    }
+
     public synchronized Result planSql(String sql) {
         Result retval = new Result();
         retval.errors = "";
 
+        // note when this call started / ensure value was previously zero
+        if (m_timeOfLastPlannerCall.compareAndSet(0, System.currentTimeMillis()) == false) {
+            retval.errors = "Multiple simultanious calls to out of process planner are not allowed";
+            return retval;
+        }
+
         if ((sql == null) || (sql.length() == 0)) {
+            m_timeOfLastPlannerCall.set(0);
             retval.errors = "Can't plan empty or null SQL.";
             return retval;
         }
@@ -102,8 +119,10 @@ public class PlannerTool {
             m_in.write(sql + "\n");
             m_in.flush();
         } catch (IOException e) {
-            // TODO Auto-generated catch block
+            m_timeOfLastPlannerCall.set(0);
             e.printStackTrace();
+            retval.errors = e.getMessage();
+            return retval;
         }
 
         BufferedReader r = new BufferedReader(new InputStreamReader(m_process.getInputStream()));
@@ -117,8 +136,10 @@ public class PlannerTool {
                 line = r.readLine();
             }
             catch (Exception e) {
-                // TODO Auto-generated catch block
+                m_timeOfLastPlannerCall.set(0);
                 e.printStackTrace();
+                retval.errors = e.getMessage();
+                return retval;
             }
             if (line == null)
                 continue;
@@ -155,6 +176,9 @@ public class PlannerTool {
         retval.errors = retval.errors.trim();
         // no errors => null
         if (retval.errors.length() == 0) retval.errors = null;
+
+        // reset the clock to zero, meaning not currently planning
+        m_timeOfLastPlannerCall.set(0);
 
         return retval;
     }

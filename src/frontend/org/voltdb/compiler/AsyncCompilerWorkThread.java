@@ -72,6 +72,15 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
         }
     }
 
+    public void verifyEverthingIsKosher() {
+        if (m_ptool != null) {
+            // check if the planner process has been blocked for 2 seconds
+            if (m_ptool.perhapsIsHung(2000)) {
+                m_ptool.kill();
+            }
+        }
+    }
+
     public void shutdown() {
         AdHocPlannerWork work = new AdHocPlannerWork();
         work.shouldShutdown = true;

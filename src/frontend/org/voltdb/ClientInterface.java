@@ -95,7 +95,9 @@ public class ClientInterface implements DumpManager.Dumpable {
 
     // clock time of last call to the initiator's tick()
     static final int TICK_INTERVAL = 5;
+    static final int POKE_INTERVAL = 1000;
     private long m_lastTickTime = 0;
+    private long m_lastCompilerThreadPoke = 0;
 
     private final int m_allPartitions[];
     final int m_siteId;
@@ -924,7 +926,7 @@ public class ClientInterface implements DumpManager.Dumpable {
         }
         try {
             // send tick every TICK_INTERVAL milliseconds
-            final long delta = time - m_lastTickTime;
+            long delta = time - m_lastTickTime;
             if (delta > TICK_INTERVAL) {
                 m_lastTickTime = time;
                 m_initiator.tick(time, TICK_INTERVAL);
@@ -938,6 +940,14 @@ public class ClientInterface implements DumpManager.Dumpable {
             else {
                 //System.out.printf("NOT sending tick after %d ms pause.\n", delta);
                 //System.out.flush();
+            }
+
+            // this code ensures that things put in the out of process
+            // planner make it out
+            delta = time - m_lastCompilerThreadPoke;
+            if (delta > POKE_INTERVAL) {
+                m_lastCompilerThreadPoke = time;
+                m_asyncCompilerWorkThread.verifyEverthingIsKosher();
             }
 
             // check for catalog updates
