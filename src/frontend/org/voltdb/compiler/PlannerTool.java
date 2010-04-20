@@ -78,6 +78,16 @@ public class PlannerTool {
         m_process.destroy();
     }
 
+    public boolean expensiveIsRunningCheck() {
+        try {
+            m_process.exitValue();
+        }
+        catch (IllegalThreadStateException e) {
+            return true;
+        }
+        return false;
+    }
+
     public synchronized Result planSql(String sql) {
         Result retval = new Result();
         retval.errors = "";

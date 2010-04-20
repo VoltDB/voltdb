@@ -22,25 +22,14 @@ import java.util.ArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
-import org.hsqldb.HSQLInterface;
-import org.hsqldb.HSQLInterface.HSQLParseException;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.debugstate.PlannerThreadContext;
-import org.voltdb.planner.CompiledPlan;
-import org.voltdb.planner.QueryPlanner;
-import org.voltdb.planner.TrivialCostModel;
-import org.voltdb.planner.CompiledPlan.Fragment;
-import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.Encoder;
-import org.voltdb.utils.LogKeys;
-import org.voltdb.utils.VoltLoggerFactory;
 
 public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpable {
 
@@ -60,8 +49,6 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
     final String m_dumpId;
     long m_currentDumpTimestamp = 0;
 
-    private static final Logger ahpLog = Logger.getLogger("ADHOCPLANNERTHREAD", VoltLoggerFactory.instance());
-
     public AsyncCompilerWorkThread(CatalogContext context, int siteId) {
         m_ptool = null;
         //m_hsql = null;
@@ -75,10 +62,14 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
     }
 
     public synchronized void ensureLoadedPlanner() {
-        if (m_isLoaded == true)
-            return;
-        m_ptool = PlannerTool.createPlannerToolProcess(m_context.catalog.serialize());
-        m_isLoaded = true;
+        // if the process was created but is dead, clear the placeholder
+        if ((m_ptool != null) && (m_ptool.expensiveIsRunningCheck() == false)) {
+            m_ptool = null;
+        }
+        // if no placeholder, create a new plannertool
+        if (m_ptool == null) {
+            m_ptool = PlannerTool.createPlannerToolProcess(m_context.catalog.serialize());
+        }
     }
 
     public void shutdown() {
@@ -111,7 +102,6 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
             String hostname,
             int sequenceNumber,
             Object clientData) {
-        ensureLoadedPlanner();
 
         AdHocPlannerWork work = new AdHocPlannerWork();
         work.clientHandle = clientHandle;
@@ -163,6 +153,12 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
                 // deal with reloading the global catalog
                 if (m_shouldUpdateCatalog.compareAndSet(true, false)) {
                     m_context = VoltDB.instance().getCatalogContext();
+                    // kill the planner process which has an outdated catalog
+                    // it will get created again for the next stmt
+                    if (m_ptool != null) {
+                        m_ptool.kill();
+                        m_ptool = null;
+                    }
                 }
 
                 AsyncCompilerResult result = null;
@@ -232,6 +228,8 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
     }
 
     private AsyncCompilerResult compileAdHocPlan(AdHocPlannerWork work) {
+        ensureLoadedPlanner();
+
         AdHocPlannedStmt plannedStmt = new AdHocPlannedStmt();
         plannedStmt.clientHandle = work.clientHandle;
         plannedStmt.connectionId = work.connectionId;
