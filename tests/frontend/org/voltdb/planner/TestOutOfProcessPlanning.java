@@ -23,15 +23,22 @@
 
 package org.voltdb.planner;
 
+import java.io.File;
+
 import junit.framework.TestCase;
 
+import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.utils.CatalogUtil;
 
 public class TestOutOfProcessPlanning extends TestCase {
 
     public void testSimple() {
-        String serializedCatalog = CatalogUtil.loadCatalogFromJar("tpcc.jar", null);
+        TPCCProjectBuilder builder = new TPCCProjectBuilder();
+        builder.addAllDefaults();
+        builder.compile("tpcc-oop.jar");
+
+        String serializedCatalog = CatalogUtil.loadCatalogFromJar("tpcc-oop.jar", null);
 
         PlannerTool pt = PlannerTool.createPlannerToolProcess(serializedCatalog);
         PlannerTool.Result result = null;
@@ -40,6 +47,9 @@ public class TestOutOfProcessPlanning extends TestCase {
 
         result = pt.planSql("ryan like the yankees");
         System.out.println(result);
+
+        final File jar = new File("tpcc-oop.jar");
+        jar.delete();
     }
 
 }

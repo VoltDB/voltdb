@@ -160,6 +160,8 @@ public class PlannerTool {
     }
 
     public static PlannerTool createPlannerToolProcess(String serializedCatalog) {
+        assert(serializedCatalog != null);
+
         String classpath = System.getProperty("java.class.path");
         assert(classpath != null);
 
