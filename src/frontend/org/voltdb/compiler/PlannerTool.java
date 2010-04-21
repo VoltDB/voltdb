@@ -245,6 +245,10 @@ public class PlannerTool {
      * @param args
      */
     public static void main(String[] args) {
+
+        // name this thread
+        Thread.currentThread().setName("VoltDB Planner Process Main");
+
         //////////////////////
         // PARSE COMMAND LINE ARGS
         //////////////////////

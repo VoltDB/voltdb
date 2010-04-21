@@ -237,22 +237,27 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
     }
 
     private AsyncCompilerResult compileAdHocPlan(AdHocPlannerWork work) {
-        ensureLoadedPlanner();
-
         AdHocPlannedStmt plannedStmt = new AdHocPlannedStmt();
         plannedStmt.clientHandle = work.clientHandle;
         plannedStmt.connectionId = work.connectionId;
         plannedStmt.hostname = work.hostname;
         plannedStmt.clientData = work.clientData;
 
-        PlannerTool.Result result = m_ptool.planSql(work.sql);
+        try {
+            ensureLoadedPlanner();
 
-        plannedStmt.aggregatorFragment = result.onePlan;
-        plannedStmt.collectorFragment = result.allPlan;
+            PlannerTool.Result result = m_ptool.planSql(work.sql);
 
-        plannedStmt.isReplicatedTableDML = result.replicatedDML;
-        plannedStmt.sql = work.sql;
-        plannedStmt.errorMsg = result.errors;
+            plannedStmt.aggregatorFragment = result.onePlan;
+            plannedStmt.collectorFragment = result.allPlan;
+
+            plannedStmt.isReplicatedTableDML = result.replicatedDML;
+            plannedStmt.sql = work.sql;
+            plannedStmt.errorMsg = result.errors;
+        }
+        catch (Exception e) {
+            plannedStmt.errorMsg = "Unexpected Ad Hoc Planning Error: " + e.getMessage();
+        }
 
         return plannedStmt;
     }
@@ -303,8 +308,6 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
             retval.encodedDiffCommands = null;
             retval.errorMsg = e.getMessage();
         }
-
-
 
         return retval;
     }
