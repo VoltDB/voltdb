@@ -41,7 +41,7 @@ script = """# setup commands:
 #   ls = lookup success
 #   lf = lookup failure
 
-begin TestName IntsMultiMapIndex/GenericMultiMapIndex bi bi bi
+begin TestName IntsMultiMapIndex/GenericMultiMapIndex bint bint bint
 is 5 6 7
 ls 5 6 7
 exec

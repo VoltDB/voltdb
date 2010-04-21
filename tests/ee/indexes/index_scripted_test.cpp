@@ -44,8 +44,13 @@ const char *kBeginCommand = "begin";
 const char *kExecCommand = "exec";
 const char *kDoneCommand = "done";
 
-const char *kBigIntTypecode = "bi";
-const char *kStringTypecode = "s";
+const char *kBigIntTypecode = "bint";
+const char *kIntegerTypecode = "int";
+const char *kSmallIntTypecode = "sint";
+const char *kTinyIntTypecode = "tint";
+const char *kFloatTypecode = "float";
+    const char *kDecimalTypecode = "dec";
+const char *kStringTypecode = "str";
 
 const char *kInsertSuccess = "is";
 const char *kInsertFailure = "if";
@@ -216,11 +221,38 @@ main(int argc, char **argv)
                     columnTypes.push_back(VALUE_TYPE_BIGINT);
                     columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
                     columnAllowNull.push_back(false);
-                } else if (strcmp(typecode, kStringTypecode) == 0) {
+                }
+                else if (strcmp(typecode, kIntegerTypecode) == 0) {
+                    columnTypes.push_back(VALUE_TYPE_INTEGER);
+                    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
+                    columnAllowNull.push_back(false);
+                }
+                else if (strcmp(typecode, kSmallIntTypecode) == 0) {
+                    columnTypes.push_back(VALUE_TYPE_SMALLINT);
+                    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_SMALLINT));
+                    columnAllowNull.push_back(false);
+                }
+                else if (strcmp(typecode, kTinyIntTypecode) == 0) {
+                    columnTypes.push_back(VALUE_TYPE_TINYINT);
+                    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+                    columnAllowNull.push_back(false);
+                }
+                else if (strcmp(typecode, kFloatTypecode) == 0) {
+                    columnTypes.push_back(VALUE_TYPE_DOUBLE);
+                    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
+                    columnAllowNull.push_back(false);
+                }
+                else if (strcmp(typecode, kDecimalTypecode) == 0) {
+                    columnTypes.push_back(VALUE_TYPE_DECIMAL);
+                    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DECIMAL));
+                    columnAllowNull.push_back(false);
+                }
+                else if (strcmp(typecode, kStringTypecode) == 0) {
                     columnTypes.push_back(VALUE_TYPE_VARCHAR);
                     columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_VARCHAR));
                     columnAllowNull.push_back(false);
-                } else {
+                }
+                else {
                     cerr << "Typecode parse error on line: " << line << endl;
                     exit(-1);
                 }
