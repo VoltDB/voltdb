@@ -304,9 +304,9 @@ public class TestSQLTypesSuite extends RegressionSuite {
     };
 
 
-    /**
-     * Insert strings that violate the VARCHAR size limit.
-     */
+    //
+    // Insert strings that violate the VARCHAR size limit.
+    //
     public void testInsertViolatesStringLength() throws IOException, ProcCallException  {
         final Client client = this.getClient();
         boolean caught = false;
@@ -348,51 +348,10 @@ public class TestSQLTypesSuite extends RegressionSuite {
         }
     }
 
-    /** A 100k blob (as part of tpc-e) crashed. Regression test this. */
-    /*public void testWayTooBigString() throws IOException, ProcCallException {
-        final Client client = getClient();
-        boolean caught = false;
-        final Object params[] = new Object[COLS + 2];
-        params[0] = "NO_NULLS";
-
-        // array to build the Big String.
-        final char blob[] = new char[100000];
-        for (int i=0; i < 100000; i++) {
-            blob[i] = 'a';
-        }
-
-        // try to insert a 100k string blob into each of the string fields
-        // this string length exceeds the fastserializable string limit
-        // and should be rejected by the client parameter fastserializer.
-        for (int stringcount = 0; stringcount < 4; ++stringcount) {
-            int curr_string = 0;
-            params[1] = pkey.incrementAndGet();
-            for (int k=0; k < COLS; ++k) {
-                if ((m_types[k] == VoltType.STRING) && (stringcount == curr_string)) {
-                    params[k+2] = new String(blob);
-                }
-                else {
-                    params[k+2] = m_midValues[k];
-                }
-                if (m_types[k] == VoltType.STRING)
-                    curr_string++;
-            }
-            try {
-                caught = false;
-                client.callProcedure("Insert", params);
-            }
-            // Distributer turns the IOException in to a runtime exception
-            catch (final RuntimeException e) {
-                caught = true;
-            }
-            assertTrue(caught);
-        }
-    }*/
-
-    /**
-     * Test that the max serializable string length is correctly handled.
-     * It must be rejected always since it is greater than the max varchar size.
-     */
+    //
+    // Test that the max serializable string length is correctly handled.
+    // It must be rejected always since it is greater than the max varchar size.
+    //
     public void testMaxSerializeStringSize() throws IOException, ProcCallException {
         final Client client = getClient();
         boolean caught = false;
@@ -433,9 +392,9 @@ public class TestSQLTypesSuite extends RegressionSuite {
         }
     }
 
-    /**
-     * Test that the max supported varchar can be inserted.
-     */
+    //
+    // Test that the max supported varchar can be inserted.
+    //
     public void testMaxValidStringSize() throws IOException, ProcCallException {
         final Client client = getClient();
         boolean caught = false;
@@ -481,9 +440,9 @@ public class TestSQLTypesSuite extends RegressionSuite {
     }
 
 
-    /**
-     * Verify that NULLS are rejected in in NOT NULL columns
-     */
+    //
+    // Verify that NULLS are rejected in in NOT NULL columns
+    //
     public void testInsertNulls_No_Nulls() throws IOException {
         final Client client = this.getClient();
 
@@ -525,9 +484,9 @@ public class TestSQLTypesSuite extends RegressionSuite {
         }
     }
 
-    /**
-     * Verify that NULLS are allowed in non-NOT NULL columns
-     */
+    //
+    // Verify that NULLS are allowed in non-NOT NULL columns
+    //
     public void testInsertNulls_Nulls_Allowed() throws IOException {
         final Client client = this.getClient();
 
@@ -790,9 +749,9 @@ public class TestSQLTypesSuite extends RegressionSuite {
         }
     }
 
-    /**
-     * Round trip the maximum value
-     */
+    //
+    // Round trip the maximum value
+    //
     public void testInsertMaxValues_No_Nulls()
     throws NoConnectionsException, ProcCallException, IOException
     {
@@ -832,9 +791,9 @@ public class TestSQLTypesSuite extends RegressionSuite {
         }
     }
 
-    /**
-     * Round trip the minimum value.
-     */
+    //
+    // Round trip the minimum value.
+    //
     public void testInsertMinValues_No_Nulls()
         throws NoConnectionsException, ProcCallException, IOException
     {
@@ -873,9 +832,9 @@ public class TestSQLTypesSuite extends RegressionSuite {
         }
     }
 
-    /**
-     * Apply a simple expression to each type that supports math.
-     */
+    //
+    // Apply a simple expression to each type that supports math.
+    //
     public void testSimpleExpressions()
     throws NoConnectionsException, ProcCallException, IOException
     {
