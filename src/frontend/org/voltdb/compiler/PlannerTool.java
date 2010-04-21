@@ -200,6 +200,7 @@ public class PlannerTool {
         cmd.add("java");
         cmd.add("-cp");
         cmd.add(classpath);
+        cmd.add("-Xmx256m");
         cmd.add(PlannerTool.class.getName());
 
         ProcessBuilder pb = new ProcessBuilder(cmd);
