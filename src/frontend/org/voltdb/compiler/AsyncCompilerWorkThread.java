@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.log4j.Logger;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Catalog;
@@ -30,6 +31,7 @@ import org.voltdb.debugstate.PlannerThreadContext;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.VoltLoggerFactory;
 
 public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpable {
 
@@ -41,6 +43,8 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
     final int m_siteId;
     boolean m_isLoaded = false;
     CatalogContext m_context;
+
+    private static final Logger ahpLog = Logger.getLogger("ADHOCPLANNERTHREAD", VoltLoggerFactory.instance());
 
     /** If this is true, update the catalog */
     private final AtomicBoolean m_shouldUpdateCatalog = new AtomicBoolean(false);
@@ -64,6 +68,7 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
     public synchronized void ensureLoadedPlanner() {
         // if the process was created but is dead, clear the placeholder
         if ((m_ptool != null) && (m_ptool.expensiveIsRunningCheck() == false)) {
+            ahpLog.error("Planner process died on its own. It will be restarted if needed.");
             m_ptool = null;
         }
         // if no placeholder, create a new plannertool
@@ -75,7 +80,8 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
     public void verifyEverthingIsKosher() {
         if (m_ptool != null) {
             // check if the planner process has been blocked for 2 seconds
-            if (m_ptool.perhapsIsHung(2000)) {
+            if (m_ptool.perhapsIsHung(5000)) {
+                ahpLog.error("Was forced to kill the planner process due to a timeout. It will be restarted if needed.");
                 m_ptool.kill();
             }
         }
