@@ -24,6 +24,7 @@
 package org.voltdb.planner;
 
 import java.io.File;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import junit.framework.TestCase;
 
@@ -33,6 +34,30 @@ import org.voltdb.utils.CatalogUtil;
 
 public class TestOutOfProcessPlanning extends TestCase {
 
+    PlannerTool m_pt = null;
+
+    class PlannerKillerThread extends Thread {
+        AtomicBoolean m_shouldStop = new AtomicBoolean(false);
+        String m_serializedCatalog = null;
+
+        @Override
+        public void run() {
+            while (m_shouldStop.get() == false) {
+                //if (m_pt.expensiveIsRunningCheck() == false) {
+                //  m_pt =
+                //}
+
+                if (m_pt.perhapsIsHung(2000)) {
+                    m_pt.kill();
+                    m_pt = PlannerTool.createPlannerToolProcess(m_serializedCatalog);
+                }
+
+                Thread.yield();
+            }
+        }
+
+    }
+
     public void testSimple() {
         TPCCProjectBuilder builder = new TPCCProjectBuilder();
         builder.addAllDefaults();
@@ -40,16 +65,53 @@ public class TestOutOfProcessPlanning extends TestCase {
 
         String serializedCatalog = CatalogUtil.loadCatalogFromJar("tpcc-oop.jar", null);
 
-        PlannerTool pt = PlannerTool.createPlannerToolProcess(serializedCatalog);
+        m_pt = PlannerTool.createPlannerToolProcess(serializedCatalog);
+
+        PlannerKillerThread ptKiller = new PlannerKillerThread();
+        ptKiller.m_serializedCatalog = serializedCatalog;
+        ptKiller.start();
+
         PlannerTool.Result result = null;
-        result = pt.planSql("select * from warehouse;");
+        result = m_pt.planSql("select * from warehouse;");
         System.out.println(result);
 
-        result = pt.planSql("ryan like the yankees");
+        result = m_pt.planSql("select * from WAREHOUSE, DISTRICT, CUSTOMER, CUSTOMER_NAME, HISTORY, STOCK, ORDERS, NEW_ORDER, ORDER_LINE where " +
+                "WAREHOUSE.W_ID = DISTRICT.D_W_ID and " +
+                "WAREHOUSE.W_ID = CUSTOMER.C_W_ID and " +
+                "WAREHOUSE.W_ID = CUSTOMER_NAME.C_W_ID and " +
+                "WAREHOUSE.W_ID = HISTORY.H_W_ID and " +
+                "WAREHOUSE.W_ID = STOCK.S_W_ID and " +
+                "WAREHOUSE.W_ID = ORDERS.O_W_ID and " +
+                "WAREHOUSE.W_ID = NEW_ORDER.NO_W_ID and " +
+                "WAREHOUSE.W_ID = ORDER_LINE.OL_W_ID and " +
+                "WAREHOUSE.W_ID = 0");
+        System.out.println(result);
+
+        result = m_pt.planSql("ryan likes the yankees");
+        System.out.println(result);
+
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e1) {
+            // TODO Auto-generated catch block
+            e1.printStackTrace();
+        }
+
+        result = m_pt.planSql("ryan likes the yankees");
+        System.out.println(result);
+
+        result = m_pt.planSql("select * from warehouse;");
         System.out.println(result);
 
         final File jar = new File("tpcc-oop.jar");
         jar.delete();
+
+        ptKiller.m_shouldStop.set(true);
+        try {
+            ptKiller.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 
 }

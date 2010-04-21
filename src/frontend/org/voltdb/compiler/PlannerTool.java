@@ -78,6 +78,12 @@ public class PlannerTool {
 
     public void kill() {
         m_process.destroy();
+        try {
+            m_process.waitFor();
+        } catch (InterruptedException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
     }
 
     public boolean expensiveIsRunningCheck() {
@@ -120,7 +126,7 @@ public class PlannerTool {
             m_in.flush();
         } catch (IOException e) {
             m_timeOfLastPlannerCall.set(0);
-            e.printStackTrace();
+            //e.printStackTrace();
             retval.errors = e.getMessage();
             return retval;
         }
@@ -137,7 +143,7 @@ public class PlannerTool {
             }
             catch (Exception e) {
                 m_timeOfLastPlannerCall.set(0);
-                e.printStackTrace();
+                //e.printStackTrace();
                 retval.errors = e.getMessage();
                 return retval;
             }
@@ -257,10 +263,9 @@ public class PlannerTool {
         String encodedSerializedCatalog = null;
         try {
             encodedSerializedCatalog = br.readLine();
-        } catch (IOException e2) {
-            log("Couldn't read catalog");
-            // TODO Auto-generated catch block
-            e2.printStackTrace();
+        } catch (IOException e) {
+            log("Couldn't read catalog: " + e.getMessage());
+            System.exit(50);
         }
 
         final String serializedCatalog = Encoder.decodeBase64AndDecompress(encodedSerializedCatalog);
@@ -293,8 +298,7 @@ public class PlannerTool {
             } catch (HSQLParseException e) {
                 // need a good error message here
                 log("Error creating hsql: " + e.getMessage());
-                e.printStackTrace();
-                return;
+                System.exit(82);
             }
         }
 
@@ -314,9 +318,10 @@ public class PlannerTool {
 
             try {
                 inputLine = br.readLine();
-            } catch (IOException e1) {
-                // TODO Auto-generated catch block
-                e1.printStackTrace();
+            } catch (IOException e) {
+                log("Exception: " + e.getMessage());
+                System.out.println("ERROR: " + e.getMessage() + "\n");
+                System.exit(81);
             }
             // check the input
             if (inputLine.length() == 0) {
@@ -375,11 +380,11 @@ public class PlannerTool {
                 String serializedPlan = planList.toJSONString();
                 String encodedPlan = serializedPlan; //Encoder.compressAndBase64Encode(serializedPlan);
                 if (frag.multiPartition) {
-                    log("PLAN-ALL: " + encodedPlan);
+                    log("PLAN-ALL GENERATED");
                     System.out.println("PLAN-ALL: " + encodedPlan);
                 }
                 else {
-                    log("PLAN-ONE: " + encodedPlan);
+                    log("PLAN-ONE GENERATED");
                     System.out.println("PLAN-ONE: " + encodedPlan);
                 }
             }
