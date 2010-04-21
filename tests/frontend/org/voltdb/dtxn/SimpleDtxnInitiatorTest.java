@@ -84,17 +84,17 @@ public class SimpleDtxnInitiatorTest extends TestCase {
     static final int LOCAL_SITE = 3;
     static final int LOCAL_MAILBOX = 0;
 
-    private class WasRun implements Runnable {
+    /*private class WasRun implements Runnable {
         @SuppressWarnings("unused")
         private boolean wasRun = false;
         @Override
         public void run() {
             wasRun = true;
         }
-    }
+    }*/
 
-    private WasRun onBackPressure;
-    private WasRun offBackPressure;
+    //private WasRun onBackPressure;
+    //private WasRun offBackPressure;
 
     class MockMessenger implements Messenger
     {

@@ -32,7 +32,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.types.TimestampType;
 
 public class ClientBenchmark extends ClientMain {
     public static final AtomicLong globalMainId = new AtomicLong(1);
@@ -98,8 +97,8 @@ public class ClientBenchmark extends ClientMain {
         int max_playerId = 50000000;
         int max_gameId = 2;
 
-        long playerId = (long) rand.nextInt(max_playerId);
-        long gameId = (long) rand.nextInt(max_gameId);
+        long playerId = rand.nextInt(max_playerId);
+        long gameId = rand.nextInt(max_gameId);
         long socialId = 1l;
         long clientId = 1l;
         long visitTimeMillis = System.currentTimeMillis();
@@ -107,7 +106,7 @@ public class ClientBenchmark extends ClientMain {
         boolean queued = false;
 
         while (!queued) {
-            long callTime = System.currentTimeMillis();
+            //long callTime = System.currentTimeMillis();
 
             queued = m_voltClient.callProcedure(new AsyncCallback(), "Insert", playerId, gameId, socialId, clientId, visitTimeMillis, visitTimeMillis);
 

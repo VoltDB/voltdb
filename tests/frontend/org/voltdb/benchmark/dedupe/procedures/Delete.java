@@ -22,9 +22,15 @@
  */
 package org.voltdb.benchmark.dedupe.procedures;
 
-import org.voltdb.*;
 import java.util.Calendar;
 import java.util.TimeZone;
+
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltTableRow;
+import org.voltdb.VoltType;
 
 @ProcInfo(
     partitionInfo = "ARCHIVED.COLUMN1: 0",
@@ -78,13 +84,13 @@ public class Delete extends VoltProcedure {
 
                 if (sqlStatements > 900) {
                     // limit of 1000 sql statements
-                    VoltTable results2[] = voltExecuteSQL();
+                    voltExecuteSQL();
                     sqlStatements = 0;
                 }
             }
 
             if (sqlStatements > 0) {
-                VoltTable results3[] = voltExecuteSQL(true);
+                voltExecuteSQL(true);
             }
         }
 

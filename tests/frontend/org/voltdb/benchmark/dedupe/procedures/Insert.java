@@ -22,9 +22,14 @@
  */
 package org.voltdb.benchmark.dedupe.procedures;
 
-import org.voltdb.*;
 import java.util.Calendar;
 import java.util.TimeZone;
+
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 
 @ProcInfo(
         partitionInfo = "ARCHIVED.COLUMN1: 0",
@@ -92,7 +97,7 @@ public class Insert extends VoltProcedure {
             }
 
             if (sqlStatements > 0) {
-                VoltTable results2[] = voltExecuteSQL(true);
+                voltExecuteSQL(true);
             }
         }
 

@@ -22,24 +22,17 @@
  */
 package org.voltdb.benchmark.dedupe;
 
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.client.Client;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureCallback;
-import org.voltdb.client.ClientFactory;
-import org.voltdb.client.NullCallback;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
-import org.voltdb.client.NoConnectionsException;
-
-import java.util.Date;
-import java.util.ArrayList;
-import java.util.*;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.io.IOException;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.PrintStream;
+import java.util.Calendar;
+import java.util.Date;
+
+import org.voltdb.VoltTable;
+import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcedureCallback;
 
 public class ClientInsert {
     public static long min_execution_milliseconds = 999999999l;
@@ -96,20 +89,20 @@ public class ClientInsert {
     }
 
     public static void main(String args[]) {
-        boolean backPressure = false;
-        long transactions_per_second = (long) Long.valueOf(args[0]);
+        //boolean backPressure = false;
+        long transactions_per_second = Long.valueOf(args[0]);
         long transactions_per_milli = transactions_per_second / 1000l;
-        long client_feedback_interval_secs = (long) Long.valueOf(args[1]);
-        long test_duration_secs = (long) Long.valueOf(args[2]);
-        int max_playerId = (int) Integer.valueOf(args[3]);
-        int max_gameId = (int) Integer.valueOf(args[4]);
-        long day_offset = (long) Long.valueOf(args[5]);
-        long lag_latency_seconds = (long) Long.valueOf(args[6]);
+        long client_feedback_interval_secs = Long.valueOf(args[1]);
+        long test_duration_secs = Long.valueOf(args[2]);
+        int max_playerId = Integer.valueOf(args[3]);
+        int max_gameId = Integer.valueOf(args[4]);
+        long day_offset = Long.valueOf(args[5]);
+        long lag_latency_seconds = Long.valueOf(args[6]);
         long lag_latency_millis = lag_latency_seconds * 1000l;
         long thisOutstanding = 0;
         long lastOutstanding = 0;
         String serverList = args[7];
-        int outputToFile = (int) Integer.valueOf(args[8]);
+        int outputToFile = Integer.valueOf(args[8]);
         String outputFileName = "log-ClientRandom.log";
         FileOutputStream foStatus;
 
@@ -186,7 +179,7 @@ public class ClientInsert {
                     System.out.printf("day_offset > 0, player pool governer disabled : hourLimitedMaxPlayerId = %d\n",timeLimitedMaxPlayerId);
                 } else {
                     // only allow 5% of total player pool per hour to enter the system
-                    timeLimitedMaxPlayerId = (int) ((((double) hourOfDay + ((double) minuteOfHour / 60.0)) * 5.0 / 100.0) * (double) max_playerId);
+                    timeLimitedMaxPlayerId = (int) (((hourOfDay + (minuteOfHour / 60.0)) * 5.0 / 100.0) * max_playerId);
                     if (timeLimitedMaxPlayerId > max_playerId) {
                         timeLimitedMaxPlayerId = max_playerId;
                     } else if (timeLimitedMaxPlayerId < 1) {
@@ -198,8 +191,8 @@ public class ClientInsert {
                 }
             }
 
-            playerId = (long) rand.nextInt(timeLimitedMaxPlayerId);
-            gameId = (long) rand.nextInt(max_gameId);
+            playerId = rand.nextInt(timeLimitedMaxPlayerId);
+            gameId = rand.nextInt(max_gameId);
             socialId = 1;
             clientId = 1l;
             visitTimeMillis = System.currentTimeMillis();
@@ -259,11 +252,11 @@ public class ClientInsert {
                     }
 
                     String currentDate = new Date().toString();
-                    System.out.printf("[%s] %.3f%% Complete | SP Calls: %,d at %,.2f SP/sec | outstanding = %d (%d) | min = %d | max = %d | avg = %.2f\n",currentDate, percentComplete, num_sp_calls, (num_sp_calls / elapsedTimeSec2), thisOutstanding,(thisOutstanding - lastOutstanding), min_execution_milliseconds, max_execution_milliseconds, (double) ((double) tot_execution_milliseconds / (double) tot_executions_latency));
+                    System.out.printf("[%s] %.3f%% Complete | SP Calls: %,d at %,.2f SP/sec | outstanding = %d (%d) | min = %d | max = %d | avg = %.2f\n",currentDate, percentComplete, num_sp_calls, (num_sp_calls / elapsedTimeSec2), thisOutstanding,(thisOutstanding - lastOutstanding), min_execution_milliseconds, max_execution_milliseconds, ((double) tot_execution_milliseconds / (double) tot_executions_latency));
                     if (outputToFile == 1) {
                         try {
                             foStatus = new FileOutputStream(outputFileName,true);
-                            new PrintStream(foStatus).printf("[%s] %.3f%% Complete | SP Calls: %,d at %,.2f SP/sec | outstanding = %d (%d) | min = %d | max = %d | avg = %.2f\n",currentDate, percentComplete, num_sp_calls, (num_sp_calls / elapsedTimeSec2), thisOutstanding,(thisOutstanding - lastOutstanding), min_execution_milliseconds, max_execution_milliseconds, (double) ((double) tot_execution_milliseconds / (double) tot_executions_latency));
+                            new PrintStream(foStatus).printf("[%s] %.3f%% Complete | SP Calls: %,d at %,.2f SP/sec | outstanding = %d (%d) | min = %d | max = %d | avg = %.2f\n",currentDate, percentComplete, num_sp_calls, (num_sp_calls / elapsedTimeSec2), thisOutstanding,(thisOutstanding - lastOutstanding), min_execution_milliseconds, max_execution_milliseconds, ((double) tot_execution_milliseconds / (double) tot_executions_latency));
                             foStatus.close();
                         } catch (IOException e) {
                               e.printStackTrace();
@@ -294,7 +287,7 @@ public class ClientInsert {
         System.out.printf(" - System ran for %12.4f seconds\n",elapsedTimeSec);
         System.out.printf(" - Performed %,d SP calls\n",num_sp_calls);
         System.out.printf(" - At %,.2f calls per second\n",num_sp_calls / elapsedTimeSec);
-        System.out.printf(" - Average Latency = %.2f ms\n",(double) ((double) tot_execution_milliseconds / (double) tot_executions_latency));
+        System.out.printf(" - Average Latency = %.2f ms\n",((double) tot_execution_milliseconds / (double) tot_executions_latency));
         System.out.printf(" -   Latency   0ms -  25ms = %,d\n",latency_counter[0]);
         System.out.printf(" -   Latency  25ms -  50ms = %,d\n",latency_counter[1]);
         System.out.printf(" -   Latency  50ms -  75ms = %,d\n",latency_counter[2]);

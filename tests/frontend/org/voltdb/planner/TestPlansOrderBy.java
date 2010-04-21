@@ -28,7 +28,7 @@ import junit.framework.TestCase;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Table;
-import org.voltdb.plannodes.*;
+import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.PlanNodeType;
 
 public class TestPlansOrderBy extends TestCase {
@@ -133,8 +133,7 @@ public class TestPlansOrderBy extends TestCase {
 
     public void testEng450()
     {
-        AbstractPlanNode pn = null;
-        pn = compile("select T.T_PKEY, " +
+        compile("select T.T_PKEY, " +
                      "sum(T.T_D1) " +
                      "from T " +
                      "group by T.T_PKEY " +

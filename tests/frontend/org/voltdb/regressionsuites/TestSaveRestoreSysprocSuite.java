@@ -23,7 +23,14 @@
 
 package org.voltdb.regressionsuites;
 
-import java.io.*;
+import java.io.ByteArrayOutputStream;
+import java.io.EOFException;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FilenameFilter;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 
 import junit.framework.Test;
@@ -601,7 +608,9 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                     throw new EOFException();
                 }
             }
-            String string = new String(readBytes.array(), "UTF-8");
+            // this throws an exception on failure
+            new String(readBytes.array(), "UTF-8");
+
             readBytes.flip();
             assertTrue(expectedBytes.equals(readBytes));
         } finally {

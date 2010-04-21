@@ -22,26 +22,25 @@
  */
 package org.voltdb.benchmark.dedupe;
 
-import org.voltdb.client.ClientFactory;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.util.Date;
+
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
-import org.voltdb.VoltType;
+import org.voltdb.client.ClientFactory;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 
-import java.util.Date;
-import java.io.IOException;
-import java.io.FileOutputStream;
-import java.io.PrintStream;
-import java.io.File;
-
 public class ClientMover {
     public static void main(String args[]) {
-        long numMoves = (long) Long.valueOf(args[0]);
+        long numMoves = Long.valueOf(args[0]);
         String serverList = args[1];
-        long clientDurationSeconds = (long) Long.valueOf(args[2]);
-        long loopPauseSeconds = (long) Long.valueOf(args[3]);
-        int outputToFile = (int) Integer.valueOf(args[4]);
+        long clientDurationSeconds = Long.valueOf(args[2]);
+        long loopPauseSeconds = Long.valueOf(args[3]);
+        int outputToFile = Integer.valueOf(args[4]);
         String outputFileName = "log-ClientMover.log";
         FileOutputStream foStatus;
 
@@ -79,7 +78,7 @@ public class ClientMover {
             }
         }
 
-        java.util.Random rand = new java.util.Random(0);
+        //java.util.Random rand = new java.util.Random(0);
 
         long startTime = System.currentTimeMillis();
         long endTime = startTime + (1000l * clientDurationSeconds);

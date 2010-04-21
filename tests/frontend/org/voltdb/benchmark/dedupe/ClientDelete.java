@@ -22,23 +22,21 @@
  */
 package org.voltdb.benchmark.dedupe;
 
-import org.voltdb.client.ClientFactory;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.util.Date;
+
 import org.voltdb.VoltTable;
-import org.voltdb.VoltTableRow;
-import org.voltdb.VoltType;
+import org.voltdb.client.ClientFactory;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 
-import java.util.Date;
-import java.io.IOException;
-import java.io.FileOutputStream;
-import java.io.PrintStream;
-
 public class ClientDelete {
     public static void main(String args[]) {
-        long numDeletes = (long) Long.valueOf(args[0]);
+        long numDeletes = Long.valueOf(args[0]);
         String serverList = args[1];
-        int outputToFile = (int) Integer.valueOf(args[2]);
+        int outputToFile = Integer.valueOf(args[2]);
         String outputFileName = "log-ClientDelete.log";
         FileOutputStream foStatus;
 
@@ -51,7 +49,7 @@ public class ClientDelete {
 
         int num_partitions = 0;
 
-        int intCounter;
+        //int intCounter;
         long longCounter;
 
         final org.voltdb.client.Client voltclient = ClientFactory.createClient();
@@ -69,7 +67,7 @@ public class ClientDelete {
             }
         }
 
-        long startTime = System.currentTimeMillis();
+        //long startTime = System.currentTimeMillis();
 
         // get the # of partitions in my cluster
         try {
