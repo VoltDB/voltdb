@@ -388,14 +388,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         if (LOG.isTraceEnabled()) {
             LOG.trace("loading table id=" + tableId + "...");
         }
-        byte[] serialized_table;
-        try {
-            final FastSerializer fs = new FastSerializer();
-            fs.writeObject(table);
-            serialized_table = fs.getBytes();
-        } catch (final IOException exception) {
-            throw new RuntimeException(exception);
-        }
+        byte[] serialized_table = table.getTableDataReference().array();
         if (LOG.isTraceEnabled()) {
             LOG.trace("passing " + serialized_table.length + " bytes to EE...");
         }

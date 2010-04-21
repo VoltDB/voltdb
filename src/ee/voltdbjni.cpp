@@ -468,7 +468,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
     jlong undoToken, jboolean allowELT)
 {
     VoltDBEngine *engine = castToEngine(engine_ptr);
-    static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     if (engine == NULL) {
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
     }
@@ -486,18 +486,21 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
     VOLT_DEBUG("deserializing %d bytes ...", (int) length);
     jbyte *bytes = env->GetByteArrayElements(serialized_table, NULL);
     ReferenceSerializeInput serialize_in(bytes, length);
-
     try {
-        bool success = engine->loadTable(bAllowELT, table_id, serialize_in,
-                                         txnId, lastCommittedTxnId);
-        env->ReleaseByteArrayElements(serialized_table, bytes, JNI_ABORT);
-        VOLT_DEBUG("deserialized table");
+        try {
+            bool success = engine->loadTable(bAllowELT, table_id, serialize_in,
+                                             txnId, lastCommittedTxnId);
+            env->ReleaseByteArrayElements(serialized_table, bytes, JNI_ABORT);
+            VOLT_DEBUG("deserialized table");
 
-        if (success)
-            return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
-    } catch (SerializableEEException &e) {
-        engine->resetReusedResultOutputBuffer();
-        e.serialize(engine->getExceptionOutputSerializer());
+            if (success)
+                return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
+        } catch (SerializableEEException &e) {
+            engine->resetReusedResultOutputBuffer();
+            e.serialize(engine->getExceptionOutputSerializer());
+        }
+    } catch (FatalException e) {
+        topend->crashVoltDB(e);
     }
 
     return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
@@ -1093,7 +1096,11 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeCOWSe
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     try {
-        return engine->cowSerializeMore( &out, tableId);
+        try {
+            return engine->cowSerializeMore( &out, tableId);
+        } catch (SQLException e) {
+            throwFatalException("%s", e.message().c_str());
+        }
     } catch (FatalException e) {
         topend->crashVoltDB(e);
     }

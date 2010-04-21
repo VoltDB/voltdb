@@ -644,8 +644,6 @@ std::vector<TableIndex*> PersistentTable::allIndexes() const {
 }
 
 void PersistentTable::onSetColumns() {
-    m_tmpTarget1 = TableTuple(m_schema);
-    m_tmpTarget2 = TableTuple(m_schema);
     if (m_allowNulls != NULL) delete[] m_allowNulls;
     m_allowNulls = new bool[m_columnCount];
     for (int i = m_columnCount - 1; i >= 0; --i) {
@@ -653,54 +651,29 @@ void PersistentTable::onSetColumns() {
     }
 }
 
-void PersistentTable::loadTuplesFrom(bool allowELT,
-                                     SerializeInput &serialize_io,
-                                     Pool *stringPool)
-{
-    serialize_io.readInt(); // table size
-    serialize_io.readInt(); // rowstart
-
-    //column
-    int columnCount = serialize_io.readShort(); // column num
-    VOLT_DEBUG("TABLE HAS %d COLUMNS", columnCount);
-
-    // skip the column types
-    for (int i = 0; i < columnCount; ++i)
-        serialize_io.readEnumInSingleByte();
-
-    // skip the column names
-    for (int i = 0; i < columnCount; ++i)
-        serialize_io.readTextString();
-
-    int tupleCount = serialize_io.readInt();
-    VOLT_DEBUG("PTABLE READ: %d TUPLES\n", tupleCount);
-    assert(tupleCount >= 0);
-
-    // allocate required data blocks first to make them alligned well
-    while (tupleCount + m_usedTuples > m_allocatedTuples) {
-        allocateNextBlock();
+/*
+ * Implemented by persistent table and called by Table::loadTuplesFrom
+ * to do additional processing for views and ELT
+ */
+void PersistentTable::processLoadedTuple(bool allowELT, TableTuple &tuple) {
+    // handle any materialized views
+    if (m_views) {
+        for (int i = 0; i < m_viewCount; i++)
+            m_views[i]->processTupleInsert(m_tmpTarget1);
     }
 
-    //data (index wasn't modified at this time for good alignment)
-    for (int i = 0; i < tupleCount; ++i) {
-        m_tmpTarget1.move(dataPtrForTuple((int) m_usedTuples + i));
-        m_tmpTarget1.setDeletedFalse();
-        m_tmpTarget1.setDirtyFalse();
-        m_tmpTarget1.deserializeFrom(serialize_io, NULL);
-
-        // handle any materialized views
-        if (m_views) {
-            for (int i = 0; i < m_viewCount; i++)
-                m_views[i]->processTupleInsert(m_tmpTarget1);
-        }
-
-        // if EL is enabled, append the tuple to the buffer
-        if (allowELT && m_exportEnabled) {
-            appendToELBuffer(m_tmpTarget1, tsSeqNo++,
-                             TupleStreamWrapper::INSERT);
-        }
+    // if EL is enabled, append the tuple to the buffer
+    if (allowELT && m_exportEnabled) {
+        appendToELBuffer(m_tmpTarget1, tsSeqNo++,
+                         TupleStreamWrapper::INSERT);
     }
+}
 
+/*
+ * Implemented by persistent table and called by Table::loadTuplesFrom
+ * to do add tuples to indexes
+ */
+void PersistentTable::populateIndexes(int tupleCount) {
     // populate indexes. walk the contiguous memory in the inner loop.
     for (int i = m_indexCount - 1; i >= 0;--i) {
         TableIndex *index = m_indexes[i];
@@ -709,9 +682,6 @@ void PersistentTable::loadTuplesFrom(bool allowELT,
             index->addEntry(&m_tmpTarget1);
         }
     }
-
-    m_tupleCount += tupleCount;
-    m_usedTuples += tupleCount;
 }
 
 size_t PersistentTable::appendToELBuffer(TableTuple &tuple, int64_t seqNo,

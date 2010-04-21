@@ -189,19 +189,28 @@ public:
      * Serialize a single tuple as a table so it can be sent to Java.
      */
     bool serializeTupleTo(SerializeOutput &serialize_out, TableTuple *tuples, int numTuples);
-    bool deserializeFrom(SerializeInput &serialize_in, Pool *stringPool);
 
     /**
      * Loads only tuple data, not schema, from the serialized table.
      * Used for initial data loading and receiving dependencies.
      * @param allowELT if false, elt enabled is overriden for this load.
      */
-    virtual void loadTuplesFrom(bool allowELT,
+    void loadTuplesFrom(bool allowELT,
                                 SerializeInput &serialize_in,
-                                Pool *stringPool = NULL)
-    {
-    }
+                                Pool *stringPool = NULL);
+protected:
+    /*
+     * Implemented by persistent table and called by Table::loadTuplesFrom
+     * to do additional processing for views and ELT
+     */
+    virtual void processLoadedTuple(bool allowELT, TableTuple &tuple) {};
 
+    /*
+     * Implemented by persistent table and called by Table::loadTuplesFrom
+     * to do add tuples to indexes
+     */
+    virtual void populateIndexes(int tupleCount) {};
+public:
     /**
      * Flush tuple stream wrappers. A negative time instructs an
      * immediate flush.
@@ -232,6 +241,8 @@ protected:
 
     // TUPLES
     TableTuple m_tempTuple;
+    /** not temptuple. these are for internal use. */
+    TableTuple m_tmpTarget1, m_tmpTarget2;
     TupleSchema* m_schema;
     uint32_t m_tupleCount;
     uint32_t m_usedTuples;

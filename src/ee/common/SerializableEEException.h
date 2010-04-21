@@ -52,6 +52,7 @@ public:
     virtual ~SerializableEEException();
 
     void serialize(ReferenceSerializeOutput *output);
+    std::string message() { return m_message; }
 protected:
     virtual void p_serialize(ReferenceSerializeOutput *output) {};
 

@@ -160,7 +160,7 @@ class NValue {
        heap. This is used to deserialize tables. */
     static void deserializeFrom(
         SerializeInput &input, const ValueType type, char *storage,
-        bool isInlined, Pool *dataPool);
+        bool isInlined, const int32_t maxLength, Pool *dataPool);
 
         // TODO: no callers use the first form; Should combine these
         // eliminate the potential NValue copy.
@@ -1825,7 +1825,7 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
  * heap. This is used to deserialize tables.
  */
 inline void NValue::deserializeFrom(SerializeInput &input, const ValueType type,
-                             char *storage, bool isInlined, Pool *dataPool) {
+                             char *storage, bool isInlined, const int32_t maxLength, Pool *dataPool) {
     switch (type) {
       case VALUE_TYPE_BIGINT:
       case VALUE_TYPE_TIMESTAMP:
@@ -1845,6 +1845,14 @@ inline void NValue::deserializeFrom(SerializeInput &input, const ValueType type,
         break;
       case VALUE_TYPE_VARCHAR: {
           const int32_t length = input.readInt();
+          if (length > maxLength) {
+              char msg[1024];
+              sprintf(msg, "Object exceeds specified size. Size is %d and max is %d", length, maxLength);
+              throw SQLException(
+                  SQLException::data_exception_string_data_length_mismatch,
+                  msg);
+          }
+
           const int8_t lengthLength = getAppropriateObjectLengthLength(length);
           // the NULL SQL string is a NULL C pointer
           if (isInlined) {

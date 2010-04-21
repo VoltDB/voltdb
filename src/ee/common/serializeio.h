@@ -53,7 +53,7 @@
 #include <arpa/inet.h>
 #include "bytearray.h"
 #include "debuglog.h"
-#include "common/FatalException.hpp"
+#include "common/SQLException.h"
 
 namespace voltdb {
 
@@ -467,7 +467,9 @@ public:
 protected:
     /** Reference output can't resize the buffer: Frowny-Face. */
     virtual void expand(size_t minimum_desired) {
-        throwFatalException("Attempted to expand a ReferenceSerializeOutput");
+        throw SQLException(SQLException::volt_output_buffer_overflow,
+            "Output from SQL stmt overflowed output/network buffer of 10mb. "
+            "Try a \"limit\" clause or a stronger predicate.");
     }
 };
 

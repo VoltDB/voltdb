@@ -207,12 +207,6 @@ TempTable* TableFactory::getCopiedTempTable(
     return table;
 }
 
-TempTable* TableFactory::getDeserializedTempTable(voltdb::CatalogId databaseId, SerializeInput& serialize_io) {
-    TempTable* table = new TempTable();
-    table->deserializeFrom(serialize_io, NULL);
-    return table;
-}
-
 void TableFactory::initCommon(
             voltdb::CatalogId databaseId,
             Table *table,

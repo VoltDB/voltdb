@@ -523,7 +523,8 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInput &tupleIn, Pool *d
          */
         const bool isInlined = m_schema->columnIsInlined(j);
         char *dataPtr = getDataPtr(j);
-        NValue::deserializeFrom(tupleIn, type, dataPtr, isInlined, dataPool);
+        const int32_t columnLength = m_schema->columnLength(j);
+        NValue::deserializeFrom(tupleIn, type, dataPtr, isInlined, columnLength, dataPool);
     }
 }
 

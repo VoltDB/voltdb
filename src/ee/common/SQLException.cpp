@@ -16,6 +16,7 @@
  */
 #include "common/SQLException.h"
 #include "common/SerializableEEException.h"
+#include "common/serializeio.h"
 #include <iostream>
 #include <cassert>
 

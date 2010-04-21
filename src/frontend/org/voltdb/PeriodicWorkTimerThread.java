@@ -46,7 +46,7 @@ public class PeriodicWorkTimerThread extends Thread {
             try {
                 foo.poll(5, TimeUnit.MILLISECONDS);
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                return;
             }
             for (ClientInterface ci : m_clientInterfaces) {
                 ci.processPeriodicWork();

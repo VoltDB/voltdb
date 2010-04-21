@@ -19,9 +19,10 @@
 #define SQLEXCEPTION_H_
 
 #include "common/SerializableEEException.h"
-#include "common/serializeio.h"
 
 namespace voltdb {
+class ReferenceSerializeOutput;
+
 class SQLException : public SerializableEEException {
 public:
 

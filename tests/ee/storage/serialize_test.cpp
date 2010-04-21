@@ -76,7 +76,7 @@ class TableSerializeTest : public Test {
         TableSerializeTest() {
             this->database_id = 1000;
 
-            std::string *columnNames = new std::string[NUM_OF_COLUMNS];
+            columnNames = new std::string[NUM_OF_COLUMNS];
             std::vector<voltdb::ValueType> columnTypes;
             std::vector<int32_t> columnSizes;
             std::vector<bool> columnAllowNull(NUM_OF_COLUMNS, false);
@@ -91,9 +91,6 @@ class TableSerializeTest : public Test {
             }
             voltdb::TupleSchema *schema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnSizes, columnAllowNull, true);
             table_ = TableFactory::getTempTable(this->database_id, "temp_table", schema, columnNames, NULL);
-
-            // clean up
-            delete[] columnNames;
 
             for (int64_t i = 1; i <= TUPLES; ++i) {
                 TableTuple &tuple = table_->tempTuple();
@@ -114,11 +111,13 @@ class TableSerializeTest : public Test {
         ~TableSerializeTest() {
             table_->deleteAllTuples(true);
             delete table_;
+            delete []columnNames;
         }
     protected:
         CatalogId database_id;
         CatalogId table_id;
         Table* table_;
+        std::string *columnNames;
 };
 
 
@@ -137,8 +136,11 @@ TEST_F(TableSerializeTest, RoundTrip) {
     std::cout << "serialized size:" << size << std::endl;
 
     // Deserialize the table: verify that it matches the existing table
-    ReferenceSerializeInput serialize_in(serialize_out.data(), serialize_out.size());
-    Table* deserialized = TableFactory::getDeserializedTempTable(this->database_id, serialize_in);
+    ReferenceSerializeInput serialize_in(serialize_out.data() + sizeof(int32_t), serialize_out.size() - sizeof(int32_t));
+    int tempTableMemory = 0;
+    TupleSchema *schema = TupleSchema::createTupleSchema(table_->schema());
+    Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema, columnNames, &tempTableMemory);
+    deserialized->loadTuplesFrom(false,  serialize_in, NULL);
     int colnum = table_->columnCount();
     EXPECT_EQ(colnum, deserialized->columnCount());
     for (int i = 0; i < colnum; ++i) {
@@ -181,8 +183,11 @@ TEST_F(TableSerializeTest, NullStrings) {
     table_->serializeTo(serialize_out);
 
     // Deserialize the table: verify that it matches the existing table
-    ReferenceSerializeInput serialize_in(serialize_out.data(), serialize_out.size());
-    Table* deserialized = TableFactory::getDeserializedTempTable(this->database_id, serialize_in);
+    ReferenceSerializeInput serialize_in(serialize_out.data() + sizeof(int32_t), serialize_out.size() - sizeof(int32_t));
+    int tempTableMemory = 0;
+    schema = TupleSchema::createTupleSchema(table_->schema());
+    Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema, columnNames, &tempTableMemory);
+    deserialized->loadTuplesFrom(false,  serialize_in, NULL);
 
     EXPECT_EQ(1, deserialized->activeTupleCount());
     EXPECT_EQ(1, table_->activeTupleCount());
@@ -193,7 +198,6 @@ TEST_F(TableSerializeTest, NullStrings) {
     EXPECT_EQ(VALUE_TYPE_VARCHAR, table_->schema()->columnType(0));
     EXPECT_EQ(VALUE_TYPE_VARCHAR, deserialized->schema()->columnType(0));
     EXPECT_EQ(true, table_->schema()->columnIsInlined(0));
-    EXPECT_EQ(false, deserialized->schema()->columnIsInlined(0));
 
     TableIterator iter(deserialized);
     TableTuple t(deserialized->schema());

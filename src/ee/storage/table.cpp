@@ -166,6 +166,9 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::string* column
     // note that any allocated memory in m_data is left alone
     // as is m_allocatedTuples
 
+    m_tmpTarget1 = TableTuple(m_schema);
+    m_tmpTarget2 = TableTuple(m_schema);
+
     onSetColumns(); // for more initialization
 }
 
@@ -357,35 +360,28 @@ bool Table::serializeTo(SerializeOutput &serialize_io) {
        bug in tables of single integers, make sure that's correct.
     */
 
-    try {
-        // a placeholder for the total table size
-        std::size_t pos = serialize_io.position();
-        serialize_io.writeInt(-1);
+    // a placeholder for the total table size
+    std::size_t pos = serialize_io.position();
+    serialize_io.writeInt(-1);
 
-        if (!serializeColumnHeaderTo(serialize_io))
-            return false;
+    if (!serializeColumnHeaderTo(serialize_io))
+        return false;
 
-        // active tuple counts
-        serialize_io.writeInt(static_cast<int32_t>(m_tupleCount));
-        int64_t written_count = 0;
-        TableIterator titer(this);
-        TableTuple tuple(m_schema);
-        while (titer.next(tuple)) {
-            tuple.serializeTo(serialize_io);
-            ++written_count;
-        }
-        assert(written_count == m_tupleCount);
-
-        // length prefix is non-inclusive
-        int32_t sz = static_cast<int32_t>(serialize_io.position() - pos - sizeof(int32_t));
-        assert(sz > 0);
-        serialize_io.writeIntAt(pos, sz);
+    // active tuple counts
+    serialize_io.writeInt(static_cast<int32_t>(m_tupleCount));
+    int64_t written_count = 0;
+    TableIterator titer(this);
+    TableTuple tuple(m_schema);
+    while (titer.next(tuple)) {
+        tuple.serializeTo(serialize_io);
+        ++written_count;
     }
-    catch(...) {
-        throw SQLException(SQLException::volt_output_buffer_overflow,
-            "Output from SQL stmt overflowed output/network buffer of 10mb. "
-            "Try a \"limit\" clause or a stronger predicate.");
-    }
+    assert(written_count == m_tupleCount);
+
+    // length prefix is non-inclusive
+    int32_t sz = static_cast<int32_t>(serialize_io.position() - pos - sizeof(int32_t));
+    assert(sz > 0);
+    serialize_io.writeIntAt(pos, sz);
 
     return true;
 }
@@ -415,62 +411,6 @@ bool Table::serializeTupleTo(SerializeOutput &serialize_io, voltdb::TableTuple *
     }
     catch(...) {
         throwFatalException("Failed while serializing table with specific tuples.");
-        return false;
-    }
-
-    return true;
-}
-
-bool Table::deserializeFrom(SerializeInput &serialize_io, Pool *stringPool) {
-
-    try {
-        /*int32_t fullSize =*/ serialize_io.readInt();
-        //VOLT_DEBUG("FULL SIZE IS %d BYTES", fullSize);
-
-        /*int16_t headerSize =*/ serialize_io.readInt();
-        //VOLT_DEBUG("HEADER IS %d BYTES", headerSize);
-
-        //column
-        int columnCount = serialize_io.readShort(); // column num
-        //VOLT_DEBUG("TABLE HAS %d COLUMNS", columnCount);
-
-        // read the column lengths, types and nullness (only types are serialized)
-        std::vector<voltdb::ValueType> columnTypes;
-        std::vector<int32_t> columnLengths;
-        std::vector<bool> allowNullColumn(columnCount, true);
-        for (int i = 0; i < columnCount; ++i) {
-            columnTypes.push_back(static_cast<voltdb::ValueType>(serialize_io.readEnumInSingleByte()));
-            //VOLT_DEBUG("TYPE OF COLUMN %d IS %d", i, columnTypes[i]);
-            if (columnTypes[i] == voltdb::VALUE_TYPE_VARCHAR) {
-                columnLengths.push_back(UNINLINEABLE_OBJECT_LENGTH);
-            } else {
-                columnLengths.push_back(static_cast<uint16_t>(voltdb::NValue::getTupleStorageSize(columnTypes[i])));
-            }
-        }
-        TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, allowNullColumn, false);
-
-        // read the column names
-        string* columnNames = new string[columnCount];
-        for (int i = 0; i < columnCount; ++i) {
-            columnNames[i] = serialize_io.readTextString();
-        }
-
-        // this will set the columns and also make the table empty
-        initializeWithColumns(schema, columnNames, true);
-        // clean up
-        delete[] columnNames;
-
-        int tupleCount = serialize_io.readInt();
-        assert(tupleCount >= 0);
-
-        //data
-        for (int i = 0; i < tupleCount; ++i) {
-            m_tempTuple.deserializeFrom(serialize_io, stringPool);
-            insertTuple(m_tempTuple);
-        }
-    }
-    catch(...) {
-        throwFatalException("Failed while deserializing table.");
         return false;
     }
 
@@ -517,5 +457,85 @@ std::vector<std::string> Table::getColumnNames() {
         columnNames.push_back(m_columnNames[ii]);
     }
     return columnNames;
+}
+
+void Table::loadTuplesFrom(bool allowELT,
+                            SerializeInput &serialize_io,
+                            Pool *stringPool) {
+    /*
+     * directly receives a VoltTable buffer.
+     * [00 01]   [02 03]   [04 .. 0x]
+     * rowstart  colcount  colcount * 1 byte (column types)
+     *
+     * [0x+1 .. 0y]
+     * colcount * strings (column names)
+     *
+     * [0y+1 0y+2 0y+3 0y+4]
+     * rowcount
+     *
+     * [0y+5 .. end]
+     * rowdata
+     */
+
+    // todo: just skip ahead to this position
+    serialize_io.readInt(); // rowstart
+
+    int16_t colcount = serialize_io.readShort();
+    assert(colcount >= 0);
+
+    // Store the following information so that we can provide them to the user
+    // on failure
+    ValueType types[colcount];
+    std::string names[colcount];
+
+    // skip the column types
+    for (int i = 0; i < colcount; ++i) {
+        types[i] = (ValueType) serialize_io.readEnumInSingleByte();
+    }
+
+    // skip the column names
+    for (int i = 0; i < colcount; ++i) {
+        names[i] = serialize_io.readTextString();
+    }
+
+    // Check if the column count matches what the temp table is expecting
+    if (colcount != m_schema->columnCount()) {
+        std::stringstream message(std::stringstream::in
+                                  | std::stringstream::out);
+        message << "Column count mismatch. Expecting "
+                << m_schema->columnCount()
+                << ", but " << colcount << " given" << std::endl;
+        message << "Expecting the following columns:" << std::endl;
+        message << debug() << std::endl;
+        message << "The following columns are given:" << std::endl;
+        for (int i = 0; i < colcount; i++) {
+            message << "column " << i << ": " << names[i]
+                    << ", type = " << getTypeName(types[i]) << std::endl;
+        }
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      message.str().c_str());
+    }
+
+    int tupleCount = serialize_io.readInt();
+    assert(tupleCount >= 0);
+
+    // allocate required data blocks first to make them alligned well
+    while (tupleCount + m_usedTuples > m_allocatedTuples) {
+        allocateNextBlock();
+    }
+
+    for (int i = 0; i < tupleCount; ++i) {
+        m_tmpTarget1.move(dataPtrForTuple((int) m_usedTuples + i));
+        m_tmpTarget1.setDeletedFalse();
+        m_tmpTarget1.setDirtyFalse();
+        m_tmpTarget1.deserializeFrom(serialize_io, stringPool);
+
+        processLoadedTuple( allowELT, m_tmpTarget1);
+    }
+
+    populateIndexes(tupleCount);
+
+    m_tupleCount += tupleCount;
+    m_usedTuples += tupleCount;
 }
 }

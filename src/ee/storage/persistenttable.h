@@ -177,7 +177,6 @@ class PersistentTable : public Table {
     // ------------------------------------------------------------------
     std::string tableType() const;
     virtual std::string debug();
-    void loadTuplesFrom(bool allowELT, SerializeInput &serialize_in, Pool *stringPool = NULL);
 
     int partitionColumn() { return m_partitionColumn; }
 
@@ -221,6 +220,18 @@ protected:
     PersistentTable(ExecutorContext *ctx, bool exportEnabled);
     void onSetColumns();
 
+    /*
+     * Implemented by persistent table and called by Table::loadTuplesFrom
+     * to do additional processing for views and ELT
+     */
+    virtual void processLoadedTuple(bool allowELT, TableTuple &tuple);
+
+    /*
+     * Implemented by persistent table and called by Table::loadTuplesFrom
+     * to do add tuples to indexes
+     */
+    virtual void populateIndexes(int tupleCount);
+
     CatalogId m_id;
 
     // pointer to current transaction id and other "global" state.
@@ -237,9 +248,6 @@ protected:
     TableIndex** m_indexes;
     int m_indexCount;
     TableIndex *m_pkeyIndex;
-
-    /** not temptuple. these are for internal use. */
-    TableTuple m_tmpTarget1, m_tmpTarget2;
 
     // temporary for tuplestream stuff
     TupleStreamWrapper *m_wrapper;

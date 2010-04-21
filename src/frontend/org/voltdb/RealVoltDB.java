@@ -466,6 +466,8 @@ public class RealVoltDB implements VoltDBInterface
      */
     public void shutdown(Thread mainSiteThread) throws InterruptedException {
         synchronized(m_startAndStopLock) {
+            fivems.interrupt();
+            fivems.join();
             // Things are going pear-shaped, tell the fault distributor to
             // shut its fat mouth
             m_faultManager.shutDown();

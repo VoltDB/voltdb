@@ -81,7 +81,6 @@ class TempTable : public Table {
         // ------------------------------------------------------------------
         // OPERATIONS
         // ------------------------------------------------------------------
-        void loadTuplesFrom(bool allowELT, SerializeInput &serialize_in, Pool *stringPool);
         void deleteAllTuples(bool freeAllocatedStrings);
         bool insertTuple(TableTuple &source);
         bool updateTuple(TableTuple &source, TableTuple &target, bool updatesIndexes);
@@ -117,10 +116,6 @@ class TempTable : public Table {
     protected:
         // can not use this constructor to coerce a cast
         explicit TempTable();
-        void onSetColumns();
-
-        /** not temptuple. these are for internal use. */
-        TableTuple m_tmpTarget1, m_tmpTarget2;
 };
 
 inline void TempTable::insertTupleNonVirtualWithDeepCopy(TableTuple &source, Pool *pool) {

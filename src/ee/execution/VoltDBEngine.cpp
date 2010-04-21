@@ -582,7 +582,11 @@ bool VoltDBEngine::loadTable(bool allowELT, int32_t tableId,
         return false;
     }
 
-    table->loadTuplesFrom(allowELT, serializeIn);
+    try {
+        table->loadTuplesFrom(allowELT, serializeIn);
+    } catch (SerializableEEException e) {
+        throwFatalException("%s", e.message().c_str());
+    }
     return true;
 }
 

@@ -158,11 +158,6 @@ public:
         const Table* templateTablezz,
         int* tempTableMemoryInBytes);
 
-    /**
-    * Deserialize a temp table.
-    */
-    static TempTable* getDeserializedTempTable(voltdb::CatalogId databaseId, SerializeInput& serialize_in);
-
 private:
     static void initConstraints(PersistentTable* table);
     static void initCommon(
