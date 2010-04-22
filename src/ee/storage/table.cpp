@@ -291,54 +291,48 @@ bool Table::serializeColumnHeaderTo(SerializeOutput &serialize_io) {
     // skip header position
     std::size_t start;
 
-    try {
-        // use a cache
-        if (m_columnHeaderData) {
-            assert(m_columnHeaderSize != -1);
-            serialize_io.writeBytes(m_columnHeaderData, m_columnHeaderSize);
-            return true;
-        }
-        assert(m_columnHeaderSize == -1);
-
-        start = serialize_io.position();
-
-        // skip header position
-        serialize_io.writeInt(-1);
-
-        // column counts as a short
-        serialize_io.writeShort(static_cast<int16_t>(m_columnCount));
-
-        // write an array of column types as bytes
-        for (int i = 0; i < m_columnCount; ++i) {
-            ValueType type = m_schema->columnType(i);
-            serialize_io.writeByte(static_cast<int8_t>(type));
-        }
-
-        // write the array of column names as voltdb strings
-        // NOTE: strings are ASCII only in metadata (UTF-8 in table storage)
-        for (int i = 0; i < m_columnCount; ++i) {
-            // column name: write (offset, length) for column definition, and string to string table
-            const string& name = columnName(i);
-            // column names can't be null, so length must be >= 0
-            int32_t length = static_cast<int32_t>(name.size());
-            assert(length >= 0);
-
-            // this is standard string serialization for voltdb
-            serialize_io.writeInt(length);
-            serialize_io.writeBytes(name.data(), length);
-        }
-
-
-        // write the header size which is a non-inclusive int
-        size_t position = serialize_io.position();
-        m_columnHeaderSize = static_cast<int32_t>(position - start);
-        int32_t nonInclusiveHeaderSize = static_cast<int32_t>(m_columnHeaderSize - sizeof(int32_t));
-        serialize_io.writeIntAt(start, nonInclusiveHeaderSize);
+    // use a cache
+    if (m_columnHeaderData) {
+        assert(m_columnHeaderSize != -1);
+        serialize_io.writeBytes(m_columnHeaderData, m_columnHeaderSize);
+        return true;
     }
-    catch(...) {
-        throwFatalException("Failed while serializing table header.");
-        return false;
+    assert(m_columnHeaderSize == -1);
+
+    start = serialize_io.position();
+
+    // skip header position
+    serialize_io.writeInt(-1);
+
+    // column counts as a short
+    serialize_io.writeShort(static_cast<int16_t>(m_columnCount));
+
+    // write an array of column types as bytes
+    for (int i = 0; i < m_columnCount; ++i) {
+        ValueType type = m_schema->columnType(i);
+        serialize_io.writeByte(static_cast<int8_t>(type));
     }
+
+    // write the array of column names as voltdb strings
+    // NOTE: strings are ASCII only in metadata (UTF-8 in table storage)
+    for (int i = 0; i < m_columnCount; ++i) {
+        // column name: write (offset, length) for column definition, and string to string table
+        const string& name = columnName(i);
+        // column names can't be null, so length must be >= 0
+        int32_t length = static_cast<int32_t>(name.size());
+        assert(length >= 0);
+
+        // this is standard string serialization for voltdb
+        serialize_io.writeInt(length);
+        serialize_io.writeBytes(name.data(), length);
+    }
+
+
+    // write the header size which is a non-inclusive int
+    size_t position = serialize_io.position();
+    m_columnHeaderSize = static_cast<int32_t>(position - start);
+    int32_t nonInclusiveHeaderSize = static_cast<int32_t>(m_columnHeaderSize - sizeof(int32_t));
+    serialize_io.writeIntAt(start, nonInclusiveHeaderSize);
 
     // cache the results
     m_columnHeaderData = new char[m_columnHeaderSize];
@@ -393,26 +387,20 @@ bool Table::serializeTo(SerializeOutput &serialize_io) {
 bool Table::serializeTupleTo(SerializeOutput &serialize_io, voltdb::TableTuple *tuples, int numTuples) {
     //assert(m_schema->equals(tuples[0].getSchema()));
 
-    try {
-        std::size_t pos = serialize_io.position();
-        serialize_io.writeInt(-1);
+    std::size_t pos = serialize_io.position();
+    serialize_io.writeInt(-1);
 
-        assert(!tuples[0].isNullTuple());
+    assert(!tuples[0].isNullTuple());
 
-        if (!serializeColumnHeaderTo(serialize_io))
-            return false;
-
-        serialize_io.writeInt(static_cast<int32_t>(numTuples));
-        for (int ii = 0; ii < numTuples; ii++) {
-            tuples[ii].serializeTo(serialize_io);
-        }
-
-        serialize_io.writeIntAt(pos, static_cast<int32_t>(serialize_io.position() - pos - sizeof(int32_t)));
-    }
-    catch(...) {
-        throwFatalException("Failed while serializing table with specific tuples.");
+    if (!serializeColumnHeaderTo(serialize_io))
         return false;
+
+    serialize_io.writeInt(static_cast<int32_t>(numTuples));
+    for (int ii = 0; ii < numTuples; ii++) {
+        tuples[ii].serializeTo(serialize_io);
     }
+
+    serialize_io.writeIntAt(pos, static_cast<int32_t>(serialize_io.position() - pos - sizeof(int32_t)));
 
     return true;
 }
