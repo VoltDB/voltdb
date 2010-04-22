@@ -52,7 +52,7 @@ public class ClientBenchmark extends ClientMain {
     //public static final Class<? extends ClientMain> m_loaderClass = anyLoader.class;
     public static final Class<? extends ClientMain> m_loaderClass = null;
 
-    public static final String m_jarFileName = "catalog.jar";
+    public static final String m_jarFileName = "dedupe.jar";
 
     static class AsyncCallback extends ProcedureCallback {
         @Override

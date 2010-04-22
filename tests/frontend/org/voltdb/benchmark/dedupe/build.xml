@@ -116,7 +116,7 @@ PRIMARY ENTRY POINTS
         <arg value="1"/>           <!-- servers -->
         <arg value="2"/>           <!-- partitions per server -->
         <arg value="localhost"/>   <!-- leader -->
-        <arg value="catalog.jar"/> <!-- output -->
+        <arg value="dedupe.jar"/> <!-- output -->
         <classpath refid='benchmark.classpath' />
         <assertions><disable /></assertions>
     </java>
@@ -135,7 +135,7 @@ CLEANING
         <fileset dir="${build.dir}" includes="**/*" />
         <fileset dir="${debugoutput.dir}" includes="**/*" />
         <fileset dir="." defaultexcludes="yes" >
-            <include name="catalog.jar" />
+            <include name="dedupe.jar" />
         </fileset>
     </delete>
 </target>
