@@ -1011,15 +1011,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final long lastCommittedTxnId, final long undoToken, boolean allowELT)
         throws EEException
     {
-        // big endian, not direct
-        final FastSerializer fser = new FastSerializer();
-
-        try {
-            fser.writeObject(table);
-        } catch (final IOException e) {
-            throw new RuntimeException(e);
-        }
-
         m_data.clear();
         m_data.putInt(Commands.LoadTable.m_id);
         m_data.putInt(tableId);
@@ -1032,7 +1023,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         else
             m_data.putShort((short) 0);
 
-        final ByteBuffer tableBytes = fser.getBuffer();
+        final ByteBuffer tableBytes = table.getTableDataReference();
         if (m_data.remaining() < tableBytes.remaining()) {
             m_data.flip();
             final ByteBuffer newBuffer = ByteBuffer.allocate(m_data.remaining()
