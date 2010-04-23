@@ -226,7 +226,8 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
                 VoltTable[] curr_results = curr_response.getResults();
                 if (first_results.length != curr_results.length)
                 {
-                    String msg = "Mismatched result count received for transaction: " + r.getTxnId();
+                    String msg = "Mismatched result count received for transaction ID: " + r.getTxnId();
+                    msg += "\n  while executing stored procedure: " + state.invocation.getProcName();
                     msg += "\n  from execution site: " + r.getCoordinatorSiteId();
                     msg += "\n  Expected number of results: " + first_results.length;
                     msg += "\n  Mismatched number of results: " + curr_results.length;
@@ -236,7 +237,8 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
                 {
                     if (!curr_results[i].hasSameContents(first_results[i]))
                     {
-                        String msg = "Mismatched results received for transaction: " + r.getTxnId();
+                        String msg = "Mismatched results received for transaction ID: " + r.getTxnId();
+                        msg += "\n  while executing stored procedure: " + state.invocation.getProcName();
                         msg += "\n  from execution site: " + r.getCoordinatorSiteId();
                         msg += "\n  Expected results: " + first_results[i].toString();
                         msg += "\n  Mismatched results: " + curr_results[i].toString();
