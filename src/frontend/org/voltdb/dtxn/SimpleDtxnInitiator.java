@@ -195,6 +195,10 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     public synchronized void tick(long time, long interval) {
         long txnId = m_idManager.getNextUniqueTransactionId();
 
+        // SEMI-HACK: this list can become incorrect if there's a node
+        // failure in between here and the Heartbeat transmission loop below.
+        // Rather than add another synchronization point, we'll just make
+        // that a survivable case, see ExecutorTxnIdSafetyState for more info.
         int[] outOfDateSites =
             VoltDB.instance().getCatalogContext().
             //siteTracker.getSitesWhichNeedAHeartbeat(time, interval);

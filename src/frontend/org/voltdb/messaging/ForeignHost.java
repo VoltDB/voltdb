@@ -23,6 +23,7 @@ import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 
+import org.apache.log4j.Logger;
 import org.voltdb.VoltDB;
 import org.voltdb.fault.NodeFailureFault;
 import org.voltdb.network.Connection;
@@ -30,9 +31,18 @@ import org.voltdb.network.QueueMonitor;
 import org.voltdb.network.VoltProtocolHandler;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DeferredSerialization;
+import org.voltdb.utils.EstTime;
+import org.voltdb.utils.VoltLoggerFactory;
 import org.voltdb.utils.DBBPool.BBContainer;
 
 public class ForeignHost {
+    private static final Logger hostLog =
+        Logger.getLogger("HOST", VoltLoggerFactory.instance());
+
+    // The amount of time we allow between messages from a host
+    // before deciding that it must be dead.  In millis.
+    static final int DEAD_HOST_TIMEOUT_THRESHOLD = 1000;
+
     private final Connection m_connection;
     private final FHInputHandler m_handler;
     private final HostMessenger m_hostMessenger;
@@ -44,6 +54,10 @@ public class ForeignHost {
     private String m_remoteHostname;
     private boolean m_closing;
     private boolean m_isUp;
+
+    private long m_lastMessageMillis;
+    private int[] m_histo;
+    private int m_deltas;
 
     /** ForeignHost's implementation of InputHandler */
     public class FHInputHandler extends VoltProtocolHandler {
@@ -108,6 +122,9 @@ public class ForeignHost {
         m_hostId = hostId;
         m_closing = false;
         m_isUp = true;
+        m_lastMessageMillis = Long.MAX_VALUE;
+        m_histo = new int[11];
+        m_deltas = 0;
     }
 
     void close()
@@ -164,6 +181,37 @@ public class ForeignHost {
                     message.cancel();
                 }
             });
+
+//        long current_time = System.currentTimeMillis();
+        long current_time = EstTime.currentTimeMillis();
+        long current_delta = current_time - m_lastMessageMillis;
+        if (m_isUp && (current_delta > DEAD_HOST_TIMEOUT_THRESHOLD))
+        {
+            hostLog.error("DEAD HOST DETECTED, host: " + m_hostId);
+            hostLog.info("\tcurrent time: " + current_time);
+            hostLog.info("\tlast message: " + m_lastMessageMillis);
+            hostLog.info("\tdelta: " + current_delta);
+            close();
+            VoltDB.instance().getFaultDistributor().
+            reportFault(new NodeFailureFault(m_hostId));
+        }
+//        else
+//        {
+//            if (current_delta > 0)
+//            {
+//                m_histo[(int)(current_delta / 100)]++;
+//                m_deltas++;
+//                if (m_deltas > 200000)
+//                {
+//                    System.out.println("Delta histo to host: " + m_hostId);
+//                    for (int i = 0; i < 11; i++)
+//                    {
+//                        System.out.println("\t" + i + ": " + m_histo[i]);
+//                    }
+//                    m_deltas = 0;
+//                }
+//            }
+//        }
     }
 
     /**
@@ -239,6 +287,9 @@ public class ForeignHost {
 
             return;
         }
+
+        //m_lastMessageMillis = System.currentTimeMillis();
+        m_lastMessageMillis = EstTime.currentTimeMillis();
 
         assert (mailboxId > -1);
         int destCount = in.getInt();

@@ -97,7 +97,16 @@ public class ExecutorTxnIdSafetyState {
 
     public synchronized long getNewestSafeTxnIdForExecutorBySiteId(int executorSiteId) {
         SiteState ss = m_stateBySite.get(executorSiteId);
-        assert(ss != null);
+        // ss will be null if the node with this failed before we got here.
+        // Just return DUMMY_LAST_SEEN_TXN_ID; any message generated for the
+        // failed node will get dropped gracefully and in the unlikely
+        // event that we actually get DUMMY_LAST_SEEN_TXN_ID to a correctly
+        // functioning execution site it will simply log an error message
+        // but keep running correctly.
+        if (ss == null)
+        {
+            return DtxnConstants.DUMMY_LAST_SEEN_TXN_ID;
+        }
         assert(ss.siteId == executorSiteId);
         PartitionState ps = ss.partition;
         ss.lastSentTxnId = ps.newestConfirmedTxnId;
