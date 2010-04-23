@@ -303,15 +303,15 @@ voltdb::TableTuple *tupleFromString(char *tupleStr, voltdb::TupleSchema *tupleSc
         switch (type) {
             case voltdb::VALUE_TYPE_TINYINT:
                 bi_value = static_cast<int64_t>(atoll(value));
-                tuple->setNValue(i, ValueFactory::getTinyIntValue(bi_value));
+                tuple->setNValue(i, ValueFactory::getTinyIntValue(static_cast<int8_t>(bi_value)));
                 break;
             case voltdb::VALUE_TYPE_SMALLINT:
                 bi_value = static_cast<int64_t>(atoll(value));
-                tuple->setNValue(i, ValueFactory::getSmallIntValue(bi_value));
+                tuple->setNValue(i, ValueFactory::getSmallIntValue(static_cast<int16_t>(bi_value)));
                 break;
             case voltdb::VALUE_TYPE_INTEGER:
                 bi_value = static_cast<int64_t>(atoll(value));
-                tuple->setNValue(i, ValueFactory::getIntegerValue(bi_value));
+                tuple->setNValue(i, ValueFactory::getIntegerValue(static_cast<int32_t>(bi_value)));
                 break;
             case voltdb::VALUE_TYPE_BIGINT:
                 bi_value = static_cast<int64_t>(atoll(value));
