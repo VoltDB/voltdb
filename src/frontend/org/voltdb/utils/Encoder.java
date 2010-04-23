@@ -148,6 +148,35 @@ public class Encoder {
         }
     }
 
+    public static String base64Encode(String string) {
+        try {
+            final byte[] inBytes = string.getBytes("UTF-8");
+            return Base64.encodeBytes(inBytes);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static byte[] base64EncodeToBytes(String string) {
+        try {
+            final byte[] inBytes = string.getBytes("UTF-8");
+            return Base64.encodeBytesToBytes(inBytes);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static byte[] base64EncodeToBytes(byte bytes[]) {
+        try {
+            return Base64.encodeBytesToBytes(bytes);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+
     public static String decodeBase64AndDecompress(String string) {
         try {
             byte[] bytes = Base64.decode(string);
@@ -172,6 +201,36 @@ public class Encoder {
     public static byte[] decodeBase64AndDecompressToBytes(String string) {
         try {
             return Base64.decode(string);
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static String decodeBase64(String string) {
+        try {
+            return new String(Base64.decode(string, Base64.DONT_GUNZIP), "UTF-8");
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static byte[] decodeBase64ToBytes(String string) {
+        try {
+            return Base64.decode(string, Base64.DONT_GUNZIP);
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static byte[] decodeBase64ToBytes(byte bytes[]) {
+        try {
+            return Base64.decode(bytes);
         }
         catch (Exception e) {
             e.printStackTrace();
