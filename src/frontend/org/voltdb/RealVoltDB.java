@@ -75,8 +75,8 @@ public class RealVoltDB implements VoltDBInterface
                 ArrayList<Integer> dead_sites =
                     VoltDB.instance().getCatalogContext().
                     siteTracker.getAllSitesForHost(node_fault.getHostId());
-                hostLog.warn("Host failed, host ID: " + node_fault.getHostId());
-                hostLog.warn("  Removing sites from cluster: " + dead_sites);
+                hostLog.error("Host failed, host ID: " + node_fault.getHostId());
+                hostLog.error("  Removing sites from cluster: " + dead_sites);
                 StringBuilder sb = new StringBuilder();
                 for (int site_id : dead_sites)
                 {
