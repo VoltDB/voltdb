@@ -104,12 +104,43 @@ public class Encoder {
     public static String compressAndBase64Encode(String string) {
         try {
             byte[] inBytes = string.getBytes("UTF-8");
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            ByteArrayOutputStream baos = new ByteArrayOutputStream((int)(string.length() * 0.7));
             GZIPOutputStream gzos = new GZIPOutputStream(baos);
             gzos.write(inBytes);
             gzos.close();
             byte[] outBytes = baos.toByteArray();
             return Base64.encodeBytes(outBytes);
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static byte[] compressAndBase64EncodeToBytes(String string) {
+        try {
+            byte[] inBytes = string.getBytes("UTF-8");
+            ByteArrayOutputStream baos = new ByteArrayOutputStream((int)(string.length() * 0.7));
+            GZIPOutputStream gzos = new GZIPOutputStream(baos);
+            gzos.write(inBytes);
+            gzos.close();
+            byte[] outBytes = baos.toByteArray();
+            return Base64.encodeBytesToBytes(outBytes);
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static byte[] compressAndBase64EncodeToBytes(byte inBytes[]) {
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream((int)(inBytes.length * .7));
+            GZIPOutputStream gzos = new GZIPOutputStream(baos);
+            gzos.write(inBytes);
+            gzos.close();
+            byte[] outBytes = baos.toByteArray();
+            return Base64.encodeBytesToBytes(outBytes);
         }
         catch (Exception e) {
             e.printStackTrace();
@@ -128,4 +159,23 @@ public class Encoder {
         }
     }
 
+    public static byte[] decodeBase64AndDecompressToBytes(byte inbytes[]) {
+        try {
+            return Base64.decodeAndGUnzip(inbytes);
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static byte[] decodeBase64AndDecompressToBytes(String string) {
+        try {
+            return Base64.decode(string);
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
 }
