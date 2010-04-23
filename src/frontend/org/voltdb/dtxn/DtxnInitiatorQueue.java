@@ -115,10 +115,13 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
 
     public void addPendingTxn(InFlightTxnState txn)
     {
-        m_pendingTxns.addTxn(txn.txnId, txn.coordinatorId, txn);
+        synchronized (m_initiator)
+        {
+            m_pendingTxns.addTxn(txn.txnId, txn.coordinatorId, txn);
+        }
     }
 
-    public synchronized void removeSite(int siteId)
+    public void removeSite(int siteId)
     {
         synchronized (m_initiator)
         {
@@ -160,109 +163,106 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
     }
 
     @Override
-    public synchronized boolean offer(VoltMessage message) {
-        // update the state of seen txnids for each executor
-        if (message instanceof HeartbeatResponseMessage) {
-            HeartbeatResponseMessage hrm = (HeartbeatResponseMessage) message;
-            m_safetyState.updateLastSeenTxnIdFromExecutorBySiteId(hrm.getExecSiteId(), hrm.getLastReceivedTxnId(), hrm.isBlocked());
-            return true;
-        }
-
-        // only valid messages are this and heartbeatresponse
-        assert(message instanceof InitiateResponseMessage);
-        final InitiateResponseMessage r = (InitiateResponseMessage) message;
-        // update the state of seen txnids for each executor
-        m_safetyState.updateLastSeenTxnIdFromExecutorBySiteId(r.getCoordinatorSiteId(), r.getLastReceivedTxnId(), false);
-
-        InFlightTxnState state;
-        int sites_left = -1;
-        synchronized (m_initiator)
+    public boolean offer(VoltMessage message)
+    {
+        synchronized(m_initiator)
         {
+            // update the state of seen txnids for each executor
+            if (message instanceof HeartbeatResponseMessage) {
+                HeartbeatResponseMessage hrm = (HeartbeatResponseMessage) message;
+                m_safetyState.updateLastSeenTxnIdFromExecutorBySiteId(hrm.getExecSiteId(), hrm.getLastReceivedTxnId(), hrm.isBlocked());
+                return true;
+            }
+
+            // only valid messages are this and heartbeatresponse
+            assert(message instanceof InitiateResponseMessage);
+            final InitiateResponseMessage r = (InitiateResponseMessage) message;
+            // update the state of seen txnids for each executor
+            m_safetyState.updateLastSeenTxnIdFromExecutorBySiteId(r.getCoordinatorSiteId(), r.getLastReceivedTxnId(), false);
+
+            InFlightTxnState state;
+            int sites_left = -1;
             state = m_pendingTxns.getTxn(r.getTxnId(), r.getCoordinatorSiteId());
             sites_left = m_pendingTxns.getTxnIdSize(r.getTxnId());
-        }
 
-        assert(state.coordinatorId == r.getCoordinatorSiteId());
-        assert(m_siteId == r.getInitiatorSiteId());
+            assert(state.coordinatorId == r.getCoordinatorSiteId());
+            assert(m_siteId == r.getInitiatorSiteId());
 
-        boolean first_response = false;
-        VoltTable[] first_results = null;
-        if (!m_txnIdResults.containsKey(r.getTxnId()))
-        {
-            ClientResponseImpl curr_response = r.getClientResponseData();
-            VoltTable[] curr_results = curr_response.getResults();
-            VoltTable[] saved_results = new VoltTable[curr_results.length];
-            // Create shallow copies of all the VoltTables to avoid
-            // race conditions with the ByteBuffer metadata
-            for (int i = 0; i < curr_results.length; ++i)
+            boolean first_response = false;
+            VoltTable[] first_results = null;
+            if (!m_txnIdResults.containsKey(r.getTxnId()))
             {
-                saved_results[i] = new VoltTable(curr_results[i].getTableDataReference(), true);
-            }
-            m_txnIdResults.put(r.getTxnId(), saved_results);
-            m_txnIdResponses.put(r.getTxnId(), r);
-            first_response = true;
-        }
-        else
-        {
-            first_results = m_txnIdResults.get(r.getTxnId());
-        }
-        if (first_response)
-        {
-            // If this is a read-only transaction then we'll return
-            // the first response to the client
-            if (state.isReadOnly)
-            {
-                enqueueResponse(r, state);
-            }
-        }
-        else
-        {
-            assert(first_results != null);
-
-            ClientResponseImpl curr_response = r.getClientResponseData();
-            VoltTable[] curr_results = curr_response.getResults();
-            if (first_results.length != curr_results.length)
-            {
-                String msg = "Mismatched result count received for transaction: " + r.getTxnId();
-                msg += "\n  from execution site: " + r.getCoordinatorSiteId();
-                msg += "\n  Expected number of results: " + first_results.length;
-                msg += "\n  Mismatched number of results: " + curr_results.length;
-                throw new RuntimeException(msg);
-            }
-            for (int i = 0; i < first_results.length; ++i)
-            {
-                if (!curr_results[i].hasSameContents(first_results[i]))
+                ClientResponseImpl curr_response = r.getClientResponseData();
+                VoltTable[] curr_results = curr_response.getResults();
+                VoltTable[] saved_results = new VoltTable[curr_results.length];
+                // Create shallow copies of all the VoltTables to avoid
+                // race conditions with the ByteBuffer metadata
+                for (int i = 0; i < curr_results.length; ++i)
                 {
-                    String msg = "Mismatched results received for transaction: " + r.getTxnId();
-                    msg += "\n  from execution site: " + r.getCoordinatorSiteId();
-                    msg += "\n  Expected results: " + first_results[i].toString();
-                    msg += "\n  Mismatched results: " + curr_results[i].toString();
-                    throw new RuntimeException(msg);
+                    saved_results[i] = new VoltTable(curr_results[i].getTableDataReference(), true);
+                }
+                m_txnIdResults.put(r.getTxnId(), saved_results);
+                m_txnIdResponses.put(r.getTxnId(), r);
+                first_response = true;
+            }
+            else
+            {
+                first_results = m_txnIdResults.get(r.getTxnId());
+            }
+            if (first_response)
+            {
+                // If this is a read-only transaction then we'll return
+                // the first response to the client
+                if (state.isReadOnly)
+                {
+                    enqueueResponse(r, state);
                 }
             }
-        }
+            else
+            {
+                assert(first_results != null);
 
-        // XXX_K-SAFE if we never receive a response from a site,
-        // this data structure is going to leak memory.  Need to ponder
-        // where to jam a timeout.  Maybe just wait for failure detection
-        // to tell us to clean up
-        if (sites_left == 0)
-        {
-            // XXX un-sync me?
-            synchronized (m_initiator)
+                ClientResponseImpl curr_response = r.getClientResponseData();
+                VoltTable[] curr_results = curr_response.getResults();
+                if (first_results.length != curr_results.length)
+                {
+                    String msg = "Mismatched result count received for transaction: " + r.getTxnId();
+                    msg += "\n  from execution site: " + r.getCoordinatorSiteId();
+                    msg += "\n  Expected number of results: " + first_results.length;
+                    msg += "\n  Mismatched number of results: " + curr_results.length;
+                    throw new RuntimeException(msg);
+                }
+                for (int i = 0; i < first_results.length; ++i)
+                {
+                    if (!curr_results[i].hasSameContents(first_results[i]))
+                    {
+                        String msg = "Mismatched results received for transaction: " + r.getTxnId();
+                        msg += "\n  from execution site: " + r.getCoordinatorSiteId();
+                        msg += "\n  Expected results: " + first_results[i].toString();
+                        msg += "\n  Mismatched results: " + curr_results[i].toString();
+                        throw new RuntimeException(msg);
+                    }
+                }
+            }
+
+            // XXX_K-SAFE if we never receive a response from a site,
+            // this data structure is going to leak memory.  Need to ponder
+            // where to jam a timeout.  Maybe just wait for failure detection
+            // to tell us to clean up
+            if (sites_left == 0)
             {
                 m_pendingTxns.removeTxnId(r.getTxnId());
                 m_initiator.reduceBackpressure(state.messageSize);
+                m_txnIdResults.remove(r.getTxnId());
+                m_txnIdResponses.remove(r.getTxnId());
+                if (!state.isReadOnly)
+                {
+                    enqueueResponse(r, state);
+                }
             }
-            m_txnIdResults.remove(r.getTxnId());
-            m_txnIdResponses.remove(r.getTxnId());
-            if (!state.isReadOnly)
-            {
-                enqueueResponse(r, state);
-            }
-        }
 
-        return true;
+            return true;
+        }
     }
 
     private void enqueueResponse(InitiateResponseMessage response,
