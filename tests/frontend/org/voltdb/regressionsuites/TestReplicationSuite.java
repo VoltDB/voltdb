@@ -30,12 +30,6 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.replication.SelectEmptyTable;
-import org.voltdb.regressionsuites.sqltypesprocs.Delete;
-import org.voltdb.regressionsuites.sqltypesprocs.Insert;
-import org.voltdb.regressionsuites.sqltypesprocs.InsertMulti;
-import org.voltdb.regressionsuites.sqltypesprocs.Select;
-import org.voltdb.regressionsuites.sqltypesprocs.Update;
-import org.voltdb.regressionsuites.sqltypesprocs.UpdateDecimal;
 
 public class TestReplicationSuite extends RegressionSuite
 {
