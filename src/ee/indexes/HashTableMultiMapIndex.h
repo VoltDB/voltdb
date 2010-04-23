@@ -86,7 +86,7 @@ public:
         m_tmp2.setFromTuple(newTupleValue, column_indices_, m_keySchema);
         if (m_eq(m_tmp1, m_tmp2)) return true; // no update is needed for this index
 
-        bool deleted = deleteEntryPrivate(newTupleValue, m_tmp1);
+        bool deleted = deleteEntryPrivate(oldTupleValue, m_tmp1);
         bool inserted = addEntryPrivate(newTupleValue, m_tmp2);
         --m_deletes;
         --m_inserts;

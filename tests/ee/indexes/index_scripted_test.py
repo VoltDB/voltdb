@@ -29,21 +29,32 @@ import sys
 print "Hooray!!!!"
 print sys.path[0]
 
-script = """# setup commands:
-#   begin indexname
-#   types list-of-types
+script = """
+# setup commands:
+#   begin indexname indextypes schema
 # types:
-#   bi = big integer
-#   s = string
+#   bint = big integer
+#   int = integer
+#   sint = small integer
+#   tint = tiny integer
+#   float = double (float)
+#   dec = decimal
+#   str = string
 # general commands:
-#   is = insert success
-#   if = insert failure
-#   ls = lookup success
-#   lf = lookup failure
+#   is = insert expecting success
+#   if = insert expecting failure
+#   ls = lookup expecting success
+#   lf = lookup expecting failure
+#   us = update expecting success
+#   uf = update expecting failure
 
-begin TestName IntsMultiMapIndex/GenericMultiMapIndex bint bint bint
-is 5 6 7
-ls 5 6 7
+begin TestName MultiIntsTree,MultiGenericTree,MultiIntsHash,MultiGenericHash,UniqueIntsTree,UniqueGenericTree,UniqueIntsHash,UniqueGenericHash bint,bint,bint
+is 5,6,7
+ls 5,6,7
+us 5,6,7 8,9,10
+uf 5,6,7 8,9,10
+df 5,6,7
+ds 8,9,10
 exec
 done
 """

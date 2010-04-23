@@ -97,7 +97,7 @@ public:
             return true;
         }
 
-        bool deleted = deleteEntryPrivate(newTupleValue, m_tmp1);
+        bool deleted = deleteEntryPrivate(oldTupleValue, m_tmp1);
         bool inserted = addEntryPrivate(newTupleValue, m_tmp2);
         --m_deletes;
         --m_inserts;

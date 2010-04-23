@@ -77,6 +77,10 @@ std::string TableTuple::debug(const std::string& tableName) const {
             buffer << ")";
         }
     }
+
+    uint64_t addressNum = (uint64_t)address();
+    buffer << " @" << addressNum;
+
     std::string ret(buffer.str());
     return ret;
 }
