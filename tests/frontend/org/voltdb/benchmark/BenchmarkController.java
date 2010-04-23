@@ -187,6 +187,9 @@ public class BenchmarkController {
             m_builderClass = (Class<? extends VoltProjectBuilder>)builderClassField.get(null);
             m_loaderClass = (Class<? extends ClientMain>)loaderClassField.get(null);
             m_jarFileName = (String)jarFileNameField.get(null);
+            if (m_config.localmode == false) {
+                m_jarFileName = config.hosts[0] + "." + m_jarFileName;
+            }
         } catch (Exception e) {
             LogKeys logkey = LogKeys.benchmark_BenchmarkController_ErrorDuringReflectionForClient;
             benchmarkLog.l7dlog( Level.FATAL, logkey.name(),
