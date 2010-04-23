@@ -56,6 +56,14 @@ uf 5,6,7 8,9,10
 df 5,6,7
 ds 8,9,10
 exec
+begin GenericTest MultiGenericTree,MultiGenericHash,UniqueGenericTree,UniqueGenericHash str,bint,bint
+is foo,6,7
+ls foo,6,7
+us foo,6,7 bar,9,10
+uf foo,6,7 bar,9,10
+df foo,6,7
+ds bar,9,10
+exec
 done
 """
 

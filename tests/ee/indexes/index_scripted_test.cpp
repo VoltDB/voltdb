@@ -28,6 +28,7 @@
 #include <iostream>
 #include <fstream>
 #include <cassert>
+#include <sys/time.h>
 #include <boost/foreach.hpp>
 #include "common/NValue.hpp"
 #include "common/ValueFactory.hpp"
@@ -232,15 +233,20 @@ void setNewCurrent(const char *testName, vector<const char*> indexNames, vector<
 
 void runTest()
 {
+    timeval tStart, tEnd;
+
     while (currentIndexes.size() > 0) {
-        currentIndex = currentIndexes.back();
-        currentIndexes.pop_back();
 
         int successes = 0;
         int failures = 0;
 
+        currentIndex = currentIndexes.back();
+        currentIndexes.pop_back();
+
+        gettimeofday(&tStart, NULL);
+
         size_t commandCount = currentCommands.size();
-        for (size_t i = 0; i < commandCount; ++i) {
+            for (size_t i = 0; i < commandCount; ++i) {
             Command &command = currentCommands[i];
             bool result;
             if (command.op == kInsertSuccess)
@@ -270,11 +276,18 @@ void runTest()
             }
         }
 
+        gettimeofday(&tEnd, NULL);
+
+        int64_t us = (tEnd.tv_sec - tStart.tv_sec) * 1000000;
+        us += tEnd.tv_usec - tStart.tv_usec;
+
+        cout << "successes/failures: " << successes << "/" << failures;
+        cout << " in " << us << "us";
+        cout << " on " << currentIndex->getName() << "/" << currentIndex->getTypeName() << endl;
+        globalFailures += failures;
+
         delete currentIndex;
         currentIndex = NULL;
-
-        cout << "successes/failures: " << successes << "/" << failures << endl;
-        globalFailures += failures;
     }
 
     cleanUp();
