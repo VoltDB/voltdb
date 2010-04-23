@@ -135,8 +135,17 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
                     if (!m_txnIdResponses.containsKey(txn_id))
                     {
                         // No response was ever received for this TXN.
-                        // What's the right thing to return to the client?
-                        // XXX-FAILURE don't like this crashing long-term
+                        // Currently, crashing is okay because there are
+                        // no valid node failures that can lead us to the
+                        // state where there are no more pending
+                        // InFlightTxnStates AND no responses for a TXN ID.
+                        // Multipartition initiators and coordinators are
+                        // currently co-located, so a node failure kills both
+                        // and this code doesn't run.  Single partition
+                        // transactions with replications are guaranteed a
+                        // response or an outstanding InFlightTxnState.
+                        // Single partition transactions with no replication
+                        // means that a node failure kills the cluster.
                         VoltDB.crashVoltDB();
                     }
                     InitiateResponseMessage r = m_txnIdResponses.get(txn_id);
@@ -247,10 +256,6 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
                 }
             }
 
-            // XXX_K-SAFE if we never receive a response from a site,
-            // this data structure is going to leak memory.  Need to ponder
-            // where to jam a timeout.  Maybe just wait for failure detection
-            // to tell us to clean up
             if (sites_left == 0)
             {
                 m_pendingTxns.removeTxnId(r.getTxnId());
