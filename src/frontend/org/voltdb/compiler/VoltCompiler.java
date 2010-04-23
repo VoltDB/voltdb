@@ -492,7 +492,8 @@ public class VoltCompiler {
                     !frequency.endsWith("m") &&
                     !frequency.endsWith("h")) {
                 throw new VoltCompilerException(
-                        "Snapshot frequency needs to end with time unit specified " +
+                        "Snapshot frequency " + frequency +
+                        " needs to end with time unit specified" +
                         " that is one of [s, m, h] (seconds, minutes, hours)");
             }
 
