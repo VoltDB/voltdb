@@ -26,6 +26,7 @@ import java.io.StringReader;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Hashtable;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -75,7 +76,9 @@ public class RealVoltDB implements VoltDBInterface
                 ArrayList<Integer> dead_sites =
                     VoltDB.instance().getCatalogContext().
                     siteTracker.getAllSitesForHost(node_fault.getHostId());
-                hostLog.error("Host failed, host ID: " + node_fault.getHostId());
+                Collections.sort(dead_sites);
+                hostLog.error("Host failed, hostname: " + node_fault.getHostname());
+                hostLog.error("  Host ID: " + node_fault.getHostId());
                 hostLog.error("  Removing sites from cluster: " + dead_sites);
                 StringBuilder sb = new StringBuilder();
                 for (int site_id : dead_sites)

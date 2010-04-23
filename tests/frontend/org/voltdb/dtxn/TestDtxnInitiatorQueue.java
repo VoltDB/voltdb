@@ -464,7 +464,7 @@ public class TestDtxnInitiatorQueue extends TestCase
         dut.addPendingTxn(createTxnState(0, 1, false, true));
         dut.offer(createInitiateResponse(0, 1, true, true, createResultSet("dude")));
 
-        NodeFailureFault node_failure = new NodeFailureFault(HOST_ID);
+        NodeFailureFault node_failure = new NodeFailureFault(HOST_ID, "localhost");
         VoltDB.instance().getFaultDistributor().reportFault(node_failure);
 
         assertTrue(m_testStream.gotResponse());

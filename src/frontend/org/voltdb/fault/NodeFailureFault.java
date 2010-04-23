@@ -22,10 +22,11 @@ public class NodeFailureFault extends VoltFault
     public static int NODE_FAILURE_INITIATOR = 2;
     public static int NODE_FAILURE_EXECUTION_SITE = 3;
 
-    public NodeFailureFault(int hostId)
+    public NodeFailureFault(int hostId, String hostname)
     {
         super(FaultType.NODE_FAILURE);
         m_hostId = hostId;
+        m_hostname = hostname;
     }
 
     public int getHostId()
@@ -33,11 +34,17 @@ public class NodeFailureFault extends VoltFault
         return m_hostId;
     }
 
+    public String getHostname()
+    {
+        return m_hostname;
+    }
+
     public String toString()
     {
         StringBuilder sb = new StringBuilder();
 
         sb.append("NodeFailureFault:\n");
+        sb.append("  Host: " + m_hostname + "\n");
         sb.append("  Host Id: " + m_hostId + "\n");
         sb.append(super.toString());
 
@@ -45,4 +52,5 @@ public class NodeFailureFault extends VoltFault
     }
 
     private int m_hostId;
+    private String m_hostname;
 }

@@ -50,7 +50,6 @@ public class ForeignHost {
     private final int m_tcpPort;
     private final int m_hostId;
 
-    @SuppressWarnings("unused")
     private String m_remoteHostname;
     private boolean m_closing;
     private boolean m_isUp;
@@ -84,7 +83,7 @@ public class ForeignHost {
             if (!m_closing)
             {
                 VoltDB.instance().getFaultDistributor().
-                reportFault(new NodeFailureFault(m_hostId));
+                reportFault(new NodeFailureFault(m_hostId, m_remoteHostname));
             }
         }
 
@@ -187,13 +186,13 @@ public class ForeignHost {
         long current_delta = current_time - m_lastMessageMillis;
         if (m_isUp && (current_delta > DEAD_HOST_TIMEOUT_THRESHOLD))
         {
-            hostLog.error("DEAD HOST DETECTED, host: " + m_hostId);
+            hostLog.error("DEAD HOST DETECTED, hostname: " + m_remoteHostname);
             hostLog.info("\tcurrent time: " + current_time);
             hostLog.info("\tlast message: " + m_lastMessageMillis);
             hostLog.info("\tdelta: " + current_delta);
             close();
             VoltDB.instance().getFaultDistributor().
-            reportFault(new NodeFailureFault(m_hostId));
+            reportFault(new NodeFailureFault(m_hostId, m_remoteHostname));
         }
 //        else
 //        {
