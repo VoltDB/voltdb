@@ -108,7 +108,7 @@ public class CatalogContext {
      * @throws ClassNotFoundException if the class is not in the jar file.
      */
     public Class<?> classForProcedure(String procedureClassName) throws ClassNotFoundException {
-        System.out.println("Loading class " + procedureClassName);
+        //System.out.println("Loading class " + procedureClassName);
 
         // this is a safety mechanism to prevent catalog classes overriding voltdb stuff
         if (procedureClassName.startsWith("org.voltdb."))
