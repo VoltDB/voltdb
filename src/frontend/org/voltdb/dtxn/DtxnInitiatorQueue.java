@@ -131,6 +131,8 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
                     InFlightTxnState state = txn_ids_affected.get(txn_id);
                     if (!m_txnIdResponses.containsKey(txn_id))
                     {
+                        // No response was ever received for this TXN.
+                        // What's the right thing to return to the client?
                         // XXX-FAILURE don't like this crashing long-term
                         VoltDB.crashVoltDB();
                     }

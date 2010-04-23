@@ -34,6 +34,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.fault.FaultDistributor;
+import org.voltdb.fault.NodeFailureFault;
 import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
@@ -450,25 +451,26 @@ public class TestDtxnInitiatorQueue extends TestCase
 //        dut.removeSite(1);
 //    }
 
-    /*public void testFaultNotification()
+    public void testFaultNotification()
     {
         MockInitiator initiator = new MockInitiator();
-        ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(m_mockVolt.getCatalogContext().siteTracker);
+        ExecutorTxnIdSafetyState safetyState =
+            new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
         DtxnInitiatorQueue dut = new DtxnInitiatorQueue(INITIATOR_SITE_ID, safetyState);
         dut.setInitiator(initiator);
         m_testStream.reset();
         // Single-partition read-write txn
         dut.addPendingTxn(createTxnState(0, 0, false, true));
         dut.addPendingTxn(createTxnState(0, 1, false, true));
+        dut.offer(createInitiateResponse(0, 1, true, true, createResultSet("dude")));
 
         NodeFailureFault node_failure = new NodeFailureFault(HOST_ID);
         VoltDB.instance().getFaultDistributor().reportFault(node_failure);
 
-        dut.offer(createInitiateResponse(0, 1, true, true, createResultSet("dude")));
         assertTrue(m_testStream.gotResponse());
         assertEquals(1, initiator.m_reduceCount);
         assertEquals(MESSAGE_SIZE, initiator.m_reduceSize);
-    }*/
+    }
 
     MockWriteStream m_testStream = new MockWriteStream();
     MockConnection m_testConnect = new MockConnection(m_testStream);
