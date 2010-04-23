@@ -223,7 +223,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
         m_buffer.putInt(0, m_rowStart - 4);
         // write the row count to the next 4 bytes after the header
         m_buffer.putInt(0);
-
+        m_buffer.limit(m_buffer.position());
         assert(verifyTableInvariants());
     }
 

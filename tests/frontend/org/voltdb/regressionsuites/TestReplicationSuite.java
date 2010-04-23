@@ -29,9 +29,19 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.replication.SelectEmptyTable;
+import org.voltdb.regressionsuites.sqltypesprocs.Delete;
+import org.voltdb.regressionsuites.sqltypesprocs.Insert;
+import org.voltdb.regressionsuites.sqltypesprocs.InsertMulti;
+import org.voltdb.regressionsuites.sqltypesprocs.Select;
+import org.voltdb.regressionsuites.sqltypesprocs.Update;
+import org.voltdb.regressionsuites.sqltypesprocs.UpdateDecimal;
 
 public class TestReplicationSuite extends RegressionSuite
 {
+    /** Procedures used by this suite */
+    static final Class<?>[] PROCEDURES = { SelectEmptyTable.class };
+
     public void testSinglePartitionInsert()
     throws IOException, ProcCallException
     {
@@ -71,6 +81,18 @@ public class TestReplicationSuite extends RegressionSuite
         results = client.callProcedure("UpdateMultiPartRepl", 200);
     }
 
+    // Failure detection keeps this failure running.  I at least made it
+    // read/write so that it would block and eventually time out
+    // when it fails.
+    public void testSelectEmptyTable()
+    throws IOException, ProcCallException, InterruptedException
+    {
+        Client client = getClient();
+        VoltTable[] results = client.callProcedure("SelectEmptyTable", 1);
+        System.out.println("results: " + results[0].toString());
+    }
+
+
     public TestReplicationSuite(String name)
     {
         super(name);
@@ -83,7 +105,7 @@ public class TestReplicationSuite extends RegressionSuite
             new MultiConfigSuiteBuilder(TestReplicationSuite.class);
 
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestReplicationSuite.class.getResource("replication-ddl.sql"));
+        project.addSchema(SelectEmptyTable.class.getResource("replication-ddl.sql"));
         project.addPartitionInfo("P1", "ID");
         project.addStmtProcedure("InsertSinglePart",
                                  "INSERT INTO P1 VALUES (?, ?, ?, ?);",
@@ -104,6 +126,8 @@ public class TestReplicationSuite extends RegressionSuite
         project.addStmtProcedure("SelectMultiPartRepl", "SELECT * FROM R1");
         project.addStmtProcedure("UpdateMultiPartRepl",
                                  "UPDATE R1 SET R1.NUM = ?");
+        project.addProcedures(PROCEDURES);
+
 
         // CLUSTER, two hosts, each with two sites, replication of 1
         config = new LocalCluster("replication-1-cluster.jar", 2, 2,

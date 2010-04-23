@@ -29,6 +29,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.replication.SelectEmptyTable;
 
 public class TestFailureDetectSuite extends RegressionSuite
 {
@@ -85,7 +86,7 @@ public class TestFailureDetectSuite extends RegressionSuite
             new MultiConfigSuiteBuilder(TestFailureDetectSuite.class);
 
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestReplicationSuite.class.getResource("replication-ddl.sql"));
+        project.addSchema(SelectEmptyTable.class.getResource("replication-ddl.sql"));
         project.addPartitionInfo("P1", "ID");
         project.addStmtProcedure("InsertSinglePart",
                                  "INSERT INTO P1 VALUES (?, ?, ?, ?);",
