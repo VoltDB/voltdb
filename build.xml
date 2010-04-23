@@ -1427,7 +1427,7 @@ BENCHMARKS
 
         <!-- all four of these have to be set for it to do anything -->
         <param name="snapshotPath" value="/tmp"/>
-        <param name="snapshotFrequency" value="{env.BMSNAPSHOTFREQUENCY}"/>
+        <param name="snapshotFrequency" value="${env.BMSNAPSHOTFREQUENCY}"/>
         <param name="snapshotPrefix" value="volt_snapshot"/>
         <param name="snapshotRetain" value="${env.BMSNAPSHOTRETAIN}"/>
     </antcall>
