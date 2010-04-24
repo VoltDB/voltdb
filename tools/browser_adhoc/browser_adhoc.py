@@ -232,10 +232,11 @@ class HTTPHandler(BaseHTTPRequestHandler):
                         rowsDisplayed = rowsDisplayed + 1
                         colCounter = 0
                         for thisValue in thisTuple:
+                            val = "NULL" if thisValue == None else thisValue
                             if (colTypes[colCounter] == 9):
-                                self.wfile.write('    <td id="leftalign">'+str(thisValue).strip()+'</td>\n');
+                                self.wfile.write('    <td id="leftalign">'+str(val).strip()+'</td>\n');
                             else:
-                                self.wfile.write('    <td id="rightalign">'+str(thisValue).strip()+'</td>\n');
+                                self.wfile.write('    <td id="rightalign">'+str(val).strip()+'</td>\n');
                             colCounter += 1
                         self.wfile.write('  </tr>\n');
 

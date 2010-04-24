@@ -83,19 +83,19 @@ class EchoServer(threading.Thread):
         self.__lock.set()
 
 class TestFastSerializer(unittest.TestCase):
-    byteArray = (1, -21, 127)
-    int16Array = (128, -256, 32767)
-    int32Array = (0, -32768, 2147483647)
-    int64Array = (-52423, 2147483647, -9223372036854775807)
-    floatArray = (float("-inf"), float("nan"), -0.009999999776482582)
-    stringArray = (None, u"hello world", u"ça")
-    dateArray = (datetime.datetime.now().replace(microsecond=0),
+    byteArray = [None, 1, -21, 127]
+    int16Array = [None, 128, -256, 32767]
+    int32Array = [None, 0, -32768, 2147483647]
+    int64Array = [None, -52423, 2147483647, -9223372036854775807]
+    floatArray = [None, float("-inf"), float("nan"), -0.009999999776482582]
+    stringArray = [None, u"hello world", u"ça"]
+    dateArray = [None, datetime.datetime.now().replace(microsecond=0),
                  datetime.datetime.fromtimestamp(0),
-                 datetime.datetime.utcnow().replace(microsecond=0))
-    decimalArray = (None,
+                 datetime.datetime.utcnow().replace(microsecond=0)]
+    decimalArray = [None,
                     decimal.Decimal("-837461"),
                     decimal.Decimal("8571391.193847158139"),
-                    decimal.Decimal("-1348392.109386749180"))
+                    decimal.Decimal("-1348392.109386749180")]
 
     ARRAY_BEGIN = 126
     ARRAY_END = 127
@@ -120,7 +120,7 @@ class TestFastSerializer(unittest.TestCase):
         self.fs.flush()
         self.fs.bufferForRead()
         self.assertEqual(self.fs.readByte(), type)
-        self.assertEqual(self.fs.readArray(type), value)
+        self.assertEqual(list(self.fs.readArray(type)), value)
 
     def testByte(self):
         for i in self.byteArray:

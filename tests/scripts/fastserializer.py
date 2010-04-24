@@ -40,6 +40,9 @@ def isNaN(d):
     itself, we have to test it by ourselves.
     """
 
+    if d == None:
+        return False
+
     # work-around for Python 2.4
     s = array.array("d", [d])
     return (s.tostring() == "\x00\x00\x00\x00\x00\x00\xf8\x7f" or
@@ -71,6 +74,11 @@ class FastSerializer:
     # SQL NULL indicator for object type serializations (string, decimal)
     NULL_STRING_INDICATOR = -1
     NULL_DECIMAL_INDICATOR = -170141183460469231731687303715884105728
+    NULL_TINYINT_INDICATOR = -128
+    NULL_SMALLINT_INDICATOR = -32768
+    NULL_INTEGER_INDICATOR = -2147483648
+    NULL_BIGINT_INDICATOR = -9223372036854775808
+    NULL_FLOAT_INDICATOR = -1.7E308
 
     # default decimal scale
     DEFAULT_DECIMAL_SCALE = 12
@@ -136,8 +144,39 @@ class FastSerializer:
 
         self.__compileStructs()
 
+        # Check if the value of a given type is NULL
         self.NULL_DECIMAL_INDICATOR = \
             self.__intToBytes(self.__class__.NULL_DECIMAL_INDICATOR, 0)
+        self.NullCheck = {self.VOLTTYPE_NULL:
+                              lambda x: None,
+                          self.VOLTTYPE_TINYINT:
+                              lambda x:
+                              None if x == self.__class__.NULL_TINYINT_INDICATOR \
+                              else x,
+                          self.VOLTTYPE_SMALLINT:
+                              lambda x:
+                              None if x == self.__class__.NULL_SMALLINT_INDICATOR \
+                              else x,
+                          self.VOLTTYPE_INTEGER:
+                              lambda x:
+                              None if x == self.__class__.NULL_INTEGER_INDICATOR \
+                              else x,
+                          self.VOLTTYPE_BIGINT:
+                              lambda x:
+                              None if x == self.__class__.NULL_BIGINT_INDICATOR \
+                              else x,
+                          self.VOLTTYPE_FLOAT:
+                              lambda x:
+                              None if abs(x - self.__class__.NULL_FLOAT_INDICATOR) < 1e307 \
+                              else x,
+                          self.VOLTTYPE_STRING:
+                              lambda x:
+                              None if x == self.__class__.NULL_STRING_INDICATOR \
+                              else x,
+                          self.VOLTTYPE_DECIMAL:
+                              lambda x:
+                              None if x == self.NULL_DECIMAL_INDICATOR \
+                              else x}
 
         if username != None and password != None:
             self.authenticate(username, password)
@@ -323,13 +362,20 @@ class FastSerializer:
 
     def readByteArray(self):
         length = self.readInt16()
-        return self.readByteArrayContent(length)
+        val = self.readByteArrayContent(length)
+        val = map(self.NullCheck[self.VOLTTYPE_TINYINT], val)
+        return val
 
     def readByte(self):
-        return self.readByteArrayContent(1)[0]
+        val = self.readByteArrayContent(1)[0]
+        return self.NullCheck[self.VOLTTYPE_TINYINT](val)
 
     def writeByte(self, value):
-        self.wbuf.extend(struct.pack(self.byteType(1), value))
+        if value == None:
+            val = self.__class__.NULL_TINYINT_INDICATOR
+        else:
+            val = value
+        self.wbuf.extend(struct.pack(self.byteType(1), val))
 
     # int16
     def readInt16ArrayContent(self, cnt):
@@ -340,13 +386,20 @@ class FastSerializer:
 
     def readInt16Array(self):
         length = self.readInt16()
-        return self.readInt16ArrayContent(length)
+        val = self.readInt16ArrayContent(length)
+        val = map(self.NullCheck[self.VOLTTYPE_SMALLINT], val)
+        return val
 
     def readInt16(self):
-        return self.readInt16ArrayContent(1)[0]
+        val = self.readInt16ArrayContent(1)[0]
+        return self.NullCheck[self.VOLTTYPE_SMALLINT](val)
 
     def writeInt16(self, value):
-        self.wbuf.extend(struct.pack(self.int16Type(1), value))
+        if value == None:
+            val = self.__class__.NULL_SMALLINT_INDICATOR
+        else:
+            val = value
+        self.wbuf.extend(struct.pack(self.int16Type(1), val))
 
     # int32
     def readInt32ArrayContent(self, cnt):
@@ -357,13 +410,20 @@ class FastSerializer:
 
     def readInt32Array(self):
         length = self.readInt16()
-        return self.readInt32ArrayContent(length)
+        val = self.readInt32ArrayContent(length)
+        val = map(self.NullCheck[self.VOLTTYPE_INTEGER], val)
+        return val
 
     def readInt32(self):
-        return self.readInt32ArrayContent(1)[0]
+        val = self.readInt32ArrayContent(1)[0]
+        return self.NullCheck[self.VOLTTYPE_INTEGER](val)
 
     def writeInt32(self, value):
-        self.wbuf.extend(struct.pack(self.int32Type(1), value))
+        if value == None:
+            val = self.__class__.NULL_INTEGER_INDICATOR
+        else:
+            val = value
+        self.wbuf.extend(struct.pack(self.int32Type(1), val))
 
     # int64
     def readInt64ArrayContent(self, cnt):
@@ -374,13 +434,20 @@ class FastSerializer:
 
     def readInt64Array(self):
         length = self.readInt16()
-        return self.readInt64ArrayContent(length)
+        val = self.readInt64ArrayContent(length)
+        val = map(self.NullCheck[self.VOLTTYPE_BIGINT], val)
+        return val
 
     def readInt64(self):
-        return self.readInt64ArrayContent(1)[0]
+        val = self.readInt64ArrayContent(1)[0]
+        return self.NullCheck[self.VOLTTYPE_BIGINT](val)
 
     def writeInt64(self, value):
-        self.wbuf.extend(struct.pack(self.int64Type(1), value))
+        if value == None:
+            val = self.__class__.NULL_BIGINT_INDICATOR
+        else:
+            val = value
+        self.wbuf.extend(struct.pack(self.int64Type(1), val))
 
     # float64
     def readFloat64ArrayContent(self, cnt):
@@ -391,14 +458,21 @@ class FastSerializer:
 
     def readFloat64Array(self):
         length = self.readInt16()
-        return self.readFloat64ArrayContent(length)
+        val = self.readFloat64ArrayContent(length)
+        val = map(self.NullCheck[self.VOLTTYPE_FLOAT], val)
+        return val
 
     def readFloat64(self):
-        return self.readFloat64ArrayContent(1)[0]
+        val = self.readFloat64ArrayContent(1)[0]
+        return self.NullCheck[self.VOLTTYPE_FLOAT](val)
 
     def writeFloat64(self, value):
+        if value == None:
+            val = self.__class__.NULL_FLOAT_INDICATOR
+        else:
+            val = value
         # work-around for python 2.4
-        tmp = array.array("d", [value])
+        tmp = array.array("d", [val])
         if self.inputBOM != self.localBOM:
             tmp.byteswap()
         self.wbuf.extend(tmp.tostring())
@@ -416,7 +490,7 @@ class FastSerializer:
     def readString(self):
         # length preceeded (2 byte value) string
         length = self.readInt32()
-        if length == self.NULL_STRING_INDICATOR:
+        if self.NullCheck[self.VOLTTYPE_STRING](length) == None:
             return None
         return self.readStringContent(length)
 
@@ -440,25 +514,34 @@ class FastSerializer:
 
     # date
     def readDate(self):
+        raw = self.readInt64()
+        if raw == None:
+            return None
         # microseconds before or after Jan 1, 1970
-        return datetime.datetime.fromtimestamp(self.readInt64()/1000000.0)
+        return datetime.datetime.fromtimestamp(raw/1000000.0)
 
     def readDateArray(self):
         retval = []
         raw = self.readInt64Array()
 
         for i in raw:
-            retval.append(datetime.datetime.fromtimestamp(i/1000000.0))
+            val = None
+            if i != None:
+                val = datetime.datetime.fromtimestamp(i/1000000.0)
+            retval.append(val)
 
         return tuple(retval)
 
     def writeDate(self, value):
-        val = int(time.mktime(value.timetuple())*1000000)
+        if value is None:
+            val = self.__class__.NULL_BIGINT_INDICATOR
+        else:
+            val = int(time.mktime(value.timetuple())*1000000)
         self.wbuf.extend(struct.pack(self.int64Type(1), val))
 
     def readDecimal(self):
         offset = 16 * struct.calcsize('b')
-        if self.rbuf[:offset] == self.NULL_DECIMAL_INDICATOR:
+        if self.NullCheck[self.VOLTTYPE_DECIMAL](self.rbuf[:offset]) == None:
             self.rbuf = self.rbuf[offset:]
             return None
         val = list(struct.unpack(self.ubyteType(16), self.rbuf[:offset]))
@@ -603,7 +686,9 @@ class VoltTable:
         result += ", ".join(map(lambda x: str(x), self.columns))
         result += "\n"
         result += "rows -\n"
-        result += "\n".join(map(lambda x: str(x), self.tuples))
+        result += "\n".join(map(lambda x:
+                                    str(map(lambda y: "NULL" if y == None else y,
+                                            x)), self.tuples))
 
         return result
 
