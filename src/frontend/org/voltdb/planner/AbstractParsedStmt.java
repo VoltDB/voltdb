@@ -259,7 +259,7 @@ public abstract class AbstractParsedStmt {
         Node isParam = attrs.getNamedItem("isparam");
 
         VoltType vt = VoltType.typeFromString(type);
-        int size = 4000;
+        int size = VoltType.MAX_VALUE_LENGTH;
         assert(vt != VoltType.VOLTTABLE);
         if (vt != VoltType.STRING) {
             size = vt.getLengthInBytesForFixedTypes();
