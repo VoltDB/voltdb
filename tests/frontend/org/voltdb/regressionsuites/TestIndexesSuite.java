@@ -31,7 +31,8 @@ import org.voltdb.VoltTableRow;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.regressionsuites.indexes.*;
+import org.voltdb.regressionsuites.indexes.CheckMultiMultiIntGTEFailure;
+import org.voltdb.regressionsuites.indexes.Insert;
 
 /**
  * Actual regression tests for SQL that I found that was broken and
@@ -140,11 +141,11 @@ public class TestIndexesSuite extends RegressionSuite {
         }
     }
 
-    /**
-     * Multimap single column
-     * @throws IOException
-     * @throws ProcCallException
-     */
+    //
+    // Multimap single column
+    // @throws IOException
+    // @throws ProcCallException
+    //
     public void testOrderedMultiOneColumnIntIndex()
     throws IOException, ProcCallException
     {
@@ -228,11 +229,11 @@ public class TestIndexesSuite extends RegressionSuite {
         }
     }
 
-    /**
-     * Multimap multi column
-     * @throws IOException
-     * @throws ProcCallException
-     */
+    //
+    // Multimap multi column
+    // @throws IOException
+    // @throws ProcCallException
+    //
     public void testOrderedMultiMultiColumnIntIndex()
     throws IOException, ProcCallException
     {
@@ -271,6 +272,26 @@ public class TestIndexesSuite extends RegressionSuite {
         assertEquals( 1, row1.getLong(1));
     }
 
+    // RE-ENABLE TO WORK ON ENG-506
+    /*public void testUpdateRange() throws IOException, ProcCallException {
+        final Client client = getClient();
+        for (int i = 0; i < 100; i++) {
+            SyncCallback cb = new SyncCallback();
+            client.callProcedure(cb, "InsertP1IX", i, "ryan likes the yankees", 100 - i, 1.5);
+        }
+        client.drain();
+
+        VoltTable[] results = client.callProcedure("Eng506UpdateRange");
+        assertNotNull(results);
+        assertEquals(1, results.length);
+        VoltTable result = results[0];
+        System.out.printf("Table has %d rows.\n", result.getRowCount());
+        result.resetRowPosition();
+        while (result.advanceRow()) {
+            System.out.println(result.getLong(0));
+        }
+    }*/
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -294,6 +315,10 @@ public class TestIndexesSuite extends RegressionSuite {
         project.addStmtProcedure("Eng397LimitIndexP1", "select * from P1 where P1.ID > 2 Limit ?");
         project.addStmtProcedure("Eng397LimitIndexR2", "select * from R2 where R2.ID > 2 Limit ?");
         project.addStmtProcedure("Eng397LimitIndexP2", "select * from P2 where P2.ID > 2 Limit ?");
+        project.addStmtProcedure("Eng506UpdateRange", "UPDATE P1IX SET NUM = 51 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.NUM>17)");
+        project.addStmtProcedure("InsertP1IX", "insert into P1IX values (?, ?, ?, ?);");
+
+        boolean success;
 
     /*
         // CONFIG #1: Local Site/Partitions running on IPC backend
@@ -308,13 +333,15 @@ public class TestIndexesSuite extends RegressionSuite {
 
         // JNI
         config = new LocalSingleProcessServer("testindexes-onesite.jar", 1, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
+        success = config.compile(project);
+        assertTrue(success);
         builder.addServerConfig(config);
 
         // CLUSTER?
         config = new LocalCluster("testindexes-cluster.jar", 2, 2,
                                   1, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
+        success = config.compile(project);
+        assertTrue(success);
         builder.addServerConfig(config);
 
         return builder;
