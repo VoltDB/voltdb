@@ -41,7 +41,7 @@ public class ForeignHost {
 
     // The amount of time we allow between messages from a host
     // before deciding that it must be dead.  In millis.
-    static final int DEAD_HOST_TIMEOUT_THRESHOLD = 1000;
+    static final int DEAD_HOST_TIMEOUT_THRESHOLD = 10000;
 
     private final Connection m_connection;
     private final FHInputHandler m_handler;
