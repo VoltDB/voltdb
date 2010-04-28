@@ -1360,6 +1360,7 @@ BENCHMARKS
         <arg value="CLIENTHOST=${clienthost1}" />
         <arg value="CLIENTHOST=${clienthost2}" />
         <arg value="CLIENTHOST=${clienthost3}" />
+        <arg value="CLIENTHOST=${clienthost4}" />
         <arg value="LISTENFORDEBUGGER=${debug}" />
         <arg value="USEPROFILE=${useprofile}" />
         <arg value="CHECKTRANSACTION=${checktransaction}" />
