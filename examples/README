@@ -17,11 +17,11 @@ voter
   This example is a simulation of a telephone based voting process where callers are allowed a limited number of votes.
 
 
-Each example includes a DDL file and a project.xml that lists the DDL file and the stored procedures names. The auction and satellite examples also include an ant build file.
+Each example includes a DDL file and a project.xml that lists the DDL file and the stored procedures names. The auction, satellite, and voter examples also include an Ant build file. (Helloworld is the exception. See the README in the helloworld folder for an explanation of how to build that example.)
 
 The command "ant -p" will print a description of the available targets for each example. The targets "client" and "server" let you  run a client and server for each example. (The satellite example contains the additional target "tracker".)
 
-To run a example project, from within the examples/example_of_choice directory:
+To run an example project, from within the examples/example_of_choice directory:
 - In a terminal window, run ant (no target) to compile the Java and example catalog
 - Run ant server, to start the VoltDB server
 - In a separate terminal window, run ant client, where you will see the results

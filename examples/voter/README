@@ -1,10 +1,42 @@
 Voter application
 ===========================
 
-Application simulates a phone based election process.
-  - Voters are allowed a limited number of votes, based on phone number.  This number is passed to the client application.
-  - The number of contestants is between 1 and 12.
-  - Multiple client applications can run simultaneously.
+This example application simulates a phone based election process. Voters (based on phone numbers generated randomly by the client application) are allowed a limited number of votes. 
+
+Many attributes of the application are customizable through arguments passed to the client, including: 
+
+  - The number of contestants (between 1 and 12)
+  - How many votes are allowed per telephone number
+  - How long the sample client runs
+  - The maximum number of transactions the client will attempt per second
+  - When to start recording performance statistics
+  - How frequently to report those statistics
+
+These attributes can be adjusted by modifying the arguments to the "client" target in the Ant build script.
+
+Measuring Performance
+---------------------
+
+The main goal of the voter application is to demonstrate the performance possibilities of VoltDB:
+
+- Stored procedures are invoked asynchronously.
+- The client application supports rate control (the number of transactions per second to send to the servers), which can be modified in the build.xml file.
+- The client also records and reports thoughput and latency.
+
+As delivered, the example runs both client and server on a single node (like the other examples). However, it can easily be reconfigured to run any combination of clients and servers.
+
+- The servers supports multiple clients at one time
+- Single node or multi-node clusters are supported as the server
+
+To test the example on a different configuration, simply edit the Ant build.xml, listing one server node as the lead node when building the catalog and using a comma-separated list of the server addresses as an argument to the client. See the comments in the build script for details.
+
+Interpreting the Results
+------------------------
+Running the Voter example on a single node, the client process is likely to submit transactions faster than the server process can execute them. As a result, although the throughput is substantially higher than traditional database products, the latency figures may be high.
+
+If the latency is high, it is likely that the clients are "firehosing" the server. Try rate-limiting the client process or adding one or more server nodes to increase performance capacity.
+
+By using a cluster of server nodes, you can get both exemplary throughput (TPS) and competitive latency figures. Using a mixture of rate-limiting the clients and different client/server configurations, the voter application can give you a good feel for the type of performance VoltDB is capable of on your hardware.
 
 
 ant targets
