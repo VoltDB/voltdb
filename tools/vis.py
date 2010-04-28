@@ -47,7 +47,7 @@ ORDER BY ma_instances.startTime DESC
 LIMIT %u
 """
     LATENCY = """
-SELECT AVG(cs.clusterRoundtripAvg) AS latency
+SELECT MIN(cs.clusterRoundtripAvg) AS latency
 FROM ma_clientInstances ci, ma_clientProcedureStats cs
 WHERE ci.clusterStartTime = %u
       AND ci.subApplicationName = 'Client'
