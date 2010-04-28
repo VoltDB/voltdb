@@ -118,7 +118,7 @@ public class FragmentResponseMessage extends VoltMessage {
 
     @Override
     protected void flattenToBuffer(final DBBPool pool) {
-        int msgsize = 4 + 4 + 8 + 1 + 1 + 2;
+        int msgsize = 4 + 4 + 8 + 1 + 1 + 4;
         assert(m_exception == null || m_status != SUCCESS);
 
         if (m_exception != null) {
@@ -166,7 +166,7 @@ public class FragmentResponseMessage extends VoltMessage {
         if (m_exception != null) {
             m_exception.serializeToBuffer(m_buffer);
         } else {
-            m_buffer.putShort((short)0);
+            m_buffer.putInt(0);
         }
 
         m_buffer.limit(m_buffer.position());

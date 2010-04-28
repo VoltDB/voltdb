@@ -27,7 +27,7 @@ SerializableEEException::SerializableEEException(VoltEEExceptionType exceptionTy
     m_exceptionType(exceptionType), m_message(message) {}
 
 void SerializableEEException::serialize(ReferenceSerializeOutput *output) {
-    const std::size_t lengthPosition = output->reserveBytes(sizeof(int16_t));
+    const std::size_t lengthPosition = output->reserveBytes(sizeof(int32_t));
     output->writeByte(static_cast<int8_t>(m_exceptionType));
     const char *messageBytes = m_message.c_str();
     const std::size_t messageLength = m_message.length();
@@ -36,8 +36,8 @@ void SerializableEEException::serialize(ReferenceSerializeOutput *output) {
     p_serialize(output);
     if (m_exceptionType == VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION)
         output->writeInt(ENGINE_ERRORCODE_ERROR);
-    const int16_t length = static_cast<int16_t>(output->position() - (lengthPosition + sizeof(int16_t)));
-    output->writeShortAt( lengthPosition, length);
+    const int32_t length = static_cast<int32_t>(output->position() - (lengthPosition + sizeof(int32_t)));
+    output->writeIntAt( lengthPosition, length);
 }
 
 SerializableEEException::~SerializableEEException() {

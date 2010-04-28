@@ -619,15 +619,15 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         }
 
         public void throwException(final int errorCode) throws IOException {
-            final ByteBuffer lengthBuffer = ByteBuffer.allocate(2);
+            final ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
             m_socketChannel.read(lengthBuffer);
             lengthBuffer.rewind();
-            final short exceptionLength = lengthBuffer.getShort();//Length is only between EE and Java.
+            final int exceptionLength = lengthBuffer.getInt();//Length is only between EE and Java.
             if (exceptionLength == 0) {
                 throw new EEException(errorCode);
             } else {
-                final ByteBuffer exceptionBuffer = ByteBuffer.allocate(exceptionLength + 2);
-                exceptionBuffer.putShort(exceptionLength);
+                final ByteBuffer exceptionBuffer = ByteBuffer.allocate(exceptionLength + 4);
+                exceptionBuffer.putInt(exceptionLength);
                 m_socketChannel.read(exceptionBuffer);
                 exceptionBuffer.rewind();
                 throw SerializableException.deserializeFromBuffer(exceptionBuffer);
