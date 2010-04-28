@@ -190,6 +190,9 @@ def main():
     latencies = latency_stat.get_latencies(timestamp, 900)
     throughput = volt_stat.get_throughputs(starttime, 900)
 
+    latency_stat.close()
+    volt_stat.close()
+
     latency_map = {}
     latencies.sort(key=lambda x: x["id"])
     for v in latencies:
@@ -201,20 +204,21 @@ def main():
         latency_map[v["hosts"]]["time"].append(datenum)
         latency_map[v["hosts"]]["latency"].append(v["latency"])
 
-    pl = Plot("Average Latency on Single Node", "Time", "Latency (ms)",
-              path + "-latency-single.png",
-              width, height)
     if 1 in latency_map:
+        pl = Plot("Average Latency on Single Node", "Time", "Latency (ms)",
+                  path + "-latency-single.png",
+                  width, height)
         v = latency_map.pop(1)
         pl.plot(v["time"], v["latency"], COLORS(1), 1)
-    pl.close()
+        pl.close()
 
-    pl = Plot("Average Latency", "Time", "Latency (ms)",
-              path + "-latency.png", width, height)
-    for k in latency_map.iterkeys():
-        v = latency_map[k]
-        pl.plot(v["time"], v["latency"], COLORS(k), k)
-    pl.close()
+    if len(latency_map) > 0:
+        pl = Plot("Average Latency", "Time", "Latency (ms)",
+                  path + "-latency.png", width, height)
+        for k in latency_map.iterkeys():
+            v = latency_map[k]
+            pl.plot(v["time"], v["latency"], COLORS(k), k)
+        pl.close()
 
     throughput_map = {}
     throughput.sort(key=lambda x: x["id"])
@@ -225,24 +229,21 @@ def main():
         throughput_map[v["hosts"]]["time"].append(datenum)
         throughput_map[v["hosts"]]["tps"].append(v["tps"])
 
-    pl = Plot("Single Node Performance", "Time", "Throughput (txns/sec)",
-              path + "-throughput-single.png",
-              width, height)
     if 1 in throughput_map:
+        pl = Plot("Single Node Performance", "Time", "Throughput (txns/sec)",
+                  path + "-throughput-single.png",
+                  width, height)
         v = throughput_map.pop(1)
         pl.plot(v["time"], v["tps"], COLORS(1), 1)
-    pl.close()
+        pl.close()
 
-    pl = Plot("Performance", "Time", "Throughput (txns/sec)",
-              path + "-throughput.png",
-              width, height)
-    for k in throughput_map.iterkeys():
-        v = throughput_map[k]
-        pl.plot(v["time"], v["tps"], COLORS(k), k)
-    pl.close()
-
-    latency_stat.close()
-    volt_stat.close()
+    if len(throughput_map) > 0:
+        pl = Plot("Performance", "Time", "Throughput (txns/sec)",
+                  path + "-throughput.png", width, height)
+        for k in throughput_map.iterkeys():
+            v = throughput_map[k]
+            pl.plot(v["time"], v["tps"], COLORS(k), k)
+        pl.close()
 
 if __name__ == "__main__":
     main()
