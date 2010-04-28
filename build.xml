@@ -1403,7 +1403,6 @@ BENCHMARKS
 
         <jvmarg value="-server" />
         <jvmarg value="-Xmx2048m" />
-        <jvmarg value="-XX:-ReduceInitialCardMarks" />
         <jvmarg value="-Xcheck:jni"/>
     </java>
 </target>
