@@ -109,7 +109,7 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse {
     @Override
     public void readExternal(FastDeserializer in) throws IOException {
         in.readByte();//Skip version byte
-        status = in.readByte();
+        status = (byte) in.readByte();
         clusterRoundTripTime = in.readInt();
         m_exception = SerializableException.deserializeFromBuffer(in.buffer());
         results = (VoltTable[]) in.readArray(VoltTable.class);
@@ -129,7 +129,7 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse {
             m_exception.serializeToBuffer(b);
             out.write(b.array());
         } else {
-            out.writeInt(0);//Length zero exception
+            out.writeShort(0);//Length zero exception
         }
         out.writeArray(results);
         out.writeString(extra);

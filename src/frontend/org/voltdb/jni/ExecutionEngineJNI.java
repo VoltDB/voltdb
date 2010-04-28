@@ -71,7 +71,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     private FastDeserializer deserializer =
         new FastDeserializer(deserializerBufferOrigin.b);
 
-    private final BBContainer exceptionBufferOrigin = org.voltdb.utils.DBBPool.allocateDirect(1024 * 1024 * 20);
+    private final BBContainer exceptionBufferOrigin = org.voltdb.utils.DBBPool.allocateDirect(4096);
     private ByteBuffer exceptionBuffer = exceptionBufferOrigin.b;
 
     /**
@@ -131,13 +131,13 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     @Override
     final protected void throwExceptionForError(final int errorCode) throws RuntimeException {
         exceptionBuffer.clear();
-        final int exceptionLength = exceptionBuffer.getInt();
+        final short exceptionLength = exceptionBuffer.getShort();
 
         if (exceptionLength == 0) {
             throw new EEException(errorCode);
         } else {
             exceptionBuffer.position(0);
-            exceptionBuffer.limit(4 + exceptionLength);
+            exceptionBuffer.limit(2 + exceptionLength);
             throw SerializableException.deserializeFromBuffer(exceptionBuffer);
         }
     }
