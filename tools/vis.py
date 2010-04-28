@@ -36,24 +36,48 @@ class Stat:
         self.conn.close()
 
 class LatencyStat(Stat):
-    LATENCIES = """
+    INSTANCES = """
 SELECT ma_instances.instanceId AS id,
        ma_instances.numHosts AS hosts,
-       AVG(ma_initiators.avgExecutionTime) AS latency,
-       DATE(ma_initiators.tsEvent) as time
-FROM ma_instances, ma_initiators
-WHERE ma_instances.instanceId = ma_initiators.instanceId
-      AND ma_instances.startTime >= '%s'
+       ma_instances.startTime as time
+FROM ma_instances
+WHERE ma_instances.startTime >= '%s'
       AND ma_instances.applicationName = 'org.voltdb.benchmark.tpcc.TPCCClient'
-      AND ma_initiators.procedureName NOT LIKE '@%%'
-GROUP BY hosts, time
 ORDER BY ma_instances.startTime DESC
 LIMIT %u
 """
+    LATENCY = """
+SELECT AVG(cs.clusterRoundtripAvg) AS latency
+FROM ma_clientInstances ci, ma_clientProcedureStats cs
+WHERE ci.clusterStartTime = %u
+      AND ci.subApplicationName = 'Client'
+      AND ci.clientInstanceId = cs.instanceId
+"""
 
     def get_latencies(self, start_time, count):
-        self.cursor.execute(self.LATENCIES % (start_time, count))
-        return self.cursor.fetchall()
+        res = []
+        # (date, numHosts) as key
+        latencies = {}
+
+        self.cursor.execute(self.INSTANCES % (start_time, count))
+        res = list(self.cursor.fetchall())
+
+        for i in res:
+            start_time = i["time"]
+            hosts = i["hosts"]
+            self.cursor.execute(self.LATENCY % (start_time))
+            latency = self.cursor.fetchone()
+            i["time"] = datetime.date.fromtimestamp(start_time / 1000.0)
+            i.update(latency)
+
+            key = (i["time"], hosts)
+            if latency["latency"] == None:
+                continue
+            if key not in latencies \
+                    or latency["latency"] < latencies[key]["latency"]:
+                latencies[key] = i
+
+        return latencies.values()
 
 class ThroughputStat(Stat):
     THROUGHPUT = """
@@ -73,7 +97,7 @@ LIMIT %u
         throughput_map = {}
 
         self.cursor.execute(self.THROUGHPUT % (time, count))
-        return self.cursor.fetchall()
+        return list(self.cursor.fetchall())
 
 class Plot:
     DPI = 100.0
@@ -163,8 +187,8 @@ def main():
 
     starttime = datetime.datetime.now() - timedelta
     timestamp = time.mktime(starttime.timetuple()) * 1000.0
-    latencies = list(latency_stat.get_latencies(timestamp, 900))
-    throughput = list(volt_stat.get_throughputs(starttime, 900))
+    latencies = latency_stat.get_latencies(timestamp, 900)
+    throughput = volt_stat.get_throughputs(starttime, 900)
 
     latency_map = {}
     latencies.sort(key=lambda x: x["id"])
