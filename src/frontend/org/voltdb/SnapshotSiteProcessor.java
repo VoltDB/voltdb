@@ -45,11 +45,10 @@ public class SnapshotSiteProcessor {
     static final int m_numSnapshotBuffers = 4;
 
     /**
-     * Dedicated byte buffer to write snapshot tuples to. Only one buffer
-     * is needed because the bottleneck is always going to be I/O and the EE
-     * always has other work to do besides serializing.
+     * Pick a buffer length that is big enough to store at least one of the largest size tuple supported
+     * in the system (2 megabytes). Add a fudge factor for metadata.
      */
-    public static final int m_snapshotBufferLength = 131072;
+    public static final int m_snapshotBufferLength = 262144 + Short.MAX_VALUE;
     private final ArrayList<BBContainer> m_snapshotBufferOrigins =
         new ArrayList<BBContainer>();
     /**

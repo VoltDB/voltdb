@@ -20,6 +20,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
 #include <iostream>
 #include <string>
 #include <vector>
@@ -29,9 +30,28 @@
 #include <deque>
 #include <boost/bind.hpp>
 #include <boost/asio.hpp>
+#include <queue>
+#include <limits>
 
 using namespace std;
 using boost::asio::ip::tcp;
+
+class QueueEntry {
+public:
+    QueueEntry(tcp::socket *nsocket, int64_t nrequestId) : socket(nsocket), requestId(nrequestId) {}
+    tcp::socket *socket;
+    int64_t requestId;
+};
+
+class CompareQueueEntry {
+public:
+    bool operator()(const QueueEntry& lhs, const QueueEntry& rhs) const {
+        if (lhs.requestId > rhs.requestId) {
+            return true;
+        }
+        return false;
+    }
+};
 
 class WriteStuff {
 public:
@@ -126,7 +146,7 @@ public:
         } else {
             std::cout << "Connected to server " << socket->remote_endpoint().address().to_string() << std::endl;
             boost::asio::ip::tcp::no_delay option(true);
-            socket->set_option(option);\
+            socket->set_option(option);
             boost::asio::ip::tcp::socket::non_blocking_io nonblocking(true);
             socket->io_control(nonblocking);
             serverSockets.push_back(socket);
@@ -149,8 +169,8 @@ public:
         }
         if (!error) {
             std::cout << "Accepted from server " << socket->remote_endpoint().address().to_string() << std::endl;
-            serverSockets.push_back(socket);
             socketAsyncWritePending[socket] = false;
+            serverSockets.push_back(socket);
             tcp::socket *newsocket = new tcp::socket(acceptor->io_service());
             acceptor->async_accept(*newsocket, boost::bind(&Server::handleServerAccept, this, boost::asio::placeholders::error, acceptor, newsocket));
             boost::asio::ip::tcp::no_delay option(true);
@@ -197,39 +217,8 @@ public:
                 if (buffer[4] == 0) {
                     //request
                     meshRequestsReceived++;
-                    char *response = acquireBuffer();
-                    int responseLength = 256 + (rand() % 600);
-                    ::memset(response, 0, responseLength + 4);
-                    *reinterpret_cast<int32_t*>(response) = responseLength;
-                    *reinterpret_cast<int8_t*>(&response[4]) = 1;//response
-                    *reinterpret_cast<int64_t*>(&response[5]) = *reinterpret_cast<int64_t*>(&buffer[5]);
-//                    if (!requestIdsRequested[socket]->insert(*reinterpret_cast<int64_t*>(&response[5])).second) {
-//                        std::cout << "Request ID " << *reinterpret_cast<int64_t*>(&response[5]) << " has already been requested" << std::endl;
-//                    }
-                    size_t written = 0;
-                    bool asyncWritePending = socketAsyncWritePending[socket];
-                    try {
-                        if (!asyncWritePending) {
-                            written = socket->write_some(boost::asio::buffer(response, responseLength + 4));
-                        }
-                    } catch (boost::exception_detail::clone_impl<boost::exception_detail::error_info_injector<boost::system::system_error> >) {
-                    }
-
-                    bytesWritten += written;
-                    if (written != static_cast<size_t>(responseLength + 4)) {
-                        size_t length = responseLength + 4 - written;
-                        if (asyncWritePending) {
-                            socketAsyncWrites[socket]->push_back(std::pair<char*, WriteStuff>(response, WriteStuff(length, written, &meshResponsesSent)));
-                        } else {
-                            boost::asio::async_write( *socket, boost::asio::buffer(&response[written], length),
-                                    boost::bind(&Server::handleWriteCompletion, this, boost::asio::placeholders::error,
-                                            boost::asio::placeholders::bytes_transferred, socket, response, &meshResponsesSent));
-                            socketAsyncWritePending[socket] = true;
-                        }
-                    } else {
-                        releaseBuffer(response);
-                        meshResponsesSent++;
-                    }
+                    int64_t requestId = *reinterpret_cast<int64_t*>(&buffer[5]);
+                    addQueueEntry(socket, requestId);
                 } else if (buffer[4] == 1) {
                     //response
                     meshResponsesReceived++;
@@ -277,11 +266,13 @@ public:
                 if (read < nextLength) {
                     boost::asio::async_read( *socket, boost::asio::buffer(&buffer[nextBufferOffset + read], nextLength - read),
                             boost::bind(&Server::handleServerRead, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred, socket, buffer, lengthOrMessage));
+                    drainPriorityQueue();
                     return;
                 }
             } catch (boost::exception_detail::clone_impl<boost::exception_detail::error_info_injector<boost::system::system_error> >) {
                 boost::asio::async_read( *socket, boost::asio::buffer(&buffer[nextBufferOffset], nextLength),
                         boost::bind(&Server::handleServerRead, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred, socket, buffer, lengthOrMessage));
+                drainPriorityQueue();
                 return;
             }
         }
@@ -475,6 +466,70 @@ public:
         buffers.push_back(buffer);
     }
 
+    void addQueueEntry(tcp::socket *socket, int64_t requestId) {
+        std::map<tcp::socket*, int64_t>::iterator iter = lastSafeRequestId.find(socket);
+        if (iter == lastSafeRequestId.end()) {
+            lastSafeRequestId[socket] = requestId;
+        } else if (iter->second < requestId) {
+            iter->second = requestId;
+        }
+        queue.push(QueueEntry(socket, requestId));
+    }
+
+    void sendResponse(QueueEntry entry) {
+        tcp::socket *socket = entry.socket;
+
+        char *response = acquireBuffer();
+        int responseLength = 256 + (rand() % 600);
+        ::memset(response, 0, responseLength + 4);
+        *reinterpret_cast<int32_t*>(response) = responseLength;
+        *reinterpret_cast<int8_t*>(&response[4]) = 1;//response
+        *reinterpret_cast<int64_t*>(&response[5]) = entry.requestId;
+//                    if (!requestIdsRequested[socket]->insert(*reinterpret_cast<int64_t*>(&response[5])).second) {
+//                        std::cout << "Request ID " << *reinterpret_cast<int64_t*>(&response[5]) << " has already been requested" << std::endl;
+//                    }
+        size_t written = 0;
+        bool asyncWritePending = socketAsyncWritePending[socket];
+        try {
+            if (!asyncWritePending) {
+                written = socket->write_some(boost::asio::buffer(response, responseLength + 4));
+            }
+        } catch (boost::exception_detail::clone_impl<boost::exception_detail::error_info_injector<boost::system::system_error> >) {
+        }
+
+        bytesWritten += written;
+        if (written != static_cast<size_t>(responseLength + 4)) {
+            size_t length = responseLength + 4 - written;
+            if (asyncWritePending) {
+                socketAsyncWrites[socket]->push_back(std::pair<char*, WriteStuff>(response, WriteStuff(length, written, &meshResponsesSent)));
+            } else {
+                boost::asio::async_write( *socket, boost::asio::buffer(&response[written], length),
+                        boost::bind(&Server::handleWriteCompletion, this, boost::asio::placeholders::error,
+                                boost::asio::placeholders::bytes_transferred, socket, response, &meshResponsesSent));
+                socketAsyncWritePending[socket] = true;
+            }
+        } else {
+            releaseBuffer(response);
+            meshResponsesSent++;
+        }
+    }
+
+    void drainPriorityQueue() {
+        int64_t minRequestId = std::numeric_limits<int64_t>::max();
+        for (std::map<tcp::socket*, int64_t>::iterator iter = lastSafeRequestId.begin();
+                iter != lastSafeRequestId.end();
+                iter++) {
+            if (iter->second < minRequestId) {
+                minRequestId = iter->second;
+            }
+        }
+        while (!queue.empty() && queue.top().requestId <= minRequestId) {
+            QueueEntry entry = queue.top();
+            queue.pop();
+            sendResponse(entry);
+        }
+    }
+
     std::deque<char*> buffers;
     int64_t nextRequestId;
     int64_t requestsReceived;
@@ -497,6 +552,8 @@ public:
     boost::unordered_map<int64_t, tcp::socket*> requestIdToClient;
     boost::unordered_map<tcp::socket*, bool> socketAsyncWritePending;
     boost::unordered_map<tcp::socket*, std::deque<std::pair<char*, WriteStuff> >* > socketAsyncWrites;
+    std::map<tcp::socket*, int64_t> lastSafeRequestId;
+    std::priority_queue< QueueEntry, std::vector<QueueEntry>, CompareQueueEntry> queue;
 };
 
 class Client {
