@@ -201,7 +201,7 @@ def main():
         latency_map[v["hosts"]]["time"].append(datenum)
         latency_map[v["hosts"]]["latency"].append(v["latency"])
 
-    pl = Plot("Average Execution Time on Single Node", "Time", "Latency (ms)",
+    pl = Plot("Average Latency on Single Node", "Time", "Latency (ms)",
               path + "-latency-single.png",
               width, height)
     if 1 in latency_map:
@@ -209,7 +209,7 @@ def main():
         pl.plot(v["time"], v["latency"], COLORS(1), 1)
     pl.close()
 
-    pl = Plot("Average Execution Time", "Time", "Latency (ms)",
+    pl = Plot("Average Latency", "Time", "Latency (ms)",
               path + "-latency.png", width, height)
     for k in latency_map.iterkeys():
         v = latency_map[k]
