@@ -27,15 +27,20 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.LinkedBlockingDeque;
 
-import org.voltdb.elt.*;
+import junit.framework.TestCase;
+
+import org.voltdb.elt.ELTDataSource;
+import org.voltdb.elt.ELTProtoMessage;
 import org.voltdb.elt.processors.RawProcessor.ProtoStateBlock;
-import org.voltdb.messaging.*;
-import org.voltdb.network.*;
+import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.messaging.FastSerializable;
+import org.voltdb.messaging.MessagingException;
+import org.voltdb.network.Connection;
+import org.voltdb.network.NIOReadStream;
+import org.voltdb.network.WriteStream;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.DBBPool.BBContainer;
-
-import junit.framework.TestCase;
 
 public class TestRawProcessor extends TestCase {
 
@@ -124,6 +129,16 @@ public class TestRawProcessor extends TestCase {
 
         public ELTProtoMessage pollWriteStream() {
             return m_writeStream.writequeue.poll();
+        }
+
+        @Override
+        public void scheduleRunnable(Runnable r) {
+        }
+
+        @Override
+        public void unregister() {
+            // TODO Auto-generated method stub
+
         }
     }
 
