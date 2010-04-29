@@ -177,27 +177,6 @@ comparisonFactory(ExpressionType c,
     return getGeneral(c, lc, rc);
 }
 
-AbstractExpression *
-inComparisonExpressionFactory(json_spirit::Object &obj, AbstractExpression *lc)
-{
-    std::vector<AbstractExpression*> vals;
-
-    // # of Value Expressions
-    json_spirit::Value valueExpressionsValue = json_spirit::find_value(obj,
-                                                                       "VALUES");
-    if (valueExpressionsValue == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "inComparisonExpressionFactory: can't find"
-                                      "VALUES value");
-    }
-    json_spirit::Array valueExpressionsArray = valueExpressionsValue.get_array();
-    for (int ii = 0; ii < valueExpressionsArray.size(); ii++) {
-        vals.push_back(AbstractExpression::buildExpressionTree(valueExpressionsArray[ii].get_obj()));
-    }
-
-    return new InComparisonExpression(lc, vals);
-}
-
 /** convert the enumerated value type into a concrete c type for the
  *  operator expression templated ctors */
 AbstractExpression *
@@ -466,12 +445,7 @@ expressionFactory(json_spirit::Object &obj,
         ret = comparisonFactory( et, lc, rc);
     break;
 
-    // InComparison
-    case (EXPRESSION_TYPE_COMPARE_IN):
-        ret = inComparisonExpressionFactory(obj, lc);
-        break;
-
-        // Conjunctions
+    // Conjunctions
     case (EXPRESSION_TYPE_CONJUNCTION_AND):
     case (EXPRESSION_TYPE_CONJUNCTION_OR):
         ret = conjunctionFactory(et, lc, rc);
@@ -594,9 +568,6 @@ getTypeName(voltdb::ExpressionType type)
             break;
         case (voltdb::EXPRESSION_TYPE_COMPARE_LIKE):
             ret = "COMPARE_LIKE";
-            break;
-        case (voltdb::EXPRESSION_TYPE_COMPARE_IN):
-            ret = "COMPARE_IN";
             break;
         case (voltdb::EXPRESSION_TYPE_CONJUNCTION_AND):
             ret = "CONJUNCTION_AND";

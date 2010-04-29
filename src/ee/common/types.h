@@ -246,7 +246,6 @@ enum ExpressionType {
     EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO       = 14, // less than equal operator between left and right
     EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO    = 15, // greater than equal operator between left and right
     EXPRESSION_TYPE_COMPARE_LIKE                    = 16, // LIKE operator (left LIKE right). both children must be string.
-    EXPRESSION_TYPE_COMPARE_IN                      = 17, // IN operator. left IN right. right must be VectorValue
 
     // -----------------------------
     // Conjunction Operators

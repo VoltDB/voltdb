@@ -415,9 +415,6 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_COMPARE_LIKE: {
         return "COMPARE_LIKE";
     }
-    case EXPRESSION_TYPE_COMPARE_IN: {
-        return "COMPARE_IN";
-    }
     case EXPRESSION_TYPE_CONJUNCTION_AND: {
         return "CONJUNCTION_AND";
     }
@@ -495,8 +492,6 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO;
     } else if (str == "COMPARE_LIKE") {
         return EXPRESSION_TYPE_COMPARE_LIKE;
-    } else if (str == "COMPARE_IN") {
-        return EXPRESSION_TYPE_COMPARE_IN;
     } else if (str == "CONJUNCTION_AND") {
         return EXPRESSION_TYPE_CONJUNCTION_AND;
     } else if (str == "CONJUNCTION_OR") {
