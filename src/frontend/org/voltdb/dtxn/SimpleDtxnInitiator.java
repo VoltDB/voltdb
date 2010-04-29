@@ -192,8 +192,9 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     long m_lastTickTime = 0;
 
     @Override
-    public synchronized void tick(long time, long interval) {
-        long txnId = m_idManager.getNextUniqueTransactionId();
+    public synchronized long tick() {
+        final long txnId = m_idManager.getNextUniqueTransactionId();
+        final long now = m_idManager.getLastUsedTime();
 
         // SEMI-HACK: this list can become incorrect if there's a node
         // failure in between here and the Heartbeat transmission loop below.
@@ -204,7 +205,6 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
             //siteTracker.getSitesWhichNeedAHeartbeat(time, interval);
             siteTracker.getUpExecutionSites();
 
-        long now = System.currentTimeMillis();
         //long duration = now - m_lastTickTime;
         //System.out.printf("Sending tick after %d ms pause.\n", duration);
         //System.out.flush();
@@ -222,6 +222,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         }
 
         m_lastTickTime = now;
+        return now;
     }
 
     @Override

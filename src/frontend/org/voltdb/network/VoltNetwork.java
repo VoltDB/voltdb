@@ -70,6 +70,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.ArrayDeque;
 import java.lang.ref.WeakReference;
 
 import org.apache.log4j.Logger;
@@ -77,7 +78,6 @@ import org.apache.log4j.Logger;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.Set;
-import java.util.ArrayDeque;
 
 import org.voltdb.utils.VoltLoggerFactory;
 import org.voltdb.utils.DBBPool;
@@ -94,16 +94,15 @@ import org.voltdb.utils.Pair;
         Logger.getLogger("NETWORK", VoltLoggerFactory.instance());
     private final ArrayDeque<Runnable> m_tasks = new ArrayDeque<Runnable>();
     // keep two lists and swap them in and out to minimize contention
-    private final ArrayList<VoltPort> m_selectorUpdates_1 = new ArrayList<VoltPort>();//Used as the lock for swapping lists
-    private final ArrayList<VoltPort> m_selectorUpdates_2 = new ArrayList<VoltPort>();
-    private ArrayList<VoltPort> m_activeUpdateList = m_selectorUpdates_1;
+    private final ArrayDeque<VoltPort> m_selectorUpdates_1 = new ArrayDeque<VoltPort>();//Used as the lock for swapping lists
+    private final ArrayDeque<VoltPort> m_selectorUpdates_2 = new ArrayDeque<VoltPort>();
+    private ArrayDeque<VoltPort> m_activeUpdateList = m_selectorUpdates_1;
     private volatile boolean m_shouldStop = false;//volatile boolean is sufficient
     private final Thread m_thread;
     private final HashSet<VoltPort> m_ports = new HashSet<VoltPort>();
     private final boolean m_useBlockingSelect;
     private final boolean m_useExecutorService;
     private final ArrayList<WeakReference<Thread>> m_networkThreads = new ArrayList<WeakReference<Thread>>();
-    private final Runnable m_periodicWork[];
     private final ArrayList<DBBPool> m_poolsToClearOnShutdown = new ArrayList<DBBPool>();
 
     /**
@@ -122,17 +121,12 @@ import org.voltdb.utils.Pair;
     public VoltNetwork(Selector selector) {
         m_thread = null;
         m_selector = selector;
-        m_periodicWork = new Runnable[0];
         m_useBlockingSelect = true;
         m_useExecutorService = false;
     }
 
     public VoltNetwork() {
-        this( true, true, new Runnable[0], null);
-    }
-
-    public VoltNetwork( Runnable periodicWork[]) {
-        this( true, true, periodicWork, null);
+        this( true, true, null);
     }
 
     /**
@@ -140,13 +134,12 @@ import org.voltdb.utils.Pair;
      * If the network is not going to provide any threads provideOwnThread should be false
      * and runOnce should be called periodically
      **/
-    public VoltNetwork(boolean useExecutorService, boolean blockingSelect, Runnable periodicWork[], Integer threads) {
+    public VoltNetwork(boolean useExecutorService, boolean blockingSelect, Integer threads) {
         m_thread = new Thread(this, "Volt Network");
         m_thread.setDaemon(true);
 
         m_useExecutorService = useExecutorService;
         m_useBlockingSelect = blockingSelect;
-        m_periodicWork = periodicWork;
 
         try {
             m_selector = Selector.open();
@@ -309,7 +302,7 @@ import org.voltdb.utils.Pair;
      * Unregister a channel. The connections streams are not drained before finishing.
      * @param c
      */
-    public void unregisterChannel (Connection c) {
+    void unregisterChannel (Connection c) {
         VoltPort port = (VoltPort)c;
         assert(c != null);
         SelectionKey selectionKey = port.getKey();
@@ -355,8 +348,8 @@ import org.voltdb.utils.Pair;
                         m_selector.selectNow();
                     }
                     installInterests();
-                    invokeCallbacks(m_useExecutorService);
-                    periodicWork();
+                    invokeCallbacks();
+                    EstTimeUpdater.update(System.currentTimeMillis());
                 }
             } catch (Exception ex) {
                 m_logger.error(null, ex);
@@ -417,7 +410,7 @@ import org.voltdb.utils.Pair;
         // draining the requested values. also guarantees
         // that the end of the list will be reached if code
         // appends to the update list without bound.
-        ArrayList<VoltPort> oldlist;
+        ArrayDeque<VoltPort> oldlist;
         synchronized(m_selectorUpdates_1) {
             if (m_activeUpdateList == m_selectorUpdates_1) {
                 oldlist = m_selectorUpdates_1;
@@ -429,7 +422,8 @@ import org.voltdb.utils.Pair;
             }
         }
 
-        for (VoltPort port : oldlist) {
+        while (!oldlist.isEmpty()) {
+            final VoltPort port = oldlist.poll();
             if (port.isRunning()) {
                 continue;
             }
@@ -438,11 +432,18 @@ import org.voltdb.utils.Pair;
                 try {
                     port.m_selectionKey.channel().close();
                 } catch (IOException e) {}
+            } else if (port.hasQueuedRunnables()) {
+                port.lockForHandlingWork();
+                port.getKey().interestOps(0);
+                m_selector.selectedKeys().remove(port.getKey());
+                synchronized (m_tasks) {
+                    m_tasks.offer(getPortCallRunnable(port));
+                    m_tasks.notify();
+                }
             } else {
                 resumeSelection(port);
             }
         }
-        oldlist.clear();
     }
 
     private void resumeSelection( VoltPort port) {
@@ -457,8 +458,28 @@ import org.voltdb.utils.Pair;
         }
     }
 
+    private Runnable getPortCallRunnable(final VoltPort port) {
+        return new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    port.call();
+                } catch (Exception e) {
+                    port.die();
+                    if (e instanceof IOException) {
+                        m_logger.trace( "VoltPort died, probably of natural causes", e);
+                    } else {
+                        networkLog.error( "VoltPort died due to an unexpected exception", e);
+                    }
+                } finally {
+                    addToChangeList (port);
+                }
+            }
+        };
+    }
+
     /** Set the selected interest set on the port and run it. */
-    protected void invokeCallbacks(final boolean useExecutor) {
+    protected void invokeCallbacks() {
         final Set<SelectionKey> selectedKeys = m_selector.selectedKeys();
         final ArrayList<Runnable> generatedTasks = new ArrayList<Runnable>();
         for(SelectionKey key : selectedKeys) {
@@ -470,25 +491,9 @@ import org.voltdb.utils.Pair;
                 port.lockForHandlingWork();
                 key.interestOps(0);
 
-                final Runnable runner = new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            port.call();
-                        } catch (Exception e) {
-                            port.die();
-                            if (e instanceof IOException) {
-                                m_logger.trace( "VoltPort died, probably of natural causes", e);
-                            } else {
-                                networkLog.error( "VoltPort died due to an unexpected exception", e);
-                            }
-                        } finally {
-                            addToChangeList (port);
-                        }
-                    }
-                };
+                final Runnable runner = getPortCallRunnable(port);
 
-                if (useExecutor) {
+                if (m_useExecutorService) {
                     generatedTasks.add(runner);
                 } else {
                     runner.run();
@@ -513,18 +518,6 @@ import org.voltdb.utils.Pair;
         }
 
         selectedKeys.clear();
-    }
-
-    private final void periodicWork() {
-        final long fnow = System.currentTimeMillis();
-        if (EstTimeUpdater.update(fnow)) {
-            synchronized (m_tasks) {
-                for (final Runnable r : m_periodicWork) {
-                    m_tasks.offer(r);
-                }
-                m_tasks.notifyAll();
-            }
-        }
     }
 
     public Map<Long, Pair<String, long[]>> getIOStats(boolean interval) {

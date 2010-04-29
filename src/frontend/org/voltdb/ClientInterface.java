@@ -32,7 +32,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -94,9 +93,7 @@ public class ClientInterface implements DumpManager.Dumpable {
     private final AtomicInteger m_numConnections = new AtomicInteger(0);
 
     // clock time of last call to the initiator's tick()
-    static final int TICK_INTERVAL = 5;
     static final int POKE_INTERVAL = 1000;
-    private long m_lastTickTime = 0;
     private long m_lastCompilerThreadPoke = 0;
 
     private final int m_allPartitions[];
@@ -917,61 +914,42 @@ public class ClientInterface implements DumpManager.Dumpable {
      */
     private long m_tickCounter = 0;
 
-    private final ReentrantLock periodicWorkLock = new ReentrantLock();
     public final void processPeriodicWork() {
-        final long time = EstTime.currentTimeMillis();
-        boolean locked = periodicWorkLock.tryLock();
-        if (!locked) {
-            return;
+        final long time = m_initiator.tick();
+        m_tickCounter++;
+        if (m_tickCounter % 20 == 0) {
+            checkForDeadConnections(time);
         }
-        try {
-            // send tick every TICK_INTERVAL milliseconds
-            long delta = time - m_lastTickTime;
-            if (delta > TICK_INTERVAL) {
-                m_lastTickTime = time;
-                m_initiator.tick(time, TICK_INTERVAL);
-                m_tickCounter++;
-                if (m_tickCounter % 20 == 0) {
-                    checkForDeadConnections(time);
-                }
-                //System.out.printf("Sending tick after %d ms pause.\n", delta);
-                //System.out.flush();
-            }
-            else {
-                //System.out.printf("NOT sending tick after %d ms pause.\n", delta);
-                //System.out.flush();
-            }
+        //System.out.printf("Sending tick after %d ms pause.\n", delta);
+        //System.out.flush();
 
-            // this code ensures that things put in the out of process
-            // planner make it out
-            delta = time - m_lastCompilerThreadPoke;
-            if (delta > POKE_INTERVAL) {
-                m_lastCompilerThreadPoke = time;
-                m_asyncCompilerWorkThread.verifyEverthingIsKosher();
-            }
-
-            // check for catalog updates
-            if (m_shouldUpdateCatalog.compareAndSet(true, false)) {
-                m_catalogContext.set(VoltDB.instance().getCatalogContext());
-                m_asyncCompilerWorkThread.notifyShouldUpdateCatalog();
-                // When the catalog updates, check to see if we're now
-                // responsible for snapshots since a node failure might have
-                // caused this
-                if (m_siteId ==
-                    m_catalogContext.get().siteTracker.getLowestLiveNonExecSiteId())
-                {
-                    m_snapshotDaemon.makeActive();
-                }
-            }
-
-            // poll planner queue
-            checkForFinishedCompilerWork();
-
-            // snapshot work
-            initiateSnapshotDaemonWork(m_snapshotDaemon.processPeriodicWork(time));
-        } finally {
-            periodicWorkLock.unlock();
+        // this code ensures that things put in the out of process
+        // planner make it out
+        long delta = time - m_lastCompilerThreadPoke;
+        if (delta > POKE_INTERVAL) {
+            m_lastCompilerThreadPoke = time;
+            m_asyncCompilerWorkThread.verifyEverthingIsKosher();
         }
+
+        // check for catalog updates
+        if (m_shouldUpdateCatalog.compareAndSet(true, false)) {
+            m_catalogContext.set(VoltDB.instance().getCatalogContext());
+            m_asyncCompilerWorkThread.notifyShouldUpdateCatalog();
+            // When the catalog updates, check to see if we're now
+            // responsible for snapshots since a node failure might have
+            // caused this
+            if (m_siteId ==
+                m_catalogContext.get().siteTracker.getLowestLiveNonExecSiteId())
+            {
+                m_snapshotDaemon.makeActive();
+            }
+        }
+
+        // poll planner queue
+        checkForFinishedCompilerWork();
+
+        // snapshot work
+        initiateSnapshotDaemonWork(m_snapshotDaemon.processPeriodicWork(time));
 
         return;
     }
@@ -998,7 +976,7 @@ public class ClientInterface implements DumpManager.Dumpable {
 
         for (final Connection c : connectionsToRemove) {
             networkLog.warn("Closing connection to " + c + " at " + now + " because it refuses to read responses");
-            VoltDB.instance().getNetwork().unregisterChannel(c);
+            c.unregister();
         }
     }
 
@@ -1146,6 +1124,14 @@ public class ClientInterface implements DumpManager.Dumpable {
         @Override
         public String getHostname() {
             return "";
+        }
+
+        @Override
+        public void scheduleRunnable(Runnable r) {
+        }
+
+        @Override
+        public void unregister() {
         }
 
     }

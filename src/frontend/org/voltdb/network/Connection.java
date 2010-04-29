@@ -33,4 +33,16 @@ public interface Connection {
     void disableReadSelection();
     void enableReadSelection();
     String getHostname();
+
+    /**
+     * Schedule an action to be invoked in a network thread
+     * that has exclusive access to this connection
+     * @param r Runnable to execute
+     **/
+    void scheduleRunnable(Runnable r);
+
+    /**
+     * Schedule the connection to be unregistered and closed
+     */
+    void unregister();
 }

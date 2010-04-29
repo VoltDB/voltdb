@@ -68,12 +68,8 @@ public abstract class TransactionInitiator {
      * about 5, but that's somewhat fungible. The goal is to let the initiator
      * evaluate whether it's been too long since it's had contact with any
      * execution sites, and to send a heartbeat message if needed.
-     *
-     * @param time The current time in milliseconds since the epoch.
-     * @param interval The target time between calls (specified by the caller)
-     * in milliseconds.
      */
-    public abstract void tick(long time, long interval);
+    public abstract long tick();
 
     /**
      * @return The id of the most recently used transaction id.

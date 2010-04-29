@@ -23,6 +23,7 @@
 package org.voltdb.dtxn;
 
 import java.nio.ByteBuffer;
+import java.util.concurrent.Future;
 
 import junit.framework.TestCase;
 
@@ -158,6 +159,18 @@ public class TestDtxnInitiatorQueue extends TestCase
             return m_writeStream;
         }
 
+        @Override
+        public void scheduleRunnable(Runnable r) {
+            // TODO Auto-generated method stub
+
+        }
+
+        @Override
+        public void unregister() {
+            // TODO Auto-generated method stub
+
+        }
+
     }
 
     class MockInitiator extends TransactionInitiator
@@ -203,8 +216,9 @@ public class TestDtxnInitiatorQueue extends TestCase
         }
 
         @Override
-        public void tick(long time, long interval)
+        public long tick()
         {
+            return 0;
         }
 
     }

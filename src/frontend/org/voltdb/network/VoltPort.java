@@ -24,10 +24,10 @@ import java.nio.ByteBuffer;
 import java.net.SocketException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.ArrayDeque;
 
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
-
 /** Encapsulates a socket registration for a VoltNetwork */
 public class VoltPort implements Callable<VoltPort>, Connection
 {
@@ -146,6 +146,15 @@ public class VoltPort implements Callable<VoltPort>, Connection
             }
 
             drainWriteStream(pool);
+
+            if (m_hasQueuedRunnables) {
+                synchronized (m_lock) {
+                    m_hasQueuedRunnables = false;
+                    while (!m_scheduledRunnables.isEmpty()) {
+                        m_scheduledRunnables.poll().run();
+                    }
+                }
+            }
         } finally {
             synchronized(m_lock) {
                 assert(m_running == true);
@@ -313,9 +322,6 @@ public class VoltPort implements Callable<VoltPort>, Connection
      */
     void unregistering() {
         m_handler.stopping(this);
-        while (m_running) {
-            Thread.yield();
-        }
     }
 
     /**
@@ -358,4 +364,35 @@ public class VoltPort implements Callable<VoltPort>, Connection
     public long connectionId() {
         return m_handler.connectionId();
     }
+
+    private volatile boolean m_hasQueuedRunnables = false;
+
+    /**
+     * Has actions waiting to be executed
+     */
+    public boolean hasQueuedRunnables() {
+        return m_hasQueuedRunnables;
+    }
+
+    private ArrayDeque<Runnable> m_scheduledRunnables = new ArrayDeque<Runnable>();
+
+    @Override
+    public void scheduleRunnable(Runnable r) {
+        synchronized (m_lock) {
+            m_hasQueuedRunnables = true;
+            m_scheduledRunnables.offer(r);
+        }
+        m_network.addToChangeList(this);
+    }
+
+    @Override
+    public void unregister() {
+        scheduleRunnable(new Runnable() {
+            @Override
+            public void run() {
+                m_network.unregisterChannel(VoltPort.this);
+            }
+        });
+    }
+
 }

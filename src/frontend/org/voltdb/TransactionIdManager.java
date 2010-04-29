@@ -203,6 +203,10 @@ public class TransactionIdManager {
         return lastTxnId;
     }
 
+    public long getLastUsedTime() {
+        return lastUsedTime;
+    }
+
     /**
      * Get a string representation of the TxnId
      */

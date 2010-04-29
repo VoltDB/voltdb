@@ -391,7 +391,7 @@ class Distributer {
             m_statsLoader = null;
         }
         m_useMultipleThreads = useMultipleThreads;
-        m_network = new VoltNetwork( useMultipleThreads, true, new Runnable[0], 3);
+        m_network = new VoltNetwork( useMultipleThreads, true, 3);
         m_expectedOutgoingMessageSize = expectedOutgoingMessageSize;
         m_network.start();
         m_pool = new DBBPool(false, arenaSizes, false);

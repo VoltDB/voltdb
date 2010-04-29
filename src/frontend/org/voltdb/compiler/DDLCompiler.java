@@ -69,6 +69,7 @@ import org.xml.sax.SAXParseException;
 public class DDLCompiler {
 
     static final int MAX_COLUMNS = 1024;
+    static final int MAX_ROW_SIZE = 1024 * 1024 * 2;
 
     HSQLInterface m_hsql;
     VoltCompiler m_compiler;
@@ -303,6 +304,22 @@ public class DDLCompiler {
             }
         }
 
+        /*
+         * Validate that the total size
+         */
+        int maxRowSize = 0;
+        for (Column c : columnMap.values()) {
+            VoltType t = VoltType.get((byte)c.getType());
+            if (t == VoltType.STRING) {
+                maxRowSize += 4 + c.getSize();
+            } else {
+                maxRowSize += t.getLengthInBytesForFixedTypes();
+            }
+        }
+        if (maxRowSize > MAX_ROW_SIZE) {
+//            throw new VoltCompilerException("Table name " + name + " has a maximum row size of " + maxRowSize +
+//                    " but the maximum supported row size is " + MAX_ROW_SIZE);
+        }
     }
 
     void addColumnToCatalog(Table table, Node node, int index) throws VoltCompilerException {

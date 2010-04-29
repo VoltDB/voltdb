@@ -278,14 +278,14 @@ public class VoltNetworkTest extends TestCase {
 
         // invoke call backs and see that the volt port has the expected
         // selected operations.
-        vn.invokeCallbacks(false);
+        vn.invokeCallbacks();
         assertEquals(SelectionKey.OP_WRITE, vp.readyOps());
 
         // and another time through, should have the new interests selected
         vp.setInterests(SelectionKey.OP_ACCEPT, 0);
         selectionKey.readyOps(SelectionKey.OP_ACCEPT);
         vn.installInterests();
-        vn.invokeCallbacks(false);
+        vn.invokeCallbacks();
         vn.shutdown();
         assertEquals(SelectionKey.OP_ACCEPT, vp.readyOps());
     }

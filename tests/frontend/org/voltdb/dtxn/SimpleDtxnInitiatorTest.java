@@ -159,6 +159,18 @@ public class SimpleDtxnInitiatorTest extends TestCase {
             return null;
         }
 
+        @Override
+        public void scheduleRunnable(Runnable r) {
+            // TODO Auto-generated method stub
+
+        }
+
+        @Override
+        public void unregister() {
+            // TODO Auto-generated method stub
+
+        }
+
     }
 
     private final class DummyWriteStream implements WriteStream {

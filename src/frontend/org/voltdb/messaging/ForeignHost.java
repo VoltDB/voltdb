@@ -129,7 +129,7 @@ public class ForeignHost {
     void close()
     {
         m_closing = true;
-        m_hostMessenger.getNetwork().unregisterChannel(m_connection);
+        m_connection.unregister();
     }
 
     boolean isUp()
