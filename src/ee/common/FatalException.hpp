@@ -18,6 +18,7 @@
 #ifndef FATALEXCEPTION_HPP_
 #define FATALEXCEPTION_HPP_
 
+#include <cstdio>
 #include <string>
 #include <string.h>
 #include <execinfo.h>

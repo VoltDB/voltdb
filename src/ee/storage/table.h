@@ -72,15 +72,13 @@ class SerializeInput;
 class SerializeOutput;
 class TableStats;
 class StatsSource;
+class StreamBlock;
 class Topend;
 
 const size_t COLUMN_DESCRIPTOR_SIZE = 1 + 4 + 4; // type, name offset, name length
 
 // use no more than 100mb for temp tables per fragment
 const int MAX_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
-
-// limit on unflushed ELT buffer age (in ms)
-const int MAX_BUFFER_AGE = 4000;
 
 /**
  * Represents a table which might or might not be a temporary table.
@@ -198,6 +196,36 @@ public:
     void loadTuplesFrom(bool allowELT,
                                 SerializeInput &serialize_in,
                                 Pool *stringPool = NULL);
+    //------------
+    // EL-RELATED
+    //------------
+    /**
+     * Get the next block of committed but unreleased ELT bytes
+     */
+    virtual StreamBlock* getCommittedEltBytes()
+    {
+        // default implementation is to return NULL, which
+        // indicates an error)
+        return NULL;
+    }
+
+    /**
+     * Release any committed ELT bytes up to the provided stream offset
+     */
+    virtual bool releaseEltBytes(int64_t releaseOffset)
+    {
+        // default implementation returns false, which
+        // indicates an error
+        return false;
+    }
+
+    /**
+     * Flush tuple stream wrappers. A negative time instructs an
+     * immediate flush.
+     */
+    virtual void flushOldTuples(int64_t timeInMillis) {
+    }
+
 protected:
     /*
      * Implemented by persistent table and called by Table::loadTuplesFrom
@@ -211,12 +239,6 @@ protected:
      */
     virtual void populateIndexes(int tupleCount) {};
 public:
-    /**
-     * Flush tuple stream wrappers. A negative time instructs an
-     * immediate flush.
-     */
-    virtual void flushOldTuples(int64_t timeInMillis) {
-    }
 
     virtual bool equals(const voltdb::Table *other) const;
     virtual voltdb::TableStats* getTableStats();

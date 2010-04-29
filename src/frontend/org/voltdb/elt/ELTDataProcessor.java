@@ -18,16 +18,16 @@
 package org.voltdb.elt;
 
 import org.apache.log4j.Logger;
+import org.voltdb.elt.processors.RawProcessor.ELTInternalMessage;
 
 /**
  * Interface ELTManager imposes on processors.
  *
  *  The ELT Manager invokes this interface in known order:
  *    1. The logger is added via addLogger.
- *    2. Destination hosts are added via addHost.
- *    3. Table sources are added via addTable
- *    4. readyForData is invoked.
- *    5. process is called for flushed data blocks
+ *    2. Table sources are added via addTable
+ *    3. readyForData is invoked.
+ *    4. process is called for flushed data blocks
  *
  *    isIdle may be invoked at any time. A processor should
  *    report idle if immediate termination would not cause loss of data
@@ -42,23 +42,13 @@ public interface ELTDataProcessor  {
      */
     void addLogger(Logger logger);
 
-    /** Allow the loader to establish any required network connections
-     *  Called once for each ELT host entry in the catalog.
-     *  @param host or ip address of destination.
-     *  @param port number of destination.
-     *  @param database name being connected to.
-     *  @param username configured username from project.xml
-     */
-    void addHost(String url, String database,
-                String username, String password);
-
     /** Pass the loader each table in each database.
      * Called once for each table in the catalog.
      * @param database these tables belong to.
      * @param tableName for the database
      * @param tableId corresponding to tableName.
      */
-    void addTable(String database, String tableName, int tableId);
+    void addDataSource(ELTDataSource dataSource);
 
     /**
      * Inform the processor that work may start arriving. Initialization
@@ -67,22 +57,13 @@ public interface ELTDataProcessor  {
     public void readyForData();
 
     /**
-     * Pass a block to be processed to the loader. The loader must successfully
-     * transfer ownership of the block (to a Connection.writeStream(), for example)
-     * OR release the block's BBContainer. Not taking one of these actions
-     * is a memory leak. Even when returning false to this method, the processor
-     * must discard BBContainer's data.
-     *
-     * This method is reentrant: multiple execution sites can call it
-     * concurrently.
-     * @param block
-     * @return false if the data was rejected by the processor
-     */
-    public boolean process(final ELTDataBlock block);
-
-    /**
      * Query if the processor is idle.
-     * @return true if all invocations of process() are completed.
+     * @return true if all polled work is complete.
      */
     public boolean isIdle();
+
+    /**
+     * Queue a work message to the processor's mailbox.
+     */
+    public void queueMessage(ELTInternalMessage m);
 }

@@ -26,23 +26,6 @@ namespace voltdb {
 
 IPCTopend::IPCTopend(VoltDBIPC *vdbipc) : m_vdbipc(vdbipc) {}
 
-/** Buffer pointer is just a pointer to a heap allocation.
-    Ship this across the socket and delete the buffer */
-void IPCTopend::handoffReadyELBuffer(char* bufferPtr, int32_t bytesUsed, CatalogId tableId) {
-    m_vdbipc->handoffReadyELBuffer(bufferPtr, bytesUsed, tableId);
-    delete[] bufferPtr;
-}
-
-/** Give the EE a buffer to use for its nefarious designs */
-char* IPCTopend::claimManagedBuffer(int32_t desiredSizeInBytes) {
-    return new char[desiredSizeInBytes];
-}
-
-/** Delete the buffer obtained via claimManagedBuffer */
-void IPCTopend::releaseManagedBuffer(char* bufferPtr) {
-    delete[] bufferPtr;
-}
-
 int IPCTopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool, Table* destination) {
     VOLT_DEBUG("iterating java dependency for id %d\n", dependencyId);
     size_t dependencySz;

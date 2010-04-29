@@ -692,11 +692,11 @@ size_t PersistentTable::appendToELBuffer(TableTuple &tuple, int64_t seqNo,
     if (!m_wrapper) {
         m_wrapper = new TupleStreamWrapper(m_executorContext->m_partitionId,
                                            m_executorContext->m_siteId,
-                                           m_id, m_executorContext->getTopend(),
+                                           m_id,
                                            m_executorContext->m_lastTickTime);
-        m_wrapper->cacheBlockHeader(*m_schema);
     }
-    return m_wrapper->appendTuple(m_executorContext->currentTxnId(),
+    return m_wrapper->appendTuple(m_executorContext->m_lastCommittedTxnId,
+                                  m_executorContext->currentTxnId(),
                                   seqNo,
                                   m_executorContext->currentTxnTimestamp(),
                                   m_tmpTarget1, type);
@@ -708,18 +708,32 @@ size_t PersistentTable::appendToELBuffer(TableTuple &tuple, int64_t seqNo,
  */
 void PersistentTable::flushOldTuples(int64_t timeInMillis)
 {
-    // if EL is enabled, check if the buffer hasn't been flushed in a while
-    if (!(m_exportEnabled && m_wrapper)) {
-        return;
+    if (m_exportEnabled && m_wrapper) {
+        m_wrapper->periodicFlush(timeInMillis,
+                                 m_executorContext->m_lastTickTime,
+                                 m_executorContext->m_lastCommittedTxnId,
+                                 m_executorContext->currentTxnId());
     }
-    else if (timeInMillis < 0) {
-        m_wrapper->flushOldTuples(m_executorContext->m_lastCommittedTxnId,
-                                  m_executorContext->m_lastTickTime);
+}
+
+StreamBlock*
+PersistentTable::getCommittedEltBytes()
+{
+    if (m_exportEnabled && m_wrapper)
+    {
+        return m_wrapper->getCommittedEltBytes();
     }
-    else if ((timeInMillis - m_wrapper->lastFlushTime()) > MAX_BUFFER_AGE) {
-        m_wrapper->flushOldTuples(m_executorContext->m_lastCommittedTxnId,
-                                  timeInMillis);
+    return NULL;
+}
+
+bool
+PersistentTable::releaseEltBytes(int64_t releaseOffset)
+{
+    if (m_exportEnabled && m_wrapper)
+    {
+        return m_wrapper->releaseEltBytes(releaseOffset);
     }
+    return false;
 }
 
 voltdb::TableStats* PersistentTable::getTableStats() {

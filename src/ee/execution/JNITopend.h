@@ -27,20 +27,12 @@ namespace voltdb {
 class JNITopend : public Topend {
 public:
     JNITopend(JNIEnv *env, jobject caller);
+    ~JNITopend();
 
     inline JNITopend* updateJNIEnv(JNIEnv *env) { m_jniEnv = env; return this; }
-
-    void handoffReadyELBuffer(char* bufferPtr, int32_t bytesUsed, CatalogId tableId);
-
-    char* claimManagedBuffer(int32_t desiredSizeInBytes);
-
-    void releaseManagedBuffer(char* bufferPtr);
-
     int loadNextDependency(int32_t dependencyId, Pool *stringPool, Table* destination);
-
     void crashVoltDB(FatalException e);
 
-    ~JNITopend();
 private:
     JNIEnv *m_jniEnv;
 
@@ -49,10 +41,6 @@ private:
      * if this is NULL, VoltDBEngine will fail to call sendDependency().
     */
     jobject m_javaExecutionEngine;
-
-    jmethodID m_handoffReadyELBufferMID;
-    jmethodID m_claimManagedBufferMID;
-    jmethodID m_releaseManagedBufferMID;
     jmethodID m_nextDependencyMID;
     jmethodID m_crashVoltDBMID;
 };

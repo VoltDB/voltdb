@@ -1107,6 +1107,44 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeCOWSe
     return 0;
 }
 
+/*
+ * Class:     org_voltdb_jni_ExecutionEngine
+ * Method:    nativeELTAction
+ *
+ * @param ackAction  true if this call contains an ack
+ * @param pollAction true if this call requests a poll
+ * @param ackOffset  if acking, the universal stream offset being acked/released
+ * @param tableId    the table ID to which the ELT action applies
+ *
+ * @return the universal stream offset for the last octet in any
+ * returned poll results (returned via the query results buffer).  On
+ * any error this will be less than 0.  For any call with no
+ * pollAction, any value >= 0 may be ignored.
+ */
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeELTAction
+  (JNIEnv *env,
+   jobject obj,
+   jlong engine_ptr,
+   jboolean ackAction,
+   jboolean pollAction,
+   jlong ackOffset,
+   jint tableId) {
+    VOLT_DEBUG("nativeELTAction in C++ called");
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    try {
+        try {
+            engine->resetReusedResultOutputBuffer();
+            return engine->eltAction(ackAction, pollAction, ackOffset, tableId);
+        } catch (SQLException e) {
+            throwFatalException("%s", e.message().c_str());
+        }
+    } catch (FatalException e) {
+        topend->crashVoltDB(e);
+    }
+    return 0;
+}
+
 #ifdef LINUX
 /*
  * Class:     org_voltdb_utils_ThreadUtils

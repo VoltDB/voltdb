@@ -37,7 +37,9 @@
 #include "common/TupleSchema.h"
 #include "common/tabletuple.h"
 #include "storage/streamedtable.h"
+#include "storage/StreamBlock.h"
 
+using namespace std;
 using namespace voltdb;
 
 const int COLUMN_COUNT = 5;
@@ -158,7 +160,6 @@ protected:
  * Fill a buffer repeatedly and make sure nothing breaks.
  */
 TEST_F(StreamedTableTest, BaseCase) {
-    int flushcount = m_topend->m_handoffcount;
     int64_t tokenOffset = 2000; // just so tokens != txnIds
 
     // repeat for more tuples than fit in the default buffer
@@ -179,14 +180,26 @@ TEST_F(StreamedTableTest, BaseCase) {
         }
 
         m_table->insertTuple(*m_tuple);
-
     }
-
-    // make sure we used more than one buffer
-    EXPECT_GT(m_topend->m_handoffcount, flushcount);
-
     // a negative flush implies "now". this helps valgrind heap block test
     m_table->flushOldTuples(-1);
+
+    // poll from the table and make sure we get "stuff", releasing as
+    // we go.  This just makes sure we don't fail catastrophically and
+    // that things are basically as we expect.
+    StreamBlock* block = m_table->getCommittedEltBytes();
+    int64_t uso = block->uso();
+    EXPECT_EQ(uso, 0);
+    size_t offset = block->offset();
+    EXPECT_TRUE(offset != 0);
+    while (block->offset() > 0)
+    {
+        m_table->releaseEltBytes(uso);
+        block = m_table->getCommittedEltBytes();
+        uso = block->uso();
+        EXPECT_EQ(uso, offset);
+        offset += block->offset();
+    }
 }
 
 int main() {

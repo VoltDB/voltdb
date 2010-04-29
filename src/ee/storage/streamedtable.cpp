@@ -30,7 +30,7 @@ StreamedTable::StreamedTable(ExecutorContext *ctx, bool exportEnabled)
     if (exportEnabled) {
         m_wrapper = new TupleStreamWrapper(m_executorContext->m_partitionId,
                                            m_executorContext->m_siteId,
-                                           m_id, m_executorContext->getTopend(),
+                                           m_id,
                                            m_executorContext->m_lastTickTime);
     }
 }
@@ -73,7 +73,8 @@ bool StreamedTable::insertTuple(TableTuple &source)
 {
     size_t mark = 0;
     if (m_wrapper) {
-        mark = m_wrapper->appendTuple(m_executorContext->currentTxnId(),
+        mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedTxnId,
+                                      m_executorContext->currentTxnId(),
                                       m_sequenceNo++,
                                       m_executorContext->currentTxnTimestamp(),
                                       source,
@@ -98,7 +99,8 @@ bool StreamedTable::deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings)
 {
     size_t mark = 0;
     if (m_wrapper) {
-        mark = m_wrapper->appendTuple(m_executorContext->currentTxnId(),
+        mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedTxnId,
+                                      m_executorContext->currentTxnId(),
                                       m_sequenceNo++,
                                       m_executorContext->currentTxnTimestamp(),
                                       tuple,
@@ -122,18 +124,32 @@ void StreamedTable::loadTuplesFrom(bool, SerializeInput&, Pool*)
 
 void StreamedTable::flushOldTuples(int64_t timeInMillis)
 {
-    // MAX_BUFFER_AGE is a global constant declared in table.h
-
     if (m_wrapper) {
-        if (timeInMillis < 0) {
-            m_wrapper->flushOldTuples(m_executorContext->m_lastCommittedTxnId,
-                                      m_executorContext->m_lastTickTime);
-        }
-        else if ((timeInMillis - m_wrapper->lastFlushTime()) > MAX_BUFFER_AGE) {
-            m_wrapper->flushOldTuples(m_executorContext->m_lastCommittedTxnId,
-                                      timeInMillis);
-        }
+        m_wrapper->periodicFlush(timeInMillis,
+                                 m_executorContext->m_lastTickTime,
+                                 m_executorContext->m_lastCommittedTxnId,
+                                 m_executorContext->currentTxnId());
     }
+}
+
+StreamBlock*
+StreamedTable::getCommittedEltBytes()
+{
+    if (m_wrapper)
+    {
+        return m_wrapper->getCommittedEltBytes();
+    }
+    return NULL;
+}
+
+bool
+StreamedTable::releaseEltBytes(int64_t releaseOffset)
+{
+    if (m_wrapper)
+    {
+        return m_wrapper->releaseEltBytes(releaseOffset);
+    }
+    return false;
 }
 
 void StreamedTable::undo(size_t mark)

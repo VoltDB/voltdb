@@ -53,6 +53,8 @@ class StreamedTable : public Table {
     virtual bool deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings);
     virtual void loadTuplesFrom(bool allowELT, SerializeInput &serialize_in, Pool *stringPool = NULL);
     virtual void flushOldTuples(int64_t timeInMillis);
+    virtual StreamBlock* getCommittedEltBytes();
+    virtual bool releaseEltBytes(int64_t releaseOffset);
 
     virtual std::string tableType() const {
         return "StreamedTable";
@@ -72,6 +74,3 @@ class StreamedTable : public Table {
 
 }
 #endif
-
-
-

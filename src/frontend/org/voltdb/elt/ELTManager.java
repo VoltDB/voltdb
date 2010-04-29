@@ -18,42 +18,39 @@
 package org.voltdb.elt;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayDeque;
-import java.util.Hashtable;
+import java.util.*;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Connector;
-import org.voltdb.catalog.ConnectorDestinationInfo;
-import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
-import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.LogKeys;
-import org.voltdb.utils.SysManageable;
-import org.voltdb.utils.VoltLoggerFactory;
+import org.voltdb.catalog.*;
+import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.elt.processors.RawProcessor.ELTInternalMessage;
+import org.voltdb.utils.*;
 import org.voltdb.utils.DBBPool.BBContainer;
 
 /**
  * Bridges the connection to an OLAP system and the buffers passed
- * between the OLAP connection and the execution engine.
+ * between the OLAP connection and the execution engine. Each processor
+ * implements ELTDataProcessor interface. The processors are passed one
+ * or more ELTDataSources. The sources map, currently, 1:1 with ELT
+ * enabled tables. The ELTDataSource has poll() and ack() methods that
+ * processors may use to pull and acknowledge as processed, EE ELT data.
+ * Data passed to processors is wrapped in ELTDataBlocks which in turn
+ * wrap a BBContainer.
+ *
+ * Processors are loaded by reflection based on configuration in project.xml.
  */
-public class ELTManager implements SysManageable {
-
-    /** tables names created in external DBs are prepended with this string */
-    public final static String TablePrefix = "VOLTDB_";
-
-    @SuppressWarnings("unused")
-    private static final Logger log =
-        Logger.getLogger(ELTManager.class.getName(), VoltLoggerFactory.instance());
-
+public class ELTManager implements SysManageable
+{
+    /**
+     * Processors also log using this facility.
+     */
     private static final Logger eltLog =
         Logger.getLogger("ELT", VoltLoggerFactory.instance());
 
     /**
-     * Store address along with ByteBuffer in a container that can return the ByteBuffer to the ELT manager
+     * Store address along with ByteBuffer in a container that can return the
+     * ByteBuffer to the ELT manager
      */
     private class ELBBContainer extends BBContainer {
         @SuppressWarnings("unused")
@@ -71,22 +68,6 @@ public class ELTManager implements SysManageable {
         }
      }
 
-    /** Thrown if the initial setup the loader fails */
-    public static class SetupException extends Exception {
-        private static final long serialVersionUID = 1L;
-        private final String m_msg;
-        SetupException(final String msg) {
-            m_msg = msg;
-        }
-        @Override
-        public String getMessage() {
-            return m_msg;
-        }
-    }
-
-    /** Connection to an OLAP loader */
-    ELTDataProcessor m_loader;
-
     /** Size of ELT buffers, currently 2MB */
     private static final int kBufferSize = 2 * 1024 * 1024;
 
@@ -96,82 +77,6 @@ public class ELTManager implements SysManageable {
     /** Map buffer pointers to their containers for lookup */
     Hashtable<Long, ELBBContainer> m_bufferMap = new Hashtable<Long, ELBBContainer>();
 
-    /** Obtain the global ELTManager via its instance() method */
-    private static ELTManager m_self;
-
-    /** Construct ELTManager using catalog.
-     * @param catalog
-     * @throws ELTManager.SetupException
-     */
-    public static synchronized void initialize(final Catalog catalog)
-      throws ELTManager.SetupException
-    {
-        m_self = new ELTManager(catalog);
-    }
-
-    /**
-     * Get the global instance of the ELTManager.
-     * @return The global single instance of the ELTManager.
-     */
-    public static ELTManager instance() {
-        assert (m_self != null);
-        return m_self;
-    }
-
-    /** Read the catalog to setup manager and loader(s) */
-    private ELTManager(final Catalog catalog) throws ELTManager.SetupException {
-        final Cluster cluster = catalog.getClusters().get("cluster");
-        final Database db = cluster.getDatabases().get("database");
-        final Connector conn= db.getConnectors().get("0");
-
-        if (conn == null) {
-            return;
-        }
-
-        if (conn.getEnabled() == false) {
-            eltLog.info("Export is disabled by user configuration.");
-            return;
-        }
-
-        ConnectorDestinationInfo dest = conn.getDestinfo().get("0");
-        if (dest == null) {
-            assert(false); // VoltCompiler should make this impossible
-            eltLog.info("Export is disabled - no specified destination");
-            return;
-        }
-
-        String urlStr = dest.getUrl();
-        final String elloader = conn.getLoaderclass();
-        String elusername = dest.getUsername();
-        String elpassword = dest.getPassword();
-
-        final CatalogMap<Table> tables = cluster.getDatabases().get("database").getTables();
-
-        try {
-            // create a new loader; pass it catalog tables and start run-loop
-            eltLog.info("Attempting to load connector " + elloader +
-                        " for user " + elusername + " password " + elpassword);
-            final Class<?> loaderClass = Class.forName(elloader);
-            m_loader = (ELTDataProcessor)loaderClass.newInstance();
-            m_loader.addLogger(eltLog);
-
-            eltLog.info("Adding destination: " + urlStr);
-            m_loader.addHost(urlStr, "database", elusername, elpassword);
-            for (final Table table : tables) {
-                m_loader.addTable("database",
-                                  table.getTypeName(),
-                                  table.getRelativeIndex());
-            }
-            m_loader.readyForData();
-        }
-        catch (final ClassNotFoundException e) {
-            eltLog.l7dlog( Level.ERROR, LogKeys.elt_ELTManager_NoLoaderExtensions.name(), e);
-            throw new ELTManager.SetupException(e.getMessage());
-        }
-        catch (final Throwable e) {
-            throw new ELTManager.SetupException(e.getMessage());
-        }
-    }
 
     /** Internal helper to allocate a buffer from the byte pool */
     private ELBBContainer claimELBBContainer(final long desiredSizeInBytes) {
@@ -211,42 +116,6 @@ public class ELTManager implements SysManageable {
         return b.address;
     }
 
-    /**
-     * Receive a completed buffer from the (IPC) EE and pass to the loader
-     */
-    public void handoffToConnection2(ByteBuffer buff, final int limit, final int tableId) {
-        final long address = DBBPool.getBufferAddress(buff);
-        handoffToConnection(address, limit, tableId);
-    }
-
-    /**
-     * Receive a completed buffer from the EE and pass to the loader
-     * @param buff
-     * @param limit
-     * @param tableId
-     */
-    public void handoffToConnection(final long buff, final int limit, final int tableId) {
-        // translate EE's hint to java buffer semantics and handoff to
-        // loader. if the loader doesn't exist or doesn't accept the
-        // data, return the container to the pool manager and continue.
-        boolean transfered = false;
-        BBContainer tin = m_bufferMap.remove(buff);
-        if (tin == null) {
-            assert(false);
-            throw new IllegalStateException("ELTManager asked to handoff unknown buffer " + buff);
-        }
-
-        tin.b.position(0);
-        tin.b.limit(limit);
-
-        final ELTDataBlock msg = new ELTDataBlock(tin, tableId);
-        transfered = m_loader.process(msg);
-
-        if (!transfered) {
-            eltLog.l7dlog(Level.ERROR, LogKeys.elt_ELTManager_DataDroppedLoaderDead.name(), null);
-        }
-    }
-
     /** Release a buffer back to the pool manager
      * @param buff
      */
@@ -259,38 +128,145 @@ public class ELTManager implements SysManageable {
         tin = null;
     }
 
-    /**
-     * Only detect if loaders have idled. This is meaningless unless
-     * the questioner has flushed all ELT buffers from the EE to the ELT
-     * Manager already.
-     */
-    @Override
-    public String operStatus() {
-        if (m_loader == null) {
-            return SysManageable.IDLE;
+    /** Thrown if the initial setup of the loader fails */
+    public static class SetupException extends Exception {
+        private static final long serialVersionUID = 1L;
+        private final String m_msg;
+        SetupException(final String msg) {
+            m_msg = msg;
         }
-        else if (m_loader.isIdle()) {
-            return SysManageable.IDLE;
-        }
-        else {
-            return SysManageable.RUNNING;
+        @Override
+        public String getMessage() {
+            return m_msg;
         }
     }
 
     /**
-     * Send a stop message to the processor. The EE buffers have already been
-     * flushed at this point, assuming this is invoked by "@Quiesce" sysproc.
+     * Connections OLAP loaders. Currently at most one loader allowed.
+     * Supporting multiple loaders mainly involves reference counting
+     * the EE data blocks and bookkeeping ACKs from processors.
+     */
+    ArrayDeque<ELTDataProcessor> m_processors = new ArrayDeque<ELTDataProcessor>();
+
+
+    /** Obtain the global ELTManager via its instance() method */
+    private static ELTManager m_self;
+
+    /**
+     * Construct ELTManager using catalog.
+     * @param myHostId
+     * @param catalog
+     * @param siteTracker
+     * @throws ELTManager.SetupException
+     */
+    public static synchronized void initialize(int myHostId, final Catalog catalog, SiteTracker siteTracker)
+      throws ELTManager.SetupException
+    {
+        ELTManager tmp = new ELTManager(myHostId, catalog, siteTracker);
+        m_self = tmp;
+    }
+
+    /**
+     * Get the global instance of the ELTManager.
+     * @return The global single instance of the ELTManager.
+     */
+    public static ELTManager instance() {
+        assert (m_self != null);
+        return m_self;
+    }
+
+    /** Read the catalog to setup manager and loader(s)
+     * @param myHostId
+     * @param siteTracker */
+    private ELTManager(int myHostId, final Catalog catalog, SiteTracker siteTracker) throws ELTManager.SetupException {
+        final Cluster cluster = catalog.getClusters().get("cluster");
+        final Database db = cluster.getDatabases().get("database");
+        final Connector conn= db.getConnectors().get("0");
+
+        if (conn == null) {
+            return;
+        }
+
+        if (conn.getEnabled() == false) {
+            eltLog.info("Export is disabled by user configuration.");
+            return;
+        }
+
+        ConnectorDestinationInfo dest = conn.getDestinfo().get("0");
+        if (dest == null) {
+            assert(false); // VoltCompiler should make this impossible
+            eltLog.info("Export is disabled - no specified destination");
+            return;
+        }
+
+        final String elloader = conn.getLoaderclass();
+        try {
+            eltLog.info("Creating connector " + elloader);
+            ELTDataProcessor newProcessor = null;
+            final Class<?> loaderClass = Class.forName(elloader);
+            newProcessor = (ELTDataProcessor)loaderClass.newInstance();
+            newProcessor.addLogger(eltLog);
+
+            Iterator<ConnectorTableInfo> tableInfoIt = conn.getTableinfo().iterator();
+            while (tableInfoIt.hasNext()) {
+                ConnectorTableInfo next = tableInfoIt.next();
+                Table table = next.getTable();
+                addDataSources(newProcessor, table, myHostId, siteTracker);
+            }
+            newProcessor.readyForData();
+            m_processors.add(newProcessor);
+        }
+        catch (final ClassNotFoundException e) {
+            eltLog.l7dlog( Level.ERROR, LogKeys.elt_ELTManager_NoLoaderExtensions.name(), e);
+            throw new ELTManager.SetupException(e.getMessage());
+        }
+        catch (final Throwable e) {
+            throw new ELTManager.SetupException(e.getMessage());
+        }
+    }
+
+    // silly helper to add datasources for a table catalog object
+    private void addDataSources(ELTDataProcessor newProcessor,
+            Table table, int hostId, SiteTracker siteTracker)
+    {
+        ArrayList<Integer> sites = siteTracker.getLiveExecutionSitesForHost(hostId);
+        for (Integer site : sites) {
+            newProcessor.addDataSource(
+                 new ELTDataSource("database",
+                                   table.getTypeName(),
+                                   siteTracker.getPartitionForSite(site),
+                                   site,
+                                   table.getRelativeIndex())
+            );
+        }
+    }
+
+    /**
+     * Ask if all loaders have idled.
      */
     @Override
-    public void quiesce() {
-        if (m_loader != null) {
-            m_loader.process(
-                             new ELTDataBlock() {
-                                 @Override
-                                 public boolean isStopMessage() {
-                                     return true;
-                                 }
-                             });
+    public String operStatus() {
+        for (ELTDataProcessor p: m_processors) {
+            if (!p.isIdle()) {
+                return SysManageable.RUNNING;
+            }
         }
+        return SysManageable.IDLE;
+    }
+
+    @Override
+    public void quiesce() {
+        // Nothing to do here in the pull model. Pollers can just send quiesce
+        // and poll queues until empty.
+    }
+
+    /**
+     * Add a message to the processor "mailbox".
+     * @param mbp
+     */
+    public void queueMessage(ELTInternalMessage mbp) {
+        // TODO: supporting multiple processors requires slicing the
+        // data buffer so each processor gets a readonly buffer.
+        m_processors.getFirst().queueMessage(mbp);
     }
 }

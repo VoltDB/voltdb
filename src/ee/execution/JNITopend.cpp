@@ -54,15 +54,9 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     jclass jniClass = m_jniEnv->GetObjectClass(m_javaExecutionEngine);
     VOLT_TRACE("found class: %d", jniClass == NULL);
 
-    // get the methods for EL and buffer management and cache them as well
-    m_handoffReadyELBufferMID = m_jniEnv->GetMethodID(jniClass, "handoffReadyELBuffer", "(JII)V");
-    assert(m_handoffReadyELBufferMID != 0);
-    m_claimManagedBufferMID = m_jniEnv->GetMethodID(jniClass, "claimManagedBuffer", "(I)J");
-    assert(m_claimManagedBufferMID != 0);
-    m_releaseManagedBufferMID = m_jniEnv->GetMethodID(jniClass, "releaseManagedBuffer", "(J)V");
-    assert(m_releaseManagedBufferMID != 0);
     m_nextDependencyMID = m_jniEnv->GetMethodID(jniClass, "nextDependencyAsBytes", "(I)[B");
     assert(m_nextDependencyMID != 0);
+
     m_crashVoltDBMID =
         m_jniEnv->GetStaticMethodID(
             jniClass,
@@ -70,37 +64,11 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
             "(Ljava/lang/String;[Ljava/lang/String;Ljava/lang/String;I)V");
     assert(m_crashVoltDBMID != 0);
 
-    if (m_handoffReadyELBufferMID == 0 ||
-            m_claimManagedBufferMID == 0 ||
-            m_releaseManagedBufferMID == 0 ||
-            m_nextDependencyMID == 0 ||
-            m_crashVoltDBMID == 0) {
+    if (m_nextDependencyMID == 0 ||
+        m_crashVoltDBMID == 0)
+    {
         throw std::exception();
     }
-}
-
-void JNITopend::handoffReadyELBuffer(char* bufferPtr, int32_t bytesUsed, CatalogId tableId) {
-    assert(bufferPtr);
-    assert(bytesUsed > 0);
-    assert(tableId > 0);
-
-    m_jniEnv->CallVoidMethod(m_javaExecutionEngine, m_handoffReadyELBufferMID,
-        reinterpret_cast<int64_t>(bufferPtr), bytesUsed, static_cast<int32_t>(tableId));
-}
-
-char* JNITopend::claimManagedBuffer(int32_t desiredSizeInBytes) {
-    assert(desiredSizeInBytes > 0);
-    assert(m_jniEnv);
-
-    int64_t result = m_jniEnv->CallLongMethod(m_javaExecutionEngine, m_claimManagedBufferMID, desiredSizeInBytes);
-    assert(reinterpret_cast<char*>(result));
-    return reinterpret_cast<char*>(result);
-}
-
-void JNITopend::releaseManagedBuffer(char* bufferPtr) {
-    assert(bufferPtr);
-
-    m_jniEnv->CallVoidMethod(m_javaExecutionEngine, m_releaseManagedBufferMID, reinterpret_cast<int64_t>(bufferPtr));
 }
 
 int JNITopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool, Table* destination) {

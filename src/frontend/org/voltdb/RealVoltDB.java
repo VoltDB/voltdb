@@ -254,14 +254,6 @@ public class RealVoltDB implements VoltDBInterface
                 }
             }}*/);
 
-            // Let the ELT system read its configuration from the catalog.
-            try {
-                ELTManager.initialize(catalog);
-            } catch (ELTManager.SetupException e) {
-                hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ELTInitFailure.name(), e);
-                System.exit(-1);
-            }
-
             // Create the intra-cluster mesh
             InetAddress leader = null;
             try {
@@ -282,6 +274,14 @@ public class RealVoltDB implements VoltDBInterface
 
             // Use the host messenger's hostId.
             int myHostId = m_messenger.getHostId();
+
+            // Let the ELT system read its configuration from the catalog.
+            try {
+                ELTManager.initialize(myHostId, catalog, m_catalogContext.siteTracker);
+            } catch (ELTManager.SetupException e) {
+                hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ELTInitFailure.name(), e);
+                System.exit(-1);
+            }
 
             // set up site structure
             m_localSites = new Hashtable<Integer, ExecutionSite>();

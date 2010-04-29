@@ -31,7 +31,7 @@ import org.voltdb.ParameterSet;
 import org.voltdb.SysProcSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.elt.ELTManager;
+import org.voltdb.elt.ELTProtoMessage;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.utils.LogKeys;
@@ -220,44 +220,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
 
     /**
-     * Called from ExecutionEngine to notify the Java Runtime that an EL buffer
-     * is full of tuples and ready to be sent to the companion OLAP system. It is
-     * assumed the buffer was originally requested through a call to
-     * {@link #claimManagedBuffer(int)}. Do not call {@link #releaseManagedBuffer(long)}
-     * for this buffer after calling this method; it will be cleaned up by
-     * the Java Runtime.
-     *
-     * @param bufferPtr The pointer to the buffer memory, cast as a long.
-     * @param bytesUsed The number of bytes in the buffer to be sent.
-     * @param tableId The catalog id of the table which sources these tuples.
-     */
-    public void handoffReadyELBuffer(final long bufferPtr, final int bytesUsed, final int tableId) {
-        ELTManager.instance().handoffToConnection(bufferPtr, bytesUsed, tableId);
-    }
-
-    /**
-     * This is called from VoltDBEngine to request a new buffer from the Java Runtime.
-     *
-     * @param desiredSizeInBytes The minimum size for the buffer requested in bytes.
-     * @return The pointer to the buffer memory cast as a long value or zero on failure.
-     */
-    public long claimManagedBuffer(final int desiredSizeInBytes) {
-        final long claimedBuffer = ELTManager.instance().claimBufferForEE(desiredSizeInBytes);
-        assert claimedBuffer != 0;
-        return claimedBuffer;
-    }
-
-    /**
-     * This is called from VoltDBEngine to release a buffer that was originally requested
-     * through a call to {@link #claimManagedBuffer(int)}.
-     *
-     * @param bufferPtr Pointer to the buffer to be released cast as a long.
-     */
-    public void releaseManagedBuffer(final long bufferPtr) {
-        ELTManager.instance().releaseManagedBuffer(bufferPtr);
-    }
-
-    /**
      * Call VoltDB.crashVoltDB on behalf of the EE
      * @param reason Reason the EE crashed
      */
@@ -290,9 +252,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Interface frontend invokes to communicate to CPP execution engine.
      */
 
-    /**
-     *
-     */
     abstract public boolean activateCopyOnWrite(final int tableId);
 
     /**
@@ -392,6 +351,19 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param undoToken The undo token.
      */
     public abstract boolean undoUndoToken(long undoToken);
+
+    /**
+     * Execute an ELT action against the execution engine.
+     * @param mAckAction true if this message instructs an ack.
+     * @param mPollAction true if this message instructs a poll.
+     * @param mAckTxnId if an ack, the transaction id being acked
+     * @param mTableId the table being polled or acked.
+     * @return the response ELTMessage
+     */
+    public abstract ELTProtoMessage eltAction(
+            boolean mAckAction, boolean mPollAction,
+            long mAckTxnId, int partitionId, int mTableId);
+
 
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to
@@ -618,4 +590,21 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      *         -1 is returned if there is an error (such as the table not being COW mode).
      */
     protected native int nativeCOWSerializeMore(long pointer, long bufferPointer, int offset, int length, int tableId);
+
+    /**
+     * Perform an ELT poll or ack action. Poll data will be returned via the usual
+     * results buffer. A single action may encompass both a poll and ack.
+     * @param pointer Pointer to an engine instance
+     * @param mAckAction True if an ack is requested
+     * @param mPollAction True if a  poll is requested
+     * @param mAckOffset The offset being ACKd.
+     * @param mTableId The table ID being acted against.
+     * @return
+     */
+    protected native long nativeELTAction(
+            long pointer,
+            boolean mAckAction, boolean mPollAction,
+            long mAckOffset, int mTableId);
+
+
 }

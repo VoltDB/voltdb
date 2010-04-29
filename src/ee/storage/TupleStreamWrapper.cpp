@@ -17,7 +17,6 @@
 
 #include "storage/TupleStreamWrapper.h"
 
-#include "common/Topend.h"
 #include "common/TupleSchema.h"
 #include "common/types.h"
 #include "common/NValue.hpp"
@@ -28,106 +27,69 @@
 #include <iostream>
 #include <cassert>
 #include <ctime>
+#include <utility>
 #include <math.h>
 
-namespace voltdb {
+using namespace std;
+using namespace voltdb;
+
 const int METADATA_COL_CNT = 6;
+const int MAX_BUFFER_AGE = 4000;
 
 TupleStreamWrapper::TupleStreamWrapper(CatalogId partitionId,
                                        CatalogId siteId,
                                        CatalogId tableId,
-                                       Topend *topend,
                                        int64_t lastFlush)
     : m_partitionId(partitionId), m_siteId(siteId), m_tableId(tableId),
-      m_topend(topend), m_lastFlush(lastFlush), m_defaultCapacity(EL_BUFFER_SIZE),
-      m_uso(0), m_openTransactionId(0), m_openTransactionUso(0), m_currBlock(NULL),
-      m_cachedBlockHeader(NULL), m_currBlockTupleCount(0)
+      m_lastFlush(lastFlush), m_defaultCapacity(EL_BUFFER_SIZE),
+      m_uso(0), m_currBlock(NULL), m_fakeBlock(NULL),
+      m_openTransactionId(0), m_openTransactionUso(0),
+      m_committedTransactionId(0), m_committedUso(0), m_firstUnpolledUso(0)
 {
-    assert(topend);
     assert(lastFlush > -1);
+    extendBufferChain(m_defaultCapacity);
 }
 
-void TupleStreamWrapper::cacheBlockHeader(TupleSchema &schema) {
-
-    // 12 byte signature
-    //  4 byte header length
-    //  2 byte version
-    //  1 byte sync marker length (0)
-    //  2 byte column count
-    //  4 byte column width (per column)
-    uint32_t totalColumns = schema.columnCount() + METADATA_COL_CNT;
-    delete[] m_cachedBlockHeader;
-    m_cachedBlockHeaderSize = 21 + 4 * totalColumns;
-    m_cachedBlockHeader = new char[m_cachedBlockHeaderSize];
-
-    // header
-    m_cachedBlockHeader[0]  = 'V';
-    m_cachedBlockHeader[1]  = 'B';
-    m_cachedBlockHeader[2]  = 'I';
-    m_cachedBlockHeader[3]  = 'N';
-    m_cachedBlockHeader[4]  = 'A';
-    m_cachedBlockHeader[5]  = 'R';
-    m_cachedBlockHeader[6]  = 'Y';
-    m_cachedBlockHeader[7]  = '\n';
-    m_cachedBlockHeader[8]  = '\377';
-    m_cachedBlockHeader[9]  = '\r';
-    m_cachedBlockHeader[10] = '\n';
-    m_cachedBlockHeader[11] = '\0';
-
-    // length of version, sync marker, column count and column widths
-    uint32_t varHeaderSize = 5 + 4 * totalColumns;
-    *(reinterpret_cast<uint32_t*>(&m_cachedBlockHeader[12])) = htonl(varHeaderSize);
-
-    // serialization version
-    *(reinterpret_cast<uint16_t*>(&m_cachedBlockHeader[16])) = htons(1);
-
-    // sync marker length. sync markers are not implemented.
-    m_cachedBlockHeader[18] = 0;
-
-    // column count
-    *(reinterpret_cast<uint16_t*>(&m_cachedBlockHeader[19])) = htons(totalColumns);
-
-    // metadata col. widths: txnid, timestamp, seqNo, partitionId, siteId, 'I/D'
-    *(reinterpret_cast<uint32_t*>(&m_cachedBlockHeader[21])) = htonl(sizeof(int64_t));
-    *(reinterpret_cast<uint32_t*>(&m_cachedBlockHeader[25])) = htonl(sizeof(int64_t));
-    *(reinterpret_cast<uint32_t*>(&m_cachedBlockHeader[29])) = htonl(sizeof(int64_t));
-    *(reinterpret_cast<uint32_t*>(&m_cachedBlockHeader[33])) = htonl(sizeof(int64_t));
-    *(reinterpret_cast<uint32_t*>(&m_cachedBlockHeader[37])) = htonl(sizeof(int64_t));
-    *(reinterpret_cast<uint32_t*>(&m_cachedBlockHeader[41])) = htonl(sizeof(char));
-
-    // tuple schema column widths
-    for (int i=0; i < schema.columnCount(); ++i) {
-        if (schema.columnType(i) == VALUE_TYPE_VARCHAR ||
-            schema.columnType(i) == VALUE_TYPE_DECIMAL)
-        {
-            // length preceded fields have -1 column width per specification
-            *(reinterpret_cast<int32_t*>(&m_cachedBlockHeader[45 + i * 4]))
-              = 0xFFFFFF;
-        }
-        else
-        {
-            // otherwise, all integer value are serialized as int64.
-            *(reinterpret_cast<uint32_t*>(&m_cachedBlockHeader[45 + i * 4]))
-              = htonl(sizeof(int64_t));
-        }
+void
+TupleStreamWrapper::setDefaultCapacity(size_t capacity)
+{
+    assert (capacity > 0);
+    if (m_uso != 0 || m_openTransactionId != 0 ||
+        m_openTransactionUso != 0 || m_committedTransactionId != 0 ||
+        m_committedUso != 0 || m_firstUnpolledUso != 0)
+    {
+        throwFatalException("setDefaultCapacity only callable before "
+                            "TupleStreamWrapper is used");
     }
+    cleanupManagedBuffers(NULL);
+    m_defaultCapacity = capacity;
+    extendBufferChain(m_defaultCapacity);
 }
 
 
+
+/*
+ * Essentially, shutdown.
+ */
 void TupleStreamWrapper::cleanupManagedBuffers(Topend *)
 {
     StreamBlock *sb = NULL;
 
-    if (m_currBlock && m_currBlock->dataPtr()) {
-        m_topend->releaseManagedBuffer(m_currBlock->dataPtr());
-    }
     delete m_currBlock;
-    m_currBlock = 0;
+    m_currBlock = NULL;
+
+    delete m_fakeBlock;
+    m_fakeBlock = NULL;
 
     while (m_pendingBlocks.empty() != true) {
         sb = m_pendingBlocks.front();
         m_pendingBlocks.pop_front();
-        m_topend->releaseManagedBuffer(sb->dataPtr());
+        delete sb;
+    }
+
+    while (m_freeBlocks.empty() != true) {
+        sb = m_freeBlocks.front();
+        m_freeBlocks.pop_front();
         delete sb;
     }
 }
@@ -135,32 +97,41 @@ void TupleStreamWrapper::cleanupManagedBuffers(Topend *)
 /*
  * Handoff fully committed blocks to the top end.
  *
- * If txnId is greater than m_openTransactionId, then all data in the
- * stream is committed. Otherwise, only the data before
- * m_openTransactionUso is committed. This forumalation allows a
- * flush() call in the middle of an open transaction.
+ * This is the only function that should modify m_openTransactionId,
+ * m_openTransactionUso.
  */
-void TupleStreamWrapper::commit(int64_t txnId)
+void TupleStreamWrapper::commit(int64_t lastCommittedTxnId, int64_t currentTxnId)
 {
-    StreamBlock *sb = NULL;
-    size_t committedUso = m_openTransactionUso;
-
-    if (txnId > m_openTransactionId) {
-        committedUso = m_uso;
+    if (currentTxnId < m_openTransactionId)
+    {
+        throwFatalException("Transactions moving backwards");
     }
 
-    // push all fully committed blocks to the topend
-    while (m_pendingBlocks.empty() != true) {
-        sb = m_pendingBlocks.front();
-        if (!((sb->uso() + sb->remaining() - 1) < committedUso)) {
-            break;
-        }
+    // more data for an ongoing transaction with no new committed data
+    if ((currentTxnId == m_openTransactionId) &&
+        (lastCommittedTxnId == m_committedTransactionId))
+    {
+        return;
+    }
 
-        m_pendingBlocks.pop_front();
-        m_topend->handoffReadyELBuffer(sb->dataPtr(),
-                                       (int32_t)sb->remaining(),
-                                       m_tableId);
-        delete sb;
+    // If the current TXN ID has advanced, then we know that:
+    // - The old open transaction has been committed
+    // - The current transaction is now our open transaction
+    if (m_openTransactionId < currentTxnId)
+    {
+        m_committedUso = m_uso;
+        // Advance the tip to the new transaction.
+        m_committedTransactionId = m_openTransactionId;
+        m_openTransactionId = currentTxnId;
+    }
+
+    // now check to see if the lastCommittedTxn tells us that our open
+    // transaction should really be committed.  If so, update the
+    // committed state.
+    if (m_openTransactionId <= lastCommittedTxnId)
+    {
+        m_committedUso = m_uso;
+        m_committedTransactionId = m_openTransactionId;
     }
 }
 
@@ -189,12 +160,13 @@ void TupleStreamWrapper::rollbackTo(size_t mark)
         m_currBlock = NULL;
         while (m_pendingBlocks.empty() != true) {
             sb = m_pendingBlocks.back();
+            m_pendingBlocks.pop_back();
             if (sb->uso() >= mark) {
-                m_pendingBlocks.pop_back();
                 discardBlock(sb);
             }
             else {
                 sb->truncateTo(mark);
+                m_currBlock = sb;
                 break;
             }
         }
@@ -206,19 +178,7 @@ void TupleStreamWrapper::rollbackTo(size_t mark)
  * be handed off
  */
 void TupleStreamWrapper::discardBlock(StreamBlock *sb) {
-    m_topend->releaseManagedBuffer(sb->dataPtr());
     delete sb;
-}
-
-/*
- * Write the cached block header into the stream block
- */
-void TupleStreamWrapper::writeBlockHeader(StreamBlock &block) {
-    if (m_cachedBlockHeader) {
-        memcpy(block.dataPtr(), m_cachedBlockHeader, m_cachedBlockHeaderSize);
-        block.consumed(m_cachedBlockHeaderSize);
-        m_uso += m_cachedBlockHeaderSize;
-    }
 }
 
 /*
@@ -233,17 +193,9 @@ void TupleStreamWrapper::extendBufferChain(size_t minLength)
     }
 
     if (m_currBlock) {
-        if (m_currBlock->remaining() > 0) {
-
-//  FOR VERTICA TEMPORARILY
-//            // write terminal row header
-//            *(reinterpret_cast<int32_t*>
-//              (m_currBlock->dataPtr() + m_currBlock->remaining())) = htonl(-1);
-//            m_currBlock->consumed(sizeof(int32_t));
-
+        if (m_currBlock->offset() > 0) {
             m_pendingBlocks.push_back(m_currBlock);
             m_currBlock = NULL;
-            m_currBlockTupleCount = 0;
         }
         // fully discard empty blocks. makes valgrind/testcase
         // conclusion easier.
@@ -253,13 +205,12 @@ void TupleStreamWrapper::extendBufferChain(size_t minLength)
         }
     }
 
-    char *buffer = m_topend->claimManagedBuffer((int32_t)m_defaultCapacity);
+    char *buffer = new char[m_defaultCapacity];
     if (!buffer) {
         throwFatalException("Failed to claim managed buffer for ELT.");
     }
 
     m_currBlock = new StreamBlock(buffer, m_defaultCapacity, m_uso);
-    writeBlockHeader(*m_currBlock);
 }
 
 /*
@@ -267,21 +218,21 @@ void TupleStreamWrapper::extendBufferChain(size_t minLength)
  * Creating a new buffer will push all queued data into the
  * pending list for commit to operate against.
  */
-void TupleStreamWrapper::flushOldTuples(int64_t lastCommittedTxn,
-                                        int64_t currentTime)
+void
+TupleStreamWrapper::periodicFlush(int64_t timeInMillis,
+                                  int64_t lastTickTime,
+                                  int64_t lastCommittedTxnId,
+                                  int64_t currentTxnId)
 {
-    // sanity checks
-    assert(currentTime >= 0);
-    m_lastFlush = currentTime;
+    // negative timeInMillis instructs a mandatory flush
+    if (timeInMillis < 0 || (timeInMillis - m_lastFlush > MAX_BUFFER_AGE)) {
+        if (timeInMillis > 0) {
+            m_lastFlush = timeInMillis;
+        }
 
-    // update the commit markers
-    if (lastCommittedTxn >= m_openTransactionId) {
-        m_openTransactionId = lastCommittedTxn + 1; // or 0?
-        m_openTransactionUso = m_uso;
+        extendBufferChain(0);
+        commit(lastCommittedTxnId, currentTxnId);
     }
-
-    extendBufferChain(0);
-    commit(lastCommittedTxn);
 }
 
 /*
@@ -291,7 +242,8 @@ void TupleStreamWrapper::flushOldTuples(int64_t lastCommittedTxn,
  * in the stream the caller can rollback to if this append
  * should be rolled back.
  */
-size_t TupleStreamWrapper::appendTuple(int64_t txnId,
+size_t TupleStreamWrapper::appendTuple(int64_t lastCommittedTxnId,
+                                       int64_t txnId,
                                        int64_t seqNo,
                                        int64_t timestamp,
                                        TableTuple &tuple,
@@ -301,16 +253,7 @@ size_t TupleStreamWrapper::appendTuple(int64_t txnId,
     size_t tupleMaxLength = 0;
 
     assert(txnId >= m_openTransactionId);
-
-    // n.b., does not support multiple open, uncommitted transactions
-    // -- data for txnId MUST NOT be in stream yet
-    // -- data for all transactions preceding txnId must be committed
-    //    or already rolled back.
-    if (txnId > m_openTransactionId) {
-        commit(txnId);
-        m_openTransactionId = txnId;
-        m_openTransactionUso = m_uso;
-    }
+    commit(lastCommittedTxnId, txnId);
 
     // Compute the upper bound on bytes required to serialize tuple.
     // eltxxx: can memoize this calculation.
@@ -319,14 +262,11 @@ size_t TupleStreamWrapper::appendTuple(int64_t txnId,
         extendBufferChain(m_defaultCapacity);
     }
 
-//  FOR VERTICA TEMPORARILY
-//  if ((m_currBlock->remaining() + tupleMaxLength + 4) > m_defaultCapacity) {
-    if ((m_currBlock->remaining() + tupleMaxLength) > m_defaultCapacity) {
+    if ((m_currBlock->offset() + tupleMaxLength) > m_defaultCapacity) {
         extendBufferChain(tupleMaxLength);
     }
-    ++m_currBlockTupleCount;
-    char *basePtr = m_currBlock->dataPtr();
-    size_t offset = m_currBlock->remaining();
+    char *basePtr = m_currBlock->mutableDataPtr();
+    size_t offset = m_currBlock->offset();
 
     // initialize the full row header to 0. This also
     // has the effect of setting each column non-null.
@@ -393,4 +333,149 @@ TupleStreamWrapper::computeOffsets(TableTuple &tuple,
     return *rowHeaderSz + metadataSz + dataSz;
 }
 
-} // namespace voltdb
+StreamBlock*
+TupleStreamWrapper::getCommittedEltBytes()
+{
+    StreamBlock* first_unpolled_block = NULL;
+
+    deque<StreamBlock*>::iterator pending_iter = m_pendingBlocks.begin();
+    while (pending_iter != m_pendingBlocks.end())
+    {
+        StreamBlock* block = *pending_iter;
+        // find the first block that is unpolled
+        //
+        // We're exploiting the fact that, currently,
+        // polling/releasing only works on block boundaries
+        if (block->uso() == m_firstUnpolledUso)
+        {
+            // get the next block
+            // -- either the next pending or m_currBlock (if no next pending)
+            ++pending_iter;
+            StreamBlock* next_block = NULL;
+            if (pending_iter != m_pendingBlocks.end())
+            {
+                next_block = *pending_iter;
+            }
+            else
+            {
+                next_block = m_currBlock;
+            }
+            // check that the entire unpolled block is committed
+            if (m_committedUso >= next_block->uso())
+            {
+                first_unpolled_block = block;
+                // find the value to update m_firstUnpolledUso
+                m_firstUnpolledUso = next_block->uso();
+            }
+            else
+            {
+                // if the unpolled block is not committed,
+                // -- construct a fake StreamBlock that makes no progress
+                // --- USO of this block but offset of 0
+                // don't advance the first unpolled USO
+                delete m_fakeBlock;
+                m_fakeBlock = new StreamBlock(0, 0, block->uso());
+                first_unpolled_block = m_fakeBlock;
+            }
+            break;
+        }
+        ++pending_iter;
+    }
+
+    // The first unpolled block wasn't found in the pending.
+    // It had better be m_currBlock or we've got troubles
+    // Since we're here, m_currBlock is not fully committed, so
+    // we just want to create a fake block based on its metadata
+    if (first_unpolled_block == NULL)
+    {
+        assert(m_currBlock->uso() == m_firstUnpolledUso);
+        delete m_fakeBlock;
+        m_fakeBlock = new StreamBlock(0, 0, m_currBlock->uso());
+        first_unpolled_block = m_fakeBlock;
+    }
+
+    // return the appropriate pointah
+    return first_unpolled_block;
+}
+
+bool
+TupleStreamWrapper::releaseEltBytes(int64_t releaseOffset)
+{
+    // To release bytes:
+    //
+
+    // Search backwards starting with m_currBlock to find the pending
+    // block with the USO that matches the offset
+    //
+    // - If it is m_currBlock, release all the m_pendingBlocks
+    // - If it is a random pending block, release all the
+    //   m_pendingBlocks older than the matching one
+    // - If it doesn't match a block USO, return false
+    //
+    // also, don't forget to update the m_firstUnpolledUso
+
+    // if released offset is in the uncommitted bytes, return an error
+    if (releaseOffset > m_committedUso)
+    {
+        return false;
+    }
+
+    // if released offset is in an already-released past, just return success
+    if ((m_pendingBlocks.empty() && releaseOffset < m_currBlock->uso()) ||
+        (releaseOffset < m_pendingBlocks.front()->uso()))
+    {
+        return true;
+    }
+
+    bool retval = false;
+
+    if (releaseOffset == m_currBlock->uso())
+    {
+        while (m_pendingBlocks.empty() != true) {
+            StreamBlock* sb = m_pendingBlocks.back();
+            m_pendingBlocks.pop_back();
+            discardBlock(sb);
+        }
+        if (m_firstUnpolledUso < m_currBlock->uso())
+        {
+            m_firstUnpolledUso = m_currBlock->uso();
+        }
+        retval = true;
+    }
+    else
+    {
+        // search pending blocks for release offset This is
+        // inefficient to walk the list twice, but it's late and I'm
+        // lazy.  We can be smarter when we rewrite this to not rely
+        // on block boundaries
+        deque<StreamBlock*>::iterator pending_iter =
+            m_pendingBlocks.begin();
+        while (pending_iter != m_pendingBlocks.end())
+        {
+            StreamBlock* block = *pending_iter;
+            if (block->uso() == releaseOffset)
+            {
+                retval = true;
+                break;
+            }
+            ++pending_iter;
+        }
+        if (retval)
+        {
+            StreamBlock* sb = m_pendingBlocks.front();
+            while (sb->uso() != releaseOffset)
+            {
+                m_pendingBlocks.pop_front();
+                discardBlock(sb);
+                sb = m_pendingBlocks.front();
+            }
+            if (m_firstUnpolledUso < releaseOffset)
+            {
+                m_firstUnpolledUso = releaseOffset;
+            }
+        }
+    }
+
+
+    return retval;
+}

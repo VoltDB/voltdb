@@ -269,6 +269,11 @@ public class FastDeserializer implements DataInput {
         return retval;
     }
 
+    /**
+     * Create a copy of the first byteLen bytes of the underlying buffer.
+     * @param byteLen Number of bytes to copy
+     * @return ByteBuffer wrapping the copied data
+     */
     public ByteBuffer readBuffer(final int byteLen) {
         final byte[] data = new byte[byteLen];
         buffer.get(data);

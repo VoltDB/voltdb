@@ -185,7 +185,10 @@ class PersistentTable : public Table {
      */
     TableTuple& getTempTupleInlined(TableTuple &source);
 
+    // ELT-related inherited methods
     virtual void flushOldTuples(int64_t timeInMillis);
+    virtual StreamBlock* getCommittedEltBytes();
+    virtual bool releaseEltBytes(int64_t releaseOffset);
 
     /** At EE setup time, add the list of views driven from this table */
     void setMaterializedViews(const std::vector<MaterializedViewMetadata*> &views);

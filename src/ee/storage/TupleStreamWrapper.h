@@ -18,6 +18,8 @@
 #ifndef TUPLESTREAMWRAPPER_H_
 #define TUPLESTREAMWRAPPER_H_
 
+#include "StreamBlock.h"
+
 #include "common/ids.h"
 #include "common/tabletuple.h"
 #include "common/executorcontext.hpp"
@@ -34,11 +36,10 @@ class TupleStreamWrapper {
 public:
     enum Type { INSERT, DELETE };
 
-    TupleStreamWrapper(CatalogId partitionId, CatalogId siteId, CatalogId tableId,
-                       Topend *topend, int64_t createTime);
+    TupleStreamWrapper(CatalogId partitionId, CatalogId siteId,
+                       CatalogId tableId, int64_t createTime);
 
     ~TupleStreamWrapper() {
-        delete[] m_cachedBlockHeader;
     }
 
     /**
@@ -52,104 +53,55 @@ public:
      * This allows testcases to use significantly smaller buffers
      * to test buffer rollover.
      */
-    void setDefaultCapacity(size_t capacity) {
-        assert (capacity > 0);
-        m_defaultCapacity = capacity;
-    }
+    void setDefaultCapacity(size_t capacity);
 
     /** Read the total bytes used over the life of the stream */
     size_t bytesUsed() {
         return m_uso;
     }
 
-    /** Send committed data to the top end */
-    void commit(int64_t txnId);
-
     /** truncate stream back to mark */
     void rollbackTo(size_t mark);
 
-    /** commit() as much data as possible */
-    void flushOldTuples(int64_t lastCommittedTxn,
-                         int64_t currentTime);
+    /** age out committed data */
+    void periodicFlush(int64_t timeInMillis,
+                       int64_t lastTickTime,
+                       int64_t lastComittedTxnId,
+                       int64_t currentTxnId);
 
     /** write a tuple to the stream */
-    size_t appendTuple(int64_t txnId,
+    size_t appendTuple(int64_t lastCommittedTxnId,
+                       int64_t txnId,
                        int64_t seqNo,
                        int64_t timestamp,
                        TableTuple &tuple,
                        TupleStreamWrapper::Type type);
 
-    /** Oldest timestamp possible for data in this stream */
-    int64_t lastFlushTime() {
-        return m_lastFlush;
-    }
+    /**
+     * Poll the stream for a buffer of committed bytes.
+     */
+    StreamBlock* getCommittedEltBytes();
 
-    /** Create and store the VBINARY block header */
-    void cacheBlockHeader(TupleSchema &schema);
+    /**
+     * Release data up to (not including) releaseOffset
+     *
+     * @return true if the release was valid, false if not
+     */
+    bool releaseEltBytes(int64_t releaseOffset);
 
 private:
-    /**
-     * A single data block with some buffer semantics.
-     */
-    class StreamBlock {
-      public:
-        StreamBlock(char* data, size_t capacity, size_t uso)
-            : m_data(data), m_capacity(capacity), m_offset(0), m_uso(uso)
-        {
-        }
 
-        ~StreamBlock()
-        {
-        }
-
-        char * dataPtr() {
-            return m_data;
-        }
-
-        size_t remaining() {
-            return m_offset;
-        }
-
-        void consumed(size_t consumed) {
-            m_offset += consumed;
-            assert (m_offset < m_capacity);
-        }
-
-        size_t uso() {
-            return m_uso;
-        }
-
-        void truncateTo(size_t mark) {
-            // just move offset. pretty easy.
-            if (((m_uso + m_offset) >= mark ) && (m_uso <= mark)) {
-                m_offset = mark - m_uso;
-            }
-            else {
-                throwFatalException( "Attempted ELT block truncation past start of block."
-                        "\n m_uso(%jd), m_offset(%jd), mark(%jd)\n",
-                        (intmax_t)m_uso, (intmax_t)m_offset, (intmax_t)mark);
-            }
-        }
-
-      private:
-        char *m_data;
-        const size_t m_capacity;
-        size_t m_offset;  // position for next write.
-        size_t m_uso;     // universal stream offset of m_offset 0.
-    };
-
-    void writeBlockHeader(StreamBlock &block);
     size_t computeOffsets(TableTuple &tuple,size_t *rowHeaderSz);
     void extendBufferChain(size_t minLength);
     void discardBlock(StreamBlock *sb);
+
+    /** Send committed data to the top end */
+    void commit(int64_t lastCommittedTxnId, int64_t txnId);
 
     // cached catalog values
     const CatalogId m_partitionId;
     const CatalogId m_siteId;
     const CatalogId m_tableId;
-
-    /** Reference to Topend (the JNI/IPC interface abstraction) */
-    Topend *m_topend;
 
     /** timestamp of most recent flush() */
     int64_t m_lastFlush;
@@ -160,32 +112,36 @@ private:
     /** Universal stream offset. Total bytes appended to this stream. */
     size_t m_uso;
 
+    /** Current block */
+    StreamBlock *m_currBlock;
+
+    /** Fake block.  Sometimes we need to return no-progress state
+        to the caller, which we can't do with an existing StreamBlock.
+        However, the convention is that we have ownership of them,
+        so we stuff it here
+    */
+    StreamBlock* m_fakeBlock;
+
+    /** Blocks not yet polled by the top-end */
+    std::deque<StreamBlock*> m_pendingBlocks;
+
+    /** Free list of blocks */
+    std::deque<StreamBlock*> m_freeBlocks;
+
     /** transaction id of the current (possibly uncommitted) transaction */
     int64_t m_openTransactionId;
 
     /** Universal stream offset when current transaction was opened */
     size_t m_openTransactionUso;
 
-    /** Current block */
-    StreamBlock *m_currBlock;
+    /** last committed transaction id */
+    int64_t m_committedTransactionId;
 
-    /** Blocks not yet issued to the top-end. Does not contain m_currBlock */
-    std::deque<StreamBlock*> m_pendingBlocks;
+    /** current committed uso */
+    size_t m_committedUso;
 
-    /** Cached block header.
-        12 byte signature
-        4 byte header length
-        2 byte version
-        1 byte sync marker length (0)
-        2 byte column count
-        4 byte column width (per column) */
-    char *m_cachedBlockHeader;
-
-    /** number of bytes in the cached header */
-    size_t m_cachedBlockHeaderSize;
-
-    /** total tuples in current block */
-    int32_t m_currBlockTupleCount;
+    /** The oldest USO that has not yet been returned to the EE on a poll */
+    size_t m_firstUnpolledUso;
 };
 
 }

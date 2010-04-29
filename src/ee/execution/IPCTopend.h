@@ -28,15 +28,7 @@ namespace voltdb {
 class IPCTopend : public Topend {
 public:
     IPCTopend( VoltDBIPC *vdbipc);
-
-    void handoffReadyELBuffer(char* bufferPtr, int32_t bytesUsed, CatalogId tableId);
-
-    char* claimManagedBuffer(int32_t desiredSizeInBytes);
-
-    void releaseManagedBuffer(char* bufferPtr);
-
     int loadNextDependency(int32_t dependencyId, Pool *stringPool, Table* destination);
-
     void crashVoltDB(FatalException e);
 
 private:

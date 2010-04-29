@@ -19,6 +19,7 @@ package org.voltdb.jni;
 
 import org.voltdb.*;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.elt.ELTProtoMessage;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.utils.DBBPool.BBContainer;
 
@@ -136,6 +137,13 @@ public class MockExecutionEngine extends ExecutionEngine {
     public int cowSerializeMore(BBContainer c, int tableId) {
         // TODO Auto-generated method stub
         return 0;
+    }
+
+    @Override
+    public ELTProtoMessage eltAction(boolean mAckAction, boolean mPollAction,
+            long mAckTxnId, int partitionId, int mTableId) {
+        // TODO Auto-generated method stub
+        return null;
     }
 
 }

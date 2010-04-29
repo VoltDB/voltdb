@@ -49,6 +49,10 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.SiteTransactionConnection;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.RestrictedPriorityQueue.QueueState;
+import org.voltdb.elt.ELTManager;
+import org.voltdb.elt.ELTProtoMessage;
+import org.voltdb.elt.processors.RawProcessor;
+import org.voltdb.elt.processors.RawProcessor.ELTInternalMessage;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.exceptions.SerializableException;
@@ -195,6 +199,8 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         }
     }
 
+    // This message is used locally to schedule a node failure event's
+    // required  processing at an execution site.
     static class ExecutionSiteNodeFailureMessage extends VoltMessage
     {
         final int m_failedHostId;
@@ -646,9 +652,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                     // hope this never happens... it doesn't right?
                     throw new RuntimeException(e);
                 }
-                //System.out.println("Sent response to periodic heartbeat.");
-                //System.out.flush();
-
                 // we're done here (in the case of heartbeats)
                 return;
             }
@@ -709,6 +712,21 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             TransactionState txnState = m_transactionsById.get(txn_id);
             assert(txnState instanceof MultiPartitionParticipantTxnState);
             ((MultiPartitionParticipantTxnState)txnState).checkWorkUnits();
+        }
+        else if (message instanceof RawProcessor.ELTInternalMessage) {
+            RawProcessor.ELTInternalMessage eltm =
+                (RawProcessor.ELTInternalMessage) message;
+            ELTProtoMessage response =
+                ee.eltAction(eltm.m_m.isAck(),
+                             eltm.m_m.isPoll(),
+                             eltm.m_m.getAckOffset(),
+                             eltm.m_m.getPartitionId(),
+                             eltm.m_m.getTableId());
+            // not all actions generate a response
+            if (response != null) {
+                ELTInternalMessage mbp = new ELTInternalMessage(eltm.m_sb, response);
+                ELTManager.instance().queueMessage(mbp);
+            }
         }
         else {
             hostLog.l7dlog(Level.FATAL, LogKeys.org_voltdb_dtxn_SimpleDtxnConnection_UnkownMessageClass.name(),

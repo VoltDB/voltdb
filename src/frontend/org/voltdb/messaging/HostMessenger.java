@@ -222,10 +222,9 @@ public class HostMessenger implements Messenger {
         return site.createMailbox(mailboxId, queue);
     }
 
-    final void send(
-            final int siteId,
-            final int mailboxId,
-            final VoltMessage message) throws MessagingException {
+    public void send(final int siteId, final int mailboxId, final VoltMessage message)
+    throws MessagingException
+    {
         assert(m_initialized);
         assert(message != null);
 

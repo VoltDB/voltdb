@@ -209,12 +209,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         bool isLocalSite(int64_t value);
         bool isLocalSite(char *string, int32_t length);
 
-        // -------------------------------------------------
-        // EL/BUFFER FUNCTIONS
-        // -------------------------------------------------
-        void handoffReadyELBuffer(char* bufferPtr, int32_t bytesUsed, int32_t tableId);
-        char* claimManagedBuffer(int32_t desiredSizeInBytes);
-        void releaseManagedBuffer(char* bufferPtr);
 
         // -------------------------------------------------
         // Non-transactional work methods
@@ -349,6 +343,22 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * the COW context). Further calls will return -1
          */
         int cowSerializeMore(ReferenceSerializeOutput *out, const CatalogId tableId);
+
+        /**
+         * Perform an action on behalf of ELT.
+         *
+         * @param ackAction whether or not this action include a
+         * release for stream octets
+         * @param pollAction whether or not this action requests the
+         * next buffer of unpolled octets
+         * @param if ackAction is true, the stream offset being released
+         * @param the ID of the table to which this action applies
+         * @return the universal offset for any poll results (results
+         * returned separatedly via QueryResults buffer)
+         */
+        long eltAction(bool ackAction, bool pollAction, long ackOffset,
+                       int tableId);
+
     protected:
         /*
          * Get the list of persistent table Ids by inspecting the catalog.

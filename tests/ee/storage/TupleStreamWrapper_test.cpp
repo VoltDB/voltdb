@@ -24,65 +24,36 @@
 #include <cstring>
 #include <cstdlib>
 #include "harness.h"
-#include "common/Topend.h"
 #include "common/types.h"
 #include "common/NValue.hpp"
 #include "common/ValueFactory.hpp"
 #include "common/TupleSchema.h"
 #include "common/tabletuple.h"
+#include "storage/StreamBlock.h"
 #include "storage/TupleStreamWrapper.h"
 
+using namespace std;
 using namespace voltdb;
 
 const int COLUMN_COUNT = 5;
-// 5 kilobytes of buffer
-const int BUFFER_SIZE = 1024 * 5;
-
-class MockTopend : public Topend {
-  public:
-    MockTopend() {
-        m_handoffcount = 0;
-        m_bytesHandedOff = 0;
-    }
-
-    void handoffReadyELBuffer(
-        char* bufferPtr, int32_t bytesUsed, CatalogId tableId)
-    {
-        m_handoffcount++;
-        m_bytesHandedOff += bytesUsed;
-        delete[] bufferPtr;
-    }
-
-    virtual char* claimManagedBuffer(int32_t desiredSizeInBytes)
-    {
-        return new char[desiredSizeInBytes];
-    }
-
-    virtual void releaseManagedBuffer(char* bufferPtr)
-    {
-        delete[] bufferPtr;
-    }
-
-    virtual int loadNextDependency(
-        int32_t dependencyId, Pool *pool, Table* destination)
-    {
-        return 0;
-    }
-
-    virtual void crashVoltDB(FatalException e) {
-
-    }
-
-    int m_handoffcount;
-    int m_bytesHandedOff;
-};
+// Annoyingly, there's no easy way to compute the exact ELT'd tuple
+// size without incestuously using code we're trying to test.  I've
+// pre-computed this magic size for an ELT'd tuple of 5 integer
+// columns, which includes:
+// 5 ELT header columns * sizeof(int64_t) = 40
+// 1 ELT header column * sizeof(char) = 1
+// 2 bytes for null mask (10 columns rounds to 16, /8 = 2) = 2
+// sizeof(int32_t) for row header = 4
+// 5 * sizeof(int64_t) for tuple data = 40
+// total: 87
+const int MAGIC_TUPLE_SIZE = 87;
+// 1k buffer
+const int BUFFER_SIZE = 1024;
 
 class TupleStreamWrapperTest : public Test {
 public:
     TupleStreamWrapperTest() : m_wrapper(NULL), m_schema(NULL), m_tuple(NULL) {
         srand(0);
-
-        m_topend = new MockTopend();
 
         // set up the schema used to fill the new buffer
         std::vector<ValueType> columnTypes;
@@ -100,10 +71,10 @@ public:
                                          true);
 
         // allocate a new buffer and wrap it
-        m_wrapper = new TupleStreamWrapper(1, 1, 1, m_topend, 1);
+        m_wrapper = new TupleStreamWrapper(1, 1, 1, 1);
 
         // excercise a smaller buffer capacity
-        m_wrapper->setDefaultCapacity(1024);
+        m_wrapper->setDefaultCapacity(BUFFER_SIZE);
 
         // set up the tuple we're going to use to fill the buffer
         // set the tuple's memory to zero
@@ -116,13 +87,25 @@ public:
         m_tuple->move(m_tupleMemory);
     }
 
+    void appendTuple(int64_t lastCommittedTxnId, int64_t currentTxnId)
+    {
+        // fill a tuple
+        for (int col = 0; col < COLUMN_COUNT; col++) {
+            int value = rand();
+            m_tuple->setNValue(col, ValueFactory::getIntegerValue(value));
+        }
+        // append into the buffer
+        m_wrapper->appendTuple(lastCommittedTxnId,
+                               currentTxnId, 1, 1, *m_tuple,
+                               TupleStreamWrapper::INSERT);
+    }
+
     virtual ~TupleStreamWrapperTest() {
         m_wrapper->cleanupManagedBuffers(NULL);
         delete m_wrapper;
         delete m_tuple;
         if (m_schema)
             TupleSchema::freeTupleSchema(m_schema);
-        delete m_topend;
     }
 
 protected:
@@ -130,131 +113,617 @@ protected:
     TupleSchema* m_schema;
     char m_tupleMemory[(COLUMN_COUNT + 1) * 8];
     TableTuple* m_tuple;
-    MockTopend *m_topend;
 };
 
+// Cases of interest:
+// 1. periodicFlush with a clean buffer (no open txns) generates a new buffer
+//    DONE
+// 2. appendTuple fills and generates a new buffer (committed TXN ID advances)
+//    DONE
+// 3. appendTuple fills a buffer with a single TXN ID, uncommitted,
+//    commits somewhere in the next buffer
+//    DONE
+// 4. case 3 but where commit is via periodic flush
+//    DONE
+// 5. case 2 but where the last tuple is rolled back
+//    DONE
+// 6. periodicFlush with a busy buffer (an open txn) doesn't generate a new buffer
+//    DONE
+// 7. roll back the last tuple, periodicFlush, get the expected length
+//    DONE
+// 8. Case 1 but where the first buffer is just released, not polled
+//    DONE
+// 9. Roll back a transaction that has filled more than one buffer,
+//    then add a transaction, then commit and poll
+//    DONE
+// 10. Rollback the first tuple, then append, make sure only 1 tuple
+//     DONE
+// 11. Test that releasing tuples that aren't committed returns an error
+//     DONE
+// 12. Test that a release value that isn't a buffer boundary returns an error
+//     DONE
+// 13. Test that releasing all the data followed by a poll results in no data
+//     DONE
+// 14. Test that a periodicFlush with both txn IDs far in the future behaves
+//     correctly
+//     DONE
+// 15. Test that a release value earlier than our current history return safely
+//     DONE
+// 16. Test that a release that includes all the pending buffers works properly
+//     DONE
+
 /**
- * The goal of this test is simply to run through the mechanics.
- * Fill a buffer repeatedly and make sure nothing breaks.
+ * Get one tuple
+ */
+TEST_F(TupleStreamWrapperTest, DoOneTuple)
+{
+    // we get nothing with no data
+    StreamBlock* results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), 0);
+
+    // write a new tuple and then flush the buffer
+    appendTuple(0, 1);
+    m_wrapper->periodicFlush(-1, 0, 1, 1);
+
+    // we should only have one tuple in the buffer
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), MAGIC_TUPLE_SIZE);
+}
+
+/**
+ * Test the really basic operation order
+ */
+TEST_F(TupleStreamWrapperTest, BasicOps)
+{
+    // we get nothing with no data
+    StreamBlock* results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), 0);
+
+    for (int i = 1; i < 10; i++)
+    {
+        appendTuple(i-1, i);
+    }
+    m_wrapper->periodicFlush(-1, 0, 9, 10);
+
+    for (int i = 10; i < 20; i++)
+    {
+        appendTuple(i-1, i);
+    }
+    m_wrapper->periodicFlush(-1, 0, 19, 19);
+
+    // get the first buffer flushed
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 9));
+
+    // now get the second
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * 9));
+    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 10));
+
+    // additional polls should return the current uso and no data
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * 19));
+    EXPECT_EQ(results->offset(), 0);
+}
+
+/**
+ * Verify that a periodicFlush with distant TXN IDs works properly
+ */
+TEST_F(TupleStreamWrapperTest, FarFutureFlush)
+{
+    // we get nothing with no data
+    StreamBlock* results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), 0);
+
+    for (int i = 1; i < 10; i++)
+    {
+        appendTuple(i-1, i);
+    }
+    m_wrapper->periodicFlush(-1, 0, 99, 100);
+
+    for (int i = 100; i < 110; i++)
+    {
+        appendTuple(i-1, i);
+    }
+    m_wrapper->periodicFlush(-1, 0, 130, 131);
+
+    // get the first buffer flushed
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 9));
+
+    // now get the second
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * 9));
+    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 10));
+
+    // additional polls should return the current uso and no data
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * 19));
+    EXPECT_EQ(results->offset(), 0);
+}
+
+/**
+ * Fill a buffer by appending tuples that advance the last committed TXN
  */
 TEST_F(TupleStreamWrapperTest, Fill) {
-    int flushcount = m_topend->m_handoffcount;
 
-    // repeat for more tuples than fit in the default buffer
-    for (int i = 0; i < 100; i++) {
+    // we get nothing with no data
+    StreamBlock* results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), 0);
 
-        // fill a tuple
-        for (int col = 0; col < COLUMN_COUNT; col++) {
-            int value = rand();
-            m_tuple->setNValue(col, ValueFactory::getIntegerValue(value));
-        }
-
-        // append into the buffer, switching buffers if full
-        m_wrapper->appendTuple(i, 1, 1, *m_tuple, TupleStreamWrapper::INSERT);
+    int tuples_to_fill = BUFFER_SIZE / MAGIC_TUPLE_SIZE;
+    // fill with just enough tuples to avoid exceeding buffer
+    for (int i = 1; i <= tuples_to_fill; i++)
+    {
+        appendTuple(i-1, i);
     }
-    // make sure we used more than one buffer
-    EXPECT_GT(m_topend->m_handoffcount, flushcount);
+    // We shouldn't yet get a buffer because we haven't forced the
+    // generation of a new one by exceeding the current one.
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), 0);
 
-    // cleanup for valgrind with a txnid > than the max value of i, above.
-    m_wrapper->flushOldTuples(1000, 1000);
+    // now, drop in one more
+    appendTuple(tuples_to_fill, tuples_to_fill + 1);
+
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * tuples_to_fill));
 }
 
-TEST_F(TupleStreamWrapperTest, Flush) {
-    int64_t txnid = 1024;
-    int64_t seqno = 10;
-    int64_t tmstmp = 1000;
+/**
+ * Fill a buffer with a single TXN, and then finally close it in the next
+ * buffer.
+ */
+TEST_F(TupleStreamWrapperTest, FillSingleTxnAndAppend) {
 
-    // verify the initial state of the stream
-    EXPECT_EQ(0, m_wrapper->bytesUsed());
+    // we get nothing with no data
+    StreamBlock* results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), 0);
 
-    // insert a tuple.
-    for (int col = 0; col < COLUMN_COUNT; col++) {
-        int value = rand();
-        m_tuple->setNValue(col, ValueFactory::getIntegerValue(value));
+    int tuples_to_fill = BUFFER_SIZE / MAGIC_TUPLE_SIZE;
+    // fill with just enough tuples to avoid exceeding buffer
+    for (int i = 1; i <= tuples_to_fill; i++)
+    {
+        appendTuple(0, 1);
     }
-    m_wrapper->appendTuple(
-        txnid++, seqno, tmstmp,
-        *m_tuple, TupleStreamWrapper::INSERT);
+    // We shouldn't yet get a buffer because we haven't forced the
+    // generation of a new one by exceeding the current one.
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), 0);
 
-    // verify content was pushed in to the stream
-    // 6 col metadata. 5 col ints. 2 bytes nullhdr. 4 byte row length
-    EXPECT_EQ((40 + 1) + (COLUMN_COUNT*8) + 2 + 4, m_wrapper->bytesUsed());
+    // now, drop in one more on the same TXN ID
+    appendTuple(0, 1);
 
-    // append a second tuple and reverify offset
-    size_t mark = m_wrapper->appendTuple(
-        txnid++, seqno, tmstmp,
-        *m_tuple, TupleStreamWrapper::INSERT);
+    // We shouldn't yet get a buffer because we haven't closed the current
+    // transaction
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), 0);
 
-    // the first mark should be equal to the bytesUsed after the first insert
-    EXPECT_EQ(mark, (40 + 1) + (COLUMN_COUNT*8) + 2 + 4);
+    // now, finally drop in a tuple that closes the first TXN
+    appendTuple(1, 2);
 
-    // should have doubled the content of the stream with this second insert
-    EXPECT_EQ(2*((40 + 1) + (COLUMN_COUNT*8) + 2 + 4),
-              m_wrapper->bytesUsed());
-
-    // flush - this is the function being tested, purportedly
-    m_wrapper->flushOldTuples(txnid, seqno);
-
-    // old buffer flushed bytes. (see size calc above)
-    EXPECT_EQ(87 * 2, m_topend->m_bytesHandedOff);
-
-    m_wrapper->flushOldTuples(txnid, seqno);
-
-    // old buffer flushed bytes. (see size calc above)
-    EXPECT_EQ(87 * 2, m_topend->m_bytesHandedOff);
-
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * tuples_to_fill));
 }
 
-TEST_F(TupleStreamWrapperTest, RollbackFirstTuple) {
-    int64_t txnid = 1;
-    int64_t seqno = 0;
-    int64_t tmstmp = 1000;
-    size_t mark = 0;
+/**
+ * Fill a buffer with a single TXN, and then finally close it in the next
+ * buffer using periodicFlush
+ */
+TEST_F(TupleStreamWrapperTest, FillSingleTxnAndFlush) {
 
-    mark = m_wrapper->appendTuple(
-        txnid++, seqno, tmstmp, *m_tuple, TupleStreamWrapper::INSERT);
+    // we get nothing with no data
+    StreamBlock* results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), 0);
 
+    int tuples_to_fill = BUFFER_SIZE / MAGIC_TUPLE_SIZE;
+    // fill with just enough tuples to avoid exceeding buffer
+    for (int i = 1; i <= tuples_to_fill; i++)
+    {
+        appendTuple(0, 1);
+    }
+    // We shouldn't yet get a buffer because we haven't forced the
+    // generation of a new one by exceeding the current one.
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), 0);
+
+    // now, drop in one more on the same TXN ID
+    appendTuple(0, 1);
+
+    // We shouldn't yet get a buffer because we haven't closed the current
+    // transaction
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), 0);
+
+    // Now, flush the buffer with the tick
+    m_wrapper->periodicFlush(-1, 0, 1, 1);
+
+    // should be able to get 2 buffers, one full and one with one tuple
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * tuples_to_fill));
+
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * tuples_to_fill));
+    EXPECT_EQ(results->offset(), MAGIC_TUPLE_SIZE);
+}
+
+/**
+ * Fill a buffer with a single TXN, close it with the first tuple in
+ * the next buffer, and then roll back that tuple, and verify that our
+ * committed buffer is still there.
+ */
+TEST_F(TupleStreamWrapperTest, FillSingleTxnAndCommitWithRollback) {
+
+    // we get nothing with no data
+    StreamBlock* results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), 0);
+
+    int tuples_to_fill = BUFFER_SIZE / MAGIC_TUPLE_SIZE;
+    // fill with just enough tuples to avoid exceeding buffer
+    for (int i = 1; i <= tuples_to_fill; i++)
+    {
+        appendTuple(0, 1);
+    }
+    // We shouldn't yet get a buffer because we haven't forced the
+    // generation of a new one by exceeding the current one.
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), 0);
+
+    // now, drop in one more on a new TXN ID.  This should commit
+    // the whole first buffer.  Roll back the new tuple and make sure
+    // we have a good buffer
+    size_t mark = m_wrapper->bytesUsed();
+    appendTuple(1, 2);
     m_wrapper->rollbackTo(mark);
-    m_wrapper->flushOldTuples(txnid++, tmstmp);
 
-    // stream should have no content
-    EXPECT_EQ(0, m_topend->m_bytesHandedOff);
+    // we'll get the old fake m_currBlock buffer first
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), 0);
 
-    mark = m_wrapper->appendTuple(
-        txnid++, seqno, tmstmp, *m_tuple, TupleStreamWrapper::INSERT);
-    m_wrapper->flushOldTuples(txnid++, tmstmp);
-
-    // stream should have a single tuple
-    EXPECT_EQ(87, m_topend->m_bytesHandedOff);
+    // so flush and make sure we got something sane
+    m_wrapper->periodicFlush(-1, 0, 1, 2);
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * tuples_to_fill));
 }
 
-TEST_F(TupleStreamWrapperTest, RollbackLastTuple) {
-    int64_t txnid = 1;
-    int64_t seqno = 0;
-    int64_t tmstmp = 1000;
-    size_t mark = 0;
+/**
+ * Verify that several filled buffers all with one open transaction returns
+ * nada.
+ */
+TEST_F(TupleStreamWrapperTest, FillWithOneTxn) {
 
-    for (int i=0; i < 5; i++) {
-        mark = m_wrapper->appendTuple(
-            txnid++, seqno, tmstmp, *m_tuple, TupleStreamWrapper::INSERT);
-        EXPECT_EQ(mark, i * 87);
+    // we get nothing with no data
+    StreamBlock* results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), 0);
+
+    int tuples_to_fill = BUFFER_SIZE / MAGIC_TUPLE_SIZE;
+    // fill several buffers
+    for (int i = 0; i <= (tuples_to_fill + 10) * 3; i++)
+    {
+        appendTuple(0, 1);
+    }
+    // We shouldn't yet get a buffer even though we've filled a bunch because
+    // the transaction is still open.
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), 0);
+}
+
+/**
+ * Simple rollback test, verify that we can rollback the first tuple,
+ * append another tuple, and only get one tuple in the output buffer.
+ */
+TEST_F(TupleStreamWrapperTest, RollbackFirstTuple)
+{
+    // we get nothing with no data
+    StreamBlock* results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), 0);
+
+    appendTuple(0, 1);
+    // rollback the first tuple
+    m_wrapper->rollbackTo(0);
+
+    // write a new tuple and then flush the buffer
+    appendTuple(0, 1);
+    m_wrapper->periodicFlush(-1, 0, 1, 1);
+
+    // we should only have one tuple in the buffer
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), MAGIC_TUPLE_SIZE);
+}
+
+/**
+ * Another simple rollback test, verify that a tuple in the middle of
+ * a buffer can get rolled back and leave the committed transaction
+ * untouched.
+ */
+TEST_F(TupleStreamWrapperTest, RollbackMiddleTuple)
+{
+    // we get nothing with no data
+    StreamBlock* results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), 0);
+
+    // append a bunch of tuples
+    for (int i = 1; i <= 10; i++)
+    {
+        appendTuple(i-1, i);
     }
 
+    // add another and roll it back and flush
+    size_t mark = m_wrapper->bytesUsed();
+    appendTuple(10, 11);
     m_wrapper->rollbackTo(mark);
-    m_wrapper->flushOldTuples(txnid++, tmstmp);
+    m_wrapper->periodicFlush(-1, 0, 10, 11);
 
-    // stream should have 4 tuples of content
-    EXPECT_EQ(4 * 87, m_topend->m_bytesHandedOff);
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 10));
+}
 
-    for (int i=0; i < 5; i++) {
-        mark = m_wrapper->appendTuple(
-            txnid++, seqno, tmstmp, *m_tuple, TupleStreamWrapper::INSERT);
-        EXPECT_EQ(mark, (i + 4) * 87);
+/**
+ * Verify that a transaction can generate entire buffers, they can all
+ * be rolled back, and the original committed bytes are untouched.
+ */
+TEST_F(TupleStreamWrapperTest, RollbackWholeBuffer)
+{
+    // we get nothing with no data
+    StreamBlock* results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), 0);
+
+    // append a bunch of tuples
+    for (int i = 1; i <= 10; i++)
+    {
+        appendTuple(i-1, i);
     }
-    m_wrapper->flushOldTuples(txnid++, tmstmp);
 
-    // 9 total tuples
-    EXPECT_EQ(9 * 87, m_topend->m_bytesHandedOff);
+    // now, fill a couple of buffers with tuples from a single transaction
+    size_t mark = m_wrapper->bytesUsed();
+    int tuples_to_fill = BUFFER_SIZE / MAGIC_TUPLE_SIZE;
+    for (int i = 0; i < (tuples_to_fill + 10) * 2; i++)
+    {
+        appendTuple(10, 11);
+    }
+    m_wrapper->rollbackTo(mark);
+    m_wrapper->periodicFlush(-1, 0, 10, 11);
+
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 10));
+}
+
+/**
+ * Test basic release.  create two buffers, release the first one, and
+ * ensure that our next poll returns the second one.
+ */
+TEST_F(TupleStreamWrapperTest, SimpleRelease)
+{
+    // we get nothing with no data
+    StreamBlock* results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), 0);
+
+    for (int i = 1; i < 10; i++)
+    {
+        appendTuple(i-1, i);
+    }
+    m_wrapper->periodicFlush(-1, 0, 9, 9);
+
+    for (int i = 10; i < 20; i++)
+    {
+        appendTuple(i-1, i);
+    }
+    m_wrapper->periodicFlush(-1, 0, 19, 19);
+
+    // release the first buffer
+    bool released = m_wrapper->releaseEltBytes((MAGIC_TUPLE_SIZE * 9));
+    EXPECT_TRUE(released);
+
+    // now get the second
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * 9));
+    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 10));
+}
+
+/**
+ * Test that attempting to release uncommitted bytes fails
+ */
+TEST_F(TupleStreamWrapperTest, ReleaseUncommitted)
+{
+    // we get nothing with no data
+    StreamBlock* results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), 0);
+
+    for (int i = 1; i < 10; i++)
+    {
+        appendTuple(i-1, i);
+    }
+    m_wrapper->periodicFlush(-1, 0, 9, 9);
+
+    // now, add some uncommitted data
+    for (int i = 10; i < 20; i++)
+    {
+        appendTuple(9, 10);
+    }
+
+    // release the first buffer
+    bool released = m_wrapper->releaseEltBytes((MAGIC_TUPLE_SIZE * 9));
+    EXPECT_TRUE(released);
+
+    // now try to release the second, uncommitted tuples
+    released = m_wrapper->releaseEltBytes((MAGIC_TUPLE_SIZE * 19));
+    EXPECT_FALSE(released);
+
+    // now, commit them and make sure they still exist
+    m_wrapper->periodicFlush(-1, 0, 19, 19);
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * 9));
+    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 10));
+}
+
+/**
+ * Test that attempting to release on a non-buffer boundary fails
+ */
+TEST_F(TupleStreamWrapperTest, ReleaseOnNonBoundary)
+{
+    // we get nothing with no data
+    StreamBlock* results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), 0);
+
+    for (int i = 1; i < 10; i++)
+    {
+        appendTuple(i-1, i);
+    }
+    m_wrapper->periodicFlush(-1, 0, 9, 9);
+
+    for (int i = 10; i < 20; i++)
+    {
+        appendTuple(i-1, i);
+    }
+    m_wrapper->periodicFlush(-1, 0, 19, 19);
+
+    // release the first buffer
+    bool released = m_wrapper->releaseEltBytes((MAGIC_TUPLE_SIZE * 4));
+    EXPECT_FALSE(released);
+
+    // get the first and make sure it still exists
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 9));
+}
+
+/**
+ * Test that releasing everything in steps and then polling results in
+ * the right StreamBlock
+ */
+TEST_F(TupleStreamWrapperTest, ReleaseAllInSteps)
+{
+    // we get nothing with no data
+    StreamBlock* results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), 0);
+
+    for (int i = 1; i < 10; i++)
+    {
+        appendTuple(i-1, i);
+    }
+    m_wrapper->periodicFlush(-1, 0, 9, 9);
+
+    for (int i = 10; i < 20; i++)
+    {
+        appendTuple(i-1, i);
+    }
+    m_wrapper->periodicFlush(-1, 0, 19, 19);
+
+    // release the first buffer
+    bool released = m_wrapper->releaseEltBytes((MAGIC_TUPLE_SIZE * 9));
+    EXPECT_TRUE(released);
+
+    // release the second buffer
+    released = m_wrapper->releaseEltBytes((MAGIC_TUPLE_SIZE * 19));
+    EXPECT_TRUE(released);
+
+    // now get the current state
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * 19));
+    EXPECT_EQ(results->offset(), 0);
+}
+
+/**
+ * Test that releasing multiple blocks at once and then polling results in
+ * the right StreamBlock
+ */
+TEST_F(TupleStreamWrapperTest, ReleaseAllAtOnce)
+{
+    // we get nothing with no data
+    StreamBlock* results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), 0);
+
+    for (int i = 1; i < 10; i++)
+    {
+        appendTuple(i-1, i);
+    }
+    m_wrapper->periodicFlush(-1, 0, 9, 9);
+
+    for (int i = 10; i < 20; i++)
+    {
+        appendTuple(i-1, i);
+    }
+    m_wrapper->periodicFlush(-1, 0, 19, 19);
+
+    // release everything
+    bool released;
+    released = m_wrapper->releaseEltBytes((MAGIC_TUPLE_SIZE * 19));
+    EXPECT_TRUE(released);
+
+    // now get the current state
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * 19));
+    EXPECT_EQ(results->offset(), 0);
+}
+
+/**
+ * Test that releasing bytes earlier than recorded history just succeeds
+ */
+TEST_F(TupleStreamWrapperTest, ReleasePreHistory)
+{
+    // we get nothing with no data
+    StreamBlock* results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), 0);
+
+    for (int i = 1; i < 10; i++)
+    {
+        appendTuple(i-1, i);
+    }
+    m_wrapper->periodicFlush(-1, 0, 9, 9);
+
+    for (int i = 10; i < 20; i++)
+    {
+        appendTuple(i-1, i);
+    }
+    m_wrapper->periodicFlush(-1, 0, 19, 19);
+
+    // release everything
+    bool released;
+    released = m_wrapper->releaseEltBytes((MAGIC_TUPLE_SIZE * 19));
+    EXPECT_TRUE(released);
+
+    // now release something early in what just got released
+    released = m_wrapper->releaseEltBytes((MAGIC_TUPLE_SIZE * 4));
+    EXPECT_TRUE(released);
+
+    // now get the current state
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * 19));
+    EXPECT_EQ(results->offset(), 0);
 }
 
 

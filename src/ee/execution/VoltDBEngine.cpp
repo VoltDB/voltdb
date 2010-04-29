@@ -94,6 +94,7 @@
 #include "storage/constraintutil.h"
 #include "storage/persistenttable.h"
 #include "storage/MaterializedViewMetadata.h"
+#include "storage/StreamBlock.h"
 #include "org_voltdb_jni_ExecutionEngine.h" // to use static values
 #include "stats/StatsAgent.h"
 #include "voltdbipc.h"
@@ -186,25 +187,18 @@ VoltDBEngine::~VoltDBEngine() {
     // strings and deallocated it.
     m_undoLog.clear();
 
-    for (int ii = 0; ii < m_tables.size(); ii++) {
-        // this cleanup anti-pattern is a mixed-bag. It is on one hand
-        // annoying that table cleanup is not self sufficient; on the
-        // other hand, releasing managed buffers requires the VoltDBEngine
-        // interface and coupling the storage component to the whole
-        // topend is a testing burden.
-        if (m_tables[ii])
-            m_tables[ii]->cleanupManagedBuffers(m_topend);
-
-        delete m_tables[ii];
-    }
-
     for (int ii = 0; ii < m_planFragments.size(); ii++) {
         delete m_planFragments[ii];
     }
 
     // clean up memory for the template memory for the single long (int) table
-    if (m_templateSingleLongTable)
+    if (m_templateSingleLongTable) {
         delete[] m_templateSingleLongTable;
+    }
+
+    for (int ii = 0; ii < m_tables.size(); ii++) {
+        delete m_tables[ii];
+    }
 
     delete m_topend;
     delete m_executorContext;
@@ -1018,26 +1012,6 @@ void VoltDBEngine::setBuffers(char *parameterBuffer, int parameterBuffercapacity
 }
 
 // -------------------------------------------------
-// EL/BUFFER FUNCTIONS
-// -------------------------------------------------
-void VoltDBEngine::handoffReadyELBuffer(char* bufferPtr, int32_t bytesUsed, int32_t tableId) {
-    assert(bufferPtr);
-    assert(bytesUsed > 0);
-    assert(tableId > 0);
-    m_topend->handoffReadyELBuffer( bufferPtr, bytesUsed, tableId);
-}
-
-char* VoltDBEngine::claimManagedBuffer(int32_t desiredSizeInBytes) {
-    assert(desiredSizeInBytes > 0);
-    return m_topend->claimManagedBuffer(desiredSizeInBytes);
-}
-
-void VoltDBEngine::releaseManagedBuffer(char* bufferPtr) {
-    assert(bufferPtr);
-    m_topend->releaseManagedBuffer(bufferPtr);
-}
-
-// -------------------------------------------------
 // MISC FUNCTIONS
 // -------------------------------------------------
 
@@ -1232,6 +1206,43 @@ int VoltDBEngine::cowSerializeMore(ReferenceSerializeOutput *out, const CatalogI
     table->serializeMore(out);
 
     return static_cast<int>(out->position());
+}
+
+long
+VoltDBEngine::eltAction(bool ackAction, bool pollAction, long ackOffset,
+                        int tableId)
+{
+    Table* table_for_el = m_tables[tableId];
+    if (table_for_el == NULL)
+    {
+        return -1;
+    }
+
+    // perform any releases before polls.
+    if (ackOffset > 0) {
+        if (!table_for_el->releaseEltBytes(ackOffset))
+        {
+            return -1;
+        }
+    }
+
+    // ack was successful.  Get the next buffer of committed ELT bytes
+    StreamBlock* block = table_for_el->getCommittedEltBytes();
+    if (block == NULL)
+    {
+        return -1;
+    }
+    // compute the stream offset for the end of the returned block
+    long retval = block->uso() + block->offset();
+    // prepend the length of the block to the results buffer
+    m_resultOutput.writeInt((int)(block->offset()));
+    // if the block isn't empty, copy it into the query results buffer
+    if (block->offset() != 0)
+    {
+        m_resultOutput.writeBytes(block->dataPtr(), block->offset());
+    }
+
+    return retval;
 }
 
 }

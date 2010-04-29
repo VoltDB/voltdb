@@ -26,6 +26,7 @@ import org.voltdb.ExecutionSite;
 import org.voltdb.ParameterSet;
 import org.voltdb.SysProcSelector;
 import org.voltdb.VoltTable;
+import org.voltdb.elt.ELTProtoMessage;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.messaging.FastDeserializer;
@@ -487,5 +488,46 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     @Override
     public int cowSerializeMore(BBContainer c, int tableId) {
         return nativeCOWSerializeMore(pointer, c.address, c.b.position(), c.b.remaining(), tableId);
+    }
+
+    /**
+     * Instruct the EE to execute an ELT poll and/or ack action. Poll response
+     * data is returned in the usual results buffer, length preceded as usual.
+     */
+    @Override
+    public ELTProtoMessage eltAction(boolean ackAction, boolean pollAction,
+            long ackTxnId, int partitionId, int tableId)
+    {
+        deserializer.clear();
+        ELTProtoMessage result = null;
+        try {
+            long offset = nativeELTAction(pointer, ackAction, pollAction, ackTxnId, tableId);
+            if (offset < 0) {
+                result = new ELTProtoMessage(partitionId, tableId);
+                result.error();
+            }
+            else if (pollAction) {
+                ByteBuffer b;
+                int byteLen = deserializer.readInt();
+                if (byteLen < 0) {
+                    throw new IOException("Invalid length in ELT poll response results.");
+                }
+
+                // need to keep the embedded length in the resulting buffer.
+                // the buffer's embedded length prefix is not self-inclusive,
+                // so add it back to the byteLen.
+                deserializer.buffer().position(0);
+                b = deserializer.readBuffer(byteLen + 4);
+                result = new ELTProtoMessage(partitionId, tableId);
+                result.pollResponse(offset, b);
+            }
+        }
+        catch (IOException e) {
+            // TODO: Not going to rollback here so EEException seems wrong?
+            // Seems to indicate invalid ELT data which should be hard error?
+            // Maybe this should be crashVoltDB?
+            throw new RuntimeException(e);
+        }
+        return result;
     }
 }

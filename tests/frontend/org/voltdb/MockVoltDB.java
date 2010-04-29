@@ -49,6 +49,7 @@ public class MockVoltDB implements VoltDBInterface
     StatsAgent m_statsAgent = null;
     int m_howManyCrashes = 0;
     FaultDistributorInterface m_faultDistributor = null;
+    HostMessenger m_hostMessenger = null;
 
     public MockVoltDB()
     {
@@ -220,11 +221,14 @@ public class MockVoltDB implements VoltDBInterface
         return m_faultDistributor;
     }
 
+    public void setHostMessenger(HostMessenger msg) {
+        m_hostMessenger = msg;
+    }
+
     @Override
     public HostMessenger getHostMessenger()
     {
-        // TODO Auto-generated method stub
-        return null;
+        return m_hostMessenger;
     }
 
     @Override

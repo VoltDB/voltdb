@@ -40,11 +40,12 @@ import org.voltdb.ParameterSet;
 import org.voltdb.SysProcSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.elt.ELTManager;
+import org.voltdb.elt.ELTProtoMessage;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
+import org.voltdb.utils.NotImplementedException;
 import org.voltdb.utils.DBBPool.BBContainer;
 
 
@@ -394,13 +395,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         static final int kErrorCode_DependencyNotFound = 102 ;
 
         /**
-         * An error code specific to the IPC backend that indicates
-         * that as part of fulfilling a previous request the IPC
-         * backend produced a full ELT buffer.
-         */
-        static final int kErrorCode_HandoffReadyELBuffer = 103;
-
-        /**
          * Invoke crash VoltDB
          */
         static final int kErrorCode_CrashVoltDB = 104;
@@ -432,10 +426,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     dependencyIdBuffer.rewind();
                     sendDependencyTable(dependencyIdBuffer.getInt());
                     continue;
-                } else if (status == kErrorCode_HandoffReadyELBuffer) {
-                    handoffReadELBuffer();
-                    continue;
-                } if (status == kErrorCode_CrashVoltDB) {
+                }
+                if (status == kErrorCode_CrashVoltDB) {
                     ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
                     while (lengthBuffer.hasRemaining()) {
                         final int read = m_socket.getChannel().read(lengthBuffer);
@@ -493,45 +485,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             return status;
         }
 
-        /**
-         * Bridge the EL buffer interface from the EE to Java/ELTManager.
-         * @throws IOException
-         */
-        private void handoffReadELBuffer() throws IOException {
-            // serialized as {int32_t limit, int32_t tableId, int32_t bytes, buffer}
-            final ByteBuffer fourbytes = ByteBuffer.allocate(4);
-            int read = -1;
-
-            // tableId
-            read = m_socketChannel.read(fourbytes);
-            if (read != 4) {
-                throw new IOException("Unable to satisfy HandoffReadyELBuffer read(a)");
-            }
-            fourbytes.rewind();
-            final int tableId = fourbytes.getInt();
-
-            // bytes
-            fourbytes.clear();
-            read = m_socketChannel.read(fourbytes);
-            if (read != 4) {
-                throw new IOException("Unable to satisfy HandoffReadyELBuffer read(b)");
-            }
-            fourbytes.rewind();
-            final int bytes = fourbytes.getInt();
-
-            // Bridge to the JNI ELTManager interface.
-            ByteBuffer buf = ELTManager.instance().claimBufferForEE2(bytes);
-            buf.position(0);
-            buf.limit(bytes); // buffer can be over-allocated. must read exactly bytes.
-            while (buf.remaining() > 0) {
-                read = m_socketChannel.read(buf);
-                if (read < 0) {
-                    throw new IOException("Unable to satisfy HandoffReadyELBuffer desired(" + bytes + ") read(" + read + ")");
-                }
-            }
-            buf.rewind();
-            ELTManager.instance().handoffToConnection2(buf, bytes, tableId);
-        }
 
         /**
          * Read and deserialize some number of tables from the wire. Assumes that the message is length prefixed.
@@ -1294,6 +1247,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         }
 
         return bytesReturned;
+    }
+
+    @Override
+    public ELTProtoMessage eltAction(boolean mAckAction, boolean mPollAction,
+            long mAckTxnId, int partitionId, int mTableId) {
+        throw new NotImplementedException("No eltAction interface in IPC bridge.");
     }
 
 }

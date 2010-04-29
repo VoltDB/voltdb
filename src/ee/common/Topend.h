@@ -31,13 +31,6 @@ class Pool;
  */
 class Topend {
   public:
-    virtual void handoffReadyELBuffer(
-        char* bufferPtr, int32_t bytesUsed, CatalogId tableId) = 0;
-
-    virtual char* claimManagedBuffer(int32_t desiredSizeInBytes) = 0;
-
-    virtual void releaseManagedBuffer(char* bufferPtr) = 0;
-
     virtual int loadNextDependency(
         int32_t dependencyId, voltdb::Pool *pool, Table* destination) = 0;
 
