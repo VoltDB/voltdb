@@ -9,6 +9,7 @@ fi
 LABEL=`ssh newbobbi grep -A7 host.$HOSTNAME .hudson/config.xml | grep label`
 if echo $LABEL | grep ubuntu; then OS=Ubuntu; fi
 if echo $LABEL | grep CentOS; then OS=el5; fi
+if echo $LABEL | grep RedHat; then OS=el6; fi
 
 if ! uname -a | grep $OS; then
   echo "wrong operating system running on $HOSTNAME"
