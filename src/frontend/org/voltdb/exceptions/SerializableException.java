@@ -115,14 +115,14 @@ public class SerializableException extends VoltProcedure.VoltAbortException {
      * Number of bytes necessary to store the serialized representation of this exception
      * @return Number of bytes
      */
-    public short getSerializedSize() {
+    public int getSerializedSize() {
         // sizes:  as near as I can tell,
         // 3 is sizeof(short) for buffer length and sizeof(byte) for exception type
         // 4 is sizeof(int) for message string length
         if (m_message == null) {
-            return (short)(3 + 4 + p_getSerializedSize());
+            return 5 + 4 + p_getSerializedSize();
         }
-        return (short)(3 + 4 + m_message.getBytes().length + p_getSerializedSize());//one byte ordinal and 4 byte length
+        return 5 + 4 + m_message.getBytes().length + p_getSerializedSize();//one byte ordinal and 4 byte length
     }
 
     /**
@@ -140,7 +140,7 @@ public class SerializableException extends VoltProcedure.VoltAbortException {
      */
     public void serializeToBuffer(ByteBuffer b) {
         assert(getSerializedSize() <= b.remaining());
-        b.putShort((short)(getSerializedSize() - 2));
+        b.putInt(getSerializedSize() - 4);
         b.put((byte)getExceptionType().ordinal());
         if (m_message != null) {
             final byte messageBytes[] = m_message.getBytes();
@@ -174,7 +174,7 @@ public class SerializableException extends VoltProcedure.VoltAbortException {
      * @return A deserialized exception if one was serialized or null
      */
     public static SerializableException deserializeFromBuffer(ByteBuffer b) {
-        final int length = b.getShort();
+        final int length = b.getInt();
         if (length == 0) {
             return null;
         }

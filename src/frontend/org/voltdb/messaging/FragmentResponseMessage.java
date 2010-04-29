@@ -124,7 +124,7 @@ public class FragmentResponseMessage extends VoltMessage {
         if (m_exception != null) {
             msgsize += m_exception.getSerializedSize();
         } else {
-            msgsize += 2;//Still serialize exception length 0
+            msgsize += 4;//Still serialize exception length 0
         }
 
         // stupid lame flattening of the tables
@@ -166,7 +166,7 @@ public class FragmentResponseMessage extends VoltMessage {
         if (m_exception != null) {
             m_exception.serializeToBuffer(m_buffer);
         } else {
-            m_buffer.putShort((short)0);
+            m_buffer.putInt(0);
         }
 
         m_buffer.limit(m_buffer.position());
