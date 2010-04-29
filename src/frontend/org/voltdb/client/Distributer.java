@@ -156,7 +156,8 @@ class Distributer {
                 if (!m_isConnected) {
                     final ClientResponse r = new ClientResponseImpl(
                             ClientResponse.CONNECTION_LOST, new VoltTable[0],
-                            "Connection to the database was lost before a response was received");
+                            "Connection to database host (" + m_hostname +
+                            ") was lost before a response was received");
                     callback.clientCallback(r);
                     c.discard();
                     return;
@@ -171,7 +172,8 @@ class Distributer {
                 if (!m_isConnected) {
                     final ClientResponse r = new ClientResponseImpl(
                             ClientResponse.CONNECTION_LOST, new VoltTable[0],
-                            "Connection to the database was lost before a response was received");
+                            "Connection to database host (" + m_hostname +
+                            ") was lost before a response was received");
                     callback.clientCallback(r);
                     return;
                 }
@@ -276,7 +278,8 @@ class Distributer {
                 final ClientResponse r =
                     new ClientResponseImpl(
                         ClientResponse.CONNECTION_LOST, new VoltTable[0],
-                        "Connection to the database was lost before a response was received");
+                        "Connection to database host (" + m_hostname +
+                        ") was lost before a response was received");
                 for (final Object stuff[] : m_callbacks.values()) {
                     ((ProcedureCallback)stuff[1]).clientCallback(r);
                 }
