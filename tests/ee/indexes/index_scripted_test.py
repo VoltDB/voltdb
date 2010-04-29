@@ -26,7 +26,6 @@ from subprocess import Popen, PIPE
 import os
 import sys
 
-print "Hooray!!!!"
 print sys.path[0]
 
 script = """
@@ -51,18 +50,18 @@ script = """
 begin TestName MultiIntsTree,MultiGenericTree,MultiIntsHash,MultiGenericHash,UniqueIntsTree,UniqueGenericTree,UniqueIntsHash,UniqueGenericHash bint,bint,bint
 is 5,6,7
 ls 5,6,7
-us 5,6,7 8,9,10
-uf 5,6,7 8,9,10
-df 5,6,7
-ds 8,9,10
+#us 5,6,7 8,9,10
+#uf 5,6,7 8,9,10
+ds 5,6,7
+df 8,9,10
 exec
 begin GenericTest MultiGenericTree,MultiGenericHash,UniqueGenericTree,UniqueGenericHash str,bint,bint
 is foo,6,7
 ls foo,6,7
-us foo,6,7 bar,9,10
-uf foo,6,7 bar,9,10
-df foo,6,7
-ds bar,9,10
+#us foo,6,7 bar,9,10
+#uf foo,6,7 bar,9,10
+ds foo,6,7
+df bar,9,10
 exec
 done
 """

@@ -97,7 +97,11 @@ public:
             return true;
         }
 
-        bool deleted = deleteEntryPrivate(oldTupleValue, m_tmp1);
+        // It looks like we're deleting the new value and inserting the new value
+        // The lookup is on the index keys, but the address of the current tuple
+        //  (which has the new key value) is needed for this non-unique index
+        //  to determine which of the tuples with a given key need to be deleted.
+        bool deleted = deleteEntryPrivate(newTupleValue, m_tmp1);
         bool inserted = addEntryPrivate(newTupleValue, m_tmp2);
         --m_deletes;
         --m_inserts;

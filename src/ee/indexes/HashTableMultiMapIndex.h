@@ -86,7 +86,11 @@ public:
         m_tmp2.setFromTuple(newTupleValue, column_indices_, m_keySchema);
         if (m_eq(m_tmp1, m_tmp2)) return true; // no update is needed for this index
 
-        bool deleted = deleteEntryPrivate(oldTupleValue, m_tmp1);
+        // It looks like we're deleting the new value and inserting the new value
+        // The lookup is on the index keys, but the address of the current tuple
+        //  (which has the new key value) is needed for this non-unique index
+        //  to determine which of the tuples with a given key need to be deleted.
+        bool deleted = deleteEntryPrivate(newTupleValue, m_tmp1);
         bool inserted = addEntryPrivate(newTupleValue, m_tmp2);
         --m_deletes;
         --m_inserts;
@@ -99,19 +103,23 @@ public:
         m_tmp2.setFromTuple(rhs, column_indices_, m_keySchema);
         return !(m_eq(m_tmp1, m_tmp2));
     }
+
     bool exists(const TableTuple* values) {
         ++m_lookups;
         m_tmp1.setFromTuple(values, column_indices_, m_keySchema);
         return (m_entries.find(m_tmp1) != m_entries.end());
     }
+
     bool moveToKey(const TableTuple *searchKey) {
         m_tmp1.setFromKey(searchKey);
         return moveToKey(m_tmp1);
     }
+
     bool moveToTuple(const TableTuple *searchTuple) {
         m_tmp1.setFromTuple(searchTuple, column_indices_, m_keySchema);
         return moveToKey(m_tmp1);
     }
+
     TableTuple nextValueAtKey() {
         if (m_match.isNullTuple()) return m_match;
         TableTuple retval = m_match;
@@ -122,6 +130,7 @@ public:
             m_match.move(const_cast<void*>(m_keyIter.first->second));
         return retval;
     }
+
     size_t getSize() const { return m_entries.size(); }
     std::string getTypeName() const { return "HashTableMultiMapIndex"; };
 

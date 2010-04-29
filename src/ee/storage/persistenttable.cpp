@@ -518,19 +518,25 @@ voltdb::TableTuple PersistentTable::lookupTuple(TableTuple tuple) {
 
 void PersistentTable::insertIntoAllIndexes(TableTuple *tuple) {
     for (int i = m_indexCount - 1; i >= 0;--i) {
-        m_indexes[i]->addEntry(tuple);
+        if (!m_indexes[i]->addEntry(tuple)) {
+            throwFatalException("Failed to insert tuple into index");
+        }
     }
 }
 
 void PersistentTable::deleteFromAllIndexes(TableTuple *tuple) {
     for (int i = m_indexCount - 1; i >= 0;--i) {
-        m_indexes[i]->deleteEntry(tuple);
+        if (!m_indexes[i]->deleteEntry(tuple)) {
+            throwFatalException("Failed to delete tuple from index");
+        }
     }
 }
 
 void PersistentTable::updateFromAllIndexes(TableTuple &targetTuple, const TableTuple &sourceTuple) {
     for (int i = m_indexCount - 1; i >= 0;--i) {
-        m_indexes[i]->replaceEntry(&targetTuple, &sourceTuple);
+        if (!m_indexes[i]->replaceEntry(&targetTuple, &sourceTuple)) {
+            throwFatalException("Failed to update tuple in index");
+        }
     }
 }
 

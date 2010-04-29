@@ -27,7 +27,6 @@ import java.io.IOException;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltTableRow;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.SyncCallback;
@@ -54,7 +53,7 @@ public class TestIndexesSuite extends RegressionSuite {
     // - multi-column
     // - multi-map
 
-    public void testParameterizedLimitOnIndexScan()
+    /*public void testParameterizedLimitOnIndexScan()
     throws IOException, ProcCallException {
         String[] tables = {"P1", "R1", "P2", "R2"};
         Client client = getClient();
@@ -271,14 +270,216 @@ public class TestIndexesSuite extends RegressionSuite {
         final VoltTableRow row1 = results[0].fetchRow(1);
         assertEquals( 0, row1.getLong(0));
         assertEquals( 1, row1.getLong(1));
-    }
+    }*/
 
     // Testing ENG-506 but this probably isn't enough to trust...
     public void testUpdateRange() throws IOException, ProcCallException {
         final Client client = getClient();
+        VoltTable[] results;
+
+        client.callProcedure(new SyncCallback(), "InsertP1IX", 960, "ztgiZQdUtVJeaPLjN", 1643, 4.95657525992782899138e-01);
+        client.callProcedure(new SyncCallback(), "InsertP1IX", 961, "ztgiZQdUtVJeaPLjN", 1643, 4.95657525992782899138e-01);
+        client.callProcedure(new SyncCallback(), "InsertP1IX", 964, "ztgiZQdUtVJeaPLjN", 1643, 8.68352518423806229997e-01);
+        client.callProcedure(new SyncCallback(), "InsertP1IX", 965, "ztgiZQdUtVJeaPLjN", 1643, 8.68352518423806229997e-01);
+        client.callProcedure(new SyncCallback(), "InsertP1IX", 968, "ztgiZQdUtVJeaPLjN", -22250, 6.20549983245015868150e-01);
+        client.callProcedure(new SyncCallback(), "InsertP1IX", 969, "ztgiZQdUtVJeaPLjN", -22250, 6.20549983245015868150e-01);
+        client.callProcedure(new SyncCallback(), "InsertP1IX", 972, "ztgiZQdUtVJeaPLjN", -22250, 2.69767394221735901105e-01);
+        client.callProcedure(new SyncCallback(), "InsertP1IX", 973, "ztgiZQdUtVJeaPLjN", -22250, 2.69767394221735901105e-01);
+        client.callProcedure(new SyncCallback(), "InsertP1IX", 976, "XtQOuGWNzVKtrpnMj", 30861, 1.83913810933858279384e-01);
+        client.callProcedure(new SyncCallback(), "InsertP1IX", 977, "XtQOuGWNzVKtrpnMj", 30861, 1.83913810933858279384e-01);
+        client.callProcedure(new SyncCallback(), "InsertP1IX", 980, "XtQOuGWNzVKtrpnMj", 30861, 9.95833142789745329182e-01);
+        client.callProcedure(new SyncCallback(), "InsertP1IX", 981, "XtQOuGWNzVKtrpnMj", 30861, 9.95833142789745329182e-01);
+        client.callProcedure(new SyncCallback(), "InsertP1IX", 984, "XtQOuGWNzVKtrpnMj", 32677, 6.78465381526806687873e-01);
+        client.callProcedure(new SyncCallback(), "InsertP1IX", 985, "XtQOuGWNzVKtrpnMj", 32677, 6.78465381526806687873e-01);
+        client.callProcedure(new SyncCallback(), "InsertP1IX", 988, "XtQOuGWNzVKtrpnMj", 32677, 3.98623510723492113783e-01);
+        client.callProcedure(new SyncCallback(), "InsertP1IX", 989, "XtQOuGWNzVKtrpnMj", 32677, 3.98623510723492113783e-01);
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 44 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID<45)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 44 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID<43)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 66 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID<86)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 66 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID<96)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 65 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID<1)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 65 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID<73)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 9 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID<86)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 9 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID<40)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 53 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID>76)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 53 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID>44)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 9 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID>29)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 9 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID>100)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 10 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID>87)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 10 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID>74)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 79 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID>32)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 79 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID>8)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 76 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID = 44)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 76 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID = 99)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 26 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID = 15)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 26 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID = 89)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 39 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID = 92)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 39 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID = 8)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 11 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID = 83)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 11 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID = 72)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 53 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID<= 75)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 53 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID<= 30)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 54 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID<= 12)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 54 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID<= 21)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 82 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID<= 15)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 82 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID<= 49)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 22 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID<= 58)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 22 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID<= 36)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 48 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID>= 90)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 48 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID>= 48)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 38 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID>= 47)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 38 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID>= 98)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 75 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID>= 33)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 75 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID>= 33)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 54 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID>= 43)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 54 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID>= 29)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 19 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID != 1)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 19 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID != 33)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 4 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID != 52)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 4 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID != 54)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 56 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID != 37)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 56 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID != 94)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 7 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID != 81)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 7 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID != 65)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 72 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID<>67)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 72 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID<>45)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 94 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID<>5)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 94 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID<>63)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 57 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID<>18)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 57 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID<>18)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 78 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID<>24)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 78 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID<>44)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 23 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM<100)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 23 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM<64)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 21 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM<3)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 21 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM<11)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 17 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM<2)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 17 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM<16)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 99 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM<18)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 99 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM<73)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 96 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM>67)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 96 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM>86)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 21 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM>84)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 21 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM>19)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 0 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM>75)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 0 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM>34)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 100 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM>82)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 100 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM>2)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 86 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM = 44)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 86 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM = 16)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 35 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM = 100)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 35 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM = 12)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 99 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM = 3)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 99 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM = 94)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 49 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM = 68)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 49 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM = 43)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 49 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM<= 58)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 49 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM<= 63)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 59 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM<= 31)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 59 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM<= 85)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 37 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM<= 80)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 37 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM<= 57)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 9 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM<= 64)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 9 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM<= 88)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 86 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM>= 29)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 86 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM>= 98)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 48 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM>= 5)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 48 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM>= 46)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 14 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM>= 83)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 14 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM>= 60)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 91 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM>= 71)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 91 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM>= 62)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 63 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM != 82)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 63 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM != 86)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 11 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM != 57)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 11 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM != 46)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 11 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM != 88)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 11 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM != 70)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 69 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM != 50)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 69 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM != 95)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 28 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM<>71)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 28 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM<>28)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 87 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM<>4)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 87 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM<>57)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 92 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM<>21)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 92 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM<>74)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 98 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM<>31)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 98 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM<>60)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 3 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID<78)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 3 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID<41)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 94 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID<41)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 94 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID<30)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 73 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID<26)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 73 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID<7)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 78 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID<72)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 78 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID<28)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 89 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID>19)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 89 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID>40)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 45 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID>100)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 45 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID>92)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 18 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID>2)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 18 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID>71)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 97 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID>86)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 97 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID>22)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 62 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID = 46)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 62 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID = 82)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 16 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID = 67)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 16 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID = 92)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 79 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID = 90)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 79 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID = 61)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 36 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID = 57)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 36 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID = 31)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 35 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID<= 70)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 35 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID<= 71)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 10 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID<= 6)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 10 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID<= 68)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 9 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID<= 66)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 9 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID<= 46)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 61 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID<= 22)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 61 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID<= 66)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 32 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID>= 62)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 32 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID>= 86)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 11 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID>= 89)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 11 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID>= 88)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 51 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID>= 28)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 51 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID>= 4)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 76 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID>= 13)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 76 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID>= 29)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 3 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID != 93)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 3 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID != 98)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 77 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID != 41)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 77 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID != 30)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 70 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID != 62)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 70 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID != 79)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 25 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID != 31)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 25 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID != 40)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 33 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID<>4)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 33 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID<>57)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 46 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID<>21)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 46 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID<>19)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 72 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID<>4)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 72 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID<>45)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 99 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID<>45)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 99 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID<>43)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 30 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.NUM<55)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 30 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.NUM<5)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 25 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.NUM<46)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 25 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.NUM<48)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 9 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.NUM<91)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 9 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.NUM<87)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 29 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.NUM<39)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 29 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.NUM<61)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 89 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.NUM>37)");
+        client.callProcedure(new SyncCallback(), "@AdHoc", "UPDATE P1IX SET NUM = 89 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.NUM>48)");
+
+        client.drain();
+
+        results = client.callProcedure("@AdHoc", "select * from P1IX");
+        System.out.printf("Table has %d rows.\n", results[0].getRowCount());
+        System.out.println(results[0]);
 
         // all values id > num and num > 17 (50 to update)
-        for (int i = 100; i < 150; i++) {
+        /*for (int i = 100; i < 150; i++) {
             SyncCallback cb = new SyncCallback();
             client.callProcedure(cb, "InsertP1IX", i, "ryan likes the yankees", i - 50, 1.5);
         }
@@ -291,17 +492,17 @@ public class TestIndexesSuite extends RegressionSuite {
         for (int i = 300; i < 350; i++) {
             SyncCallback cb = new SyncCallback();
             client.callProcedure(cb, "InsertP1IX", i, "ryan likes the yankees", i, 1.5);
-        }
+        }*/
 
         client.drain();
 
-        VoltTable[] results = client.callProcedure("Eng506UpdateRange");
+        results = client.callProcedure("Eng506UpdateRange", 51, 17);
         assertNotNull(results);
         assertEquals(1, results.length);
         VoltTable result = results[0];
         long modified = result.fetchRow(0).getLong(0);
         System.out.printf("Update statment modified %d rows.\n", modified);
-        assertEquals(50, modified);
+        assertEquals(16, modified);
     }
 
     //
@@ -327,7 +528,7 @@ public class TestIndexesSuite extends RegressionSuite {
         project.addStmtProcedure("Eng397LimitIndexP1", "select * from P1 where P1.ID > 2 Limit ?");
         project.addStmtProcedure("Eng397LimitIndexR2", "select * from R2 where R2.ID > 2 Limit ?");
         project.addStmtProcedure("Eng397LimitIndexP2", "select * from P2 where P2.ID > 2 Limit ?");
-        project.addStmtProcedure("Eng506UpdateRange", "UPDATE P1IX SET NUM = 51 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.NUM>17)");
+        project.addStmtProcedure("Eng506UpdateRange", "UPDATE P1IX SET NUM = ? WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.NUM>?)");
         project.addStmtProcedure("InsertP1IX", "insert into P1IX values (?, ?, ?, ?);");
 
         boolean success;
@@ -336,12 +537,13 @@ public class TestIndexesSuite extends RegressionSuite {
         // CONFIG #1: Local Site/Partitions running on IPC backend
         config = new LocalSingleProcessServer("sqltypes-onesite.jar", 1, BackendTarget.NATIVE_EE_IPC);
         config.compile(project);
-        builder.addServerConfig(config);
+        builder.addServerConfig(config);*/
         // CONFIG #2: HSQL
         config = new LocalSingleProcessServer("testindexes-hsql.jar", 1, BackendTarget.HSQLDB_BACKEND);
-        config.compile(project);
+        success = config.compile(project);
+        assertTrue(success);
         builder.addServerConfig(config);
-     */
+
 
         // JNI
         config = new LocalSingleProcessServer("testindexes-onesite.jar", 1, BackendTarget.NATIVE_EE_JNI);
@@ -350,11 +552,11 @@ public class TestIndexesSuite extends RegressionSuite {
         builder.addServerConfig(config);
 
         // CLUSTER?
-        config = new LocalCluster("testindexes-cluster.jar", 2, 2,
+        /*config = new LocalCluster("testindexes-cluster.jar", 2, 2,
                                   1, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
-        builder.addServerConfig(config);
+        builder.addServerConfig(config);*/
 
         return builder;
     }
