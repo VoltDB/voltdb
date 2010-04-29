@@ -30,6 +30,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.indexes.CheckMultiMultiIntGTEFailure;
 import org.voltdb.regressionsuites.indexes.Insert;
@@ -272,25 +273,36 @@ public class TestIndexesSuite extends RegressionSuite {
         assertEquals( 1, row1.getLong(1));
     }
 
-    // RE-ENABLE TO WORK ON ENG-506
-    /*public void testUpdateRange() throws IOException, ProcCallException {
+    // Testing ENG-506 but this probably isn't enough to trust...
+    public void testUpdateRange() throws IOException, ProcCallException {
         final Client client = getClient();
-        for (int i = 0; i < 100; i++) {
+
+        // all values id > num and num > 17 (50 to update)
+        for (int i = 100; i < 150; i++) {
             SyncCallback cb = new SyncCallback();
-            client.callProcedure(cb, "InsertP1IX", i, "ryan likes the yankees", 100 - i, 1.5);
+            client.callProcedure(cb, "InsertP1IX", i, "ryan likes the yankees", i - 50, 1.5);
         }
+        // all values id > num and num <= 17 (18 to ignore)
+        for (int i = 200; i <= 217; i++) {
+            SyncCallback cb = new SyncCallback();
+            client.callProcedure(cb, "InsertP1IX", i, "ryan likes the yankees", i - 200, 1.5);
+        }
+        // all values id <= num and num > 17 (50 to ignore)
+        for (int i = 300; i < 350; i++) {
+            SyncCallback cb = new SyncCallback();
+            client.callProcedure(cb, "InsertP1IX", i, "ryan likes the yankees", i, 1.5);
+        }
+
         client.drain();
 
         VoltTable[] results = client.callProcedure("Eng506UpdateRange");
         assertNotNull(results);
         assertEquals(1, results.length);
         VoltTable result = results[0];
-        System.out.printf("Table has %d rows.\n", result.getRowCount());
-        result.resetRowPosition();
-        while (result.advanceRow()) {
-            System.out.println(result.getLong(0));
-        }
-    }*/
+        long modified = result.fetchRow(0).getLong(0);
+        System.out.printf("Update statment modified %d rows.\n", modified);
+        assertEquals(50, modified);
+    }
 
     //
     // JUnit / RegressionSuite boilerplate
