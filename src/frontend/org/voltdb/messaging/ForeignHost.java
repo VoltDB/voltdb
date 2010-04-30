@@ -181,10 +181,13 @@ public class ForeignHost {
                 }
             });
 
-//        long current_time = System.currentTimeMillis();
         long current_time = EstTime.currentTimeMillis();
         long current_delta = current_time - m_lastMessageMillis;
-        if (m_isUp && (current_delta > DEAD_HOST_TIMEOUT_THRESHOLD))
+        // NodeFailureFault no longer immediately trips FHInputHandler to
+        // set m_isUp to false, so use both that and m_closing to
+        // avoid repeat reports of a single node failure
+        if ((m_closing || m_isUp) &&
+            (current_delta > DEAD_HOST_TIMEOUT_THRESHOLD))
         {
             hostLog.error("DEAD HOST DETECTED, hostname: " + m_remoteHostname);
             hostLog.info("\tcurrent time: " + current_time);

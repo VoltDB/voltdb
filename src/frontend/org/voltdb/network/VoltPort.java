@@ -147,12 +147,22 @@ public class VoltPort implements Callable<VoltPort>, Connection
 
             drainWriteStream(pool);
 
+            /*
+             * m_lock is used to protect the m_scheduledRunnables structure and doesn't need to be held
+             * while scheduled runnables are invoked. It can't be held because a scheduled runnable might
+             * need to acquire other locks such as the NIOWriteStream's lock for shutdown.
+             */
             if (m_hasQueuedRunnables) {
-                synchronized (m_lock) {
-                    m_hasQueuedRunnables = false;
-                    while (!m_scheduledRunnables.isEmpty()) {
-                        m_scheduledRunnables.poll().run();
+                while (true) {
+                    Runnable r;
+                    synchronized (m_lock) {
+                        if (m_scheduledRunnables.isEmpty()) {
+                            m_hasQueuedRunnables = false;
+                            break;
+                        }
+                        r = m_scheduledRunnables.poll();
                     }
+                    r.run();
                 }
             }
         } finally {
