@@ -426,42 +426,54 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
 
             w.putDependency(dependencyId, response.getExecutorSiteId(),
                             payload);
-            checkWorkUnitComplete(w);
+            if (w.allDependenciesSatisfied()) {
+                handleWorkUnitComplete(w);
+            }
         }
     }
 
-    void checkWorkUnitComplete(WorkUnit w)
+    void handleWorkUnitComplete(WorkUnit w)
     {
-        if (w.allDependenciesSatisfied()) {
-            for (int depId : w.getDependencyIds())
-                m_missingDependencies.remove(depId);
-
-            // slide this new stack frame drop into the right position
-            // (before any other stack frame drops)
-            if ((w.shouldResumeProcedure()) &&
+        for (int depId : w.getDependencyIds()) {
+            m_missingDependencies.remove(depId);
+        }
+        // slide this new stack frame drop into the right position
+        // (before any other stack frame drops)
+        if ((w.shouldResumeProcedure()) &&
                 (m_readyWorkUnits.peekLast() != null) &&
                 (m_readyWorkUnits.peekLast().shouldResumeProcedure())) {
 
-                ArrayDeque<WorkUnit> deque = new ArrayDeque<WorkUnit>();
-                while ((m_readyWorkUnits.peekLast() != null) &&
-                       (m_readyWorkUnits.peekLast().shouldResumeProcedure())) {
-                    deque.add(m_readyWorkUnits.pollLast());
-                }
-                deque.add(w);
-                while (deque.size() > 0)
-                    m_readyWorkUnits.add(deque.pollLast());
+            ArrayDeque<WorkUnit> deque = new ArrayDeque<WorkUnit>();
+            while ((m_readyWorkUnits.peekLast() != null) &&
+                    (m_readyWorkUnits.peekLast().shouldResumeProcedure())) {
+                deque.add(m_readyWorkUnits.pollLast());
             }
-            else {
-                m_readyWorkUnits.add(w);
-            }
+            deque.add(w);
+            while (deque.size() > 0)
+                m_readyWorkUnits.add(deque.pollLast());
+        }
+        else {
+            m_readyWorkUnits.add(w);
         }
     }
 
     public void checkWorkUnits()
     {
+        // Find any workunits with previously unmet dependencies
+        // that may now be satisfied.  We can't remove them from
+        // the map in this loop because we induce a
+        // ConcurrentModificationException
+        ArrayList<WorkUnit> done_wus = new ArrayList<WorkUnit>();
         for (WorkUnit w : m_missingDependencies.values())
         {
-            checkWorkUnitComplete(w);
+            if (w.allDependenciesSatisfied()) {
+                done_wus.add(w);
+            }
+        }
+
+        for (WorkUnit w : done_wus)
+        {
+            handleWorkUnitComplete(w);
         }
     }
 
