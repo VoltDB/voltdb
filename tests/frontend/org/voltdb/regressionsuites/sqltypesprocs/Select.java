@@ -52,6 +52,12 @@ public class Select extends VoltProcedure {
     public final SQLStmt i_expressions_no_nulls = new SQLStmt
     ("SELECT * FROM EXPRESSIONS_NO_NULLS WHERE PKEY = ?;");
 
+    public final SQLStmt i_jumbo_row = new SQLStmt
+    ("SELECT * FROM JUMBO_ROW WHERE PKEY = ?;");
+
+    public final SQLStmt i_jumbo_row_too_big = new SQLStmt
+    ("SELECT * FROM JUMBO_ROW WHERE PKEY = ?;");
+
     public VoltTable[] run(String tablename, long pkey) {
 
         if (tablename.equals("NO_NULLS")) {
@@ -71,6 +77,8 @@ public class Select extends VoltProcedure {
         }
         else if (tablename.equals("EXPRESSIONS_NO_NULLS")) {
             voltQueueSQL(i_expressions_no_nulls, pkey);
+        } else if (tablename.equals("JUMBO_ROW")) {
+            voltQueueSQL(i_jumbo_row, 0);
         }
 
         return voltExecuteSQL();

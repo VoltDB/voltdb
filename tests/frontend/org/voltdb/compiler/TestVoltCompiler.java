@@ -92,6 +92,7 @@ public class TestVoltCompiler extends TestCase {
         project.addPartitionInfo("WITH_NULL_DEFAULTS", "PKEY");
         project.addPartitionInfo("EXPRESSIONS_WITH_NULLS", "PKEY");
         project.addPartitionInfo("EXPRESSIONS_NO_NULLS", "PKEY");
+        project.addPartitionInfo("JUMBO_ROW", "PKEY");
         project.addELT("bob", "forapples",
                        "org.voltdb.elt.processors.RawProcessor",
                        "faraway", false);

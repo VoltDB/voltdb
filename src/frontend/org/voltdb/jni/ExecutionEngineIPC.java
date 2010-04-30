@@ -418,10 +418,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 status = m_socket.getInputStream().read();
                 if (status == kErrorCode_RetrieveDependency) {
                     final ByteBuffer dependencyIdBuffer = ByteBuffer.allocate(4);
-                    final int read = m_socketChannel.read(dependencyIdBuffer);
-                    if (read == 0) {
-                        throw new IOException("Unable to read enough bytes for dependencyId in order to " +
-                        " satisfy IPC backend request for a dependency table");
+                    while (dependencyIdBuffer.hasRemaining()) {
+                        final int read = m_socketChannel.read(dependencyIdBuffer);
+                        if (read == -1) {
+                            throw new IOException("Unable to read enough bytes for dependencyId in order to " +
+                            " satisfy IPC backend request for a dependency table");
+                        }
                     }
                     dependencyIdBuffer.rewind();
                     sendDependencyTable(dependencyIdBuffer.getInt());
@@ -493,25 +495,29 @@ public class ExecutionEngineIPC extends ExecutionEngine {
          */
         public void readResultTables(final VoltTable tables[]) throws IOException {
             final ByteBuffer resultTablesLengthBytes = ByteBuffer.allocate(4);
-            resultTablesLengthBytes.rewind();
+
             //resultTablesLengthBytes.order(ByteOrder.LITTLE_ENDIAN);
-            int read = m_socketChannel.read(resultTablesLengthBytes);
-            resultTablesLengthBytes.rewind();
-            assert (read == 4);
+            while (resultTablesLengthBytes.hasRemaining()) {
+                int read = m_socketChannel.read(resultTablesLengthBytes);
+                if (read == -1) {
+                    throw new EOFException();
+                }
+            }
+            resultTablesLengthBytes.flip();
+
             final int resultTablesLength = resultTablesLengthBytes.getInt();
             final ByteBuffer resultTablesBuffer = ByteBuffer
                     .allocate(resultTablesLength);
-            resultTablesBuffer.clear();
-            resultTablesBuffer.rewind();
             //resultTablesBuffer.order(ByteOrder.LITTLE_ENDIAN);
-            read = m_socketChannel.read(resultTablesBuffer);
-            while (read != resultTablesLength) {
-                read += m_socketChannel.read(resultTablesBuffer);
+            while (resultTablesBuffer.hasRemaining()) {
+                int read = m_socketChannel.read(resultTablesBuffer);
+                if (read == -1) {
+                    throw new EOFException();
+                }
             }
-            resultTablesBuffer.rewind();
-            assert (read == resultTablesLength);
-            final FastDeserializer ds = new FastDeserializer(resultTablesBuffer);
+            resultTablesBuffer.flip();
 
+            final FastDeserializer ds = new FastDeserializer(resultTablesBuffer);
             // check if anything was changed
             final boolean dirty = ds.readBoolean();
             if (dirty)
@@ -530,25 +536,28 @@ public class ExecutionEngineIPC extends ExecutionEngine {
          * Returns a list of pairs of dependency ids and dependency tables.
          */
         public DependencyPair readDependencies() throws IOException {
-            int read = 0;
-
             // read the result set size, which doesn't include this 4 byte
             // length notification!
             final ByteBuffer resultSetSizeBuff = ByteBuffer.allocate(4);
             resultSetSizeBuff.rewind();
-            read = 0;
-            while (read != 4) {
-                read += m_socketChannel.read(resultSetSizeBuff);
+            while (resultSetSizeBuff.hasRemaining()) {
+                int read = m_socketChannel.read(resultSetSizeBuff);
+                if (read == -1) {
+                    throw new EOFException();
+                }
             }
+
             resultSetSizeBuff.rewind();
             final int resultsSize = resultSetSizeBuff.getInt();
 
             // read the serialized dependencies
             final ByteBuffer depsBuff = ByteBuffer.allocate(resultsSize);
             depsBuff.clear().rewind();
-            read = 0;
-            while (read != (resultsSize)) {
-                read += m_socketChannel.read(depsBuff);
+            while (depsBuff.hasRemaining()) {
+                int read = m_socketChannel.read(depsBuff);
+                if (read == -1) {
+                    throw new EOFException();
+                }
             }
 
             // deserialize the dependencies
@@ -573,15 +582,26 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
         public void throwException(final int errorCode) throws IOException {
             final ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
-            m_socketChannel.read(lengthBuffer);
-            lengthBuffer.rewind();
+            while (lengthBuffer.hasRemaining()) {
+                int read = m_socketChannel.read(lengthBuffer);
+                if (read == -1) {
+                    throw new EOFException();
+                }
+            }
+            lengthBuffer.flip();
             final int exceptionLength = lengthBuffer.getInt();//Length is only between EE and Java.
             if (exceptionLength == 0) {
                 throw new EEException(errorCode);
             } else {
                 final ByteBuffer exceptionBuffer = ByteBuffer.allocate(exceptionLength + 4);
                 exceptionBuffer.putInt(exceptionLength);
-                m_socketChannel.read(exceptionBuffer);
+                while(exceptionBuffer.hasRemaining()) {
+                    int read = m_socketChannel.read(exceptionBuffer);
+                    if (read == -1) {
+                        throw new EOFException();
+                    }
+                }
+                assert(!exceptionBuffer.hasRemaining());
                 exceptionBuffer.rewind();
                 throw SerializableException.deserializeFromBuffer(exceptionBuffer);
             }
@@ -1048,10 +1068,20 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         try {
             if (result == ExecutionEngine.ERRORCODE_SUCCESS) {
                 final ByteBuffer messageLengthBuffer = ByteBuffer.allocate(4);
-                m_connection.m_socketChannel.read(messageLengthBuffer);
+                while (messageLengthBuffer.hasRemaining()) {
+                    int read = m_connection.m_socketChannel.read(messageLengthBuffer);
+                    if (read == -1) {
+                        throw new EOFException();
+                    }
+                }
                 messageLengthBuffer.rewind();
                 final ByteBuffer messageBuffer = ByteBuffer.allocate(messageLengthBuffer.getInt());
-                m_connection.m_socketChannel.read(messageBuffer);
+                while (messageBuffer.hasRemaining()) {
+                    int read = m_connection.m_socketChannel.read(messageBuffer);
+                    if (read == -1) {
+                        throw new EOFException();
+                    }
+                }
                 messageBuffer.rewind();
 
                 final FastDeserializer fds = new FastDeserializer(messageBuffer);
@@ -1227,7 +1257,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             m_connection.readStatusByte();
 
             ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
-            m_connection.m_socketChannel.read(lengthBuffer);
+            while (lengthBuffer.hasRemaining()) {
+                int read = m_connection.m_socketChannel.read(lengthBuffer);
+                if (read == -1) {
+                    throw new EOFException();
+                }
+            }
             lengthBuffer.flip();
             final int length = lengthBuffer.getInt();
             bytesReturned = length;

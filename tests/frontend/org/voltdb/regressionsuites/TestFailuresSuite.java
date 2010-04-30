@@ -138,11 +138,13 @@ public class TestFailuresSuite extends RegressionSuite {
         } catch (ProcCallException e) {
             threwException = true;
             assertTrue(e.getMessage().contains("CONSTRAINT VIOLATION"));
-            assertTrue(e.getCause().getMessage().contains("UNIQUE"));
-            VoltTable table = ((ConstraintFailureException)e.getCause()).getTuples();
-            table.resetRowPosition();
-            assertTrue(table.advanceRow());
-            assertTrue(java.util.Arrays.equals(stringData, table.getStringAsBytes(2)));
+            assertTrue(e.getCause().getMessage().toUpperCase().contains("UNIQUE"));
+            if (!isHSQL()) {
+                VoltTable table = ((ConstraintFailureException)e.getCause()).getTuples();
+                table.resetRowPosition();
+                assertTrue(table.advanceRow());
+                assertTrue(java.util.Arrays.equals(stringData, table.getStringAsBytes(2)));
+            }
         }
         assertTrue(threwException);
     }

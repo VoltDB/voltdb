@@ -429,7 +429,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
             catch (final ProcCallException e) {
                 caught = true;
             }
-            // the last (32,000) string should be fine here.
+            // the last (1048576) string should be fine here.
             if (stringcount != 3) {
                 assertTrue(caught);
             }
@@ -883,6 +883,79 @@ public class TestSQLTypesSuite extends RegressionSuite {
         }
     }
 
+    public void testJumboRow() throws Exception {
+        final Client client = getClient();
+        byte firstStringBytes[] = new byte[1048576];
+        java.util.Arrays.fill(firstStringBytes, (byte)'c');
+        String firstString = new String(firstStringBytes, "UTF-8");
+        byte secondStringBytes[] = new byte[1048572];
+        java.util.Arrays.fill(secondStringBytes, (byte)'a');
+        String secondString = new String(secondStringBytes, "UTF-8");
+
+        Object params[] = new Object[] {
+                "JUMBO_ROW",
+                0,
+                0,
+                0,
+                0,
+                0,
+                0.0,
+                new TimestampType(0),
+                firstString,
+                secondString,
+                "",
+                "",
+                VoltType.NULL_DECIMAL
+        };
+        VoltTable results[] = client.callProcedure("Insert", params);
+        params = null;
+        firstString = null;
+        secondString = null;
+
+        assertEquals(results.length, 1);
+        assertEquals( 1, results[0].asScalarLong());
+
+        results = client.callProcedure("Select", "JUMBO_ROW", 0);
+        assertEquals(results.length, 1);
+        assertTrue(results[0].advanceRow());
+        assertTrue(java.util.Arrays.equals( results[0].getStringAsBytes(1), firstStringBytes));
+        assertTrue(java.util.Arrays.equals( results[0].getStringAsBytes(2), secondStringBytes));
+
+        java.util.Arrays.fill(firstStringBytes, (byte)'q');
+        firstString = new String(firstStringBytes, "UTF-8");
+        java.util.Arrays.fill(secondStringBytes, (byte)'r');
+        secondString = new String(secondStringBytes, "UTF-8");
+
+        params = new Object[] {
+                "JUMBO_ROW",
+                0,
+                0,
+                0,
+                0,
+                0,
+                0.0,
+                new TimestampType(0),
+                firstString,
+                secondString,
+                "",
+                "",
+                VoltType.NULL_DECIMAL
+        };
+
+        results = client.callProcedure("Update", params);
+        params = null;
+        firstString = null;
+        secondString = null;
+
+        assertEquals(results.length, 1);
+        assertEquals( 1, results[0].asScalarLong());
+
+        results = client.callProcedure("Select", "JUMBO_ROW", 0);
+        assertEquals(results.length, 1);
+        assertTrue(results[0].advanceRow());
+        assertTrue(java.util.Arrays.equals( results[0].getStringAsBytes(1), firstStringBytes));
+        assertTrue(java.util.Arrays.equals( results[0].getStringAsBytes(2), secondStringBytes));
+    }
 
     public void testUpdateDecimalWithPVE()
     throws NoConnectionsException, ProcCallException, IOException
@@ -937,6 +1010,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
         project.addPartitionInfo("WITH_NULL_DEFAULTS", "PKEY");
         project.addPartitionInfo("EXPRESSIONS_WITH_NULLS", "PKEY");
         project.addPartitionInfo("EXPRESSIONS_NO_NULLS", "PKEY");
+        project.addPartitionInfo("JUMBO_ROW", "PKEY");
         project.addProcedures(PROCEDURES);
 
 

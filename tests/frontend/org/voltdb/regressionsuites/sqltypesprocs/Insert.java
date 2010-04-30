@@ -56,6 +56,9 @@ public class Insert extends VoltProcedure {
     public final SQLStmt i_expressions_no_nulls = new SQLStmt
       ("INSERT INTO EXPRESSIONS_NO_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
+    public final SQLStmt i_jumbo_row = new SQLStmt
+    ("INSERT INTO JUMBO_ROW VALUES (?, ?, ?)");
+
     public VoltTable[] run(
             String tablename,
             long pkey,
@@ -108,6 +111,8 @@ public class Insert extends VoltProcedure {
             voltQueueSQL(i_expressions_no_nulls, pkey, v_tinyint, v_smallint, v_integer,
                          a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
                          a_pool_s, a_pool_max_s, a_decimal);
+        } else if (tablename.equals("JUMBO_ROW")) {
+            voltQueueSQL(i_jumbo_row, 0, a_inline_s1, a_inline_s2);
         }
 
         return voltExecuteSQL();

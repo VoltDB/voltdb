@@ -114,7 +114,10 @@ CREATE TABLE EXPRESSIONS_NO_NULLS (
  PRIMARY KEY (PKEY)
 );
 
-
-
-
-
+-- Table for super big rows that test max supported storage
+CREATE TABLE JUMBO_ROW (
+ PKEY          INTEGER      NOT NULL,
+ STRING1       VARCHAR(1048576),
+ STRING2       VARCHAR(1048572),
+ PRIMARY KEY (PKEY)
+);
