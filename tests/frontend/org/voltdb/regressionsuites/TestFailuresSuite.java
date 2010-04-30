@@ -32,6 +32,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.exceptions.ConstraintFailureException;
 import org.voltdb.regressionsuites.failureprocs.CleanupFail;
 import org.voltdb.regressionsuites.failureprocs.DivideByZero;
 import org.voltdb.regressionsuites.failureprocs.FetchTooMuch;
@@ -136,6 +137,12 @@ public class TestFailuresSuite extends RegressionSuite {
             client.callProcedure("InsertBigString", 0, new String(stringData, "UTF-8"));
         } catch (ProcCallException e) {
             threwException = true;
+            assertTrue(e.getMessage().contains("CONSTRAINT VIOLATION"));
+            assertTrue(e.getCause().getMessage().contains("UNIQUE"));
+            VoltTable table = ((ConstraintFailureException)e.getCause()).getTuples();
+            table.resetRowPosition();
+            assertTrue(table.advanceRow());
+            assertTrue(java.util.Arrays.equals(stringData, table.getStringAsBytes(2)));
         }
         assertTrue(threwException);
     }
