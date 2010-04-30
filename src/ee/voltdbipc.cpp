@@ -258,10 +258,10 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
     if (result != kErrorCode_None) {
         ssize_t bytes = 0;
         if (result == kErrorCode_Error) {
-            char msg[3];
+            char msg[5];
             msg[0] = result;
-            *reinterpret_cast<int16_t*>(&msg[1]) = 0;//exception length 0
-            bytes = write(m_fd, msg, sizeof(int8_t) + sizeof(int16_t));
+            *reinterpret_cast<int32_t*>(&msg[1]) = 0;//exception length 0
+            bytes = write(m_fd, msg, sizeof(int8_t) + sizeof(int32_t));
         } else {
             bytes = write(m_fd, &result, sizeof(int8_t));
         }
