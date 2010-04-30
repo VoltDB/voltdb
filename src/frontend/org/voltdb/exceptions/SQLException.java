@@ -60,8 +60,8 @@ public class SQLException extends SerializableException {
      * Return the amount of storage necesary to store the 5 character SQL state, 2 byte string length, and message.
      */
     @Override
-    protected short p_getSerializedSize() {
-        return (short)(5);// sqlState + messageBytesLength + messageBytes
+    protected int p_getSerializedSize() {
+        return 5;// sqlState + messageBytesLength + messageBytes
     }
 
     /**

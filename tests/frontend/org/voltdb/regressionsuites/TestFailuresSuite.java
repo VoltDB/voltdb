@@ -119,6 +119,27 @@ public class TestFailuresSuite extends RegressionSuite {
         return;
     }
 
+    /*
+     * Check that a very large ConstraintFailureException can serialize correctly.
+     */
+    public void testTicket511_ViolateUniquenessWithLargeString() throws Exception {
+        Client client = getClient();
+        System.out.println("STARTING testTicket511_ViolateUniquenessWithLargeString");
+        byte stringData[] = new byte[60000];
+        java.util.Arrays.fill(stringData, (byte)'a');
+
+        client.callProcedure("InsertBigString", 0, new String(stringData, "UTF-8"));
+
+        java.util.Arrays.fill(stringData, (byte)'b');
+        boolean threwException = false;
+        try {
+            client.callProcedure("InsertBigString", 0, new String(stringData, "UTF-8"));
+        } catch (ProcCallException e) {
+            threwException = true;
+        }
+        assertTrue(threwException);
+    }
+
     public void testDivideByZero() throws IOException {
         System.out.println("STARTING DivideByZero");
         Client client = getClient();

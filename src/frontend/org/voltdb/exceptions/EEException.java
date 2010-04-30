@@ -52,7 +52,7 @@ public class EEException extends SerializableException {
     }
 
     @Override
-    protected short p_getSerializedSize() {
+    protected int p_getSerializedSize() {
         return 4;
     }
 

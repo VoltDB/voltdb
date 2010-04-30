@@ -106,6 +106,7 @@ public class ConstraintFailureException extends SQLException {
      */
     private VoltTable table = null;
 
+    @Override
     public String getMessage() {
         if (buffer.capacity() == 0) {
             return super.getMessage();
@@ -125,6 +126,7 @@ public class ConstraintFailureException extends SQLException {
      * Retrieve a string representation of the exception. If this is a rethrown HSQLDB exception it returns the enclosed exceptions
      * string. Otherwise a new string is generated with the details of the constraint violation.
      */
+    @Override
     public String toString() {
         return getMessage();
     }
@@ -135,8 +137,8 @@ public class ConstraintFailureException extends SQLException {
     }
 
     @Override
-    protected short p_getSerializedSize() {
-        return (short)(super.p_getSerializedSize() + 12 + buffer.capacity());
+    protected int p_getSerializedSize() {
+        return super.p_getSerializedSize() + 12 + buffer.capacity();
     }
 
     @Override

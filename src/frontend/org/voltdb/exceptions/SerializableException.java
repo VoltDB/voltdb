@@ -130,7 +130,7 @@ public class SerializableException extends VoltProcedure.VoltAbortException {
      * subclass data
      * @return Number of bytes necessary to store subclass data
      */
-    protected short p_getSerializedSize() {
+    protected int p_getSerializedSize() {
         return 0;
     }
 
