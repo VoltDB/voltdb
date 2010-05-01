@@ -488,7 +488,7 @@ class FastSerializer:
         return val[0].decode("utf-8")
 
     def readString(self):
-        # length preceeded (2 byte value) string
+        # length preceeded (4 byte value) string
         length = self.readInt32()
         if self.NullCheck[self.VOLTTYPE_STRING](length) == None:
             return None
@@ -777,7 +777,7 @@ class VoltException:
     VOLTEXCEPTION_GENERIC = 4
 
     def __init__(self, fser):
-        self.length = fser.readInt16()
+        self.length = fser.readInt32()
         if self.length == 0:
             self.type = self.VOLTEXCEPTION_NONE
             return
