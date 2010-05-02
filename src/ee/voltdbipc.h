@@ -122,6 +122,7 @@ private:
 
     int8_t activateCopyOnWrite(struct ipc_command *cmd);
     void  cowSerializeMore(struct ipc_command *cmd);
+    void  eltAction(struct ipc_command *cmd);
 
     void signalHandler(int signum, siginfo_t *info, void *context);
     static void signalDispatcher(int signum, siginfo_t *info, void *context);

@@ -45,7 +45,6 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.utils.NotImplementedException;
 import org.voltdb.utils.DBBPool.BBContainer;
 
 
@@ -122,8 +121,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         Quiesce(16),
         ActivateCopyOnWrite(17),
         COWSerializeMore(18),
-        UpdateCatalog(19);
-
+        UpdateCatalog(19),
+        ELTAction(20);
         Commands(final int id) {
             m_id = id;
         }
@@ -1287,7 +1286,40 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     @Override
     public ELTProtoMessage eltAction(boolean mAckAction, boolean mPollAction,
             long mAckTxnId, int partitionId, int mTableId) {
-        throw new NotImplementedException("No eltAction interface in IPC bridge.");
+        try {
+            m_data.clear();
+            m_data.putInt(Commands.ELTAction.m_id);
+            m_data.putInt(mAckAction ? 1 : 0);
+            m_data.putInt(mPollAction ? 1 : 0);
+            m_data.putLong(mAckTxnId);
+            m_data.putInt(mTableId);
+            m_data.flip();
+            m_connection.write();
+
+            ByteBuffer data = null;
+            ByteBuffer results = ByteBuffer.allocate(12);
+            while (results.remaining() > 0)
+                m_connection.m_socketChannel.read(results);
+            results.flip();
+            long result_offset = results.getLong();
+            int result_sz = results.getInt();
+            data = ByteBuffer.allocate(result_sz + 4);
+            data.putInt(result_sz);
+            while (data.remaining() > 0)
+                m_connection.m_socketChannel.read(data);
+            data.flip();
+
+            ELTProtoMessage reply = null;
+            if (mPollAction) {
+                reply = new ELTProtoMessage(partitionId, mTableId);
+                reply.pollResponse(result_offset, data);
+            }
+            return reply;
+
+        } catch (final IOException e) {
+            throw new RuntimeException(e);
+        }
+
     }
 
 }

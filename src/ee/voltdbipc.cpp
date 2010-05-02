@@ -159,6 +159,18 @@ typedef struct {
     int bufferSize;
 }__attribute__((packed)) cow_serialize_more;
 
+/*
+ * Header for an ELT action.
+ */
+typedef struct {
+    struct ipc_command cmd;
+    int32_t isAck;
+    int32_t isPoll;
+    int64_t offset;
+    int32_t tableId;
+}__attribute__((packed)) elt_action;
+
+
 using namespace voltdb;
 
 /*
@@ -247,6 +259,10 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
         break;
       case 19:
         result = updateCatalog(cmd);
+        break;
+      case 20:
+        eltAction(cmd);
+        result = kErrorCode_None;
         break;
       default:
         result = stub(cmd);
@@ -972,6 +988,31 @@ void VoltDBIPC::cowSerializeMore(struct ipc_command *cmd) {
         crashVoltDB(e);
     }
 }
+
+void VoltDBIPC::eltAction(struct ipc_command *cmd) {
+    elt_action *action = (elt_action*)cmd;
+    ssize_t bytesWritten = 0;
+    m_engine->resetReusedResultOutputBuffer();
+    long result = m_engine->eltAction(action->isAck,
+                                      action->isPoll,
+                                      ntohll(action->offset),
+                                      ntohl(action->tableId));
+    int buflength = m_engine->getResultsSize();
+
+    // write offset across bigendian.
+    result = htonll(result);
+    for (bytesWritten = 0; bytesWritten < 8; ) {
+        bytesWritten += write(m_fd, &result, 8 - bytesWritten);
+    }
+
+    // write the poll data. It is at least 4 bytes of length prefix.
+    for (bytesWritten = 0; bytesWritten < buflength; ) {
+        bytesWritten += write(m_fd,
+                              (m_engine->getReusedResultBuffer() + bytesWritten),
+                              (buflength - bytesWritten));
+    }
+}
+
 
 /**
  * The following code is for handling signals. A stack trace will be printed
