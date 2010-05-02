@@ -40,6 +40,7 @@ public:
                        CatalogId tableId, int64_t createTime);
 
     ~TupleStreamWrapper() {
+        cleanupManagedBuffers(NULL);
     }
 
     /**
