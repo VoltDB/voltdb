@@ -22,7 +22,4 @@
             <partition table='BID' column='ITEMID' />
         </partitions>
     </database>
-    <!--<vertica-el enabled='false' user='dbadmin' pass=''>
-         <host address='vertica.ip.address.here' />
-    </vertica-el>-->
 </project>
