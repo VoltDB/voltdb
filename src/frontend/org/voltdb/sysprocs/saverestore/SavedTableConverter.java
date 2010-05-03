@@ -52,7 +52,7 @@ public abstract class SavedTableConverter
                 return true;
             }
         }
-        return true;
+        return false;
     }
 
     public static VoltTable convertTable(VoltTable inputTable,

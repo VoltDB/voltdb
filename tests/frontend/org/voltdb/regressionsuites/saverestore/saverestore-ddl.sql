@@ -57,3 +57,11 @@ CREATE TABLE CHANGE_TYPES (
   BECOMES_FLOAT INTEGER, -- this column becomes a float
   BECOMES_TINY INTEGER --this column becomes a tinyint
 );
+
+-- Table for super big rows that test max supported storage
+CREATE TABLE JUMBO_ROW (
+ PKEY          INTEGER      NOT NULL,
+ STRING1       VARCHAR(1048576),
+ STRING2       VARCHAR(1048564),
+ PRIMARY KEY (PKEY)
+);

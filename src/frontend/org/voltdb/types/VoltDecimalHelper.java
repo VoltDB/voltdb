@@ -190,7 +190,7 @@ public class VoltDecimalHelper {
           boolean isNegative = false;
           if (unscaledBI.signum() < 0) {
               isNegative = true;
-              unscaledBI.negate();
+              unscaledBI = unscaledBI.negate();
           }
           final byte unscaledValue[] = unscaledBI.toByteArray();
           if (unscaledValue.length > 16) {

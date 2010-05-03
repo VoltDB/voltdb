@@ -311,14 +311,19 @@ public class DDLCompiler {
         for (Column c : columnMap.values()) {
             VoltType t = VoltType.get((byte)c.getType());
             if (t == VoltType.STRING) {
+                if (c.getSize() > 1024 * 1024) {
+                    throw m_compiler.new VoltCompilerException("Table name " + name + " column " + c.getName() +
+                            " has a maximum size of " + c.getSize() + " bytes" +
+                            " but the maximum supported size is " + VoltType.MAX_VALUE_LENGTH_STR);
+                }
                 maxRowSize += 4 + c.getSize();
             } else {
                 maxRowSize += t.getLengthInBytesForFixedTypes();
             }
         }
         if (maxRowSize > MAX_ROW_SIZE) {
-//            throw new VoltCompilerException("Table name " + name + " has a maximum row size of " + maxRowSize +
-//                    " but the maximum supported row size is " + MAX_ROW_SIZE);
+            throw m_compiler.new VoltCompilerException("Table name " + name + " has a maximum row size of " + maxRowSize +
+                    " but the maximum supported row size is " + MAX_ROW_SIZE);
         }
     }
 

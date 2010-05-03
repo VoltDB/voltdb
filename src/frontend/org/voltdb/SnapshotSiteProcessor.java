@@ -48,7 +48,7 @@ public class SnapshotSiteProcessor {
      * Pick a buffer length that is big enough to store at least one of the largest size tuple supported
      * in the system (2 megabytes). Add a fudge factor for metadata.
      */
-    public static final int m_snapshotBufferLength = 262144 + Short.MAX_VALUE;
+    public static final int m_snapshotBufferLength = (1024 * 1024 * 2) + Short.MAX_VALUE;
     private final ArrayList<BBContainer> m_snapshotBufferOrigins =
         new ArrayList<BBContainer>();
     /**

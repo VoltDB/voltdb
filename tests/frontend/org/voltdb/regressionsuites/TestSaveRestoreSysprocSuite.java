@@ -51,6 +51,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.regressionsuites.saverestore.CatalogChangeSingleProcessServer;
 import org.voltdb.regressionsuites.saverestore.SaveRestoreTestProjectBuilder;
+import org.voltdb.types.TimestampType;
 import org.voltdb.utils.SnapshotConverter;
 import org.voltdb.utils.SnapshotVerifier;
 
@@ -366,6 +367,52 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         }
     }
 
+    public void testSaveRestoreJumboRows()
+    throws IOException, InterruptedException, ProcCallException
+    {
+        Client client = getClient();
+        byte firstStringBytes[] = new byte[1048576];
+        java.util.Arrays.fill(firstStringBytes, (byte)'c');
+        String firstString = new String(firstStringBytes, "UTF-8");
+        byte secondStringBytes[] = new byte[1048564];
+        java.util.Arrays.fill(secondStringBytes, (byte)'a');
+        String secondString = new String(secondStringBytes, "UTF-8");
+
+        VoltTable results[] = client.callProcedure("JumboInsert", 0, firstString, secondString);
+        firstString = null;
+        secondString = null;
+
+        assertEquals(results.length, 1);
+        assertEquals( 1, results[0].asScalarLong());
+
+        results = client.callProcedure("JumboSelect", 0);
+        assertEquals(results.length, 1);
+        assertTrue(results[0].advanceRow());
+        assertTrue(java.util.Arrays.equals( results[0].getStringAsBytes(1), firstStringBytes));
+        assertTrue(java.util.Arrays.equals( results[0].getStringAsBytes(2), secondStringBytes));
+
+        saveTables(client);
+        validateSnapshot(true);
+
+        // Kill and restart all the execution sites.
+        m_config.shutDown();
+
+        releaseClient(client);
+        // Kill and restart all the execution sites.
+        m_config.shutDown();
+        m_config.startUp();
+
+        client = getClient();
+
+        client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT);
+
+        results = client.callProcedure("JumboSelect", 0);
+        assertEquals(results.length, 1);
+        assertTrue(results[0].advanceRow());
+        assertTrue(java.util.Arrays.equals( results[0].getStringAsBytes(1), firstStringBytes));
+        assertTrue(java.util.Arrays.equals( results[0].getStringAsBytes(2), secondStringBytes));
+    }
+
     public void testTSVConversion() throws Exception
     {
         Client client = getClient();
@@ -575,7 +622,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         assertNotNull(deleteResults);
         assertEquals( 1, deleteResults.length);
         assertEquals( 9, deleteResults[0].getColumnCount());
-        assertEquals( 7, deleteResults[0].getRowCount());
+        assertEquals( 8, deleteResults[0].getRowCount());
         tmp_files = tmp_dir.listFiles(cleaner);
         assertEquals( 0, tmp_files.length);
 

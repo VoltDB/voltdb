@@ -74,7 +74,7 @@ public class TableSaveFile
      * big enough...
      */
     private static final int DEFAULT_CHUNKSIZE =
-        org.voltdb.SnapshotSiteProcessor.m_snapshotBufferLength + Short.MAX_VALUE;
+        org.voltdb.SnapshotSiteProcessor.m_snapshotBufferLength;
 
     public TableSaveFile(
             FileChannel dataIn,
@@ -500,8 +500,9 @@ public class TableSaveFile
                         throw new IOException("Corrupted TableSaveFile chunk has negative chunk length");
                     }
 
-                    if (nextChunkLength > 2097152) {
-                        throw new IOException("Corrupted TableSaveFile chunk has unreasonable length > 2 megs");
+                    if (nextChunkLength > DEFAULT_CHUNKSIZE) {
+                        throw new IOException("Corrupted TableSaveFile chunk has unreasonable length " +
+                                "> DEFAULT_CHUNKSIZE bytes");
                     }
 
                     /*

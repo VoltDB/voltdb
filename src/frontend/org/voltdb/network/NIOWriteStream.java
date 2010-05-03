@@ -620,7 +620,7 @@ public class NIOWriteStream implements WriteStream {
         if (m_lastPendingWriteTime == -1) {
             m_lastPendingWriteTime = EstTime.currentTimeMillis();
         }
-        if (m_queuedWrites.size() > 1000 && !m_hadBackPressure) {
+        if (m_queuedWrites.size() > m_maxQueuedWrites && !m_hadBackPressure) {
             backpressureStarted();
         }
     }

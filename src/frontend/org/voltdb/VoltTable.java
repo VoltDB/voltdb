@@ -646,7 +646,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
             final int rowsize = m_buffer.position() - pos - 4;
 
             // check for too big rows
-            if ((rowsize + 4) > VoltTableRow.MAX_TUPLE_LENGTH) {
+            if (rowsize > VoltTableRow.MAX_TUPLE_LENGTH) {
                 throw new VoltOverflowException(
                         "Table row total length larger than allowed max " + VoltTableRow.MAX_TUPLE_LENGTH_STR);
             }

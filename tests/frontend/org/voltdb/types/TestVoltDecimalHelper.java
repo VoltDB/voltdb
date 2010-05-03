@@ -27,6 +27,7 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 
 import junit.framework.TestCase;
+import org.voltdb.messaging.*;
 
 public class TestVoltDecimalHelper extends TestCase {
 
@@ -47,8 +48,8 @@ public class TestVoltDecimalHelper extends TestCase {
         assertEquals(bd2, null);
     }
 
-    public void testSerializatinRoundTrip() {
-        BigDecimal bd = new BigDecimal(7654321).setScale(12);
+    public void testSerializatinRoundTrip() throws Exception {
+        BigDecimal bd = new BigDecimal("7654321");
         ByteBuffer buf = ByteBuffer.allocate(100);
 
         VoltDecimalHelper.serializeBigDecimal(bd, buf);
@@ -59,6 +60,41 @@ public class TestVoltDecimalHelper extends TestCase {
         System.out.println(bd2.toString());
 
         int cmp = bd.compareTo(bd2);
+        assertEquals(0, cmp);
+
+        FastSerializer fs = new FastSerializer();
+        VoltDecimalHelper.serializeBigDecimal(bd, fs);
+        BigDecimal bd3 = VoltDecimalHelper.deserializeBigDecimal(fs.getBuffer());
+
+        System.out.println(bd.toString());
+        System.out.println(bd3.toString());
+
+        cmp = bd.compareTo(bd3);
+        assertEquals(0, cmp);
+    }
+
+    public void testSerializatinRoundTripNegative() throws Exception {
+        BigDecimal bd = new BigDecimal("-23325.23425");
+        ByteBuffer buf = ByteBuffer.allocate(100);
+
+        VoltDecimalHelper.serializeBigDecimal(bd, buf);
+        buf.flip();
+        BigDecimal bd2  = VoltDecimalHelper.deserializeBigDecimal(buf);
+
+        System.out.println(bd.toString());
+        System.out.println(bd2.toString());
+
+        int cmp = bd.compareTo(bd2);
+        assertEquals(0, cmp);
+
+        FastSerializer fs = new FastSerializer();
+        VoltDecimalHelper.serializeBigDecimal(bd, fs);
+        BigDecimal bd3 = VoltDecimalHelper.deserializeBigDecimal(fs.getBuffer());
+
+        System.out.println(bd.toString());
+        System.out.println(bd3.toString());
+
+        cmp = bd.compareTo(bd3);
         assertEquals(0, cmp);
     }
 

@@ -888,7 +888,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
         byte firstStringBytes[] = new byte[1048576];
         java.util.Arrays.fill(firstStringBytes, (byte)'c');
         String firstString = new String(firstStringBytes, "UTF-8");
-        byte secondStringBytes[] = new byte[1048572];
+        byte secondStringBytes[] = new byte[1048564];
         java.util.Arrays.fill(secondStringBytes, (byte)'a');
         String secondString = new String(secondStringBytes, "UTF-8");
 

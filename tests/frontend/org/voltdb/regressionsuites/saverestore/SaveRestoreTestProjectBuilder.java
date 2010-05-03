@@ -34,11 +34,12 @@ import org.voltdb.utils.CatalogUtil;
 public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
 {
     public static Class<?> PROCEDURES[] =
-        new Class<?>[] { MatView.class, SaveRestoreSelect.class };
+        new Class<?>[] { MatView.class, SaveRestoreSelect.class};
 
     public static String partitioning[][] =
         new String[][] {{"PARTITION_TESTER", "PT_ID"},
-                        {"CHANGE_COLUMNS", "ID"}};
+                        {"CHANGE_COLUMNS", "ID"},
+                        {"JUMBO_ROW", "PKEY"}};
 
     public static final URL ddlURL =
         SaveRestoreTestProjectBuilder.class.getResource("saverestore-ddl.sql");
@@ -68,6 +69,9 @@ public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
         addDefaultProcedures();
         addDefaultPartitioning();
         addDefaultSchema();
+        addStmtProcedure("JumboInsert", "INSERT INTO JUMBO_ROW VALUES ( ?, ?, ?)", "JUMBO_ROW.PKEY: 0");
+        addStmtProcedure("JumboSelect", "SELECT * FROM JUMBO_ROW WHERE PKEY = ?", "JUMBO_ROW.PKEY: 0");
+        addStmtProcedure("JumboCount", "SELECT COUNT(*) FROM JUMBO_ROW");
     }
 
     public String getJARFilename()
@@ -83,6 +87,10 @@ public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
         addDefaultSchema();
         addDefaultPartitioning();
         addDefaultProcedures();
+
+        addStmtProcedure("JumboInsert", "INSERT INTO JUMBO_ROW VALUES ( ?, ?, ?)", "JUMBO_ROW.PKEY: 0");
+        addStmtProcedure("JumboSelect", "SELECT * FROM JUMBO_ROW WHERE PKEY = ?", "JUMBO_ROW.PKEY: 0");
+        addStmtProcedure("JumboCount", "SELECT COUNT(*) FROM JUMBO_ROW");
 
         boolean status = compile(catalogJar);
         assert(status);
