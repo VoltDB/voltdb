@@ -49,6 +49,13 @@ def isNaN(d):
             s.tostring() == "\x00\x00\x00\x00\x00\x00\xf8\xff" or
             s.tostring() == "\x00\x00\x00\x00\x00\x00\xf0\x7f")
 
+def if_else(cond, a, b):
+    """Work around Python 2.4
+    """
+
+    if cond: return a
+    else: return b
+
 class FastSerializer:
     "Primitive type de/serialization in VoltDB formats"
 
@@ -151,32 +158,32 @@ class FastSerializer:
                               lambda x: None,
                           self.VOLTTYPE_TINYINT:
                               lambda x:
-                              None if x == self.__class__.NULL_TINYINT_INDICATOR \
-                              else x,
+                              if_else(x == self.__class__.NULL_TINYINT_INDICATOR,
+                                      None, x),
                           self.VOLTTYPE_SMALLINT:
                               lambda x:
-                              None if x == self.__class__.NULL_SMALLINT_INDICATOR \
-                              else x,
+                              if_else(x == self.__class__.NULL_SMALLINT_INDICATOR,
+                                      None, x),
                           self.VOLTTYPE_INTEGER:
                               lambda x:
-                              None if x == self.__class__.NULL_INTEGER_INDICATOR \
-                              else x,
+                              if_else(x == self.__class__.NULL_INTEGER_INDICATOR,
+                                      None, x),
                           self.VOLTTYPE_BIGINT:
                               lambda x:
-                              None if x == self.__class__.NULL_BIGINT_INDICATOR \
-                              else x,
+                              if_else(x == self.__class__.NULL_BIGINT_INDICATOR,
+                                      None, x),
                           self.VOLTTYPE_FLOAT:
                               lambda x:
-                              None if abs(x - self.__class__.NULL_FLOAT_INDICATOR) < 1e307 \
-                              else x,
+                              if_else(abs(x - self.__class__.NULL_FLOAT_INDICATOR) < 1e307,
+                                      None, x),
                           self.VOLTTYPE_STRING:
                               lambda x:
-                              None if x == self.__class__.NULL_STRING_INDICATOR \
-                              else x,
+                              if_else(x == self.__class__.NULL_STRING_INDICATOR,
+                                      None, x),
                           self.VOLTTYPE_DECIMAL:
                               lambda x:
-                              None if x == self.NULL_DECIMAL_INDICATOR \
-                              else x}
+                              if_else(x == self.NULL_DECIMAL_INDICATOR,
+                                      None, x)}
 
         if username != None and password != None:
             self.authenticate(username, password)
@@ -219,11 +226,11 @@ class FastSerializer:
         self.flush()
 
         # A length, version number, and status code is returned
-        self.rbuf = self.socket.recv(4)
-        self.rbuf = self.socket.recv(self.readInt32())
-        self.readByte()
+        self.bufferForRead()
+        version = self.readByte()
+        status = self.readByte()
 
-        if self.readByte() != 0:
+        if status != 0:
             raise SystemExit("Authentication failed.")
 
         self.readInt32()
@@ -687,7 +694,7 @@ class VoltTable:
         result += "\n"
         result += "rows -\n"
         result += "\n".join(map(lambda x:
-                                    str(map(lambda y: "NULL" if y == None else y,
+                                    str(map(lambda y: if_else(y == None, "NULL", y),
                                             x)), self.tuples))
 
         return result
