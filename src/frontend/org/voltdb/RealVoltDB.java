@@ -32,10 +32,9 @@ import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.log4j.Level;
+import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.apache.log4j.xml.DOMConfigurator;
-import org.apache.log4j.LogManager;
-
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Site;
 import org.voltdb.catalog.SnapshotSchedule;
@@ -143,7 +142,7 @@ public class RealVoltDB implements VoltDBInterface
     public VoltDB.Configuration m_config = new VoltDB.Configuration();
     private CatalogContext m_catalogContext;
     private String m_buildString;
-    private String m_versionString = "0.7.01";
+    private String m_versionString = "0.9.01";
     // fields accessed via the singleton
     private HostMessenger m_messenger = null;
     private final ArrayList<ClientInterface> m_clientInterfaces =
