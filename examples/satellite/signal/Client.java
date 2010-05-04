@@ -49,7 +49,7 @@ public class Client {
             //Add to the database
             try {
                 VoltTable[] result = db.callProcedure(AddSatellite.class.getSimpleName(),
-                            o.id, o.model, o.country, o.currentLat, o.currentLong);
+                            o.id, o.model, o.country, o.currentLat, o.currentLong).getResults();
                 o.id = (int) result[0].asScalarLong();
                 System.out.println("Satellite ID is " + o.id);
             }
@@ -70,7 +70,7 @@ public class Client {
                 s.Move();
                 try {
                     VoltTable[] result = db.callProcedure(UpdateLocation.class.getSimpleName(),
-                            s.id,  s.currentLat, s.currentLong);
+                            s.id,  s.currentLat, s.currentLong).getResults();
                     assert (result != null);
                     long updatedRows = result[0].fetchRow(0).getLong(0);
                     assert(updatedRows > 0);

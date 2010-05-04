@@ -27,15 +27,21 @@ public class ProcCallException extends Exception {
     private static final long serialVersionUID = 1L;
     String m_message;
     Exception m_cause;
+    ClientResponse m_response;
 
-   ProcCallException(String lastCallInfo, Exception cause) {
+   ProcCallException(ClientResponse response, String lastCallInfo, Exception cause) {
        m_message = lastCallInfo;
        m_cause = cause;
+       m_response = response;
    }
 
    @Override
    public String getMessage() {
        return m_message;
+   }
+
+   public ClientResponse getClientResponse() {
+       return m_response;
    }
 
    @Override

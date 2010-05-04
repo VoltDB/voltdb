@@ -152,7 +152,7 @@ public class TestHSQLBackend extends TestCase {
         client.createConnection("localhost", "program", "none");
 
         // call the insert procedure
-        VoltTable[] results = client.callProcedure("InsertHistory", 5, 5, 5, 5, 5, 100000L, 2.5, "nada");
+        VoltTable[] results = client.callProcedure("InsertHistory", 5, 5, 5, 5, 5, 100000L, 2.5, "nada").getResults();
         // check one table was returned
         assertTrue(results.length > 0);
         assertTrue(results[0].getRowCount() == 1);

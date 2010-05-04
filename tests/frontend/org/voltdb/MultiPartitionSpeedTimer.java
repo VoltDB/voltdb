@@ -50,9 +50,9 @@ public class MultiPartitionSpeedTimer extends TestCase {
     long m_duration;
     Client m_client;
 
-    class SpeedTestCallback extends ProcedureCallback {
+    class SpeedTestCallback implements ProcedureCallback {
         @Override
-        protected void clientCallback(ClientResponse clientResponse) {
+        public void clientCallback(ClientResponse clientResponse) {
             if (clientResponse.getStatus() == ClientResponse.CONNECTION_LOST){
                 return;
             }

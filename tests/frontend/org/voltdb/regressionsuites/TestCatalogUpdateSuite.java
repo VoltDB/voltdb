@@ -83,7 +83,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
     AtomicInteger m_outstandingCalls = new AtomicInteger(0);
 
-    class CatTestCallback extends ProcedureCallback {
+    class CatTestCallback implements ProcedureCallback {
 
         final byte m_expectedStatus;
 
@@ -93,7 +93,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         }
 
         @Override
-        protected void clientCallback(ClientResponse clientResponse) {
+        public void clientCallback(ClientResponse clientResponse) {
             m_outstandingCalls.decrementAndGet();
             if (m_expectedStatus != clientResponse.getStatus()) {
                 if (clientResponse.getExtra() != null)
@@ -157,7 +157,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // this is a do nothing change... shouldn't affect anything
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.jar");
-        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
+        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL).getResults();
         assertTrue(results.length == 1);
 
         client.drain();
@@ -204,17 +204,17 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // change the insert new order procedure
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-conflict.jar");
-        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
+        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL).getResults();
         assertTrue(results.length == 1);
 
         // call the new proc and make sure the one we want gets run
-        results = client.callProcedure(InsertNewOrder.class.getSimpleName(), 100, 100, 100, 100, 100, 100, 1.0, "a");
+        results = client.callProcedure(InsertNewOrder.class.getSimpleName(), 100, 100, 100, 100, 100, 100, 1.0, "a").getResults();
         assertEquals(1, results.length);
         assertEquals(1776, results[0].asScalarLong());
 
         // load a big catalog change just to make sure nothing fails horribly
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-many.jar");
-        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
+        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL).getResults();
         assertTrue(results.length == 1);
 
         loadSomeData(client, 65, 5);

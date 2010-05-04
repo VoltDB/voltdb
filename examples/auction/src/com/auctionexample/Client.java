@@ -100,7 +100,7 @@ public class Client {
         ///////////////////////////////////////
         VoltTable infoResult = null;
         try {
-            VoltTable[] infoResultSet = client.callProcedure("GetAuctionInfo", auctionId);
+            VoltTable[] infoResultSet = client.callProcedure("GetAuctionInfo", auctionId).getResults();
             if (infoResultSet.length != 1) throw new Exception("GetAuctionInfo returned no results");
             infoResult = infoResultSet[0];
         } catch (Exception e) {
@@ -115,7 +115,7 @@ public class Client {
 
         VoltTable bidResult = null;
         try {
-            VoltTable[] bidResultSet = client.callProcedure("BidOnAuction", auctionId, userId, newBidAmount, nextBidId++);
+            VoltTable[] bidResultSet = client.callProcedure("BidOnAuction", auctionId, userId, newBidAmount, nextBidId++).getResults();
             if (bidResultSet.length != 1) throw new Exception("BidOnAuction returned no results");
             bidResult = bidResultSet[0];
         } catch (Exception e) {
@@ -183,7 +183,7 @@ public class Client {
 
                 // loop over all auction ids, printing a row of status for each one
                 for (long auctionId : allAuctionIds) {
-                    VoltTable[] statusResultSet = client.callProcedure("AuctionStatus", auctionId);
+                    VoltTable[] statusResultSet = client.callProcedure("AuctionStatus", auctionId).getResults();
                     if (statusResultSet.length != 1) throw new Exception("AuctionStatus returned no results");
                     VoltTable statusTable = statusResultSet[0];
                     VoltTableRow row = statusTable.fetchRow(0);

@@ -72,7 +72,7 @@ public class TestRollbackSuite extends RegressionSuite {
         }
 
         try {
-            VoltTable[] results = client.callProcedure("SelectAll");
+            VoltTable[] results = client.callProcedure("SelectAll").getResults();
 
             assertEquals(results.length, 9);
 
@@ -81,7 +81,7 @@ public class TestRollbackSuite extends RegressionSuite {
             assertTrue(table.getRowCount() == 0);
 
             // check the mat view
-            results = client.callProcedure("ReadMatView", 2);
+            results = client.callProcedure("ReadMatView", 2).getResults();
             assertEquals(results.length, 1);
             assertTrue(results[0].getRowCount() == 0);
 
@@ -110,7 +110,7 @@ public class TestRollbackSuite extends RegressionSuite {
         }
 
         try {
-            VoltTable[] results = client.callProcedure("SelectAll");
+            VoltTable[] results = client.callProcedure("SelectAll").getResults();
 
             assertEquals(results.length, 9);
 
@@ -119,7 +119,7 @@ public class TestRollbackSuite extends RegressionSuite {
             assertTrue(table.getRowCount() == 0);
 
             // check the mat view
-            results = client.callProcedure("ReadMatView", 2);
+            results = client.callProcedure("ReadMatView", 2).getResults();
             assertEquals(results.length, 1);
             assertTrue(results[0].getRowCount() == 0);
         }
@@ -147,7 +147,7 @@ public class TestRollbackSuite extends RegressionSuite {
         }
 
         try {
-            VoltTable[] results = client.callProcedure("SelectAll");
+            VoltTable[] results = client.callProcedure("SelectAll").getResults();
 
             assertEquals(results.length, 9);
 
@@ -156,7 +156,7 @@ public class TestRollbackSuite extends RegressionSuite {
             assertTrue(table.getRowCount() == 0);
 
             // check the mat view
-            results = client.callProcedure("ReadMatView", 2);
+            results = client.callProcedure("ReadMatView", 2).getResults();
             assertEquals(results.length, 1);
             assertTrue(results[0].getRowCount() == 0);
         }
@@ -188,7 +188,7 @@ public class TestRollbackSuite extends RegressionSuite {
         }
 
         try {
-            VoltTable[] results = client.callProcedure("SelectAll");
+            VoltTable[] results = client.callProcedure("SelectAll").getResults();
 
             assertEquals(results.length, 9);
 
@@ -201,7 +201,7 @@ public class TestRollbackSuite extends RegressionSuite {
             assertEquals(2, table.getLong(2));
 
             // check the mat view
-            results = client.callProcedure("ReadMatView", 2);
+            results = client.callProcedure("ReadMatView", 2).getResults();
             assertEquals(results.length, 1);
             assertTrue(results[0].getRowCount() == 1);
             results[0].advanceRow();
@@ -239,7 +239,7 @@ public class TestRollbackSuite extends RegressionSuite {
 
         VoltTable results[] = null;
         try {
-            results = client.callProcedure("@AdHoc", "SELECT * FROM CUSTOMER_NAME");
+            results = client.callProcedure("@AdHoc", "SELECT * FROM CUSTOMER_NAME").getResults();
         } catch (ProcCallException e) {
             fail();
         }
@@ -265,7 +265,7 @@ public class TestRollbackSuite extends RegressionSuite {
 
         results = null;
         try {
-            results = client.callProcedure("@AdHoc", "SELECT * FROM CUSTOMER_NAME");
+            results = client.callProcedure("@AdHoc", "SELECT * FROM CUSTOMER_NAME").getResults();
         } catch (ProcCallException e) {
             fail();
         }
@@ -332,7 +332,7 @@ public class TestRollbackSuite extends RegressionSuite {
         }
 
         try {
-            VoltTable[] results = client.callProcedure("SelectAll");
+            VoltTable[] results = client.callProcedure("SelectAll").getResults();
 
             assertEquals(results.length, 9);
 
@@ -365,7 +365,7 @@ public class TestRollbackSuite extends RegressionSuite {
         }
 
         try {
-            VoltTable[] results = client.callProcedure("SelectAll");
+            VoltTable[] results = client.callProcedure("SelectAll").getResults();
 
             assertEquals(results.length, 9);
 
@@ -404,7 +404,7 @@ public class TestRollbackSuite extends RegressionSuite {
         try {
             System.out.println("Calling SelectAll");
             System.out.flush();
-            VoltTable[] results = client.callProcedure("SelectAll");
+            VoltTable[] results = client.callProcedure("SelectAll").getResults();
             System.out.println("Called SelectAll");
             System.out.flush();
 
@@ -450,7 +450,7 @@ public class TestRollbackSuite extends RegressionSuite {
         }
 
         try {
-            VoltTable[] results = client.callProcedure("SelectAll");
+            VoltTable[] results = client.callProcedure("SelectAll").getResults();
 
             assertEquals(results.length, 9);
 
@@ -467,7 +467,7 @@ public class TestRollbackSuite extends RegressionSuite {
             assertEquals(2, table.getLong(2));
 
             // check the mat view
-            results = client.callProcedure("ReadMatView", 2);
+            results = client.callProcedure("ReadMatView", 2).getResults();
             assertEquals(results.length, 1);
             table = results[0];
             table.advanceRow();
@@ -486,7 +486,7 @@ public class TestRollbackSuite extends RegressionSuite {
         }
 
         try {
-            VoltTable[] results = client.callProcedure("FetchNORowUsingIndex", 2, 3, 1);
+            VoltTable[] results = client.callProcedure("FetchNORowUsingIndex", 2, 3, 1).getResults();
 
             assertEquals(results.length, 1);
             VoltTable table = results[0];
@@ -529,7 +529,7 @@ public class TestRollbackSuite extends RegressionSuite {
         }
 
         try {
-            VoltTable[] results = client.callProcedure("SelectAll");
+            VoltTable[] results = client.callProcedure("SelectAll").getResults();
 
             assertEquals(results.length, 9);
 
@@ -547,7 +547,7 @@ public class TestRollbackSuite extends RegressionSuite {
             assertEquals(2, table.getLong(2));
 
             // check the mat view
-            results = client.callProcedure("ReadMatView", 2);
+            results = client.callProcedure("ReadMatView", 2).getResults();
             assertEquals(results.length, 1);
             table = results[0];
             table.advanceRow();
@@ -566,7 +566,7 @@ public class TestRollbackSuite extends RegressionSuite {
         }
 
         try {
-            VoltTable[] results = client.callProcedure("FetchNORowUsingIndex", 2, 4, 3);
+            VoltTable[] results = client.callProcedure("FetchNORowUsingIndex", 2, 4, 3).getResults();
 
             assertEquals(results.length, 1);
             VoltTable table = results[0];
@@ -610,7 +610,7 @@ public class TestRollbackSuite extends RegressionSuite {
         }
 
         try {
-            VoltTable[] results = client.callProcedure("SelectAll");
+            VoltTable[] results = client.callProcedure("SelectAll").getResults();
 
             assertEquals(results.length, 9);
 
@@ -628,7 +628,7 @@ public class TestRollbackSuite extends RegressionSuite {
             assertEquals(2, table.getLong(2));
 
             // check the mat view
-            results = client.callProcedure("ReadMatView", 2);
+            results = client.callProcedure("ReadMatView", 2).getResults();
             assertEquals(results.length, 1);
             table = results[0];
             table.advanceRow();
@@ -647,7 +647,7 @@ public class TestRollbackSuite extends RegressionSuite {
         }
 
         try {
-            VoltTable[] results = client.callProcedure("FetchNORowUsingIndex", 2, 4, 3);
+            VoltTable[] results = client.callProcedure("FetchNORowUsingIndex", 2, 4, 3).getResults();
 
             assertEquals(results.length, 1);
             VoltTable table = results[0];

@@ -94,8 +94,8 @@ public interface Client {
      * @throws org.voltdb.client.ProcCallException
      * @throws NoConnectionsException
      */
-    public VoltTable[] callProcedure(String procName, Object... parameters)
-        throws ProcCallException, NoConnectionsException;
+    public ClientResponse callProcedure(String procName, Object... parameters)
+        throws IOException, NoConnectionsException, ProcCallException;
 
     /**
      * Asynchronously invoke a procedure. Does not guarantee that the invocation is actually queued. If there

@@ -529,7 +529,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
 
             // verify that the row was inserted
             try {
-                final VoltTable[] result = client.callProcedure("Select", "ALLOW_NULLS", pkey.get());
+                final VoltTable[] result = client.callProcedure("Select", "ALLOW_NULLS", pkey.get()).getResults();
                 final VoltTableRow row = result[0].fetchRow(0);
                 for (int i=0; i < COLS; ++i) {
                     final Object obj = row.get(i+1, m_types[i]);
@@ -585,7 +585,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
             }
 
             // verify that the row was updated
-            final VoltTable[] result = client.callProcedure("Select", "ALLOW_NULLS", pkey.get());
+            final VoltTable[] result = client.callProcedure("Select", "ALLOW_NULLS", pkey.get()).getResults();
             final VoltTableRow row = result[0].fetchRow(0);
             for (int i=0; i < COLS; ++i) {
                 final Object obj = row.get(i+1, m_types[i]);
@@ -635,7 +635,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
             }
 
             // verify that the row was updated
-            final VoltTable[] result = client.callProcedure("Select", "ALLOW_NULLS", pkey.get());
+            final VoltTable[] result = client.callProcedure("Select", "ALLOW_NULLS", pkey.get()).getResults();
             final VoltTableRow row = result[0].fetchRow(0);
             for (int i=0; i < COLS; ++i) {
                 final Object obj = row.get(i+1, m_types[i]);
@@ -666,7 +666,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
                 assert(params[i+2] != null);
             }
             client.callProcedure("Insert", params);
-            VoltTable[] result = client.callProcedure("Select", "ALLOW_NULLS", pkey.get());
+            VoltTable[] result = client.callProcedure("Select", "ALLOW_NULLS", pkey.get()).getResults();
             System.out.println(result[0]);
 
             try {
@@ -680,7 +680,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
             }
 
             // verify that the row was deleted
-            result = client.callProcedure("Select", "ALLOW_NULLS", pkey.get());
+            result = client.callProcedure("Select", "ALLOW_NULLS", pkey.get()).getResults();
             assertEquals(0, result[0].getRowCount());
         }
      }
@@ -709,7 +709,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
             fail();
         }
 
-        VoltTable[] result = client.callProcedure("Select", "WITH_DEFAULTS", pkey.get());
+        VoltTable[] result = client.callProcedure("Select", "WITH_DEFAULTS", pkey.get()).getResults();
         VoltTableRow row = result[0].fetchRow(0);
         for (int i=0; i < COLS; ++i) {
             Object obj = row.get(i+1, m_types[i]);
@@ -741,7 +741,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
             fail();
         }
 
-        VoltTable[] result = client.callProcedure("Select", "WITH_NULL_DEFAULTS", pkey.get());
+        VoltTable[] result = client.callProcedure("Select", "WITH_NULL_DEFAULTS", pkey.get()).getResults();
         VoltTableRow row = result[0].fetchRow(0);
         for (int i=0; i < COLS; ++i) {
             Object obj = row.get(i+1, m_types[i]);
@@ -781,7 +781,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
             params[0] = "NO_NULLS";
             client.callProcedure("Insert", params);
             // verify that the row was updated
-            final VoltTable[] result = client.callProcedure("Select", "NO_NULLS", pkey.get());
+            final VoltTable[] result = client.callProcedure("Select", "NO_NULLS", pkey.get()).getResults();
             final VoltTableRow row = result[0].fetchRow(0);
             for (int i=0; i < COLS; ++i) {
                 final Object obj = row.get(i+1, m_types[i]);
@@ -822,7 +822,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
             System.out.println("testInsertMinValues: " + k + " MIN type is " + m_types[k]);
             params[0] = "NO_NULLS";
             client.callProcedure("Insert", params);
-            final VoltTable[] result = client.callProcedure("Select", "NO_NULLS", pkey.get());
+            final VoltTable[] result = client.callProcedure("Select", "NO_NULLS", pkey.get()).getResults();
             final VoltTableRow row = result[0].fetchRow(0);
             for (int i=0; i < COLS; ++i) {
                 final Object obj = row.get(i+1, m_types[i]);
@@ -872,7 +872,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
             final String sql = "SELECT (" + m_columnNames[i] + " + 11) from NO_NULLS where "
             + m_columnNames[3] + " = " + m_midValues[3];
             System.out.println("testsimpleexpression: " + sql);
-            final VoltTable[] result = client.callProcedure("@AdHoc", sql);
+            final VoltTable[] result = client.callProcedure("@AdHoc", sql).getResults();
             final VoltTableRow row = result[0].fetchRow(0);
             final Object obj = row.get(0, m_types[i]);
 
@@ -907,7 +907,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
                 "",
                 VoltType.NULL_DECIMAL
         };
-        VoltTable results[] = client.callProcedure("Insert", params);
+        VoltTable results[] = client.callProcedure("Insert", params).getResults();
         params = null;
         firstString = null;
         secondString = null;
@@ -915,7 +915,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
         assertEquals(results.length, 1);
         assertEquals( 1, results[0].asScalarLong());
 
-        results = client.callProcedure("Select", "JUMBO_ROW", 0);
+        results = client.callProcedure("Select", "JUMBO_ROW", 0).getResults();
         assertEquals(results.length, 1);
         assertTrue(results[0].advanceRow());
         assertTrue(java.util.Arrays.equals( results[0].getStringAsBytes(1), firstStringBytes));
@@ -942,7 +942,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
                 VoltType.NULL_DECIMAL
         };
 
-        results = client.callProcedure("Update", params);
+        results = client.callProcedure("Update", params).getResults();
         params = null;
         firstString = null;
         secondString = null;
@@ -950,7 +950,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
         assertEquals(results.length, 1);
         assertEquals( 1, results[0].asScalarLong());
 
-        results = client.callProcedure("Select", "JUMBO_ROW", 0);
+        results = client.callProcedure("Select", "JUMBO_ROW", 0).getResults();
         assertEquals(results.length, 1);
         assertTrue(results[0].advanceRow());
         assertTrue(java.util.Arrays.equals( results[0].getStringAsBytes(1), firstStringBytes));
@@ -979,10 +979,10 @@ public class TestSQLTypesSuite extends RegressionSuite {
         client.callProcedure("Insert", params);
 
         // update the mid value to the minimum decimal value
-        VoltTable[] result = client.callProcedure("UpdateDecimal", m_minValues[10], m_midValues[10]);
+        VoltTable[] result = client.callProcedure("UpdateDecimal", m_minValues[10], m_midValues[10]).getResults();
 
         // select that same row again by primary key
-        result = client.callProcedure("Select", "ALLOW_NULLS", 0);
+        result = client.callProcedure("Select", "ALLOW_NULLS", 0).getResults();
 
         // and verify the row
         final VoltTableRow row = result[0].fetchRow(0);

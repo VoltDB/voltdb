@@ -30,7 +30,7 @@ public class Client {
     private void doSelect(long id) {
         System.out.println("Select(" + id + ")");
         try {
-            VoltTable[] result = client.callProcedure(Select.class.getSimpleName(), id);
+            VoltTable[] result = client.callProcedure(Select.class.getSimpleName(), id).getResults();
             assert result.length == 1;
             final int rowCount = result[0].getRowCount();
             if (rowCount == 0) {
@@ -73,7 +73,7 @@ public class Client {
     private void doInsert(long id, long item) {
         System.out.println("Insert(" + id + "," + item + ")");
         try {
-            VoltTable[] result = client.callProcedure(Insert.class.getSimpleName(), id, item);
+            VoltTable[] result = client.callProcedure(Insert.class.getSimpleName(), id, item).getResults();
             assert (result != null);
             long insertedRows = result[0].fetchRow(0).getLong(0);
             System.out.println("INSERT(" + id + "," + item + ") successfully inserted " + insertedRows + " row(s)");
@@ -99,7 +99,7 @@ public class Client {
     private void tryInvalidInsert(long id) {
         System.out.println("Insert(" + id + ")");
         try {
-            VoltTable[] result = client.callProcedure(Insert.class.getSimpleName(), id);
+            VoltTable[] result = client.callProcedure(Insert.class.getSimpleName(), id).getResults();
             assert (result != null);
             System.out.println("INVALID INSERT(" + id + ") successful");
         }
@@ -125,7 +125,7 @@ public class Client {
     private void doDelete(long id) {
         System.out.println("Delete (" + id + ")");
         try {
-            VoltTable[] result = client.callProcedure(Delete.class.getSimpleName(), id);
+            VoltTable[] result = client.callProcedure(Delete.class.getSimpleName(), id).getResults();
             assert (result != null);
             long deletedRows = result[0].fetchRow(0).getLong(0);
             System.out.println("DELETE(" + id + ") successfully deleted " + deletedRows + " row(s)");

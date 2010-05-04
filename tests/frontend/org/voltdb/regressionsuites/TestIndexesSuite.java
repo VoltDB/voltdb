@@ -474,7 +474,7 @@ public class TestIndexesSuite extends RegressionSuite {
 
         client.drain();
 
-        results = client.callProcedure("@AdHoc", "select * from P1IX");
+        results = client.callProcedure("@AdHoc", "select * from P1IX").getResults();
         System.out.printf("Table has %d rows.\n", results[0].getRowCount());
         System.out.println(results[0]);
 
@@ -496,7 +496,7 @@ public class TestIndexesSuite extends RegressionSuite {
 
         client.drain();
 
-        results = client.callProcedure("Eng506UpdateRange", 51, 17);
+        results = client.callProcedure("Eng506UpdateRange", 51, 17).getResults();
         assertNotNull(results);
         assertEquals(1, results.length);
         VoltTable result = results[0];

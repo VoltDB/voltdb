@@ -115,7 +115,7 @@ public class TPCCDebugTest extends TestCase {
     }*/
 
     public void testUpdateDebug() throws IOException, ProcCallException {
-        VoltTable[] retvals = client.callProcedure("debugUpdateProc", 0L);
+        VoltTable[] retvals = client.callProcedure("debugUpdateProc", 0L).getResults();
         assertTrue(retvals.length == 0);
     }
 

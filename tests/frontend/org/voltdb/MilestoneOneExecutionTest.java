@@ -38,7 +38,7 @@ public class MilestoneOneExecutionTest extends TestCase {
 
     public void testMilestoneOneSeparate() throws InterruptedException, IOException, ProcCallException {
         // call the insert procedure
-        VoltTable[] results = client.callProcedure("MilestoneOneInsert", 99L, "TEST");
+        VoltTable[] results = client.callProcedure("MilestoneOneInsert", 99L, "TEST").getResults();
         // check one table was returned
         assertEquals(1, results.length);
         // check one tuple was modified
@@ -47,7 +47,7 @@ public class MilestoneOneExecutionTest extends TestCase {
         System.out.println("JUNIT: Ran first statement to completion.");
 
         // call the select procedure
-        results = client.callProcedure("MilestoneOneSelect", 99L);
+        results = client.callProcedure("MilestoneOneSelect", 99L).getResults();
         // check one table was returned
         assertTrue(results.length == 1);
         // check one tuple was modified

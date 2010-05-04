@@ -106,7 +106,7 @@ public class OverheadClient extends ClientMain {
 
     }
 
-    class MeasureOverheadCallback extends ProcedureCallback {
+    class MeasureOverheadCallback implements ProcedureCallback {
 
         @Override
         public void clientCallback(ClientResponse clientResponse) {

@@ -86,7 +86,7 @@ public class ClientMover {
 
         // get the # of partitions in my cluster
         try {
-            VoltTable vtPartitionInfo[] = voltclient.callProcedure("@Statistics","partitioncount",0l);
+            VoltTable vtPartitionInfo[] = voltclient.callProcedure("@Statistics","partitioncount",0l).getResults();
             num_partitions = (int) vtPartitionInfo[0].fetchRow(0).getLong(0);
             System.out.println("System is running with " + num_partitions + " partition(s).");
         } catch (ProcCallException e) {
@@ -94,6 +94,9 @@ public class ClientMover {
             e.printStackTrace();
         } catch (NoConnectionsException e) {
             System.err.println("NoConnectionsException:");
+            e.printStackTrace();
+        } catch (IOException e) {
+            System.err.println("IOException:");
             e.printStackTrace();
         }
 
@@ -116,7 +119,7 @@ public class ClientMover {
                 for (longCounter = 0; longCounter < num_partitions; longCounter++) {
                     try {
                         long callTimeBegin = System.currentTimeMillis();
-                        VoltTable vtArchiveVisits[] = voltclient.callProcedure("ArchiveVisits", longCounter, numMoves, callTimeMillis);
+                        VoltTable vtArchiveVisits[] = voltclient.callProcedure("ArchiveVisits", longCounter, numMoves, callTimeMillis).getResults();
                         long callTimeEnd = System.currentTimeMillis();
                         int rowCount = vtArchiveVisits[0].getRowCount();
 

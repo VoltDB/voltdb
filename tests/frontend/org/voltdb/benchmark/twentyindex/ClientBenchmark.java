@@ -55,7 +55,7 @@ public class ClientBenchmark extends ClientMain {
 
     public static final String m_jarFileName = "20index.jar";
 
-    static class AsyncCallback extends ProcedureCallback {
+    static class AsyncCallback implements ProcedureCallback {
         @Override
         public void clientCallback(ClientResponse clientResponse) {
             final byte status = clientResponse.getStatus();

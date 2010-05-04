@@ -71,7 +71,7 @@ public class ClientDelete {
 
         // get the # of partitions in my cluster
         try {
-            VoltTable vtPartitionInfo[] = voltclient.callProcedure("@Statistics","partitioncount",0l);
+            VoltTable vtPartitionInfo[] = voltclient.callProcedure("@Statistics","partitioncount",0l).getResults();
             num_partitions = (int) vtPartitionInfo[0].fetchRow(0).getLong(0);
             System.out.println("System is running with " + num_partitions + " partition(s).");
         } catch (ProcCallException e) {
@@ -79,6 +79,9 @@ public class ClientDelete {
             e.printStackTrace();
         } catch (NoConnectionsException e) {
             System.err.println("NoConnectionsException:");
+            e.printStackTrace();
+        } catch (IOException e) {
+            System.err.println("IOException:");
             e.printStackTrace();
         }
 
@@ -92,7 +95,7 @@ public class ClientDelete {
                 try {
                     long callTimeBegin = System.currentTimeMillis();
 
-                    VoltTable vtDeleteVisits[] = voltclient.callProcedure("DeleteVisits", longCounter, numDeletes, callTimeBegin);
+                    VoltTable vtDeleteVisits[] = voltclient.callProcedure("DeleteVisits", longCounter, numDeletes, callTimeBegin).getResults();
                     int rowCount = (int) vtDeleteVisits[0].fetchRow(0).getLong(0);
 
                     long callTimeEnd = System.currentTimeMillis();
@@ -118,6 +121,9 @@ public class ClientDelete {
                     e.printStackTrace();
                 } catch (NoConnectionsException e) {
                     System.err.println("NoConnectionsException:");
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    System.err.println("IOException:");
                     e.printStackTrace();
                 }
             }

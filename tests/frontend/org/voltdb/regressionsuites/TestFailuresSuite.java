@@ -66,12 +66,12 @@ public class TestFailuresSuite extends RegressionSuite {
 
         VoltTable[] results = null;
         try {
-            results = client.callProcedure("ViolateUniqueness", 1L, 1L, 1L);
+            results = client.callProcedure("ViolateUniqueness", 1L, 1L, 1L).getResults();
             System.out.println("testVU client response received");
             assertEquals(results.length, 0);
         } catch (ProcCallException e) {
             try {
-                results = client.callProcedure("InsertNewOrder", 2L, 2L, 2L);
+                results = client.callProcedure("InsertNewOrder", 2L, 2L, 2L).getResults();
             } catch (ProcCallException e1) {
                 fail(e1.toString());
             } catch (IOException e1) {
@@ -94,7 +94,7 @@ public class TestFailuresSuite extends RegressionSuite {
         System.out.println("STARTING testVoilateUniquenessAndCatchException");
         VoltTable[] results = null;
         try {
-            results = client.callProcedure("ViolateUniquenessAndCatchException", 1L, 1L, 1L);
+            results = client.callProcedure("ViolateUniquenessAndCatchException", 1L, 1L, 1L).getResults();
             assertTrue(results.length == 1);
             System.out.println("PASSED testVoilateUandCE");
         } catch (ProcCallException e) {
@@ -108,7 +108,7 @@ public class TestFailuresSuite extends RegressionSuite {
         }
 
         try {
-            results = client.callProcedure("InsertNewOrder", 2L, 2L, 2L);
+            results = client.callProcedure("InsertNewOrder", 2L, 2L, 2L).getResults();
         } catch (ProcCallException e1) {
             fail(e1.toString());
         } catch (IOException e1) {
@@ -155,7 +155,7 @@ public class TestFailuresSuite extends RegressionSuite {
 
         VoltTable[] results = null;
         try {
-            results = client.callProcedure("DivideByZero", 0L, 0L, 1L);
+            results = client.callProcedure("DivideByZero", 0L, 0L, 1L).getResults();
             System.out.println("DivideByZero client response received");
             assertEquals(results.length, 0);
         } catch (ProcCallException e) {
@@ -199,20 +199,20 @@ public class TestFailuresSuite extends RegressionSuite {
         VoltTable[] results = null;
 
         while (totalBytes < expectedMaxSuccessBytes) {
-            results = client.callProcedure("InsertBigString", expectedRows++, longString);
+            results = client.callProcedure("InsertBigString", expectedRows++, longString).getResults();
             assertEquals(1, results.length);
             assertEquals(1, results[0].asScalarLong());
             totalBytes += STRLEN;
         }
 
-        results = client.callProcedure("WorkWithBigString", expectedRows++, longString);
+        results = client.callProcedure("WorkWithBigString", expectedRows++, longString).getResults();
         assertEquals(1, results.length);
         assertEquals(expectedRows, results[0].getRowCount());
         totalBytes += STRLEN;
 
         // 11MB exceeds the response buffer limit.
         while (totalBytes < (11 * 1024 * 1024)) {
-            results = client.callProcedure("InsertBigString", expectedRows++, longString);
+            results = client.callProcedure("InsertBigString", expectedRows++, longString).getResults();
             assertEquals(1, results.length);
             assertEquals(1, results[0].asScalarLong());
             totalBytes += STRLEN;
@@ -221,7 +221,7 @@ public class TestFailuresSuite extends RegressionSuite {
         //System.out.printf("Fail Bytes: %d, Expected Rows %d\n", totalBytes, expectedRows);
         //System.out.flush();
         try {
-            results = client.callProcedure("WorkWithBigString", expectedRows++, longString);
+            results = client.callProcedure("WorkWithBigString", expectedRows++, longString).getResults();
             fail();
         } catch (ProcCallException e) {
             // this should eventually happen
@@ -245,20 +245,20 @@ public class TestFailuresSuite extends RegressionSuite {
         int nextId = 0;
 
         for (int mb = 0; mb < 75; mb += 5) {
-            results = client.callProcedure("InsertLotsOfData", 0, nextId);
+            results = client.callProcedure("InsertLotsOfData", 0, nextId).getResults();
             assertEquals(1, results.length);
             assertTrue(nextId < results[0].asScalarLong());
             nextId = (int) results[0].asScalarLong();
             System.err.println("Inserted " + (mb + 5) + "mb");
         }
 
-        results = client.callProcedure("FetchTooMuch", 0);
+        results = client.callProcedure("FetchTooMuch", 0).getResults();
         assertEquals(1, results.length);
         assertTrue(1 < results[0].asScalarLong());
         System.out.println("Fetched the 75 megabytes");
 
         for (int mb = 0; mb < 75; mb += 5) {
-            results = client.callProcedure("InsertLotsOfData", 0, nextId);
+            results = client.callProcedure("InsertLotsOfData", 0, nextId).getResults();
             assertEquals(1, results.length);
             assertTrue(nextId < results[0].asScalarLong());
             nextId = (int) results[0].asScalarLong();
@@ -266,7 +266,7 @@ public class TestFailuresSuite extends RegressionSuite {
         }
 
         try {
-            results = client.callProcedure("FetchTooMuch", 0);
+            results = client.callProcedure("FetchTooMuch", 0).getResults();
         } catch (ProcCallException e) {
             e.printStackTrace();
             return;
@@ -280,11 +280,11 @@ public class TestFailuresSuite extends RegressionSuite {
 
         VoltTable[] results = null;
 
-        results = client.callProcedure("CleanupFail", 0, 0, 0);
+        results = client.callProcedure("CleanupFail", 0, 0, 0).getResults();
         assertEquals(1, results.length);
         assertEquals(1, results[0].asScalarLong());
 
-        results = client.callProcedure("CleanupFail", 2, 2, 2);
+        results = client.callProcedure("CleanupFail", 2, 2, 2).getResults();
         assertEquals(1, results.length);
         assertEquals(1, results[0].asScalarLong());
     }

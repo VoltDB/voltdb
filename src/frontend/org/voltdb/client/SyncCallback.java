@@ -27,7 +27,7 @@ import org.voltdb.VoltTable;
  * then call {@link #waitForResponse} on each of the <code>SyncCallback</code>s to join on the responses.
  *
  */
-public final class SyncCallback extends ProcedureCallback {
+public final class SyncCallback extends AbstractProcedureArgumentCacher implements ProcedureCallback {
     private final Semaphore m_lock;
     private ClientResponse m_response;
 
@@ -38,7 +38,7 @@ public final class SyncCallback extends ProcedureCallback {
     }
 
     @Override
-    protected void clientCallback(ClientResponse clientResponse) {
+    public void clientCallback(ClientResponse clientResponse) {
         m_response = clientResponse;
         m_lock.release();
     }
@@ -71,16 +71,11 @@ public final class SyncCallback extends ProcedureCallback {
     }
 
     /**
-     * Retrieve the result of a stored procedure invocation. Instead of returning a ClientResponse with a status
-     * code this method will throw a ProcCallException if the response code was not SUCCESS
-     * @return The results tables returned by the stored procedure
-     * @throws ProcCallException Exception describing why the procedure failed.
+     * Return the arguments provided with the procedure invocation
+     * @return Object array containing procedure arguments
      */
-    public VoltTable[] result() throws ProcCallException {
-        assert(m_response != null);
-        if (m_response.getStatus() != ClientResponse.SUCCESS) {
-            throw new ProcCallException(m_response.getExtra(), m_response.getException());
-        }
-        return m_response.getResults();
+    @Override
+    public Object[] args() {
+        return super.args();
     }
 }

@@ -133,7 +133,7 @@ public class MultisiteClient extends ClientMain {
         return queued;
     }
 
-    class RunChangeSeatCallback extends ProcedureCallback {
+    class RunChangeSeatCallback implements ProcedureCallback {
         @Override
         public void clientCallback(ClientResponse clientResponse) {
             if (clientResponse.getStatus() == ClientResponse.CONNECTION_LOST){
@@ -168,7 +168,7 @@ public class MultisiteClient extends ClientMain {
                                    fid, cid, seat);
     }
 
-    class RunUpdateReservationCallback extends ProcedureCallback {
+    class RunUpdateReservationCallback implements ProcedureCallback {
         private final int m_rid, m_maxfid;
 
         RunUpdateReservationCallback(int rid, int maxfid) {
@@ -203,7 +203,7 @@ public class MultisiteClient extends ClientMain {
                                    rid, value);
     }
 
-    class RunFindOpenSeats extends ProcedureCallback {
+    class RunFindOpenSeats implements ProcedureCallback {
 
         @Override
         public void clientCallback(ClientResponse clientResponse) {

@@ -52,13 +52,13 @@ public class TestSqlUpdateSuite extends RegressionSuite {
         {
             client.callProcedure("Insert", table, i, "desc", i, 14.5);
         }
-        VoltTable[] results = client.callProcedure("@AdHoc", update);
+        VoltTable[] results = client.callProcedure("@AdHoc", update).getResults();
         // ADHOC update still returns number of modified rows * number of partitions
         // Comment this out until it's fixed; the select count should be good enough, though
         //assertEquals(expectedRowsChanged, results[0].asScalarLong());
         String query = String.format("select count(%s.NUM) from %s where %s.NUM = -1",
                                      table, table, table);
-        results = client.callProcedure("@AdHoc", query);
+        results = client.callProcedure("@AdHoc", query).getResults();
         assertEquals(expectedRowsChanged, results[0].asScalarLong());
     }
 

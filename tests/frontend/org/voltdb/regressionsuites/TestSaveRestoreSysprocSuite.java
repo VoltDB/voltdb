@@ -299,7 +299,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         {
             results = client.callProcedure("@SnapshotSave", TMPDIR,
                                            TESTNONCE,
-                                           (byte)1);
+                                           (byte)1).getResults();
         }
         catch (Exception ex)
         {
@@ -320,7 +320,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         VoltTable result = null;
         try
         {
-            result = client.callProcedure("SaveRestoreSelect", tableName)[0];
+            result = client.callProcedure("SaveRestoreSelect", tableName).getResults()[0];
         }
         catch (Exception e)
         {
@@ -378,14 +378,14 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         java.util.Arrays.fill(secondStringBytes, (byte)'a');
         String secondString = new String(secondStringBytes, "UTF-8");
 
-        VoltTable results[] = client.callProcedure("JumboInsert", 0, firstString, secondString);
+        VoltTable results[] = client.callProcedure("JumboInsert", 0, firstString, secondString).getResults();
         firstString = null;
         secondString = null;
 
         assertEquals(results.length, 1);
         assertEquals( 1, results[0].asScalarLong());
 
-        results = client.callProcedure("JumboSelect", 0);
+        results = client.callProcedure("JumboSelect", 0).getResults();
         assertEquals(results.length, 1);
         assertTrue(results[0].advanceRow());
         assertTrue(java.util.Arrays.equals( results[0].getStringAsBytes(1), firstStringBytes));
@@ -406,7 +406,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
         client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT);
 
-        results = client.callProcedure("JumboSelect", 0);
+        results = client.callProcedure("JumboSelect", 0).getResults();
         assertEquals(results.length, 1);
         assertTrue(results[0].advanceRow());
         assertTrue(java.util.Arrays.equals( results[0].getStringAsBytes(1), firstStringBytes));
@@ -488,14 +488,14 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         VoltTable[] results = null;
 
         results = client.callProcedure("@SnapshotSave", TMPDIR,
-                                       TESTNONCE, (byte)1);
+                                       TESTNONCE, (byte)1).getResults();
 
         validateSnapshot(true);
 
         /*
          * Check that snapshot status returns a reasonable result
          */
-        VoltTable statusResults[] = client.callProcedure("@SnapshotStatus");
+        VoltTable statusResults[] = client.callProcedure("@SnapshotStatus").getResults();
         assertNotNull(statusResults);
         assertEquals( 2, statusResults.length);
         assertEquals( 8, statusResults[0].getColumnCount());
@@ -506,7 +506,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         assertFalse( 0 == statusResults[0].getLong("END_TIME"));
         assertTrue("SUCCESS".equals(statusResults[0].getString("RESULT")));
 
-        VoltTable scanResults[] = client.callProcedure("@SnapshotScan", new Object[] { null });
+        VoltTable scanResults[] = client.callProcedure("@SnapshotScan", new Object[] { null }).getResults();
         assertNotNull(scanResults);
         assertEquals( 1, scanResults.length);
         assertEquals( 1, scanResults[0].getColumnCount());
@@ -514,13 +514,13 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         assertTrue( scanResults[0].advanceRow());
         assertTrue( "ERR_MSG".equals(scanResults[0].getColumnName(0)));
 
-        scanResults = client.callProcedure("@SnapshotScan", "/doesntexist");
+        scanResults = client.callProcedure("@SnapshotScan", "/doesntexist").getResults();
         assertNotNull(scanResults);
         assertEquals( 1, scanResults[1].getRowCount());
         assertTrue( scanResults[1].advanceRow());
         assertTrue( "FAILURE".equals(scanResults[1].getString("RESULT")));
 
-        scanResults = client.callProcedure("@SnapshotScan", TMPDIR);
+        scanResults = client.callProcedure("@SnapshotScan", TMPDIR).getResults();
         assertNotNull(scanResults);
         assertEquals( 3, scanResults.length);
         assertEquals( 8, scanResults[0].getColumnCount());
@@ -542,7 +542,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         File[] tmp_files = tmp_dir.listFiles(cleaner);
         tmp_files[0].delete();
 
-        scanResults = client.callProcedure("@SnapshotScan", TMPDIR);
+        scanResults = client.callProcedure("@SnapshotScan", TMPDIR).getResults();
         assertNotNull(scanResults);
         assertEquals( 3, scanResults.length);
         assertEquals( 8, scanResults[0].getColumnCount());
@@ -598,7 +598,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         try
         {
             results = client.callProcedure("@SnapshotSave", TMPDIR,
-                                           TESTNONCE, (byte)1);
+                                           TESTNONCE, (byte)1).getResults();
         }
         catch (Exception ex)
         {
@@ -618,7 +618,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             client.callProcedure(
                 "@SnapshotDelete",
                 new String[] {TMPDIR},
-                new String[]{TESTNONCE});
+                new String[]{TESTNONCE}).getResults();
         assertNotNull(deleteResults);
         assertEquals( 1, deleteResults.length);
         assertEquals( 9, deleteResults[0].getColumnCount());
@@ -689,7 +689,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         /*
          * Check that snapshot status returns a reasonable result
          */
-        VoltTable statusResults[] = client.callProcedure("@SnapshotStatus");
+        VoltTable statusResults[] = client.callProcedure("@SnapshotStatus").getResults();
         assertNotNull(statusResults);
         assertEquals( 2, statusResults.length);
         assertEquals( 8, statusResults[0].getColumnCount());
@@ -743,7 +743,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         checkTable(client, "REPLICATED_TESTER", "RT_ID",
                    num_replicated_items_per_chunk * num_replicated_chunks);
 
-        results = client.callProcedure("@Statistics", "table", 0);
+        results = client.callProcedure("@Statistics", "table", 0).getResults();
 
         int foundItem = 0;
         while (results[0].advanceRow())
@@ -798,7 +798,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
         try
         {
-            results = client.callProcedure("@SnapshotStatus");
+            results = client.callProcedure("@SnapshotStatus").getResults();
             assertTrue(results[0].advanceRow());
             assertTrue(results[0].getString("RESULT").equals("SUCCESS"));
             assertEquals( 1, results[0].getRowCount());
@@ -818,7 +818,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         try
         {
             results = client.callProcedure("@SnapshotRestore", TMPDIR,
-                                           TESTNONCE, ALLOWELT);
+                                           TESTNONCE, ALLOWELT).getResults();
 
             while (results[0].advanceRow()) {
                 if (results[0].getString("RESULT").equals("FAILURE")) {
@@ -835,7 +835,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         checkTable(client, "PARTITION_TESTER", "PT_ID",
                    num_partitioned_items_per_chunk * num_partitioned_chunks);
 
-        results = client.callProcedure("@Statistics", "table", 0);
+        results = client.callProcedure("@Statistics", "table", 0).getResults();
 
         int foundItem = 0;
         while (results[0].advanceRow())
@@ -870,7 +870,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
         try
         {
-            results = client.callProcedure("@SnapshotStatus");
+            results = client.callProcedure("@SnapshotStatus").getResults();
             assertTrue(results[0].advanceRow());
             assertTrue(results[0].getString("RESULT").equals("FAILURE"));
         }
@@ -895,7 +895,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         try
         {
             results = client.callProcedure("@SnapshotRestore", TMPDIR,
-                                           TESTNONCE, ALLOWELT);
+                                           TESTNONCE, ALLOWELT).getResults();
         }
         catch (Exception ex)
         {
@@ -906,7 +906,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         checkTable(client, "PARTITION_TESTER", "PT_ID",
                    num_partitioned_items_per_chunk * num_partitioned_chunks);
 
-        results = client.callProcedure("@Statistics", "table", 0);
+        results = client.callProcedure("@Statistics", "table", 0).getResults();
 
         foundItem = 0;
         while (results[0].advanceRow())
@@ -995,7 +995,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
             client = getClient();
 
-            results = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT);
+            results = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT).getResults();
             assertNotNull(results);
             deleteTestFiles();
             releaseClient(client);
@@ -1033,7 +1033,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
             client = getClient();
 
-            VoltTable results[] = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT);
+            VoltTable results[] = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT).getResults();
             assertNotNull(results);
             deleteTestFiles();
             releaseClient(client);
@@ -1111,7 +1111,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         try
         {
             results = client.callProcedure("@SnapshotRestore", TMPDIR,
-                                           TESTNONCE, ALLOWELT);
+                                           TESTNONCE, ALLOWELT).getResults();
             // XXX Should check previous results for success but meh for now
         }
         catch (Exception ex)
@@ -1125,7 +1125,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         checkTable(client, "REPLICATED_TESTER", "RT_ID",
                    num_replicated_items_per_chunk * num_replicated_chunks);
 
-        results = client.callProcedure("@Statistics", "table", 0);
+        results = client.callProcedure("@Statistics", "table", 0).getResults();
 
         int foundItem = 0;
         while (results[0].advanceRow())
@@ -1192,7 +1192,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         try
         {
             results = client.callProcedure("@SnapshotRestore", TMPDIR,
-                                           TESTNONCE, ALLOWELT);
+                                           TESTNONCE, ALLOWELT).getResults();
         }
         catch (Exception ex)
         {
@@ -1202,7 +1202,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
         // XXX consider adding a check that the newly materialized table is
         // not loaded
-        results = client.callProcedure("@Statistics", "table", 0);
+        results = client.callProcedure("@Statistics", "table", 0).getResults();
 
         boolean found_gets_created = false;
         while (results[0].advanceRow())
@@ -1219,7 +1219,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
         // Check the table which changed columns
         VoltTable[] change_results =
-            client.callProcedure("SaveRestoreSelect", "CHANGE_COLUMNS");
+            client.callProcedure("SaveRestoreSelect", "CHANGE_COLUMNS").getResults();
 
         assertEquals(3, change_results[0].getColumnCount());
         for (int i = 0; i < 10; i++)
@@ -1288,7 +1288,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         client.callProcedure("@Statistics", "table", 0);
 
         VoltTable[] change_results =
-            client.callProcedure("SaveRestoreSelect", "CHANGE_TYPES");
+            client.callProcedure("SaveRestoreSelect", "CHANGE_TYPES").getResults();
 
         VoltTableRow row = change_results[0].fetchRow(0);
         assertEquals(100, row.getLong(1));
@@ -1346,7 +1346,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         try
         {
             results = client.callProcedure("@SnapshotRestore", TMPDIR,
-                                           TESTNONCE, ALLOWELT);
+                                           TESTNONCE, ALLOWELT).getResults();
         }
         catch (Exception ex)
         {

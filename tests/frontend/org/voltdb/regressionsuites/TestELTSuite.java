@@ -88,13 +88,13 @@ public class TestELTSuite extends RegressionSuite {
     }
 
     private void quiesce(final Client client)
-    throws ProcCallException, NoConnectionsException
+    throws ProcCallException, NoConnectionsException, IOException
     {
         client.callProcedure("@Quiesce");
     }
 
     private void quiesceAndVerify(final Client client, TupleVerifier verifier)
-    throws ProcCallException, NoConnectionsException
+    throws ProcCallException, NoConnectionsException, IOException
     {
         quiesce(client);
         ELPoller poller = new ELPoller(verifier);

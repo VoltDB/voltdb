@@ -62,7 +62,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         try {
             client.callProcedure("InsertOrderLine", 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1.5, "poo");
             client.callProcedure("UpdateTests", 1L);
-            VoltTable[] results = client.callProcedure("FeaturesSelectAll");
+            VoltTable[] results = client.callProcedure("FeaturesSelectAll").getResults();
 
             assertEquals(5, results.length);
 
@@ -93,7 +93,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
 
         try {
             client.callProcedure("InsertNewOrder", 1L, 3L, 1L);
-            VoltTable[] results = client.callProcedure("SelfJoinTest", 1L);
+            VoltTable[] results = client.callProcedure("SelfJoinTest", 1L).getResults();
 
             assertEquals(results.length, 1);
 
@@ -118,7 +118,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         final String testString = "並丧";
         try {
             client.callProcedure("InsertOrderLine", 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1.5, testString);
-            VoltTable[] results = client.callProcedure("FeaturesSelectAll");
+            VoltTable[] results = client.callProcedure("FeaturesSelectAll").getResults();
 
             assertEquals(5, results.length);
 
@@ -149,7 +149,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
             client.callProcedure("InsertOrderLine", 2L, 1L, 1L, 2L, 2L, 2L, 2L, 2L, 1.5, "a");
             client.callProcedure("InsertOrderLine", 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1.5, testString);
             client.callProcedure("InsertOrderLine", 3L, 1L, 1L, 3L, 3L, 3L, 3L, 3L, 1.5, "def");
-            VoltTable[] results = client.callProcedure("SelectOrderLineByDistInfo", testString);
+            VoltTable[] results = client.callProcedure("SelectOrderLineByDistInfo", testString).getResults();
             assertEquals(1, results.length);
             VoltTable table = results[0];
             assertTrue(table.getRowCount() == 1);
@@ -170,7 +170,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
     public void testBatchedMultipartitionTxns() throws IOException, ProcCallException {
         Client client = getClient();
 
-        VoltTable[] results = client.callProcedure("BatchedMultiPartitionTest");
+        VoltTable[] results = client.callProcedure("BatchedMultiPartitionTest").getResults();
         assertEquals(5, results.length);
         assertEquals(1, results[0].asScalarLong());
         assertEquals(1, results[1].asScalarLong());
@@ -193,7 +193,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
 
         VoltTable[] results = null;
         try {
-            results = client.callProcedure("WorkWithBigString", 1, longString);
+            results = client.callProcedure("WorkWithBigString", 1, longString).getResults();
         } catch (ProcCallException e) {
             e.printStackTrace();
             fail();
@@ -220,7 +220,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
 
         VoltTable[] results = null;
         try {
-            results = client.callProcedure("PassByteArrayArg", 1, 2, longString.getBytes("UTF-8"));
+            results = client.callProcedure("PassByteArrayArg", 1, 2, longString.getBytes("UTF-8")).getResults();
         } catch (ProcCallException e) {
             e.printStackTrace();
             fail();

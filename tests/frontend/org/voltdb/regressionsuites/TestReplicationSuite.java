@@ -41,12 +41,12 @@ public class TestReplicationSuite extends RegressionSuite
     {
         Client client = getClient();
         VoltTable[] results = client.callProcedure("InsertSinglePart", 1,
-                                                   "desc", 100, 14.5);
+                                                   "desc", 100, 14.5).getResults();
         assertEquals(1, results[0].asScalarLong());
-        results = client.callProcedure("SelectSinglePart", 1);
+        results = client.callProcedure("SelectSinglePart", 1).getResults();
         System.out.println(results[0].toString());
         assertEquals(1, results[0].getRowCount());
-        results = client.callProcedure("UpdateSinglePart", 200, 1);
+        results = client.callProcedure("UpdateSinglePart", 200, 1).getResults();
     }
 
     public void testMultiPartitionInsert()
@@ -54,9 +54,9 @@ public class TestReplicationSuite extends RegressionSuite
     {
         Client client = getClient();
         VoltTable[] results = client.callProcedure("InsertMultiPart", 1,
-                                                   "desc", 100, 14.5);
+                                                   "desc", 100, 14.5).getResults();
         assertEquals(1, results[0].asScalarLong());
-        results = client.callProcedure("SelectMultiPart");
+        results = client.callProcedure("SelectMultiPart").getResults();
         System.out.println(results[0].toString());
         assertEquals(1, results[0].getRowCount());
     }
@@ -66,13 +66,13 @@ public class TestReplicationSuite extends RegressionSuite
     {
         Client client = getClient();
         VoltTable[] results = client.callProcedure("InsertMultiPartRepl", 1,
-                                                   "desc", 100, 14.5);
+                                                   "desc", 100, 14.5).getResults();
         System.out.println("results: " + results[0].toString());
         assertEquals(1, results[0].asScalarLong());
-        results = client.callProcedure("SelectMultiPartRepl");
+        results = client.callProcedure("SelectMultiPartRepl").getResults();
         System.out.println(results[0].toString());
         assertEquals(1, results[0].getRowCount());
-        results = client.callProcedure("UpdateMultiPartRepl", 200);
+        results = client.callProcedure("UpdateMultiPartRepl", 200).getResults();
     }
 
     // Failure detection keeps this failure running.  I at least made it
@@ -82,7 +82,7 @@ public class TestReplicationSuite extends RegressionSuite
     throws IOException, ProcCallException, InterruptedException
     {
         Client client = getClient();
-        VoltTable[] results = client.callProcedure("SelectEmptyTable", 1);
+        VoltTable[] results = client.callProcedure("SelectEmptyTable", 1).getResults();
         System.out.println("results: " + results[0].toString());
     }
 

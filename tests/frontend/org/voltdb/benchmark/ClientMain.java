@@ -739,7 +739,7 @@ public abstract class ClientMain {
             // Only initiate the snapshot if it's the first client
             while (m_id == 0) {
                 // Take a snapshot of the database. This call is blocking.
-                response = client.callProcedure("@SnapshotSave", dir, nonce, 1);
+                response = client.callProcedure("@SnapshotSave", dir, nonce, 1).getResults();
                 if (response.length != 1 || !response[0].advanceRow()
                     || !response[0].getString("RESULT").equals("SUCCESS")) {
                     if (keepTrying
@@ -765,7 +765,7 @@ public abstract class ClientMain {
 
                 while (maxTry-- > 0) {
                     boolean found = false;
-                    response = client.callProcedure("@SnapshotStatus");
+                    response = client.callProcedure("@SnapshotStatus").getResults();
                     if (response.length != 2) {
                         System.err.println("Failed to get snapshot status");
                         return false;
@@ -792,7 +792,7 @@ public abstract class ClientMain {
             }
 
             // Get host ID to hostname mappings
-            response = client.callProcedure("@SystemInformation");
+            response = client.callProcedure("@SystemInformation").getResults();
             if (response.length != 1) {
                 System.err.println("Failed to get host ID to IP address mapping");
                 return false;
@@ -805,7 +805,7 @@ public abstract class ClientMain {
             }
 
             // Do a scan to get all the file names and table names
-            response = client.callProcedure("@SnapshotScan", dir);
+            response = client.callProcedure("@SnapshotScan", dir).getResults();
             if (response.length != 3) {
                 System.err.println("Failed to get snapshot filenames");
                 return false;
@@ -946,9 +946,9 @@ public abstract class ClientMain {
             if (m_id == 0) {
                 client.callProcedure("@SnapshotDelete",
                                      new String[] { dir },
-                                     new String[] { nonce });
+                                     new String[] { nonce }).getResults();
             }
-        } catch (NoConnectionsException e) {
+        } catch (IOException e) {
             e.printStackTrace();
         } catch (ProcCallException e) {
             e.printStackTrace();

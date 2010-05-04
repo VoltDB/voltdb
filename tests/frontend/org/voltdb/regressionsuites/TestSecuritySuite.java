@@ -83,22 +83,22 @@ public class TestSecuritySuite extends RegressionSuite {
         //User1 should be able to do both
         m_username = "user1";
         Client client = getClient();
-        VoltTable modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (1, 1, 1);")[0];
+        VoltTable modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (1, 1, 1);").getResults()[0];
         assertTrue(modCount.getRowCount() == 1);
         assertTrue(modCount.asScalarLong() == 1);
-        VoltTable results[] = client.callProcedure("@Statistics", "INITIATOR", 0);
+        VoltTable results[] = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
         // one aggregate table returned
         assertTrue(results.length == 1);
 
         //User2 can only do adhoc
         m_username = "user2";
         client = getClient();
-        modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (2, 2, 2);")[0];
+        modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (2, 2, 2);").getResults()[0];
         assertTrue(modCount.getRowCount() == 1);
         assertTrue(modCount.asScalarLong() == 1);
         boolean exceptionThrown = false;
         try {
-            results = client.callProcedure("@Statistics", "INITIATOR", 0);
+            results = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
         } catch (ProcCallException e) {
             e.printStackTrace();
             exceptionThrown = true;
@@ -108,10 +108,10 @@ public class TestSecuritySuite extends RegressionSuite {
         //User3 can "only" run sysprocs which includes adhoc
         m_username = "user3";
         client = getClient();
-        modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (3, 3, 3);")[0];
+        modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (3, 3, 3);").getResults()[0];
         assertTrue(modCount.getRowCount() == 1);
         assertTrue(modCount.asScalarLong() == 1);
-        results = client.callProcedure("@Statistics", "INITIATOR", 0);
+        results = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
         // one aggregate table returned
         assertTrue(results.length == 1);
 
@@ -120,7 +120,7 @@ public class TestSecuritySuite extends RegressionSuite {
         client = getClient();
         exceptionThrown = false;
         try {
-            modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (2, 2, 2);")[0];
+            modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (2, 2, 2);").getResults()[0];
         } catch (ProcCallException e) {
             e.printStackTrace();
             exceptionThrown = true;
@@ -128,7 +128,7 @@ public class TestSecuritySuite extends RegressionSuite {
         assertTrue(exceptionThrown);
         exceptionThrown = false;
         try {
-            results = client.callProcedure("@Statistics", "INITIATOR", 0);
+            results = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
         } catch (ProcCallException e) {
             e.printStackTrace();
             exceptionThrown = true;
@@ -138,22 +138,22 @@ public class TestSecuritySuite extends RegressionSuite {
         //User 5 can run sysprocs due to his group
         m_username = "user5";
         client = getClient();
-        modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (4, 4, 4);")[0];
+        modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (4, 4, 4);").getResults()[0];
         assertTrue(modCount.getRowCount() == 1);
         assertTrue(modCount.asScalarLong() == 1);
-        results = client.callProcedure("@Statistics", "INITIATOR", 0);
+        results = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
         // one aggregate table returned
         assertTrue(results.length == 1);
 
         //User 6 can only run adhoc due to his group
         m_username = "user6";
         client = getClient();
-        modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (5, 5, 5);")[0];
+        modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (5, 5, 5);").getResults()[0];
         assertTrue(modCount.getRowCount() == 1);
         assertTrue(modCount.asScalarLong() == 1);
         exceptionThrown = false;
         try {
-            results = client.callProcedure("@Statistics", "INITIATOR", 0);
+            results = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
         } catch (ProcCallException e) {
             e.printStackTrace();
             exceptionThrown = true;
@@ -163,10 +163,10 @@ public class TestSecuritySuite extends RegressionSuite {
         //User 7 can do anything due to his group
         m_username = "user7";
         client = getClient();
-        modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (6, 6, 6);")[0];
+        modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (6, 6, 6);").getResults()[0];
         assertTrue(modCount.getRowCount() == 1);
         assertTrue(modCount.asScalarLong() == 1);
-        results = client.callProcedure("@Statistics", "INITIATOR", 0);
+        results = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
         // one aggregate table returned
         assertTrue(results.length == 1);
     }

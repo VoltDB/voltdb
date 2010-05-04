@@ -59,7 +59,7 @@ public class ClientVoter {
 
     public static boolean checkLatency = false;
 
-    static class AsyncCallback extends ProcedureCallback {
+    static class AsyncCallback implements ProcedureCallback {
         @Override
         public synchronized void clientCallback(ClientResponse clientResponse) {
             final byte status = clientResponse.getStatus();
@@ -171,13 +171,13 @@ public class ClientVoter {
 
         try {
             // initialize the database if this is the first connecting client, otherwise get existing configuration information
-            VoltTable[] vtInitialize = voltclient.callProcedure("Initialize", maxContestant, contestantNames);
+            VoltTable[] vtInitialize = voltclient.callProcedure("Initialize", maxContestant, contestantNames).getResults();
             maxContestant = (int) vtInitialize[0].fetchRow(0).getLong(0);
             System.out.printf("Running for %d contestant(s)\n",maxContestant);
         } catch (ProcCallException e) {
             e.printStackTrace();
             System.exit(-1);
-        } catch (NoConnectionsException e) {
+        } catch (java.io.IOException e) {
             e.printStackTrace();
             System.exit(-1);
         }
@@ -291,7 +291,7 @@ public class ClientVoter {
 
         try {
             // initialize the database if this is the first connecting client, otherwise get existing configuration information
-            VoltTable[] vtResults = voltclient.callProcedure("Results");
+            VoltTable[] vtResults = voltclient.callProcedure("Results").getResults();
 
             int rowCount = vtResults[0].getRowCount();
             if (rowCount == 0) {
@@ -312,7 +312,7 @@ public class ClientVoter {
         } catch (ProcCallException e) {
             e.printStackTrace();
             System.exit(-1);
-        } catch (NoConnectionsException e) {
+        } catch (java.io.IOException e) {
             e.printStackTrace();
             System.exit(-1);
         }

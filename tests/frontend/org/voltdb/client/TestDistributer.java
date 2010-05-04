@@ -208,7 +208,7 @@ public class TestDistributer extends TestCase {
         volatile VoltNetwork network;
     }
 
-    public class ProcCallback extends ProcedureCallback {
+    public class ProcCallback implements ProcedureCallback {
         @Override
         public void clientCallback(ClientResponse clientResponse) {
             System.err.println("Ran callback.");

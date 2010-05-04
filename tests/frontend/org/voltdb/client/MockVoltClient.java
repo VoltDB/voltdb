@@ -66,20 +66,57 @@ public class MockVoltClient implements Client {
         super();
     }
 
-    public VoltTable[] callProcedure(String procName, Object... parameters) throws ProcCallException {
+    public ClientResponse callProcedure(String procName, Object... parameters) throws ProcCallException {
         numCalls += 1;
         calledName = procName;
         calledParameters = parameters;
 
         if (abortMessage != null) {
-            ProcCallException e = new ProcCallException(abortMessage, null);
+            ProcCallException e = new ProcCallException(null ,abortMessage, null);
             abortMessage = null;
             throw e;
         }
 
-        VoltTable[] result = nextResult;
+        final VoltTable[] result = nextResult;
         if (resetAfterCall) nextResult = null;
-        return result;
+        return new ClientResponse() {
+
+            @Override
+            public int getClientRoundtrip() {
+                // TODO Auto-generated method stub
+                return 0;
+            }
+
+            @Override
+            public int getClusterRoundtrip() {
+                // TODO Auto-generated method stub
+                return 0;
+            }
+
+            @Override
+            public Exception getException() {
+                // TODO Auto-generated method stub
+                return null;
+            }
+
+            @Override
+            public String getExtra() {
+                // TODO Auto-generated method stub
+                return null;
+            }
+
+            @Override
+            public VoltTable[] getResults() {
+                return result;
+            }
+
+            @Override
+            public byte getStatus() {
+                // TODO Auto-generated method stub
+                return 0;
+            }
+
+        };
     }
 
     public String calledName;

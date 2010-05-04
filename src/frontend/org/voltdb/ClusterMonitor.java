@@ -371,7 +371,7 @@ public class ClusterMonitor {
             synchronized (ClusterMonitor.this) {
                 try {
                     while (true) {
-                        VoltTable stats[] = m_client.callProcedure("@Statistics", "management", (byte)1);
+                        VoltTable stats[] = m_client.callProcedure("@Statistics", "management", (byte)1).getResults();
                         final VoltTable initiatorResults = stats[0];
                         final VoltTable procedureResults = stats[1];
                         final VoltTable ioResults = stats[2];

@@ -121,13 +121,14 @@ final class ClientImpl implements Client {
      * @throws org.voltdb.client.ProcCallException
      * @throws NoConnectionsException
      */
-    public final VoltTable[] callProcedure(String procName, Object... parameters)
-        throws ProcCallException, NoConnectionsException
+    public final ClientResponse callProcedure(String procName, Object... parameters)
+        throws IOException, NoConnectionsException, ProcCallException
     {
         if (m_isShutdown) {
-            throw new ProcCallException("Client instance is shutdown", null);
+            throw new NoConnectionsException("Client instance is shutdown");
         }
         final SyncCallback cb = new SyncCallback();
+        cb.setArgs(parameters);
         final ProcedureInvocation invocation =
               new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
 
@@ -141,11 +142,13 @@ final class ClientImpl implements Client {
         try {
             cb.waitForResponse();
         } catch (final InterruptedException e) {
-            throw new ProcCallException("Interrupted while waiting for response", e);
+            throw new java.io.InterruptedIOException("Interrupted while waiting for response");
         }
-        m_lastCallInfo = cb.getResponse().getExtra();
+        if (cb.getResponse().getStatus() != ClientResponse.SUCCESS) {
+            throw new ProcCallException(cb.getResponse(), cb.getResponse().getExtra(), cb.getResponse().getException());
+        }
         // cb.result() throws ProcCallException if procedure failed
-        return cb.result();
+        return cb.getResponse();
     }
 
     /**
@@ -192,6 +195,8 @@ final class ClientImpl implements Client {
         }
         if (callback == null) {
             callback = new NullCallback();
+        } else if (callback instanceof ProcedureArgumentCacher) {
+            ((ProcedureArgumentCacher)callback).setArgs(parameters);
         }
         ProcedureInvocation invocation =
             new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
@@ -204,14 +209,6 @@ final class ClientImpl implements Client {
             return;
         }
         m_distributer.drain();
-    }
-
-    /**
-     * Get the string value returned with the previous procedure call.
-     * @return The string value returned with the previous call.
-     */
-    public String getInfoForPreviousCall() {
-        return m_lastCallInfo;
     }
 
     /**
@@ -285,7 +282,6 @@ final class ClientImpl implements Client {
 
     static final Logger LOG = Logger.getLogger(ClientImpl.class.getName());  // Logger shared by client package.
     private final Distributer m_distributer;                             // de/multiplexes connections to a cluster
-    private String m_lastCallInfo = null;
     private final Object m_backpressureLock = new Object();
     private boolean m_backpressure = false;
 

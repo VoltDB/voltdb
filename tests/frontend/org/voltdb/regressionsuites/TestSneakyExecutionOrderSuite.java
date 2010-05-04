@@ -51,7 +51,7 @@ public class TestSneakyExecutionOrderSuite extends RegressionSuite {
         super(name);
     }
 
-    class MPCallback extends ProcedureCallback {
+    class MPCallback implements ProcedureCallback {
         @Override
         public void clientCallback(ClientResponse clientResponse) {
             if (clientResponse.getStatus() == ClientResponse.CONNECTION_LOST){
@@ -61,7 +61,7 @@ public class TestSneakyExecutionOrderSuite extends RegressionSuite {
             answersReceived.decrementAndGet();
         }
     }
-    class SPCallback extends ProcedureCallback {
+    class SPCallback implements ProcedureCallback {
         @Override
         public void clientCallback(ClientResponse clientResponse) {
             if (clientResponse.getStatus() == ClientResponse.CONNECTION_LOST){

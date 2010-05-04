@@ -79,7 +79,7 @@ public class BingoClient extends ClientMain {
         boolean initialized = false;
         int round = 0;
 
-        private class Callback extends ProcedureCallback {
+        private class Callback implements ProcedureCallback {
             private final Transaction t;
 
             public Callback(Transaction t) {

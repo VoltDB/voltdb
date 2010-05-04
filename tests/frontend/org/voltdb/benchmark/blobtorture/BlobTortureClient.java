@@ -98,7 +98,7 @@ public class BlobTortureClient extends ClientMain {
 
     private void loadBlobs() {
         try {
-            m_partitionCount = m_voltClient.callProcedure("@Statistics", "PARTITIONCOUNT", 0)[0].asScalarLong();
+            m_partitionCount = m_voltClient.callProcedure("@Statistics", "PARTITIONCOUNT", 0).getResults()[0].asScalarLong();
             System.err.println("Partition count is " + m_partitionCount);
             final StringBuffer sb = new StringBuffer(m_blobSize);
             for (int ii = 0; ii < m_blobSize; ii++) {
@@ -108,7 +108,7 @@ public class BlobTortureClient extends ClientMain {
             for (long ii = 0; ii < m_partitionCount; ii++) {
                 System.err.println("Loading blob ID " + ii);
                 try {
-                    VoltTable vt = m_voltClient.callProcedure("InsertBlob", ii, blobBytes)[0];
+                    VoltTable vt = m_voltClient.callProcedure("InsertBlob", ii, blobBytes).getResults()[0];
                     vt.advanceRow();
                     final byte bytes[] = vt.getStringAsBytes(1);
                     if (bytes.length != m_blobSize) {
@@ -128,7 +128,7 @@ public class BlobTortureClient extends ClientMain {
     private final ProcedureCallback m_callback = new ProcedureCallback() {
 
         @Override
-        protected void clientCallback(ClientResponse clientResponse) {
+        public void clientCallback(ClientResponse clientResponse) {
             if (clientResponse.getStatus() != ClientResponse.SUCCESS){
                 System.out.println(clientResponse.getExtra());
                 System.out.println(clientResponse.getException());

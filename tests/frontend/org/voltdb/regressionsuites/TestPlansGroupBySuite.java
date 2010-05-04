@@ -61,7 +61,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
         for (int i = 1; i <= 10; i++) {
             for (int j = 0; j < i; j++) {
                 //qs = "INSERT INTO T1 VALUES (" + pkey++ + ", " + i + ");";
-                vt = client.callProcedure("T1Insert", pkey++, i)[0];
+                vt = client.callProcedure("T1Insert", pkey++, i).getResults()[0];
                 assertTrue(vt.getRowCount() == 1);
                 // assertTrue(vt.asScalarLong() == 1);
             }
@@ -70,7 +70,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
         // (so that the table results of "count" and "group by" can be
         // distinguished)
         vt = client.callProcedure("@AdHoc", "insert into t1 values (" + pkey++
-                + ",11);")[0];
+                + ",11);").getResults()[0];
         assertTrue(vt.getRowCount() == 1);
         // assertTrue(vt.asScalarLong() == 1);
         return pkey;
@@ -126,11 +126,11 @@ public class TestPlansGroupBySuite extends RegressionSuite {
 
         loaderNxN(client, 0);
 
-        vt = client.callProcedure("@AdHoc", "Select * from T1")[0];
+        vt = client.callProcedure("@AdHoc", "Select * from T1").getResults()[0];
         System.out.println("T1-*:" + vt);
 
         // execute the query
-        vt = client.callProcedure("@AdHoc", "SELECT A1 from T1 group by A1")[0];
+        vt = client.callProcedure("@AdHoc", "SELECT A1 from T1 group by A1").getResults()[0];
 
         // one row per unique value of A1
         System.out.println("testSelectAGroubyA: " + vt);
@@ -160,7 +160,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
         loaderNxN(client, 0);
 
         vt = client.callProcedure("@AdHoc",
-        "select count(A1) from T1 group by A1")[0];
+        "select count(A1) from T1 group by A1").getResults()[0];
         System.out.println("testSelectCountAGroupbyA result: " + vt);
         assertTrue(vt.getRowCount() == 11);
 
@@ -189,7 +189,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
 
         String qs = "select A1, sum(A1) from T1 group by A1";
 
-        vt = client.callProcedure("@AdHoc", qs)[0];
+        vt = client.callProcedure("@AdHoc", qs).getResults()[0];
         System.out.println("testSelectSumAGroupbyA result: " + vt);
         assertEquals(11, vt.getRowCount());
 
@@ -216,7 +216,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
         Client client = getClient();
         loaderNxN(client, 0);
         vt = client
-        .callProcedure("@AdHoc", "select count(distinct A1) from T1")[0];
+        .callProcedure("@AdHoc", "select count(distinct A1) from T1").getResults()[0];
         assertTrue(vt.getRowCount() == 1);
 
         // there are 11 distinct values for A1
@@ -231,7 +231,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
         VoltTable vt;
         Client client = getClient();
         loaderNxN(client, 0);
-        vt = client.callProcedure("@AdHoc", "select count(A1) from T1")[0];
+        vt = client.callProcedure("@AdHoc", "select count(A1) from T1").getResults()[0];
         assertTrue(vt.getRowCount() == 1);
 
         // there are 56 rows in the table 1 + 2 + 3 + .. + 10 + 1
@@ -249,7 +249,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
 
         loaderNxN(client, 0);
 
-        vt = client.callProcedure("@AdHoc", "select distinct a1 from t1")[0];
+        vt = client.callProcedure("@AdHoc", "select distinct a1 from t1").getResults()[0];
         System.out.println("testSelectDistinctA result row("
                 + vt.getColumnName(0) + ") " + vt);
 
@@ -281,7 +281,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
 
         String qs = "select sum(F_VAL1), sum(F_VAL2), sum(F_VAL3) from F";
 
-        vt = client.callProcedure("@AdHoc", qs)[0];
+        vt = client.callProcedure("@AdHoc", qs).getResults()[0];
         System.out.println("testDistributedSum result: " + vt);
         assertTrue(vt.getRowCount() == 1);
         while (vt.advanceRow()) {
@@ -306,7 +306,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
 
         String qs = "select sum(V.SUM_v1), sum(V.SUM_V2), sum(V.SUM_V3) from V";
 
-        vt = client.callProcedure("@AdHoc", qs)[0];
+        vt = client.callProcedure("@AdHoc", qs).getResults()[0];
         System.out.println("testDistributedSum_View result: " + vt);
         assertTrue(vt.getRowCount() == 1);
         while (vt.advanceRow()) {
@@ -334,7 +334,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
         String qs = "select V.V_D1_PKEY, sum(V.SUM_V1), sum(V.SUM_V2), sum(V.SUM_V3) "
             + "from V group by V.V_D1_PKEY";
 
-        vt = client.callProcedure("@AdHoc", qs)[0];
+        vt = client.callProcedure("@AdHoc", qs).getResults()[0];
         System.out.println("testDistributedSumAndJoin result: " + vt);
         assert (vt.getRowCount() == 10); // 10 unique values for dim1 which is
         // the grouping col
@@ -379,7 +379,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
         loadF(client, 0);
         loadDims(client);
 
-        vt = client.callProcedure("SumGroupSingleJoin")[0];
+        vt = client.callProcedure("SumGroupSingleJoin").getResults()[0];
         assertTrue(vt.getRowCount() == 10);
 
         int found[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -419,7 +419,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
             + " from D1, V where D1.D1_PKEY = V.V_D1_PKEY and D1.D1_PKEY = 5"
             + " group by D1.D1_NAME";
 
-        vt = client.callProcedure("@AdHoc", qs)[0];
+        vt = client.callProcedure("@AdHoc", qs).getResults()[0];
         assertTrue(vt.getRowCount() == 1);
         System.out.println("testDistributedSumGroupSingleJoinOneDim: " + vt);
         while (vt.advanceRow()) {
@@ -456,7 +456,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
             + "where V.V_D1_PKEY = D1.D1_PKEY and V.V_D2_PKEY = D2.D2_PKEY "
             + "group by D1.D1_NAME, D2.D2_NAME";
 
-        vt = client.callProcedure("@AdHoc", qs)[0];
+        vt = client.callProcedure("@AdHoc", qs).getResults()[0];
         System.out.println("DistributedSumGroupMultiJoin: " + vt);
 
         // sort the output by d2's value
@@ -515,7 +515,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
             + "where V.V_D1_PKEY = D1.D1_PKEY and V.V_D2_PKEY = D2.D2_PKEY and D1.D1_PKEY = 6 "
             + "group by D1.D1_NAME, D2.D2_NAME;";
 
-        vt = client.callProcedure("@AdHoc", qs)[0];
+        vt = client.callProcedure("@AdHoc", qs).getResults()[0];
         // 5 unique values of d2 for each value of d1 (and a single d1 value is selected above)
         assertEquals(vt.getRowCount(), 5);
 
@@ -568,7 +568,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
             +        "and D1.D1_PKEY = 6 and D2.D2_PKEY = 26 "
             + "group by D1.D1_NAME, D2.D2_NAME, D3.D3_NAME;";
 
-        vt = client.callProcedure("@AdHoc", qs)[0];
+        vt = client.callProcedure("@AdHoc", qs).getResults()[0];
         System.out.println("MultiJoin3Dims: " + vt);
 
         // output looks like this - in either ordering

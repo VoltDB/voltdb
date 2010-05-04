@@ -175,25 +175,13 @@ public class MultiLoader extends ClientMain {
     }
 
     private void rethrowExceptionLoad(String procedureName, Object... parameters) {
-        SyncCallback callback = new SyncCallback();
         try {
-            while(!m_voltClient.callProcedure(callback, procedureName, parameters)) {
-                m_voltClient.backpressureBarrier();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-            System.exit(-1);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-        try {
-            callback.waitForResponse();
-            VoltTable ret[] = callback.result();
+            VoltTable ret[] = m_voltClient.callProcedure(procedureName, parameters).getResults();
             assert ret.length == 0;
-        } catch (InterruptedException e) {
+        } catch (ProcCallException e) {
             e.printStackTrace();
             System.exit(-1);
-        } catch (ProcCallException e) {
+        } catch (IOException e) {
             e.printStackTrace();
             System.exit(-1);
         }
@@ -625,7 +613,7 @@ public class MultiLoader extends ClientMain {
 
                     private double lastPercentCompleted = 0.0;
                     @Override
-                    protected synchronized void clientCallback(ClientResponse clientResponse) {
+                    public synchronized void clientCallback(ClientResponse clientResponse) {
                         if (clientResponse.getStatus() != ClientResponse.SUCCESS){
                             System.err.println(clientResponse.getExtra());
                             System.exit(-1);

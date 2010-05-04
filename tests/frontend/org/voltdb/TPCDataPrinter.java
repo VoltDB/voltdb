@@ -57,7 +57,7 @@ public abstract class TPCDataPrinter {
     public static HashMap<String, VoltTable> getAllData(Client client) {
         VoltTable[] tables = null;
         try {
-            tables = client.callProcedure("SelectAll");
+            tables = client.callProcedure("SelectAll").getResults();
         } catch (ProcCallException e) {
             e.printStackTrace();
         } catch (IOException e) {
@@ -73,7 +73,7 @@ public abstract class TPCDataPrinter {
     public static void printAllData(Client client) {
         VoltTable[] tables = null;
         try {
-            tables = client.callProcedure("SelectAll");
+            tables = client.callProcedure("SelectAll").getResults();
         } catch (ProcCallException e) {
             throw new RuntimeException(e);
         } catch (IOException e) {

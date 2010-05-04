@@ -66,7 +66,7 @@ public class TestMultiPartitionSuite extends RegressionSuite {
 
             System.out.println("\nBEGIN TEST\n==================\n");
 
-            VoltTable[] results = client.callProcedure("MultiSiteSelect");
+            VoltTable[] results = client.callProcedure("MultiSiteSelect").getResults();
 
             assertTrue(results.length == 1);
             VoltTable resultAll = results[0];
@@ -92,7 +92,7 @@ public class TestMultiPartitionSuite extends RegressionSuite {
 
             System.out.println("\nBEGIN TEST\n==================\n");
 
-            VoltTable[] results = client.callProcedure("MultiSiteIndexSelect");
+            VoltTable[] results = client.callProcedure("MultiSiteIndexSelect").getResults();
 
             assertTrue(results.length == 2);
 
@@ -123,14 +123,14 @@ public class TestMultiPartitionSuite extends RegressionSuite {
             System.out.println("\nBEGIN TEST\n==================\n");
 
             // delete a tuple
-            VoltTable[] results = client.callProcedure("MultiSiteDelete");
+            VoltTable[] results = client.callProcedure("MultiSiteDelete").getResults();
             assertTrue(results.length == 1);
             VoltTable resultModCount = results[0];
             long modCount = resultModCount.asScalarLong();
             assertTrue(modCount == 1);
 
             // check for three remaining tuples
-            results = client.callProcedure("MultiSiteSelect");
+            results = client.callProcedure("MultiSiteSelect").getResults();
             assertTrue(results.length == 1);
             VoltTable allData = results[0];
             System.out.println("Leftover: " + allData.toString());
@@ -152,7 +152,7 @@ public class TestMultiPartitionSuite extends RegressionSuite {
             client.callProcedure("InsertNewOrder", 1L, 1L, 1L);
 
             // parameters to UpdateNewOrder are no_o_id, alwaysFail
-            VoltTable[] results = client.callProcedure("UpdateNewOrder", 1L, 1L);
+            VoltTable[] results = client.callProcedure("UpdateNewOrder", 1L, 1L).getResults();
             assertTrue(results.length == 1);
             assertTrue(results[0].asScalarLong() == 1);
         } catch (Exception e) {

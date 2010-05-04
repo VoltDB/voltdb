@@ -14,17 +14,17 @@
  * You should have received a copy of the GNU General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 package org.voltdb.client;
 
 /**
- * A utility callback that can be instantiated for asynchronous invocations where the result including success/failure
- * is going to be ignored.
+ * An interface that can be implemented by procedure callbacks that want an opportunity to cache the arguments
+ * to the procedure invocation
  */
-public final class NullCallback implements ProcedureCallback {
-
-    @Override
-    public void clientCallback(ClientResponse clientResponse) {
-    }
-
+public interface ProcedureArgumentCacher {
+    /**
+     * Invoked when a procedure is called to give the callback an opportunity to cache
+     * the arguments
+     * @param args Array of arguments passed to the stored procedure
+     */
+    void setArgs(Object args[]);
 }

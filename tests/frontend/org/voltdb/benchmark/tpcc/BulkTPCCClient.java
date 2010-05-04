@@ -98,7 +98,7 @@ public class BulkTPCCClient extends BulkClient {
     }
 
     // Delivery
-    class DeliveryCallback extends ProcedureCallback {
+    class DeliveryCallback implements ProcedureCallback {
         @Override
         public void clientCallback(ClientResponse clientResponse) {
             assert clientResponse.getStatus() == 1;
@@ -115,7 +115,7 @@ public class BulkTPCCClient extends BulkClient {
 
     // NewOrder
 
-    class NewOrderCallback extends ProcedureCallback {
+    class NewOrderCallback implements ProcedureCallback {
 
         public NewOrderCallback(boolean rollback) {
             super();
@@ -133,7 +133,7 @@ public class BulkTPCCClient extends BulkClient {
 
     // Order status
 
-    class VerifyBasicCallback extends ProcedureCallback {
+    class VerifyBasicCallback implements ProcedureCallback {
         private final TPCCSimulation.Transaction m_transactionType;
 
         /**
@@ -159,7 +159,7 @@ public class BulkTPCCClient extends BulkClient {
         }
     }
 
-    class ResetWarehouseCallback extends ProcedureCallback {
+    class ResetWarehouseCallback implements ProcedureCallback {
         @Override
         public void clientCallback(ClientResponse clientResponse) {
             m_counts[TPCCSimulation.Transaction.RESET_WAREHOUSE.ordinal()].incrementAndGet();
@@ -167,7 +167,7 @@ public class BulkTPCCClient extends BulkClient {
     }
 
     // StockLevel
-    class StockLevelCallback extends ProcedureCallback {
+    class StockLevelCallback implements ProcedureCallback {
         @Override
         public void clientCallback(ClientResponse clientResponse) {
             assert clientResponse.getStatus() == 1;

@@ -21,11 +21,11 @@ public class Client {
                */
     VoltTable[] results = null;
     try {
-       results = myApp.callProcedure("Insert","Hello",  "World", "English");
-       results = myApp.callProcedure("Insert","Bonjour","Monde", "French");
-       results = myApp.callProcedure("Insert","Hola",   "Mundo", "Spanish");
-       results = myApp.callProcedure("Insert","Hej",    "Verden","Danish");
-       results = myApp.callProcedure("Insert","Ciao",   "Mondo", "Italian");
+       results = myApp.callProcedure("Insert","Hello",  "World", "English").getResults();
+       results = myApp.callProcedure("Insert","Bonjour","Monde", "French").getResults();
+       results = myApp.callProcedure("Insert","Hola",   "Mundo", "Spanish").getResults();
+       results = myApp.callProcedure("Insert","Hej",    "Verden","Danish").getResults();
+       results = myApp.callProcedure("Insert","Ciao",   "Mondo", "Italian").getResults();
         } catch (Exception e) {
             e.printStackTrace();
             System.exit(-1);
@@ -35,7 +35,7 @@ public class Client {
              * Retrieve the message.
              */
     try {
-       results = myApp.callProcedure("Select", "Spanish");
+       results = myApp.callProcedure("Select", "Spanish").getResults();
         } catch (Exception e) {
             e.printStackTrace();
             System.exit(-1);

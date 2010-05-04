@@ -61,7 +61,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             String query =
                 String.format("select count(*), %s.NUM from %s group by %s.NUM",
                               table, table, table);
-            VoltTable[] results = client.callProcedure("@AdHoc", query);
+            VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(3, results[0].getRowCount());
             while (results[0].advanceRow())
             {
@@ -108,19 +108,19 @@ public class TestFixedSQLSuite extends RegressionSuite {
             // being used
             String query = "select * from " + table + " where (" +
                 table + ".ID = 5) and (" + table + ".NUM < " + table +".ID)";
-            VoltTable[] results = client.callProcedure("@AdHoc", query);
+            VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(0, results[0].getRowCount());
             query = "select * from " + table + " where (" +
                 table + ".ID = 5) and (" + table + ".NUM <= " + table +".ID)";
-            results = client.callProcedure("@AdHoc", query);
+            results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(0, results[0].getRowCount());
             query = "select * from " + table + " where (" +
                 table + ".ID = 15) and (" + table + ".NUM > " + table +".ID)";
-            results = client.callProcedure("@AdHoc", query);
+            results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(0, results[0].getRowCount());
             query = "select * from " + table + " where (" +
                 table + ".ID = 15) and (" + table + ".NUM >= " + table +".ID)";
-            results = client.callProcedure("@AdHoc", query);
+            results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(0, results[0].getRowCount());
         }
     }
@@ -152,7 +152,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("Insert", table, 3, "desc", 100, 14.5);
             String query = "select * from " + table + " where " +
                 table + ".ID < " + table +".NUM limit 2";
-            VoltTable[] results = client.callProcedure("@AdHoc", query);
+            VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
             // we should get 2 rows but this bug would result in only 1 returned
             assertEquals(2, results[0].getRowCount());
         }
@@ -181,21 +181,21 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("Insert", table, 1, "desc", 2, 14.5);
             String query = String.format("select %s.ID + 10 from %s",
                                          table, table);
-            VoltTable[] results = client.callProcedure("@AdHoc", query);
+            VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
             results[0].advanceRow();
             assertEquals(11, results[0].getLong(0));
             query = String.format("select %s.NUM + 20 from %s", table, table);
-            results = client.callProcedure("@AdHoc", query);
+            results = client.callProcedure("@AdHoc", query).getResults();
             results[0].advanceRow();
             assertEquals(22, results[0].getLong(0));
             query = String.format("select %s.RATIO + 5.5 from %s",
                                   table, table);
-            results = client.callProcedure("@AdHoc", query);
+            results = client.callProcedure("@AdHoc", query).getResults();
             results[0].advanceRow();
             assertEquals(20.0, results[0].getDouble(0));
             query = String.format("select %s.ID + %s.NUM from %s",
                                   table, table, table);
-            results = client.callProcedure("@AdHoc", query);
+            results = client.callProcedure("@AdHoc", query).getResults();
             results[0].advanceRow();
             assertEquals(3, results[0].getLong(0));
         }
@@ -224,22 +224,22 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
         // join on the (5-id), (id) columns
         String query = "select * from P1, R1 where P1.NUM = R1.NUM";
-        VoltTable vts[] = client.callProcedure("@AdHoc", query);
+        VoltTable vts[] = client.callProcedure("@AdHoc", query).getResults();
         testNestLoopJoinPredicates_verify(vts);
 
         // same thing using inner join syntax
         query = "select * from P1 INNER JOIN R1 on P1.NUM = R1.NUM";
-        vts = client.callProcedure("@AdHoc", query);
+        vts = client.callProcedure("@AdHoc", query).getResults();
         testNestLoopJoinPredicates_verify(vts);
 
         // join on ID and verify NUM. (ID is indexed)
         query = "select * from P1, R1 where P1.ID = R1.ID";
-        vts = client.callProcedure("@AdHoc", query);
+        vts = client.callProcedure("@AdHoc", query).getResults();
         testNestLoopJoinPredicates_verifyid(vts);
 
         // as above with inner join syntax
         query = "select * from P1 INNER JOIN R1 on P1.ID = R1.ID";
-        vts = client.callProcedure("@AdHoc", query);
+        vts = client.callProcedure("@AdHoc", query).getResults();
         testNestLoopJoinPredicates_verifyid(vts);
     }
 
@@ -295,12 +295,12 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
         // join on the (5-id), (id) columns and select a value modified by an expression
         String query = "select (P1.ID + 20), (R1.ID + 40) from P1, R1 where P1.NUM = R1.NUM";
-        VoltTable vts[] = client.callProcedure("@AdHoc", query);
+        VoltTable vts[] = client.callProcedure("@AdHoc", query).getResults();
         testNestLoopJoinPredicatesWithExpressions_verify(vts);
 
         // same thing using inner join syntax
         query = "select (P1.ID + 20), (R1.ID + 40) from P1 INNER JOIN R1 on P1.NUM = R1.NUM";
-        vts = client.callProcedure("@AdHoc", query);
+        vts = client.callProcedure("@AdHoc", query).getResults();
         testNestLoopJoinPredicatesWithExpressions_verify(vts);
     }
 
@@ -344,12 +344,12 @@ public class TestFixedSQLSuite extends RegressionSuite {
         // join on the (5-id), (id) columns and select a value modified by an expression
         // use an alias that would select an invalid column. (be a jerk).
         String query = "select R1.ID AS DESC, (P1.ID + 20) AS THOMAS from P1, R1 where P1.NUM = R1.NUM";
-        VoltTable vts[] = client.callProcedure("@AdHoc", query);
+        VoltTable vts[] = client.callProcedure("@AdHoc", query).getResults();
         testNestLoopJoinPredicatesWithAliases_verify(vts);
 
         // same thing using inner join syntax
         query = "select R1.ID AS DESC, (P1.ID + 20) AS THOMAS from P1 INNER JOIN R1 on P1.NUM = R1.NUM";
-        vts = client.callProcedure("@AdHoc", query);
+        vts = client.callProcedure("@AdHoc", query).getResults();
         testNestLoopJoinPredicatesWithAliases_verify(vts);
     }
 
@@ -398,17 +398,17 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("Insert", table, 8, "desc", 100, 14.5);
             String query = "select * from " + table + " where " +
                 table + ".ID > 1";
-            VoltTable[] results = client.callProcedure("@AdHoc", query);
+            VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
             // we should get 5 rows but this bug would result in all 6 returned
             assertEquals(5, results[0].getRowCount());
             // make sure that we work if the value we want isn't present
             query = "select * from " + table + " where " +
                 table + ".ID > 4";
-            results = client.callProcedure("@AdHoc", query);
+            results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(3, results[0].getRowCount());
             query = "select * from " + table + " where " +
                 table + ".ID > 8";
-            results = client.callProcedure("@AdHoc", query);
+            results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(0, results[0].getRowCount());
         }
     }
@@ -426,13 +426,13 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("Insert", table, 7, "desc", 300, 14.5);
             client.callProcedure("Insert", table, 8, "desc", 500, 14.5);
             String query = String.format("select count(*) from %s", table);
-            VoltTable[] results = client.callProcedure("@AdHoc", query);
+            VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(1, results[0].getRowCount());
             results[0].advanceRow();
             assertEquals(6, results[0].getLong(0));
             query = String.format("select %s.NUM, count(*) from %s group by %s.NUM",
                                   table, table, table);
-            results = client.callProcedure("@AdHoc", query);
+            results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(3, results[0].getRowCount());
             while (results[0].advanceRow())
             {
@@ -476,7 +476,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
         client.callProcedure("@AdHoc", query);
         query = "select count(*) from COUNT_NULL";
-        VoltTable[] results = client.callProcedure("@AdHoc", query);
+        VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
         assertEquals(1, results[0].getRowCount());
         results[0].advanceRow();
         assertEquals(4, results[0].getLong(0));
@@ -496,15 +496,15 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("Insert", table, 8, "desc", 600, 14.5);
             String query = String.format("select * from %s where (%s.ID + 1) = 2",
                                          table, table);
-            VoltTable[] results = client.callProcedure("@AdHoc", query);
+            VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(1, results[0].getRowCount());
             query = String.format("select * from %s where (%s.ID + 1) > 2",
                                          table, table);
-            results = client.callProcedure("@AdHoc", query);
+            results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(5, results[0].getRowCount());
             query = String.format("select * from %s where (%s.ID + 1) >= 2",
                                          table, table);
-            results = client.callProcedure("@AdHoc", query);
+            results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(6, results[0].getRowCount());
         }
     }
@@ -547,7 +547,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("Insert", table, 8, "desc", 600, 600.0);
             String query = String.format("select %s.RATIO / 2.0 from %s order by ID",
                                          table, table);
-            VoltTable[] results = client.callProcedure("@AdHoc", query);
+            VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(6, results[0].getRowCount());
             for (double f=50.0; results[0].advanceRow(); f+=50.0) {
                 double num = (results[0].getDouble(0));
@@ -555,7 +555,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             }
             query = String.format("select * from %s where %s.RATIO >= 400.0",
                                   table, table);
-            results = client.callProcedure("@AdHoc", query);
+            results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(3, results[0].getRowCount());
         }
     }
@@ -575,11 +575,11 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("Insert", table, 8, "desc", 600, 14.5);
             String query = String.format("select * from %s where %s.ID >= 2.1",
                                   table, table);
-            VoltTable[] results = client.callProcedure("@AdHoc", query);
+            VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(4, results[0].getRowCount());
             query = String.format("select * from %s where %s.ID >= 4.0",
                                   table, table);
-            results = client.callProcedure("@AdHoc", query);
+            results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(3, results[0].getRowCount());
         }
     }
@@ -600,23 +600,23 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
         // test > on the join (ticket 227)
         String query = "select * from R2, P2 where R2.ID > 1";
-        VoltTable[] results = client.callProcedure("@AdHoc", query);
+        VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
         assertEquals(30, results[0].getRowCount());
         query = "select * from P2, R2 where R2.ID > 1";
-        results = client.callProcedure("@AdHoc", query);
+        results = client.callProcedure("@AdHoc", query).getResults();
         assertEquals(30, results[0].getRowCount());
         // test >= on the join (ticket 228)
         query = "select * from R2, P2 where R2.ID >= 3";
-        results = client.callProcedure("@AdHoc", query);
+        results = client.callProcedure("@AdHoc", query).getResults();
         assertEquals(24, results[0].getRowCount());
         query = "select * from P2, R2 where R2.ID >= 3";
-        results = client.callProcedure("@AdHoc", query);
+        results = client.callProcedure("@AdHoc", query).getResults();
         assertEquals(24, results[0].getRowCount());
         query = "select * from R2, P2 where R2.ID >= 4";
-        results = client.callProcedure("@AdHoc", query);
+        results = client.callProcedure("@AdHoc", query).getResults();
         assertEquals(18, results[0].getRowCount());
         query = "select * from P2, R2 where R2.ID >= 4";
-        results = client.callProcedure("@AdHoc", query);
+        results = client.callProcedure("@AdHoc", query).getResults();
         assertEquals(18, results[0].getRowCount());
     }
 
@@ -632,7 +632,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("Insert", table, id++, "desc", 100, 14.5);
         }
         String query = "select R1.ID + 5 from R1, P1 order by R1.ID";
-        VoltTable[] results = client.callProcedure("@AdHoc", query);
+        VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
         assertEquals(9, results[0].getRowCount());
         for (int i = 0; i < 3; i++)
         {
@@ -654,7 +654,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             "INSERT INTO R1_DECIMAL VALUES (26, 307473.174514, 289429.605067, 9.71903320295135486617e-01)";
         client.callProcedure("@AdHoc", sql);
         sql = "select R1_DECIMAL.CASH + 2.0 from R1_DECIMAL";
-        VoltTable[] results = client.callProcedure("@AdHoc", sql);
+        VoltTable[] results = client.callProcedure("@AdHoc", sql).getResults();
         assertEquals(1, results.length);
     }
 
@@ -693,19 +693,19 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
         String sql = "INSERT INTO R1_DECIMAL VALUES " +
            "(26, 307473.174514, 289429.605067, 9.71903320295135486617e-01)";
-        results = client.callProcedure("@AdHoc", sql);
+        results = client.callProcedure("@AdHoc", sql).getResults();
         assertEquals(1, results.length);
         assertEquals(1, results[0].asScalarLong());
 
         sql = "UPDATE R1_DECIMAL SET CASH = CASH * 5 WHERE " +
             "R1_DECIMAL.CASH != 88687.224073";
-        results = client.callProcedure("@AdHoc", sql);
+        results = client.callProcedure("@AdHoc", sql).getResults();
         assertEquals(1, results.length);
         assertEquals(1, results[0].asScalarLong());
 
         sql = "UPDATE R1_DECIMAL SET CASH = CASH + 5.5 WHERE " +
             "R1_DECIMAL.CASH != 88687.224073";
-        results = client.callProcedure("@AdHoc", sql);
+        results = client.callProcedure("@AdHoc", sql).getResults();
         assertEquals(1, results.length);
         assertEquals(1, results[0].asScalarLong());
     }
@@ -722,8 +722,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("Insert", table, id++, "desc", 300, 16.5);
         }
         String query = "select distinct P1.NUM from R1, P1 order by P1.NUM";
-        VoltTable[] results = client.callProcedure("@AdHoc", query);
-        results = client.callProcedure("@AdHoc", query);
+        VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
+        results = client.callProcedure("@AdHoc", query).getResults();
         assertEquals(3, results[0].getRowCount());
         for (int i = 100; results[0].advanceRow(); i+=100)
         {
@@ -744,8 +744,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("Insert", table, id++, "desc", 300, 16.5);
         }
         String query = "select max(P1.ID) from R1, P1";
-        VoltTable[] results = client.callProcedure("@AdHoc", query);
-        results = client.callProcedure("@AdHoc", query);
+        VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
+        results = client.callProcedure("@AdHoc", query).getResults();
         assertEquals(1, results[0].getRowCount());
         results[0].advanceRow();
         assertEquals(2, results[0].getLong(0));
@@ -764,8 +764,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("Insert", table, id++, "desc", 300, 16.5);
         }
         String query = "select P1.ID from R1, P1 group by P1.ID";
-        VoltTable[] results = client.callProcedure("@AdHoc", query);
-        results = client.callProcedure("@AdHoc", query);
+        VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
+        results = client.callProcedure("@AdHoc", query).getResults();
         assertEquals(3, results[0].getRowCount());
         assertEquals(1, results[0].getColumnCount());
         for (int i = 0; results[0].advanceRow(); i++)
@@ -787,8 +787,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("Insert", table, id++, "desc", 300, 16.5);
         }
         String query = "select P1.ID from P1, R1 order by P1.ID";
-        VoltTable[] results = client.callProcedure("@AdHoc", query);
-        results = client.callProcedure("@AdHoc", query);
+        VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
+        results = client.callProcedure("@AdHoc", query).getResults();
         assertEquals(9, results[0].getRowCount());
         assertEquals(1, results[0].getColumnCount());
         for (int i = 0; i < 3; i++)
@@ -820,7 +820,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             String query =
                 String.format("select (%s.NUM + %s.NUM) as NUMSUM from %s where (%s.NUM + %s.NUM) > 400",
                               table, table, table, table, table);
-            VoltTable[] results = client.callProcedure("@AdHoc", query);
+            VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(2, results[0].getRowCount());
 // This failing statement is the current ticket 231 failing behavior.
 //            query =
@@ -848,7 +848,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             String query =
                 String.format("select %s.NUM from %s group by %s.NUM order by %s.NUM",
                               table, table, table, table);
-            VoltTable[] results = client.callProcedure("@AdHoc", query);
+            VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(3, results[0].getRowCount());
         }
     }
@@ -868,12 +868,12 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("Insert", table, id++, "desc", 400, 18.5);
             String query = String.format("select distinct %s.NUM from %s order by %s.NUM",
                                          table, table, table);
-            VoltTable[] results = client.callProcedure("@AdHoc", query);
+            VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(4, results[0].getRowCount());
         }
         String query = "select distinct P1.NUM from R1, P1 order by P1.NUM";
-        VoltTable[] results = client.callProcedure("@AdHoc", query);
-        results = client.callProcedure("@AdHoc", query);
+        VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
+        results = client.callProcedure("@AdHoc", query).getResults();
         assertEquals(4, results[0].getRowCount());
     }
 
@@ -884,13 +884,13 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("Insert", "P1", i, "desc", 100 + i, 4.5);
         }
         // base case
-        VoltTable[] results = client.callProcedure("Eng397Limit1", new Integer(10));
+        VoltTable[] results = client.callProcedure("Eng397Limit1", new Integer(10)).getResults();
         assertEquals(10, results[0].getRowCount());
 
         // negative limit rollsback
         boolean caught = false;
         try {
-            results = client.callProcedure("Eng397Limit1", new Integer(-1));
+            results = client.callProcedure("Eng397Limit1", new Integer(-1)).getResults();
         }
         catch (ProcCallException ignored) {
             caught = true;

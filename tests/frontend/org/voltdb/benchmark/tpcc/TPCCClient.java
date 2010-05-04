@@ -567,7 +567,7 @@ implements TPCCSimulation.ProcCaller {
     }
 
     // Delivery
-    class DeliveryCallback extends ProcedureCallback {
+    class DeliveryCallback implements ProcedureCallback {
         @Override
         public void clientCallback(ClientResponse clientResponse) {
             boolean status = checkTransaction(Constants.DELIVERY, clientResponse, false, false);
@@ -605,7 +605,7 @@ implements TPCCSimulation.ProcCaller {
 
     // NewOrder
 
-    class NewOrderCallback extends ProcedureCallback {
+    class NewOrderCallback implements ProcedureCallback {
 
         public NewOrderCallback(boolean rollback) {
             super();
@@ -644,7 +644,7 @@ implements TPCCSimulation.ProcCaller {
 
     // Order status
 
-    class VerifyBasicCallback extends ProcedureCallback {
+    class VerifyBasicCallback implements ProcedureCallback {
         private final TPCCSimulation.Transaction m_transactionType;
         private final String m_procedureName;
 
@@ -831,7 +831,7 @@ implements TPCCSimulation.ProcCaller {
 
 
     // StockLevel
-    class StockLevelCallback extends ProcedureCallback {
+    class StockLevelCallback implements ProcedureCallback {
         @Override
         public void clientCallback(ClientResponse clientResponse) {
             boolean status = checkTransaction(Constants.STOCK_LEVEL,
@@ -858,7 +858,7 @@ implements TPCCSimulation.ProcCaller {
 
     }
 
-    class DumpStatisticsCallback extends ProcedureCallback {
+    class DumpStatisticsCallback implements ProcedureCallback {
         @Override
         public void clientCallback(ClientResponse clientResponse) {
             if (checkTransaction(null, clientResponse, false, false))
@@ -871,7 +871,7 @@ implements TPCCSimulation.ProcCaller {
                 "@Statistics", "procedure");
     }
 
-    class ResetWarehouseCallback extends ProcedureCallback {
+    class ResetWarehouseCallback implements ProcedureCallback {
         @Override
         public void clientCallback(ClientResponse clientResponse) {
             if (checkTransaction(null, clientResponse, false, false))

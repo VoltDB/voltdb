@@ -79,31 +79,31 @@ public class TestTPCCSuite extends RegressionSuite {
             VoltTable[] results = null;
             TimestampType timestamp = new TimestampType();
 
-            results = client.callProcedure("InsertWarehouse", 8L, "EZ Street WHouse", "Headquarters", "77 Mass. Ave.", "Cambridge", "AZ", "12938", .1234, 18837.57);
+            results = client.callProcedure("InsertWarehouse", 8L, "EZ Street WHouse", "Headquarters", "77 Mass. Ave.", "Cambridge", "AZ", "12938", .1234, 18837.57).getResults();
             assertTrue(results[0].asScalarLong() == 1L);
 
-            results = client.callProcedure("InsertDistrict", 7L, 3L, "A District", "Street Addy", "meh", "westerfield", "BA", "99999", .0825, 15241.45, 21L);
+            results = client.callProcedure("InsertDistrict", 7L, 3L, "A District", "Street Addy", "meh", "westerfield", "BA", "99999", .0825, 15241.45, 21L).getResults();
             assertTrue(results[0].asScalarLong() == 1L);
 
-            results = client.callProcedure("InsertItem", 5L, 21L, "An Item", 7.33, "Some Data");
+            results = client.callProcedure("InsertItem", 5L, 21L, "An Item", 7.33, "Some Data").getResults();
             assertTrue(results[0].asScalarLong() == 1L);
 
-            results = client.callProcedure("InsertCustomer", 2L, 7L, 8L, "I", "Is", "Name", "Place", "Place2", "BiggerPlace", "AL", "91083", "(913) 909 - 0928", new TimestampType(), "GC", 19298943.12, .13, 15.75, 18832.45, 45L, 15L, "Some History");
+            results = client.callProcedure("InsertCustomer", 2L, 7L, 8L, "I", "Is", "Name", "Place", "Place2", "BiggerPlace", "AL", "91083", "(913) 909 - 0928", new TimestampType(), "GC", 19298943.12, .13, 15.75, 18832.45, 45L, 15L, "Some History").getResults();
             assertTrue(results[0].asScalarLong() == 1L);
 
-            results = client.callProcedure("InsertHistory", 13L, 2L, 7L, 5L, 6L, timestamp, 23.334, "Some History");
+            results = client.callProcedure("InsertHistory", 13L, 2L, 7L, 5L, 6L, timestamp, 23.334, "Some History").getResults();
             assertTrue(results[0].asScalarLong() == 1L);
 
-            results = client.callProcedure("InsertStock", 5L, 3L, 45L, "INFO", "INFO", "INFO", "INFO", "INFO", "INFO", "INFO", "INFO", "INFO", "INFO", 5582L, 152L, 32L, "DATA");
+            results = client.callProcedure("InsertStock", 5L, 3L, 45L, "INFO", "INFO", "INFO", "INFO", "INFO", "INFO", "INFO", "INFO", "INFO", "INFO", 5582L, 152L, 32L, "DATA").getResults();
             assertTrue(results[0].asScalarLong() == 1L);
 
-            results = client.callProcedure("InsertOrders", 2L, 7L, 5L, 6L, timestamp, 2L, 7L, 5L);
+            results = client.callProcedure("InsertOrders", 2L, 7L, 5L, 6L, timestamp, 2L, 7L, 5L).getResults();
             assertTrue(results[0].asScalarLong() == 1L);
 
-            results = client.callProcedure("InsertNewOrder", 7L, 5L, 6L);
+            results = client.callProcedure("InsertNewOrder", 7L, 5L, 6L).getResults();
             assertTrue(results[0].asScalarLong() == 1L);
 
-            results = client.callProcedure("InsertOrderLine", 6L, 7L, 3L, 1L, 4L, 3L, timestamp, 45L, 152.15, "blah blah blah");
+            results = client.callProcedure("InsertOrderLine", 6L, 7L, 3L, 1L, 4L, 3L, timestamp, 45L, 152.15, "blah blah blah").getResults();
             assertTrue(results[0].asScalarLong() == 1L);
 
             TPCDataPrinter.printAllData(client);
@@ -126,14 +126,14 @@ public class TestTPCCSuite extends RegressionSuite {
         // d_tax, double d_ytd, long d_next_o_id
         VoltTable[] idresults = client.callProcedure("InsertDistrict", 7L, 3L,
                 "A District", "Street Addy", "meh", "westerfield", "BA",
-                "99999", .0825, 15241.45, 21L);
+                "99999", .0825, 15241.45, 21L).getResults();
         // check that a district was inserted
         assertEquals(1L, idresults[0].asScalarLong());
 
         // This tests case of stock level transaction being called when there
         // are no items with stock and no
         // long w_id, long d_id, long threshold
-        VoltTable[] results = client.callProcedure(Constants.STOCK_LEVEL, (byte)3, (byte)7, 1);
+        VoltTable[] results = client.callProcedure(Constants.STOCK_LEVEL, (byte)3, (byte)7, 1).getResults();
         // check one table was returned
         assertEquals(1, results.length);
         // check one tuple was modified
@@ -150,12 +150,12 @@ public class TestTPCCSuite extends RegressionSuite {
         // double ol_amount, String ol_dist_info
         TimestampType timestamp = new TimestampType();
         VoltTable[] olresults = client.callProcedure("InsertOrderLine", 4L, 7L,
-                3L, 1L, 4L, 3L, timestamp, 45L, 152.15, "blah blah blah");
+                3L, 1L, 4L, 3L, timestamp, 45L, 152.15, "blah blah blah").getResults();
         assertEquals(1L, olresults[0].asScalarLong());
 
         try {
             // We expect this to fail because the stock table is empty.
-            results = client.callProcedure(Constants.STOCK_LEVEL, (byte)3, (byte)7, 1L);
+            results = client.callProcedure(Constants.STOCK_LEVEL, (byte)3, (byte)7, 1L).getResults();
 
             //
             // If this is true SLEV procedure, then we want to check that we got nothing
@@ -186,10 +186,10 @@ public class TestTPCCSuite extends RegressionSuite {
         timestamp = new TimestampType();
         VoltTable[] isresults = client.callProcedure("InsertStock", 4L, 3L, 45L,
                 "INFO", "INFO", "INFO", "INFO", "INFO", "INFO", "INFO", "INFO",
-                "INFO", "INFO", 5582L, 152L, 32L, "DATA");
+                "INFO", "INFO", 5582L, 152L, 32L, "DATA").getResults();
         assertEquals(1L, isresults[0].asScalarLong());
 
-        results = client.callProcedure(Constants.STOCK_LEVEL, (byte)3, (byte)7, 5000);
+        results = client.callProcedure(Constants.STOCK_LEVEL, (byte)3, (byte)7, 5000).getResults();
         // check one table was returned
         assertEquals(1, results.length);
         // check one tuple was modified
@@ -201,19 +201,19 @@ public class TestTPCCSuite extends RegressionSuite {
 
         // On more test: this test that Distinct is working properly.
         VoltTable[] ol2results = client.callProcedure("InsertOrderLine", 5L, 7L,
-                3L, 1L, 5L, 3L, timestamp, 45L, 152.15, "blah blah blah");
+                3L, 1L, 5L, 3L, timestamp, 45L, 152.15, "blah blah blah").getResults();
         assertEquals(1L, ol2results[0].asScalarLong());
 
         VoltTable[] ol3results = client.callProcedure("InsertOrderLine", 6L, 7L,
-                3L, 1L, 4L, 3L, timestamp, 45L, 152.15, "blah blah blah");
+                3L, 1L, 4L, 3L, timestamp, 45L, 152.15, "blah blah blah").getResults();
         assertEquals(1L, ol3results[0].asScalarLong());
 
         VoltTable[] is2results = client.callProcedure("InsertStock", 5L, 3L, 45L,
                 "INFO", "INFO", "INFO", "INFO", "INFO", "INFO", "INFO", "INFO",
-                "INFO", "INFO", 5582L, 152L, 32L, "DATA");
+                "INFO", "INFO", 5582L, 152L, 32L, "DATA").getResults();
         assertEquals(1L, is2results[0].asScalarLong());
 
-        results = client.callProcedure(Constants.STOCK_LEVEL, (byte)3, (byte)7, 5000);
+        results = client.callProcedure(Constants.STOCK_LEVEL, (byte)3, (byte)7, 5000).getResults();
         // check one table was returned
         assertEquals(1, results.length);
         // check one tuple was modified
@@ -232,7 +232,7 @@ public class TestTPCCSuite extends RegressionSuite {
         // String w_city, String w_zip, double w_tax, long w_ytd
         VoltTable warehouse = client.callProcedure("InsertWarehouse", W_ID,
                 "EZ Street WHouse", "Headquarters", "77 Mass. Ave.",
-                "Cambridge", "AZ", "12938", W_TAX, 18837.57)[0];
+                "Cambridge", "AZ", "12938", W_TAX, 18837.57).getResults()[0];
         // check for successful insertion.
         assertEquals(1L, warehouse.asScalarLong());
 
@@ -243,7 +243,7 @@ public class TestTPCCSuite extends RegressionSuite {
         // d_tax, double d_ytd, long d_next_o_id
         VoltTable district = client.callProcedure("InsertDistrict", D_ID, W_ID,
                 "A District", "Street Addy", "meh", "westerfield", "BA",
-                "99999", D_TAX, 15241.45, D_NEXT_O_ID)[0];
+                "99999", D_TAX, 15241.45, D_NEXT_O_ID).getResults()[0];
         // check that a district was inserted
         assertEquals(1L, district.asScalarLong());
 
@@ -258,7 +258,7 @@ public class TestTPCCSuite extends RegressionSuite {
                 W_ID, "I", "Is", "Name", "Place", "Place2", "BiggerPlace",
                 "AL", "91083", "(913) 909 - 0928", new TimestampType(), "GC",
                 19298943.12, C_DISCOUNT, 15.75, 18832.45, 45L, 15L,
-                "Some History")[0];
+                "Some History").getResults()[0];
         // check for successful insertion.
         assertEquals(1L, customer.asScalarLong());
 
@@ -273,24 +273,24 @@ public class TestTPCCSuite extends RegressionSuite {
         VoltTable stock1 = client.callProcedure("InsertStock", 4L, W_ID,
                 s_quantities[0], "INFO", "INFO", "INFO", "INFO", "INFO",
                 "INFO", "INFO", "INFO", "INFO", "INFO", INITIAL_S_YTD, INITIAL_S_ORDER_CNT, 32L,
-                "DATA")[0];
+                "DATA").getResults()[0];
         VoltTable stock2 = client.callProcedure("InsertStock", 5L, W_ID,
                 s_quantities[1], "INFO", "INFO", "INFO", "INFO", "INFO",
                 "INFO", "INFO", "INFO", "INFO", "INFO", INITIAL_S_YTD+10, INITIAL_S_ORDER_CNT+10,
-                32L, "foo" + Constants.ORIGINAL_STRING + "bar")[0];
+                32L, "foo" + Constants.ORIGINAL_STRING + "bar").getResults()[0];
         VoltTable stock3 = client.callProcedure("InsertStock", 6L, W_ID,
                 s_quantities[2], "INFO", "INFO", "INFO", "INFO", "INFO",
                 "INFO", "INFO", "INFO", "INFO", "INFO", INITIAL_S_YTD+20, INITIAL_S_ORDER_CNT+20,
-                32L, "DATA")[0];
+                32L, "DATA").getResults()[0];
 
         final double PRICE = 2341.23;
         // long i_id, long i_im_id, String i_name, double i_price, String i_data
         VoltTable item1 = client.callProcedure("InsertItem", 4L, 4L, "ITEM1",
-                PRICE, Constants.ORIGINAL_STRING)[0];
+                PRICE, Constants.ORIGINAL_STRING).getResults()[0];
         VoltTable item2 = client.callProcedure("InsertItem", 5L, 5L, "ITEM2",
-                PRICE, Constants.ORIGINAL_STRING)[0];
+                PRICE, Constants.ORIGINAL_STRING).getResults()[0];
         VoltTable item3 = client.callProcedure("InsertItem", 6L, 6L, "ITEM3",
-                PRICE, Constants.ORIGINAL_STRING)[0];
+                PRICE, Constants.ORIGINAL_STRING).getResults()[0];
         // check the inserts went through.
         assertEquals(1L, stock1.asScalarLong());
         assertEquals(1L, stock2.asScalarLong());
@@ -312,7 +312,7 @@ public class TestTPCCSuite extends RegressionSuite {
         TPCDataPrinter.printAllData(client);
         TimestampType timestamp = new TimestampType();
         VoltTable[] neworder = client.callProcedure("neworder", W_ID, D_ID, C_ID,
-                timestamp, items, warehouses, quantities);
+                timestamp, items, warehouses, quantities).getResults();
 
         // Now to check returns are correct. We assume that inserts and such
         // within the actual transaction went through since it didn't rollback
@@ -348,7 +348,7 @@ public class TestTPCCSuite extends RegressionSuite {
         }
 
         // verify that stock was updated correctly
-        VoltTable[] allTables = client.callProcedure("SelectAll");
+        VoltTable[] allTables = client.callProcedure("SelectAll").getResults();
         VoltTable stock = allTables[TPCDataPrinter.nameMap.get("STOCK")];
         for (int i = 0; i < stock.getRowCount(); ++i) {
             VoltTableRow stockRow = stock.fetchRow(i);
@@ -368,7 +368,7 @@ public class TestTPCCSuite extends RegressionSuite {
         }
 
         // Verify that we only inserted one new order
-        allTables = client.callProcedure("SelectAll");
+        allTables = client.callProcedure("SelectAll").getResults();
         TPCDataPrinter.nameMap.get("ORDERS");
         // only 1 order, from the first new order call
         district = allTables[TPCDataPrinter.nameMap.get("DISTRICT")];
@@ -389,7 +389,7 @@ public class TestTPCCSuite extends RegressionSuite {
         final double initialYTD = 15241.45;
         VoltTable district = client.callProcedure("InsertDistrict", D_ID, W_ID,
                 "A District", "Street Addy", "meh", "westerfield", "BA",
-                "99999", .0825, initialYTD, 21L)[0];
+                "99999", .0825, initialYTD, 21L).getResults()[0];
         // check that a district was inserted
         assertEquals(1L, district.asScalarLong());
 
@@ -397,7 +397,7 @@ public class TestTPCCSuite extends RegressionSuite {
         // String w_city, String w_zip, double w_tax, long w_ytd
         VoltTable warehouse = client.callProcedure("InsertWarehouse", W_ID,
                 "EZ Street WHouse", "Headquarters", "77 Mass. Ave.",
-                "Cambridge", "AZ", "12938", .1234, initialYTD)[0];
+                "Cambridge", "AZ", "12938", .1234, initialYTD).getResults()[0];
         // check for successful insertion.
         assertEquals(1L, warehouse.asScalarLong());
 
@@ -412,7 +412,7 @@ public class TestTPCCSuite extends RegressionSuite {
                 W_ID, "I", "Be", "lastname", "Place", "Place2", "BiggerPlace",
                 "AL", "91083", "(193) 099 - 9082", new TimestampType(), "BC",
                 19298943.12, .13, initialBalance, initialYTD, 0L, 15L,
-                "Some History")[0];
+                "Some History").getResults()[0];
         // check for successful insertion.
         assertEquals(1L, customer1.asScalarLong());
 
@@ -420,7 +420,7 @@ public class TestTPCCSuite extends RegressionSuite {
                 D_ID, W_ID, "We", "R", "Customer", "Random Department",
                 "Place2", "BiggerPlace", "AL", "13908", "(913) 909 - 0928",
                 new TimestampType(), "GC", 19298943.12, .13, initialBalance, initialYTD,
-                1L, 15L, "Some History")[0];
+                1L, 15L, "Some History").getResults()[0];
         // check for successful insertion.
         assertEquals(1L, customer2.asScalarLong());
 
@@ -428,7 +428,7 @@ public class TestTPCCSuite extends RegressionSuite {
                 D_ID, W_ID, "Who", "Is", "Customer", "Receiving",
                 "450 Mass F.X.", "BiggerPlace", "CI", "91083",
                 "(541) 931 - 0928", new TimestampType(), "GC", 19899324.21, .13,
-                initialBalance, initialYTD, 2L, 15L, "Some History")[0];
+                initialBalance, initialYTD, 2L, 15L, "Some History").getResults()[0];
         // check for successful insertion.
         assertEquals(1L, customer3.asScalarLong());
 
@@ -436,7 +436,7 @@ public class TestTPCCSuite extends RegressionSuite {
                 D_ID, W_ID, "ICanBe", "", "Customer", "street", "place",
                 "BiggerPlace", "MA", "91083", "(913) 909 - 0928", new TimestampType(),
                 "GC", 19298943.12, .13, initialBalance, initialYTD, 3L, 15L,
-                "Some History")[0];
+                "Some History").getResults()[0];
         // check for successful insertion.
         assertEquals(1L, customer4.asScalarLong());
 
@@ -444,7 +444,7 @@ public class TestTPCCSuite extends RegressionSuite {
         // long c_d_id
         final double paymentAmount = 500.25;
         VoltTable[] results = client.callProcedure("paymentByCustomerName", W_ID,
-                D_ID, paymentAmount, W_ID, D_ID, "Customer".getBytes("UTF-8"), new TimestampType());
+                D_ID, paymentAmount, W_ID, D_ID, "Customer".getBytes("UTF-8"), new TimestampType()).getResults();
         assertEquals(3, results.length);
         // check that the middle "Customer" was returned
         assertEquals(C_ID + 1, results[2].fetchRow(0).getLong("c_id"));
@@ -452,7 +452,7 @@ public class TestTPCCSuite extends RegressionSuite {
 
         // Verify that both warehouse, district and customer were updated
         // correctly
-        VoltTable[] allTables = client.callProcedure("SelectAll");
+        VoltTable[] allTables = client.callProcedure("SelectAll").getResults();
         warehouse = allTables[TPCDataPrinter.nameMap.get("WAREHOUSE")];
         assertEquals(1, warehouse.getRowCount());
         assertEquals(initialYTD + paymentAmount, warehouse.fetchRow(0)
@@ -473,7 +473,7 @@ public class TestTPCCSuite extends RegressionSuite {
         // long d_id, long w_id, double h_amount, String c_last, long c_w_id,
         // long c_d_id
         results = client.callProcedure("paymentByCustomerId", W_ID, D_ID,
-                paymentAmount, W_ID, D_ID, C_ID, new TimestampType());
+                paymentAmount, W_ID, D_ID, C_ID, new TimestampType()).getResults();
         // Also tests badcredit case.
         assertEquals(3, results.length);
         assertEquals(C_ID, results[2].fetchRow(0).getLong("c_id"));
@@ -483,7 +483,7 @@ public class TestTPCCSuite extends RegressionSuite {
 
         // Verify that both warehouse and district's ytd values were incremented
         // correctly
-        allTables = client.callProcedure("SelectAll");
+        allTables = client.callProcedure("SelectAll").getResults();
         warehouse = allTables[TPCDataPrinter.nameMap.get("WAREHOUSE")];
         assertEquals(1, warehouse.getRowCount());
         assertEquals(initialYTD + paymentAmount * 2, warehouse.fetchRow(0)
@@ -512,24 +512,24 @@ public class TestTPCCSuite extends RegressionSuite {
         final double initialYTD = 15241.45;
         VoltTable district1 = client.callProcedure("InsertDistrict", D_ID, W_ID,
                 "A District", "Street Addy", "meh", "westerfield", "BA",
-                "99999", .0825, initialYTD, 21L)[0];
+                "99999", .0825, initialYTD, 21L).getResults()[0];
         // check that a district was inserted
         assertEquals(1L, district1.asScalarLong());
         VoltTable district2 = client.callProcedure("InsertDistrict", D2_ID, W2_ID,
                 "fdsdfaaaaa", "fsdfsdfasas", "fda", "asdasfddsds", "MA",
-                "99999", .0825, initialYTD, 21L)[0];
+                "99999", .0825, initialYTD, 21L).getResults()[0];
         assertEquals(1L, district2.asScalarLong());
 
         // long w_id, String w_name, String w_street_1, String w_street_2,
         // String w_city, String w_zip, double w_tax, long w_ytd
         VoltTable warehouse1 = client.callProcedure("InsertWarehouse", W_ID,
                 "EZ Street WHouse", "Headquarters", "77 Mass. Ave.",
-                "Cambridge", "AZ", "12938", .1234, initialYTD)[0];
+                "Cambridge", "AZ", "12938", .1234, initialYTD).getResults()[0];
         // check for successful insertion.
         assertEquals(1L, warehouse1.asScalarLong());
         VoltTable warehouse2 = client.callProcedure("InsertWarehouse", W2_ID,
                 "easdsdfsdfddfdsd", "asfadasffass", "fdswwwwaafff",
-                "Cambridge", "AZ", "12938", .1234, initialYTD)[0];
+                "Cambridge", "AZ", "12938", .1234, initialYTD).getResults()[0];
         assertEquals(1L, warehouse2.asScalarLong());
 
         // customer 1 and 2 are in district1, 3 and 4 are in district2
@@ -545,7 +545,7 @@ public class TestTPCCSuite extends RegressionSuite {
                 W_ID, "I", "Be", "lastname", "Place", "Place2", "BiggerPlace",
                 "AL", "91083", "(193) 099 - 9082", new TimestampType(), "BC",
                 19298943.12, .13, initialBalance, initialYTD, 0L, 15L,
-                "Some History")[0];
+                "Some History").getResults()[0];
         // check for successful insertion.
         assertEquals(1L, customer1.asScalarLong());
         client.callProcedure("InsertCustomerName", C_ID, D_ID, W_ID, "I", "lastname");
@@ -554,7 +554,7 @@ public class TestTPCCSuite extends RegressionSuite {
                 D_ID, W_ID, "We", "R", "Customer", "Random Department",
                 "Place2", "BiggerPlace", "AL", "13908", "(913) 909 - 0928",
                 new TimestampType(), "GC", 19298943.12, .13, initialBalance, initialYTD,
-                1L, 15L, "Some History")[0];
+                1L, 15L, "Some History").getResults()[0];
         // check for successful insertion.
         assertEquals(1L, customer2.asScalarLong());
         client.callProcedure("InsertCustomerName", C_ID + 1, D_ID, W_ID, "We", "Customer");
@@ -563,7 +563,7 @@ public class TestTPCCSuite extends RegressionSuite {
                 D2_ID, W2_ID, "Who", "Is", "Customer", "Receiving",
                 "450 Mass F.X.", "BiggerPlace", "CI", "91083",
                 "(541) 931 - 0928", new TimestampType(), "GC", 19899324.21, .13,
-                initialBalance, initialYTD, 2L, 15L, "Some History")[0];
+                initialBalance, initialYTD, 2L, 15L, "Some History").getResults()[0];
         // check for successful insertion.
         assertEquals(1L, customer3.asScalarLong());
         client.callProcedure("InsertCustomerName", C_ID + 2, D2_ID, W2_ID, "Who", "Customer");
@@ -572,7 +572,7 @@ public class TestTPCCSuite extends RegressionSuite {
                 D2_ID, W2_ID, "ICanBe", "", "Customer", "street", "place",
                 "BiggerPlace", "MA", "91083", "(913) 909 - 0928", new TimestampType(),
                 "GC", 19298943.12, .13, initialBalance, initialYTD, 3L, 15L,
-                "Some History")[0];
+                "Some History").getResults()[0];
         // check for successful insertion.
         assertEquals(1L, customer4.asScalarLong());
         client.callProcedure("InsertCustomerName", C_ID + 3, D2_ID, W2_ID, "ICanBe", "Customer");
@@ -582,7 +582,7 @@ public class TestTPCCSuite extends RegressionSuite {
         // long c_d_id
         // w_id =Warehouse2 but c_w_id=warehouse1 !
         VoltTable[] results = client.callProcedure("paymentByCustomerName", W2_ID,
-                D2_ID, paymentAmount, W_ID, D_ID, "Customer".getBytes("UTF-8"), new TimestampType());
+                D2_ID, paymentAmount, W_ID, D_ID, "Customer".getBytes("UTF-8"), new TimestampType()).getResults();
         assertEquals(3, results.length);
         assertTrue(results[0].getRowCount() > 0);
         // only customer2 should be returned as this is a query on warehouse1
@@ -615,7 +615,7 @@ public class TestTPCCSuite extends RegressionSuite {
         // long c_d_id
         // w_id =Warehouse2 but c_w_id=warehouse1 !
         results = client.callProcedure("paymentByCustomerId", W2_ID, D2_ID,
-                paymentAmount, W_ID, D_ID, C_ID, new TimestampType());
+                paymentAmount, W_ID, D_ID, C_ID, new TimestampType()).getResults();
         // Also tests badcredit case.
         assertEquals(3, results.length);
         assertEquals(C_ID, results[2].fetchRow(0).getLong("c_id"));
@@ -656,7 +656,7 @@ public class TestTPCCSuite extends RegressionSuite {
         // d_tax, double d_ytd, long d_next_o_id
         VoltTable[] idresults = client.callProcedure("InsertDistrict", 7L, 3L,
                 "A District", "Street Addy", "meh", "westerfield", "BA",
-                "99999", .0825, 15241.45, 21L);
+                "99999", .0825, 15241.45, 21L).getResults();
         // check that a district was inserted
         assertEquals(1L, idresults[0].asScalarLong());
 
@@ -664,7 +664,7 @@ public class TestTPCCSuite extends RegressionSuite {
         // String w_city, String w_zip, double w_tax, long w_ytd
         VoltTable warehouse = client.callProcedure("InsertWarehouse", 3L,
                 "EZ Street WHouse", "Headquarters", "77 Mass. Ave.",
-                "Cambridge", "AZ", "12938", .1234, 18837.57)[0];
+                "Cambridge", "AZ", "12938", .1234, 18837.57).getResults()[0];
         // check for successful insertion.
         assertEquals(1L, warehouse.asScalarLong());
 
@@ -672,22 +672,22 @@ public class TestTPCCSuite extends RegressionSuite {
                 "We", "R", "Customer", "Random Department", "Place2",
                 "BiggerPlace", "AL", "13908", "(913) 909 - 0928", new TimestampType(),
                 "GC", 19298943.12, .13, 15.75, 18832.45, 45L, 15L,
-                "Some History")[0];
+                "Some History").getResults()[0];
         // check for successful insertion.
         assertEquals(1L, customer.asScalarLong());
 
         VoltTable orders = client.callProcedure("InsertOrders", 9L, 7L, 3L, 5L,
-                new TimestampType(), 10L, 5L, 6L)[0];
+                new TimestampType(), 10L, 5L, 6L).getResults()[0];
         // check for successful insertion.
         assertEquals(1L, orders.asScalarLong());
 
         TPCDataPrinter.printAllData(client);
 
         VoltTable[] results = client.callProcedure("ostatByCustomerName", (byte)3, (byte)7,
-                "Customer".getBytes("UTF-8"));
+                "Customer".getBytes("UTF-8")).getResults();
         assertEquals(3, results.length);
 
-        results = client.callProcedure("ostatByCustomerId", (byte)3, (byte)7, 5);
+        results = client.callProcedure("ostatByCustomerId", (byte)3, (byte)7, 5).getResults();
         assertEquals(3, results.length);
     }
 
@@ -701,7 +701,7 @@ public class TestTPCCSuite extends RegressionSuite {
         // d_tax, double d_ytd, long d_next_o_id
         VoltTable[] idresults = client.callProcedure("InsertDistrict", D_ID,
                 W_ID, "A District", "Street Addy", "meh", "westerfield", "BA",
-                "99999", .0825, 15241.45, 21L);
+                "99999", .0825, 15241.45, 21L).getResults();
         // check that a district was inserted
         assertEquals(1L, idresults[0].asScalarLong());
 
@@ -709,7 +709,7 @@ public class TestTPCCSuite extends RegressionSuite {
         // String w_city, String w_zip, double w_tax, long w_ytd
         VoltTable warehouse = client.callProcedure("InsertWarehouse", W_ID,
                 "EZ Street WHouse", "Headquarters", "77 Mass. Ave.",
-                "Cambridge", "AZ", "12938", .1234, 18837.57)[0];
+                "Cambridge", "AZ", "12938", .1234, 18837.57).getResults()[0];
         // check for successful insertion.
         assertEquals(1L, warehouse.asScalarLong());
 
@@ -717,24 +717,24 @@ public class TestTPCCSuite extends RegressionSuite {
                 W_ID, "We", "R", "Customer", "Random Department",
                 "Place2", "BiggerPlace", "AL", "13908", "(913) 909 - 0928",
                 new TimestampType(), "GC", 19298943.12, .13, 15.75, 18832.45, 45L, 15L,
-                "Some History")[0];
+                "Some History").getResults()[0];
         // check for successful insertion.
         assertEquals(1L, customer.asScalarLong());
 
         final long O_OL_CNT = 1;
         VoltTable orders = client.callProcedure("InsertOrders", O_ID, D_ID, W_ID,
-                5L, new TimestampType(), 10L, O_OL_CNT, 1L)[0];
+                5L, new TimestampType(), 10L, O_OL_CNT, 1L).getResults()[0];
         // check for successful insertion.
         assertEquals(1L, orders.asScalarLong());
 
         // Insert an order line for this order
         VoltTable line = client.callProcedure("InsertOrderLine",
                 O_ID, D_ID, W_ID, 1L, I_ID, W_ID, new TimestampType(), 1L,
-                1.0, "ol_dist_info")[0];
+                1.0, "ol_dist_info").getResults()[0];
         assertEquals(1L, line.asScalarLong());
 
         VoltTable newOrder = client.callProcedure("InsertNewOrder", O_ID, D_ID,
-                W_ID)[0];
+                W_ID).getResults()[0];
         // check for successful insertion.
         assertEquals(1L, newOrder.asScalarLong());
 
@@ -742,7 +742,7 @@ public class TestTPCCSuite extends RegressionSuite {
         TPCDataPrinter.printAllData(client);
 
         VoltTable[] results = client.callProcedure("delivery", W_ID, 10,
-                new TimestampType());
+                new TimestampType()).getResults();
 
         System.out.println("DATA after DELIVERY transaction");
         TPCDataPrinter.printAllData(client);

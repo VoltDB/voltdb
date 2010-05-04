@@ -71,7 +71,7 @@ public class BulkOverheadClient extends BulkClient {
         }
     }
 
-    private class MeasureOverheadCallback extends ProcedureCallback {
+    private class MeasureOverheadCallback implements ProcedureCallback {
 
         @Override
         public void clientCallback(ClientResponse clientResponse) {

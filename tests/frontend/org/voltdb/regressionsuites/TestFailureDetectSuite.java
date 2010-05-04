@@ -38,16 +38,16 @@ public class TestFailureDetectSuite extends RegressionSuite
     {
         Client client = getClient();
         VoltTable[] results = client.callProcedure("InsertMultiPart", 1,
-                                                   "desc", 100, 14.5);
+                                                   "desc", 100, 14.5).getResults();
         assertEquals(1, results[0].asScalarLong());
-        results = client.callProcedure("SelectMultiPart");
+        results = client.callProcedure("SelectMultiPart").getResults();
         System.out.println(results[0].toString());
         assertEquals(1, results[0].getRowCount());
         LocalCluster config = (LocalCluster) m_config;
         config.shutDownSingleHost(0);
         for (int i = 0; i < 100; i++)
         {
-            results = client.callProcedure("SelectMultiPart");
+            results = client.callProcedure("SelectMultiPart").getResults();
             assertEquals(1, results[0].getRowCount());
         }
     }
@@ -57,9 +57,9 @@ public class TestFailureDetectSuite extends RegressionSuite
     {
         Client client = getClient();
         VoltTable[] results = client.callProcedure("InsertSinglePart", 1,
-                                                   "desc", 100, 14.5);
+                                                   "desc", 100, 14.5).getResults();
         assertEquals(1, results[0].asScalarLong());
-        results = client.callProcedure("SelectSinglePart", 1);
+        results = client.callProcedure("SelectSinglePart", 1).getResults();
         System.out.println(results[0].toString());
         assertEquals(1, results[0].getRowCount());
         LocalCluster config = (LocalCluster) m_config;
@@ -69,7 +69,7 @@ public class TestFailureDetectSuite extends RegressionSuite
         // be roughly like pulling the plug
         for (int i = 0; i < 100; i++)
         {
-            results = client.callProcedure("UpdateSinglePart", 1, 200);
+            results = client.callProcedure("UpdateSinglePart", 1, 200).getResults();
             assertEquals(1, results[0].getRowCount());
         }
     }

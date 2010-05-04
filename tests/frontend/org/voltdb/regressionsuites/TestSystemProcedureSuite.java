@@ -57,7 +57,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     public void testLastCommittedTransaction() throws Exception {
         Client client = getClient();
         VoltTable results[] = null;
-        results = client.callProcedure("@LastCommittedTransaction");
+        results = client.callProcedure("@LastCommittedTransaction").getResults();
 
         assertTrue(results.length == 1);
         assertTrue(results[0].asScalarLong() == 0);
@@ -85,7 +85,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     public void testUpdateLogging() throws Exception {
         Client client = getClient();
         VoltTable results[] = null;
-        results = client.callProcedure("@UpdateLogging", m_loggingConfig);
+        results = client.callProcedure("@UpdateLogging", m_loggingConfig).getResults();
         for (VoltTable result : results) {
             assertEquals( 0, result.asScalarLong());
         }
@@ -94,7 +94,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     public void testStatistics_Table() throws Exception {
         Client client = getClient();
         VoltTable results[] = null;
-        results = client.callProcedure("@Statistics", "table", 0);
+        results = client.callProcedure("@Statistics", "table", 0).getResults();
         // one aggregate table returned
         assertTrue(results.length == 1);
         // with 10 rows per site. Can be two values depending on the test scenario of cluster vs. local.
@@ -106,7 +106,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     public void testStatistics_Procedure() throws Exception {
         Client client  = getClient();
         VoltTable results[] = null;
-        results = client.callProcedure("@Statistics", "procedure", 0);
+        results = client.callProcedure("@Statistics", "procedure", 0).getResults();
         // one aggregate table returned
         assertTrue(results.length == 1);
         System.out.println("Test procedures table: " + results[0].toString());
@@ -115,7 +115,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     public void testStatistics_iostats() throws Exception {
         Client client  = getClient();
         VoltTable results[] = null;
-        results = client.callProcedure("@Statistics", "iostats", 0);
+        results = client.callProcedure("@Statistics", "iostats", 0).getResults();
         // one aggregate table returned
         assertTrue(results.length == 1);
         System.out.println("Test iostats table: " + results[0].toString());
@@ -124,8 +124,8 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     public void testStatistics_Initiator() throws Exception {
         Client client  = getClient();
         VoltTable results[] = null;
-        results = client.callProcedure("@Statistics", "INITIATOR", 0);
-        results = client.callProcedure("@Statistics", "INITIATOR", 0);
+        results = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
+        results = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
         // one aggregate table returned
         assertTrue(results.length == 1);
         System.out.println("Test initiators table: " + results[0].toString());
@@ -163,7 +163,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     public void testStatistics_PartitionCount() throws Exception {
         Client client = getClient();
         final VoltTable results[] =
-            client.callProcedure("@Statistics", SysProcSelector.PARTITIONCOUNT.name(), 0);
+            client.callProcedure("@Statistics", SysProcSelector.PARTITIONCOUNT.name(), 0).getResults();
         assertEquals( 1, results.length);
         assertTrue( results[0] != null);
         assertEquals( 1, results[0].getRowCount());
@@ -181,7 +181,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
 
     public void testSystemInformation() throws IOException, ProcCallException {
         Client client = getClient();
-        VoltTable results[] = client.callProcedure("@SystemInformation");
+        VoltTable results[] = client.callProcedure("@SystemInformation").getResults();
         assertEquals(1, results.length);
         System.out.println(results[0]);
     }
@@ -190,7 +190,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     // "@Quiesce" is used more meaningfully in TestELTSuite.
     public void testQuiesce() throws IOException, ProcCallException {
         Client client = getClient();
-        VoltTable results[] = client.callProcedure("@Quiesce");
+        VoltTable results[] = client.callProcedure("@Quiesce").getResults();
         assertEquals(1, results.length);
         results[0].advanceRow();
         assertEquals(results[0].get(0, VoltType.STRING), "okay");
@@ -258,7 +258,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                                  partitioned_table, 1);
             client.callProcedure("@LoadMultipartitionTable", "ITEM",
                                  replicated_table, 1);
-            VoltTable results[] = client.callProcedure("@Statistics", "table", 0);
+            VoltTable results[] = client.callProcedure("@Statistics", "table", 0).getResults();
 
             int foundItem = 0;
             // to verify, each of the 2 sites should have 5 warehouses.

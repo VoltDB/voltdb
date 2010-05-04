@@ -22,14 +22,10 @@ package org.voltdb.client;
  * Extend this class and provide an implementation of {@link #clientCallback} to receive a response to a
  * stored procedure invocation.
  */
-public abstract class ProcedureCallback {
-    final void invokeCallback(ClientResponse clientResponse) {
-        clientCallback(clientResponse);
-    }
-
+public interface ProcedureCallback {
     /**
      * Implementation of callback to be provided by client applications
      * @param clientResponse Response to the stored procedure invocation this callback is associated with
      */
-    abstract protected void clientCallback(ClientResponse clientResponse);
+    abstract public void clientCallback(ClientResponse clientResponse);
 }

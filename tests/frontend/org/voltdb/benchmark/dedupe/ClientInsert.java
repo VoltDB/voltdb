@@ -44,7 +44,7 @@ public class ClientInsert {
 
     public static boolean checkLatency = false;
 
-    static class AsyncCallback extends ProcedureCallback {
+    static class AsyncCallback implements ProcedureCallback {
         @Override
         public synchronized void clientCallback(ClientResponse clientResponse) {
             final byte status = clientResponse.getStatus();

@@ -96,7 +96,7 @@ class Loader {
             TimestampType endTime = new TimestampType(startTime.getTime() + duration);
 
             VoltTable[] table = client.callProcedure("InsertIntoItem", itemId, itemName, itemDescription,
-                    sellerId, categoryId, itemId, startPrice, startTime, endTime);
+                    sellerId, categoryId, itemId, startPrice, startTime, endTime).getResults();
             if (table.length != 1)
                 throw new Exception("InsertIntoItem returned the wrong number of tables.");
             if (table[0].asScalarLong() != 1)
@@ -106,7 +106,7 @@ class Loader {
                     itemId, itemName, itemDescription, sellerId, categoryId, itemId, startPrice, startTime.asApproximateJavaDate(), endTime.asApproximateJavaDate());
 
             // insert a user-less bid into the bid table with price = auction.startprice
-            table = client.callProcedure("InsertIntoBid", itemId, itemId, -1, 0L, startPrice);
+            table = client.callProcedure("InsertIntoBid", itemId, itemId, -1, 0L, startPrice).getResults();
             if (table.length != 1)
                 throw new Exception("InsertIntoBid returned the wrong number of tables.");
             if (table[0].asScalarLong() != 1)
@@ -144,7 +144,7 @@ class Loader {
             String catName = nextLine[1];
             String catDescription = nextLine[2];
 
-            VoltTable[] table = client.callProcedure("InsertIntoCategory", catId, catName, catDescription);
+            VoltTable[] table = client.callProcedure("InsertIntoCategory", catId, catName, catDescription).getResults();
             if (table.length != 1)
                 throw new Exception("InsertIntoCategory returned the wrong number of tables.");
             if (table[0].asScalarLong() != 1)
@@ -191,7 +191,7 @@ class Loader {
             String email = nextLine[7];
 
             VoltTable[] table = client.callProcedure("InsertIntoUser", userId, lastName, firstName,
-                    streetAddress, city, state, zip, email);
+                    streetAddress, city, state, zip, email).getResults();
             if (table.length != 1)
                 throw new Exception("InsertIntoUser returned the wrong number of tables.");
             if (table[0].asScalarLong() != 1)
