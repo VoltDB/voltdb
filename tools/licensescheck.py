@@ -25,29 +25,30 @@ def verifyLicense(f, content, approvedLicensesJavaC, approvedLicensesPython):
 
         # skip hashbang
         if content.startswith("#!"):
-            (ignore, sep, content) = content.partition("\n");
+            (ignore, content) = content.split("\n", 1)
             content = content.lstrip()
 
         # skip python coding magic
         if content.startswith("# -*-"):
-            (ignore, sep, content) = content.partition("\n");
+            (ignore, content) = content.split("\n", 1)
             content = content.lstrip()
 
         # verify license
-        if not content.startswith(approvedLicensesPython):
-            print "ERROR: \"%s\" does not start with an approved license." % f
-        else:
-            return 0
+        for license in approvedLicensesPython:
+            if content.startswith(license):
+                return 0
+        print "ERROR: \"%s\" does not start with an approved license." % f
     else:
         if not content.startswith("/*"):
             if content.lstrip().startswith("/*"):
                 print "ERROR: \"%s\" contains whitespace before initial comment." % f
             else:
                 print "ERROR: \"%s\" does not begin with a comment." % f
-        elif not content.startswith(approvedLicensesJavaC):
-            print "ERROR: \"%s\" does not start with an approved license." % f
-        else:
-            return 0
+            return 1
+        for license in approvedLicensesJavaC:
+            if content.startswith(license):
+                return 0
+        print "ERROR: \"%s\" does not start with an approved license." % f
     return 1
 
 def verifyTrailingWhitespace(f, content):
@@ -71,7 +72,10 @@ def readFile(filename):
     return fileString
 
 def processFile(f, approvedLicensesJavaC, approvedLicensesPython):
-    if not f.endswith(('.java', '.cpp', '.cc', '.h', '.hpp', '.py')):
+    for suffix in ('.java', '.cpp', '.cc', '.h', '.hpp', '.py'):
+        if f.endswith(suffix):
+            break
+    else:
         return 0
     content = readFile(f)
     retval = verifyLicense(f, content,  approvedLicensesJavaC, approvedLicensesPython)
