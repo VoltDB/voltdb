@@ -1345,6 +1345,12 @@ BENCHMARKS
         <arg value="DURATION=${duration}" />
         <arg value="REMOTEPATH=${remotepath}" />
         <arg value="REMOTEUSER=${remoteuser}"/>
+        <arg value="HOST=${manualhost1}" />
+        <arg value="HOST=${manualhost2}" />
+        <arg value="HOST=${manualhost3}" />
+        <arg value="HOST=${manualhost4}" />
+        <arg value="HOST=${manualhost5}" />
+        <arg value="HOST=${manualhost6}" />
         <arg value="HOST=${host1}" />
         <arg value="HOST=${host2}" />
         <arg value="HOST=${host3}" />
@@ -1411,12 +1417,21 @@ BENCHMARKS
     <antcall target="benchmark" inheritAll='true'>
         <param name="local" value="false"/>
         <param name="client" value="${env.BMCLIENT}"/>
+
         <param name="hostcount" value="${env.BMHOSTCOUNT}"/>
-        <!-- use env.FIRSTSERVER to override host1 from volt3a -->
         <param name="sitesperhost" value="${env.BMSITESPERHOST}"/>
+        <!-- use env.FIRSTSERVER to override host1 from volt3a -->
+        <param name="manualhost1" value="${env.HOST1}"/>
+        <param name="manualhost2" value="${env.HOST2}"/>
+        <param name="manualhost3" value="${env.HOST3}"/>
+        <param name="manualhost4" value="${env.HOST4}"/>
+        <param name="manualhost5" value="${env.HOST5}"/>
+        <param name="manualhost6" value="${env.HOST6}"/>
+
         <param name="clientcount" value="${env.BMCLIENTCOUNT}"/>
-        <!-- use env.FIRSTCLIENT to override clienthost1 from volt4a -->
         <param name="processesperclient" value="1"/>
+        <!-- use env.FIRSTCLIENT to override clienthost1 from volt4a -->
+
         <param name="duration" value="${env.BMDURATION}000"/>
         <param name="interval" value="${env.BMINTERVAL}000"/>
         <param name="txnrate" value="${env.BMRATELIMIT}"/>
