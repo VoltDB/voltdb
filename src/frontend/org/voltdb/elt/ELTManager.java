@@ -17,7 +17,6 @@
 
 package org.voltdb.elt;
 
-import java.nio.ByteBuffer;
 import java.util.*;
 
 import org.apache.log4j.Level;
@@ -26,7 +25,6 @@ import org.voltdb.catalog.*;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.elt.processors.RawProcessor.ELTInternalMessage;
 import org.voltdb.utils.*;
-import org.voltdb.utils.DBBPool.BBContainer;
 
 /**
  * Bridges the connection to an OLAP system and the buffers passed
@@ -49,86 +47,8 @@ public class ELTManager
         Logger.getLogger("ELT", VoltLoggerFactory.instance());
 
     /**
-     * Store address along with ByteBuffer in a container that can return the
-     * ByteBuffer to the ELT manager
+     * Thrown if the initial setup of the loader fails
      */
-    private class ELBBContainer extends BBContainer {
-        @SuppressWarnings("unused")
-        private final BBContainer m_originContainer;
-        private ELBBContainer(final ByteBuffer b, final long address, BBContainer origin) {
-            super(b, address);
-            m_originContainer = origin;
-        }
-
-        @Override
-        public void discard() {
-            synchronized (m_bufferPool) {
-                m_bufferPool.offer(this);
-            }
-        }
-     }
-
-    /** Size of ELT buffers, currently 2MB */
-    private static final int kBufferSize = 2 * 1024 * 1024;
-
-    /** Pool of native byte buffers: EE writes, Loader reads. */
-    ArrayDeque<ELBBContainer> m_bufferPool = new ArrayDeque<ELBBContainer>();
-
-    /** Map buffer pointers to their containers for lookup */
-    Hashtable<Long, ELBBContainer> m_bufferMap = new Hashtable<Long, ELBBContainer>();
-
-
-    /** Internal helper to allocate a buffer from the byte pool */
-    private ELBBContainer claimELBBContainer(final long desiredSizeInBytes) {
-        ELBBContainer b;
-        synchronized (m_bufferPool) {
-            b = m_bufferPool.poll();
-        }
-
-        if (b == null) {
-            final BBContainer originContainer = DBBPool.allocateDirect(kBufferSize);
-            final ByteBuffer buffer = originContainer.b;
-            final long address = DBBPool.getBufferAddress(buffer);
-            b = new ELBBContainer( buffer, address, originContainer);
-        }
-        assert b.address != 0;
-        m_bufferMap.put(b.address, b);
-        return b;
-    }
-
-    /**
-     * Originate an empty buffer for the (IPC) EE.
-     * @param desiredSizeInBytes The size of the desired buffer.
-     * @return the allocated buffer.
-     */
-    public ByteBuffer claimBufferForEE2(final long desiredSizeInBytes) {
-        ELBBContainer b = claimELBBContainer(desiredSizeInBytes);
-        return b.b;
-    }
-
-    /**
-     * Originate an empty buffer for the EE
-     * @param desiredSizeInBytes The size of the buffer desired.
-     * @return The address of the assigned buffer.
-     */
-    public long claimBufferForEE(final long desiredSizeInBytes) {
-        ELBBContainer b = claimELBBContainer(desiredSizeInBytes);
-        return b.address;
-    }
-
-    /** Release a buffer back to the pool manager
-     * @param buff
-     */
-    public void releaseManagedBuffer(final long buff) {
-        BBContainer tin = m_bufferMap.remove(buff);
-        if (tin == null) {
-            throw new IllegalStateException("ELTManager asked to handoff unknown buffer");
-        }
-        tin.discard();
-        tin = null;
-    }
-
-    /** Thrown if the initial setup of the loader fails */
     public static class SetupException extends Exception {
         private static final long serialVersionUID = 1L;
         private final String m_msg;
