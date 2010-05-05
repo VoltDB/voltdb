@@ -270,7 +270,7 @@ public class TestIndexesSuite extends RegressionSuite {
     }
 
     void callHelper(Client client, String procname, Object ...objects )
-    throws NoConnectionsException, InterruptedException
+    throws InterruptedException, IOException
     {
         NullCallback nullCallback = new NullCallback();
         boolean done;
