@@ -30,6 +30,7 @@ import junit.framework.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.exceptions.ConstraintFailureException;
@@ -41,6 +42,7 @@ import org.voltdb.regressionsuites.failureprocs.InsertLotsOfData;
 import org.voltdb.regressionsuites.failureprocs.TooFewParams;
 import org.voltdb.regressionsuites.failureprocs.ViolateUniqueness;
 import org.voltdb.regressionsuites.failureprocs.ViolateUniquenessAndCatchException;
+import org.voltdb.regressionsuites.failureprocs.ReturnAppStatus;
 import org.voltdb.regressionsuites.sqlfeatureprocs.WorkWithBigString;
 
 public class TestFailuresSuite extends RegressionSuite {
@@ -49,7 +51,8 @@ public class TestFailuresSuite extends RegressionSuite {
     static final Class<?>[] PROCEDURES = {
         ViolateUniqueness.class, ViolateUniquenessAndCatchException.class,
         DivideByZero.class, WorkWithBigString.class, InsertBigString.class,
-        InsertLotsOfData.class, FetchTooMuch.class, CleanupFail.class, TooFewParams.class
+        InsertLotsOfData.class, FetchTooMuch.class, CleanupFail.class, TooFewParams.class,
+        ReturnAppStatus.class
     };
 
     /**
@@ -351,6 +354,42 @@ public class TestFailuresSuite extends RegressionSuite {
 
         // make sure we can call adhocs
         client.callProcedure("@AdHoc", "select * from warehouse;");
+    }
+
+    public void testAppStatus() throws Exception {
+        System.out.println("STARTING testAppStatus");
+        Client client = getClient();
+
+        ClientResponse response = client.callProcedure( "ReturnAppStatus", 0, "statusstring", (byte)0);
+        assertNull(response.getAppStatusString());
+        assertEquals(response.getAppStatus(), Byte.MIN_VALUE);
+        assertEquals(response.getResults()[0].getStatusCode(), Byte.MIN_VALUE);
+
+        response = client.callProcedure( "ReturnAppStatus", 1, "statusstring", (byte)1);
+        assertTrue("statusstring".equals(response.getAppStatusString()));
+        assertEquals(response.getAppStatus(), 1);
+        assertEquals(response.getResults()[0].getStatusCode(), 1);
+
+        response = client.callProcedure( "ReturnAppStatus", 2, "statusstring", (byte)2);
+        assertNull(response.getAppStatusString());
+        assertEquals(response.getAppStatus(), 2);
+        assertEquals(response.getResults()[0].getStatusCode(), 2);
+
+        response = client.callProcedure( "ReturnAppStatus", 3, "statusstring", (byte)3);
+        assertTrue("statusstring".equals(response.getAppStatusString()));
+        assertEquals(response.getAppStatus(), Byte.MIN_VALUE);
+        assertEquals(response.getResults()[0].getStatusCode(), 3);
+
+        boolean threwException = false;
+        try {
+            response = client.callProcedure( "ReturnAppStatus", 4, "statusstring", (byte)4);
+        } catch (ProcCallException e) {
+            threwException = true;
+            response = e.getClientResponse();
+        }
+        assertTrue(threwException);
+        assertTrue("statusstring".equals(response.getAppStatusString()));
+        assertEquals(response.getAppStatus(), 4);
     }
 
     /**
