@@ -245,7 +245,6 @@ public class TestELTSuite extends RegressionSuite {
      * of each in the EL stream. Some procedures rollback (after a real insert).
      * Tests that streams are correct in the face of rollback.
      */
-/*
      public void testELTRollback() throws IOException, ProcCallException, InterruptedException {
         ELTSuiteTupleVerifier verifier = new ELTSuiteTupleVerifier();
         final Client client = getClient();
@@ -258,6 +257,7 @@ public class TestELTSuite extends RegressionSuite {
 
         // roughly 10k rows is a full buffer it seems
         for (int pkey=0; pkey < 25000; pkey++) {
+            if ((pkey % 500) == 0) System.out.println("Rollback test added " + pkey + " rows");
             final Object[] params = convertValsToParams(pkey, rowdata);
             // rollback or insert?
             random = Math.random();
@@ -280,7 +280,7 @@ public class TestELTSuite extends RegressionSuite {
         }
         quiesceAndVerify(client, verifier);
     }
-*/
+
     private VoltTable createLoadTableTable(boolean addToVerifier, ELTSuiteTupleVerifier verifier) {
 
         VoltTable loadTable = new VoltTable(new ColumnInfo("PKEY", VoltType.INTEGER),
