@@ -21,8 +21,6 @@ import java.io.File;
 import java.util.Map;
 import java.util.TimeZone;
 
-import org.voltdb.elt.ELTManager;
-
 /**
  * <code>VoltDB</code> is the main class for VoltDB server.
  * It sets up global objects and then starts the individual threads
@@ -217,22 +215,6 @@ public class VoltDB {
         System.err.println("The log may contain additional information.");
         System.exit(-1);
     }
-
-    /**
-     * Return the operational status of this node. Currently only
-     * the ELT Manager has the option of a non-running status.
-     */
-    public static String getOperStatus() {
-        return ELTManager.instance().operStatus();
-    }
-
-    /**
-     * Instruct the global components to quiesce.
-     */
-    public static void quiesce() {
-        ELTManager.instance().quiesce();
-    }
-
 
     /**
      * Entry point for the VoltDB server process.

@@ -89,8 +89,6 @@ public class SysProcFragmentId
     // @Quiesce
     public static final long PF_quiesce_sites = 100;
     public static final long PF_quiesce_processed_sites = 101;
-    public static final long PF_quiesce_nodes = 102;
-    public static final long PF_quiesce_processed_nodes = 103;
 
     // @SnapshotStatus
     public static final long PF_scanSnapshotRegistries = 110;

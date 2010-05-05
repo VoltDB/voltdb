@@ -28,10 +28,6 @@ import org.voltdb.elt.processors.RawProcessor.ELTInternalMessage;
  *    2. Table sources are added via addTable
  *    3. readyForData is invoked.
  *    4. process is called for flushed data blocks
- *
- *    isIdle may be invoked at any time. A processor should
- *    report idle if immediate termination would not cause loss of data
- *    queued to it via the process method.
  */
 public interface ELTDataProcessor  {
 
@@ -51,16 +47,9 @@ public interface ELTDataProcessor  {
     void addDataSource(ELTDataSource dataSource);
 
     /**
-     * Inform the processor that work may start arriving. Initialization
-     * is complete.
+     * Inform the processor that initialization is complete; commence work.
      */
     public void readyForData();
-
-    /**
-     * Query if the processor is idle.
-     * @return true if all polled work is complete.
-     */
-    public boolean isIdle();
 
     /**
      * Queue a work message to the processor's mailbox.

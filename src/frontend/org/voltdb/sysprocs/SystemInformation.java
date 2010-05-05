@@ -69,9 +69,6 @@ public class SystemInformation extends VoltSystemProcedure {
         vt.addRow(VoltDB.instance().getHostMessenger().getHostId(),
                   "version", VoltDB.instance().getVersionString());
 
-        // node status. currently := {running, idle}
-        vt.addRow(VoltDB.instance().getHostMessenger().getHostId(),
-                  "operStatus", context.getOperStatus());
         return vt;
     }
 

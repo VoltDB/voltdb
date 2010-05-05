@@ -326,7 +326,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         public ExecutionEngine getExecutionEngine();
         public long getLastCommittedTxnId();
         public long getNextUndo();
-        public Object getOperStatus();
         public ExecutionSite getExecutionSite();
     }
 
@@ -337,7 +336,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         public ExecutionEngine getExecutionEngine() { return ee; }
         public long getLastCommittedTxnId()         { return lastCommittedTxnId; }
         public long getNextUndo()                   { return getNextUndoToken(); }
-        public String getOperStatus()               { return VoltDB.getOperStatus(); }
         public ExecutionSite getExecutionSite()     { return ExecutionSite.this; }
     }
 

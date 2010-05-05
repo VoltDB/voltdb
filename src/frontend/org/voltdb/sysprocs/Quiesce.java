@@ -32,9 +32,7 @@ import org.voltdb.dtxn.DtxnConstants;
 public class Quiesce extends VoltSystemProcedure {
 
     static final int DEP_SITES = (int) SysProcFragmentId.PF_quiesce_sites | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-    static final int DEP_NODES = (int) SysProcFragmentId.PF_quiesce_nodes | DtxnConstants.MULTIPARTITION_DEPENDENCY;
     static final int DEP_PROCESSED_SITES = (int) SysProcFragmentId.PF_quiesce_processed_sites;
-    static final int DEP_PROCESSED_NODES = (int) SysProcFragmentId.PF_quiesce_processed_nodes;
 
     @Override
     public void init(int numberOfPartitions, SiteProcedureConnection site,
@@ -42,9 +40,7 @@ public class Quiesce extends VoltSystemProcedure {
     {
         super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
         site.registerPlanFragment(SysProcFragmentId.PF_quiesce_sites, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_quiesce_nodes, this);
         site.registerPlanFragment(SysProcFragmentId.PF_quiesce_processed_sites, this);
-        site.registerPlanFragment(SysProcFragmentId.PF_quiesce_processed_nodes, this);
     }
 
     @Override
@@ -63,27 +59,6 @@ public class Quiesce extends VoltSystemProcedure {
                 VoltTable dummy = new VoltTable(new ColumnInfo("status", VoltType.STRING));
                 dummy.addRow("okay");
                 return new DependencyPair(DEP_PROCESSED_SITES, dummy);
-            }
-
-            else if (fragmentId == SysProcFragmentId.PF_quiesce_nodes) {
-                // Choose the lowest site ID on this host to do the global
-                // quiesce.  All other sites should just claim 'okay'
-                int host_id = context.getExecutionSite().getCorrespondingHostId();
-                Integer lowest_site_id =
-                    VoltDB.instance().getCatalogContext().siteTracker.
-                    getLowestLiveExecSiteIdForHost(host_id);
-                if (context.getExecutionSite().getSiteId() == lowest_site_id)
-                {
-                    VoltDB.quiesce();
-                }
-                VoltTable dummy = new VoltTable(new ColumnInfo("status", VoltType.STRING));
-                dummy.addRow("okay");
-                return new DependencyPair(DEP_NODES, dummy);
-            }
-            else if (fragmentId == SysProcFragmentId.PF_quiesce_processed_nodes) {
-                VoltTable dummy = new VoltTable(new ColumnInfo("status", VoltType.STRING));
-                dummy.addRow("okay");
-                return new DependencyPair(DEP_PROCESSED_NODES, dummy);
             }
         }
         catch (Exception ex) {
@@ -116,29 +91,6 @@ public class Quiesce extends VoltSystemProcedure {
             catch (Exception ex) {
                 ex.printStackTrace();
             }
-
-            SynthesizedPlanFragment pfs2[] = new SynthesizedPlanFragment[2];
-            pfs2[0] = new SynthesizedPlanFragment();
-            pfs2[0].fragmentId = SysProcFragmentId.PF_quiesce_nodes;
-            pfs2[0].outputDepId = DEP_NODES;
-            pfs2[0].inputDepIds = new int[]{};
-            pfs2[0].multipartition = true;
-            pfs2[0].parameters = new ParameterSet();
-
-            pfs2[1] = new SynthesizedPlanFragment();
-            pfs2[1].fragmentId = SysProcFragmentId.PF_quiesce_processed_nodes;
-            pfs2[1].outputDepId = DEP_PROCESSED_NODES;
-            pfs2[1].inputDepIds = new int[] { DEP_NODES };
-            pfs2[1].multipartition = false;
-            pfs2[1].parameters = new ParameterSet();
-
-            try {
-                result = executeSysProcPlanFragments(pfs2, DEP_PROCESSED_NODES);
-            }
-            catch (Exception ex) {
-                ex.printStackTrace();
-            }
-
             return result;
     }
 

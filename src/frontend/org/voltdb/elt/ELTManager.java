@@ -40,7 +40,7 @@ import org.voltdb.utils.DBBPool.BBContainer;
  *
  * Processors are loaded by reflection based on configuration in project.xml.
  */
-public class ELTManager implements SysManageable
+public class ELTManager
 {
     /**
      * Processors also log using this facility.
@@ -239,25 +239,6 @@ public class ELTManager implements SysManageable
                                    table.getRelativeIndex())
             );
         }
-    }
-
-    /**
-     * Ask if all loaders have idled.
-     */
-    @Override
-    public String operStatus() {
-        for (ELTDataProcessor p: m_processors) {
-            if (!p.isIdle()) {
-                return SysManageable.RUNNING;
-            }
-        }
-        return SysManageable.IDLE;
-    }
-
-    @Override
-    public void quiesce() {
-        // Nothing to do here in the pull model. Pollers can just send quiesce
-        // and poll queues until empty.
     }
 
     /**

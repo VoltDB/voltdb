@@ -414,18 +414,6 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
     }
 
     @Override
-    public boolean isIdle() {
-        synchronized (m_connections) {
-            for (Connection c : m_connections) {
-                if (!c.writeStream().isEmpty()) {
-                    return true;
-                }
-            }
-            return false;
-        }
-    }
-
-    @Override
     public void addLogger(Logger logger) {
         m_logger = logger;
     }
