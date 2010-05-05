@@ -27,13 +27,17 @@ import java.io.*;
 import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.List;
+
 import org.voltdb.elt.processors.RawProcessor;
 import org.voltdb.messaging.FastDeserializer;
 
 
 /**
  *   Listen for ELT output and run a provided tuple verifier
- *   against that stream of data.
+ *   against that stream of data. If there are multiple advertised
+ *   data sources, each source will be polled to completion in turn.
+ *   (Source 1 drained. Source 2 drained.. etc.)
  */
 
 public class ELPoller implements Runnable {
@@ -53,15 +57,35 @@ public class ELPoller implements Runnable {
     {
         private final SocketChannel m_socket;
         private int m_state = RawProcessor.CLOSED;
+        private int m_currentPartitionId = -1;
+        private int m_currentTableId = -1;
 
-        int m_tableId = -1;
-        int m_partitionId = -1;
+        private List<ELTProtoMessage.AdvertisedDataSource> m_sources = null;
         boolean m_done = false;
 
         VerificationStream(final SocketChannel client)
         throws IOException
         {
             m_socket = client;
+        }
+
+        void nextSource() throws IOException {
+            if (m_sources.size() == 0) {
+                m_done = true;
+                return;
+            }
+            ELTProtoMessage.AdvertisedDataSource next = m_sources.remove(0);
+            m_currentPartitionId = next.partitionId();;
+            m_currentTableId = next.tableId();
+            poll();
+        }
+
+        int currentPartitionId() {
+            return m_currentPartitionId;
+        }
+
+        int currentTableId() {
+            return m_currentTableId;
         }
 
         @Override
@@ -101,7 +125,7 @@ public class ELPoller implements Runnable {
             // but I hesitate to add a no-argument constructor
             // while getting the interfaces to line up.
             System.out.println("Opening new verification stream connection.");
-            ELTProtoMessage m = new ELTProtoMessage(m_partitionId, m_tableId);
+            ELTProtoMessage m = new ELTProtoMessage(-1, -1);
             m.open();
             ByteBuffer buf = m.toBuffer();
             while (buf.remaining() > 0) {
@@ -112,7 +136,7 @@ public class ELPoller implements Runnable {
         private void poll() throws IOException
         {
             System.out.println("Polling for new data.");
-            ELTProtoMessage m = new ELTProtoMessage(m_partitionId, m_tableId);
+            ELTProtoMessage m = new ELTProtoMessage(currentPartitionId(), currentTableId());
             m.poll();
             ByteBuffer buf = m.toBuffer();
             while (buf.remaining() > 0) {
@@ -123,7 +147,7 @@ public class ELPoller implements Runnable {
         private void pollAndAck(ELTProtoMessage prev) throws IOException
         {
             System.out.println("Poller: pollAndAck " + prev.getAckOffset());
-            ELTProtoMessage next = new ELTProtoMessage(m_partitionId, m_tableId);
+            ELTProtoMessage next = new ELTProtoMessage(currentPartitionId(), currentTableId());
             next.poll().ack(prev.getAckOffset());
             ByteBuffer buf = next.toBuffer();
             while (buf.remaining() > 0) {
@@ -155,11 +179,9 @@ public class ELPoller implements Runnable {
         {
             if (m_state == RawProcessor.CLOSED) {
                 m_state = RawProcessor.CONNECTED;
-
-                m_tableId = m.getTableId();
-                m_partitionId = m.getPartitionId();
-                System.out.printf("Poller: connected verification stream: %d/%d\n", m_tableId, m_partitionId);
-                poll();
+                m_sources = m.getAdvertisedDataSources();
+                System.out.printf("Poller: connected verification stream.");
+                nextSource();
             }
             else {
                 assert(false);
@@ -171,7 +193,7 @@ public class ELPoller implements Runnable {
             if (m_state == RawProcessor.CONNECTED) {
                 // if a poll returns no data, this process is complete.
                 if (m.getData().remaining() == 0) {
-                    m_done = true;
+                    nextSource();
                     return;
                 }
 
@@ -181,7 +203,7 @@ public class ELPoller implements Runnable {
 
                 // a stream block prefix of 0 also means empty queue.
                 if (ttllength == 0) {
-                    m_done = true;
+                    nextSource();
                     return;
                 }
 

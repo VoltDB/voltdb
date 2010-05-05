@@ -62,7 +62,7 @@ public class TestELTProtoMessage extends TestCase {
 
     public void testIsOpenResponse() {
         ELTProtoMessage m = new ELTProtoMessage(1,2);
-        m.openResponse();
+        m.openResponse(null);
         assertTrue(m.isOpenResponse());
         assertMsgType(m, ELTProtoMessage.kOpenResponse);
     }
@@ -184,7 +184,11 @@ public class TestELTProtoMessage extends TestCase {
     // mimic what raw processor and the el poller do to each other
     public void testELPollerPattern() throws IOException {
         final ELTProtoMessage r = new ELTProtoMessage(1, 5);
-        r.openResponse();
+        ByteBuffer data = ByteBuffer.allocate(8);
+        data.putInt(100);
+        data.putInt(200);
+        data.flip();
+        r.pollResponse(1000, data);
         final DBBPool p = new DBBPool();
         BBContainer bb =
             new DeferredSerialization() {
@@ -197,18 +201,19 @@ public class TestELTProtoMessage extends TestCase {
                 @Override
                 public void cancel() {
                     // TODO Auto-generated method stub
-
                 }
             }.serialize(p);
 
         ByteBuffer b = bb.b;
-        assertEquals(20, b.getInt());
+        assertEquals(28, b.getInt());
         FastDeserializer fds = new FastDeserializer(b);
         ELTProtoMessage m = ELTProtoMessage.readExternal(fds);
         assertEquals(1, m.m_partitionId);
         assertEquals(5, m.getTableId());
-        assertTrue(m.isOpenResponse());
-        assertMsgType(m, ELTProtoMessage.kOpenResponse);
+        assertTrue(m.isPollResponse());
+        assertTrue(m.getData().remaining() == 8);
+        assertMsgType(m, ELTProtoMessage.kPollResponse);
+
     }
 
 }

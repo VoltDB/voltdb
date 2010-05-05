@@ -24,6 +24,7 @@
 package org.voltdb.elt;
 
 import org.voltdb.*;
+import org.voltdb.catalog.Table;
 import org.voltdb.elt.processors.RawProcessor;
 import org.voltdb.messaging.*;
 
@@ -52,31 +53,62 @@ public class TestELTDataSource extends TestCase {
         public VoltMessage msg = null;
     }
 
+    MockVoltDB m_mockVoltDB = new MockVoltDB();
+    int m_host = 0;
+    int m_site = 1;
+    int m_part = 2;
+
+    @Override
+    public void setUp() {
+        m_mockVoltDB.addHost(m_host);
+        m_mockVoltDB.addPartition(m_part);
+        m_mockVoltDB.addSite(m_site, m_host, m_part, true);
+        m_mockVoltDB.addTable("TableName", false);
+        m_mockVoltDB.addColumnToTable("TableName", "COL1", VoltType.INTEGER, false, null, VoltType.INTEGER);
+        m_mockVoltDB.addColumnToTable("TableName", "COL2", VoltType.STRING, false, null, VoltType.STRING);
+    }
+
     public void testELTDataSource() {
-        ELTDataSource s = new ELTDataSource("database", "table", 1,  2, 3);
+        Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
+        ELTDataSource s = new ELTDataSource("database",
+                                            table.getTypeName(),
+                                            m_part,
+                                            m_site,
+                                            table.getRelativeIndex(),
+                                            table.getColumns());
+
         assertEquals("database", s.getDatabase());
-        assertEquals("table", s.getTableName());
-        assertEquals(1, s.getPartitionId());
-        assertEquals(2, s.getSiteId());
-        assertEquals(3, s.getTableId());
+        assertEquals("TableName", s.getTableName());
+        assertEquals(m_part, s.getPartitionId());
+        assertEquals(m_site, s.getSiteId());
+        assertEquals(table.getRelativeIndex(), s.getTableId());
+        assertEquals(2, s.m_columnNames.size());
+        assertEquals(2, s.m_columnTypes.size());
+        assertEquals("COL1", s.m_columnNames.get(0));
+        assertEquals("COL2", s.m_columnNames.get(1));
+        assertEquals(VoltType.INTEGER.ordinal(), s.m_columnTypes.get(0).intValue());
+        assertEquals(VoltType.STRING.ordinal(), s.m_columnTypes.get(1).intValue());
     }
 
 
     public void testPoll() throws MessagingException {
         MockHostMessenger hm = new MockHostMessenger();
-        MockVoltDB mockvolt = new MockVoltDB();
-        mockvolt.setHostMessenger(hm);
-        mockvolt.addHost(10);
-        mockvolt.addPartition(20);
-        mockvolt.addSite(30, 10, 20, true);
-        VoltDB.replaceVoltDBInstanceForTest(mockvolt);
+        m_mockVoltDB.setHostMessenger(hm);
+        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
+        Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
+        ELTDataSource s = new ELTDataSource("database",
+                                            table.getTypeName(),
+                                            m_part,
+                                            m_site,
+                                            table.getRelativeIndex(),
+                                            table.getColumns());
 
-        ELTProtoMessage m = new ELTProtoMessage(1, 3);
+        ELTProtoMessage m = new ELTProtoMessage(m_part, table.getRelativeIndex());
         RawProcessor.ELTInternalMessage pair = new RawProcessor.ELTInternalMessage(null, m);
-        ELTDataSource s = new ELTDataSource("database", "table", 1, 2, 3);
+
         s.poll(pair);
 
-        assertEquals(2, hm.siteId);
+        assertEquals(m_site, hm.siteId);
         assertEquals(0, hm.mailboxId);
         assertTrue(hm.msg instanceof RawProcessor.ELTInternalMessage);
         assertEquals(pair, hm.msg);

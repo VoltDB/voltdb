@@ -68,6 +68,9 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
     HashMap<Integer, HashMap<Integer,ELTDataSource>> m_sources =
         new HashMap<Integer, HashMap<Integer, ELTDataSource>>();
 
+    ArrayList<ELTDataSource> m_sourcesArray =
+        new ArrayList<ELTDataSource>();
+
     /**
      * As long as m_shouldContinue is true, the service will listen for new
      * TCP/IP connections on LISTENER_PORT. At the moment, multiple client
@@ -100,8 +103,10 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
 
         void protocolError(ELTProtoMessage m, String string)
         {
+            if (m_logger != null) {
+                m_logger.error("Closing ELT connection with error: " + string);
+            }
             m_state = RawProcessor.CLOSED;
-
             final ELTProtoMessage r =
                 new ELTProtoMessage(m.getPartitionId(), m.getTableId());
             r.error();
@@ -124,7 +129,7 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
         void event(final ELTProtoMessage m)
         {
             if (m.isError()) {
-                protocolError(m, "Error. May indicate that an invalid ack offset was requested.");
+                protocolError(m, "Internal error message. May indicate that an invalid ack offset was requested.");
                 return;
             }
 
@@ -135,33 +140,38 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
 
             else if (m.isOpen()) {
                 if (m_state != RawProcessor.CLOSED) {
-                    protocolError(m, "Must not OPEN an already opened connection.");
+                    protocolError(m, "Client must not open an already opened connection.");
                     return;
                 }
                 if (m.isClose() || m.isPoll() || m.isAck()) {
-                    protocolError(m, "Invalid combination of OPEN with other action.");
+                    protocolError(m, "Invalid combination of open with close, poll or ack.");
                     return;
                 }
                 m_state = RawProcessor.CONNECTED;
 
-                // TODO: need to respond with full topology information
-                // For now, return first datasource partition/table pair
-                // this is enough to bootstrap the test harness.
-                int found_partitionId = -1;
-                int found_tableId = -1;
-                Set<Integer> keySet = m_sources.keySet();
-                for (Integer p_id : keySet) {
-                    found_partitionId = p_id;
-                    Set<Integer> keySet2 = m_sources.get(p_id).keySet();
-                    for (Integer t_id : keySet2) {
-                        found_tableId = t_id;
+                // Respond by advertising the full data source set.
+                FastSerializer fs = new FastSerializer();
+                try {
+                    // serialize an array of DataSources
+                    fs.writeInt(m_sourcesArray.size());
+                    for (ELTDataSource src : m_sourcesArray) {
+                        fs.writeInt(src.getPartitionId());
+                        fs.writeInt(src.getTableId());
+                        fs.writeString(src.getTableName());
+                        fs.writeInt(src.m_columnNames.size());
+                        for (int ii=0; ii < src.m_columnNames.size(); ++ii) {
+                            fs.writeString(src.m_columnNames.get(ii));
+                            fs.writeInt(src.m_columnTypes.get(ii));
+                        }
                     }
                 }
-                assert (found_partitionId != -1);
-                assert (found_tableId != -1);
+                catch (IOException e) {
+                    protocolError(m, "Error producing open response advertisement.");
+                    return;
+                }
 
-                final ELTProtoMessage r = new ELTProtoMessage(found_partitionId, found_tableId);
-                r.openResponse();
+                final ELTProtoMessage r = new ELTProtoMessage(-1, -1);
+                r.openResponse(fs.getBuffer());
                 m_c.writeStream().enqueue(
                     new DeferredSerialization() {
                         @Override
@@ -393,6 +403,7 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
         int partid = dataSource.getPartitionId();
         int tableid = dataSource.getTableId();
 
+        m_sourcesArray.add(dataSource);
         HashMap<Integer, ELTDataSource> partmap = m_sources.get(partid);
         if (partmap == null) {
             partmap = new HashMap<Integer, ELTDataSource>();

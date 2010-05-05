@@ -29,6 +29,8 @@ import java.util.concurrent.LinkedBlockingDeque;
 
 import junit.framework.TestCase;
 
+import org.voltdb.MockVoltDB;
+import org.voltdb.VoltType;
 import org.voltdb.elt.ELTDataSource;
 import org.voltdb.elt.ELTProtoMessage;
 import org.voltdb.elt.processors.RawProcessor.ProtoStateBlock;
@@ -146,9 +148,27 @@ public class TestRawProcessor extends TestCase {
         LinkedBlockingDeque<ELTProtoMessage> eequeue =
             new LinkedBlockingDeque<ELTProtoMessage>();
 
+
+        // not really sure how much of this is needed, but pass at least
+        // a mostly real set of CatalogMaps to the datasource ctor.
+        public static MockVoltDB m_mockVoltDB = new MockVoltDB();
+        public static int m_host = 0;
+        public static int m_site = 1;
+        public static int m_part = 2;
+
+        static {
+            m_mockVoltDB.addHost(m_host);
+            m_mockVoltDB.addPartition(m_part);
+            m_mockVoltDB.addSite(m_site, m_host, m_part, true);
+            m_mockVoltDB.addTable("TableName", false);
+            m_mockVoltDB.addColumnToTable("TableName", "COL1", VoltType.INTEGER, false, null, VoltType.INTEGER);
+            m_mockVoltDB.addColumnToTable("TableName", "COL2", VoltType.STRING, false, null, VoltType.STRING);
+        }
+
         public MockELTDataSource(String db, String tableName, int partitionId,
                 int siteId, int tableId) {
-            super(db, tableName, partitionId, siteId, tableId);
+            super(db, tableName, partitionId, siteId, tableId,
+                  m_mockVoltDB.getCatalogContext().database.getTables().get("TableName").getColumns());
         }
 
         @Override
@@ -158,8 +178,8 @@ public class TestRawProcessor extends TestCase {
                 ELTProtoMessage r =
                     new ELTProtoMessage(m.m_m.getPartitionId(), m.m_m.getTableId());
                 ByteBuffer data = ByteBuffer.allocate(8);
-                data.putInt(100);
-                data.putInt(200);
+                data.putInt(100); // some fake poll data
+                data.putInt(200); // more fake poll data
                 r.pollResponse(2000, data);
                 eequeue.add(r);
             }

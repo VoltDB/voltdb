@@ -19,6 +19,7 @@ package org.voltdb.elt;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
@@ -46,6 +47,48 @@ public class ELTProtoMessage
     public boolean isClose()        {return (m_type & kClose) != 0;}
     public boolean isError()        {return (m_type & kError) != 0;}
 
+    /**
+     * The ELT data source metadata returned in a kOpenResponse message.
+     */
+    static public class AdvertisedDataSource {
+        final private int m_partitionId;
+        final private int m_tableId;
+        final private String m_tableName;
+
+        final private ArrayList<String> m_columnNames =
+            new ArrayList<String>();
+
+        final private ArrayList<Integer> m_columnTypes =
+            new ArrayList<Integer>();
+
+        public AdvertisedDataSource(int p_id, int t_id, String t_name,
+                ArrayList<String> names, ArrayList<Integer> types)
+        {
+            m_partitionId = p_id;
+            m_tableId = t_id;
+            m_tableName = t_name;
+        }
+
+        public int partitionId() {
+            return m_partitionId;
+        }
+
+        public int tableId() {
+            return m_tableId;
+        }
+
+        public int columnType(int index) {
+            return m_columnTypes.get(index);
+        }
+
+        public String columnName(int index) {
+            return m_columnNames.get(index);
+        }
+
+        public String tableName() {
+            return m_tableName;
+        }
+    }
 
     /**
      * Called to produce an ELT protocol message from a FastDeserializer.
@@ -113,8 +156,9 @@ public class ELTProtoMessage
         return this;
     }
 
-    public ELTProtoMessage openResponse() {
+    public ELTProtoMessage openResponse(ByteBuffer bb) {
         m_type |= kOpenResponse;
+        m_data = bb;
         return this;
     }
 
@@ -155,6 +199,42 @@ public class ELTProtoMessage
 
     public long getAckOffset() {
         return m_offset;
+    }
+
+    /**
+     * Provide a simple accessor to read the list of advertised data sources
+     * returned as the payload to an open response.
+     * @return List of data sources advertised with an open response.
+     * @throws IOException
+     */
+    public ArrayList<AdvertisedDataSource> getAdvertisedDataSources()
+    throws IOException
+    {
+        if (!isOpenResponse()) {
+            return null;
+        }
+
+        ArrayList<AdvertisedDataSource> result =
+            new ArrayList<AdvertisedDataSource>();
+
+        FastDeserializer fds = new FastDeserializer(m_data);
+
+        int count = m_data.getInt();
+        for (int i=0; i < count; i++) {
+            ArrayList<Integer> types = new ArrayList<Integer>();
+            ArrayList<String> names = new ArrayList<String>();
+
+            int p_id = fds.readInt();
+            int t_id = fds.readInt();
+            String t_name = fds.readString();
+            int colcnt = fds.readInt();
+            for (int jj = 0; jj < colcnt; jj++) {
+                names.add(fds.readString());
+                types.add(fds.readInt());
+            }
+            result.add(new AdvertisedDataSource(p_id, t_id, t_name, names, types));
+        }
+        return result;
     }
 
     @Override

@@ -17,9 +17,14 @@
 
 package org.voltdb.elt;
 
+import java.util.ArrayList;
+
 import org.voltdb.VoltDB;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
 import org.voltdb.elt.processors.RawProcessor;
 import org.voltdb.messaging.MessagingException;
+import org.voltdb.utils.CatalogUtil;
 
 /**
  *  Allows an ELTDataProcessor to access underlying table queues
@@ -31,6 +36,8 @@ public class ELTDataSource {
     private final int m_tableId;
     private final int m_siteId;
     private final int m_partitionId;
+    public final ArrayList<String> m_columnNames = new ArrayList<String>();
+    public final ArrayList<Integer> m_columnTypes = new ArrayList<Integer>();
 
     /**
      * Create a new data source.
@@ -39,13 +46,22 @@ public class ELTDataSource {
      * @param partitionId
      * @param siteId
      * @param tableId
+     * @param catalogMap
      */
-    public ELTDataSource(String db, String tableName, int partitionId, int siteId, int tableId) {
+    public ELTDataSource(String db, String tableName,
+                int partitionId, int siteId, int tableId,
+                CatalogMap<Column> catalogMap)
+    {
         m_database = db;
         m_tableName = tableName;
         m_tableId = tableId;
         m_partitionId = partitionId;
         m_siteId = siteId;
+
+        for (Column c : CatalogUtil.getSortedCatalogItems(catalogMap, "index")) {
+            m_columnNames.add(c.getName());
+            m_columnTypes.add(c.getType());
+        }
     }
 
     /**

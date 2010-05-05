@@ -229,7 +229,8 @@ public class ELTManager
                                    table.getTypeName(),
                                    siteTracker.getPartitionForSite(site),
                                    site,
-                                   table.getRelativeIndex())
+                                   table.getRelativeIndex(),
+                                   table.getColumns())
             );
         }
     }
