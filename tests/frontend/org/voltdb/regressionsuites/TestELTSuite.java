@@ -28,9 +28,7 @@ import java.util.ArrayList;
 
 import org.voltdb.*;
 import org.voltdb.VoltTable.ColumnInfo;
-import org.voltdb.client.Client;
-import org.voltdb.client.NoConnectionsException;
-import org.voltdb.client.ProcCallException;
+import org.voltdb.client.*;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.elt.*;
 
@@ -90,6 +88,7 @@ public class TestELTSuite extends RegressionSuite {
     private void quiesce(final Client client)
     throws ProcCallException, NoConnectionsException, IOException
     {
+        client.drain();
         client.callProcedure("@Quiesce");
     }
 
@@ -103,7 +102,7 @@ public class TestELTSuite extends RegressionSuite {
     }
 
     private void quiesceAndVerifyFalse(final Client client, TupleVerifier verifier)
-    throws ProcCallException, NoConnectionsException
+    throws ProcCallException, IOException
     {
         quiesce(client);
 
@@ -197,27 +196,24 @@ public class TestELTSuite extends RegressionSuite {
         quiesceAndVerifyFalse(client, verifier);
     }
 
-//    /**
-//     * Sends ten tuples to an EL enabled VoltServer and verifies the receipt
-//     * of those tuples after a quiesce (shutdown). Base case.
-//     */
-//    public void testELTRoundTripStreamedTable() throws IOException, ProcCallException, InterruptedException
-//    {
-//        final Client client = getClient();
-//
-//        final LocalSingleProcessServerELT config =
-//            (LocalSingleProcessServerELT) getServerConfig();
-//
-//        for (int i=0; i < 10; i++) {
-//            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-//            config.addRow("WITH_DEFAULTS", convertValsToRow(i, rowdata));
-//
-//            final Object[] params = convertValsToParams(i, rowdata);
-//            client.callProcedure("Insert", params);
-//        }
-//        quiesceAndVerify(client);
-//    }
-//
+    /**
+     * Sends ten tuples to an EL enabled VoltServer and verifies the receipt
+     * of those tuples after a quiesce (shutdown). Base case.
+     */
+    public void testELTRoundTripStreamedTable() throws IOException, ProcCallException, InterruptedException
+    {
+        final Client client = getClient();
+        ELTSuiteTupleVerifier verifier = new ELTSuiteTupleVerifier();
+
+        for (int i=0; i < 10; i++) {
+            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            verifier.addRow("WITH_DEFAULTS", convertValsToRow(i, rowdata));
+            final Object[] params = convertValsToParams(i, rowdata);
+            client.callProcedure("Insert", params);
+        }
+        quiesceAndVerify(client, verifier);
+    }
+
     /** Test that a table w/o ELT enabled does not produce ELT content */
     public void testThatTablesOptIn() throws IOException, ProcCallException, InterruptedException
     {
@@ -240,6 +236,16 @@ public class TestELTSuite extends RegressionSuite {
         quiesceAndVerify(client, verifier);
     }
 
+
+    class RollbackCallback implements ProcedureCallback {
+        @Override
+        public void clientCallback(ClientResponse clientResponse) {
+            if (clientResponse.getStatus() != ClientResponse.USER_ABORT) {
+                fail();
+            }
+        }
+    }
+
     /*
      * Sends many tuples to an EL enabled VoltServer and verifies the receipt
      * of each in the EL stream. Some procedures rollback (after a real insert).
@@ -256,28 +262,35 @@ public class TestELTSuite extends RegressionSuite {
         final Object[] rowdata = TestSQLTypesSuite.m_midValues;
 
         // roughly 10k rows is a full buffer it seems
-        for (int pkey=0; pkey < 25000; pkey++) {
-            if ((pkey % 500) == 0) System.out.println("Rollback test added " + pkey + " rows");
+        for (int pkey=0; pkey < 175000; pkey++) {
+            if ((pkey % 1000) == 0) {
+                System.out.println("Rollback test added " + pkey + " rows");
+            }
             final Object[] params = convertValsToParams(pkey, rowdata);
-            // rollback or insert?
             random = Math.random();
             if (random <= rollbackPerc) {
-                try {
-                    // note - not update the el verifier as this rollsback
-                    client.callProcedure("RollbackInsert", params);
-                }
-                catch (ProcCallException ex) {
-                    // make sure the proc failed "on purpose"
-                    if (!(ex.getMessage().contains("OK"))) {
-                        throw ex;
+                // note - do not update the el verifier as this rollsback
+                boolean done;
+                do {
+                    done = client.callProcedure(new RollbackCallback(), "RollbackInsert", params);
+                    if (done == false) {
+                        client.backpressureBarrier();
                     }
-                }
+                } while (!done);
             }
             else {
                 verifier.addRow("ALLOW_NULLS", convertValsToRow(pkey, rowdata));
-                client.callProcedure("Insert", params);
+                // the sync call back isn't synchronous if it isn't explicitly blocked on...
+                boolean done;
+                do {
+                    done = client.callProcedure(new SyncCallback(), "Insert", params);
+                    if (done == false) {
+                        client.backpressureBarrier();
+                    }
+                } while (!done);
             }
         }
+        client.drain();
         quiesceAndVerify(client, verifier);
     }
 
@@ -344,56 +357,56 @@ public class TestELTSuite extends RegressionSuite {
         quiesceAndVerify(client, verifier);
     }
 
-//    /*
-//     * Verify that planner rejects updates to append-only tables
-//     */
-//    public void testELTUpdateAppendOnly() throws IOException {
-//        final Client client = getClient();
-//        boolean passed = false;
-//        try {
-//            client.callProcedure("@AdHoc", "Update WITH_DEFAULTS SET A_TINYINT=0 WHERE PKEY=0;");
-//        }
-//        catch (ProcCallException e) {
-//            if (e.getMessage().contains("Illegal to update an export-only table.")) {
-//                passed = true;
-//            }
-//        }
-//        assertTrue(passed);
-//    }
-//
-//    /*
-//     * Verify that planner rejects reads of append-only tables.
-//     */
-//    public void testELTSelectAppendOnly() throws IOException {
-//        final Client client = getClient();
-//        boolean passed = false;
-//        try {
-//            client.callProcedure("@AdHoc", "Select PKEY from WITH_DEFAULTS WHERE PKEY=0;");
-//        }
-//        catch (ProcCallException e) {
-//            if (e.getMessage().contains("Illegal to read an export-only table.")) {
-//                passed = true;
-//            }
-//        }
-//        assertTrue(passed);
-//    }
-//
-//    /*
-//     *  Verify that planner rejects deletes of append-only tables
-//     */
-//    public void testELTDeleteAppendOnly() throws IOException {
-//        final Client client = getClient();
-//        boolean passed = false;
-//        try {
-//            client.callProcedure("@AdHoc", "DELETE from WITH_DEFAULTS WHERE PKEY=0;");
-//        }
-//        catch (ProcCallException e) {
-//            if (e.getMessage().contains("Illegal to delete from an export-only table.")) {
-//                passed = true;
-//            }
-//        }
-//        assertTrue(passed);
-//    }
+    /*
+     * Verify that planner rejects updates to append-only tables
+     */
+    public void testELTUpdateAppendOnly() throws IOException {
+        final Client client = getClient();
+        boolean passed = false;
+        try {
+            client.callProcedure("@AdHoc", "Update WITH_DEFAULTS SET A_TINYINT=0 WHERE PKEY=0;");
+        }
+        catch (ProcCallException e) {
+            if (e.getMessage().contains("Illegal to update an export-only table.")) {
+                passed = true;
+            }
+        }
+        assertTrue(passed);
+    }
+
+    /*
+     * Verify that planner rejects reads of append-only tables.
+     */
+    public void testELTSelectAppendOnly() throws IOException {
+        final Client client = getClient();
+        boolean passed = false;
+        try {
+            client.callProcedure("@AdHoc", "Select PKEY from WITH_DEFAULTS WHERE PKEY=0;");
+        }
+        catch (ProcCallException e) {
+            if (e.getMessage().contains("Illegal to read an export-only table.")) {
+                passed = true;
+            }
+        }
+        assertTrue(passed);
+    }
+
+    /*
+     *  Verify that planner rejects deletes of append-only tables
+     */
+    public void testELTDeleteAppendOnly() throws IOException {
+        final Client client = getClient();
+        boolean passed = false;
+        try {
+            client.callProcedure("@AdHoc", "DELETE from WITH_DEFAULTS WHERE PKEY=0;");
+        }
+        catch (ProcCallException e) {
+            if (e.getMessage().contains("Illegal to delete from an export-only table.")) {
+                passed = true;
+            }
+        }
+        assertTrue(passed);
+    }
 
 
     /*
@@ -422,9 +435,9 @@ public class TestELTSuite extends RegressionSuite {
         // add the connector/processor (name, host, port)
         // and the exportable tables (name, export-only)
         project.addELT("org.voltdb.elt.processors.RawProcessor", true /*enabled*/);
-        // project.addELTTable("NO_NULLS", false);   // non-elt'd persistent table
+        // "NO_NULLS" is a non-elt'd persistent table
         project.addELTTable("ALLOW_NULLS", false);   // persistent table
-        // project.addELTTable("WITH_DEFAULTS", true);  // streamed table
+        project.addELTTable("WITH_DEFAULTS", true);  // streamed table
         // and then project builder as normal
         project.addPartitionInfo("NO_NULLS", "PKEY");
         project.addPartitionInfo("ALLOW_NULLS", "PKEY");

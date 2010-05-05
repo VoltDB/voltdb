@@ -124,7 +124,7 @@ public class ELPoller implements Runnable {
             // can send any table/partition pair to open
             // but I hesitate to add a no-argument constructor
             // while getting the interfaces to line up.
-            System.out.println("Opening new verification stream connection.");
+            System.out.println("Poller: opening new verification stream connection.");
             ELTProtoMessage m = new ELTProtoMessage(-1, -1);
             m.open();
             ByteBuffer buf = m.toBuffer();
@@ -135,7 +135,7 @@ public class ELPoller implements Runnable {
 
         private void poll() throws IOException
         {
-            System.out.println("Polling for new data.");
+            System.out.println("Poller: polling partitionId(" + currentPartitionId() + ") table(" + currentTableId() + ")");
             ELTProtoMessage m = new ELTProtoMessage(currentPartitionId(), currentTableId());
             m.poll();
             ByteBuffer buf = m.toBuffer();
@@ -146,7 +146,7 @@ public class ELPoller implements Runnable {
 
         private void pollAndAck(ELTProtoMessage prev) throws IOException
         {
-            System.out.println("Poller: pollAndAck " + prev.getAckOffset());
+            System.out.println("Poller: pollAndAck " + prev.getAckOffset() + " partitionId(" + currentPartitionId() + ") table(" + currentTableId() + ")");
             ELTProtoMessage next = new ELTProtoMessage(currentPartitionId(), currentTableId());
             next.poll().ack(prev.getAckOffset());
             ByteBuffer buf = next.toBuffer();
@@ -180,7 +180,7 @@ public class ELPoller implements Runnable {
             if (m_state == RawProcessor.CLOSED) {
                 m_state = RawProcessor.CONNECTED;
                 m_sources = m.getAdvertisedDataSources();
-                System.out.printf("Poller: connected verification stream.");
+                System.out.println("Poller: connected verification stream.");
                 nextSource();
             }
             else {
@@ -199,7 +199,6 @@ public class ELPoller implements Runnable {
 
                 // read the streamblock length prefix.
                 int ttllength = m.getData().getInt();
-                System.out.println("Poller: data payload bytes: " + ttllength);
 
                 // a stream block prefix of 0 also means empty queue.
                 if (ttllength == 0) {
@@ -213,7 +212,6 @@ public class ELPoller implements Runnable {
                     byte[] rowdata = new byte[length];
                     m.getData().get(rowdata, 0, length);
                     m_verifier.verifyRow(length, rowdata);
-                    System.out.println("Poller verifier (all rows?) " + m_verifier.allRowsVerified());
                 }
 
                 // ack the old block and poll the next.
