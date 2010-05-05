@@ -31,13 +31,13 @@ import org.voltdb.messaging.FastSerializer;
  */
 public class ELTProtoMessage
 {
-    public static final int kOpen           = 1 << 0;
-    public static final int kOpenResponse   = 1 << 1;
-    public static final int kPoll           = 1 << 2;
-    public static final int kPollResponse   = 1 << 3;
-    public static final int kAck            = 1 << 4;
-    public static final int kClose          = 1 << 5;
-    public static final int kError          = 1 << 6;
+    public static final short kOpen           = 1 << 0;
+    public static final short kOpenResponse   = 1 << 1;
+    public static final short kPoll           = 1 << 2;
+    public static final short kPollResponse   = 1 << 3;
+    public static final short kAck            = 1 << 4;
+    public static final short kClose          = 1 << 5;
+    public static final short kError          = 1 << 6;
 
     public boolean isOpen()         {return (m_type & kOpen) != 0;}
     public boolean isOpenResponse() {return (m_type & kOpenResponse) != 0;}
@@ -102,7 +102,8 @@ public class ELTProtoMessage
     throws IOException
     {
         ELTProtoMessage m = new ELTProtoMessage(0, 0);
-        m.m_type = fds.readInt();
+        m.m_version = fds.readShort();
+        m.m_type = fds.readShort();
         m.m_partitionId = fds.readInt();
         m.m_tableId = fds.readInt();
         m.m_offset = fds.readLong();
@@ -135,7 +136,8 @@ public class ELTProtoMessage
     {
         // write the length first. then the payload.
         fs.writeInt(serializableBytes());
-        fs.writeInt(m_type);
+        fs.writeShort(m_version);
+        fs.writeShort(m_type);
         fs.writeInt(m_partitionId);
         fs.writeInt(m_tableId);
         fs.writeLong(m_offset);
@@ -144,6 +146,10 @@ public class ELTProtoMessage
             // write advances m_data's position.
             m_data.flip();
         }
+    }
+
+    public short version() {
+        return m_version;
     }
 
     public ELTProtoMessage error() {
@@ -256,8 +262,11 @@ public class ELTProtoMessage
     private static int FIXED_PAYLOAD_LENGTH =
         (Integer.SIZE/8 * 3) + (Long.SIZE/8 * 1);
 
+    // message version. Currently all messages are version 1.
+    short m_version = 1;
+
     // bitmask of protocol actions in this message.
-    int m_type = 0;
+    short m_type = 0;
 
     // partition id for this ack or poll
     int m_partitionId = -1;
