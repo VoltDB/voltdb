@@ -283,7 +283,7 @@ public class TestELTSuite extends RegressionSuite {
                 // the sync call back isn't synchronous if it isn't explicitly blocked on...
                 boolean done;
                 do {
-                    done = client.callProcedure(new SyncCallback(), "Insert", params);
+                    done = client.callProcedure(new NullCallback(), "Insert", params);
                     if (done == false) {
                         client.backpressureBarrier();
                     }
