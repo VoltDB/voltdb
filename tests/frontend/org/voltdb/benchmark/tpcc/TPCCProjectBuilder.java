@@ -116,9 +116,7 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
     }
 
     public void addDefaultELT() {
-        addELT("dbadmin", "vertica",
-               "org.voltdb.elt.connectors.VerticaConnector",
-               "volt4a:5433", true);
+        addELT("org.voltdb.elt.connectors.VerticaConnector", true);
 
         /* Fixed after the loader completes. */
         // addELTTable("WAREHOUSE", false);
@@ -132,7 +130,7 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
         // addELTTable("HISTORY", false);     // 1 insert per payment (43%)
         // addELTTable("ORDERS", false);      // 1 insert per new order (45%)
         // addELTTable("NEW_ORDER", false);   // 1 insert per new order; 10 deletes per delivery (4%)
-        addELTTable("ORDER_LINE", false);  // 10 inserts per new order
+        addELTTable("ORDER_LINE", false);     // 10 inserts per new order
     }
 
     @Override

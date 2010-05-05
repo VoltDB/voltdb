@@ -29,7 +29,6 @@ public class Connector extends CatalogType {
     String m_loaderclass = new String();
     boolean m_enabled;
     CatalogMap<ConnectorTableInfo> m_tableInfo;
-    CatalogMap<ConnectorDestinationInfo> m_destInfo;
 
     void setBaseValues(Catalog catalog, CatalogType parent, String path, String name) {
         super.setBaseValues(catalog, parent, path, name);
@@ -37,8 +36,6 @@ public class Connector extends CatalogType {
         m_fields.put("enabled", m_enabled);
         m_tableInfo = new CatalogMap<ConnectorTableInfo>(catalog, this, path + "/" + "tableInfo", ConnectorTableInfo.class);
         m_childCollections.put("tableInfo", m_tableInfo);
-        m_destInfo = new CatalogMap<ConnectorDestinationInfo>(catalog, this, path + "/" + "destInfo", ConnectorDestinationInfo.class);
-        m_childCollections.put("destInfo", m_destInfo);
     }
 
     void update() {
@@ -59,11 +56,6 @@ public class Connector extends CatalogType {
     /** GETTER: Per table configuration */
     public CatalogMap<ConnectorTableInfo> getTableinfo() {
         return m_tableInfo;
-    }
-
-    /** GETTER: Per destination configuration */
-    public CatalogMap<ConnectorDestinationInfo> getDestinfo() {
-        return m_destInfo;
     }
 
     /** SETTER: The class name of the connector */

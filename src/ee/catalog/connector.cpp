@@ -22,7 +22,6 @@
 #include <cassert>
 #include "connector.h"
 #include "catalog.h"
-#include "connectordestinationinfo.h"
 #include "connectortableinfo.h"
 
 using namespace catalog;
@@ -30,13 +29,12 @@ using namespace std;
 
 Connector::Connector(Catalog *catalog, CatalogType *parent, const string &path, const string &name)
 : CatalogType(catalog, parent, path, name),
-  m_tableInfo(catalog, this, path + "/" + "tableInfo"), m_destInfo(catalog, this, path + "/" + "destInfo")
+  m_tableInfo(catalog, this, path + "/" + "tableInfo")
 {
     CatalogValue value;
     m_fields["loaderclass"] = value;
     m_fields["enabled"] = value;
     m_childCollections["tableInfo"] = &m_tableInfo;
-    m_childCollections["destInfo"] = &m_destInfo;
 }
 
 void Connector::update() {
@@ -51,20 +49,12 @@ CatalogType * Connector::addChild(const std::string &collectionName, const std::
             return NULL;
         return m_tableInfo.add(childName);
     }
-    if (collectionName.compare("destInfo") == 0) {
-        CatalogType *exists = m_destInfo.get(childName);
-        if (exists)
-            return NULL;
-        return m_destInfo.add(childName);
-    }
     return NULL;
 }
 
 CatalogType * Connector::getChild(const std::string &collectionName, const std::string &childName) const {
     if (collectionName.compare("tableInfo") == 0)
         return m_tableInfo.get(childName);
-    if (collectionName.compare("destInfo") == 0)
-        return m_destInfo.get(childName);
     return NULL;
 }
 
@@ -72,8 +62,6 @@ void Connector::removeChild(const std::string &collectionName, const std::string
     assert (m_childCollections.find(collectionName) != m_childCollections.end());
     if (collectionName.compare("tableInfo") == 0)
         return m_tableInfo.remove(childName);
-    if (collectionName.compare("destInfo") == 0)
-        return m_destInfo.remove(childName);
 }
 
 const string & Connector::loaderclass() const {
@@ -86,9 +74,5 @@ bool Connector::enabled() const {
 
 const CatalogMap<ConnectorTableInfo> & Connector::tableInfo() const {
     return m_tableInfo;
-}
-
-const CatalogMap<ConnectorDestinationInfo> & Connector::destInfo() const {
-    return m_destInfo;
 }
 

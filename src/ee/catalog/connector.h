@@ -29,7 +29,6 @@
 namespace catalog {
 
 class ConnectorTableInfo;
-class ConnectorDestinationInfo;
 /**
  * Export connector (ELT)
  */
@@ -43,7 +42,6 @@ protected:
     std::string m_loaderclass;
     bool m_enabled;
     CatalogMap<ConnectorTableInfo> m_tableInfo;
-    CatalogMap<ConnectorDestinationInfo> m_destInfo;
 
     virtual void update();
 
@@ -58,8 +56,6 @@ public:
     bool enabled() const;
     /** GETTER: Per table configuration */
     const CatalogMap<ConnectorTableInfo> & tableInfo() const;
-    /** GETTER: Per destination configuration */
-    const CatalogMap<ConnectorDestinationInfo> & destInfo() const;
 };
 
 } // namespace catalog

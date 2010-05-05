@@ -167,21 +167,6 @@
 		</xsd:sequence>
               </xsd:complexType>
             </xsd:element>
-            <!-- <destinations> -->
-            <xsd:element name="destinations" minOccurs="0">
-              <xsd:complexType>
-                <xsd:sequence>
-                  <!-- <destination> -->
-                  <xsd:element name="destination" minOccurs="1" maxOccurs="1">
-                    <xsd:complexType>
-                      <xsd:attribute name="url" type="xsd:string" use="required"/>
-                      <xsd:attribute name="username" type="xsd:string"/>
-                      <xsd:attribute name="password" type="xsd:string"/>
-                    </xsd:complexType>
-                  </xsd:element>
-                </xsd:sequence>
-              </xsd:complexType>
-            </xsd:element>
 	  </xsd:all>
 	  <!-- connector attributes -->
           <xsd:attribute name="class" type="xsd:string" use="required"/>

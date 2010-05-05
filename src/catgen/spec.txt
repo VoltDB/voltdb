@@ -43,17 +43,10 @@ begin ConnectorTableInfo      "Per-export connector table configuration"
   bool appendOnly             "True if this table is an append-only table for export."
 end
 
-begin ConnectorDestinationInfo
-  string url                    "The protocol and address of the destination"
-  string username               "Authentication name"
-  string password
-end
-
 begin Connector                      "Export connector (ELT)"
   string loaderclass                 "The class name of the connector"
   bool enabled                       "Is the connector enabled"
   ConnectorTableInfo* tableInfo      "Per table configuration"
-  ConnectorDestinationInfo* destInfo "Per destination configuration"
 end
 
 begin Group

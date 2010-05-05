@@ -178,11 +178,7 @@ public class VoltProjectBuilder {
     final LinkedHashSet<Class<?>> m_supplementals = new LinkedHashSet<Class<?>>();
     final LinkedHashMap<String, String> m_partitionInfos = new LinkedHashMap<String, String>();
 
-    String m_elloader = "org.voltdb.VerticaLoader";
-    String m_elurl = null;
-    // private int m_elport;
-    private String m_elusername;
-    private String m_elpassword;
+    String m_elloader = null;
 
     BackendTarget m_target = BackendTarget.NATIVE_EE_JNI;
     PrintStream m_compilerDebugPrintStream = null;
@@ -326,13 +322,8 @@ public class VoltProjectBuilder {
         m_snapshotPrefix = prefix;
     }
 
-    public void addELT(final String username, final String password,
-        final String loader, final String url, boolean enabled)
-    {
+    public void addELT(final String loader, boolean enabled) {
         m_elloader = loader;
-        m_elurl = url;
-        m_elusername = username;
-        m_elpassword = password;
         m_elenabled = enabled;
     }
 
@@ -625,7 +616,7 @@ public class VoltProjectBuilder {
         }
 
         // project/database/exports
-        if ((m_elurl != null) && (m_elurl.length() > 0)) {
+        if (m_elloader != null) {
             final Element exports = doc.createElement("exports");
             database.appendChild(exports);
 
@@ -633,18 +624,6 @@ public class VoltProjectBuilder {
             conn.setAttribute("class", m_elloader);
             conn.setAttribute("enabled", m_elenabled ? "true" : "false");
             exports.appendChild(conn);
-
-            final Element dests = doc.createElement("destinations");
-            conn.appendChild(dests);
-
-            final String[] hosts = m_elurl.split("\\s+");
-            for (int i=0; i < hosts.length; ++i) {
-                final Element dest = doc.createElement("destination");
-                dest.setAttribute("username", m_elusername);
-                dest.setAttribute("password", m_elpassword);
-                dest.setAttribute("url", hosts[i]);
-                dests.appendChild(dest);
-            }
 
             if (m_eltTables.size() > 0) {
                 final Element tables = doc.createElement("tables");

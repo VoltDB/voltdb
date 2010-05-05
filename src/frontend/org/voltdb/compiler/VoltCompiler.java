@@ -68,7 +68,6 @@ import org.voltdb.compiler.projectfile.UsersType;
 import org.voltdb.compiler.projectfile.ClassdependenciesType.Classdependency;
 import org.voltdb.compiler.projectfile.ExportsType.Connector;
 import org.voltdb.compiler.projectfile.ExportsType.Connector.Tables;
-import org.voltdb.compiler.projectfile.ExportsType.Connector.Destinations.Destination;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.JarReader;
 import org.voltdb.utils.LogKeys;
@@ -843,17 +842,9 @@ public class VoltCompiler {
     void compileConnector(final Connector conn, final Database catdb)
         throws VoltCompilerException
     {
-        Destination dest = conn.getDestinations().getDestination();
-
         // Test the error paths before touching the catalog
         if (conn == null) {
             return;
-        }
-
-        if (dest.getUrl() == null || dest.getUrl().length() <= 1) {
-            throw new VoltCompilerException
-            ("In parsing project file: export destination address" +
-            " must be a valid URL.");
         }
 
         // Figure out if the connector is enabled or disabled
@@ -865,24 +856,11 @@ public class VoltCompiler {
                              "configured to be disabled. Export will be disabled.");
         }
 
-        if (dest == null) {
-            compilerLog.info("Export configuration does not include destination. " +
-                             "Export will be disabled.");
-            // VoltDBEngine.cpp and ELTManager.java rely on this logic
-            adminstate = false;
-        }
-
         // Catalog Connector
         // Relying on schema's enforcement of at most 1 connector
         org.voltdb.catalog.Connector catconn = catdb.getConnectors().add("0");
         catconn.setEnabled(adminstate);
         catconn.setLoaderclass(conn.getClazz());
-
-        // Catalog Connector.ConnectorDestinationInfo
-        org.voltdb.catalog.ConnectorDestinationInfo catdest = catconn.getDestinfo().add("0");
-        catdest.setUrl(dest.getUrl());
-        catdest.setUsername(dest.getUsername());
-        catdest.setPassword(dest.getPassword());
 
         // Catalog Connector.ConnectorTableInfo
         Integer i = 0;

@@ -37,7 +37,6 @@ import org.voltdb.ProcInfoData;
 import org.voltdb.benchmark.tpcc.TPCCClient;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Connector;
-import org.voltdb.catalog.ConnectorDestinationInfo;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
@@ -93,9 +92,7 @@ public class TestVoltCompiler extends TestCase {
         project.addPartitionInfo("EXPRESSIONS_WITH_NULLS", "PKEY");
         project.addPartitionInfo("EXPRESSIONS_NO_NULLS", "PKEY");
         project.addPartitionInfo("JUMBO_ROW", "PKEY");
-        project.addELT("bob", "forapples",
-                       "org.voltdb.elt.processors.RawProcessor",
-                       "faraway", false);
+        project.addELT("org.voltdb.elt.processors.RawProcessor", false);
         project.addELTTable("ALLOW_NULLS", false);   // persistent table
         project.addELTTable("WITH_DEFAULTS", true);  // streamed table
         try {
@@ -109,10 +106,6 @@ public class TestVoltCompiler extends TestCase {
                 get("database").getConnectors().get("0");
             assertFalse(connector.getEnabled());
 
-            ConnectorDestinationInfo dest = connector.getDestinfo().get("0");
-            assertTrue(dest.getUsername().equals("bob"));
-            assertTrue(dest.getPassword().equals("forapples"));
-            assertTrue(dest.getUrl().equals("faraway"));
         } finally {
             final File jar = new File("/tmp/eltsettingstest.jar");
             jar.delete();
@@ -571,7 +564,6 @@ public class TestVoltCompiler extends TestCase {
             "  <procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
             "  <exports><connector class='org.voltdb.VerticaLoader'> " +
             "             <tables><table name='foo' exportonly='true'/></tables>" +
-            "             <destinations><destination url='localhost:9999' username='foo' password='bar'/></destinations>" +
             "           </connector>" +
             "  </exports>" +
             " </database>" +

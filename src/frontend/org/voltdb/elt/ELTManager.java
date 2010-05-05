@@ -192,13 +192,6 @@ public class ELTManager
             return;
         }
 
-        ConnectorDestinationInfo dest = conn.getDestinfo().get("0");
-        if (dest == null) {
-            assert(false); // VoltCompiler should make this impossible
-            eltLog.info("Export is disabled - no specified destination");
-            return;
-        }
-
         final String elloader = conn.getLoaderclass();
         try {
             eltLog.info("Creating connector " + elloader);
