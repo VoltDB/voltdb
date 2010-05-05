@@ -408,7 +408,7 @@ public abstract class VoltProcedure {
         if (retval == null)
             retval = new ClientResponseImpl(
                     status,
-                    Byte.MIN_VALUE,
+                    m_statusCode,
                     m_statusString,
                     results,
                     null);
@@ -1296,7 +1296,7 @@ public abstract class VoltProcedure {
 
         return new ClientResponseImpl(
                 status,
-                Byte.MIN_VALUE,
+                m_statusCode,
                 m_statusString,
                 new VoltTable[0],
                 msgOut.toString(), e);
