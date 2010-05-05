@@ -96,9 +96,16 @@ public class TestPlansGroupBySuite extends RegressionSuite {
             int f_d2 = i % 50; // 50 unique dim2s
             int f_d3 = i % 100; // 100 unique dim3s
 
+            boolean done;
             SyncCallback cb = new SyncCallback();
-            client.callProcedure(cb, "InsertF", pkey++, f_d1, f_d2, f_d3,
-                    2, (i * 10), (i % 2));
+            do {
+                done = client.callProcedure(cb, "InsertF", pkey++, f_d1, f_d2, f_d3,
+                                            2, (i * 10), (i % 2));
+                if (!done) {
+                    client.backpressureBarrier();
+                }
+            } while (!done);
+
 
             if (!async) {
                 cb.waitForResponse();
