@@ -108,7 +108,8 @@ def run_config(config, basedir, output_dir, random_seed, report_all, args):
     command = " ".join(args[2:])
     command += " schema=" + os.path.basename(config['ddl'])
 
-    generator = SQLGenerator(config["schema"], config["template"])
+    random_state = random.getstate()
+    generator = SQLGenerator(config["schema"], config["template"], True)
     statements = []
     counter = 0
 
@@ -119,6 +120,16 @@ def run_config(config, basedir, output_dir, random_seed, report_all, args):
 
     if run_once("jni", command, statements) != 0:
         exit(-1)
+
+    random.seed(random_seed)
+    random.setstate(random_state)
+    generator = SQLGenerator(config["schema"], config["template"], False)
+    counter = 0
+
+    for i in generator.generate():
+        statements[counter]["SQL"] = i
+        counter += 1
+
     if run_once("hsqldb", command, statements) != 0:
         exit(-1)
 

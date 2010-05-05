@@ -36,6 +36,7 @@ VALUE_TYPE = "_value"
 TABLE_TYPE = "_table"
 
 COUNT = 2                       # number of random values to generate by default
+IS_VOLT = False
 
 # Python 2.4 doesn't have these two methods in the itertools module, so here's
 # the equivalent implementations.
@@ -122,7 +123,7 @@ class IDValueGenerator(BaseValueGenerator):
     def __init__(self, start = None):
         BaseValueGenerator.__init__(self)
 
-        if start:
+        if start != None:
             self.__class__.counter = start
 
     def generate(self, count):
@@ -222,9 +223,9 @@ class DateValueGenerator(BaseValueGenerator):
         BaseValueGenerator.__init__(self)
 
     def generate(self, count):
-        now = time.mktime(datetime.datetime.now().timetuple())
-        values = [datetime.datetime.fromtimestamp(random.randint(0, now))
-                  for i in xrange(count)]
+        # HSQL doesn't support microsecond, 13 digit number
+        max_dt = 9999999999999
+        values = [random.randint(0, max_dt) for i in xrange(count)]
 
         return values
 
@@ -571,6 +572,8 @@ class ValueGenerator(VariableGenerator):
         else:
             values = type[self.__type]()
         for i in values.generate(COUNT):
+            if IS_VOLT and self.__type == "date":
+                i = i * 1000
             if isinstance(i, basestring):
                 i = u"'%s'" % (i)
             elif isinstance(i, float):
@@ -861,7 +864,13 @@ class Template:
         return outlines
 
 class SQLGenerator:
-    def __init__(self, catalog, template):
+    def __init__(self, catalog, template, is_volt):
+        global IS_VOLT
+        IS_VOLT = is_volt
+
+        # Reset the counters
+        IDValueGenerator(0)
+
         self.__operators = (CmpGenerator, MathGenerator, LogicGenerator,
                             NegationGenerator, DistinctGenerator,
                             SortOrderGenerator, AggregationGenerator,
