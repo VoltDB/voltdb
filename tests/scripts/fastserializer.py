@@ -520,11 +520,14 @@ class FastSerializer:
         self.wbuf.extend(encoded_value)
 
     # date
+    # The timestamp we receive from the server is a 64-bit integer representing
+    # microseconds since the epoch. It will be converted to a datetime object in
+    # the local timezone.
     def readDate(self):
         raw = self.readInt64()
         if raw == None:
             return None
-        # microseconds before or after Jan 1, 1970
+        # microseconds before or after Jan 1, 1970 UTC
         return datetime.datetime.fromtimestamp(raw/1000000.0)
 
     def readDateArray(self):
@@ -543,7 +546,8 @@ class FastSerializer:
         if value is None:
             val = self.__class__.NULL_BIGINT_INDICATOR
         else:
-            val = int(time.mktime(value.timetuple())*1000000)
+            seconds = int(value.strftime("%s"))
+            val = seconds * 1000000 + value.microsecond
         self.wbuf.extend(struct.pack(self.int64Type(1), val))
 
     def readDecimal(self):

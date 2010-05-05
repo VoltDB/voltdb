@@ -89,9 +89,9 @@ class TestFastSerializer(unittest.TestCase):
     int64Array = [None, -52423, 2147483647, -9223372036854775807]
     floatArray = [None, float("-inf"), float("nan"), -0.009999999776482582]
     stringArray = [None, u"hello world", u"ça"]
-    dateArray = [None, datetime.datetime.now().replace(microsecond=0),
-                 datetime.datetime.fromtimestamp(0),
-                 datetime.datetime.utcnow().replace(microsecond=0)]
+    dateArray = [None, datetime.datetime.now(),
+                 datetime.datetime.utcfromtimestamp(0),
+                 datetime.datetime.utcnow()]
     decimalArray = [None,
                     decimal.Decimal("-837461"),
                     decimal.Decimal("8571391.193847158139"),
@@ -111,8 +111,10 @@ class TestFastSerializer(unittest.TestCase):
         self.fs.prependLength()
         self.fs.flush()
         self.fs.bufferForRead()
-        self.assertEqual(self.fs.readByte(), type)
-        self.assertEqual(self.fs.read(type), value)
+        t = self.fs.readByte()
+        self.assertEqual(t, type)
+        v = self.fs.read(type)
+        self.assertEqual(v, value)
 
     def sendArrayAndCompare(self, type, value):
         self.fs.writeWireTypeArray(type, value)
