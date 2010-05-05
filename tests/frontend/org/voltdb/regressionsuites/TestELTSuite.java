@@ -26,8 +26,8 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.util.ArrayList;
 
-import org.voltdb.BackendTarget;
-import org.voltdb.VoltType;
+import org.voltdb.*;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
@@ -102,18 +102,16 @@ public class TestELTSuite extends RegressionSuite {
         assertTrue(verifier.allRowsVerified());
     }
 
-//    private void quiesceAndVerifyFalse(final Client client)
-//        throws ProcCallException, NoConnectionsException {
-//
-//        final LocalSingleProcessServerELT config =
-//            (LocalSingleProcessServerELT) getServerConfig();
-//
-//        quiesce(client);
-//
-//        // and read and close the el sink server
-//        config.finishELTPolling();
-//        assertFalse(config.allRowsVerified());
-//    }
+    private void quiesceAndVerifyFalse(final Client client, TupleVerifier verifier)
+    throws ProcCallException, NoConnectionsException
+    {
+        quiesce(client);
+
+        // and read and close the el sink server
+        ELPoller poller = new ELPoller(verifier);
+        poller.run();
+        assertFalse(verifier.allRowsVerified());
+    }
 
     /**
      * Sends ten tuples to an EL enabled VoltServer and verifies the receipt
@@ -134,78 +132,70 @@ public class TestELTSuite extends RegressionSuite {
         quiesceAndVerify(client, verifier);
     }
 
+    /** Verify test infrastructure fails a test that sends too many rows (0 rows registered) */
+    public void testELTLocalServerTooMany() throws IOException, ProcCallException, InterruptedException
+    {
+        ELTSuiteTupleVerifier verifier = new ELTSuiteTupleVerifier();
+        final Client client = getClient();
 
+        for (int i=0; i < 10; i++) {
+            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            // don't register any rows with TupleVerifier
+            final Object[] params = convertValsToParams(i, rowdata);
+            client.callProcedure("Insert", params);
+        }
+        quiesceAndVerifyFalse(client, verifier);
+    }
 
+    /** Verify test infrastructure fails a test that sends too many rows (Some rows registered) */
+    public void testELTLocalServerTooMany2() throws IOException, ProcCallException, InterruptedException
+    {
+        ELTSuiteTupleVerifier verifier = new ELTSuiteTupleVerifier();
+        final Client client = getClient();
 
-//    /** Verify test infrastructure fails a test that sends too many rows (0 rows registered) */
-//    public void testELTLocalServerTooMany() throws IOException, ProcCallException, InterruptedException
-//    {
-//        final Client client = getClient();
-//
-//        for (int i=0; i < 10; i++) {
-//            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-//            // don't register any rows with TupleVerifier
-//            final Object[] params = convertValsToParams(i, rowdata);
-//            client.callProcedure("Insert", params);
-//        }
-//        quiesceAndVerifyFalse(client);
-//    }
-//
-//    /** Verify test infrastructure fails a test that sends too many rows (Some rows registered) */
-//    public void testELTLocalServerTooMany2() throws IOException, ProcCallException, InterruptedException
-//    {
-//        final Client client = getClient();
-//
-//        final LocalSingleProcessServerELT config =
-//            (LocalSingleProcessServerELT) getServerConfig();
-//
-//        for (int i=0; i < 10; i++) {
-//            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-//            // don't register half of the rows!
-//            if (i % 2 == 0)
-//                config.addRow("ALLOW_NULLS", convertValsToRow(i, rowdata));
-//            final Object[] params = convertValsToParams(i, rowdata);
-//            client.callProcedure("Insert", params);
-//        }
-//        quiesceAndVerifyFalse(client);
-//    }
-//
-//    /** Verify test infrastructure fails a test that sends too few rows */
-//    public void testELTLocalServerTooFew() throws IOException, ProcCallException, InterruptedException
-//    {
-//        final Client client = getClient();
-//
-//        final LocalSingleProcessServerELT config =
-//            (LocalSingleProcessServerELT) getServerConfig();
-//
-//        for (int i=0; i < 10; i++) {
-//            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-//            // add each row twice - verify the test infra. catches a failure
-//            config.addRow("ALLOW_NULLS", convertValsToRow(i, rowdata));
-//            config.addRow("ALLOW_NULLS", convertValsToRow(i, rowdata));
-//            final Object[] params = convertValsToParams(i, rowdata);
-//            client.callProcedure("Insert", params);
-//        }
-//        quiesceAndVerifyFalse(client);
-//    }
-//
-//    /** Verify test infrastructure fails a test that sends mismatched data */
-//    public void testELTLocalServerBadData() throws IOException, ProcCallException, InterruptedException
-//    {
-//        final Client client = getClient();
-//
-//        final LocalSingleProcessServerELT config =
-//            (LocalSingleProcessServerELT) getServerConfig();
-//
-//        for (int i=0; i < 10; i++) {
-//            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-//            // add wrong pkeys on purpose!
-//            config.addRow("ALLOW_NULLS", convertValsToRow(i+10, rowdata));
-//            final Object[] params = convertValsToParams(i, rowdata);
-//            client.callProcedure("Insert", params);
-//        }
-//        quiesceAndVerifyFalse(client);
-//    }
+        for (int i=0; i < 10; i++) {
+            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            // don't register half of the rows!
+            if (i % 2 == 0)
+                verifier.addRow("ALLOW_NULLS", convertValsToRow(i, rowdata));
+            final Object[] params = convertValsToParams(i, rowdata);
+            client.callProcedure("Insert", params);
+        }
+        quiesceAndVerifyFalse(client, verifier);
+    }
+
+    /** Verify test infrastructure fails a test that sends too few rows */
+    public void testELTLocalServerTooFew() throws IOException, ProcCallException, InterruptedException
+    {
+        ELTSuiteTupleVerifier verifier = new ELTSuiteTupleVerifier();
+        final Client client = getClient();
+
+        for (int i=0; i < 10; i++) {
+            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            // add each row twice - verify the test infra. catches a failure
+            verifier.addRow("ALLOW_NULLS", convertValsToRow(i, rowdata));
+            verifier.addRow("ALLOW_NULLS", convertValsToRow(i, rowdata));
+            final Object[] params = convertValsToParams(i, rowdata);
+            client.callProcedure("Insert", params);
+        }
+        quiesceAndVerifyFalse(client, verifier);
+    }
+
+    /** Verify test infrastructure fails a test that sends mismatched data */
+    public void testELTLocalServerBadData() throws IOException, ProcCallException, InterruptedException
+    {
+        ELTSuiteTupleVerifier verifier = new ELTSuiteTupleVerifier();
+        final Client client = getClient();
+
+        for (int i=0; i < 10; i++) {
+            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            // add wrong pkeys on purpose!
+            verifier.addRow("ALLOW_NULLS", convertValsToRow(i+10, rowdata));
+            final Object[] params = convertValsToParams(i, rowdata);
+            client.callProcedure("Insert", params);
+        }
+        quiesceAndVerifyFalse(client, verifier);
+    }
 
 //    /**
 //     * Sends ten tuples to an EL enabled VoltServer and verifies the receipt
@@ -228,139 +218,132 @@ public class TestELTSuite extends RegressionSuite {
 //        quiesceAndVerify(client);
 //    }
 //
-//    /** Test that a table w/o ELT enabled does not produce ELT content */
-//    public void testThatTablesOptIn() throws IOException, ProcCallException, InterruptedException
-//    {
-//        final Client client = getClient();
-//
-//        Object params[] = new Object[TestSQLTypesSuite.COLS + 2];
-//        params[0] = "NO_NULLS";  // this table should not produce ELT output
-//
-//        // populate the row data
-//        for (int i=0; i < TestSQLTypesSuite.COLS; ++i) {
-//            params[i+2] = TestSQLTypesSuite.m_midValues[i];
-//        }
-//
-//        for (int i=0; i < 10; i++) {
-//            params[1] = i; // pkey
-//            // do NOT add row to TupleVerfier as none should be produced
-//            client.callProcedure("Insert", params);
-//        }
-//        quiesceAndVerify(client);
-//    }
-//
-//
-//    /*
-//     * Sends many tuples to an EL enabled VoltServer and verifies the receipt
-//     * of each in the EL stream. Some procedures rollback (after a real insert).
-//     * Tests that streams are correct in the face of rollback.
-//     */
-//
-///* RawProcessor doesn't wait for ACK of data receipt and reports done too early.
-// * This races against the test harness which can conclude full quiesce is achieved
-// * before having read the final bytes of data. This then fails the verifier (not
-// * all rows ELT'd. Comment out this testcase until the raw processor quiesces
-// * better.
-//
-//     public void testELTRollback() throws IOException, ProcCallException, InterruptedException {
-//        final LocalSingleProcessServerELT config =
-//            (LocalSingleProcessServerELT) getServerConfig();
-//
-//        final Client client = getClient();
-//
-//        double rollbackPerc = 0.15;
-//        double random = Math.random(); // initializes the generator
-//
-//        // eltxxx: should pick more random data
-//        final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-//
-//        // roughly 10k rows is a full buffer it seems
-//        for (int pkey=0; pkey < 25000; pkey++) {
-//            final Object[] params = convertValsToParams(pkey, rowdata);
-//            // rollback or insert?
-//            random = Math.random();
-//            if (random <= rollbackPerc) {
-//                try {
-//                    // note - not update the el verifier as this rollsback
-//                    client.callProcedure("RollbackInsert", params);
-//                }
-//                catch (ProcCallException ex) {
-//                    // make sure the proc failed "on purpose"
-//                    if (!(ex.getMessage().contains("OK"))) {
-//                        throw ex;
-//                    }
-//                }
-//            }
-//            else {
-//                config.addRow("ALLOW_NULLS", convertValsToRow(pkey, rowdata));
-//                client.callProcedure("Insert", params);
-//            }
-//        }
-//        quiesceAndVerify(client);
-//    }
-//*/
-//    private VoltTable createLoadTableTable(boolean addToVerifier) {
-//        final LocalSingleProcessServerELT config =
-//            (LocalSingleProcessServerELT)getServerConfig();
-//
-//        VoltTable loadTable = new VoltTable(new ColumnInfo("PKEY", VoltType.INTEGER),
-//          new ColumnInfo(TestSQLTypesSuite.m_columnNames[0], TestSQLTypesSuite.m_types[0]),
-//          new ColumnInfo(TestSQLTypesSuite.m_columnNames[1], TestSQLTypesSuite.m_types[1]),
-//          new ColumnInfo(TestSQLTypesSuite.m_columnNames[2], TestSQLTypesSuite.m_types[2]),
-//          new ColumnInfo(TestSQLTypesSuite.m_columnNames[3], TestSQLTypesSuite.m_types[3]),
-//          new ColumnInfo(TestSQLTypesSuite.m_columnNames[4], TestSQLTypesSuite.m_types[4]),
-//          new ColumnInfo(TestSQLTypesSuite.m_columnNames[5], TestSQLTypesSuite.m_types[5]),
-//          new ColumnInfo(TestSQLTypesSuite.m_columnNames[6], TestSQLTypesSuite.m_types[6]),
-//          new ColumnInfo(TestSQLTypesSuite.m_columnNames[7], TestSQLTypesSuite.m_types[7]),
-//          new ColumnInfo(TestSQLTypesSuite.m_columnNames[8], TestSQLTypesSuite.m_types[8]),
-//          new ColumnInfo(TestSQLTypesSuite.m_columnNames[9], TestSQLTypesSuite.m_types[9]),
-//          new ColumnInfo(TestSQLTypesSuite.m_columnNames[10], TestSQLTypesSuite.m_types[10]));
-//
-//        for (int i=0; i < 100; i++) {
-//            if (addToVerifier) {
-//                config.addRow("ALLOW_NULLS", convertValsToRow(i, TestSQLTypesSuite.m_midValues));
-//            }
-//            loadTable.addRow(convertValsToRow(i, TestSQLTypesSuite.m_midValues));
-//        }
-//        return loadTable;
-//    }
-//
-//    /*
-//     * Verify that allowELT = no is obeyed for @LoadMultipartitionTable
-//     */
-//    public void testLoadMultiPartitionTableELTOff() throws IOException, ProcCallException
-//    {
-//        // allow ELT is off. no rows added to the verifier
-//        VoltTable loadTable = createLoadTableTable(false);
-//        Client client = getClient();
-//        client.callProcedure("@LoadMultipartitionTable", "ALLOW_NULLS", loadTable, 0);
-//        quiesceAndVerify(client);
-//    }
-//
-//    /*
-//     * Verify that allowELT = yes is obeyed for @LoadMultipartitionTable
-//     */
-//    public void testLoadMultiPartitionTableELTOn() throws IOException, ProcCallException
-//    {
-//        // allow ELT is on. rows added to the verifier
-//        VoltTable loadTable = createLoadTableTable(true);
-//        Client client = getClient();
-//        client.callProcedure("@LoadMultipartitionTable", "ALLOW_NULLS", loadTable, 1);
-//        quiesceAndVerify(client);
-//    }
-//
-//    /*
-//     * Verify that allowELT = yes is obeyed for @LoadMultipartitionTable
-//     */
-//    public void testLoadMultiPartitionTableELTOn2() throws IOException, ProcCallException
-//    {
-//        // allow ELT is on but table is not opted in to ELT.
-//        VoltTable loadTable = createLoadTableTable(false);
-//        Client client = getClient();
-//        client.callProcedure("@LoadMultipartitionTable", "NO_NULLS", loadTable, 1);
-//        quiesceAndVerify(client);
-//    }
-//
+    /** Test that a table w/o ELT enabled does not produce ELT content */
+    public void testThatTablesOptIn() throws IOException, ProcCallException, InterruptedException
+    {
+        ELTSuiteTupleVerifier verifier = new ELTSuiteTupleVerifier();
+        final Client client = getClient();
+
+        Object params[] = new Object[TestSQLTypesSuite.COLS + 2];
+        params[0] = "NO_NULLS";  // this table should not produce ELT output
+
+        // populate the row data
+        for (int i=0; i < TestSQLTypesSuite.COLS; ++i) {
+            params[i+2] = TestSQLTypesSuite.m_midValues[i];
+        }
+
+        for (int i=0; i < 10; i++) {
+            params[1] = i; // pkey
+            // do NOT add row to TupleVerfier as none should be produced
+            client.callProcedure("Insert", params);
+        }
+        quiesceAndVerify(client, verifier);
+    }
+
+    /*
+     * Sends many tuples to an EL enabled VoltServer and verifies the receipt
+     * of each in the EL stream. Some procedures rollback (after a real insert).
+     * Tests that streams are correct in the face of rollback.
+     */
+/*
+     public void testELTRollback() throws IOException, ProcCallException, InterruptedException {
+        ELTSuiteTupleVerifier verifier = new ELTSuiteTupleVerifier();
+        final Client client = getClient();
+
+        double rollbackPerc = 0.15;
+        double random = Math.random(); // initializes the generator
+
+        // eltxxx: should pick more random data
+        final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+
+        // roughly 10k rows is a full buffer it seems
+        for (int pkey=0; pkey < 25000; pkey++) {
+            final Object[] params = convertValsToParams(pkey, rowdata);
+            // rollback or insert?
+            random = Math.random();
+            if (random <= rollbackPerc) {
+                try {
+                    // note - not update the el verifier as this rollsback
+                    client.callProcedure("RollbackInsert", params);
+                }
+                catch (ProcCallException ex) {
+                    // make sure the proc failed "on purpose"
+                    if (!(ex.getMessage().contains("OK"))) {
+                        throw ex;
+                    }
+                }
+            }
+            else {
+                verifier.addRow("ALLOW_NULLS", convertValsToRow(pkey, rowdata));
+                client.callProcedure("Insert", params);
+            }
+        }
+        quiesceAndVerify(client, verifier);
+    }
+*/
+    private VoltTable createLoadTableTable(boolean addToVerifier, ELTSuiteTupleVerifier verifier) {
+
+        VoltTable loadTable = new VoltTable(new ColumnInfo("PKEY", VoltType.INTEGER),
+          new ColumnInfo(TestSQLTypesSuite.m_columnNames[0], TestSQLTypesSuite.m_types[0]),
+          new ColumnInfo(TestSQLTypesSuite.m_columnNames[1], TestSQLTypesSuite.m_types[1]),
+          new ColumnInfo(TestSQLTypesSuite.m_columnNames[2], TestSQLTypesSuite.m_types[2]),
+          new ColumnInfo(TestSQLTypesSuite.m_columnNames[3], TestSQLTypesSuite.m_types[3]),
+          new ColumnInfo(TestSQLTypesSuite.m_columnNames[4], TestSQLTypesSuite.m_types[4]),
+          new ColumnInfo(TestSQLTypesSuite.m_columnNames[5], TestSQLTypesSuite.m_types[5]),
+          new ColumnInfo(TestSQLTypesSuite.m_columnNames[6], TestSQLTypesSuite.m_types[6]),
+          new ColumnInfo(TestSQLTypesSuite.m_columnNames[7], TestSQLTypesSuite.m_types[7]),
+          new ColumnInfo(TestSQLTypesSuite.m_columnNames[8], TestSQLTypesSuite.m_types[8]),
+          new ColumnInfo(TestSQLTypesSuite.m_columnNames[9], TestSQLTypesSuite.m_types[9]),
+          new ColumnInfo(TestSQLTypesSuite.m_columnNames[10], TestSQLTypesSuite.m_types[10]));
+
+        for (int i=0; i < 100; i++) {
+            if (addToVerifier) {
+                verifier.addRow("ALLOW_NULLS", convertValsToRow(i, TestSQLTypesSuite.m_midValues));
+            }
+            loadTable.addRow(convertValsToRow(i, TestSQLTypesSuite.m_midValues));
+        }
+        return loadTable;
+    }
+
+    /*
+     * Verify that allowELT = no is obeyed for @LoadMultipartitionTable
+     */
+    public void testLoadMultiPartitionTableELTOff() throws IOException, ProcCallException
+    {
+        // allow ELT is off. no rows added to the verifier
+        ELTSuiteTupleVerifier verifier = new ELTSuiteTupleVerifier();
+        VoltTable loadTable = createLoadTableTable(false, verifier);
+        Client client = getClient();
+        client.callProcedure("@LoadMultipartitionTable", "ALLOW_NULLS", loadTable, 0);
+        quiesceAndVerify(client, verifier);
+    }
+
+    /*
+     * Verify that allowELT = yes is obeyed for @LoadMultipartitionTable
+     */
+    public void testLoadMultiPartitionTableELTOn() throws IOException, ProcCallException
+    {
+        // allow ELT is on. rows added to the verifier
+        ELTSuiteTupleVerifier verifier = new ELTSuiteTupleVerifier();
+        VoltTable loadTable = createLoadTableTable(true, verifier);
+        Client client = getClient();
+        client.callProcedure("@LoadMultipartitionTable", "ALLOW_NULLS", loadTable, 1);
+        quiesceAndVerify(client, verifier);
+    }
+
+    /*
+     * Verify that allowELT = yes is obeyed for @LoadMultipartitionTable
+     */
+    public void testLoadMultiPartitionTableELTOn2() throws IOException, ProcCallException
+    {
+        // allow ELT is on but table is not opted in to ELT.
+        ELTSuiteTupleVerifier verifier = new ELTSuiteTupleVerifier();
+        VoltTable loadTable = createLoadTableTable(false, verifier);
+        Client client = getClient();
+        client.callProcedure("@LoadMultipartitionTable", "NO_NULLS", loadTable, 1);
+        quiesceAndVerify(client, verifier);
+    }
+
 //    /*
 //     * Verify that planner rejects updates to append-only tables
 //     */
