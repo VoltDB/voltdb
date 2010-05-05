@@ -84,7 +84,7 @@ def run_once(name, command, statements):
         tables = [normalize(t, statement["SQL"]) for t in client.response.tables]
         tablestr = cPickle.dumps(tables, cPickle.HIGHEST_PROTOCOL)
         statement[name] = {"Status": client.response.status,
-                           "Info": client.response.info,
+                           "Info": client.response.statusString,
                            "Result": encodestring(tablestr)}
 
     client.onecmd("shutdown")

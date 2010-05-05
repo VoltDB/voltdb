@@ -880,10 +880,10 @@ class VoltResponse:
             table = VoltTable(self.fser)
             self.tables.append(table.readFromSerializer())
 
-
     def __str__(self):
         tablestr = "\n\n".join([str(i) for i in self.tables])
-        return "Status: %d\nInformation: %s\n%s" % (self.status, self.info,
+        return "Status: %d\nInformation: %s\n%s" % (self.status,
+                                                    self.statusString,
                                                     tablestr)
 
 class VoltProcedure:
