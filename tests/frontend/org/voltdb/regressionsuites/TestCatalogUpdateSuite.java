@@ -23,6 +23,7 @@
 
 package org.voltdb.regressionsuites;
 
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
@@ -96,8 +97,8 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         public void clientCallback(ClientResponse clientResponse) {
             m_outstandingCalls.decrementAndGet();
             if (m_expectedStatus != clientResponse.getStatus()) {
-                if (clientResponse.getExtra() != null)
-                    System.err.println(clientResponse.getExtra());
+                if (clientResponse.getStatusString() != null)
+                    System.err.println(clientResponse.getStatusString());
                 if (clientResponse.getException() != null)
                     clientResponse.getException().printStackTrace();
                 assertTrue(false);
@@ -224,7 +225,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         assertTrue(true);
     }
 
-    public void loadSomeData(Client client, int start, int count) throws NoConnectionsException, ProcCallException {
+    public void loadSomeData(Client client, int start, int count) throws IOException, ProcCallException {
         for (int i = start; i < (start + count); i++) {
             CatTestCallback callback = new CatTestCallback(ClientResponse.SUCCESS);
             client.callProcedure(callback, InsertNewOrder.class.getSimpleName(), i, i, i);

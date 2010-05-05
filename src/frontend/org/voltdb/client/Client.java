@@ -107,7 +107,7 @@ public interface Client {
      * @return <code>true</code> if the procedure was queued and <code>false</code> otherwise
      */
     public boolean callProcedure(ProcedureCallback callback, String procName, Object... parameters)
-    throws NoConnectionsException;
+    throws IOException, NoConnectionsException;
 
     /**
      * Asynchronously invoke a procedure. Does not guarantee that the invocation is actually queued. If there
@@ -129,7 +129,7 @@ public interface Client {
             int expectedSerializedSize,
             String procName,
              Object... parameters)
-    throws NoConnectionsException;
+    throws IOException, NoConnectionsException;
 
     /**
      * Calculate the size of a stored procedure invocation once it is serialized. This is computationally intensive
@@ -218,4 +218,19 @@ public interface Client {
      * @return Volt server build string
      */
     public String getBuildString();
+
+    /**
+     * The default behavior for queuing of asynchronous procedure invocations is to block until
+     * it is possible to queue the invocation. If blocking is set to false callProcedure will always return
+     * immediately if it is not possible to queue the procedure invocation due to backpressure.
+     * @param blocking
+     */
+    void configureBlocking(boolean blocking);
+
+    /**
+     * Whether callProcedure will return immediately if a an async procedure invocation could not be queued
+     * due to backpressure
+     * @return true if callProcedure will block until backpressure ceases and false otherwise
+     */
+    boolean blocking();
 }

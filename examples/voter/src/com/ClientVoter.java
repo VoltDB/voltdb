@@ -66,7 +66,7 @@ public class ClientVoter {
 
             if (status != ClientResponse.SUCCESS) {
                 System.err.println("Failed to execute!!!");
-                System.err.println(clientResponse.getExtra());
+                System.err.println(clientResponse.getStatusString());
                 System.err.println(clientResponse.getException());
                 System.exit(-1);
             } else {
@@ -218,7 +218,7 @@ public class ClientVoter {
                         }
                     }
                 }
-            } catch (NoConnectionsException e) {
+            } catch (java.io.IOException e) {
                 e.printStackTrace();
             }
           

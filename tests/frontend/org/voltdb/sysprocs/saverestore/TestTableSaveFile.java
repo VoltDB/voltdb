@@ -154,8 +154,9 @@ public class TestTableSaveFile extends TestCase {
         // tuple lengths
         ByteBuffer tableHeader = savefile.getTableHeader();
         tableHeader.position(0);
-        assertEquals(4 + 2 + 1 + 4 + 3, tableHeader.remaining());
-        assertEquals(tableHeader.getInt(), 10);
+        assertEquals(4 + 1 + 2 + 1 + 4 + 3, tableHeader.remaining());
+        assertEquals(tableHeader.getInt(), 11);
+        assertEquals(tableHeader.get(), Byte.MIN_VALUE);
         assertEquals(tableHeader.getShort(), 1);
         assertEquals(tableHeader.get(), VoltType.STRING.getValue());
         assertEquals(tableHeader.getInt(), 3);

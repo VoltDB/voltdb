@@ -117,7 +117,6 @@ public class VoltDecimalHelper {
         boolean isNegative = false;
         if (unscaledBI.signum() < 0) {
             isNegative = true;
-            unscaledBI = unscaledBI.negate();
         }
         final byte unscaledValue[] = unscaledBI.toByteArray();
         if (unscaledValue.length > 16) {
@@ -135,11 +134,6 @@ public class VoltDecimalHelper {
     }
 
     /**
-     * The sign bit is stored in the most significant bit of a byte
-     */
-    private static final byte signBit = (byte)(1 << 7);
-
-    /**
      * Converts BigInteger's byte representation containing a scaled magnitude to a fixed size 16 byte array
      * and set the sign in the most significant byte's most significant bit.
      * @param scaledValue Scaled twos complement representation of the decimal
@@ -148,17 +142,14 @@ public class VoltDecimalHelper {
      */
     private static final byte[] expandToLength16(byte scaledValue[], final boolean isNegative) {
         if (scaledValue.length == 16) {
-            if (isNegative) {
-                scaledValue[0] |= signBit;
-            }
             return scaledValue;
         }
         byte replacement[] = new byte[16];
+        if (isNegative){
+            java.util.Arrays.fill( replacement, (byte)-1);
+        }
         for (int ii = 15; 15 - ii < scaledValue.length; ii--) {
             replacement[ii] = scaledValue[ii - (replacement.length - scaledValue.length)];
-        }
-        if (isNegative) {
-            replacement[0] |= signBit;
         }
         return replacement;
     }
@@ -190,7 +181,6 @@ public class VoltDecimalHelper {
           boolean isNegative = false;
           if (unscaledBI.signum() < 0) {
               isNegative = true;
-              unscaledBI = unscaledBI.negate();
           }
           final byte unscaledValue[] = unscaledBI.toByteArray();
           if (unscaledValue.length > 16) {
@@ -213,14 +203,7 @@ public class VoltDecimalHelper {
         if (java.util.Arrays.equals(decimalBytes, NULL_INDICATOR)) {
             return null;
         }
-        boolean isNegative = false;
-        if ((decimalBytes[0] & signBit) != 0) {
-            decimalBytes[0] &= ~signBit;
-            isNegative = true;
-        }
-        final BigDecimal bd = new BigDecimal(
-                isNegative ? new BigInteger(decimalBytes).negate() : new BigInteger(decimalBytes),
-
+        final BigDecimal bd = new BigDecimal(new BigInteger(decimalBytes),
                         kDefaultScale, context);
         if (bd.precision() > 38) {
             throw new IOException("Decimal " + bd + " has precision > 38.");
@@ -259,18 +242,80 @@ public class VoltDecimalHelper {
         if (java.util.Arrays.equals(decimalBytes, NULL_INDICATOR)) {
             return null;
         }
-        boolean isNegative = false;
-        if ((decimalBytes[0] & signBit) != 0) {
-            decimalBytes[0] &= ~signBit;
-            isNegative = true;
-        }
         final BigDecimal bd = new BigDecimal(
-                isNegative ? new BigInteger(decimalBytes).negate() : new BigInteger(decimalBytes),
-
+                new BigInteger(decimalBytes),
                         kDefaultScale, context);
         if (bd.precision() > 38) {
             throw new RuntimeException("Decimal " + bd + " has more than 38 digits of precision.");
         }
         return bd;
+    }
+
+    public static void main(String args[]) throws Exception {
+        java.nio.ByteBuffer buffer = java.nio.ByteBuffer.allocate(16);
+        java.math.BigDecimal bd = new java.math.BigDecimal("-23325.23425");
+        org.voltdb.types.VoltDecimalHelper.serializeBigDecimal(bd, buffer);
+        buffer.flip();
+        while (buffer.hasRemaining()) {
+            System.out.println(buffer.get());
+        }
+        buffer.flip();
+        System.out.println(org.voltdb.types.VoltDecimalHelper.deserializeBigDecimal(buffer));
+        System.out.println("----");
+        org.voltdb.messaging.FastSerializer fs = new org.voltdb.messaging.FastSerializer();
+        bd = new java.math.BigDecimal("-23325.23425");
+        org.voltdb.types.VoltDecimalHelper.serializeBigDecimal(bd, fs);
+
+        buffer = fs.getBuffer();
+        while (buffer.hasRemaining()) {
+            System.out.println(buffer.get());
+        }
+        buffer.flip();
+
+        org.voltdb.messaging.FastDeserializer fds = new org.voltdb.messaging.FastDeserializer(buffer);
+        System.out.println(org.voltdb.types.VoltDecimalHelper.deserializeBigDecimal(fds));
+
+        System.out.println("---");
+        BigInteger bi = new BigInteger(
+                new byte[] {
+                        -128, 0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        82,
+                        -34,
+                        45,
+                        77,
+                        -58,
+                        38,
+                        -128 });
+        System.out.println(bi);
+        bi = new BigInteger(
+                new byte[] {
+                        -1,
+                        -1,
+                        -1,
+                        -1,
+                        -1,
+                        -1,
+                        -1,
+                        -1,
+                        -1,
+                        -83,
+                        33,
+                        -46,
+                        -78,
+                        57,
+                        -39,
+                        -128 });
+        System.out.println(bi);
+        System.out.println(new BigDecimal(
+                bi,
+                        kDefaultScale, context));
+
+        System.out.println(deserializeBigDecimal(ByteBuffer.wrap(NULL_INDICATOR)));
     }
 }

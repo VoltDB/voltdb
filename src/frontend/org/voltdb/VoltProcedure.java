@@ -118,6 +118,12 @@ public abstract class VoltProcedure {
     private final int expectedDeps[] = new int[1000];
     private ParameterSet parameterSets[];
 
+    /**
+     * Status code that can be set by stored procedure upon invocation that will be returned with the response.
+     */
+    private byte m_statusCode = Byte.MIN_VALUE;
+    private String m_statusString = null;
+
     // data from hsql wrapper
     private final ArrayList<VoltTable> queryResults = new ArrayList<VoltTable>();
 
@@ -280,7 +286,8 @@ public abstract class VoltProcedure {
     /* Package private but not final, to enable mock volt procedure objects */
     ClientResponseImpl call(TransactionState txnState, Object... paramList) {
         m_currentTxnState = txnState;
-
+        m_statusCode = Byte.MIN_VALUE;
+        m_statusString = null;
         if (ProcedureProfiler.profilingLevel != ProcedureProfiler.Level.DISABLED) {
             profiler.startCounter(catProc);
         }
@@ -399,7 +406,12 @@ public abstract class VoltProcedure {
         }
 
         if (retval == null)
-            retval = new ClientResponseImpl( status, results, null);
+            retval = new ClientResponseImpl(
+                    status,
+                    Byte.MIN_VALUE,
+                    m_statusString,
+                    results,
+                    null);
 
         return retval;
     }
@@ -1024,13 +1036,18 @@ public abstract class VoltProcedure {
     }
 
     /**
-     * Currently unsupported in VoltDB.
-     * Write a message to the VoltDB server's log.
-     * @param msg Message to log
-     * @return <tt>true</tt>
+     * Set the status code that will be returned to the client. This is not the same as the status
+     * code returned by the server. If a procedure sets the status code and then rolls back or causes an error
+     * the status code will still be propagated back to the client so it is always necessary to check
+     * the server status code first.
+     * @param statusCode
      */
-    public boolean voltLog(String msg) {
-        return true;
+    public void setAppStatusCode(byte statusCode) {
+        m_statusCode = statusCode;
+    }
+
+    public void setAppStatusString(String statusString) {
+        m_statusString = statusString;
     }
 
     private VoltTable[] slowPath(int batchSize, SQLStmt[] batchStmts, Object[][] batchArgs, boolean finalTask) {
@@ -1277,6 +1294,11 @@ public abstract class VoltProcedure {
 
         log.trace(msgOut);
 
-        return new ClientResponseImpl(status, new VoltTable[0], msgOut.toString(), e);
+        return new ClientResponseImpl(
+                status,
+                Byte.MIN_VALUE,
+                m_statusString,
+                new VoltTable[0],
+                msgOut.toString(), e);
     }
 }

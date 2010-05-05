@@ -23,6 +23,7 @@
 
 package org.voltdb.benchmark.multisite;
 
+import java.io.IOException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ClientResponse;
@@ -86,7 +87,7 @@ public class MultisiteClient extends ClientMain {
                 m_voltClient.backpressureBarrier();
                 executeTransaction();
             }
-        } catch (NoConnectionsException e) {
+        } catch (IOException e) {
             /*
              * Client has no clean mechanism for terminating with the DB.
              */
@@ -118,7 +119,7 @@ public class MultisiteClient extends ClientMain {
     // used only for the random number helpers in this context
     private Loader m_loader = new Loader(new String[] {});
 
-    private boolean executeTransaction() throws NoConnectionsException {
+    private boolean executeTransaction() throws IOException {
         int val = m_loader.number(1,100);
         boolean queued = false;
         if (val <= m_multipartition) {
@@ -149,7 +150,7 @@ public class MultisiteClient extends ClientMain {
         }
     }
 
-    private boolean runChangeSeat() throws NoConnectionsException {
+    private boolean runChangeSeat() throws IOException {
         // fid, cid, seatnum
 
         // cids are assigned to flights such that:
@@ -192,7 +193,7 @@ public class MultisiteClient extends ClientMain {
 
     }
 
-    private boolean runUpdateReservation() throws NoConnectionsException {
+    private boolean runUpdateReservation() throws IOException {
         // there are roughly 150 * 0.80 * maxflights reservations in the system
         int maxfid = Loader.kMaxFlights / m_scalefactor;
         int rid = m_loader.number(1, (int) (150 * 0.8 * maxfid));
@@ -221,7 +222,7 @@ public class MultisiteClient extends ClientMain {
 
     }
 
-    private boolean runFindOpenSeats() throws NoConnectionsException {
+    private boolean runFindOpenSeats() throws IOException {
         // find a random fid
         int maxfid = Loader.kMaxFlights / m_scalefactor;
         int fid = m_loader.number(1, maxfid);

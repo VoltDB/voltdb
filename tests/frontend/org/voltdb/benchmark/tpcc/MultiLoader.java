@@ -615,7 +615,7 @@ public class MultiLoader extends ClientMain {
                     @Override
                     public synchronized void clientCallback(ClientResponse clientResponse) {
                         if (clientResponse.getStatus() != ClientResponse.SUCCESS){
-                            System.err.println(clientResponse.getExtra());
+                            System.err.println(clientResponse.getStatusString());
                             System.exit(-1);
                         }
                         invocationsCompleted++;

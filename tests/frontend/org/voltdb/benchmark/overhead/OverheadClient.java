@@ -23,6 +23,8 @@
 
 package org.voltdb.benchmark.overhead;
 
+import java.io.IOException;
+
 import org.voltdb.benchmark.*;
 
 import java.util.logging.Logger;
@@ -129,7 +131,7 @@ public class OverheadClient extends ClientMain {
     long invocations = 0;
 
     @Override
-    protected boolean runOnce() throws NoConnectionsException {
+    protected boolean runOnce() throws IOException {
      // always execute the same boring transaction.
         try {
             return invokeOverhead();
@@ -139,7 +141,7 @@ public class OverheadClient extends ClientMain {
     }
 
     @Override
-    protected void runLoop() throws NoConnectionsException {
+    protected void runLoop() throws IOException {
         try {
             while (true) {
                 // always execute the same boring transaction.
@@ -151,7 +153,7 @@ public class OverheadClient extends ClientMain {
         }
     }
 
-    private boolean invokeOverhead() throws NoConnectionsException {
+    private boolean invokeOverhead() throws IOException {
         if ((transactionToInvoke == Transaction.MEASURE_OVERHEAD) ||
                 (transactionToInvoke == Transaction.MEASURE_OVERHEAD_MULTIPARTITION) ||
                 (transactionToInvoke == Transaction.MEASURE_OVERHEAD_MULTIPARTITION_BATCHED) ||

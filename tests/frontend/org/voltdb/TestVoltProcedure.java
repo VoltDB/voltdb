@@ -149,7 +149,7 @@ public class TestVoltProcedure extends TestCase {
     public void testNullLong() {
         ClientResponse r = call(LongProcedure.class);
         assertEquals(ClientResponse.GRACEFUL_FAILURE, r.getStatus());
-        assertTrue(r.getExtra().contains("cannot be null"));
+        assertTrue(r.getStatusString().contains("cannot be null"));
     }
 
     public void testNullLongArray() {
@@ -161,8 +161,8 @@ public class TestVoltProcedure extends TestCase {
     public void testNullPointerException() {
         ClientResponse r = call(NPEProcedure.class);
         assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.getStatus());
-        System.out.println(r.getExtra());
-        assertTrue(r.getExtra().contains("Null Pointer Exception"));
+        System.out.println(r.getStatusString());
+        assertTrue(r.getStatusString().contains("Null Pointer Exception"));
     }
 
     public void testProcedureStatsCollector() {

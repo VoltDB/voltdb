@@ -145,7 +145,7 @@ final class ClientImpl implements Client {
             throw new java.io.InterruptedIOException("Interrupted while waiting for response");
         }
         if (cb.getResponse().getStatus() != ClientResponse.SUCCESS) {
-            throw new ProcCallException(cb.getResponse(), cb.getResponse().getExtra(), cb.getResponse().getException());
+            throw new ProcCallException(cb.getResponse(), cb.getResponse().getStatusString(), cb.getResponse().getException());
         }
         // cb.result() throws ProcCallException if procedure failed
         return cb.getResponse();
@@ -159,7 +159,7 @@ final class ClientImpl implements Client {
      * @return True if the procedure was queued and false otherwise
      */
     public final boolean callProcedure(ProcedureCallback callback, String procName, Object... parameters)
-    throws NoConnectionsException {
+    throws IOException, NoConnectionsException {
         if (m_isShutdown) {
             return false;
         }
@@ -189,7 +189,7 @@ final class ClientImpl implements Client {
             int expectedSerializedSize,
             String procName,
             Object... parameters)
-            throws NoConnectionsException {
+            throws IOException, NoConnectionsException {
         if (m_isShutdown) {
             return false;
         }
@@ -201,7 +201,18 @@ final class ClientImpl implements Client {
         ProcedureInvocation invocation =
             new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
 
-        return m_distributer.queue(invocation, callback, expectedSerializedSize, false);
+        if (m_blockingQueue) {
+            while (!m_distributer.queue(invocation, callback, expectedSerializedSize, false)) {
+                try {
+                    backpressureBarrier();
+                } catch (InterruptedException e) {
+                    throw new java.io.InterruptedIOException("Interrupted while invoking procedure asynchronously");
+                }
+            }
+            return true;
+        } else {
+            return m_distributer.queue(invocation, callback, expectedSerializedSize, false);
+        }
     }
 
     public void drain() throws NoConnectionsException {
@@ -285,6 +296,13 @@ final class ClientImpl implements Client {
     private final Object m_backpressureLock = new Object();
     private boolean m_backpressure = false;
 
+    private boolean m_blockingQueue = true;
+
+    @Override
+    public void configureBlocking(boolean blocking) {
+        m_blockingQueue = blocking;
+    }
+
     @Override
     public VoltTable getIOStats() {
         return m_distributer.getConnectionStats(false);
@@ -313,5 +331,10 @@ final class ClientImpl implements Client {
     @Override
     public String getBuildString() {
         return m_distributer.getBuildString();
+    }
+
+    @Override
+    public boolean blocking() {
+        return m_blockingQueue;
     }
 }

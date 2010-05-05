@@ -37,6 +37,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.ExpressionType;
 
 import java.util.ArrayDeque;
+import java.io.IOException;
 
 public class BingoClient extends ClientMain {
 
@@ -102,8 +103,8 @@ public class BingoClient extends ClientMain {
                     if (clientResponse.getException() != null) {
                         clientResponse.getException().printStackTrace();
                     }
-                    if (clientResponse.getExtra() != null) {
-                        System.err.println(clientResponse.getExtra());
+                    if (clientResponse.getStatusString() != null) {
+                        System.err.println(clientResponse.getStatusString());
                     }
 
                     System.exit(-1);
@@ -162,7 +163,7 @@ public class BingoClient extends ClientMain {
                         (long)t.tid);
             }
             m_voltClient.drain();
-        } catch (NoConnectionsException e) {
+        } catch (IOException e) {
             return false;
         }
         return true;
@@ -211,7 +212,7 @@ public class BingoClient extends ClientMain {
                 invokeBingo();
                 m_voltClient.backpressureBarrier();
             }
-        } catch (NoConnectionsException e) {
+        } catch (IOException e) {
             /*
              * Client has no clean mechanism for terminating with the DB.
              */
@@ -222,11 +223,11 @@ public class BingoClient extends ClientMain {
     }
 
     @Override
-    protected boolean runOnce() throws NoConnectionsException {
+    protected boolean runOnce() throws IOException {
         return invokeBingo();
     }
 
-    private boolean invokeBingo() throws NoConnectionsException {
+    private boolean invokeBingo() throws IOException {
         // which Transaction enum value to execute.
         Transaction proc = Transaction.ERROR;
         boolean queued = false;

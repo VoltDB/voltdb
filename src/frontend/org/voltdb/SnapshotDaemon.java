@@ -436,8 +436,8 @@ class SnapshotDaemon {
 
     private void logFailureResponse(String message, ClientResponse response) {
         hostLog.error(message, response.getException());
-        if (response.getExtra() != null) {
-            hostLog.error(response.getExtra());
+        if (response.getStatusString() != null) {
+            hostLog.error(response.getStatusString());
         }
     }
 

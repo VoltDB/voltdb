@@ -23,6 +23,7 @@
 
 package org.voltdb.benchmark.dedupe;
 
+import java.io.IOException;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -62,7 +63,7 @@ public class ClientBenchmark extends ClientMain {
             if (status != ClientResponse.SUCCESS) {
                 System.err.println("Failed to execute!!!");
                 System.err.println(clientResponse.getException());
-                System.err.println(clientResponse.getExtra());
+                System.err.println(clientResponse.getStatusString());
                 System.exit(-1);
             } else {
                 pClientCallback(clientResponse.getResults());
@@ -91,7 +92,7 @@ public class ClientBenchmark extends ClientMain {
     }
 
 
-    public void doOne() throws NoConnectionsException {
+    public void doOne() throws IOException {
         // Generate random data
 
         int max_playerId = 50000000;
@@ -123,7 +124,7 @@ public class ClientBenchmark extends ClientMain {
     }
 
     @Override
-    protected boolean runOnce() throws NoConnectionsException {
+    protected boolean runOnce() throws IOException {
         doOne();
 
         return true;

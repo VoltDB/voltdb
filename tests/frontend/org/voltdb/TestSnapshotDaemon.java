@@ -99,7 +99,7 @@ public class TestSnapshotDaemon {
             }
 
             @Override
-            public String getExtra() {
+            public String getStatusString() {
                 return "Super fail";
             }
 
@@ -123,6 +123,16 @@ public class TestSnapshotDaemon {
                 return 0;
             }
 
+            @Override
+            public byte getAppStatus() {
+                return 0;
+            }
+
+            @Override
+            public String getAppStatusString() {
+                return null;
+            }
+
         };
     }
 
@@ -131,11 +141,6 @@ public class TestSnapshotDaemon {
 
             @Override
             public Exception getException() {
-                return null;
-            }
-
-            @Override
-            public String getExtra() {
                 return null;
             }
 
@@ -159,6 +164,21 @@ public class TestSnapshotDaemon {
             @Override
             public int getClientRoundtrip() {
                 return 0;
+            }
+
+            @Override
+            public byte getAppStatus() {
+                return 0;
+            }
+
+            @Override
+            public String getAppStatusString() {
+                return null;
+            }
+
+            @Override
+            public String getStatusString() {
+                return null;
             }
 
         };
@@ -198,7 +218,7 @@ public class TestSnapshotDaemon {
             }
 
             @Override
-            public String getExtra() {
+            public String getStatusString() {
                 return null;
             }
 
@@ -232,6 +252,16 @@ public class TestSnapshotDaemon {
                 return 0;
             }
 
+            @Override
+            public byte getAppStatus() {
+                return 0;
+            }
+
+            @Override
+            public String getAppStatusString() {
+                return null;
+            }
+
         };
     }
 
@@ -244,7 +274,7 @@ public class TestSnapshotDaemon {
             }
 
             @Override
-            public String getExtra() {
+            public String getStatusString() {
                 return null;
             }
 
@@ -294,6 +324,16 @@ public class TestSnapshotDaemon {
             @Override
             public int getClientRoundtrip() {
                 return 0;
+            }
+
+            @Override
+            public byte getAppStatus() {
+                return 0;
+            }
+
+            @Override
+            public String getAppStatusString() {
+                return null;
             }
 
         };
@@ -373,13 +413,11 @@ public class TestSnapshotDaemon {
 
             @Override
             public Exception getException() {
-                // TODO Auto-generated method stub
                 return null;
             }
 
             @Override
-            public String getExtra() {
-                // TODO Auto-generated method stub
+            public String getStatusString() {
                 return null;
             }
 
@@ -403,6 +441,16 @@ public class TestSnapshotDaemon {
             @Override
             public int getClientRoundtrip() {
                 return 0;
+            }
+
+            @Override
+            public byte getAppStatus() {
+                return 0;
+            }
+
+            @Override
+            public String getAppStatusString() {
+                return null;
             }
 
         });

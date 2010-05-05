@@ -304,6 +304,9 @@ bool Table::serializeColumnHeaderTo(SerializeOutput &serialize_io) {
     // skip header position
     serialize_io.writeInt(-1);
 
+    //status code
+    serialize_io.writeByte(-128);
+
     // column counts as a short
     serialize_io.writeShort(static_cast<int16_t>(m_columnCount));
 
@@ -467,6 +470,8 @@ void Table::loadTuplesFrom(bool allowELT,
 
     // todo: just skip ahead to this position
     serialize_io.readInt(); // rowstart
+
+    serialize_io.readByte();
 
     int16_t colcount = serialize_io.readShort();
     assert(colcount >= 0);

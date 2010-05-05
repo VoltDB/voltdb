@@ -75,9 +75,8 @@ public class TestExecutionSite extends TestCase {
         {
             m_site.simulateExecutePlanFragments(txnState.txnId, testReadOnly());
 
-            final ClientResponseImpl response = new ClientResponseImpl();
-            response.setResults(ClientResponseImpl.SUCCESS,
-                                new VoltTable[] {}, "MockSPVoltProcedure Response");
+            final ClientResponseImpl response = new ClientResponseImpl(ClientResponseImpl.SUCCESS,
+                    new VoltTable[] {}, "MockSPVoltProcedure Response");
             ++m_called;
             return response;
         }

@@ -555,15 +555,15 @@ class FastSerializer:
         self.rbuf = self.rbuf[offset:]
         mostSignificantBit = 1 << 7
         isNegative = (val[0] & mostSignificantBit) != 0
-        val[0] &= mostSignificantBit
-        unscaledValue = 0
-        for x in xrange(1, 16):
+        unscaledValue = -(val[0] & mostSignificantBit) << 120
+        # Clear the highest bit
+        # Unleash the powers of the butterfly
+        val[0] &= ~mostSignificantBit
+        # Get the 2's complement
+        for x in xrange(16):
             unscaledValue += val[x] << ((15 - x) * 8)
-        unscaledValue = tuple(str(unscaledValue))
-        unscaledValueDigits = []
-        for x in unscaledValue:
-            unscaledValueDigits.append(int(x))
-        return decimal.Decimal((isNegative, tuple(unscaledValueDigits),
+        unscaledValue = map(lambda x: int(x), str(abs(unscaledValue)))
+        return decimal.Decimal((isNegative, tuple(unscaledValue),
                                 -self.__class__.DEFAULT_DECIMAL_SCALE))
 
     def readDecimalArray(self):
@@ -596,17 +596,28 @@ class FastSerializer:
 
     def __intToBytes(self, value, sign):
         value_bytes = ""
-        while value > 0:
-            value_bytes = struct.pack(self.uint64Type(1),
-                                      value & 0xffffffffffffffffL) + value_bytes
-            value = value >> 64
-        if len(value_bytes) > 15:
+        if sign == 1:
+            value = ~value + 1      # 2's complement
+        # Turn into byte array
+        while value != 0 and value != -1:
+            byte = value & 0xff
+            # flip the high order bits to 1 only if the number is negative and
+            # this is the highest order byte
+            if value >> 8 == 0 and sign == 1:
+                mask = 1 << 7
+                while mask > 0 and (byte & mask) == 0:
+                    byte |= mask
+                    mask >> 1
+            value_bytes = struct.pack(self.ubyteType(1), byte) + value_bytes
+            value = value >> 8
+        if len(value_bytes) > 16:
             raise ValueError("Precision of this decimal is >38 digits");
         if sign == 1:
-            ret = struct.pack(self.ubyteType(1), 1 << 7)
+            ret = struct.pack(self.ubyteType(1), 0xff)
         else:
             ret = struct.pack(self.ubyteType(1), 0)
-        ret += struct.pack(self.ubyteType(1), 0) * (15 - len(value_bytes))
+        # Pad it
+        ret *= 16 - len(value_bytes)
         ret += value_bytes
         return ret
 
@@ -726,9 +737,9 @@ class VoltTable:
     def readFromSerializer(self):
         # 1.
         tablesize = self.fser.readInt32()
-
         # 2.
         headersize = self.fser.readInt32()
+        statuscode = self.fser.readByte()
         columncount = self.fser.readInt16()
         for i in xrange(columncount):
             column = VoltColumn(fser = self.fser)
@@ -754,6 +765,7 @@ class VoltTable:
         # calculate the size
         header_fser = FastSerializer()
 
+        header_fser.writeByte(0)
         header_fser.writeInt16(len(self.columns))
         map(lambda x: x.writeType(header_fser), self.columns)
         map(lambda x: x.writeName(header_fser), self.columns)
@@ -839,9 +851,23 @@ class VoltResponse:
         # tables[], info, id.
         self.fser.bufferForRead()
         self.version = self.fser.readByte()
+        self.clientHandle = self.fser.readInt64()
+        presentFields = fser.readByte();
         self.status = self.fser.readByte()
+        if presentFields & (1 << 5) != 0:
+            self.statusString = self.fser.readString()
+        else:
+            self.statusString = None
+        self.appStatus = self.fser.readByte()
+        if presentFields & (1 << 7) != 0:
+            self.appStatusString = self.fser.readString()
+        else:
+            self.appStatusString = None
         self.roundtripTime = self.fser.readInt32()
-        self.exception = VoltException(self.fser)
+        if presentFields & (1 << 6) != 0:
+            self.exception = VoltException(self.fser)
+        else:
+            self.exception = None
 
         # tables[]
         tablecount = self.fser.readInt16()
@@ -849,9 +875,7 @@ class VoltResponse:
         for i in xrange(tablecount):
             table = VoltTable(self.fser)
             self.tables.append(table.readFromSerializer())
-        # info, id
-        self.info = self.fser.readString()
-        self.clientHandle = self.fser.readInt64()
+
 
     def __str__(self):
         tablestr = "\n\n".join([str(i) for i in self.tables])

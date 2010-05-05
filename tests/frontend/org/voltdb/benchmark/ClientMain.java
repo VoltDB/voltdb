@@ -263,7 +263,7 @@ public abstract class ClientMain {
                 try {
                     runLoop();
                 }
-                catch (final NoConnectionsException e) {
+                catch (final IOException e) {
 
                 }
             }
@@ -324,7 +324,7 @@ public abstract class ClientMain {
                                 break;
                             }
                         }
-                        catch (final NoConnectionsException e) {
+                        catch (final IOException e) {
                             return;
                         }
                     }
@@ -342,7 +342,7 @@ public abstract class ClientMain {
      * Implemented by derived classes. Loops indefinitely invoking stored
      * procedures. Method never returns and never receives any updates.
      */
-    abstract protected void runLoop() throws NoConnectionsException;
+    abstract protected void runLoop() throws IOException;
 
     protected boolean useHeavyweightClient() {
         return false;
@@ -355,7 +355,7 @@ public abstract class ClientMain {
      *
      * @return True if an invocation was queued and false otherwise
      */
-    protected boolean runOnce() throws NoConnectionsException {
+    protected boolean runOnce() throws IOException {
         throw new UnsupportedOperationException();
     }
 
@@ -648,8 +648,8 @@ public abstract class ClientMain {
             if (clientResponse.getException() != null) {
                 clientResponse.getException().printStackTrace();
             }
-            if (clientResponse.getExtra() != null) {
-                System.err.println(clientResponse.getExtra());
+            if (clientResponse.getStatusString() != null) {
+                System.err.println(clientResponse.getStatusString());
             }
 
             System.exit(-1);

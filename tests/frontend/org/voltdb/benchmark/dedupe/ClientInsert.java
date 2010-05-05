@@ -51,7 +51,7 @@ public class ClientInsert {
 
             if (status != ClientResponse.SUCCESS) {
                 System.err.println("Failed to execute!!!");
-                System.err.println(clientResponse.getExtra());
+                System.err.println(clientResponse.getStatusString());
                 System.err.println(clientResponse.getException());
                 System.exit(-1);
             } else {
@@ -211,7 +211,7 @@ public class ClientInsert {
                         }
                     }
                 }
-            } catch (NoConnectionsException e) {
+            } catch (IOException e) {
                 e.printStackTrace();
             }
 

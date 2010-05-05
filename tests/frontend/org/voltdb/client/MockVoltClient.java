@@ -100,8 +100,7 @@ public class MockVoltClient implements Client {
             }
 
             @Override
-            public String getExtra() {
-                // TODO Auto-generated method stub
+            public String getStatusString() {
                 return null;
             }
 
@@ -112,8 +111,17 @@ public class MockVoltClient implements Client {
 
             @Override
             public byte getStatus() {
-                // TODO Auto-generated method stub
                 return 0;
+            }
+
+            @Override
+            public byte getAppStatus() {
+                return 0;
+            }
+
+            @Override
+            public String getAppStatusString() {
+                return null;
             }
 
         };
@@ -222,5 +230,17 @@ public class MockVoltClient implements Client {
     public String getBuildString() {
         // TODO Auto-generated method stub
         return null;
+    }
+
+    @Override
+    public boolean blocking() {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    @Override
+    public void configureBlocking(boolean blocking) {
+        // TODO Auto-generated method stub
+
     }
 }

@@ -23,6 +23,8 @@
 
 package org.voltdb.benchmark.blobtorture;
 
+import java.io.IOException;
+
 import org.voltdb.benchmark.*;
 
 import java.util.logging.Logger;
@@ -65,16 +67,12 @@ public class BlobTortureClient extends ClientMain {
 
     private boolean m_didFirstInvocation = false;
     @Override
-    protected boolean runOnce() throws NoConnectionsException {
+    protected boolean runOnce() throws IOException {
         if (!m_didFirstInvocation) {
             m_didFirstInvocation = true;
             loadBlobs();
         }
-        try {
-            return selectBlob();
-        } catch (NoConnectionsException e) {
-            throw e;
-        }
+        return selectBlob();
     }
 
     private long m_partitionCount;
@@ -82,17 +80,10 @@ public class BlobTortureClient extends ClientMain {
 
 
     @Override
-    protected void runLoop() throws NoConnectionsException {
+    protected void runLoop() throws IOException {
         loadBlobs();
         while (true) {
-            while (!selectBlob()) {
-                try {
-                    m_voltClient.backpressureBarrier();
-                } catch (InterruptedException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
-            }
+            selectBlob();
         }
     }
 
@@ -130,7 +121,7 @@ public class BlobTortureClient extends ClientMain {
         @Override
         public void clientCallback(ClientResponse clientResponse) {
             if (clientResponse.getStatus() != ClientResponse.SUCCESS){
-                System.out.println(clientResponse.getExtra());
+                System.out.println(clientResponse.getStatusString());
                 System.out.println(clientResponse.getException());
                 System.exit(-1);
             }
@@ -150,7 +141,7 @@ public class BlobTortureClient extends ClientMain {
 
     };
 
-    private boolean selectBlob() throws NoConnectionsException {
+    private boolean selectBlob() throws IOException {
         final long blobId = Math.abs(m_random.nextLong()) % m_partitionCount;
         return m_voltClient.callProcedure( m_callback, "SelectBlob", blobId);
     }
