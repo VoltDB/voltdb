@@ -487,6 +487,9 @@ public class RealVoltDB implements VoltDBInterface
                 ci.shutdown();
             }
 
+            // shut down ELT and its connectors.
+            ELTManager.instance().shutdown();
+
             // tell all m_sites to stop their runloops
             if (m_localSites != null) {
                 for (ExecutionSite site : m_localSites.values())

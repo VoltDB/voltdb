@@ -267,37 +267,48 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
 
         @Override
         public void run() {
-            ServerSocketChannel acceptSock;
+            ServerSocketChannel acceptSock = null;
             try {
-                acceptSock = ServerSocketChannel.open();
-                acceptSock.configureBlocking(true);
-                acceptSock.socket().bind(new InetSocketAddress(LISTENER_PORT));
-            }
-            catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-
-            do {
                 try {
-                    final SocketChannel socket = acceptSock.accept();
-                    PollingProtocolHandler ih = new PollingProtocolHandler();
-
-                    Connection conn =
-                        VoltDB.instance().getNetwork().registerChannel(socket, ih, 0);
-
-                    ProtoStateBlock sb = new ProtoStateBlock(conn);
-                    ih.setStateBlock(sb);
-
-                    synchronized (m_connections) {
-                        m_connections.add(conn);
-                    }
-
-                    // can now turn on read interest -- fully configured.
-                    conn.enableReadSelection();
+                    acceptSock = ServerSocketChannel.open();
+                    acceptSock.configureBlocking(true);
+                    acceptSock.socket().bind(new InetSocketAddress(LISTENER_PORT));
                 }
                 catch (IOException e) {
+                    throw new RuntimeException(e);
                 }
-            } while (m_shouldContinue.get() == true);
+
+                do {
+                    try {
+                        final SocketChannel socket = acceptSock.accept();
+                        PollingProtocolHandler ih = new PollingProtocolHandler();
+
+                        Connection conn =
+                            VoltDB.instance().getNetwork().registerChannel(socket, ih, 0);
+
+                        ProtoStateBlock sb = new ProtoStateBlock(conn);
+                        ih.setStateBlock(sb);
+
+                        synchronized (m_connections) {
+                            m_connections.add(conn);
+                        }
+
+                        // can now turn on read interest -- fully configured.
+                        conn.enableReadSelection();
+                    }
+                    catch (IOException e) {
+                    }
+                } while (m_shouldContinue.get() == true);
+            }
+            finally {
+                if (acceptSock != null) {
+                    try {
+                        acceptSock.close();
+                    }
+                    catch (IOException e) {
+                    }
+                }
+            }
         }
     }
 
@@ -442,6 +453,25 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
             catch (InterruptedException e) {
                 // acceptable. just re-loop.
             }
+        }
+    }
+
+    @Override
+    public void shutdown() {
+        m_shouldContinue.set(false);
+        m_acceptor.interrupt();
+        this.interrupt();
+        try {
+            System.out.println("Joining acceptor.");
+            m_acceptor.join();
+        }
+        catch (InterruptedException e) {
+        }
+        try {
+            System.out.println("Joining Processor.");
+            this.join();
+        }
+        catch (InterruptedException e) {
         }
     }
 

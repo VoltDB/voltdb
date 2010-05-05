@@ -269,4 +269,11 @@ public class ELTManager implements SysManageable
         // data buffer so each processor gets a readonly buffer.
         m_processors.getFirst().queueMessage(mbp);
     }
+
+    public void shutdown() {
+        for (ELTDataProcessor p : m_processors) {
+            p.shutdown();
+        }
+
+    }
 }

@@ -66,4 +66,9 @@ public interface ELTDataProcessor  {
      * Queue a work message to the processor's mailbox.
      */
     public void queueMessage(ELTInternalMessage m);
+
+    /**
+     * The system is terminating. Cleanup and exit the processor.
+     */
+    public void shutdown();
 }
