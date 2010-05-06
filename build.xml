@@ -1246,6 +1246,9 @@ TEST CASES
                else="${regression_config}">
         <isset property="sql_coverage_default"/>
     </condition>
+    <condition property="failonerror" value="true" else="false">
+        <equals arg1="${meta_config}" arg2="${regression_config}" />
+    </condition>
     <condition property="config_arg" value="-c ${sql_coverage_config}" else="">
         <isset property="sql_coverage_config"/>
     </condition>
@@ -1282,7 +1285,7 @@ TEST CASES
         <include name="version.txt"/>
       </fileset>
     </copy>
-    <exec dir='tests/scripts' executable='python' failonerror='true'>
+    <exec dir='tests/scripts' executable='python' failonerror="${failonerror}">
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
         <arg line='sql_coverage_test.py' />
