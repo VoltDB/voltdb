@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 
+import org.voltdb.VoltType;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 
@@ -55,18 +56,18 @@ public class ELTProtoMessage
         final private int m_tableId;
         final private String m_tableName;
 
-        final private ArrayList<String> m_columnNames =
-            new ArrayList<String>();
+        private ArrayList<String> m_columnNames = new ArrayList<String>();
 
-        final private ArrayList<Integer> m_columnTypes =
-            new ArrayList<Integer>();
+        private ArrayList<VoltType> m_columnTypes = new ArrayList<VoltType>();
 
         public AdvertisedDataSource(int p_id, int t_id, String t_name,
-                ArrayList<String> names, ArrayList<Integer> types)
+                ArrayList<String> names, ArrayList<VoltType> types)
         {
             m_partitionId = p_id;
             m_tableId = t_id;
             m_tableName = t_name;
+            m_columnNames = names;
+            m_columnTypes = types;
         }
 
         public int partitionId() {
@@ -77,8 +78,13 @@ public class ELTProtoMessage
             return m_tableId;
         }
 
-        public int columnType(int index) {
+        public VoltType columnType(int index) {
             return m_columnTypes.get(index);
+        }
+
+        public ArrayList<VoltType> columnTypes()
+        {
+            return m_columnTypes;
         }
 
         public String columnName(int index) {
@@ -227,7 +233,7 @@ public class ELTProtoMessage
 
         int count = m_data.getInt();
         for (int i=0; i < count; i++) {
-            ArrayList<Integer> types = new ArrayList<Integer>();
+            ArrayList<VoltType> types = new ArrayList<VoltType>();
             ArrayList<String> names = new ArrayList<String>();
 
             int p_id = fds.readInt();
@@ -236,7 +242,7 @@ public class ELTProtoMessage
             int colcnt = fds.readInt();
             for (int jj = 0; jj < colcnt; jj++) {
                 names.add(fds.readString());
-                types.add(fds.readInt());
+                types.add(VoltType.get((byte)fds.readInt()));
             }
             result.add(new AdvertisedDataSource(p_id, t_id, t_name, names, types));
         }

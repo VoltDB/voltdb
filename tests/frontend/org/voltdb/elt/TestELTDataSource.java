@@ -23,6 +23,9 @@
 
 package org.voltdb.elt;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+
 import org.voltdb.*;
 import org.voltdb.catalog.Table;
 import org.voltdb.elt.processors.RawProcessor;
@@ -33,9 +36,9 @@ import junit.framework.TestCase;
 public class TestELTDataSource extends TestCase {
 
     private static class MockHostMessenger extends HostMessenger {
-        public MockHostMessenger() {
+        public MockHostMessenger() throws UnknownHostException {
             super(null, // VoltNetwork
-                  null, // Coordinator IP
+                  InetAddress.getLocalHost(), // Coordinator IP
                   1,    // expected hosts,
                   0,    // catalogCRC
                   null); // hostLog);
@@ -91,7 +94,7 @@ public class TestELTDataSource extends TestCase {
     }
 
 
-    public void testPoll() throws MessagingException {
+    public void testPoll() throws MessagingException, UnknownHostException {
         MockHostMessenger hm = new MockHostMessenger();
         m_mockVoltDB.setHostMessenger(hm);
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);

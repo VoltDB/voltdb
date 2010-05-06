@@ -43,9 +43,11 @@ import org.voltdb.elt.*;
 public class TestELTSuite extends RegressionSuite {
 
     /** Shove a table name and pkey in front of row data */
-    private Object[] convertValsToParams(final int i, final Object[] rowdata) {
+    private Object[] convertValsToParams(String tableName, final int i,
+                                         final Object[] rowdata)
+    {
         final Object[] params = new Object[rowdata.length + 2];
-        params[0] = "ALLOW_NULLS";
+        params[0] = tableName;
         params[1] = i;
         for (int ii=0; ii < rowdata.length; ++ii)
             params[ii+2] = rowdata[ii];
@@ -61,30 +63,6 @@ public class TestELTSuite extends RegressionSuite {
         return row;
     }
 
-
-    /**
-     * The verifier; the LocalSingleProcessServerELT will invoke this
-     * constructor for each test. (Therefore must be public.)
-     */
-    public static class ELTSuiteTupleVerifier extends SingleTableVerifier {
-        public ELTSuiteTupleVerifier() {
-            final ArrayList<VoltType> schema = new ArrayList<VoltType>();
-            schema.add(VoltType.INTEGER);
-            schema.add(VoltType.TINYINT);
-            schema.add(VoltType.SMALLINT);
-            schema.add(VoltType.INTEGER);
-            schema.add(VoltType.BIGINT);
-            schema.add(VoltType.FLOAT);
-            schema.add(VoltType.TIMESTAMP);
-            schema.add(VoltType.STRING); // varchar(4)
-            schema.add(VoltType.STRING); // varchar(10)
-            schema.add(VoltType.STRING); // varchar(1024)
-            schema.add(VoltType.STRING); // varchar(32000)
-            schema.add(VoltType.DECIMAL);
-            addTable("ALLOW_NULLS", schema);
-        }
-    }
-
     private void quiesce(final Client client)
     throws ProcCallException, NoConnectionsException, IOException
     {
@@ -92,24 +70,32 @@ public class TestELTSuite extends RegressionSuite {
         client.callProcedure("@Quiesce");
     }
 
-    private void quiesceAndVerify(final Client client, TupleVerifier verifier)
-    throws ProcCallException, NoConnectionsException, IOException
-    {
-        quiesce(client);
-        ELPoller poller = new ELPoller(verifier);
-        poller.run();
-        assertTrue(verifier.allRowsVerified());
-    }
-
-    private void quiesceAndVerifyFalse(final Client client, TupleVerifier verifier)
+    private void quiesceAndVerify(final Client client, ELTestClient tester)
     throws ProcCallException, IOException
     {
         quiesce(client);
+        tester.work();
+        assertTrue(tester.allRowsVerified());
+    }
 
-        // and read and close the el sink server
-        ELPoller poller = new ELPoller(verifier);
-        poller.run();
-        assertFalse(verifier.allRowsVerified());
+    private void quiesceAndVerifyFalse(final Client client, ELTestClient tester)
+    throws ProcCallException, IOException
+    {
+        quiesce(client);
+        tester.work();
+        assertFalse(tester.allRowsVerified());
+    }
+
+    /**
+     * Verify safe startup (we can connect clients and poll empty tables)
+     */
+    public void testELTSafeStartup() throws IOException, ProcCallException, InterruptedException
+    {
+        ELTestClient tester = new ELTestClient();
+        tester.connectToELServer();
+
+        final Client client = getClient();
+        quiesceAndVerify(client, tester);
     }
 
     /**
@@ -118,82 +104,88 @@ public class TestELTSuite extends RegressionSuite {
      */
     public void testELTRoundTripPersistentTable() throws IOException, ProcCallException, InterruptedException
     {
-        ELTSuiteTupleVerifier verifier = new ELTSuiteTupleVerifier();
+        ELTestClient tester = new ELTestClient();
+        tester.connectToELServer();
 
         final Client client = getClient();
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            verifier.addRow("ALLOW_NULLS", convertValsToRow(i, rowdata));
+            tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, rowdata));
 
-            final Object[] params = convertValsToParams(i, rowdata);
+            final Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
         }
-        quiesceAndVerify(client, verifier);
+        quiesceAndVerify(client, tester);
     }
 
-    /** Verify test infrastructure fails a test that sends too many rows (0 rows registered) */
     public void testELTLocalServerTooMany() throws IOException, ProcCallException, InterruptedException
     {
-        ELTSuiteTupleVerifier verifier = new ELTSuiteTupleVerifier();
-        final Client client = getClient();
+        ELTestClient tester = new ELTestClient();
+        tester.connectToELServer();
 
+        final Client client = getClient();
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            // don't register any rows with TupleVerifier
-            final Object[] params = convertValsToParams(i, rowdata);
+            final Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
         }
-        quiesceAndVerifyFalse(client, verifier);
+        quiesceAndVerifyFalse(client, tester);
     }
 
-    /** Verify test infrastructure fails a test that sends too many rows (Some rows registered) */
     public void testELTLocalServerTooMany2() throws IOException, ProcCallException, InterruptedException
     {
-        ELTSuiteTupleVerifier verifier = new ELTSuiteTupleVerifier();
-        final Client client = getClient();
+        ELTestClient tester = new ELTestClient();
+        tester.connectToELServer();
 
+        final Client client = getClient();
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            // don't register half of the rows!
-            if (i % 2 == 0)
-                verifier.addRow("ALLOW_NULLS", convertValsToRow(i, rowdata));
-            final Object[] params = convertValsToParams(i, rowdata);
+            // register only even rows with tester
+            if ((i % 2) == 0)
+            {
+                tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, rowdata));
+            }
+            final Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
         }
-        quiesceAndVerifyFalse(client, verifier);
+        quiesceAndVerifyFalse(client, tester);
     }
 
     /** Verify test infrastructure fails a test that sends too few rows */
     public void testELTLocalServerTooFew() throws IOException, ProcCallException, InterruptedException
     {
-        ELTSuiteTupleVerifier verifier = new ELTSuiteTupleVerifier();
+        ELTestClient tester = new ELTestClient();
+        tester.connectToELServer();
         final Client client = getClient();
 
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            // add each row twice - verify the test infra. catches a failure
-            verifier.addRow("ALLOW_NULLS", convertValsToRow(i, rowdata));
-            verifier.addRow("ALLOW_NULLS", convertValsToRow(i, rowdata));
-            final Object[] params = convertValsToParams(i, rowdata);
-            client.callProcedure("Insert", params);
+            tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, rowdata));
+            final Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata);
+            // Only do the first 7 inserts
+            if (i < 7)
+            {
+                client.callProcedure("Insert", params);
+            }
         }
-        quiesceAndVerifyFalse(client, verifier);
+        quiesceAndVerifyFalse(client, tester);
     }
 
     /** Verify test infrastructure fails a test that sends mismatched data */
     public void testELTLocalServerBadData() throws IOException, ProcCallException, InterruptedException
     {
-        ELTSuiteTupleVerifier verifier = new ELTSuiteTupleVerifier();
+        ELTestClient tester = new ELTestClient();
+        tester.connectToELServer();
         final Client client = getClient();
 
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
             // add wrong pkeys on purpose!
-            verifier.addRow("ALLOW_NULLS", convertValsToRow(i+10, rowdata));
-            final Object[] params = convertValsToParams(i, rowdata);
+            tester.addRow("ALLOW_NULLS", i + 10, convertValsToRow(i+10, rowdata));
+            final Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
         }
-        quiesceAndVerifyFalse(client, verifier);
+        quiesceAndVerifyFalse(client, tester);
     }
 
     /**
@@ -202,26 +194,28 @@ public class TestELTSuite extends RegressionSuite {
      */
     public void testELTRoundTripStreamedTable() throws IOException, ProcCallException, InterruptedException
     {
+        ELTestClient tester = new ELTestClient();
+        tester.connectToELServer();
         final Client client = getClient();
-        ELTSuiteTupleVerifier verifier = new ELTSuiteTupleVerifier();
 
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            verifier.addRow("WITH_DEFAULTS", convertValsToRow(i, rowdata));
-            final Object[] params = convertValsToParams(i, rowdata);
+            tester.addRow("NO_NULLS", i, convertValsToRow(i, rowdata));
+            final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
         }
-        quiesceAndVerify(client, verifier);
+        quiesceAndVerify(client, tester);
     }
 
     /** Test that a table w/o ELT enabled does not produce ELT content */
     public void testThatTablesOptIn() throws IOException, ProcCallException, InterruptedException
     {
-        ELTSuiteTupleVerifier verifier = new ELTSuiteTupleVerifier();
+        ELTestClient tester = new ELTestClient();
+        tester.connectToELServer();
         final Client client = getClient();
 
         Object params[] = new Object[TestSQLTypesSuite.COLS + 2];
-        params[0] = "NO_NULLS";  // this table should not produce ELT output
+        params[0] = "WITH_DEFAULTS";  // this table should not produce ELT output
 
         // populate the row data
         for (int i=0; i < TestSQLTypesSuite.COLS; ++i) {
@@ -233,7 +227,7 @@ public class TestELTSuite extends RegressionSuite {
             // do NOT add row to TupleVerfier as none should be produced
             client.callProcedure("Insert", params);
         }
-        quiesceAndVerify(client, verifier);
+        quiesceAndVerify(client, tester);
     }
 
 
@@ -251,8 +245,9 @@ public class TestELTSuite extends RegressionSuite {
      * of each in the EL stream. Some procedures rollback (after a real insert).
      * Tests that streams are correct in the face of rollback.
      */
-     public void testELTRollback() throws IOException, ProcCallException, InterruptedException {
-        ELTSuiteTupleVerifier verifier = new ELTSuiteTupleVerifier();
+    public void testELTRollback() throws IOException, ProcCallException, InterruptedException {
+        ELTestClient tester = new ELTestClient();
+        tester.connectToELServer();
         final Client client = getClient();
 
         double rollbackPerc = 0.15;
@@ -266,7 +261,7 @@ public class TestELTSuite extends RegressionSuite {
             if ((pkey % 1000) == 0) {
                 System.out.println("Rollback test added " + pkey + " rows");
             }
-            final Object[] params = convertValsToParams(pkey, rowdata);
+            final Object[] params = convertValsToParams("ALLOW_NULLS", pkey, rowdata);
             random = Math.random();
             if (random <= rollbackPerc) {
                 // note - do not update the el verifier as this rollsback
@@ -279,7 +274,7 @@ public class TestELTSuite extends RegressionSuite {
                 } while (!done);
             }
             else {
-                verifier.addRow("ALLOW_NULLS", convertValsToRow(pkey, rowdata));
+                tester.addRow("ALLOW_NULLS", pkey, convertValsToRow(pkey, rowdata));
                 // the sync call back isn't synchronous if it isn't explicitly blocked on...
                 boolean done;
                 do {
@@ -291,10 +286,10 @@ public class TestELTSuite extends RegressionSuite {
             }
         }
         client.drain();
-        quiesceAndVerify(client, verifier);
+        quiesceAndVerify(client, tester);
     }
 
-    private VoltTable createLoadTableTable(boolean addToVerifier, ELTSuiteTupleVerifier verifier) {
+    private VoltTable createLoadTableTable(boolean addToVerifier, ELTestClient tester) {
 
         VoltTable loadTable = new VoltTable(new ColumnInfo("PKEY", VoltType.INTEGER),
           new ColumnInfo(TestSQLTypesSuite.m_columnNames[0], TestSQLTypesSuite.m_types[0]),
@@ -311,7 +306,7 @@ public class TestELTSuite extends RegressionSuite {
 
         for (int i=0; i < 100; i++) {
             if (addToVerifier) {
-                verifier.addRow("ALLOW_NULLS", convertValsToRow(i, TestSQLTypesSuite.m_midValues));
+                tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, TestSQLTypesSuite.m_midValues));
             }
             loadTable.addRow(convertValsToRow(i, TestSQLTypesSuite.m_midValues));
         }
@@ -324,11 +319,12 @@ public class TestELTSuite extends RegressionSuite {
     public void testLoadMultiPartitionTableELTOff() throws IOException, ProcCallException
     {
         // allow ELT is off. no rows added to the verifier
-        ELTSuiteTupleVerifier verifier = new ELTSuiteTupleVerifier();
-        VoltTable loadTable = createLoadTableTable(false, verifier);
+        ELTestClient tester = new ELTestClient();
+        tester.connectToELServer();
+        VoltTable loadTable = createLoadTableTable(false, tester);
         Client client = getClient();
         client.callProcedure("@LoadMultipartitionTable", "ALLOW_NULLS", loadTable, 0);
-        quiesceAndVerify(client, verifier);
+        quiesceAndVerify(client, tester);
     }
 
     /*
@@ -337,11 +333,12 @@ public class TestELTSuite extends RegressionSuite {
     public void testLoadMultiPartitionTableELTOn() throws IOException, ProcCallException
     {
         // allow ELT is on. rows added to the verifier
-        ELTSuiteTupleVerifier verifier = new ELTSuiteTupleVerifier();
-        VoltTable loadTable = createLoadTableTable(true, verifier);
+        ELTestClient tester = new ELTestClient();
+        tester.connectToELServer();
+        VoltTable loadTable = createLoadTableTable(true, tester);
         Client client = getClient();
         client.callProcedure("@LoadMultipartitionTable", "ALLOW_NULLS", loadTable, 1);
-        quiesceAndVerify(client, verifier);
+        quiesceAndVerify(client, tester);
     }
 
     /*
@@ -350,11 +347,12 @@ public class TestELTSuite extends RegressionSuite {
     public void testLoadMultiPartitionTableELTOn2() throws IOException, ProcCallException
     {
         // allow ELT is on but table is not opted in to ELT.
-        ELTSuiteTupleVerifier verifier = new ELTSuiteTupleVerifier();
-        VoltTable loadTable = createLoadTableTable(false, verifier);
+        ELTestClient tester = new ELTestClient();
+        tester.connectToELServer();
+        VoltTable loadTable = createLoadTableTable(false, tester);
         Client client = getClient();
-        client.callProcedure("@LoadMultipartitionTable", "NO_NULLS", loadTable, 1);
-        quiesceAndVerify(client, verifier);
+        client.callProcedure("@LoadMultipartitionTable", "WITH_DEFAULTS", loadTable, 1);
+        quiesceAndVerify(client, tester);
     }
 
     /*
@@ -364,7 +362,7 @@ public class TestELTSuite extends RegressionSuite {
         final Client client = getClient();
         boolean passed = false;
         try {
-            client.callProcedure("@AdHoc", "Update WITH_DEFAULTS SET A_TINYINT=0 WHERE PKEY=0;");
+            client.callProcedure("@AdHoc", "Update NO_NULLS SET A_TINYINT=0 WHERE PKEY=0;");
         }
         catch (ProcCallException e) {
             if (e.getMessage().contains("Illegal to update an export-only table.")) {
@@ -381,7 +379,7 @@ public class TestELTSuite extends RegressionSuite {
         final Client client = getClient();
         boolean passed = false;
         try {
-            client.callProcedure("@AdHoc", "Select PKEY from WITH_DEFAULTS WHERE PKEY=0;");
+            client.callProcedure("@AdHoc", "Select PKEY from NO_NULLS WHERE PKEY=0;");
         }
         catch (ProcCallException e) {
             if (e.getMessage().contains("Illegal to read an export-only table.")) {
@@ -398,7 +396,7 @@ public class TestELTSuite extends RegressionSuite {
         final Client client = getClient();
         boolean passed = false;
         try {
-            client.callProcedure("@AdHoc", "DELETE from WITH_DEFAULTS WHERE PKEY=0;");
+            client.callProcedure("@AdHoc", "DELETE from NO_NULLS WHERE PKEY=0;");
         }
         catch (ProcCallException e) {
             if (e.getMessage().contains("Illegal to delete from an export-only table.")) {
@@ -435,9 +433,9 @@ public class TestELTSuite extends RegressionSuite {
         // add the connector/processor (name, host, port)
         // and the exportable tables (name, export-only)
         project.addELT("org.voltdb.elt.processors.RawProcessor", true /*enabled*/);
-        // "NO_NULLS" is a non-elt'd persistent table
+        // "WITH_DEFAULTS" is a non-elt'd persistent table
         project.addELTTable("ALLOW_NULLS", false);   // persistent table
-        project.addELTTable("WITH_DEFAULTS", true);  // streamed table
+        project.addELTTable("NO_NULLS", true);  // streamed table
         // and then project builder as normal
         project.addPartitionInfo("NO_NULLS", "PKEY");
         project.addPartitionInfo("ALLOW_NULLS", "PKEY");

@@ -83,7 +83,16 @@ PersistentTable::PersistentTable(ExecutorContext *ctx, bool exportEnabled) :
     Table(TABLE_BLOCKSIZE), m_executorContext(ctx), m_uniqueIndexes(NULL), m_uniqueIndexCount(0), m_allowNulls(NULL),
     m_indexes(NULL), m_indexCount(0), m_pkeyIndex(NULL), m_wrapper(NULL),
     tsSeqNo(0), m_viewCount(0), m_views(NULL), stats_(this), m_exportEnabled(exportEnabled),
-    m_COWContext(NULL)  {}
+    m_COWContext(NULL)
+{
+    if (exportEnabled)
+    {
+        m_wrapper = new TupleStreamWrapper(m_executorContext->m_partitionId,
+                                           m_executorContext->m_siteId,
+                                           m_id,
+                                           m_executorContext->m_lastTickTime);
+    }
+}
 
 PersistentTable::~PersistentTable() {
     // delete all tuples to free strings
@@ -693,14 +702,6 @@ void PersistentTable::populateIndexes(int tupleCount) {
 size_t PersistentTable::appendToELBuffer(TableTuple &tuple, int64_t seqNo,
                                          TupleStreamWrapper::Type type) {
 
-    // eltxxx: avoid this silly delayed allocation
-    // if there's no wrapper, allocate one
-    if (!m_wrapper) {
-        m_wrapper = new TupleStreamWrapper(m_executorContext->m_partitionId,
-                                           m_executorContext->m_siteId,
-                                           m_id,
-                                           m_executorContext->m_lastTickTime);
-    }
     return m_wrapper->appendTuple(m_executorContext->m_lastCommittedTxnId,
                                   m_executorContext->currentTxnId(),
                                   seqNo,
