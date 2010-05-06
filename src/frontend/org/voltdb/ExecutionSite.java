@@ -610,8 +610,8 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         shutdown();
     }
 
-    private void completeTransaction(boolean readOnly) {
-        if (!readOnly) {
+    private void completeTransaction(TransactionState txnState) {
+        if (!txnState.isReadOnly) {
             assert(latestUndoToken != kInvalidUndoToken);
             assert(txnBeginUndoToken != kInvalidUndoToken);
             assert(latestUndoToken >= txnBeginUndoToken);
@@ -624,6 +624,13 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             // reset for error checking purposes
             txnBeginUndoToken = kInvalidUndoToken;
             batchBeginUndoToken = kInvalidUndoToken;
+        }
+
+        // advance the committed transaction point. Necessary for both ELT
+        // commit tracking and for fault detection transaction partial-transaction
+        // resolution.
+        if (txnState.txnId > lastCommittedTxnId) {
+            lastCommittedTxnId = txnState.txnId;
         }
     }
 
@@ -1144,7 +1151,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         do
         {
             if (currentTxnState.doWork()) {
-                completeTransaction(currentTxnState.isReadOnly);
+                completeTransaction(currentTxnState);
                 TransactionState ts = m_transactionsById.remove(currentTxnState.txnId);
                 assert(ts != null);
                 return null;
@@ -1199,7 +1206,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             assert(txnBeginUndoToken != kInvalidUndoToken);
             assert(latestUndoToken >= txnBeginUndoToken);
 
-            // don't go to the EE of no work was done
+            // don't go to the EE if no work was done
             if (latestUndoToken > txnBeginUndoToken) {
                 ee.undoUndoToken(txnBeginUndoToken);
             }
@@ -1328,10 +1335,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         }
 
         log.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
-        if (txnState.txnId > lastCommittedTxnId) {
-            lastCommittedTxnId = txnState.txnId;
-        }
-
         return response;
     }
 
