@@ -98,6 +98,7 @@ def run_config(config, basedir, output_dir, random_seed, report_all, args):
             config[key] = os.path.abspath(os.path.join(basedir, config[key]))
     report_filename = "report.xml"
     report_filename = os.path.abspath(os.path.join(output_dir, report_filename))
+    template = config["template"]
 
     global normalize
     if "normalizer" in config:
@@ -109,7 +110,9 @@ def run_config(config, basedir, output_dir, random_seed, report_all, args):
     command += " schema=" + os.path.basename(config['ddl'])
 
     random_state = random.getstate()
-    generator = SQLGenerator(config["schema"], config["template"], True)
+    if "template-jni" in config:
+        template = config["template-jni"]
+    generator = SQLGenerator(config["schema"], template, True)
     statements = []
     counter = 0
 
@@ -123,7 +126,13 @@ def run_config(config, basedir, output_dir, random_seed, report_all, args):
 
     random.seed(random_seed)
     random.setstate(random_state)
-    generator = SQLGenerator(config["schema"], config["template"], False)
+    # To get around the timestamp issue. Volt and HSQLDB use different units
+    # for timestamp (microsec vs. millisec), so we have to use different
+    # template file for regression test, since all the statements are not
+    # generated in this case.
+    if "template-hsqldb" in config:
+        template = config["template-hsqldb"]
+    generator = SQLGenerator(config["schema"], template, False)
     counter = 0
 
     for i in generator.generate():

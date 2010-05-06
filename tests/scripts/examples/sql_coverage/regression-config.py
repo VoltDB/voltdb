@@ -43,4 +43,9 @@
                       "ddl": "decimal-DDL.sql",
                       "template": "regression-basic-decimal.sql",
                       "normalizer": "normalizer.py"},
+    "basic-timestamp": {"schema": "timestamp-schema.py",
+                        "ddl": "timestamp-DDL.sql",
+                        "template": "regression-basic-timestamp.sql",
+                        "template-hsqldb": "regression-basic-timestamp-hsql.sql",
+                        "normalizer": "normalizer.py"},
 }
