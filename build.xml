@@ -1235,6 +1235,9 @@ TEST CASES
     <property name="regression_config"
               location="${test.example.dir}/regression-config.py" />
     <property name="sqlcov.dir" location="${build.dir}/sqlcoverage" />
+    <exec dir='.' executable='/bin/sh'>
+        <arg line="-c 'rm -rf ${sqlcov.dir}'"/>
+    </exec>
     <mkdir dir="${sqlcov.dir}" />
     <condition property="" value="${env.VOLTBUILD}" else='release'>
         <isset property="env.VOLTBUILD"/>
