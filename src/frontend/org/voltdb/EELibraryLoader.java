@@ -27,18 +27,34 @@ public class EELibraryLoader {
     private static final Logger hostLog = Logger.getLogger(
             "HOST", VoltLoggerFactory.instance());
 
+
+    static private boolean test64bit() {
+        // Sun JVMs are nice and chatty on this topic.
+        String sun_arch_data_model = System.getProperty("sun.arch.data.model", "none");
+        if (sun_arch_data_model.contains("64")) {
+            return true;
+        }
+        hostLog.info("Unable to positively confirm a 64-bit JVM. VoltDB requires" +
+                " a 64-bit JVM. A 32-bit JVM will fail to load the native VoltDB" +
+                " library.");
+        return false;
+    }
+
     /**
      * Load the shared native library if not yet loaded. Returns true if the library was loaded
      **/
     public synchronized static boolean loadExecutionEngineLibrary(boolean mustSuccede) {
         if (!voltSharedLibraryLoaded) {
             if (VoltDB.getLoadLibVOLTDB()) {
+                test64bit();
+
                 try {
                     final Logger hostLog = Logger.getLogger("HOST", VoltLoggerFactory.instance());
                     final String libname = "voltdb-" + VoltDB.instance().getVersionString();
                     hostLog.info("Attempting to load native VoltDB library " + libname +
                             ". Expect to see a confirmation following this upon success. " +
-                            "If none appears then you may need to compile VoltDB for your platform");
+                            "If none appears then you may need to compile VoltDB for your platform " +
+                            "or you may be running a 32-bit JVM.");
                     System.loadLibrary(libname);
                     voltSharedLibraryLoaded = true;
                     hostLog.info("Successfully loaded native VoltDB library " + libname +
