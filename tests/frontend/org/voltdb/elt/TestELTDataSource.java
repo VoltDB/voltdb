@@ -85,12 +85,15 @@ public class TestELTDataSource extends TestCase {
         assertEquals(m_part, s.getPartitionId());
         assertEquals(m_site, s.getSiteId());
         assertEquals(table.getRelativeIndex(), s.getTableId());
-        assertEquals(2, s.m_columnNames.size());
-        assertEquals(2, s.m_columnTypes.size());
-        assertEquals("COL1", s.m_columnNames.get(0));
-        assertEquals("COL2", s.m_columnNames.get(1));
-        assertEquals(VoltType.INTEGER.ordinal(), s.m_columnTypes.get(0).intValue());
-        assertEquals(VoltType.STRING.ordinal(), s.m_columnTypes.get(1).intValue());
+        // There are 6 additional ELT columns added
+        assertEquals(2 + 6, s.m_columnNames.size());
+        assertEquals(2 + 6, s.m_columnTypes.size());
+        assertEquals("VOLT_TRANSACTION_ID", s.m_columnNames.get(0));
+        assertEquals("VOLT_ELT_OPERATION", s.m_columnNames.get(5));
+        assertEquals("COL1", s.m_columnNames.get(6));
+        assertEquals("COL2", s.m_columnNames.get(7));
+        assertEquals(VoltType.INTEGER.ordinal(), s.m_columnTypes.get(6).intValue());
+        assertEquals(VoltType.STRING.ordinal(), s.m_columnTypes.get(7).intValue());
     }
 
 

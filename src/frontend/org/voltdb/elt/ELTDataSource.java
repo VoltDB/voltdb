@@ -20,6 +20,7 @@ package org.voltdb.elt;
 import java.util.ArrayList;
 
 import org.voltdb.VoltDB;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.elt.processors.RawProcessor;
@@ -57,6 +58,26 @@ public class ELTDataSource {
         m_tableId = tableId;
         m_partitionId = partitionId;
         m_siteId = siteId;
+
+        // Add the ELT meta-data columns to the schema first
+        // Transaction ID
+        m_columnNames.add("VOLT_TRANSACTION_ID");
+        m_columnTypes.add((Integer)((int)VoltType.BIGINT.getValue()));
+        // timestamp
+        m_columnNames.add("VOLT_ELT_TIMESTAMP");
+        m_columnTypes.add((Integer)((int)VoltType.BIGINT.getValue()));
+        // sequence #
+        m_columnNames.add("VOLT_ELT_SEQUENCE_NUMBER");
+        m_columnTypes.add((Integer)((int)VoltType.BIGINT.getValue()));
+        // partition ID
+        m_columnNames.add("VOLT_PARTITION_ID");
+        m_columnTypes.add((Integer)((int)VoltType.BIGINT.getValue()));
+        // site ID
+        m_columnNames.add("VOLT_SITE_ID");
+        m_columnTypes.add((Integer)((int)VoltType.BIGINT.getValue()));
+        // INSERT or DELETE (ELT OPERATION TYPE?)
+        m_columnNames.add("VOLT_ELT_OPERATION");
+        m_columnTypes.add((Integer)((int)VoltType.TINYINT.getValue()));
 
         for (Column c : CatalogUtil.getSortedCatalogItems(catalogMap, "index")) {
             m_columnNames.add(c.getName());

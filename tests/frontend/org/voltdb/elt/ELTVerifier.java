@@ -90,8 +90,7 @@ class ELTVerifier extends ELTDecoderBase
         // eltxxx: verify elt headers.
         // skip the null byte array - which length depends on the total column count
         // see EE's TupleStreamWrapper::computeOffsets()
-        final int totalColCount = m_tableSchema.size() + 6;
-        final int nullArrayLength = ((totalColCount + 7) & -8) >> 3;
+        final int nullArrayLength = ((m_tableSchema.size() + 7) & -8) >> 3;
 
         try {
             // skip the elt header (txnid, timestamp, seqno, pid, sid, 'I'/'D')
@@ -99,7 +98,9 @@ class ELTVerifier extends ELTDecoderBase
             fds.skipBytes(41);
 
             // iterate the schema, decode and verify the rowdata
-            for (int i=0; i < m_tableSchema.size(); i++) {
+            // skip 6 cols into the ELT schema since it includes the ELT columns
+            // but then we need to back up the index into srcdata.
+            for (int i=6; i < m_tableSchema.size(); i++) {
                 switch (m_tableSchema.get(i)) {
                 default:
                     assert(false) : "Unknown type in verifyRow()";
@@ -107,56 +108,56 @@ class ELTVerifier extends ELTDecoderBase
                     m_rowFailed = true;
                     return false;
                 case TINYINT:
-                    result = decodeAndCompareTinyInt(srcdata[i], fds);
+                    result = decodeAndCompareTinyInt(srcdata[i - 6], fds);
                     if (!result) {
                         m_rowFailed = true;
                         return false;
                     }
                     break;
                 case SMALLINT:
-                    result = decodeAndCompareSmallInt(srcdata[i], fds);
+                    result = decodeAndCompareSmallInt(srcdata[i - 6], fds);
                     if (!result) {
                         m_rowFailed = true;
                         return false;
                     }
                     break;
                 case INTEGER:
-                    result = decodeAndCompareInteger(srcdata[i], fds);
+                    result = decodeAndCompareInteger(srcdata[i - 6], fds);
                     if (!result) {
                         m_rowFailed = true;
                         return false;
                     }
                     break;
                 case BIGINT:
-                    result = decodeAndCompareBigInt(srcdata[i], fds);
+                    result = decodeAndCompareBigInt(srcdata[i - 6], fds);
                     if (!result) {
                         m_rowFailed = true;
                         return false;
                     }
                     break;
                 case FLOAT:
-                    result = decodeAndCompareFloat(srcdata[i], fds);
+                    result = decodeAndCompareFloat(srcdata[i - 6], fds);
                     if (!result) {
                         m_rowFailed = true;
                         return false;
                     }
                     break;
                 case TIMESTAMP:
-                    result = decodeAndCompareTimestamp(srcdata[i], fds);
+                    result = decodeAndCompareTimestamp(srcdata[i - 6], fds);
                     if (!result) {
                         m_rowFailed = true;
                         return false;
                     }
                     break;
                 case STRING:
-                    result = decodeAndCompareString(srcdata[i], fds);
+                    result = decodeAndCompareString(srcdata[i - 6], fds);
                     if (!result) {
                         m_rowFailed = true;
                         return false;
                     }
                     break;
                 case DECIMAL:
-                    result = decodeAndCompareDecimal(srcdata[i], fds);
+                    result = decodeAndCompareDecimal(srcdata[i - 6], fds);
                     if (!result) {
                         m_rowFailed = true;
                         return false;
