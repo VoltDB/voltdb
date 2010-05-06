@@ -48,4 +48,8 @@
                         "template": "regression-basic-timestamp.sql",
                         "template-hsqldb": "regression-basic-timestamp-hsql.sql",
                         "normalizer": "normalizer.py"},
+    "basic-matview": {"schema": "matview-schema.py",
+                      "ddl": "matview-DDL.sql",
+                      "template": "regression-basic-matview.sql",
+                      "normalizer": "normalizer.py"},
 }
