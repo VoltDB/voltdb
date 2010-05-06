@@ -40,7 +40,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
 
     private final ArrayDeque<WorkUnit> m_readyWorkUnits = new ArrayDeque<WorkUnit>();
     private boolean m_isCoordinator;
-    private int m_siteId;
+    private final int m_siteId;
     private int[] m_nonCoordinatingSites;
     private boolean m_shouldResumeProcedure = false;
     private boolean m_hasStartedWork = false;
@@ -341,8 +341,8 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         }
 
         // if this txn is a participant and this is a final task...
-        // if it's empty, then it's always a commit message
-        // if it's got work in it, then it's only a commit message if
+        // if empty, then it's always a commit message
+        // if has work, then it's only a commit message if
         //    the transaction is clean (and stays clean after this work)
         if ((!m_isCoordinator) && (task.isFinalTask())) {
             // add a workunit that will commit the txn
