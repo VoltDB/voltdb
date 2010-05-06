@@ -300,6 +300,9 @@ public class FastSerializer implements DataOutput {
         write(strbytes);
     }
 
+    // These writeArray() methods are tested in TestSQLTypesSuite.
+    // If changing the max limits, please update testInvalidParameterSerializations.
+
     public void writeArray(FastSerializable[] values) throws IOException {
         if (values.length > Short.MAX_VALUE) {
             throw new IOException("Array exceeds maximum length of "

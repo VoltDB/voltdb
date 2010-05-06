@@ -36,12 +36,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.regressionsuites.sqltypesprocs.Delete;
-import org.voltdb.regressionsuites.sqltypesprocs.Insert;
-import org.voltdb.regressionsuites.sqltypesprocs.InsertMulti;
-import org.voltdb.regressionsuites.sqltypesprocs.Select;
-import org.voltdb.regressionsuites.sqltypesprocs.Update;
-import org.voltdb.regressionsuites.sqltypesprocs.UpdateDecimal;
+import org.voltdb.regressionsuites.sqltypesprocs.*;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 
@@ -65,7 +60,8 @@ public class TestSQLTypesSuite extends RegressionSuite {
                                            InsertMulti.class,
                                            Select.class,
                                            Update.class,
-                                           UpdateDecimal.class};
+                                           UpdateDecimal.class,
+                                           TestParamSetErrors.class};
 
 
     /** Utility to create an array of bytes with value "b" of length "length" */
@@ -989,6 +985,70 @@ public class TestSQLTypesSuite extends RegressionSuite {
         final BigDecimal bd = (row.getDecimalAsBigDecimal(11));
         assertTrue(comparisonHelper(m_minValues[10], bd, m_types[10]));
     }
+
+    private void helper_testInvalidParameterSerializations(Client client, Object[] params)
+    throws NoConnectionsException, IOException, ProcCallException
+    {
+        try {
+            client.callProcedure("TestParamSetErrors", params);
+        }
+        catch (RuntimeException e) {
+            assertTrue(e.getCause() instanceof IOException);
+        }
+    }
+
+    public void testInvalidParameterSerializations()
+    throws NoConnectionsException, ProcCallException, IOException
+    {
+        final Client client = this.getClient();
+        final Object params[] = new Object[8];
+
+        params[0] = new short[1];
+        params[1] = new int[1];
+        params[2] = new long[1];
+        params[3] = new double[1];
+        params[4] = new String[1];
+        params[5] = new TimestampType[1];
+        params[6] = new BigDecimal[1];
+        params[7] = new byte[1];
+
+        // make sure the procedure CAN work.
+        client.callProcedure("TestParamSetErrors", params);
+
+        // now cycle through invalid array lengths
+        // these should fail in client serialization to the server
+        params[0] = new short[Short.MAX_VALUE + 1];
+        helper_testInvalidParameterSerializations(client, params);
+
+        params[0] = new short[1];
+        params[1] = new int[Short.MAX_VALUE + 1];
+        helper_testInvalidParameterSerializations(client, params);
+
+        params[1] = new int[1];
+        params[2] = new long[Short.MAX_VALUE + 1];
+        helper_testInvalidParameterSerializations(client, params);
+
+        params[2] = new long[1];
+        params[3] = new double[Short.MAX_VALUE + 1];
+        helper_testInvalidParameterSerializations(client, params);
+
+        params[3] = new double[1];
+        params[4] = new String[Short.MAX_VALUE + 1];
+        helper_testInvalidParameterSerializations(client, params);
+
+        params[4] = new String[1];
+        params[5] = new TimestampType[Short.MAX_VALUE + 1];
+        helper_testInvalidParameterSerializations(client, params);
+
+        params[5] = new TimestampType[1];
+        params[6] = new BigDecimal[Short.MAX_VALUE + 1];
+        helper_testInvalidParameterSerializations(client, params);
+
+        params[6] = new BigDecimal[1];
+        params[7] = new byte[VoltType.MAX_VALUE_LENGTH + 1];
+        helper_testInvalidParameterSerializations(client, params);
+    }
+
 
     //
     // JUnit / RegressionSuite boilerplate
