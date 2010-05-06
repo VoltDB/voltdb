@@ -119,24 +119,28 @@ public class ELConnection implements Runnable {
         // loop here to empty RX ?
         // receive data from network and hand to the proper ELProtocolHandler RX queue
         ELTProtoMessage m = null;
-        try {
-            m = nextMessage();
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-
-        if (m != null &&m.isError())
+        do
         {
-            // XXX handle error from server, just die for now
-            m_state = CLOSING;
-        }
+            try {
+                m = nextMessage();
+            } catch (IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
 
-        if (m != null && m.isPollResponse())
-        {
-            ELDataSink rx_sink = m_sinks.get(m.getTableId()).get(m.getPartitionId());
-            rx_sink.getRxQueue().offer(m);
+            if (m != null &&m.isError())
+            {
+                // XXX handle error from server, just die for now
+                m_state = CLOSING;
+            }
+
+            if (m != null && m.isPollResponse())
+            {
+                ELDataSink rx_sink = m_sinks.get(m.getTableId()).get(m.getPartitionId());
+                rx_sink.getRxQueue().offer(m);
+            }
         }
+        while (m != null);
 
         // work all the ELProtocolHandlers
         for (HashMap<Integer, ELDataSink> part_map : m_sinks.values())
