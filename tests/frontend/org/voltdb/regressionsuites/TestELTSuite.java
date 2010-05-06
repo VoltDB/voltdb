@@ -24,8 +24,6 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
-import java.util.ArrayList;
-
 import org.voltdb.*;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.*;
@@ -448,7 +446,7 @@ public class TestELTSuite extends RegressionSuite {
 
         // JNI
         final VoltServerConfig config =
-            new LocalSingleProcessServer("elt-ddl.sql", 1,
+            new LocalSingleProcessServer("elt-ddl.sql", 2,
                                          BackendTarget.NATIVE_EE_JNI);
 
         config.compile(project);
