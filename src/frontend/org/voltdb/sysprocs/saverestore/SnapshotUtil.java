@@ -557,6 +557,7 @@ public class SnapshotUtil {
                     missingTables.append(", ");
                 }
                 missingTables.append(tableName);
+                hh++;
             }
             missingTables.append('\n');
         }

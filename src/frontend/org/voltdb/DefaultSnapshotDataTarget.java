@@ -138,7 +138,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         fs.writeString(hostname);
         fs.writeString(clusterName);
         fs.writeString(databaseName);
-        fs.writeString(tableName);
+        fs.writeString(tableName.toUpperCase());
         fs.writeBoolean(isReplicated);
         if (!isReplicated) {
             fs.writeArray(partitionIds);

@@ -159,6 +159,9 @@ public class FastDeserializer implements DataInput {
             throw new IOException("Serializable strings cannot be longer then "
                     + VoltType.MAX_VALUE_LENGTH + " bytes");
         }
+        if (len < NULL_STRING_INDICATOR) {
+            throw new IOException("String length is negative " + len);
+        }
 
         // now assume not null
         final byte[] strbytes = new byte[len];
@@ -193,7 +196,14 @@ public class FastDeserializer implements DataInput {
 
     public Object readArray(final Class<?> type) throws IOException {
         final int count = type == byte.class ? readInt() : readShort();
-
+        if (count < 0) {
+            throw new IOException("Array length is negative " + count);
+        }
+        if (type == byte.class) {
+            if (count > (1024 * 1024)) {
+                throw new IOException("Array length is greater then the max of 1 megabyte " + count);
+            }
+        }
         if (type == byte.class) {
             final byte[] retval = new byte[count];
             for (int i = 0; i < count; i++) {

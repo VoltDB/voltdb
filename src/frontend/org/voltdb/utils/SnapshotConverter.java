@@ -91,11 +91,12 @@ public class SnapshotConverter {
                     System.err.println("Error: No tables specified");
                     System.exit(-1);
                 }
-                for (String table : tables) {
-                    if (table.isEmpty()) {
+                for (int dd = 0; dd < tables.length; dd++) {
+                    if (tables[dd].isEmpty()) {
                         System.err.println("Error: Empty table name specified");
                         System.exit(-1);
                     }
+                    tables[dd] = tables[dd].toUpperCase();
                 }
             } else if (arg.equals("--outdir")) {
                 if (args.length < ii + 1) {
@@ -144,20 +145,18 @@ public class SnapshotConverter {
         }
         boolean fail = false;
         if (snapshotName == null) {
-            System.err.println("Error: No --snapshot specified");
+            System.err.println("Error: No --name specified");
             fail = true;
         }
         if (directories == null) {
-            System.err.println("Error: No --dirs specified");
-            fail = true;
+            directories = new File[] { new File(".") };
         }
         if (tables == null) {
             System.err.println("Error: No --tables specified");
             fail = true;
         }
         if (outdir == null) {
-            System.err.println("Error: No --outdir specified");
-            fail = true;
+            outdir = new File(".");
         }
         if (type == null) {
             System.err.println("Error: No --type specified");
@@ -303,8 +302,8 @@ public class SnapshotConverter {
     }
 
     private static void printHelpAndQuit( int code) {
-        System.out.println("snapshotconvert --help");
-        System.out.println("snapshotconvert --name full_snapshot_name --dirs dir1[,dir2[,dir3[..]]] " +
+        System.out.println("java -cp <classpath> -Djava.library.path=<library path> org.voltdb.utils.SnapshotConverter --help");
+        System.out.println("java -cp <classpath> -Djava.library.path=<library path> org.voltdb.utils.SnapshotConverter --name full_snapshot_name --dirs dir1[,dir2[,dir3[..]]] " +
                 "--tables table1[,table2[,table3[..]]] --type CSV|TSV --outdir dir ");
         System.exit(code);
     }

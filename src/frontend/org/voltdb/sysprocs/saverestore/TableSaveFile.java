@@ -74,7 +74,7 @@ public class TableSaveFile
      * big enough...
      */
     private static final int DEFAULT_CHUNKSIZE =
-        org.voltdb.SnapshotSiteProcessor.m_snapshotBufferLength;
+        org.voltdb.SnapshotSiteProcessor.m_snapshotBufferLength + (1024 * 256);
 
     public TableSaveFile(
             FileChannel dataIn,

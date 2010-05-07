@@ -59,7 +59,7 @@ class SnapshotDaemon {
      * enough time has passed.
      */
     private long m_lastSysprocInvocation = System.currentTimeMillis();
-    private final long m_minTimeBetweenSysprocs = 3000;
+    private final long m_minTimeBetweenSysprocs = 7000;
 
     /**
      * List of snapshots on disk sorted by creation time

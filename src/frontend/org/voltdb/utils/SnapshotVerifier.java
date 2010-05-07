@@ -34,28 +34,29 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil.SpecificSnapshotFilter;
 public class SnapshotVerifier {
 
     public static void main(String args[]) {
-        if (args[0].equals("--help")) {
+        if (args.length == 0) {
+            //printHelpAndQuit(0);
+        } else if (args[0].equals("--help")) {
             printHelpAndQuit(0);
         }
 
+        FileFilter filter = new SnapshotFilter();
         boolean specifiedSingle = false;
-        boolean specifiedAll = false;
+        String snapshotName = null;
         for (int ii = 0; ii < args.length; ii++) {
-            if (args[ii].equals("--single")) {
+            if (args[ii].equals("--name")) {
                 specifiedSingle = true;
-            } else if (args[ii].equals("--all")) {
-                specifiedAll = true;
+                if (ii + 1 >= args.length) {
+                    System.err.println("Error: No snapshot name specified after --name");
+                    printHelpAndQuit(-1);
+                }
+                snapshotName = args[ii + 1];
+                break;
             }
         }
 
-        if (specifiedSingle && specifiedAll) {
-            System.err.println("Error: Can only specify one option of --single or --all");
-            printHelpAndQuit(-1);
-        }
-
-        if (!specifiedSingle && !specifiedAll) {
-            System.err.println("Error: Must specify one of --single or --all");
-            printHelpAndQuit(-1);
+        if (specifiedSingle) {
+            filter = new SpecificSnapshotFilter(snapshotName);
         }
 
         List<String> directories = null;
@@ -64,36 +65,14 @@ public class SnapshotVerifier {
                 if (ii + 1 >= args.length) {
                     System.err.println("Error: No directories specified after --dirs");
                     printHelpAndQuit(-1);
+                    break;
                 }
                 directories = Arrays.asList(args[ii + 1].split(","));
             }
         }
         if (directories == null) {
-            System.err.println("Error: No directories specified using --dirs");
-            printHelpAndQuit(-1);
-        }
-
-        FileFilter filter = new SnapshotFilter();
-
-        if (specifiedSingle) {
-            String snapshotName = null;
-            for (int ii = 0; ii < args.length; ii++) {
-                if (args[ii].equals("--name")) {
-                    if (ii + 1 >= args.length) {
-                        System.err.println("Error: No name specified after --name");
-                        printHelpAndQuit(-1);
-                    }
-                    snapshotName = args[ii + 1];
-                    break;
-                }
-            }
-
-            if (snapshotName == null) {
-                System.err.println("Error: No snapshot name specified using --name even though --single was specified");
-                printHelpAndQuit(-1);
-            }
-
-            filter = new SpecificSnapshotFilter(snapshotName);
+            directories = new ArrayList<String>();
+            directories.add(".");
         }
 
         TreeMap<Long, Snapshot> snapshots = new TreeMap<Long, Snapshot>();
@@ -111,8 +90,8 @@ public class SnapshotVerifier {
     }
 
     private static void printHelpAndQuit( int code) {
-        System.out.println("Usage: snapshotcheck --single --name full_snapshot_name --dirs dir1[,dir2[,dir3[..]]] ");
-        System.out.println("snapshotcheck --all --dirs dir1[,dir2[,dir3[..]]] ");
+        System.out.println("Usage\nSpecific snapshot: java -cp <classpath> -Djava.library.path=<library path> org.voltdb.utils.SnapshotVerifier --name snapshot_name --dirs dir1[,dir2[,dir3[..]]] ");
+        System.out.println("All snapshots: java -cp <classpath> -Djava.library.path=<library path> org.voltdb.utils.SnapshotVerifier --dirs dir1[,dir2[,dir3[..]]] ");
         System.exit(code);
     }
 }

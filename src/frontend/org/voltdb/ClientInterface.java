@@ -377,7 +377,27 @@ public class ClientInterface implements DumpManager.Dumpable {
             }
             lengthBuffer.flip();
 
-            final ByteBuffer message = ByteBuffer.allocate(lengthBuffer.getInt());
+            final int messageLength = lengthBuffer.getInt();
+            if (messageLength < 0) {
+              //Send negative response
+                responseBuffer.put((byte)3).flip();
+                socket.write(responseBuffer);
+                socket.close();
+                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
+                             "): wire protocol violation (message length " + messageLength + " is negative).");
+                return null;
+            }
+            if (messageLength > ((1024 * 1024) * 2)) {
+                //Send negative response
+                  responseBuffer.put((byte)3).flip();
+                  socket.write(responseBuffer);
+                  socket.close();
+                  authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
+                               "): wire protocol violation (message length " + messageLength + " is too large).");
+                  return null;
+              }
+
+            final ByteBuffer message = ByteBuffer.allocate(messageLength);
             //Do non-blocking I/O to retrieve the login message
             for (int ii = 0; ii < 4; ii++) {
                 socket.read(message);

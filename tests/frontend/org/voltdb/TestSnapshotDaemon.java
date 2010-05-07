@@ -382,7 +382,7 @@ public class TestSnapshotDaemon {
         work = daemon.processClientResponse(getSuccessfulScanOneResult());
         assertNull(work);
         assertNull(daemon.processPeriodicWork(startTime + 2000));
-        work = daemon.processPeriodicWork(startTime + 5000);
+        work = daemon.processPeriodicWork(startTime + 8000);
         assertNotNull(work);
         assertTrue("@SnapshotSave".equals(work.getFirst()));
         assertTrue("/tmp".equals(work.getSecond()[0]));
@@ -407,7 +407,7 @@ public class TestSnapshotDaemon {
         assertNotNull(daemon.processPeriodicWork(startTime));
         assertNotNull(daemon.processClientResponse(getSuccessfulScanThreeResults()));
         assertNull(daemon.processClientResponse(getErrMsgResponse()));
-        daemon.processPeriodicWork(startTime + 5000);
+        daemon.processPeriodicWork(startTime + 7500);
         assertNull(daemon.processPeriodicWork(startTime + 10000));
         daemon.processClientResponse(new ClientResponse() {
 
