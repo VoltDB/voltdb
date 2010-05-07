@@ -61,7 +61,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
                                            Select.class,
                                            Update.class,
                                            UpdateDecimal.class,
-                                           TestParamSetErrors.class};
+                                           ParamSetArrays.class};
 
 
     /** Utility to create an array of bytes with value "b" of length "length" */
@@ -990,7 +990,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
     throws NoConnectionsException, IOException, ProcCallException
     {
         try {
-            client.callProcedure("TestParamSetErrors", params);
+            client.callProcedure("ParamSetArrays", params);
         }
         catch (RuntimeException e) {
             assertTrue(e.getCause() instanceof IOException);
@@ -1013,7 +1013,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
         params[7] = new byte[1];
 
         // make sure the procedure CAN work.
-        client.callProcedure("TestParamSetErrors", params);
+        client.callProcedure("ParamSetArrays", params);
 
         // now cycle through invalid array lengths
         // these should fail in client serialization to the server

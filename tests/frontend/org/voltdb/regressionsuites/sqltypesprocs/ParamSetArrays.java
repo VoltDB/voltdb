@@ -38,7 +38,7 @@ import org.voltdb.types.TimestampType;
 /**
  * Explicitly manipulate decimal columns using parameter value expressions.
  */
-public class TestParamSetErrors extends VoltProcedure {
+public class ParamSetArrays extends VoltProcedure {
 
     public final SQLStmt u_allow_null_where = new SQLStmt(
             "Update ALLOW_NULLS set A_DECIMAL = ? where A_DECIMAL = ?;"
