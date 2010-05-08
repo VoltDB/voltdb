@@ -29,12 +29,15 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.replication.EvilDeterminism;
 import org.voltdb.regressionsuites.replication.SelectEmptyTable;
 
 public class TestReplicationSuite extends RegressionSuite
 {
     /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { SelectEmptyTable.class };
+    static final Class<?>[] PROCEDURES = {
+        SelectEmptyTable.class, EvilDeterminism.class
+    };
 
     public void testSinglePartitionInsert()
     throws IOException, ProcCallException
@@ -86,6 +89,16 @@ public class TestReplicationSuite extends RegressionSuite
         System.out.println("results: " + results[0].toString());
     }
 
+    // Make sure date and random number APIs return deterministic results
+    public void testDeterminismInAPI()
+    throws IOException, ProcCallException
+    {
+        Client client = getClient();
+        // should fail if both copies don't return the same result or if an
+        // exception is thrown
+        VoltTable[] results = client.callProcedure("EvilDeterminism", 1).getResults();
+        assertEquals(1, results[0].getRowCount());
+    }
 
     public TestReplicationSuite(String name)
     {

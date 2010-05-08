@@ -25,10 +25,12 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 
 import org.apache.log4j.Level;
@@ -573,7 +575,31 @@ public abstract class VoltProcedure {
         }
     }
 
+    /**
+     * Get a Java RNG seeded with the current transaction id. This will ensure that
+     * two procedures for the same transaction, but running on different replicas,
+     * can generate an identical stream of random numbers. This is required to endure
+     * procedures have deterministic behavior.
+     *
+     * @return A deterministically-seeded java.util.Random instance.
+     */
+    public Random getSeededRandomNumberGenerator() {
+        return new Random(m_currentTxnState.txnId);
+    }
 
+    /**
+     * Get the time that this procedure was accepted into the VoltDB cluster. This is the
+     * effective, but not always actual, moment in time this procedure executes. Use this
+     * method to get the current time instead of non-deterministic methods. Note that the
+     * value will not be unique across transactions as it is only millisecond granularity.
+     *
+     * @return A java.util.Date instance with deterministic time for all replicas using
+     * UTC (Universal Coordinated Time is like GMT).
+     */
+    public Date getTransactionTime() {
+        long ts = TransactionIdManager.getTimestampFromTransactionId(m_currentTxnState.txnId);
+        return new Date(ts);
+    }
 
     /**
      * Queue the SQL {@link org.voltdb.SQLStmt statement} for execution with the specified argument list.

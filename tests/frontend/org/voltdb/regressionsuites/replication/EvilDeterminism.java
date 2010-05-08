@@ -23,32 +23,45 @@
 
 package org.voltdb.regressionsuites.replication;
 
+import java.util.Date;
+import java.util.Random;
+
 import org.voltdb.ProcInfo;
-import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.VoltTable.ColumnInfo;
 
 @ProcInfo(
-          partitionInfo = "P1.ID: 0",
-          singlePartition = true)
+        partitionInfo = "P1.ID: 0",
+        singlePartition = true
+)
+public class EvilDeterminism extends VoltProcedure {
 
-public class SelectEmptyTable extends VoltProcedure
-{
-    public final SQLStmt makeReadWrite =
-        new SQLStmt("insert into P1 VALUES (?, 'bung', 1, 1.0);");
-
-    public VoltTable[] run(long id)
+    public VoltTable run(long id)
     {
+        // Get a deterministic date and a non-deterministic date and
+        // verify they're within ten seconds of each other as a basic
+        // sanity check
+        long nonDeterDate = new Date().getTime();
+        long deterDate = getTransactionTime().getTime();
+        long diffInMS = nonDeterDate - deterDate;
+        if (diffInMS > 10000) {
+            String msg = "VoltProcedure time is to far from real time: " + String.valueOf(diffInMS) + " ms";
+            throw new VoltAbortException(msg);
+        }
 
-        VoltTable empty1 = new VoltTable(new VoltTable.ColumnInfo("column1",VoltType.BIGINT),
-                                          new VoltTable.ColumnInfo("column2",VoltType.BIGINT),
-                                          new VoltTable.ColumnInfo("column3",VoltType.BIGINT),
-                                          new VoltTable.ColumnInfo("column4",VoltType.BIGINT),
-                                          new VoltTable.ColumnInfo("checktime",VoltType.BIGINT));
+        // Get a deterministically-generated random number
+        Random rand = getSeededRandomNumberGenerator();
+        long randNo = rand.nextLong();
 
-        VoltTable empty2 = new VoltTable(new VoltTable.ColumnInfo("called_time_milliseconds",VoltType.BIGINT));
-        final VoltTable[] vtReturn = {empty1, empty2};
-        return vtReturn;
+        // Return the deterministic values.
+        // Replication should check to make sure they're the same
+        // from all replicas.
+        VoltTable retval = new VoltTable(
+                new ColumnInfo("date", VoltType.BIGINT),
+                new ColumnInfo("rand", VoltType.BIGINT));
+        retval.addRow(deterDate, randNo);
+        return retval;
     }
 }
