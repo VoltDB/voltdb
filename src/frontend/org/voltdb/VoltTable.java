@@ -200,9 +200,16 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
         m_colCount = columnCount;
         m_rowCount = 0;
 
-        assert(columns != null);
-        assert(columnCount > 0);
-        assert(columns.length >= columnCount);
+        // do some trivial checks to make sure the schema is not totally wrong
+        if (columns == null) {
+            throw new RuntimeException("VoltTable(..) constructor passed null schema.");
+        }
+        if (columnCount <= 0) {
+            throw new RuntimeException("VoltTable(..) constructor requires at least one column.");
+        }
+        if (columns.length < columnCount) {
+            throw new RuntimeException("VoltTable(..) constructor passed truncated column schema array.");
+        }
 
         // put a dummy value in for header size for now
         m_buffer.putInt(0);
