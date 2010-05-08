@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.benchmark.Verification.Expression;
@@ -902,7 +903,7 @@ public abstract class ClientMain {
                         if (chunk == null)
                             continue;
 
-                        table = new VoltTable(chunk.b, true);
+                        table = PrivateVoltTableFactory.createVoltTableFromBuffer(chunk.b, true);
                         // Now, check each row
                         while (isSatisfied && table.advanceRow()) {
                             isSatisfied = Verification.checkRow(m_constraints.get(key),

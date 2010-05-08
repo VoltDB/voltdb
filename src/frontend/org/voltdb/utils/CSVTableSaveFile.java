@@ -19,6 +19,7 @@ package org.voltdb.utils;
 
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
 import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
@@ -170,7 +171,8 @@ public class CSVTableSaveFile {
 
                 try {
                     final int size = c.b.remaining();
-                    final VoltTable vt = new VoltTable(c.b, true);
+                    final VoltTable vt =
+                        PrivateVoltTableFactory.createVoltTableFromBuffer(c.b, true);
                     StringBuilder sb = new StringBuilder(size * 2);
                     final SimpleDateFormat sdf = new SimpleDateFormat("yyyy.MM.dd HH:mm:ss:SSS:");
                     while (vt.advanceRow()) {

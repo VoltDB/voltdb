@@ -37,6 +37,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite;
 import org.voltdb.ParameterSet;
+import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SysProcSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -921,7 +922,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         }
         if (result == ExecutionEngine.ERRORCODE_SUCCESS) {
             final VoltTable resultTables[] = new VoltTable[1];
-            resultTables[0] = new VoltTable();
+            resultTables[0] = PrivateVoltTableFactory.createUnititializedVoltTable();
             try {
                 m_connection.readResultTables(resultTables);
             } catch (final IOException e) {
@@ -951,7 +952,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         if (result == ExecutionEngine.ERRORCODE_SUCCESS) {
             final VoltTable resultTables[] = new VoltTable[numFragmentIds];
             for (int ii = 0; ii < numFragmentIds; ii++) {
-                resultTables[ii] = new VoltTable();
+                resultTables[ii] = PrivateVoltTableFactory.createUnititializedVoltTable();
             }
             try {
                 m_connection.readResultTables(resultTables);
@@ -1085,7 +1086,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
                 final FastDeserializer fds = new FastDeserializer(messageBuffer);
                 final VoltTable results[] = new VoltTable[1];
-                final VoltTable resultTable = new VoltTable();
+                final VoltTable resultTable = PrivateVoltTableFactory.createUnititializedVoltTable();
                 results[0] = (VoltTable)fds.readObject(resultTable, this);
                 return results;
             }

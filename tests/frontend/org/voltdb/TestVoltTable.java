@@ -153,6 +153,14 @@ public class TestVoltTable extends TestCase {
         } catch (IllegalArgumentException e) {}
     }
 
+    public void testLongSchemaOver1K() {
+        StringBuilder columnname = new StringBuilder();
+        while (columnname.length() < 8192) {
+            columnname.append("ryanlikestheyankees");
+        }
+        t = new VoltTable(new ColumnInfo(columnname.toString(), VoltType.BIGINT));
+    }
+
     public void testColumnIndexBounds() {
         try {
             LONG_FIVE.fetchRow(0).getLong(-1);

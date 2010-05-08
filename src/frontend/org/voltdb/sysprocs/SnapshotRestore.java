@@ -312,7 +312,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                     if (c == null) {
                         continue;//Should be equivalent to break
                     }
-                    VoltTable old_table = new VoltTable(c.b, true);
+                    VoltTable old_table = PrivateVoltTableFactory.createVoltTableFromBuffer(c.b, true);
                     Table new_catalog_table = getCatalogTable(table_name);
                     table = SavedTableConverter.convertTable(old_table,
                                                              new_catalog_table);
@@ -858,24 +858,26 @@ public class SnapshotRestore extends VoltSystemProcedure
                 }
 
                 if (needsConversion == null) {
-                    VoltTable old_table = new VoltTable(c.b.duplicate(), true);
+                    VoltTable old_table =
+                        PrivateVoltTableFactory.createVoltTableFromBuffer(c.b.duplicate(), true);
                     needsConversion = SavedTableConverter.needsConversion(old_table, new_catalog_table);
                 }
                 if (needsConversion.booleanValue()) {
-                    VoltTable old_table = new VoltTable(c.b , true);
+                    VoltTable old_table =
+                        PrivateVoltTableFactory.createVoltTableFromBuffer(c.b , true);
                     table = SavedTableConverter.convertTable(old_table,
                                                          new_catalog_table);
                 } else {
                     ByteBuffer copy = ByteBuffer.allocate(c.b.remaining());
                     copy.put(c.b);
                     copy.flip();
-                    table = new VoltTable(copy, true);
+                    table = PrivateVoltTableFactory.createVoltTableFromBuffer(copy, true);
                 }
                 c.discard();
             }
             catch (IOException e)
             {
-                VoltTable result = new VoltTable();
+                VoltTable result = PrivateVoltTableFactory.createUnititializedVoltTable();
                 result = constructResultsTable();
                 result.addRow(m_hostId, hostname, m_siteId, tableName, -1, "FAILURE",
                               "Unable to load table: " + tableName +
@@ -884,7 +886,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             }
             catch (VoltTypeException e)
             {
-                VoltTable result = new VoltTable();
+                VoltTable result = PrivateVoltTableFactory.createUnititializedVoltTable();
                 result = constructResultsTable();
                 result.addRow(m_hostId, hostname, m_siteId, tableName, -1, "FAILURE",
                               "Unable to load table: " + tableName +
@@ -984,11 +986,11 @@ public class SnapshotRestore extends VoltSystemProcedure
                 }
 
                 if (needsConversion == null) {
-                    VoltTable old_table = new VoltTable(c.b.duplicate(), true);
+                    VoltTable old_table = PrivateVoltTableFactory.createVoltTableFromBuffer(c.b.duplicate(), true);
                     needsConversion = SavedTableConverter.needsConversion(old_table, new_catalog_table);
                 }
 
-                final VoltTable old_table = new VoltTable(c.b, true);
+                final VoltTable old_table = PrivateVoltTableFactory.createVoltTableFromBuffer(c.b, true);
                 if (needsConversion) {
                     table = SavedTableConverter.convertTable(old_table,
                                                              new_catalog_table);
@@ -998,7 +1000,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             }
             catch (IOException e)
             {
-                VoltTable result = new VoltTable();
+                VoltTable result = PrivateVoltTableFactory.createUnititializedVoltTable();
                 result = constructResultsTable();
                 result.addRow(m_hostId, hostname, m_siteId, tableName, relevantPartitionIds[0],
                               "FAILURE", "Unable to load table: " + tableName +
@@ -1007,7 +1009,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             }
             catch (VoltTypeException e)
             {
-                VoltTable result = new VoltTable();
+                VoltTable result = PrivateVoltTableFactory.createUnititializedVoltTable();
                 result = constructResultsTable();
                 result.addRow(m_hostId, hostname, m_siteId, tableName, relevantPartitionIds[0],
                               "FAILURE", "Unable to load table: " + tableName +

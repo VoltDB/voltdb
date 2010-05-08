@@ -34,9 +34,11 @@ import org.voltdb.*;
 )
 public class measureOverhead extends VoltProcedure {
     @SuppressWarnings("unused")
-    private final VoltTable item_data_template = new VoltTable();
+    private final VoltTable item_data_template =
+        PrivateVoltTableFactory.createUnititializedVoltTable();
     @SuppressWarnings("unused")
-    private final VoltTable misc_template = new VoltTable();
+    private final VoltTable misc_template =
+        PrivateVoltTableFactory.createUnititializedVoltTable();
 
     public final SQLStmt getID = new SQLStmt("SELECT NO_O_ITEM FROM NEWORDER WHERE NO_O_ID = ?;");
 

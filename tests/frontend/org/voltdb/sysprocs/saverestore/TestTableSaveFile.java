@@ -31,6 +31,7 @@ import java.util.zip.CRC32;
 import junit.framework.TestCase;
 
 import org.voltdb.DefaultSnapshotDataTarget;
+import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -191,7 +192,7 @@ public class TestTableSaveFile extends TestCase {
 
         BBContainer c = savefile.getNextChunk();
         try {
-            VoltTable test_table = new VoltTable(c.b, false);
+            VoltTable test_table = PrivateVoltTableFactory.createVoltTableFromBuffer(c.b, false);
             test_table.toString();
             assertEquals(table, test_table);
         } finally {
@@ -212,7 +213,7 @@ public class TestTableSaveFile extends TestCase {
         while (savefile.hasMoreChunks()) {
             BBContainer c = savefile.getNextChunk();
             try {
-                test_table = new VoltTable(c.b, false);
+                test_table = PrivateVoltTableFactory.createVoltTableFromBuffer(c.b, false);
                 if (reaggregate_table == null) {
                     reaggregate_table = test_table.clone(10000);
                 }

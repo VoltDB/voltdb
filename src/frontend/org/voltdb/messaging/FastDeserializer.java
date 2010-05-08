@@ -27,6 +27,8 @@ import java.nio.ByteOrder;
 
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
+import org.voltdb.PrivateVoltTableFactory;
+import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 
 /**
@@ -92,11 +94,18 @@ public class FastDeserializer implements DataInput {
      * @return A derserialized object.
      * @throws IOException Rethrows any IOExceptions thrown.
      */
+    @SuppressWarnings("unchecked")
     public <T extends FastSerializable> T readObject(final Class<T> expectedType) throws IOException {
         assert(expectedType != null);
         T obj = null;
         try {
-            obj = expectedType.newInstance();
+            // Since VoltTable has no empty ctor, special case it
+            if (expectedType == VoltTable.class) {
+                obj = (T) PrivateVoltTableFactory.createUnititializedVoltTable();
+            }
+            else {
+                obj = expectedType.newInstance();
+            }
             obj.readExternal(this);
         } catch (final InstantiationException e) {
             e.printStackTrace();

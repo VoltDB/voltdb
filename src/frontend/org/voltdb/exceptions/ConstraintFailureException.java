@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 import java.util.logging.Logger;
 
 import org.voltdb.types.ConstraintType;
+import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.FastDeserializer;
 
@@ -75,7 +76,7 @@ public class ConstraintFailureException extends SQLException {
             return table;
         }
 
-        table = new VoltTable();
+        table = PrivateVoltTableFactory.createUnititializedVoltTable();
         try {
             table.readExternal(new FastDeserializer(buffer));
         } catch (IOException e) {

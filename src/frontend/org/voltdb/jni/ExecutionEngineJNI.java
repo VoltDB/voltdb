@@ -24,6 +24,7 @@ import org.apache.log4j.Logger;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite;
 import org.voltdb.ParameterSet;
+import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SysProcSelector;
 import org.voltdb.VoltTable;
 import org.voltdb.elt.ELTProtoMessage;
@@ -348,7 +349,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 fullBacking.position(fullBacking.position() + tableSize);
                 tableBacking.limit(tableSize);
 
-                results[i] = new VoltTable(tableBacking, true);
+                results[i] = PrivateVoltTableFactory.createVoltTableFromBuffer(tableBacking, true);
             }
             return results;
         } catch (final IOException ex) {
@@ -441,7 +442,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             deserializer.readInt();//Ignore the length of the result tables
             final VoltTable results[] = new VoltTable[numResults];
             for (int ii = 0; ii < numResults; ii++) {
-                final VoltTable resultTable = new VoltTable();
+                final VoltTable resultTable = PrivateVoltTableFactory.createUnititializedVoltTable();
                 results[ii] = (VoltTable)deserializer.readObject(resultTable, this);
             }
             return results;

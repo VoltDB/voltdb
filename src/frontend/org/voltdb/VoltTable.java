@@ -157,19 +157,17 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
     }
 
     /**
-     * End users shouldn't be calling this.&nbsp;Do nothing constructor
-     * that does no initialization or allocation.
+     * Do nothing constructor that does no initialization or allocation.
      */
-    public VoltTable() {}
+    VoltTable() {}
 
     /**
-     * End users shouldn't be calling this.&nbsp;Create a table
-     * from an existing backing buffer.
+     * Create a table from an existing backing buffer.
      *
      * @param backing The buffer containing the serialized table.
      * @param readOnly Can this table be changed?
      */
-    public VoltTable(ByteBuffer backing, boolean readOnly) {
+    VoltTable(ByteBuffer backing, boolean readOnly) {
         m_buffer = backing;
 
         // rowstart represents and offset to the start of row data,
@@ -196,55 +194,97 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
      * @param columnCount The number of columns in the array to use.
      */
     public VoltTable(ColumnInfo[] columns, int columnCount) {
-        m_buffer = ByteBuffer.allocate(1024);
-        m_colCount = columnCount;
-        m_rowCount = 0;
-
-        // do some trivial checks to make sure the schema is not totally wrong
-        if (columns == null) {
-            throw new RuntimeException("VoltTable(..) constructor passed null schema.");
-        }
-        if (columnCount <= 0) {
-            throw new RuntimeException("VoltTable(..) constructor requires at least one column.");
-        }
-        if (columns.length < columnCount) {
-            throw new RuntimeException("VoltTable(..) constructor passed truncated column schema array.");
-        }
-
-        // put a dummy value in for header size for now
-        m_buffer.putInt(0);
-
-        //Put in 0 for the status code
-        m_buffer.put(Byte.MIN_VALUE);
-
-        m_buffer.putShort((short) columnCount);
-
-        for (int i = 0; i < columnCount; i++)
-            m_buffer.put(columns[i].type.getValue());
-        for (int i = 0; i < columnCount; i++) {
-            if (columns[i].name == null) {
-                m_buffer.position(0);
-                throw new IllegalArgumentException("VoltTable column names can not be null.");
-            }
-            writeStringToBuffer(columns[i].name, METADATA_ENCODING, m_buffer);
-        }
-        // write the header size to the first 4 bytes (length-prefixed non-inclusive)
-        m_rowStart = m_buffer.position();
-        m_buffer.putInt(0, m_rowStart - 4);
-        // write the row count to the next 4 bytes after the header
-        m_buffer.putInt(0);
-        m_buffer.limit(m_buffer.position());
-        assert(verifyTableInvariants());
+        initializeFromColumns(columns, columnCount);
     }
 
     /**
-     * Create an empty table from column schema.
+     * Create an empty table from column schema given as an array.
      *
      * @param columns An array of ColumnInfo objects, one per column
      * in the desired order.
      */
-    public VoltTable(ColumnInfo... columns) {
-        this(columns, columns.length);
+    public VoltTable(ColumnInfo[] columns) {
+        initializeFromColumns(columns, columns.length);
+    }
+
+    /**
+     * Create an empty table from column schema.
+     * Note that while this accepts a varargs set of columns,
+     * it requires at least one column to prevent user errors.
+     *
+     * @param firstColumn The first column of the table.
+     * @param columns An array of ColumnInfo objects, one per column
+     * in the desired order (can be empty).
+     */
+    public VoltTable(ColumnInfo firstColumn, ColumnInfo... columns) {
+        int allLen = 1 + columns.length;
+        ColumnInfo[] allColumns = new ColumnInfo[allLen];
+        allColumns[0] = firstColumn;
+        for (int i = 0; i < columns.length; i++) {
+            allColumns[i+1] = columns[i];
+        }
+        initializeFromColumns(allColumns, allLen);
+    }
+
+    private void initializeFromColumns(ColumnInfo[] columns, int columnCount) {
+        // allocate a 1K table backing for starters
+        int allocationSize = 1024;
+        m_buffer = ByteBuffer.allocate(allocationSize);
+
+        // while not successful at initializing,
+        //  use a bigger and bigger backing
+        boolean success = false;
+        while (!success) {
+            try {
+                // inside the try block, do initialization
+
+                m_colCount = columnCount;
+                m_rowCount = 0;
+
+                // do some trivial checks to make sure the schema is not totally wrong
+                if (columns == null) {
+                    throw new RuntimeException("VoltTable(..) constructor passed null schema.");
+                }
+                if (columnCount <= 0) {
+                    throw new RuntimeException("VoltTable(..) constructor requires at least one column.");
+                }
+                if (columns.length < columnCount) {
+                    throw new RuntimeException("VoltTable(..) constructor passed truncated column schema array.");
+                }
+
+                // put a dummy value in for header size for now
+                m_buffer.putInt(0);
+
+                //Put in 0 for the status code
+                m_buffer.put(Byte.MIN_VALUE);
+
+                m_buffer.putShort((short) columnCount);
+
+                for (int i = 0; i < columnCount; i++)
+                    m_buffer.put(columns[i].type.getValue());
+                for (int i = 0; i < columnCount; i++) {
+                    if (columns[i].name == null) {
+                        m_buffer.position(0);
+                        throw new IllegalArgumentException("VoltTable column names can not be null.");
+                    }
+                    writeStringToBuffer(columns[i].name, METADATA_ENCODING, m_buffer);
+                }
+                // write the header size to the first 4 bytes (length-prefixed non-inclusive)
+                m_rowStart = m_buffer.position();
+                m_buffer.putInt(0, m_rowStart - 4);
+                // write the row count to the next 4 bytes after the header
+                m_buffer.putInt(0);
+                m_buffer.limit(m_buffer.position());
+
+                success = true;
+            }
+            catch (BufferOverflowException e) {
+                // if too small buffer, grow
+                allocationSize *= 4;
+                m_buffer = ByteBuffer.allocate(allocationSize);
+            }
+        }
+        assert(verifyTableInvariants());
     }
 
     /**

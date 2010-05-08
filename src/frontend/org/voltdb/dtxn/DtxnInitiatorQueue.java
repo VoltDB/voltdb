@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Queue;
 
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.fault.FaultHandler;
@@ -208,7 +209,8 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
                 // race conditions with the ByteBuffer metadata
                 for (int i = 0; i < curr_results.length; ++i)
                 {
-                    saved_results[i] = new VoltTable(curr_results[i].getTableDataReference(), true);
+                    saved_results[i] =
+                        PrivateVoltTableFactory.createVoltTableFromBuffer(curr_results[i].getTableDataReference(), true);
                 }
                 m_txnIdResults.put(r.getTxnId(), saved_results);
                 m_txnIdResponses.put(r.getTxnId(), r);

@@ -85,7 +85,7 @@ public abstract class VoltTableRow {
 
     protected int m_activeRowIndex = INVALID_ROW_INDEX;
 
-    VoltTableRow() {}
+    protected VoltTableRow() {}
 
     /**
      * Return the {@link VoltType type} of the column with the specified index.
