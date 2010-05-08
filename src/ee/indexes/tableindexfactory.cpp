@@ -161,9 +161,9 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
             return new BinaryTreeUniqueIndex<GenericKey<64>, GenericComparator<64>, GenericEqualityChecker<64> >(schemeCopy);
         } else if (keySize <= 96) {
             return new BinaryTreeUniqueIndex<GenericKey<96>, GenericComparator<96>, GenericEqualityChecker<96> >(schemeCopy);
-        } else if (keySize < 128) {
+        } else if (keySize <= 128) {
             return new BinaryTreeUniqueIndex<GenericKey<128>, GenericComparator<128>, GenericEqualityChecker<128> >(schemeCopy);
-        } else if (keySize < 256) {
+        } else if (keySize <= 256) {
             return new BinaryTreeUniqueIndex<GenericKey<256>, GenericComparator<256>, GenericEqualityChecker<256> >(schemeCopy);
         } else {
             throwFatalException( "We currently only support generic column indexes with keys 256 bytes or less..." );
@@ -189,9 +189,9 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
             return new BinaryTreeMultiMapIndex<GenericKey<64>, GenericComparator<64>, GenericEqualityChecker<64> >(schemeCopy);
         } else if (keySize <= 96) {
             return new BinaryTreeMultiMapIndex<GenericKey<96>, GenericComparator<96>, GenericEqualityChecker<96> >(schemeCopy);
-        } else if (keySize < 128) {
+        } else if (keySize <= 128) {
             return new BinaryTreeMultiMapIndex<GenericKey<128>, GenericComparator<128>, GenericEqualityChecker<128> >(schemeCopy);
-        } else if (keySize < 256) {
+        } else if (keySize <= 256) {
             return new BinaryTreeMultiMapIndex<GenericKey<256>, GenericComparator<256>, GenericEqualityChecker<256> >(schemeCopy);
         } else {
             throwFatalException( "We currently only support generic column indexes with keys 256 bytes or less..." );
