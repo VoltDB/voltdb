@@ -67,6 +67,9 @@ public abstract class VoltProcedure {
     // Path of least resistance?
     static class StmtProcedure extends VoltProcedure {}
 
+    // This must match MAX_BATCH_COUNT in src/ee/execution/VoltDBEngine.h
+    final static int MAX_BATCH_SIZE = 1000;
+
     final static Double DOUBLE_NULL = new Double(-1.7976931348623157E+308);
     public static final String ANON_STMT_NAME = "sql";
 
@@ -112,12 +115,12 @@ public abstract class VoltProcedure {
     private Set<Object> m_workloadQueryHandles;
 
     // data copied from EE proc wrapper
-    private final SQLStmt batchQueryStmts[] = new SQLStmt[1000];
+    private final SQLStmt batchQueryStmts[] = new SQLStmt[MAX_BATCH_SIZE];
     private int batchQueryStmtIndex = 0;
     private Object[] batchQueryArgs[];
     private int batchQueryArgsIndex = 0;
-    private final long fragmentIds[] = new long[1000];
-    private final int expectedDeps[] = new int[1000];
+    private final long fragmentIds[] = new long[MAX_BATCH_SIZE];
+    private final int expectedDeps[] = new int[MAX_BATCH_SIZE];
     private ParameterSet parameterSets[];
 
     /**
@@ -347,8 +350,8 @@ public abstract class VoltProcedure {
                     log.trace("invoking... procMethod=" + procMethod.getName() + ", class=" + getClass().getName());
                 }
                 try {
-                    batchQueryArgs = new Object[1000][];
-                    parameterSets = new ParameterSet[1000];
+                    batchQueryArgs = new Object[MAX_BATCH_SIZE][];
+                    parameterSets = new ParameterSet[MAX_BATCH_SIZE];
                     Object rawResult = procMethod.invoke(this, paramList);
                     results = getResultsFromRawResults(rawResult);
                     if (results == null)
@@ -384,8 +387,8 @@ public abstract class VoltProcedure {
         else {
             assert(catProc.getStatements().size() == 1);
             try {
-                batchQueryArgs = new Object[1000][];
-                parameterSets = new ParameterSet[1000];
+                batchQueryArgs = new Object[MAX_BATCH_SIZE][];
+                parameterSets = new ParameterSet[MAX_BATCH_SIZE];
                 if (!isNative) {
                     // HSQL handling
                     VoltTable table = hsql.runSQLWithSubstitutions(m_cachedSingleStmt[0], paramList);
