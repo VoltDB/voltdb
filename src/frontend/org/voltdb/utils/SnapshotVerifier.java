@@ -42,36 +42,33 @@ public class SnapshotVerifier {
 
         FileFilter filter = new SnapshotFilter();
         boolean specifiedSingle = false;
-        String snapshotName = null;
+        HashSet<String> snapshotNames = new HashSet<String>();
         for (int ii = 0; ii < args.length; ii++) {
-            if (args[ii].equals("--name")) {
-                specifiedSingle = true;
-                if (ii + 1 >= args.length) {
-                    System.err.println("Error: No snapshot name specified after --name");
-                    printHelpAndQuit(-1);
-                }
-                snapshotName = args[ii + 1];
-                break;
+            if (args[ii].equals("--dirs")) {
+                ii++;
+                continue;
             }
+            specifiedSingle = true;
+            snapshotNames.add(args[ii]);
         }
 
         if (specifiedSingle) {
-            filter = new SpecificSnapshotFilter(snapshotName);
+            filter = new SpecificSnapshotFilter(snapshotNames);
         }
 
-        List<String> directories = null;
+        List<String> directories = new ArrayList<String>();
         for (int ii = 0; ii < args.length; ii++) {
-            if (args[ii].equals("--dirs")) {
+            if (args[ii].equals("--dir")) {
                 if (ii + 1 >= args.length) {
-                    System.err.println("Error: No directories specified after --dirs");
+                    System.err.println("Error: No directories specified after --dir");
                     printHelpAndQuit(-1);
                     break;
                 }
-                directories = Arrays.asList(args[ii + 1].split(","));
+                directories.add(args[ii + 1]);
+                ii++;
             }
         }
-        if (directories == null) {
-            directories = new ArrayList<String>();
+        if (directories.isEmpty()) {
             directories.add(".");
         }
 
@@ -90,8 +87,8 @@ public class SnapshotVerifier {
     }
 
     private static void printHelpAndQuit( int code) {
-        System.out.println("Usage\nSpecific snapshot: java -cp <classpath> -Djava.library.path=<library path> org.voltdb.utils.SnapshotVerifier --name snapshot_name --dirs dir1[,dir2[,dir3[..]]] ");
-        System.out.println("All snapshots: java -cp <classpath> -Djava.library.path=<library path> org.voltdb.utils.SnapshotVerifier --dirs dir1[,dir2[,dir3[..]]] ");
+        System.out.println("Usage\nSpecific snapshot: java -cp <classpath> -Djava.library.path=<library path> org.voltdb.utils.SnapshotVerifier snapshot_name --dir dir1 --dir dir2 --dir dir3");
+        System.out.println("All snapshots: java -cp <classpath> -Djava.library.path=<library path> org.voltdb.utils.SnapshotVerifier --dir dir1 --dir dir2 --dir dir3");
         System.exit(code);
     }
 }

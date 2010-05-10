@@ -347,10 +347,8 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         try {
             System.setOut(ps);
             String args[] = new String[] {
-                    "--single",
-                    "--name",
                     TESTNONCE,
-                    "--dirs",
+                    "--dir",
                     TMPDIR
             };
             SnapshotVerifier.main(args);
@@ -631,11 +629,10 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
     private void generateAndValidateTextFile(StringBuilder expectedText, boolean csv) throws Exception {
         String args[] = new String[] {
-                "--name",
                 TESTNONCE,
-               "--dirs",
+               "--dir",
                TMPDIR,
-               "--tables",
+               "--table",
                "REPLICATED_TESTER",
                "--type",
                csv ? "CSV" : "TSV",

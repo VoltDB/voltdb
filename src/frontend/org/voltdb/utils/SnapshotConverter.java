@@ -36,68 +36,49 @@ public class SnapshotConverter {
      * @param args
      */
     public static void main(String[] args) {
-        int ii = 0;
         String snapshotName = null;
-        File directories[] = null;
-        String tables[] = null;
+        ArrayList<File> directories = new ArrayList<File>();
+        ArrayList<String> tables = new ArrayList<String>();
         File outdir = null;
         String type = null;
         Escaper escaper = null;
         char delimeter = ' ';
-        for (String arg : args) {
+        for (int ii = 0; ii < args.length; ii++) {
+            String arg = args[ii];
             if (arg.equals("--help")) {
                 printHelpAndQuit(0);
-            } else if (arg.equals("--name")) {
-                if (args.length < ii + 1) {
-                    System.err.println("Error: Not enough args following --name");
-                    printHelpAndQuit(-1);
-                }
-                snapshotName = args[ii + 1];
-            } else if (arg.equals("--dirs")) {
+            } else if (arg.equals("--dir")) {
                 if (args.length < ii + 1) {
                     System.err.println("Error: Not enough args following --dirs");
                     printHelpAndQuit(-1);
                 }
                 boolean invalidDir = false;
-                String dirs[] = args[ii + 1].split(",");
-                directories = new File[dirs.length];
-                int zz = 0;
-                for (String dir : dirs) {
-                    File f = new File(dir);
-                    if (!f.exists()) {
-                        System.err.println("Error: " + dir + " does not exist");
-                        invalidDir = true;
-                    }
-                    if (!f.canRead()) {
-                        System.err.println("Error: " + dir + " does not have read permission set");
-                        invalidDir = true;
-                    }
-                    if (!f.canExecute()) {
-                        System.err.println("Error: " + dir + " does not have execute permission set");
-                        invalidDir = true;
-                    }
-                    directories[zz++] = f;
+                String dir = args[ii + 1];
+                ii++;
+                File f = new File(dir);
+                if (!f.exists()) {
+                    System.err.println("Error: " + dir + " does not exist");
+                    invalidDir = true;
                 }
+                if (!f.canRead()) {
+                    System.err.println("Error: " + dir + " does not have read permission set");
+                    invalidDir = true;
+                }
+                if (!f.canExecute()) {
+                    System.err.println("Error: " + dir + " does not have execute permission set");
+                    invalidDir = true;
+                }
+                directories.add(f);
                 if (invalidDir) {
                     System.exit(-1);
                 }
-            } else if (arg.equals("--tables")) {
+            } else if (arg.equals("--table")) {
                 if (args.length < ii + 1) {
                     System.err.println("Error: Not enough args following --tables");
                     printHelpAndQuit(-1);
                 }
-                tables = args[ii + 1].split(",");
-                if (tables.length == 0) {
-                    System.err.println("Error: No tables specified");
-                    System.exit(-1);
-                }
-                for (int dd = 0; dd < tables.length; dd++) {
-                    if (tables[dd].isEmpty()) {
-                        System.err.println("Error: Empty table name specified");
-                        System.exit(-1);
-                    }
-                    tables[dd] = tables[dd].toUpperCase();
-                }
+                tables.add(args[ii +1].toUpperCase());
+                ii++;
             } else if (arg.equals("--outdir")) {
                 if (args.length < ii + 1) {
                     System.err.println("Error: Not enough args following --outdir");
@@ -124,6 +105,7 @@ public class SnapshotConverter {
                 if (invalidDir) {
                     System.exit(-1);
                 }
+                ii++;
             }  else if (arg.equals("--type")) {
                 if (args.length < ii + 1) {
                     System.err.println("Error: Not enough args following --type");
@@ -140,18 +122,24 @@ public class SnapshotConverter {
                     System.err.println("Error: --type must be one of CSV or TSV");
                     printHelpAndQuit(-1);
                 }
+                ii++;
+            } else {
+                if (snapshotName != null) {
+                    System.err.println("Error: Multiple snapshots specified for conversion. First - " + snapshotName + " second " + args[ii]);
+                    printHelpAndQuit(-1);
+                }
+                snapshotName = args[ii];
             }
-            ii++;
         }
         boolean fail = false;
         if (snapshotName == null) {
             System.err.println("Error: No --name specified");
             fail = true;
         }
-        if (directories == null) {
-            directories = new File[] { new File(".") };
+        if (directories.isEmpty()) {
+            directories.add(new File("."));
         }
-        if (tables == null) {
+        if (tables.isEmpty()) {
             System.err.println("Error: No --tables specified");
             fail = true;
         }
@@ -168,14 +156,16 @@ public class SnapshotConverter {
         }
 
         TreeMap<Long, Snapshot> snapshots = new TreeMap<Long, Snapshot>();
-        SpecificSnapshotFilter filter = new SpecificSnapshotFilter(snapshotName);
+        HashSet<String> snapshotNames = new HashSet<String>();
+        snapshotNames.add(snapshotName);
+        SpecificSnapshotFilter filter = new SpecificSnapshotFilter(snapshotNames);
         for (File directory : directories) {
             SnapshotUtil.retrieveSnapshotFiles( directory, snapshots, filter, 0, false);
         }
 
         if (snapshots.size() > 1) {
             System.err.println("Error: Found " + snapshots.size() + " snapshots with specified name");
-            ii = 0;
+            int ii = 0;
             for (Map.Entry<Long, Snapshot> entry : snapshots.entrySet()) {
                 System.err.println("Snapshot " + ii + " taken " + new Date(entry.getKey()));
                 System.err.println("Files: ");
@@ -214,7 +204,7 @@ public class SnapshotConverter {
             if (!tableFiles.m_isReplicated) {
                 TreeSet<Integer> partitionsIds = new TreeSet<Integer>();
                 Map<File, Set<Integer>> partitionsFromFile = new TreeMap<File, Set<Integer>>();
-                for (ii = 0; ii < tableFiles.m_files.size(); ii++) {
+                for (int ii = 0; ii < tableFiles.m_files.size(); ii++) {
                     Set<Integer> validParititions = tableFiles.m_validPartitionIds.get(ii);
                     TreeSet<Integer> partitionsToTake = new TreeSet<Integer>(validParititions);
                     partitionsToTake.removeAll(partitionsIds);
@@ -282,7 +272,7 @@ public class SnapshotConverter {
                 int partitions[] = null;
                 if (partitionSet != null) {
                     partitions = new int[partitionSet.size()];
-                    ii = 0;
+                    int ii = 0;
                     for (Integer partition : partitionSet) {
                         partitions[ii++] = partition;
                     }
@@ -303,8 +293,8 @@ public class SnapshotConverter {
 
     private static void printHelpAndQuit( int code) {
         System.out.println("java -cp <classpath> -Djava.library.path=<library path> org.voltdb.utils.SnapshotConverter --help");
-        System.out.println("java -cp <classpath> -Djava.library.path=<library path> org.voltdb.utils.SnapshotConverter --name full_snapshot_name --dirs dir1[,dir2[,dir3[..]]] " +
-                "--tables table1[,table2[,table3[..]]] --type CSV|TSV --outdir dir ");
+        System.out.println("java -cp <classpath> -Djava.library.path=<library path> org.voltdb.utils.SnapshotConverter --dir dir1 --dir dir2 --dir dir3" +
+                "--table table1 --table table2 --table table3 --type CSV|TSV --outdir dir snapshot_name");
         System.exit(code);
     }
 }

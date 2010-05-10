@@ -151,9 +151,11 @@ public class NIOWriteStream implements WriteStream {
         if (networkLog.isTraceEnabled()) {
             networkLog.trace("Backpressure started for client " + m_port);
         }
-        m_hadBackPressure = true;
-        if (m_onBackPressureCallback != null) {
-            m_onBackPressureCallback.run();
+        if (m_hadBackPressure == false) {
+            m_hadBackPressure = true;
+            if (m_onBackPressureCallback != null) {
+                m_onBackPressureCallback.run();
+            }
         }
     }
 
@@ -164,9 +166,11 @@ public class NIOWriteStream implements WriteStream {
         if (networkLog.isTraceEnabled()) {
             networkLog.trace("Backpressure ended for client " + m_port);
         }
-        m_hadBackPressure = false;
-        if (m_offBackPressureCallback != null) {
-            m_offBackPressureCallback.run();
+        if (m_hadBackPressure == true) {
+            m_hadBackPressure = false;
+            if (m_offBackPressureCallback != null) {
+                m_offBackPressureCallback.run();
+            }
         }
     }
     /**
@@ -413,7 +417,7 @@ public class NIOWriteStream implements WriteStream {
                 return false;
             }
             updateLastPendingWriteTimeAndQueueBackpressure();
-            updateQueued(c.b.remaining(), true);
+            updateQueued(c.b.remaining(), false);
             m_queuedBuffers.offer(c);
             m_port.setInterests( SelectionKey.OP_WRITE, 0);
         }
@@ -544,7 +548,7 @@ public class NIOWriteStream implements WriteStream {
                     public void cancel() {}
                 });
             } else {
-                updateQueued(b.remaining(), true);
+                updateQueued(b.remaining(), false);
                 m_queuedBuffers.offer(DBBPool.wrapBB(b));
             }
             m_port.setInterests( SelectionKey.OP_WRITE, 0);

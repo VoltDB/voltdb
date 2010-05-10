@@ -196,10 +196,10 @@ public class SnapshotUtil {
      * Filter that looks for files related to a specific snapshot.
      */
     public static class SpecificSnapshotFilter extends SnapshotFilter {
-        private final String snapshotName;
+        private final Set<String> snapshotNames;
 
-        public SpecificSnapshotFilter(String snapshotName) {
-            this.snapshotName = snapshotName;
+        public SpecificSnapshotFilter(Set<String> snapshotNames) {
+            this.snapshotNames = snapshotNames;
         }
 
         @Override
@@ -212,9 +212,11 @@ public class SnapshotUtil {
                 return true;
             }
 
-            if (pathname.getName().startsWith(snapshotName + "-") ||
-                    pathname.getName().equals(snapshotName + ".digest")) {
-                return true;
+            for (String snapshotName : snapshotNames) {
+                if (pathname.getName().startsWith(snapshotName + "-") ||
+                        pathname.getName().equals(snapshotName + ".digest")) {
+                    return true;
+                }
             }
 
             return false;
