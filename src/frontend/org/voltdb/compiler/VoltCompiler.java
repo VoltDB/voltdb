@@ -895,7 +895,6 @@ public class VoltCompiler {
         {
          // package.classname                                readonly    everysite
          {"org.voltdb.sysprocs.AdHoc",                        "false",    "false"},
-         {"org.voltdb.sysprocs.LastCommittedTransaction",     "true",     "false"},
          {"org.voltdb.sysprocs.LoadMultipartitionTable",      "false",    "false"},
          {"org.voltdb.sysprocs.Quiesce",                      "false",    "false"},
          {"org.voltdb.sysprocs.SnapshotSave",                 "false",    "false"},

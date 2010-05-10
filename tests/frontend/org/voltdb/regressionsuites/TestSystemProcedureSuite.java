@@ -54,15 +54,6 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         fail("Expected exception.");
     }
 
-    public void testLastCommittedTransaction() throws Exception {
-        Client client = getClient();
-        VoltTable results[] = null;
-        results = client.callProcedure("@LastCommittedTransaction").getResults();
-
-        assertTrue(results.length == 1);
-        assertTrue(results[0].asScalarLong() == 0);
-    }
-
     private final String m_loggingConfig =
         "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>" +
         "<!DOCTYPE log4j:configuration SYSTEM \"log4j.dtd\">" +

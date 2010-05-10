@@ -38,11 +38,11 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
 
     /*
      * Common sysproc column names. For consistency (and the kids).
+     */
     protected static VoltType CTYPE_ID = VoltType.INTEGER;
     protected static String CNAME_HOST_ID = "HOST_ID";
     protected static String CNAME_SITE_ID = "SITE_ID";
     protected static String CNAME_PARTITION_ID = "PARTITION_ID";
-     */
 
     /**
      * Utility to aggregate a list of tables sharing a schema.
