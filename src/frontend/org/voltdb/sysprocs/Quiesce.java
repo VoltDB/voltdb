@@ -27,8 +27,15 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.DtxnConstants;
 
+/**
+ * Forces a flush of committed ELT data to the connector queues.
+ * An operator can drain all {@link org.voltdb.client.Client} instances
+ * generating stored procedure work, call the Quiesce system procedure,
+ * and then can poll the ELT connector until all data sources return
+ * empty buffers.  This process guarantees the poller received all
+ * ELT data.
+  */
 @ProcInfo(singlePartition = false)
-
 public class Quiesce extends VoltSystemProcedure {
 
     static final int DEP_SITES = (int) SysProcFragmentId.PF_quiesce_sites | DtxnConstants.MULTIPARTITION_DEPENDENCY;
@@ -56,8 +63,8 @@ public class Quiesce extends VoltSystemProcedure {
                 return new DependencyPair(DEP_SITES, results);
             }
             else if (fragmentId == SysProcFragmentId.PF_quiesce_processed_sites) {
-                VoltTable dummy = new VoltTable(new ColumnInfo("status", VoltType.STRING));
-                dummy.addRow("okay");
+                VoltTable dummy = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
+                dummy.addRow(VoltSystemProcedure.STATUS_OK);
                 return new DependencyPair(DEP_PROCESSED_SITES, dummy);
             }
         }
@@ -67,6 +74,11 @@ public class Quiesce extends VoltSystemProcedure {
         return null;
     }
 
+    /**
+     * There are no user specified parameters.
+     * @param ctx Internal parameter not visible the end-user.
+     * @return {@link org.voltdb.VoltSystemProcedure#STATUS_SCHEMA}
+     */
     public VoltTable[] run(SystemProcedureExecutionContext ctx) {
             VoltTable[] result = null;
 

@@ -184,7 +184,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         VoltTable results[] = client.callProcedure("@Quiesce").getResults();
         assertEquals(1, results.length);
         results[0].advanceRow();
-        assertEquals(results[0].get(0, VoltType.STRING), "okay");
+        assertEquals(results[0].get(0, VoltType.BIGINT), new Long(0));
     }
 
     public void testLoadMulipartitionTable_InvalidTableName() throws IOException, ProcCallException {
