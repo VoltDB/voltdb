@@ -125,7 +125,7 @@ public class DDLCompiler {
                 m_hsql.runDDLCommand(stmt.statement);
                 stmt = getNextStatement(reader, m_compiler);
             } catch (HSQLParseException e) {
-                String msg = "DDL Error: " + e.getMessage();
+                String msg = "DDL Error: \"" + e.getMessage() + "\" in statement ending on lineno: " + stmt.lineNo;
                 throw m_compiler.new VoltCompilerException(msg, stmt.lineNo);
             }
         }
