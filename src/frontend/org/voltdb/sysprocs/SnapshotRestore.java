@@ -877,7 +877,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             }
             catch (IOException e)
             {
-                VoltTable result = PrivateVoltTableFactory.createUnititializedVoltTable();
+                VoltTable result = PrivateVoltTableFactory.createUninitializedVoltTable();
                 result = constructResultsTable();
                 result.addRow(m_hostId, hostname, m_siteId, tableName, -1, "FAILURE",
                               "Unable to load table: " + tableName +
@@ -886,7 +886,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             }
             catch (VoltTypeException e)
             {
-                VoltTable result = PrivateVoltTableFactory.createUnititializedVoltTable();
+                VoltTable result = PrivateVoltTableFactory.createUninitializedVoltTable();
                 result = constructResultsTable();
                 result.addRow(m_hostId, hostname, m_siteId, tableName, -1, "FAILURE",
                               "Unable to load table: " + tableName +
@@ -1000,7 +1000,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             }
             catch (IOException e)
             {
-                VoltTable result = PrivateVoltTableFactory.createUnititializedVoltTable();
+                VoltTable result = PrivateVoltTableFactory.createUninitializedVoltTable();
                 result = constructResultsTable();
                 result.addRow(m_hostId, hostname, m_siteId, tableName, relevantPartitionIds[0],
                               "FAILURE", "Unable to load table: " + tableName +
@@ -1009,7 +1009,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             }
             catch (VoltTypeException e)
             {
-                VoltTable result = PrivateVoltTableFactory.createUnititializedVoltTable();
+                VoltTable result = PrivateVoltTableFactory.createUninitializedVoltTable();
                 result = constructResultsTable();
                 result.addRow(m_hostId, hostname, m_siteId, tableName, relevantPartitionIds[0],
                               "FAILURE", "Unable to load table: " + tableName +

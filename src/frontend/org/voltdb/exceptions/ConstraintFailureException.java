@@ -76,7 +76,7 @@ public class ConstraintFailureException extends SQLException {
             return table;
         }
 
-        table = PrivateVoltTableFactory.createUnititializedVoltTable();
+        table = PrivateVoltTableFactory.createUninitializedVoltTable();
         try {
             table.readExternal(new FastDeserializer(buffer));
         } catch (IOException e) {

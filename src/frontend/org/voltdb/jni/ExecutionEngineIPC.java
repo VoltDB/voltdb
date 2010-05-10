@@ -922,7 +922,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         }
         if (result == ExecutionEngine.ERRORCODE_SUCCESS) {
             final VoltTable resultTables[] = new VoltTable[1];
-            resultTables[0] = PrivateVoltTableFactory.createUnititializedVoltTable();
+            resultTables[0] = PrivateVoltTableFactory.createUninitializedVoltTable();
             try {
                 m_connection.readResultTables(resultTables);
             } catch (final IOException e) {
@@ -952,7 +952,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         if (result == ExecutionEngine.ERRORCODE_SUCCESS) {
             final VoltTable resultTables[] = new VoltTable[numFragmentIds];
             for (int ii = 0; ii < numFragmentIds; ii++) {
-                resultTables[ii] = PrivateVoltTableFactory.createUnititializedVoltTable();
+                resultTables[ii] = PrivateVoltTableFactory.createUninitializedVoltTable();
             }
             try {
                 m_connection.readResultTables(resultTables);
@@ -1086,7 +1086,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
                 final FastDeserializer fds = new FastDeserializer(messageBuffer);
                 final VoltTable results[] = new VoltTable[1];
-                final VoltTable resultTable = PrivateVoltTableFactory.createUnititializedVoltTable();
+                final VoltTable resultTable = PrivateVoltTableFactory.createUninitializedVoltTable();
                 results[0] = (VoltTable)fds.readObject(resultTable, this);
                 return results;
             }

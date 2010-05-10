@@ -101,7 +101,7 @@ public class FastDeserializer implements DataInput {
         try {
             // Since VoltTable has no empty ctor, special case it
             if (expectedType == VoltTable.class) {
-                obj = (T) PrivateVoltTableFactory.createUnititializedVoltTable();
+                obj = (T) PrivateVoltTableFactory.createUninitializedVoltTable();
             }
             else {
                 obj = expectedType.newInstance();

@@ -444,7 +444,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             deserializer.readInt();//Ignore the length of the result tables
             final VoltTable results[] = new VoltTable[numResults];
             for (int ii = 0; ii < numResults; ii++) {
-                final VoltTable resultTable = PrivateVoltTableFactory.createUnititializedVoltTable();
+                final VoltTable resultTable = PrivateVoltTableFactory.createUninitializedVoltTable();
                 results[ii] = (VoltTable)deserializer.readObject(resultTable, this);
             }
             return results;

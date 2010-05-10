@@ -28,7 +28,7 @@ import java.nio.ByteBuffer;
  */
 public abstract class PrivateVoltTableFactory {
 
-    public static VoltTable createUnititializedVoltTable() {
+    public static VoltTable createUninitializedVoltTable() {
         return new VoltTable();
     }
 

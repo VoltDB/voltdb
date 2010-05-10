@@ -154,11 +154,13 @@ public class TestVoltTable extends TestCase {
     }
 
     public void testLongSchemaOver1K() {
+        // this test would crash before r531
         StringBuilder columnname = new StringBuilder();
         while (columnname.length() < 8192) {
             columnname.append("ryanlikestheyankees");
         }
         t = new VoltTable(new ColumnInfo(columnname.toString(), VoltType.BIGINT));
+        assertTrue(t.getColumnName(0).compareTo(columnname.toString()) == 0);
     }
 
     public void testColumnIndexBounds() {
