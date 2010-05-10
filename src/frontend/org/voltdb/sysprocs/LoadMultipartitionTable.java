@@ -28,16 +28,19 @@ import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.DtxnConstants;
 
-@ProcInfo(singlePartition = false)
-/*
- * Given a VoltTable with a schema corresponding to a persistent table, load all
- * of the rows applicable to the current partitioning at each node in the
- * cluster.
+/**
+ * Given as input a VoltTable with a schema corresponding to a persistent table,
+ * partition the rows and insert into the appropriate persistent table
+ * partitions(s). This system procedure does not generate undo data. Any
+ * intermediate failure, for example a constraint violation, will leave partial
+ * and inconsistent data in the persistent store.
  */
-public class LoadMultipartitionTable extends VoltSystemProcedure {
+@ProcInfo(singlePartition = false)
+public class LoadMultipartitionTable extends VoltSystemProcedure
+{
 
-    static final int DEP_distribute = (int)
-        SysProcFragmentId.PF_distribute | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+    static final int DEP_distribute = (int) SysProcFragmentId.PF_distribute |
+                                      DtxnConstants.MULTIPARTITION_DEPENDENCY;
 
     static final int DEP_aggregate = (int) SysProcFragmentId.PF_aggregate;
 
@@ -45,7 +48,8 @@ public class LoadMultipartitionTable extends VoltSystemProcedure {
 
     @Override
     public void init(int numberOfPartitions, SiteProcedureConnection site,
-            Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster) {
+            Procedure catProc, BackendTarget eeType, HsqlBackend hsql,
+            Cluster cluster) {
         super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
         m_cluster = cluster;
         site.registerPlanFragment(SysProcFragmentId.PF_distribute, this);
@@ -53,11 +57,12 @@ public class LoadMultipartitionTable extends VoltSystemProcedure {
     }
 
     @Override
-    public DependencyPair executePlanFragment(HashMap<Integer, List<VoltTable>> dependencies, long fragmentId,
+    public DependencyPair executePlanFragment(
+            HashMap<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params, SystemProcedureExecutionContext context) {
-        // need to return something ..
-        VoltTable result = new VoltTable(new VoltTable.ColumnInfo("TxnId", VoltType.BIGINT));
-        result.addRow(1);
+        // Return the standard status schema for sysprocs
+        VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
+        result.addRow(VoltSystemProcedure.STATUS_OK);
 
         if (fragmentId == SysProcFragmentId.PF_distribute) {
             assert context.getCluster().getTypeName() != null;
@@ -75,7 +80,8 @@ public class LoadMultipartitionTable extends VoltSystemProcedure {
                                     (String) (params.toArray()[0]),
                                     (VoltTable) (params.toArray()[1]),
                                     (Integer) (params.toArray()[2]));
-            } catch (VoltAbortException e) {
+            }
+            catch (VoltAbortException e) {
                 // must continue and reply with dependency.
                 e.printStackTrace();
             }
@@ -89,10 +95,26 @@ public class LoadMultipartitionTable extends VoltSystemProcedure {
         return null;
     }
 
+    /**
+     * These parameters, with the exception of ctx, map to user provided values.
+     *
+     * @param ctx
+     *            Internal. Not a user-supplied parameter.
+     * @param tableName
+     *            Name of persistent table receiving data.
+     * @param table
+     *            A VoltTable with schema matching tableName containing data to
+     *            load.
+     * @param allowELT
+     *            If equal to 1, and ELT is enabled for tableName, the loaded
+     *            data is passed through the EL process. If 0, ELT is ignored
+     *            for this operation even if ELT is enabled for tableName.
+     * @return {@link org.voltdb.VoltSystemProcedure#STATUS_SCHEMA}
+     * @throws VoltAbortException
+     */
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
             String tableName, VoltTable table, int allowELT)
-    throws VoltAbortException
-    {
+            throws VoltAbortException {
         VoltTable[] results;
         SynthesizedPlanFragment pfs[];
 
@@ -101,8 +123,8 @@ public class LoadMultipartitionTable extends VoltSystemProcedure {
         // split up the incoming table .. then send those partial
         // tables to the appropriate sites.
 
-        Table catTable =
-            m_cluster.getDatabases().get("database").getTables().getIgnoreCase(tableName);
+        Table catTable = m_cluster.getDatabases().get("database").getTables()
+                                  .getIgnoreCase(tableName);
         if (catTable == null) {
             throw new VoltAbortException("Table not present in catalog.");
         }
@@ -149,9 +171,10 @@ public class LoadMultipartitionTable extends VoltSystemProcedure {
             while (table.advanceRow()) {
                 int p = 0;
                 try {
-                    p = TheHashinator.hashToPartition(table.get(partitionCol,
-                            partitionType));
-                } catch (Exception e) {
+                    p = TheHashinator.hashToPartition(
+                        table.get(partitionCol, partitionType));
+                }
+                catch (Exception e) {
                     e.printStackTrace();
                     throw new RuntimeException(e.getMessage());
                 }
@@ -162,16 +185,15 @@ public class LoadMultipartitionTable extends VoltSystemProcedure {
             int num_exec_sites = VoltDB.instance().getCatalogContext().siteTracker.getLiveSiteCount();
             pfs = new SynthesizedPlanFragment[num_exec_sites + 1];
             int site_index = 0;
-            for (Site site : VoltDB.instance().getCatalogContext().siteTracker.getUpSites())
-            {
-                if (!site.getIsexec())
-                {
+            for (Site site : VoltDB.instance().getCatalogContext().siteTracker.getUpSites()) {
+                if (!site.getIsexec()) {
                     continue;
                 }
                 ParameterSet params = new ParameterSet();
                 int site_id = Integer.valueOf(site.getTypeName());
                 int partition = VoltDB.instance().getCatalogContext().siteTracker.getPartitionForSite(site_id);
-                params.setParameters(tableName, partitionedTables[partition], allowELT);
+                params.setParameters(tableName, partitionedTables[partition],
+                                     allowELT);
                 pfs[site_index] = new SynthesizedPlanFragment();
                 pfs[site_index].fragmentId = SysProcFragmentId.PF_distribute;
                 pfs[site_index].outputDepId = DEP_distribute;
