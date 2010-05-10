@@ -620,6 +620,10 @@ public class DDLCompiler {
                 assert(colExpr.getExpressionType() == ExpressionType.VALUE_TUPLE);
                 processMaterializedViewColumn(matviewinfo, srcTable, destTable, destColumn,
                         col.expression.getExpressionType(), (TupleValueExpression)colExpr);
+
+                // Correctly set the type of the column so that it's consistent.
+                // Otherwise HSQLDB might promote types differently than Volt.
+                destColumn.setType(col.expression.getValueType().getValue());
             }
         }
     }
