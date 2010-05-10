@@ -37,12 +37,12 @@ public abstract class SiteStatsSource extends StatsSource {
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
         super.populateColumnSchema(columns);
-        columns.add(new ColumnInfo("SITE_ID", VoltType.BIGINT));
+        columns.add(new ColumnInfo(VoltSystemProcedure.CNAME_SITE_ID, VoltSystemProcedure.CTYPE_ID));
     }
 
     @Override
     protected void updateStatsRow(Object rowKey, Object rowValues[]) {
-        rowValues[columnNameToIndex.get("SITE_ID")] = new Long(m_siteId);
+        rowValues[columnNameToIndex.get(VoltSystemProcedure.CNAME_SITE_ID)] = new Integer(m_siteId);
         super.updateStatsRow(rowKey, rowValues);
     }
 }

@@ -86,7 +86,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final int siteId,
             final int partitionId,
             final int hostId,
-            final String hostname) {
+            final String hostname)
+    {
         // base class loads the volt shared library
         super(site);
         //exceptionBuffer.order(ByteOrder.nativeOrder());
@@ -430,7 +431,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final SysProcSelector selector,
             final int locators[],
             final boolean interval,
-            final Long now) {
+            final Long now)
+    {
         deserializer.clear();
         final int numResults = nativeGetStats(pointer, selector.ordinal(), locators, interval, now);
         if (numResults == -1) {

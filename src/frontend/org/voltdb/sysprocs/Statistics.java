@@ -34,6 +34,9 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.utils.Pair;
 import org.voltdb.utils.VoltLoggerFactory;
 
+/**
+ * Access the TABLE, PRCOEDURE, INITIATOR, IOSTATS, or PARTITIONCOUNT statistics.
+ */
 @ProcInfo(
     // partitionInfo = "TABLE.ATTR: 0",
     singlePartition = false
@@ -81,7 +84,7 @@ public class Statistics extends VoltSystemProcedure {
         site.registerPlanFragment(SysProcFragmentId.PF_initiatorAggregator,
                                   this);
         site.registerPlanFragment(SysProcFragmentId.PF_partitionCount,
-                this);
+                                  this);
         site.registerPlanFragment(SysProcFragmentId.PF_ioData, this);
         site.registerPlanFragment(SysProcFragmentId.PF_ioDataAggregator, this);
     }
@@ -167,8 +170,7 @@ public class Statistics extends VoltSystemProcedure {
                 getLowestLiveExecSiteIdForHost(host_id);
             if (context.getExecutionSite().getSiteId() != lowest_site_id)
             {
-                // Hacky way to generate an empty table with the correct
-                // schema
+                // Hacky way to generate an empty table with the correct schema
                 result.clearRowData();
             }
             return new DependencyPair(DEP_initiatorData, result);
@@ -233,7 +235,7 @@ public class Statistics extends VoltSystemProcedure {
 
     private static final ColumnInfo ioColumnInfo[] = new ColumnInfo[] {
         new ColumnInfo( "TIMESTAMP", VoltType.BIGINT),
-        new ColumnInfo( "HOST_ID", VoltType.INTEGER),
+        new ColumnInfo( VoltSystemProcedure.CNAME_HOST_ID, VoltSystemProcedure.CTYPE_ID),
         new ColumnInfo( "HOSTNAME", VoltType.STRING),
         new ColumnInfo( "CONNECTION_ID", VoltType.BIGINT),
         new ColumnInfo( "CONNECTION_HOSTNAME", VoltType.STRING),
@@ -243,6 +245,16 @@ public class Statistics extends VoltSystemProcedure {
         new ColumnInfo( "MESSAGES_WRITTEN", VoltType.BIGINT)
     };
 
+
+    /**
+     * Returns a table stats.
+     * requested.
+     * @param ctx          Internal. Not exposed to the end-user.
+     * @param selector     Selector requested TABLE, PROCEDURE, INITIATOR, PARTITIONCOUNT, IOSTATS, MANAGEMENT
+     * @param interval     1 for interval statistics. 0 for full statistics.
+     * @return             The returned schema is specific to the selector.
+     * @throws VoltAbortException
+     */
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
             String selector, long interval) throws VoltAbortException
     {
