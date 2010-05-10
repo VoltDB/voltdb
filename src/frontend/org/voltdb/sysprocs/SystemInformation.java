@@ -46,9 +46,10 @@ public class SystemInformation extends VoltSystemProcedure {
      */
     private VoltTable populateTable(SystemProcedureExecutionContext context) {
         VoltTable vt = new VoltTable(
-                new ColumnInfo("node_id", VoltType.INTEGER),
-                new ColumnInfo("key", VoltType.STRING),
-                new ColumnInfo("value", VoltType.STRING));
+                new ColumnInfo(VoltSystemProcedure.CNAME_HOST_ID,
+                               VoltSystemProcedure.CTYPE_ID),
+                new ColumnInfo("KEY", VoltType.STRING),
+                new ColumnInfo("VALUE", VoltType.STRING));
 
         // host name and IP address.
         try {
@@ -116,6 +117,16 @@ public class SystemInformation extends VoltSystemProcedure {
         return null;
     }
 
+    /**
+     * Retrieve basic management informatino about the cluster.
+     * Use this procedure to read the ipaddress, hostname, buildstring
+     * and version of each node of the cluster.
+     *
+     * @param ctx       Internal parameter. Not user visible.
+     * @return          A table with three columns:
+     *  HOST_ID(INTEGER), KEY(STRING), VALUE(STRING).
+     *  Keys are "hostname", "ipaddress", "buildstring" and "version".
+     */
     public VoltTable[] run(SystemProcedureExecutionContext ctx) {
         SynthesizedPlanFragment spf[] = new SynthesizedPlanFragment[2];
         spf[0] = new SynthesizedPlanFragment();
