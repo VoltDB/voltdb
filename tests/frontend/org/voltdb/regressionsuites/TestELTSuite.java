@@ -446,7 +446,7 @@ public class TestELTSuite extends RegressionSuite {
 
         // JNI
         final VoltServerConfig config =
-            new LocalSingleProcessServer("elt-ddl.sql", 2,
+            new LocalSingleProcessServer("elt-ddl.jar", 2,
                                          BackendTarget.NATIVE_EE_JNI);
 
         config.compile(project);

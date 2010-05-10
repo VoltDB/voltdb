@@ -29,6 +29,7 @@ import java.util.ArrayList;
 
 import org.voltdb.VoltType;
 import org.voltdb.elclient.ELTDecoderBase;
+import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.types.TimestampType;
 
@@ -41,12 +42,11 @@ class ELTVerifier extends ELTDecoderBase
     private String m_tableName;
     private int m_partitionId;
 
-    ELTVerifier(String tableName, int partitionId,
-                ArrayList<VoltType> tableSchema)
+    ELTVerifier(AdvertisedDataSource source)
     {
-        super(tableSchema);
-        m_tableName = tableName;
-        m_partitionId = partitionId;
+        super(source);
+        m_tableName = source.tableName();
+        m_partitionId = source.partitionId();
         m_data = new ArrayDeque<Object[]>();
     }
 

@@ -35,9 +35,24 @@ public abstract class ELClientBase implements Runnable {
     private final int m_processorPort;
     private SocketChannel m_socket;
     private ELConnection m_elConnection;
+    private InetAddress m_serverAddr;
+
+    public ELClientBase(InetAddress serverAddr) {
+        m_processorPort = RawProcessor.LISTENER_PORT;
+        m_serverAddr = serverAddr;
+    }
 
     public ELClientBase() {
         m_processorPort = RawProcessor.LISTENER_PORT;
+        try
+        {
+            m_serverAddr = InetAddress.getLocalHost();
+        }
+        catch (UnknownHostException e)
+        {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
     }
 
     /**
@@ -56,17 +71,13 @@ public abstract class ELClientBase implements Runnable {
         System.out.println("Starting EL Client socket.");
         try {
             SocketAddress sockaddr =
-                new InetSocketAddress(InetAddress.getLocalHost(),
+                new InetSocketAddress(m_serverAddr,
                                       m_processorPort);
             m_socket = SocketChannel.open(sockaddr);
             m_socket.configureBlocking(false);
             m_elConnection = new ELConnection(m_socket);
             m_elConnection.openELTConnection();
             constructELTDataSinks(m_elConnection);
-        }
-        catch (UnknownHostException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
         }
         catch (IOException e) {
             // TODO Auto-generated catch block
@@ -87,6 +98,10 @@ public abstract class ELClientBase implements Runnable {
     @Override
     public void run() {
         connectToELServer();
-        work();
+        // really stupid continue decision
+        while (m_socket.isConnected())
+        {
+            work();
+        }
     }
 }

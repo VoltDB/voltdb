@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 
 import org.voltdb.VoltType;
+import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.types.TimestampType;
 
@@ -32,9 +33,9 @@ public abstract class ELTDecoderBase
     // Taking the coward's way out for now and just accepting
     // an array of VoltTypes.  In the future this should expand to
     // possibly be the whole schema
-    public ELTDecoderBase(ArrayList<VoltType> tableSchema)
+    public ELTDecoderBase(AdvertisedDataSource source)
     {
-        m_tableSchema = tableSchema;
+        m_tableSchema = source.columnTypes();
     }
 
     /**

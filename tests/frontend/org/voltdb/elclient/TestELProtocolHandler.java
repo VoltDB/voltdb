@@ -27,6 +27,7 @@ import java.util.ArrayList;
 
 import org.voltdb.VoltType;
 import org.voltdb.elt.ELTProtoMessage;
+import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
 
 import junit.framework.TestCase;
 
@@ -37,9 +38,9 @@ public class TestELProtocolHandler extends TestCase {
 
     class TestELTDecoder extends ELTDecoderBase
     {
-        public TestELTDecoder(ArrayList<VoltType> tableSchema)
+        public TestELTDecoder(AdvertisedDataSource source)
         {
-            super(tableSchema);
+            super(source);
         }
 
         @Override
@@ -60,7 +61,10 @@ public class TestELProtocolHandler extends TestCase {
     {
         ELDataSink dut =
             new ELDataSink(PARTITION_ID, TABLE_ID, "coffeetable",
-                                  new TestELTDecoder(new ArrayList<VoltType>()));
+                           new TestELTDecoder(new AdvertisedDataSource(PARTITION_ID,
+                                                                       TABLE_ID,
+                                                                       "coffeetable",
+                                                                       null, null)));
         assertNull(dut.getTxQueue().peek());
         dut.work();
         assertNotNull(dut.getTxQueue().peek());

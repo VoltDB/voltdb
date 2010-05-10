@@ -44,9 +44,7 @@ public class ELTestClient extends ELClientBase
         for (AdvertisedDataSource source : m_dataSources)
         {
             // create a verifier with the 'schema'
-            ELTVerifier verifier = new ELTVerifier(source.tableName(),
-                                                   source.partitionId(),
-                                                   source.columnTypes());
+            ELTVerifier verifier = new ELTVerifier(source);
             // hash it by table name + partition ID
             System.out.println("Creating verifier for table: " + source.tableName() +
                                ", part ID: " + source.partitionId());

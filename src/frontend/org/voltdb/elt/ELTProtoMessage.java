@@ -91,6 +91,11 @@ public class ELTProtoMessage
             return m_columnNames.get(index);
         }
 
+        public ArrayList<String> columnNames()
+        {
+            return m_columnNames;
+        }
+
         public String tableName() {
             return m_tableName;
         }
