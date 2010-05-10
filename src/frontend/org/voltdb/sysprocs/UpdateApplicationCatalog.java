@@ -62,6 +62,15 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             throw new VoltAbortException("Error reading Catalog URL.");
     }
 
+    /**
+     * Parameters to run are provided internally and do not map to the
+     * user's input.
+     * @param ctx
+     * @param catalogDiffCommands
+     * @param catalogURL
+     * @param expectedCatalogVersion
+     * @return Standard STATUS table.
+     */
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
             String catalogDiffCommands, String catalogURL, int expectedCatalogVersion)
     {
@@ -72,16 +81,11 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         // others will see there is no work to do and gracefully continue.
         // then update data at the local site.
         String commands = Encoder.decodeBase64AndDecompress(catalogDiffCommands);
-
-        System.out.println("UPDATING Global Catalog Data");
         VoltDB.instance().catalogUpdate(commands, catalogURL, expectedCatalogVersion, getTransactionId());
-
-        System.out.println("Now update local catalog data.");
         ctx.getExecutionSite().updateCatalog(commands);
 
-        VoltTable t = new VoltTable(new VoltTable.ColumnInfo("", VoltType.BIGINT));
-        t.addRow(1);
-
-        return (new VoltTable[] {t});
+        VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
+        result.addRow(VoltSystemProcedure.STATUS_OK);
+        return (new VoltTable[] {result});
     }
 }
