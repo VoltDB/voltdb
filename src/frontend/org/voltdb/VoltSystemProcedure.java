@@ -36,6 +36,37 @@ import org.voltdb.messaging.FragmentTaskMessage;
  */
 public abstract class VoltSystemProcedure extends VoltProcedure {
 
+    /*
+     * Common sysproc column names. For consistency (and the kids).
+    protected static VoltType CTYPE_ID = VoltType.INTEGER;
+    protected static String CNAME_HOST_ID = "HOST_ID";
+    protected static String CNAME_SITE_ID = "SITE_ID";
+    protected static String CNAME_PARTITION_ID = "PARTITION_ID";
+     */
+
+    /**
+     * Utility to aggregate a list of tables sharing a schema.
+     * Common for sysprocs to do this, to aggregate results.
+     */
+    protected VoltTable unionTables(List<VoltTable> operands) {
+        VoltTable result = null;
+        VoltTable vt = operands.get(0);
+        if (vt != null) {
+            VoltTable.ColumnInfo[] columns = new VoltTable.ColumnInfo[vt.getColumnCount()];
+            for (int ii = 0; ii < vt.getColumnCount(); ii++) {
+                columns[ii] = new VoltTable.ColumnInfo(vt.getColumnName(ii), vt.getColumnType(ii));
+            }
+            result = new VoltTable(columns);
+            for (Object table : operands) {
+                vt = (VoltTable) (table);
+                while (vt.advanceRow()) {
+                    result.add(vt);
+                }
+            }
+        }
+        return result;
+    }
+
     /**
      * Allow sysprocs to update m_currentTxnState manually. User procedures
      * are passed this state in call(); sysprocs have other entry points
@@ -65,10 +96,11 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         public boolean suppressDuplicates = false;
     }
 
-    abstract public DependencyPair executePlanFragment(HashMap<Integer,List<VoltTable>> dependencies,
-                                                      long fragmentId,
-                                                      ParameterSet params,
-                                                      ExecutionSite.SystemProcedureExecutionContext context);
+    abstract public DependencyPair executePlanFragment(
+            HashMap<Integer,List<VoltTable>> dependencies,
+            long fragmentId,
+            ParameterSet params,
+            ExecutionSite.SystemProcedureExecutionContext context);
 
     /**
      * Produce work units, possibly on all sites, for a list of plan fragments.
@@ -80,8 +112,9 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
      *        The id of the table returned as the result of this procedure.
      * @return the resulting VoltTable as a length-one array.
      */
-    protected VoltTable[] executeSysProcPlanFragments(SynthesizedPlanFragment pfs[],
-                                                      int aggregatorOutputDependencyId)
+    protected VoltTable[] executeSysProcPlanFragments(
+            SynthesizedPlanFragment pfs[],
+            int aggregatorOutputDependencyId)
     {
         VoltTable[] results = new VoltTable[1];
         executeSysProcPlanFragmentsAsync(pfs);

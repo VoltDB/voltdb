@@ -109,24 +109,7 @@ public class SystemInformation extends VoltSystemProcedure {
             return new DependencyPair(DEP_DISTRIBUTE, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_systemInformation_aggregate) {
-            VoltTable result = null;
-
-            // copy-paste from stats. should be a volt table utility.
-            List<VoltTable> dep = dependencies.get(DEP_DISTRIBUTE);
-            VoltTable vt = dep.get(0);
-            if (vt != null) {
-                VoltTable.ColumnInfo[] columns = new VoltTable.ColumnInfo[vt.getColumnCount()];
-                for (int ii = 0; ii < vt.getColumnCount(); ii++) {
-                    columns[ii] = new VoltTable.ColumnInfo(vt.getColumnName(ii), vt.getColumnType(ii));
-                }
-                result = new VoltTable(columns);
-                for (Object d : dep) {
-                    vt = (VoltTable) (d);
-                    while (vt.advanceRow()) {
-                        result.add(vt);
-                    }
-                }
-            }
+            VoltTable result = unionTables(dependencies.get(DEP_DISTRIBUTE));
             return new DependencyPair(DEP_AGGREGATE, result);
         }
 

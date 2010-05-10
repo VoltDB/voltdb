@@ -115,27 +115,7 @@ public class Statistics extends VoltSystemProcedure {
             return new DependencyPair(DEP_tableData, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_tableAggregator) {
-            VoltTable result = null;
-
-            // create an output table from the schema of a dependency table
-            // (they're all the same). Iterate the dependencies and add
-            // all rows from each to the output.
-            List<VoltTable> dep = dependencies.get(DEP_tableData);
-            VoltTable vt = dep.get(0);
-            if (vt != null) {
-                VoltTable.ColumnInfo[] columns = new VoltTable.ColumnInfo[vt.getColumnCount()];
-                for (int ii = 0; ii < vt.getColumnCount(); ii++) {
-                    columns[ii] = new VoltTable.ColumnInfo(vt.getColumnName(ii), vt.getColumnType(ii));
-                }
-                result = new VoltTable(columns);
-                for (Object d : dep) {
-                    vt = (VoltTable) (d);
-                    while (vt.advanceRow()) {
-                        // this adds the active row of vt
-                        result.add(vt);
-                    }
-                }
-            }
+            VoltTable result = unionTables(dependencies.get(DEP_tableData));
             return new DependencyPair(DEP_tableAggregator, result);
         }
 
@@ -158,27 +138,7 @@ public class Statistics extends VoltSystemProcedure {
             return new DependencyPair(DEP_procedureData, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_procedureAggregator) {
-            VoltTable result = null;
-
-            // create an output table from the schema of a dependency table
-            // (they'll be the same). Then iterate the dependencies and add
-            // all rows from each to the output.
-            List<VoltTable> dep = dependencies.get(DEP_procedureData);
-            VoltTable vt = dep.get(0);
-            if (vt != null) {
-                VoltTable.ColumnInfo[] columns = new VoltTable.ColumnInfo[vt.getColumnCount()];
-                for (int ii = 0; ii < vt.getColumnCount(); ii++) {
-                    columns[ii] = new VoltTable.ColumnInfo(vt.getColumnName(ii), vt.getColumnType(ii));
-                }
-                result = new VoltTable(columns);
-                for (Object d : dep) {
-                    vt = (VoltTable) (d);
-                    while (vt.advanceRow()) {
-                        // this adds the active row of vt
-                        result.add(vt);
-                    }
-                }
-            }
+            VoltTable result = unionTables(dependencies.get(DEP_procedureData));
             return new DependencyPair(DEP_procedureAggregator, result);
         }
 
@@ -214,27 +174,7 @@ public class Statistics extends VoltSystemProcedure {
             return new DependencyPair(DEP_initiatorData, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_initiatorAggregator) {
-            VoltTable result = null;
-
-            // create an output table from the schema of a dependency table
-            // (they'll be the same). Then iterate the dependencies and add
-            // all rows from each to the output.
-            List<VoltTable> dep = dependencies.get(DEP_initiatorData);
-            VoltTable vt = dep.get(0);
-            if (vt != null) {
-                VoltTable.ColumnInfo[] columns = new VoltTable.ColumnInfo[vt.getColumnCount()];
-                for (int ii = 0; ii < vt.getColumnCount(); ii++) {
-                    columns[ii] = new VoltTable.ColumnInfo(vt.getColumnName(ii), vt.getColumnType(ii));
-                }
-                result = new VoltTable(columns);
-                for (Object d : dep) {
-                    vt = (VoltTable) (d);
-                    while (vt.advanceRow()) {
-                        // this adds the active row of vt
-                        result.add(vt);
-                    }
-                }
-            }
+            VoltTable result = unionTables(dependencies.get(DEP_initiatorData));
             return new DependencyPair(DEP_initiatorAggregator, result);
         } else if (fragmentId == SysProcFragmentId.PF_partitionCount) {
             VoltTable result = new VoltTable(new VoltTable.ColumnInfo("Partition count", VoltType.INTEGER));
@@ -279,7 +219,6 @@ public class Statistics extends VoltSystemProcedure {
             return new DependencyPair(DEP_ioData, result);
         } else if (fragmentId == SysProcFragmentId.PF_ioDataAggregator) {
             final VoltTable result = new VoltTable(ioColumnInfo);
-
             List<VoltTable> dep = dependencies.get(DEP_ioData);
             for (VoltTable t : dep) {
                 while (t.advanceRow()) {
