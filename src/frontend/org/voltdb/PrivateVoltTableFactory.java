@@ -26,7 +26,7 @@ import java.nio.ByteBuffer;
  * it makes it very hard for someone to unintentionally call them.
  *
  */
-public class PrivateVoltTableFactory {
+public abstract class PrivateVoltTableFactory {
 
     public static VoltTable createUnititializedVoltTable() {
         return new VoltTable();
@@ -35,5 +35,4 @@ public class PrivateVoltTableFactory {
     public static VoltTable createVoltTableFromBuffer(ByteBuffer backing, boolean readOnly) {
         return new VoltTable(backing, readOnly);
     }
-
 }

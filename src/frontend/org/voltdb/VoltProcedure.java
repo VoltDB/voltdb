@@ -129,6 +129,10 @@ public abstract class VoltProcedure {
     // data from hsql wrapper
     private final ArrayList<VoltTable> queryResults = new ArrayList<VoltTable>();
 
+    // cached txnid-seeded RNG so all calls to getSeededRandomNumberGenerator() for
+    // a given call don't re-seed and generate the same number over and over
+    private Random m_cachedRNG = null;
+
     /**
      * End users should not instantiate VoltProcedure instances.
      * Constructor does nothing. All actual initialization is done in the
@@ -290,6 +294,8 @@ public abstract class VoltProcedure {
         m_currentTxnState = txnState;
         m_statusCode = Byte.MIN_VALUE;
         m_statusString = null;
+        // kill the cache of the rng
+        m_cachedRNG = null;
         if (ProcedureProfiler.profilingLevel != ProcedureProfiler.Level.DISABLED) {
             profiler.startCounter(catProc);
         }
@@ -584,7 +590,11 @@ public abstract class VoltProcedure {
      * @return A deterministically-seeded java.util.Random instance.
      */
     public Random getSeededRandomNumberGenerator() {
-        return new Random(m_currentTxnState.txnId);
+        // this value is memoized here and reset at the beginning of call(...).
+        if (m_cachedRNG == null) {
+            m_cachedRNG = new Random(m_currentTxnState.txnId);
+        }
+        return m_cachedRNG;
     }
 
     /**
