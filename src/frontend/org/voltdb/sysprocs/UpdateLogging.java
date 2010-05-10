@@ -29,7 +29,6 @@ import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
@@ -59,16 +58,20 @@ public class UpdateLogging extends VoltSystemProcedure
                                    "invalid fragment id: " + String.valueOf(fragmentId));
     }
 
+    /**
+     * Change the operational log configuration.
+     * @param ctx       Internal parameter. Not user-accessible.
+     * @param xmlConfig New configuration XML document.
+     * @return          Standard STATUS table.
+     */
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
                            String xmlConfig)
     {
         VoltDB.instance().logUpdate(xmlConfig, getTransactionId());
-
         ctx.getExecutionSite().updateBackendLogLevels();
 
-        VoltTable t = new VoltTable(new VoltTable.ColumnInfo("", VoltType.BIGINT));
-        t.addRow(0);
-
+        VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
+        t.addRow(VoltSystemProcedure.STATUS_OK);
         return (new VoltTable[] {t});
     }
 }
