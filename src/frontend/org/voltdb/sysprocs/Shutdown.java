@@ -28,17 +28,14 @@ import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.utils.VoltLoggerFactory;
 import org.apache.log4j.Logger;
 
-/** A wholly improper shutdown. The only guarantee is that a transaction
- * is committed or not committed - never partially committed. However, no
- * promise is given to return a result to a client, to finish work queued
- * behind this procedure or to return meaningful errors for those queued
- * transactions.
+/**
+ * A wholly improper shutdown. No promise is given to return a result to a client,
+ * to finish work queued behind this procedure or to return meaningful errors for
+ * those queued transactions.
  *
- * Invoking this procedure will terminate each node in the cluster.
+ * Invoking this procedure immediately attempts to terminate each node in the cluster.
  */
-
 @ProcInfo(singlePartition = false)
-
 public class Shutdown extends VoltSystemProcedure {
 
     @Override
@@ -92,6 +89,11 @@ public class Shutdown extends VoltSystemProcedure {
         return null;
     }
 
+    /**
+     * Begin an un-graceful shutdown.
+     * @param ctx Internal parameter not exposed to the end-user.
+     * @return Never returned, no he never returned...
+     */
     public VoltTable[] run(SystemProcedureExecutionContext ctx) {
         SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[1];
         pfs[0] = new SynthesizedPlanFragment();
