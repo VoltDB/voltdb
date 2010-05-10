@@ -28,8 +28,9 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.DtxnConstants;
 
 /**
- *
- *
+ * This procedure is not available to users. It is not added to
+ * the users catalog.  This procedure should not be described
+ * in the documentation.
  */
 @ProcInfo(singlePartition = false)
 public class StartSampler extends VoltSystemProcedure {
