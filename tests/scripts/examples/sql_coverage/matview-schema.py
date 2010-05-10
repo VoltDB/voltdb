@@ -34,6 +34,10 @@
     "MATP1": {
         "columns": (("BIG", FastSerializer.VOLTTYPE_BIGINT),
                     ("NUM", FastSerializer.VOLTTYPE_BIGINT),
+                    ("IDCOUNT", FastSerializer.VOLTTYPE_BIGINT),
+                    ("TINYCOUNT", FastSerializer.VOLTTYPE_BIGINT),
+                    ("SMALLCOUNT", FastSerializer.VOLTTYPE_BIGINT),
+                    ("BIGCOUNT", FastSerializer.VOLTTYPE_BIGINT),
                     ("TINYSUM", FastSerializer.VOLTTYPE_BIGINT),
                     ("SMALLSUM", FastSerializer.VOLTTYPE_BIGINT)),
         "partitions": (),
