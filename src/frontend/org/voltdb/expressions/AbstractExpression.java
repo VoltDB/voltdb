@@ -251,7 +251,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
     public void toJSONString(JSONStringer stringer) throws JSONException {
         stringer.key(Members.TYPE.name()).value(m_type.toString());
-        stringer.key(Members.VALUE_TYPE.name()).value(m_valueType.name());
+        stringer.key(Members.VALUE_TYPE.name()).value(m_valueType == null ? null : m_valueType.name());
         stringer.key(Members.VALUE_SIZE.name()).value(m_valueSize);
 
         if (m_left != null) {
