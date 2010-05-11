@@ -36,5 +36,5 @@ UPDATE _table SET @assign_col = @assign_col _math _value[int:0,3]
 -- test simple update
 UPDATE _table SET @assign_col = @assign_type
 -- ENG-495 test type casting errors
-UPDATE _table SET @assign_col = _value[string]
-UPDATE _table SET @assign_col = _value[decimal]
+UPDATE _table SET _variable = _value[string]
+UPDATE _table SET _variable = _value[decimal]
