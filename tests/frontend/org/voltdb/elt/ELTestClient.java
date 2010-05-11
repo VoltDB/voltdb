@@ -34,7 +34,9 @@ import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
 public class ELTestClient extends ELClientBase
 {
     private ArrayList<AdvertisedDataSource> m_dataSources = null;
-    private HashMap<String, ELTVerifier> m_verifiers =
+
+    // hash table name + partition to verifier
+    private final HashMap<String, ELTVerifier> m_verifiers =
         new HashMap<String, ELTVerifier>();
 
     @Override
@@ -66,6 +68,7 @@ public class ELTestClient extends ELClientBase
         if (verifier == null)
         {
             // something horribly wrong, bail
+            System.out.println("No verifier for table " + tableName + " and partition " + partition);
             System.exit(1);
         }
         verifier.addRow(data);

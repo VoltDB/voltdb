@@ -29,6 +29,7 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.*;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.elt.*;
+import org.voltdb.regressionsuites.sqltypesprocs.*;
 
 /**
  *  End to end ELT tests using the RawProcessor and the ELSinkServer.
@@ -405,12 +406,47 @@ public class TestELTSuite extends RegressionSuite {
     }
 
 
+    /**
+     * Verify round trips of updates to a persistent table.
+     */
+    public void testELTUpdates() throws IOException, ProcCallException, InterruptedException
+    {
+        ELTestClient  tester = new ELTestClient();
+        tester.connectToELServer();
+        final Client client = getClient();
+
+        // insert
+        for (int i=0; i < 10; i++) {
+            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, rowdata));
+            final Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata);
+            client.callProcedure("Insert", params);
+        }
+
+        // updates
+        for (int i=0; i < 10; i++) {
+            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            // add the 'D' row
+            tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, rowdata));
+
+            // calculate the update and add that to the tester
+            rowdata[0] = new Byte((byte) (10 + i));
+            tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, rowdata));
+
+            // perform the update
+            final Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata);
+            client.callProcedure("Update_ELT", params);
+        }
+    }
+
+
     /*
      * Test suite boilerplate
      */
     static final Class<?>[] PROCEDURES = {
-        org.voltdb.regressionsuites.sqltypesprocs.Insert.class,
-        org.voltdb.regressionsuites.sqltypesprocs.RollbackInsert.class
+        Insert.class,
+        RollbackInsert.class,
+        Update_ELT.class
     };
 
     public TestELTSuite(final String name) {
@@ -433,7 +469,7 @@ public class TestELTSuite extends RegressionSuite {
         project.addELT("org.voltdb.elt.processors.RawProcessor", true /*enabled*/);
         // "WITH_DEFAULTS" is a non-elt'd persistent table
         project.addELTTable("ALLOW_NULLS", false);   // persistent table
-        project.addELTTable("NO_NULLS", true);  // streamed table
+        project.addELTTable("NO_NULLS", true);       // streamed table
         // and then project builder as normal
         project.addPartitionInfo("NO_NULLS", "PKEY");
         project.addPartitionInfo("ALLOW_NULLS", "PKEY");
@@ -454,5 +490,4 @@ public class TestELTSuite extends RegressionSuite {
 
         return builder;
     }
-
 }
