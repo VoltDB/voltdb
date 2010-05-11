@@ -199,7 +199,7 @@ public class PlanAssembler {
         for (Table table : tableList) {
             for (ConnectorTableInfo ti : tableinfo) {
                 if (ti.getAppendonly() &&
-                    ti.getTable().getTypeName().equals(table.getTypeName()))
+                    ti.getTable().getTypeName().equalsIgnoreCase(table.getTypeName()))
                 {
                     return true;
                 }
