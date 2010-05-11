@@ -706,7 +706,7 @@ size_t PersistentTable::appendToELBuffer(TableTuple &tuple, int64_t seqNo,
                                   m_executorContext->currentTxnId(),
                                   seqNo,
                                   m_executorContext->currentTxnTimestamp(),
-                                  m_tmpTarget1, type);
+                                  tuple, type);
 }
 
 /**
