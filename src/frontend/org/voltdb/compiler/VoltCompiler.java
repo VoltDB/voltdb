@@ -700,6 +700,15 @@ public class VoltCompiler {
             throw new RuntimeException(ex);
         }
 
+        // Process and add exports and connectors to the catalog
+        // Must do this before compiling procedures to deny updates
+        // on append-only tables.
+        if (database.getExports() != null) {
+            // currently, only a single connector is allowed
+            Connector conn = database.getExports().getConnector();
+            compileConnector(conn, db);
+        }
+
         // Actually parse and handle all the Procedures
         for (final ProcedureDescriptor procedureDescriptor : procedures) {
             final String procedureName = procedureDescriptor.m_className;
@@ -707,13 +716,6 @@ public class VoltCompiler {
             m_currentFilename += ".class";
             ProcedureCompiler.compile(this, m_hsql, m_estimates,
                     m_catalog, db, procedureDescriptor);
-        }
-
-        // Process and add exports and connectors to the catalog
-        if (database.getExports() != null) {
-            // currently, only a single connector is allowed
-            Connector conn = database.getExports().getConnector();
-            compileConnector(conn, db);
         }
 
         // Add all the class dependencies to the output jar
