@@ -409,6 +409,34 @@ public class TestELTSuite extends RegressionSuite {
     /**
      * Verify round trips of updates to a persistent table.
      */
+    public void testELTDeletes() throws IOException, ProcCallException, InterruptedException
+    {
+        ELTestClient  tester = new ELTestClient();
+        tester.connectToELServer();
+        final Client client = getClient();
+
+        // insert
+        for (int i=0; i < 10; i++) {
+            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, rowdata));
+            final Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata);
+            client.callProcedure("Insert", params);
+        }
+
+        for (int i=0; i < 10; i++) {
+            // add the full 'D' row
+            Object[] rowdata_d = TestSQLTypesSuite.m_midValues;
+            tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, rowdata_d));
+
+            // perform the delete
+            client.callProcedure("Delete", "ALLOW_NULLS", i);
+        }
+        quiesceAndVerify(client, tester);
+    }
+
+    /**
+     * Verify round trips of updates to a persistent table.
+     */
     public void testELTUpdates() throws IOException, ProcCallException, InterruptedException
     {
         ELTestClient  tester = new ELTestClient();
@@ -423,16 +451,11 @@ public class TestELTSuite extends RegressionSuite {
             client.callProcedure("Insert", params);
         }
 
-        // ClientResponse callProcedure = client.callProcedure("@AdHoc", "SELECT * from ALLOW_NULLS");
-        // System.out.println(callProcedure.getResults()[0]);
-
-        // updates
+        // update
         for (int i=0; i < 10; i++) {
-
             // add the 'D' row
             Object[] rowdata_d = TestSQLTypesSuite.m_midValues;
             tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, rowdata_d));
-
 
             // calculate the update and add that to the tester
             Object[] rowdata_i = TestSQLTypesSuite.m_defaultValues;
@@ -443,11 +466,47 @@ public class TestELTSuite extends RegressionSuite {
             client.callProcedure("Update_ELT", params);
         }
 
-        // callProcedure = client.callProcedure("@AdHoc", "SELECT * from ALLOW_NULLS");
-        // System.out.println(callProcedure.getResults()[0]);
+        // delete
+        for (int i=0; i < 10; i++) {
+            // add the full 'D' row
+            Object[] rowdata_d = TestSQLTypesSuite.m_defaultValues;
+            tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, rowdata_d));
+
+            // perform the delete
+            client.callProcedure("Delete", "ALLOW_NULLS", i);
+        }
 
         quiesceAndVerify(client, tester);
     }
+
+    /**
+     * Multi-table test
+     */
+    /**
+     * Verify round trips of updates to a persistent table.
+     */
+    public void testELTMultiTable() throws IOException, ProcCallException, InterruptedException
+    {
+        ELTestClient  tester = new ELTestClient();
+        tester.connectToELServer();
+        final Client client = getClient();
+
+        for (int i=0; i < 10; i++) {
+            // add data to a first (persistent) table
+            Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, rowdata));
+            Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata);
+            client.callProcedure("Insert", params);
+
+            // add data to a second (streaming) table.
+            rowdata = TestSQLTypesSuite.m_defaultValues;
+            tester.addRow("NO_NULLS", i, convertValsToRow(i, rowdata));
+            params = convertValsToParams("NO_NULLS", i, rowdata);
+            client.callProcedure("Insert", params);
+        }
+        quiesceAndVerify(client, tester);
+    }
+
 
 
     /*
@@ -456,7 +515,8 @@ public class TestELTSuite extends RegressionSuite {
     static final Class<?>[] PROCEDURES = {
         Insert.class,
         RollbackInsert.class,
-        Update_ELT.class
+        Update_ELT.class,
+        Delete.class
     };
 
     public TestELTSuite(final String name) {
