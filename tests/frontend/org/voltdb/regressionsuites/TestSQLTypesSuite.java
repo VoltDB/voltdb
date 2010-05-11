@@ -284,7 +284,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
     };
 
     // default (defined in DDL) value for each type
-    public Object[] m_defaultValues = {
+    public static Object[] m_defaultValues = {
       new Byte((byte)(1)),
       new Short((short)(2)),
       3,

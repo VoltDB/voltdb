@@ -25,9 +25,6 @@ package org.voltdb.elt;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
-
-import org.voltdb.VoltType;
 import org.voltdb.elclient.ELTDecoderBase;
 import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
 import org.voltdb.messaging.FastDeserializer;
@@ -35,12 +32,12 @@ import org.voltdb.types.TimestampType;
 
 class ELTVerifier extends ELTDecoderBase
 {
-    private ArrayDeque<Object[]> m_data;
+    private final ArrayDeque<Object[]> m_data;
     private boolean m_rowFailed = false;
     private long m_lastAck = -1;
     private int m_ackRepeats = 0;
-    private String m_tableName;
-    private int m_partitionId;
+    private final String m_tableName;
+    private final int m_partitionId;
 
     ELTVerifier(AdvertisedDataSource source)
     {
@@ -78,6 +75,8 @@ class ELTVerifier extends ELTDecoderBase
 
         // no data found - an ERROR.
         if (srcdata == null) {
+            System.out.println("No source data. Rows remaining: " + m_data.size() +
+                               " received: " + rowData.length + " bytes to verify.");
             m_rowFailed = true;
             return false;
         }
@@ -209,7 +208,14 @@ class ELTVerifier extends ELTDecoderBase
         if (object instanceof BigDecimal) {
             final BigDecimal bd1 = (BigDecimal)object;
             final BigDecimal bd2 = ELTDecoderBase.decodeDecimal(fds);
-            return bd1.equals(bd2);
+            // NOTE: not comparing scale. EE serialization of BD doesn't obey scale
+            if (bd1.compareTo(bd2) != 0) {
+                System.out.println("compare DECIMAL failed: " + bd1 + " != " + bd2);
+                return false;
+            }
+            else {
+                return true;
+            }
         }
         return false;
     }
@@ -299,6 +305,7 @@ class ELTVerifier extends ELTDecoderBase
         if (i1.intValue() != i2)
         {
             System.out.println("compare INTEGER failed: " + i1 + " != " + i2);
+            System.out.println("remaining rows: " + m_data.size());
         }
         return i1.intValue() == i2;
     }

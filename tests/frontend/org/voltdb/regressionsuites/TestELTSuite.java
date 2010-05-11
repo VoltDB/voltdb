@@ -423,20 +423,30 @@ public class TestELTSuite extends RegressionSuite {
             client.callProcedure("Insert", params);
         }
 
+        // ClientResponse callProcedure = client.callProcedure("@AdHoc", "SELECT * from ALLOW_NULLS");
+        // System.out.println(callProcedure.getResults()[0]);
+
         // updates
         for (int i=0; i < 10; i++) {
-            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+
             // add the 'D' row
-            tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, rowdata));
+            Object[] rowdata_d = TestSQLTypesSuite.m_midValues;
+            tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, rowdata_d));
+
 
             // calculate the update and add that to the tester
-            rowdata[0] = new Byte((byte) (10 + i));
-            tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, rowdata));
+            Object[] rowdata_i = TestSQLTypesSuite.m_defaultValues;
+            tester.addRow("ALLOW_NULLS", i, convertValsToRow(i,rowdata_i));
 
             // perform the update
-            final Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata);
+            final Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata_i);
             client.callProcedure("Update_ELT", params);
         }
+
+        // callProcedure = client.callProcedure("@AdHoc", "SELECT * from ALLOW_NULLS");
+        // System.out.println(callProcedure.getResults()[0]);
+
+        quiesceAndVerify(client, tester);
     }
 
 
