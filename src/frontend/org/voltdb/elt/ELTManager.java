@@ -79,10 +79,13 @@ public class ELTManager
      * @param siteTracker
      * @throws ELTManager.SetupException
      */
-    public static synchronized void initialize(int myHostId, final Catalog catalog, SiteTracker siteTracker)
-      throws ELTManager.SetupException
+    public static synchronized void initialize(int myHostId,
+                                               final Catalog catalog,
+                                               SiteTracker siteTracker,
+                                               int eltPort)
+    throws ELTManager.SetupException
     {
-        ELTManager tmp = new ELTManager(myHostId, catalog, siteTracker);
+        ELTManager tmp = new ELTManager(myHostId, catalog, siteTracker, eltPort);
         m_self = tmp;
     }
 
@@ -98,7 +101,10 @@ public class ELTManager
     /** Read the catalog to setup manager and loader(s)
      * @param myHostId
      * @param siteTracker */
-    private ELTManager(int myHostId, final Catalog catalog, SiteTracker siteTracker) throws ELTManager.SetupException {
+    private ELTManager(int myHostId, final Catalog catalog,
+                       SiteTracker siteTracker, int eltPort)
+    throws ELTManager.SetupException
+    {
         final Cluster cluster = catalog.getClusters().get("cluster");
         final Database db = cluster.getDatabases().get("database");
         final Connector conn= db.getConnectors().get("0");
@@ -115,9 +121,11 @@ public class ELTManager
         final String elloader = conn.getLoaderclass();
         try {
             eltLog.info("Creating connector " + elloader);
+            eltLog.info("   Using ELT server port: " + eltPort);
             ELTDataProcessor newProcessor = null;
             final Class<?> loaderClass = Class.forName(elloader);
             newProcessor = (ELTDataProcessor)loaderClass.newInstance();
+            newProcessor.setEltPort(eltPort);
             newProcessor.addLogger(eltLog);
 
             Iterator<ConnectorTableInfo> tableInfoIt = conn.getTableinfo().iterator();

@@ -75,6 +75,11 @@ public interface VoltServerConfig {
     public String getName();
 
     /**
+     * Get the number of nodes running in this test suite
+     */
+    public int getNodeCount();
+
+    /**
      * @return Is the underlying instance of VoltDB running HSQL?
      */
     public boolean isHSQL();

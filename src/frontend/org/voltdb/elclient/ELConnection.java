@@ -18,10 +18,12 @@
 package org.voltdb.elclient;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Queue;
 
 import org.voltdb.elt.ELTProtoMessage;
 import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
@@ -38,43 +40,22 @@ public class ELConnection implements Runnable {
     static final private int CONNECTED = 2;
     static final private int CLOSING = 3;
     private int m_state = CLOSED;
+    private String m_connectionName;
 
+    private InetSocketAddress m_serverAddr;
     private SocketChannel m_socket;
 
-    // First hash by table, second by partition
+    // cached reference to ELClientBase's collection of ELDataSinks
     private HashMap<Integer, HashMap<Integer, ELDataSink>> m_sinks;
 
     private ArrayList<AdvertisedDataSource> m_dataSources;
 
-    public ELConnection(SocketChannel socket) {
-        m_socket = socket;
-        m_sinks = new HashMap<Integer, HashMap<Integer, ELDataSink>>();
-    }
-
-    /**
-     * Register a data sink to receive and decode an ELT data source.
-     * The sink will receive the stream corresponding to the
-     * table ID and partition ID with which it was constructed.
-     * @param sink
-     */
-    public void registerDataSink(ELDataSink sink)
+    public ELConnection(InetSocketAddress serverAddr,
+                        HashMap<Integer, HashMap<Integer, ELDataSink>> dataSinks)
     {
-        int table_id = sink.getTableId();
-        int part_id = sink.getPartitionId();
-        HashMap<Integer, ELDataSink> part_map =
-            m_sinks.get(table_id);
-        if (part_map == null)
-        {
-            part_map = new HashMap<Integer, ELDataSink>();
-            m_sinks.put(table_id, part_map);
-        }
-        if (part_map.containsKey(part_id))
-        {
-            System.out.println("ELClient already contains a sink for table: " + table_id +
-                               ", partition: " + part_id);
-            return;
-        }
-        part_map.put(part_id, sink);
+        m_sinks = dataSinks;
+        m_serverAddr = serverAddr;
+        m_connectionName = serverAddr.toString();
     }
 
     /**
@@ -84,6 +65,15 @@ public class ELConnection implements Runnable {
      */
     public void openELTConnection() throws IOException
     {
+        System.out.println("Starting EL Client socket to: " + m_connectionName);
+        try {
+            m_socket = SocketChannel.open(m_serverAddr);
+            m_socket.configureBlocking(false);
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+
         if (m_state == CLOSED)
         {
             open();
@@ -112,10 +102,34 @@ public class ELConnection implements Runnable {
     }
 
     /**
+     * Retrieve the name of this connection.  This is currently
+     * equivalent to InetSocketAddress.toString()
+     * @return
+     */
+    public String getConnectionName()
+    {
+        return m_connectionName;
+    }
+
+    /**
+     * Retrieve the connected-ness of this EL Connection
+     * @return
+     */
+    public boolean isConnected()
+    {
+        return (m_state == CONNECTED);
+    }
+
+    /**
      * perform a single iteration of work for the EL connection.
      */
     public void work()
     {
+        // eltxxx need better error handling code in here
+        if (!m_socket.isConnected() || !m_socket.isOpen())
+        {
+            m_state = CLOSING;
+        }
         // loop here to empty RX ?
         // receive data from network and hand to the proper ELProtocolHandler RX queue
         ELTProtoMessage m = null;
@@ -137,34 +151,32 @@ public class ELConnection implements Runnable {
             if (m != null && m.isPollResponse())
             {
                 ELDataSink rx_sink = m_sinks.get(m.getTableId()).get(m.getPartitionId());
-                rx_sink.getRxQueue().offer(m);
+                rx_sink.getRxQueue(m_connectionName).offer(m);
             }
         }
         while (m != null);
 
-        // work all the ELProtocolHandlers
-        for (HashMap<Integer, ELDataSink> part_map : m_sinks.values())
-        {
-            for (ELDataSink work_sink : part_map.values())
-            {
-                work_sink.work();
-            }
-        }
-
-        // service all the ELProtocolHandler TX queues
+        // service all the ELDataSink TX queues
         for (HashMap<Integer, ELDataSink> part_map : m_sinks.values())
         {
             for (ELDataSink tx_sink : part_map.values())
             {
-                // XXX loop to drain the tx queue?
-                ELTProtoMessage tx_m = tx_sink.getTxQueue().poll();
-                if (tx_m != null)
+                Queue<ELTProtoMessage> tx_queue =
+                    tx_sink.getTxQueue(m_connectionName);
+                // this connection might not be connected to every sink
+                if (tx_queue != null)
                 {
-                    try {
-                        sendMessage(tx_m);
-                    } catch (IOException e) {
-                        // TODO Auto-generated catch block
-                        e.printStackTrace();
+                    // XXX loop to drain the tx queue?
+                    ELTProtoMessage tx_m =
+                        tx_queue.poll();
+                    if (tx_m != null)
+                    {
+                        try {
+                            sendMessage(tx_m);
+                        } catch (IOException e) {
+                            // TODO Auto-generated catch block
+                            e.printStackTrace();
+                        }
                     }
                 }
             }
@@ -189,7 +201,7 @@ public class ELConnection implements Runnable {
         sendMessage(m);
     }
 
-    private ELTProtoMessage nextMessage() throws IOException
+    public ELTProtoMessage nextMessage() throws IOException
     {
         FastDeserializer fds;
         final ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
@@ -226,7 +238,7 @@ public class ELConnection implements Runnable {
         return m;
     }
 
-    private void sendMessage(ELTProtoMessage m) throws IOException
+    public void sendMessage(ELTProtoMessage m) throws IOException
     {
         ByteBuffer buf = m.toBuffer();
         while (buf.remaining() > 0) {

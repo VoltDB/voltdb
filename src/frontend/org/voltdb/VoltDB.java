@@ -21,6 +21,8 @@ import java.io.File;
 import java.util.Map;
 import java.util.TimeZone;
 
+import org.voltdb.elt.processors.RawProcessor;
+
 /**
  * <code>VoltDB</code> is the main class for VoltDB server.
  * It sets up global objects and then starts the individual threads
@@ -71,6 +73,9 @@ public class VoltDB {
         public boolean m_useThreadAffinity = false;
         /** port number for the first client interface for each server */
         public int m_port = DEFAULT_PORT;
+
+        /** port number for the ELT connector */
+        public int m_eltPort = RawProcessor.DEFAULT_LISTENER_PORT;
 
         public boolean listenForDumpRequests = false;
 
@@ -125,6 +130,12 @@ public class VoltDB {
                 }
                 else if (arg.startsWith("port ")) {
                     m_port = Integer.parseInt(arg.substring("port ".length()));
+                }
+                else if (arg.equals("eltport")) {
+                    m_eltPort = Integer.parseInt(args[++i]);
+                }
+                else if (arg.startsWith("eltport ")) {
+                    m_eltPort = Integer.parseInt(arg.substring("eltport ".length()));
                 }
                 else if (arg.equals("catalog")) {
                     m_pathToCatalog = args[++i];

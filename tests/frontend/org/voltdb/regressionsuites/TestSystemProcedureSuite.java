@@ -315,7 +315,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
          * Add a cluster configuration for sysprocs too
          */
         config = new LocalCluster("sysproc-cluster.jar", 2, 2, 1,
-                                  BackendTarget.NATIVE_EE_JNI);
+                                  BackendTarget.NATIVE_EE_JNI, false);
         config.compile(project);
         builder.addServerConfig(config);
 

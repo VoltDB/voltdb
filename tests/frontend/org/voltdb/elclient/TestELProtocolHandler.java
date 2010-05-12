@@ -23,13 +23,11 @@
 package org.voltdb.elclient;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-
-import org.voltdb.VoltType;
-import org.voltdb.elt.ELTProtoMessage;
-import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
 
 import junit.framework.TestCase;
+
+import org.voltdb.elt.ELTProtoMessage;
+import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
 
 public class TestELProtocolHandler extends TestCase {
 
@@ -59,44 +57,46 @@ public class TestELProtocolHandler extends TestCase {
 
     public void testBasicStuff()
     {
+        String CONN_NAME = "ryanlovestheyankees";
         ELDataSink dut =
             new ELDataSink(PARTITION_ID, TABLE_ID, "coffeetable",
                            new TestELTDecoder(new AdvertisedDataSource(PARTITION_ID,
                                                                        TABLE_ID,
                                                                        "coffeetable",
                                                                        null, null)));
-        assertNull(dut.getTxQueue().peek());
+        dut.addELConnection(CONN_NAME);
+        assertNull(dut.getTxQueue(CONN_NAME).peek());
         dut.work();
-        assertNotNull(dut.getTxQueue().peek());
-        ELTProtoMessage m = dut.getTxQueue().poll();
+        assertNotNull(dut.getTxQueue(CONN_NAME).peek());
+        ELTProtoMessage m = dut.getTxQueue(CONN_NAME).poll();
         assertTrue(m.isPoll());
         assertFalse(m.isAck());
         // move the offset along a bit
         m = new ELTProtoMessage(PARTITION_ID, TABLE_ID);
         m.pollResponse(0, makeFakePollData(10));
-        dut.getRxQueue().offer(m);
+        dut.getRxQueue(CONN_NAME).offer(m);
         dut.work();
-        assertNotNull(dut.getTxQueue().peek());
-        m = dut.getTxQueue().poll();
+        assertNotNull(dut.getTxQueue(CONN_NAME).peek());
+        m = dut.getTxQueue(CONN_NAME).poll();
         assertTrue(m.isPoll());
         assertTrue(m.isAck());
         assertEquals(0, m.getAckOffset());
         m = new ELTProtoMessage(PARTITION_ID, TABLE_ID);
         m.pollResponse(10, makeFakePollData(20));
-        dut.getRxQueue().offer(m);
+        dut.getRxQueue(CONN_NAME).offer(m);
         dut.work();
-        assertNotNull(dut.getTxQueue().peek());
-        m = dut.getTxQueue().poll();
+        assertNotNull(dut.getTxQueue(CONN_NAME).peek());
+        m = dut.getTxQueue(CONN_NAME).poll();
         assertTrue(m.isPoll());
         assertTrue(m.isAck());
         assertEquals(10, m.getAckOffset());
         // stall the poll and verify the incoming message is just a poll
         m = new ELTProtoMessage(PARTITION_ID, TABLE_ID);
         m.pollResponse(20, makeFakePollData(0));
-        dut.getRxQueue().offer(m);
+        dut.getRxQueue(CONN_NAME).offer(m);
         dut.work();
-        assertNotNull(dut.getTxQueue().peek());
-        m = dut.getTxQueue().poll();
+        assertNotNull(dut.getTxQueue(CONN_NAME).peek());
+        m = dut.getTxQueue(CONN_NAME).poll();
         assertTrue(m.isPoll());
         assertFalse(m.isAck());
     }

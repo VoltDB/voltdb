@@ -371,7 +371,7 @@ public class TestSqlAggregateSuite extends RegressionSuite {
 
         // Cluster
         config = new LocalCluster("sqlaggregate-cluster.jar", 2, 2,
-                                  1, BackendTarget.NATIVE_EE_JNI);
+                                  1, BackendTarget.NATIVE_EE_JNI, false);
         config.compile(project);
         builder.addServerConfig(config);
 

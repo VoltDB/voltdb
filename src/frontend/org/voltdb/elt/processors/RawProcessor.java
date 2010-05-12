@@ -79,7 +79,8 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
      * client-2. Using multiple clients is heavily advised against.
      */
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
-    final public static int LISTENER_PORT = 5443;
+    final public static int DEFAULT_LISTENER_PORT = 5443;
+    int m_eltPort;
     final AcceptorThread m_acceptor = new AcceptorThread();
 
     /**
@@ -282,7 +283,7 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
                 try {
                     acceptSock = ServerSocketChannel.open();
                     acceptSock.configureBlocking(true);
-                    acceptSock.socket().bind(new InetSocketAddress(LISTENER_PORT));
+                    acceptSock.socket().bind(new InetSocketAddress(m_eltPort));
                 }
                 catch (IOException e) {
                     throw new RuntimeException(e);
@@ -427,6 +428,12 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
     @Override
     public void addLogger(Logger logger) {
         m_logger = logger;
+    }
+
+    @Override
+    public void setEltPort(int port)
+    {
+        m_eltPort = port;
     }
 
     @Override

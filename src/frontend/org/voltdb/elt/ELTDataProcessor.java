@@ -38,6 +38,8 @@ public interface ELTDataProcessor  {
      */
     void addLogger(Logger logger);
 
+    void setEltPort(int port);
+
     /** Pass the loader each table in each database.
      * Called once for each table in the catalog.
      * @param database these tables belong to.

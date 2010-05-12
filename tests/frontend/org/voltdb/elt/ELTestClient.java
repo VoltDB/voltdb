@@ -22,43 +22,50 @@
  */
 package org.voltdb.elt;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 
 import org.voltdb.TheHashinator;
 import org.voltdb.elclient.ELClientBase;
 import org.voltdb.elclient.ELConnection;
-import org.voltdb.elclient.ELDataSink;
+import org.voltdb.elclient.ELTDecoderBase;
 import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
+import org.voltdb.elt.processors.RawProcessor;
 
 public class ELTestClient extends ELClientBase
 {
-    private ArrayList<AdvertisedDataSource> m_dataSources = null;
-
     // hash table name + partition to verifier
     private final HashMap<String, ELTVerifier> m_verifiers =
         new HashMap<String, ELTVerifier>();
 
-    @Override
-    public void constructELTDataSinks(ELConnection elConnection)
+    public ELTestClient(int nodeCount)
     {
-        m_dataSources = elConnection.getDataSources();
-        for (AdvertisedDataSource source : m_dataSources)
+        ArrayList<InetSocketAddress> servers =
+            new ArrayList<InetSocketAddress>();
+        for (int i = 0; i < nodeCount; i++)
         {
-            // create a verifier with the 'schema'
-            ELTVerifier verifier = new ELTVerifier(source);
-            // hash it by table name + partition ID
-            System.out.println("Creating verifier for table: " + source.tableName() +
-                               ", part ID: " + source.partitionId());
+            servers.add(new InetSocketAddress("localhost",
+                                              RawProcessor.DEFAULT_LISTENER_PORT + i));
+        }
+        super.setServerInfo(servers);
+    }
+
+    @Override
+    public ELTDecoderBase constructELTDecoder(AdvertisedDataSource source)
+    {
+        // create a verifier with the 'schema'
+        ELTVerifier verifier = new ELTVerifier(source);
+        // hash it by table name + partition ID
+        System.out.println("Creating verifier for table: " + source.tableName() +
+                           ", part ID: " + source.partitionId());
+        if (!m_verifiers.containsKey(source.tableName() + source.partitionId()))
+        {
             m_verifiers.put(source.tableName() + source.partitionId(),
                             verifier);
-            // create a protocol handler for the lot and register it with
-            // the connection
-            ELDataSink handler =
-                new ELDataSink(source.partitionId(), source.tableId(),
-                                      source.tableName(), verifier);
-            elConnection.registerDataSink(handler);
         }
+        return verifier;
     }
 
     public void addRow(String tableName, Object partitionHash, Object[] data)
@@ -84,6 +91,13 @@ public class ELTestClient extends ELClientBase
                 retval = false;
             }
         }
+        for (ELConnection connection : m_elConnections.values())
+        {
+            if (!connection.isConnected())
+            {
+                retval = true;
+            }
+        }
         return retval;
     }
 
@@ -94,6 +108,84 @@ public class ELTestClient extends ELClientBase
         {
             if (!verifier.allRowsVerified())
             {
+                retval = false;
+            }
+        }
+        return retval;
+    }
+
+    public boolean verifyEltOffsets()
+    {
+        boolean retval = true;
+
+        HashMap<Integer, Long> table_offsets = new HashMap<Integer, Long>();
+
+        // Generate polls for every connection/table/partition
+        for (ELConnection connection : m_elConnections.values())
+        {
+            HashMap<Integer, Long> seen_responses = new HashMap<Integer, Long>();
+            for (AdvertisedDataSource source : connection.getDataSources())
+            {
+                try
+                {
+                    ELTProtoMessage poll = new ELTProtoMessage(source.partitionId(),
+                                                               source.tableId());
+                    poll.poll();
+                    connection.sendMessage(poll);
+
+                    // Poll this source on this connection
+                    ELTProtoMessage m = null;
+                    // We know all possibly outstanding responses will be fully
+                    // drained, so just wait until we get any response for
+                    // this data source
+                    while (m == null || m.getTableId() != source.tableId() ||
+                           m.getPartitionId() != source.partitionId())
+                    {
+                        m = connection.nextMessage();
+                    }
+                    assert(m.isPollResponse());
+                    long offset = m.getAckOffset();
+                    // Now, see if we've seen this offset for this table.  If so,
+                    // check to see that it's equal.  Otherwise, stash it.
+                    Integer table_hash = m.getTableId() * 137 + m.getPartitionId();
+                    if (!table_offsets.containsKey(table_hash))
+                    {
+                        table_offsets.put(table_hash, offset);
+                    }
+                    else
+                    {
+                        if (table_offsets.get(table_hash) != offset)
+                        {
+                            System.out.println("Mismatched ELT offset: " + offset);
+                            System.out.println("  Table ID: " + source.tableName());
+                            System.out.println("  Partition: " + source.partitionId());
+                            System.out.println("  Orig. offset: " + table_offsets.get(table_hash));
+                            retval = false;
+                        }
+                    }
+                    if (seen_responses.containsKey(table_hash))
+                    {
+                        System.out.println("Saw duplicate response from connection: " +
+                                           connection.getConnectionName());
+                        System.out.println("   for table: " + source.tableName() +
+                                           ", " + source.partitionId());
+                        retval = false;
+                    }
+                    else
+                    {
+                        seen_responses.put(table_hash, offset);
+                    }
+                }
+                catch (IOException e)
+                {
+                    e.printStackTrace();
+                    System.exit(1);
+                }
+            }
+            if (seen_responses.entrySet().size() != connection.getDataSources().size())
+            {
+                System.out.println("Didn't see enough responses from connection: " +
+                                   connection.getConnectionName());
                 retval = false;
             }
         }

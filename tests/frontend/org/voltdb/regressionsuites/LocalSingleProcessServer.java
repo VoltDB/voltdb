@@ -41,7 +41,6 @@ public class LocalSingleProcessServer implements VoltServerConfig {
 
     public final String m_jarFileName;
     public final int m_siteCount;
-    public final int m_replication;
     public final BackendTarget m_target;
 
     ServerThread m_server = null;
@@ -50,18 +49,11 @@ public class LocalSingleProcessServer implements VoltServerConfig {
     public LocalSingleProcessServer(String jarFileName, int siteCount,
                                     BackendTarget target)
     {
-        this(jarFileName, siteCount, 0, target);
-    }
-
-    public LocalSingleProcessServer(String jarFileName, int siteCount,
-                                    int replication, BackendTarget target)
-    {
         assert(jarFileName != null);
         assert(siteCount > 0);
         final String buildType = System.getenv().get("BUILD");
         m_jarFileName = Configuration.getPathToCatalogForTest(jarFileName);
         m_siteCount = siteCount;
-        m_replication = replication;
         if (buildType == null) {
             m_target = target;
         } else {
@@ -81,7 +73,7 @@ public class LocalSingleProcessServer implements VoltServerConfig {
     public boolean compile(VoltProjectBuilder builder) {
         if (m_compiled == true)
             return true;
-        m_compiled = builder.compile(m_jarFileName, m_siteCount, m_replication);
+        m_compiled = builder.compile(m_jarFileName, m_siteCount, 0);
         return m_compiled;
     }
 
@@ -108,6 +100,12 @@ public class LocalSingleProcessServer implements VoltServerConfig {
         else
             retval += "-JNI";
         return retval;
+    }
+
+    @Override
+    public int getNodeCount()
+    {
+        return 1;
     }
 
     @Override

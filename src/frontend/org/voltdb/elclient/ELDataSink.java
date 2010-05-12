@@ -17,8 +17,10 @@
 
 package org.voltdb.elclient;
 
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Queue;
+import java.util.Map.Entry;
 
 import org.voltdb.elt.ELTProtoMessage;
 
@@ -29,9 +31,10 @@ public class ELDataSink implements Runnable
     private int m_partitionId = -1;
     private String m_tableName;
     private ELTDecoderBase m_decoder;
+    private String m_activeConnection = null;
 
-    private LinkedList<ELTProtoMessage> m_rxQueue;
-    private LinkedList<ELTProtoMessage> m_txQueue;
+    private HashMap<String, LinkedList<ELTProtoMessage>> m_rxQueues;
+    private HashMap<String, LinkedList<ELTProtoMessage>> m_txQueues;
 
     boolean m_started = false;
 
@@ -42,8 +45,8 @@ public class ELDataSink implements Runnable
         m_partitionId = partitionId;
         m_tableName = tableName;
         m_decoder = decoder;
-        m_rxQueue = new LinkedList<ELTProtoMessage>();
-        m_txQueue = new LinkedList<ELTProtoMessage>();
+        m_rxQueues = new HashMap<String, LinkedList<ELTProtoMessage>>();
+        m_txQueues = new HashMap<String, LinkedList<ELTProtoMessage>>();
     }
 
     public int getTableId()
@@ -56,14 +59,24 @@ public class ELDataSink implements Runnable
         return m_partitionId;
     }
 
-    public Queue<ELTProtoMessage> getRxQueue()
+    void addELConnection(String connectionName)
     {
-        return m_rxQueue;
+        if (m_activeConnection == null)
+        {
+            m_activeConnection = connectionName;
+        }
+        m_rxQueues.put(connectionName, new LinkedList<ELTProtoMessage>());
+        m_txQueues.put(connectionName, new LinkedList<ELTProtoMessage>());
     }
 
-    public Queue<ELTProtoMessage> getTxQueue()
+    Queue<ELTProtoMessage> getRxQueue(String connectionName)
     {
-        return m_txQueue;
+        return m_rxQueues.get(connectionName);
+    }
+
+    Queue<ELTProtoMessage> getTxQueue(String connectionName)
+    {
+        return m_txQueues.get(connectionName);
     }
 
     // XXX hacky "for when we move to threading" blah
@@ -83,10 +96,14 @@ public class ELDataSink implements Runnable
             poll();
             m_started = true;
         }
-        ELTProtoMessage m = m_rxQueue.poll();
-        if (m != null && m.isPollResponse())
+        for (Entry<String, LinkedList<ELTProtoMessage>> rx_conn : m_rxQueues.entrySet())
         {
-            handlePollResponse(m);
+            ELTProtoMessage m = rx_conn.getValue().poll();
+            if (m != null && m.isPollResponse())
+            {
+                m_activeConnection = rx_conn.getKey();
+                handlePollResponse(m);
+            }
         }
     }
 
@@ -97,7 +114,7 @@ public class ELDataSink implements Runnable
 
         ELTProtoMessage m = new ELTProtoMessage(m_partitionId, m_tableId);
         m.poll();
-        m_txQueue.offer(m);
+        m_txQueues.get(m_activeConnection).offer(m);
     }
 
     private void pollAndAck(ELTProtoMessage prev)
@@ -105,7 +122,21 @@ public class ELDataSink implements Runnable
         System.out.println("Poller, table " + m_tableName + ": pollAndAck " + prev.getAckOffset());
         ELTProtoMessage next = new ELTProtoMessage(m_partitionId, m_tableId);
         next.poll().ack(prev.getAckOffset());
-        m_txQueue.offer(next);
+        ELTProtoMessage ack = new ELTProtoMessage(m_partitionId, m_tableId);
+        ack.ack(prev.getAckOffset());
+        for (String connectionName : m_txQueues.keySet())
+        {
+            if (connectionName.equals(m_activeConnection))
+            {
+//                System.out.println("POLLANDACK: " + connectionName + ", offset: " + prev.getAckOffset());
+                m_txQueues.get(m_activeConnection).offer(next);
+            }
+            else
+            {
+//                System.out.println("ACK: " + connectionName + ", offset: " + prev.getAckOffset());
+                m_txQueues.get(connectionName).offer(ack);
+            }
+        }
     }
 
     private void handlePollResponse(ELTProtoMessage m)

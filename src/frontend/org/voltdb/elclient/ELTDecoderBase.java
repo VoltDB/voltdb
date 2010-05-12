@@ -28,13 +28,13 @@ import org.voltdb.types.TimestampType;
 
 public abstract class ELTDecoderBase
 {
+    protected AdvertisedDataSource m_source;
+    // This is available as a convenience, could go away.
     protected ArrayList<VoltType> m_tableSchema;
 
-    // Taking the coward's way out for now and just accepting
-    // an array of VoltTypes.  In the future this should expand to
-    // possibly be the whole schema
     public ELTDecoderBase(AdvertisedDataSource source)
     {
+        m_source = source;
         m_tableSchema = source.columnTypes();
     }
 

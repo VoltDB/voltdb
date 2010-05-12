@@ -25,6 +25,7 @@ package org.voltdb.elt;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayDeque;
+
 import org.voltdb.elclient.ELTDecoderBase;
 import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
 import org.voltdb.messaging.FastDeserializer;

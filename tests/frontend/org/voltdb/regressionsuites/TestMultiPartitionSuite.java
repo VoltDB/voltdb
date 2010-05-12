@@ -229,7 +229,7 @@ public class TestMultiPartitionSuite extends RegressionSuite {
 
         // Cluster
         config = new LocalCluster("distregression-cluster.jar", 2, 2,
-                                  1, BackendTarget.NATIVE_EE_JNI);
+                                  1, BackendTarget.NATIVE_EE_JNI, false);
         config.compile(project);
         builder.addServerConfig(config);
 

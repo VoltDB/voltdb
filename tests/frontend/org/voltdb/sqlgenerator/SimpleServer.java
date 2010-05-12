@@ -87,7 +87,7 @@ public class SimpleServer {
 
         LocalCluster cluster = new LocalCluster("simple.jar",
                                                 sites, hosts, k_factor,
-                                                config.m_backend);
+                                                config.m_backend, false);
 
         if (!cluster.compile(builder))
         {
