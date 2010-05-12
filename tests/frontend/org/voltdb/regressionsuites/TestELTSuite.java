@@ -551,11 +551,11 @@ public class TestELTSuite extends RegressionSuite {
         config.compile(project);
         builder.addServerConfig(config);
 
-//        // three host, two site-per-host, k=1 replication config
-//        config = new LocalCluster("elt-ddl-cluster-norep.jar", 2, 3, 1,
-//                                  BackendTarget.NATIVE_EE_JNI, true);
-//        config.compile(project);
-//        builder.addServerConfig(config);
+        // three host, two site-per-host, k=1 replication config
+        config = new LocalCluster("elt-ddl-cluster-rep.jar", 2, 3, 1,
+                                  BackendTarget.NATIVE_EE_JNI, true);
+        config.compile(project);
+        builder.addServerConfig(config);
 
         return builder;
     }

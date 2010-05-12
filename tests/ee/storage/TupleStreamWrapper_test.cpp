@@ -710,7 +710,7 @@ TEST_F(TupleStreamWrapperTest, ReleaseOnNonBoundary)
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->unreleasedUso(), (MAGIC_TUPLE_SIZE * 4));
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 9));
-    EXPECT_EQ(results->unreleasedSize(), (MAGIC_TUPLE_SIZE * 9));
+    EXPECT_EQ(results->unreleasedSize(), (MAGIC_TUPLE_SIZE * 5));
 }
 
 /**
@@ -860,10 +860,10 @@ TEST_F(TupleStreamWrapperTest, ReleaseInCurrentBlock)
     // Poll and verify that we get a StreamBlock that indicates that
     // there's no data available at the new release point
     results = m_wrapper->getCommittedEltBytes();
-    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * 4));
     EXPECT_EQ(results->unreleasedUso(), (MAGIC_TUPLE_SIZE * 4));
-    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 4));
-    EXPECT_EQ(results->unreleasedSize(), (MAGIC_TUPLE_SIZE * 4));
+    EXPECT_EQ(results->offset(), 0);
+    EXPECT_EQ(results->unreleasedSize(), 0);
 
     // Now, flush the buffer and then verify that the next poll gets
     // the right partial result
@@ -872,7 +872,7 @@ TEST_F(TupleStreamWrapperTest, ReleaseInCurrentBlock)
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->unreleasedUso(), (MAGIC_TUPLE_SIZE * 4));
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 9));
-    EXPECT_EQ(results->unreleasedSize(), (MAGIC_TUPLE_SIZE * 9));
+    EXPECT_EQ(results->unreleasedSize(), (MAGIC_TUPLE_SIZE * 5));
 }
 
 int main() {

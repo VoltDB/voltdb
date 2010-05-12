@@ -342,39 +342,24 @@ TupleStreamWrapper::getCommittedEltBytes()
     while (pending_iter != m_pendingBlocks.end())
     {
         StreamBlock* block = *pending_iter;
-        // find the first block that is unpolled
-        //
-        // We're exploiting the fact that, currently,
-        // polling/releasing only works on block boundaries
-        if (block->uso() == m_firstUnpolledUso)
+        // find the first block that has unpolled data
+        if (m_firstUnpolledUso < (block->uso() + block->offset()))
         {
-            // get the next block
-            // -- either the next pending or m_currBlock (if no next pending)
-            ++pending_iter;
-            StreamBlock* next_block = NULL;
-            if (pending_iter != m_pendingBlocks.end())
-            {
-                next_block = *pending_iter;
-            }
-            else
-            {
-                next_block = m_currBlock;
-            }
-            // check that the entire unpolled block is committed
-            if (m_committedUso >= next_block->uso())
+            // check that the entire remainder is committed
+            if (m_committedUso >= (block->uso() + block->offset()))
             {
                 first_unpolled_block = block;
                 // find the value to update m_firstUnpolledUso
-                m_firstUnpolledUso = next_block->uso();
+                m_firstUnpolledUso = block->uso() + block->offset();
             }
             else
             {
                 // if the unpolled block is not committed,
                 // -- construct a fake StreamBlock that makes no progress
-                // --- USO of this block but offset of 0
+                // --- unreleased USO of this block but offset of 0
                 // don't advance the first unpolled USO
                 delete m_fakeBlock;
-                m_fakeBlock = new StreamBlock(0, 0, block->uso());
+                m_fakeBlock = new StreamBlock(0, 0, block->unreleasedUso());
                 first_unpolled_block = m_fakeBlock;
             }
             break;
@@ -388,9 +373,8 @@ TupleStreamWrapper::getCommittedEltBytes()
     // we just want to create a fake block based on its metadata
     if (first_unpolled_block == NULL)
     {
-        assert(m_currBlock->uso() == m_firstUnpolledUso);
         delete m_fakeBlock;
-        m_fakeBlock = new StreamBlock(0, 0, m_currBlock->uso());
+        m_fakeBlock = new StreamBlock(0, 0, m_currBlock->unreleasedUso());
         first_unpolled_block = m_fakeBlock;
     }
 
@@ -401,19 +385,6 @@ TupleStreamWrapper::getCommittedEltBytes()
 bool
 TupleStreamWrapper::releaseEltBytes(int64_t releaseOffset)
 {
-    // To release bytes:
-    //
-
-    // Search backwards starting with m_currBlock to find the pending
-    // block with the USO that matches the offset
-    //
-    // - If it is m_currBlock, release all the m_pendingBlocks
-    // - If it is a random pending block, release all the
-    //   m_pendingBlocks older than the matching one
-    // - If it doesn't match a block USO, return false
-    //
-    // also, don't forget to update the m_firstUnpolledUso
-
     // if released offset is in the uncommitted bytes, return an error
     if (releaseOffset > m_committedUso)
     {
@@ -422,60 +393,49 @@ TupleStreamWrapper::releaseEltBytes(int64_t releaseOffset)
 
     // if released offset is in an already-released past, just return success
     if ((m_pendingBlocks.empty() && releaseOffset < m_currBlock->uso()) ||
-        (releaseOffset < m_pendingBlocks.front()->uso()))
+        (!m_pendingBlocks.empty() && releaseOffset < m_pendingBlocks.front()->uso()))
     {
         return true;
     }
 
     bool retval = false;
 
-    if (releaseOffset == m_currBlock->uso())
+    if (releaseOffset >= m_currBlock->uso())
     {
         while (m_pendingBlocks.empty() != true) {
             StreamBlock* sb = m_pendingBlocks.back();
             m_pendingBlocks.pop_back();
             discardBlock(sb);
         }
-        if (m_firstUnpolledUso < m_currBlock->uso())
-        {
-            m_firstUnpolledUso = m_currBlock->uso();
-        }
+        m_currBlock->releaseUso(releaseOffset);
         retval = true;
     }
     else
     {
-        // search pending blocks for release offset This is
-        // inefficient to walk the list twice, but it's late and I'm
-        // lazy.  We can be smarter when we rewrite this to not rely
-        // on block boundaries
-        deque<StreamBlock*>::iterator pending_iter =
-            m_pendingBlocks.begin();
-        while (pending_iter != m_pendingBlocks.end())
+        StreamBlock* sb = m_pendingBlocks.front();
+        while (!m_pendingBlocks.empty() && !retval)
         {
-            StreamBlock* block = *pending_iter;
-            if (block->uso() == releaseOffset)
-            {
-                retval = true;
-                break;
-            }
-            ++pending_iter;
-        }
-        if (retval)
-        {
-            StreamBlock* sb = m_pendingBlocks.front();
-            while (sb->uso() != releaseOffset)
+            if (releaseOffset >= sb->uso() + sb->offset())
             {
                 m_pendingBlocks.pop_front();
                 discardBlock(sb);
                 sb = m_pendingBlocks.front();
             }
-            if (m_firstUnpolledUso < releaseOffset)
+            else
             {
-                m_firstUnpolledUso = releaseOffset;
+                sb->releaseUso(releaseOffset);
+                retval = true;
             }
         }
     }
 
+    if (retval)
+    {
+        if (m_firstUnpolledUso < releaseOffset)
+        {
+            m_firstUnpolledUso = releaseOffset;
+        }
+    }
 
     return retval;
 }
