@@ -342,7 +342,7 @@ DISTRIBUTION
     <copy todir="${dist.dir}/voltdb" file="COPYING"/>
 
     <!-- create an archive for distribution -->
-    <tar destfile="voltdb-temp.tar" >
+    <tar destfile="${build.dir}/voltdb-temp.tar" >
         <tarfileset
             prefix="voltdb-${dist.version}"
             dir="${dist.dir}"
@@ -355,8 +355,8 @@ DISTRIBUTION
             includes="**/*.py generate"
         />
     </tar>
-    <gzip src="voltdb-temp.tar" destfile="${build.dir}/voltdb-${dist.version}.tar.gz" />
-    <delete file="voltdb-temp.tar" />
+    <gzip src="${build.dir}/voltdb-temp.tar" destfile="${build.dir}/voltdb-${dist.version}.tar.gz" />
+    <delete file="${build.dir}/voltdb-temp.tar" />
 </target>
 
 <!--
