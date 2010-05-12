@@ -149,14 +149,30 @@ public class TestDistributer extends TestCase {
                         final ByteBuffer lengthBuffer = ByteBuffer.allocate(5);//Extra byte for version also
                         client.read(lengthBuffer);
 
+                        final ByteBuffer serviceLengthBuffer = ByteBuffer.allocate(4);
+                        while (serviceLengthBuffer.remaining() > 0)
+                            client.read(serviceLengthBuffer);
+                        serviceLengthBuffer.flip();
+                        ByteBuffer serviceBuffer = ByteBuffer.allocate(serviceLengthBuffer.getInt());
+                        while (serviceBuffer.remaining() > 0)
+                            client.read(serviceBuffer);
+                        serviceBuffer.flip();
+
                         final ByteBuffer usernameLengthBuffer = ByteBuffer.allocate(4);
-                        client.read(usernameLengthBuffer); usernameLengthBuffer.flip();
+                        while (usernameLengthBuffer.remaining() > 0)
+                            client.read(usernameLengthBuffer);
+                        usernameLengthBuffer.flip();
                         final int usernameLength = usernameLengthBuffer.getInt();
                         final ByteBuffer usernameBuffer = ByteBuffer.allocate(usernameLength);
-                        client.read(usernameBuffer); usernameBuffer.flip();
+                        while (usernameBuffer.remaining() > 0)
+                            client.read(usernameBuffer);
+                        usernameBuffer.flip();
 
                         final ByteBuffer passwordBuffer = ByteBuffer.allocate(20);
-                        client.read(passwordBuffer); passwordBuffer.flip();
+                        while (passwordBuffer.remaining() > 0)
+                            client.read(passwordBuffer);
+                        passwordBuffer.flip();
+
                         final byte usernameBytes[] = new byte[usernameLength];
                         final byte passwordBytes[] = new byte[20];
                         usernameBuffer.get(usernameBytes);

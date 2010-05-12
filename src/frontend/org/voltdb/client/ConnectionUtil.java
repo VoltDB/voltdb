@@ -75,7 +75,7 @@ public class ConnectionUtil {
     /**
      * Create a connection to a Volt server and authenticate the connection.
      * @param host
-     * @param program
+     * @param username
      * @param password
      * @param port
      * @throws IOException
@@ -86,7 +86,7 @@ public class ConnectionUtil {
      *
      */
     public static Object[] getAuthenticatedConnection(
-            String host, String program, String password, int port)
+            String host, String username, String password, int port)
     throws IOException {
         Object returnArray[] = new Object[3];
         boolean success = false;
@@ -115,9 +115,10 @@ public class ConnectionUtil {
             }
             byte passwordHash[] = md.digest(password.getBytes());
             FastSerializer fs = new FastSerializer();
-            fs.writeInt(0);//Placeholder for length
-            fs.writeByte(0);//version
-            fs.writeString(program);
+            fs.writeInt(0);             // placeholder for length
+            fs.writeByte(0);            // version
+            fs.writeString("database"); // data service (export|database)
+            fs.writeString(username);
             fs.write(passwordHash);
             final ByteBuffer fsBuffer = fs.getBuffer();
             final ByteBuffer b = ByteBuffer.allocate(fsBuffer.remaining());

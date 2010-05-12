@@ -214,6 +214,9 @@ class FastSerializer:
         #protocol version
         self.writeByte(0)
 
+        # service requested
+        self.writeString("database")
+
         if username:
             # utf8 encode supplied username
             self.writeString(username)

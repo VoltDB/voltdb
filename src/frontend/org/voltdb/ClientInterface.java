@@ -423,12 +423,12 @@ public class ClientInterface implements DumpManager.Dumpable {
             }
             message.flip().position(1);//skip version
             FastDeserializer fds = new FastDeserializer(message);
+            final String service = fds.readString();
             final String username = fds.readString();
-
             final byte password[] = new byte[20];
             message.get(password);
 
-            final AuthSystem.AuthUser user = m_catalogContext.get().authSystem.authenticate(username, password);
+            final AuthSystem.AuthUser user = m_catalogContext.get().authSystem.authenticate(service, username, password);
             ClientInputHandler handler = null;
             if (user == null) {
                 //Send negative response

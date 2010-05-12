@@ -278,7 +278,7 @@ public class AuthSystem {
      * @param password SHA-1 single hashed version of the users clear text password
      * @return The permission set for the user if authentication succeeds or null if authentication fails.
      */
-    AuthUser authenticate(String username, byte[] password) {
+    AuthUser authenticate(String service, String username, byte[] password) {
         if (!m_enabled) {
             return new AuthUser(null, null, false, false) {
                 @Override
