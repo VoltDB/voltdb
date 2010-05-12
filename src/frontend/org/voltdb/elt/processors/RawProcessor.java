@@ -292,7 +292,7 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
                 do {
                     try {
                         final SocketChannel socket = acceptSock.accept();
-                        PollingProtocolHandler ih = new PollingProtocolHandler();
+                        ExportInputHandler ih = new ExportInputHandler();
 
                         Connection conn =
                             VoltDB.instance().getNetwork().registerChannel(socket, ih, 0);
@@ -330,7 +330,7 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
      * the base class to read length prefixed messages from the network
      * and pushes those messages into the processor's mailbox queue.
      */
-    private class PollingProtocolHandler extends VoltProtocolHandler
+    private class ExportInputHandler extends VoltProtocolHandler
     {
         @Override
         public int getExpectedOutgoingMessageSize() {
