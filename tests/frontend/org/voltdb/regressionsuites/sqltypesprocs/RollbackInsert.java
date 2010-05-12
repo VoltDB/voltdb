@@ -25,10 +25,16 @@ package org.voltdb.regressionsuites.sqltypesprocs;
 
 import java.math.BigDecimal;
 
+import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.types.TimestampType;
+
+@ProcInfo (
+    partitionInfo = "NO_NULLS.PKEY: 1",
+    singlePartition = true
+)
 
 /**
  * This procedure performs an insert and then rolls it back;
