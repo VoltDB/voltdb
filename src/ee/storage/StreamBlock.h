@@ -31,7 +31,8 @@ namespace voltdb
     class StreamBlock {
     public:
         StreamBlock(char* data, size_t capacity, size_t uso)
-            : m_data(data), m_capacity(capacity), m_offset(0), m_uso(uso)
+            : m_data(data), m_capacity(capacity), m_offset(0),
+            m_releaseOffset(0), m_uso(uso)
         {
         }
 
@@ -40,8 +41,11 @@ namespace voltdb
             delete[] m_data;
         }
 
+        /**
+         * Returns a pointer to the first unreleased octet in the block
+         */
         const char* const dataPtr() const {
-            return m_data;
+            return m_data + m_releaseOffset;
         }
 
         /**
@@ -61,9 +65,33 @@ namespace voltdb
             return m_offset;
         }
 
+        /**
+         * Returns the USO of the first unreleased octet in this block
+         */
+        const size_t unreleasedUso()
+        {
+            return m_uso + m_releaseOffset;
+        }
+
+        /**
+         * Returns the size of the unreleased data in this block.
+         */
+        const size_t unreleasedSize()
+        {
+            return m_offset - m_releaseOffset;
+        }
+
     private:
         char* mutableDataPtr() {
             return m_data;
+        }
+
+        // The USO for octets up to which are being released
+        void releaseUso(size_t releaseUso)
+        {
+            assert(releaseUso >= m_uso);
+            m_releaseOffset = releaseUso - m_uso;
+            assert(m_releaseOffset <= m_offset);
         }
 
         void consumed(size_t consumed) {
@@ -72,6 +100,9 @@ namespace voltdb
         }
 
         void truncateTo(size_t mark) {
+            // We should NEVER be truncating back to an offset
+            // that has been released
+            assert((mark - m_uso) >= m_releaseOffset);
             // just move offset. pretty easy.
             if (((m_uso + m_offset) >= mark ) && (m_uso <= mark)) {
                 m_offset = mark - m_uso;
@@ -86,6 +117,7 @@ namespace voltdb
         char *m_data;
         const size_t m_capacity;
         size_t m_offset;  // position for next write.
+        size_t m_releaseOffset;  // position for next read.
         size_t m_uso;     // universal stream offset of m_offset 0.
 
         friend class TupleStreamWrapper;

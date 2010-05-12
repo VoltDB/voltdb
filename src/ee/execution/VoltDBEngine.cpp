@@ -1236,11 +1236,11 @@ VoltDBEngine::eltAction(bool ackAction, bool pollAction, long ackOffset,
     // compute the stream offset for the end of the returned block
     long retval = block->uso() + block->offset();
     // prepend the length of the block to the results buffer
-    m_resultOutput.writeInt((int)(block->offset()));
+    m_resultOutput.writeInt((int)(block->unreleasedSize()));
     // if the block isn't empty, copy it into the query results buffer
-    if (block->offset() != 0)
+    if (block->unreleasedSize() != 0)
     {
-        m_resultOutput.writeBytes(block->dataPtr(), block->offset());
+        m_resultOutput.writeBytes(block->dataPtr(), block->unreleasedSize());
     }
 
     return retval;
