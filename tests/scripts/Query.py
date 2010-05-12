@@ -46,16 +46,17 @@ class VoltQueryClient(cmd.Cmd):
                     FastSerializer.VOLTTYPE_TIMESTAMP:
                         lambda x: datetime.fromtimestamp(x)}
 
-    def __init__(self, host, port, username = "", password = ""):
+    def __init__(self, host, port, username = "", password = "",
+                 dump_file = None):
         cmd.Cmd.__init__(self)
 
         self.__quiet = False
         self.__timeout = None
 
-        self.__initialize(host, port, username, password)
+        self.__initialize(host, port, username, password, dump_file)
 
-    def __initialize(self, host, port, username, password):
-        self.fs = FastSerializer(host, port, username, password)
+    def __initialize(self, host, port, username, password, dump_file):
+        self.fs = FastSerializer(host, port, username, password, dump_file)
 
         self.adhoc = VoltProcedure(self.fs, "@AdHoc",
                                    [FastSerializer.VOLTTYPE_STRING])
@@ -383,15 +384,21 @@ class VoltQueryClient(cmd.Cmd):
         self.safe_print("Supported types", self.__class__.TYPES.keys())
 
 def help(program_name):
-    print program_name, "hostname port [command]"
+    print program_name, "hostname port [dump=filename] [command]"
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         help(sys.argv[0])
         exit(-1)
 
+    filename = None
+    if len(sys.argv) >= 4 and sys.argv[3].startswith("dump="):
+        filename = sys.argv[3].split("=")[1]
+        del sys.argv[3]
+
     try:
-        command = VoltQueryClient(sys.argv[1], int(sys.argv[2]))
+        command = VoltQueryClient(sys.argv[1], int(sys.argv[2]),
+                                  dump_file = filename)
     except socket.error:
         sys.stderr.write("Error connecting to the server %s\n" % (sys.argv[1]))
         exit(-1)

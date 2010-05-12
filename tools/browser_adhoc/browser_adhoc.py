@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from os import curdir, sep
+import sys
 import mimetypes
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 import cgi
@@ -275,13 +276,18 @@ class HTTPHandler(BaseHTTPRequestHandler):
 def connect_to_server():
     global client
 
+    filename = None
+    if len(sys.argv) >= 2:
+        filename = sys.argv[1]
+
     try:
         if client != None:
             client.close()
         print "Connecting to server at ", volt_server_ip, \
             " on port ", volt_server_port
         client = VoltQueryClient(volt_server_ip, volt_server_port,
-                                 volt_username, volt_password)
+                                 volt_username, volt_password,
+                                 dump_file = filename)
         client.set_quiet(True)
     except socket.error:
         raise IOError("Error connecting to the server")

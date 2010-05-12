@@ -99,12 +99,15 @@ class FastSerializer:
     # that host order is little endian. See isNaN().
 
     def __init__(self, host = None, port = None, username = None,
-                 password = None):
+                 password = None, dump_file = None):
         # connect a socket to host, port and get a file object
         self.wbuf = array.array('c')
         self.rbuf = ""
         self.host = host
         self.port = port
+        self.dump_file = None
+        if dump_file != None:
+            self.dump_file = open(dump_file, "wb")
 
         self.socket = None
         if self.host != None and self.port != None:
@@ -200,6 +203,8 @@ class FastSerializer:
         self.stringType = lambda length : '%c%ds' % (self.inputBOM, length)
 
     def close(self):
+        if self.dump_file != None:
+            self.dump_file.close()
         self.socket.close()
 
     def authenticate(self, username, password):
@@ -269,6 +274,9 @@ class FastSerializer:
             print "ERROR: not connected to server."
             exit(-1)
 
+        if self.dump_file != None:
+            self.dump_file.write(self.wbuf)
+            self.dump_file.write("\n")
         self.socket.sendall(self.wbuf.tostring())
         self.wbuf = array.array('c')
 
@@ -284,9 +292,14 @@ class FastSerializer:
             responseprefix += self.socket.recv(4 - len(responseprefix))
             if responseprefix == "":
                 raise IOError("Connection broken")
+        if self.dump_file != None:
+            self.dump_file.write(responseprefix)
         responseLength = struct.unpack(self.int32Type(1), responseprefix)[0]
         while (len(self.rbuf) < responseLength):
             self.rbuf += self.socket.recv(responseLength - len(self.rbuf))
+        if self.dump_file != None:
+            self.dump_file.write(self.rbuf)
+            self.dump_file.write("\n")
 
     def read(self, type):
         if type not in self.READER:
