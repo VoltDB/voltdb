@@ -19,6 +19,7 @@ package org.voltdb.elt;
 
 import org.apache.log4j.Logger;
 import org.voltdb.elt.processors.RawProcessor.ELTInternalMessage;
+import org.voltdb.network.InputHandler;
 
 /**
  * Interface ELTManager imposes on processors.
@@ -38,8 +39,6 @@ public interface ELTDataProcessor  {
      */
     void addLogger(Logger logger);
 
-    void setEltPort(int port);
-
     /** Pass the loader each table in each database.
      * Called once for each table in the catalog.
      * @param database these tables belong to.
@@ -57,6 +56,13 @@ public interface ELTDataProcessor  {
      * Queue a work message to the processor's mailbox.
      */
     public void queueMessage(ELTInternalMessage m);
+
+    /**
+     * A client has connected. Create an InputHandler for it.
+     * @param service The service requested.
+     * @returns InputHandler or null if unable to create an input handler for the service.
+     */
+    public InputHandler createInputHandler(String service);
 
     /**
      * The system is terminating. Cleanup and exit the processor.

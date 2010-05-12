@@ -54,7 +54,7 @@ class Distributer {
     private final ArrayList<ClientStatusListener> m_listeners = new ArrayList<ClientStatusListener>();
 
     //Selector and connection handling, does all work in blocking selection thread
-    private VoltNetwork m_network;
+    private final VoltNetwork m_network;
 
     // Temporary until a distribution/affinity algorithm is written
     private int m_nextConnection = 0;

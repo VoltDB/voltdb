@@ -24,6 +24,7 @@ import org.apache.log4j.Logger;
 import org.voltdb.catalog.*;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.elt.processors.RawProcessor.ELTInternalMessage;
+import org.voltdb.network.InputHandler;
 import org.voltdb.utils.*;
 
 /**
@@ -81,11 +82,10 @@ public class ELTManager
      */
     public static synchronized void initialize(int myHostId,
                                                final Catalog catalog,
-                                               SiteTracker siteTracker,
-                                               int eltPort)
+                                               SiteTracker siteTracker)
     throws ELTManager.SetupException
     {
-        ELTManager tmp = new ELTManager(myHostId, catalog, siteTracker, eltPort);
+        ELTManager tmp = new ELTManager(myHostId, catalog, siteTracker);
         m_self = tmp;
     }
 
@@ -102,7 +102,7 @@ public class ELTManager
      * @param myHostId
      * @param siteTracker */
     private ELTManager(int myHostId, final Catalog catalog,
-                       SiteTracker siteTracker, int eltPort)
+                       SiteTracker siteTracker)
     throws ELTManager.SetupException
     {
         final Cluster cluster = catalog.getClusters().get("cluster");
@@ -121,11 +121,9 @@ public class ELTManager
         final String elloader = conn.getLoaderclass();
         try {
             eltLog.info("Creating connector " + elloader);
-            eltLog.info("   Using ELT server port: " + eltPort);
             ELTDataProcessor newProcessor = null;
             final Class<?> loaderClass = Class.forName(elloader);
             newProcessor = (ELTDataProcessor)loaderClass.newInstance();
-            newProcessor.setEltPort(eltPort);
             newProcessor.addLogger(eltLog);
 
             Iterator<ConnectorTableInfo> tableInfoIt = conn.getTableinfo().iterator();
@@ -178,5 +176,20 @@ public class ELTManager
             p.shutdown();
         }
 
+    }
+
+    /**
+     * Factory for input handlers
+     * @return InputHandler for new client connection
+     */
+    public InputHandler createInputHandler(String service) {
+        InputHandler handler = null;
+        for (ELTDataProcessor p : m_processors) {
+            handler = p.createInputHandler(service);
+            if (handler != null) {
+                return handler;
+            }
+        }
+        return null;
     }
 }

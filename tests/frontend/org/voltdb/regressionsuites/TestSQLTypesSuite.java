@@ -1089,7 +1089,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
         builder.addServerConfig(config);
 
         // CLUSTER?
-        config = new LocalCluster("sqltypes-cluster.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI, false);
+        config = new LocalCluster("sqltypes-cluster.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         config.compile(project);
         builder.addServerConfig(config);
 

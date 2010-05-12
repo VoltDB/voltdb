@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Queue;
 
+import org.voltdb.client.ConnectionUtil;
 import org.voltdb.elt.ELTProtoMessage;
 import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
 import org.voltdb.messaging.FastDeserializer;
@@ -40,14 +41,15 @@ public class ELConnection implements Runnable {
     static final private int CONNECTED = 2;
     static final private int CLOSING = 3;
     private int m_state = CLOSED;
-    private String m_connectionName;
-
-    private InetSocketAddress m_serverAddr;
+    private final String m_connectionName;
+    private final InetSocketAddress m_serverAddr;
     private SocketChannel m_socket;
 
-    // cached reference to ELClientBase's collection of ELDataSinks
-    private HashMap<Integer, HashMap<Integer, ELDataSink>> m_sinks;
+    private final String m_username = "";
+    private final String m_password = "";
 
+    // cached reference to ELClientBase's collection of ELDataSinks
+    private final HashMap<Integer, HashMap<Integer, ELDataSink>> m_sinks;
     private ArrayList<AdvertisedDataSource> m_dataSources;
 
     public ELConnection(InetSocketAddress serverAddr,
@@ -66,13 +68,14 @@ public class ELConnection implements Runnable {
     public void openELTConnection() throws IOException
     {
         System.out.println("Starting EL Client socket to: " + m_connectionName);
-        try {
-            m_socket = SocketChannel.open(m_serverAddr);
-            m_socket.configureBlocking(false);
-        }
-        catch (IOException e) {
-            e.printStackTrace();
-        }
+        Object[] cxndata =
+            ConnectionUtil.
+            getAuthenticatedExportConnection(m_serverAddr.getHostName(),
+                                             m_username,
+                                             m_password,
+                                             m_serverAddr.getPort());
+
+        m_socket = (SocketChannel) cxndata[0];
 
         if (m_state == CLOSED)
         {
@@ -94,7 +97,7 @@ public class ELConnection implements Runnable {
     /**
      * Retrieve the list of data sources returned by the
      * open response provided by the server
-     * @return
+     * @return List of advertised sources
      */
     public ArrayList<AdvertisedDataSource> getDataSources()
     {
@@ -104,7 +107,7 @@ public class ELConnection implements Runnable {
     /**
      * Retrieve the name of this connection.  This is currently
      * equivalent to InetSocketAddress.toString()
-     * @return
+     * @return Connection name
      */
     public String getConnectionName()
     {
@@ -113,7 +116,7 @@ public class ELConnection implements Runnable {
 
     /**
      * Retrieve the connected-ness of this EL Connection
-     * @return
+     * @return true if in CONNECTED state
      */
     public boolean isConnected()
     {

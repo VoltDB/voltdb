@@ -18,17 +18,13 @@
 package org.voltdb.elt.processors;
 
 import java.io.*;
-import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
 import java.util.*;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.log4j.Logger;
-import org.voltdb.VoltDB;
 import org.voltdb.elt.*;
 import org.voltdb.messaging.*;
 import org.voltdb.network.*;
@@ -79,9 +75,6 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
      * client-2. Using multiple clients is heavily advised against.
      */
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
-    final public static int DEFAULT_LISTENER_PORT = 5443;
-    int m_eltPort;
-    final AcceptorThread m_acceptor = new AcceptorThread();
 
     /**
      * Set of accepted client connections. MUST synchronize on m_connections
@@ -267,63 +260,6 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
     }
 
     /**
-     * An internal thread that blocks on socket accept. Accepted connections
-     * create NetworkHandlers that run the client poll/ack protocol.
-     */
-    private class AcceptorThread extends Thread
-    {
-        AcceptorThread() {
-            super("ELT client acceptor");
-        }
-
-        @Override
-        public void run() {
-            ServerSocketChannel acceptSock = null;
-            try {
-                try {
-                    acceptSock = ServerSocketChannel.open();
-                    acceptSock.configureBlocking(true);
-                    acceptSock.socket().bind(new InetSocketAddress(m_eltPort));
-                }
-                catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-
-                do {
-                    try {
-                        final SocketChannel socket = acceptSock.accept();
-                        ExportInputHandler ih = new ExportInputHandler();
-
-                        Connection conn =
-                            VoltDB.instance().getNetwork().registerChannel(socket, ih, 0);
-
-                        ProtoStateBlock sb = new ProtoStateBlock(conn);
-                        ih.setStateBlock(sb);
-
-                        synchronized (m_connections) {
-                            m_connections.add(conn);
-                        }
-
-                        // can now turn on read interest -- fully configured.
-                        conn.enableReadSelection();
-                    }
-                    catch (IOException e) {
-                    }
-                } while (m_shouldContinue.get() == true);
-            }
-            finally {
-                if (acceptSock != null) {
-                    try {
-                        acceptSock.close();
-                    }
-                    catch (IOException e) {
-                    }
-                }
-            }
-        }
-    }
-
-    /**
      * The network read handler for the raw processor network stream.
      * Must extend VoltPrococolHandler as NIOReadStream has only
      * package private methods. The handler is very simple; it uses
@@ -332,14 +268,19 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
      */
     private class ExportInputHandler extends VoltProtocolHandler
     {
+        /**
+         * Called by VoltNetwork after the connection object is constructed
+         * and before the channel is registered to the selector.
+         */
+        @Override
+        public void starting(Connection c) {
+            m_sb = new ProtoStateBlock(c);
+        }
+
         @Override
         public int getExpectedOutgoingMessageSize() {
             // roughly 2MB plus the message metadata
             return (1024 * 1024 * 2) + 128;
-        }
-
-        public void setStateBlock(ProtoStateBlock sb) {
-            m_sb = sb;
         }
 
         @Override
@@ -417,23 +358,12 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
     @Override
     public void readyForData() {
         m_logger.info("Processor ready for data.");
-
-        // allow new connections now
-        m_acceptor.start();
-
-        // start the mailbox processing
         this.start();
     }
 
     @Override
     public void addLogger(Logger logger) {
         m_logger = logger;
-    }
-
-    @Override
-    public void setEltPort(int port)
-    {
-        m_eltPort = port;
     }
 
     @Override
@@ -463,18 +393,18 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
     }
 
     @Override
+    public InputHandler createInputHandler(String service) {
+        if (service.equalsIgnoreCase("export")) {
+            return new ExportInputHandler();
+        }
+        return null;
+    }
+
+    @Override
     public void shutdown() {
         m_shouldContinue.set(false);
-        m_acceptor.interrupt();
         this.interrupt();
         try {
-            System.out.println("Joining acceptor.");
-            m_acceptor.join();
-        }
-        catch (InterruptedException e) {
-        }
-        try {
-            System.out.println("Joining Processor.");
             this.join();
         }
         catch (InterruptedException e) {

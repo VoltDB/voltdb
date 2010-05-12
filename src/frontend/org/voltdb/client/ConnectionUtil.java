@@ -83,10 +83,34 @@ public class ConnectionUtil {
      * authenticated socket channel, the second. is an array of 4 longs -
      * Integer hostId, Long connectionId, Long timestamp (part of instanceId), Int leaderAddress (part of instanceId).
      * The last object is the build string
-     *
      */
     public static Object[] getAuthenticatedConnection(
-            String host, String username, String password, int port)
+            String host, String username, String password, int port) throws IOException
+    {
+        return getAuthenticatedConnection("database", host, username, password, port);
+    }
+
+    /**
+     * Create a connection to a Volt server for export and authenticate the connection.
+     * @param host
+     * @param username
+     * @param password
+     * @param port
+     * @throws IOException
+     * @returns An array of objects. The first is an
+     * authenticated socket channel, the second. is an array of 4 longs -
+     * Integer hostId, Long connectionId, Long timestamp (part of instanceId), Int leaderAddress (part of instanceId).
+     * The last object is the build string
+     */
+    public static Object[] getAuthenticatedExportConnection(
+            String host, String username, String password, int port) throws IOException
+    {
+        return getAuthenticatedConnection("export", host, username, password, port);
+    }
+
+
+    private static Object[] getAuthenticatedConnection(
+            String service, String host, String username, String password, int port)
     throws IOException {
         Object returnArray[] = new Object[3];
         boolean success = false;
@@ -117,7 +141,7 @@ public class ConnectionUtil {
             FastSerializer fs = new FastSerializer();
             fs.writeInt(0);             // placeholder for length
             fs.writeByte(0);            // version
-            fs.writeString("database"); // data service (export|database)
+            fs.writeString(service);    // data service (export|database)
             fs.writeString(username);
             fs.write(passwordHash);
             final ByteBuffer fsBuffer = fs.getBuffer();

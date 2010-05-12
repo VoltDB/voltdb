@@ -38,7 +38,6 @@ import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.elt.processors.RawProcessor;
 
 /**
  * Implementation of a VoltServerConfig for a multi-process
@@ -52,12 +51,9 @@ public class LocalCluster implements VoltServerConfig {
     final int m_siteCount;
     final int m_hostCount;
     final int m_replication;
-    final boolean m_useElt;
     final BackendTarget m_target;
     final String m_buildDir;
-
     int m_portOffset;
-    int m_eltPortOffset;
 
     // state
     boolean m_compiled = false;
@@ -135,8 +131,7 @@ public class LocalCluster implements VoltServerConfig {
     }
 
     public LocalCluster(String jarFileName, int siteCount,
-                        int hostCount, int replication, BackendTarget target,
-                        boolean useElt)
+                        int hostCount, int replication, BackendTarget target)
     {
         System.out.println("Instantiating LocalCluster for " + jarFileName);
         System.out.println("Sites: " + siteCount + " hosts: " + hostCount
@@ -151,7 +146,6 @@ public class LocalCluster implements VoltServerConfig {
         m_target = target;
         m_hostCount = hostCount;
         m_replication = replication;
-        m_useElt = useElt;
         String buildDir = System.getenv("VOLTDB_BUILD_DIR");  // via build.xml
         if (buildDir == null)
             m_buildDir = System.getProperty("user.dir") + "/obj/release";
@@ -178,12 +172,6 @@ public class LocalCluster implements VoltServerConfig {
                                            "-1");
         // When we actually append a port value, this will be correct.
         m_portOffset = m_procBuilder.command().size() - 1;
-        if (m_useElt)
-        {
-            m_procBuilder.command().add("eltport");
-            m_procBuilder.command().add("-1");
-            m_eltPortOffset = m_procBuilder.command().size() - 1;
-        }
 
         for (String s : m_procBuilder.command()) {
             System.out.println(s);
@@ -229,7 +217,6 @@ public class LocalCluster implements VoltServerConfig {
         config.m_pathToCatalog = m_jarFileName;
         config.m_profilingLevel = ProcedureProfiler.Level.DISABLED;
         config.m_port = VoltDB.DEFAULT_PORT;
-        config.m_eltPort = RawProcessor.DEFAULT_LISTENER_PORT;
 
         m_localServer = new ServerThread(config);
         m_localServer.start();
@@ -240,11 +227,6 @@ public class LocalCluster implements VoltServerConfig {
                 m_procBuilder.command().set(m_portOffset,
                                             String.valueOf(VoltDB.DEFAULT_PORT + i));
 
-                if (m_useElt)
-                {
-                    m_procBuilder.command().set(m_eltPortOffset,
-                                                String.valueOf(RawProcessor.DEFAULT_LISTENER_PORT + i));
-                }
                 Process proc = m_procBuilder.start();
                 m_cluster.add(proc);
                 // write output to obj/release/testoutput/<test name>-n.txt

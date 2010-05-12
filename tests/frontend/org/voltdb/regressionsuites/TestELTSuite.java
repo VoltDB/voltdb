@@ -99,6 +99,7 @@ public class TestELTSuite extends RegressionSuite {
         assertFalse(tester.allRowsVerified());
     }
 
+    @Override
     public void setUp()
     {
         super.setUp();
@@ -547,7 +548,7 @@ public class TestELTSuite extends RegressionSuite {
 
         // three host, two site-per-host, k=1 replication config
         config = new LocalCluster("elt-ddl-cluster-rep.jar", 2, 3, 1,
-                                  BackendTarget.NATIVE_EE_JNI, true);
+                                  BackendTarget.NATIVE_EE_JNI);
         config.compile(project);
         builder.addServerConfig(config);
 

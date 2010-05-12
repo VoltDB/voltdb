@@ -28,11 +28,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 import org.voltdb.TheHashinator;
+import org.voltdb.VoltDB;
 import org.voltdb.elclient.ELClientBase;
 import org.voltdb.elclient.ELConnection;
 import org.voltdb.elclient.ELTDecoderBase;
 import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
-import org.voltdb.elt.processors.RawProcessor;
 
 public class ELTestClient extends ELClientBase
 {
@@ -46,8 +46,7 @@ public class ELTestClient extends ELClientBase
             new ArrayList<InetSocketAddress>();
         for (int i = 0; i < nodeCount; i++)
         {
-            servers.add(new InetSocketAddress("localhost",
-                                              RawProcessor.DEFAULT_LISTENER_PORT + i));
+            servers.add(new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT + i));
         }
         super.setServerInfo(servers);
     }

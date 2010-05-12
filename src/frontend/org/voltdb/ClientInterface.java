@@ -46,16 +46,12 @@ import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.debugstate.InitiatorContext;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
 import org.voltdb.dtxn.TransactionInitiator;
+import org.voltdb.elt.ELTManager;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.Messenger;
-import org.voltdb.network.Connection;
-import org.voltdb.network.NIOReadStream;
-import org.voltdb.network.QueueMonitor;
-import org.voltdb.network.VoltNetwork;
-import org.voltdb.network.VoltProtocolHandler;
-import org.voltdb.network.WriteStream;
+import org.voltdb.network.*;
 import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.EstTime;
@@ -273,7 +269,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                             if (socket != null) {
                                 boolean success = false;
                                 try {
-                                    final ClientInputHandler handler = authenticate(socket);
+                                    final InputHandler handler = authenticate(socket);
                                     if (handler != null) {
                                         socket.configureBlocking(false);
                                         socket.socket().setTcpNoDelay(false);
@@ -281,10 +277,11 @@ public class ClientInterface implements DumpManager.Dumpable {
 
                                         synchronized (m_connections){
                                             Connection c = null;
-                                            if (m_hasDTXNBackPressure) {
-                                                c = m_network.registerChannel(socket, handler, 0);
-                                            } else {
+                                            if (!m_hasDTXNBackPressure) {
                                                 c = m_network.registerChannel(socket, handler, SelectionKey.OP_READ);
+                                            }
+                                            else {
+                                                c = m_network.registerChannel(socket, handler, 0);
                                             }
                                             m_connections.add(c);
                                         }
@@ -337,8 +334,9 @@ public class ClientInterface implements DumpManager.Dumpable {
          * @return AuthUser a set of user permissions or null if authentication fails
          * @throws IOException
          */
-        private ClientInputHandler
-                authenticate(final SocketChannel socket) throws IOException {
+        private InputHandler
+        authenticate(final SocketChannel socket) throws IOException
+        {
             ByteBuffer responseBuffer = ByteBuffer.allocate(6);
             byte version = (byte)0;
             responseBuffer.putInt(2);//message length
@@ -429,7 +427,7 @@ public class ClientInterface implements DumpManager.Dumpable {
             message.get(password);
 
             final AuthSystem.AuthUser user = m_catalogContext.get().authSystem.authenticate(service, username, password);
-            ClientInputHandler handler = null;
+            InputHandler handler = null;
             if (user == null) {
                 //Send negative response
                 responseBuffer.put((byte)-1).flip();
@@ -438,11 +436,18 @@ public class ClientInterface implements DumpManager.Dumpable {
                 authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
                              "): user " + username + " failed authentication.");
                 return null;
-            } else {
+            } else if (service.equalsIgnoreCase("database")) {
                 handler =
                     new ClientInputHandler(
                             user,
                             socket.socket().getInetAddress().getHostName());
+            }
+            else {
+                // If no processor can handle this service, null is returned.
+                handler = ELTManager.instance().createInputHandler(service);
+            }
+
+            if (handler != null) {
                 byte buildString[] = VoltDB.instance().getBuildString().getBytes("UTF-8");
                 responseBuffer = ByteBuffer.allocate(34 + buildString.length);
                 responseBuffer.putInt(30 + buildString.length);//message length
@@ -457,6 +462,17 @@ public class ClientInterface implements DumpManager.Dumpable {
                 responseBuffer.putInt(buildString.length);
                 responseBuffer.put(buildString).flip();
                 socket.write(responseBuffer);
+
+            }
+            else {
+                // Send negative response
+                responseBuffer.put((byte)-1).flip();
+                socket.write(responseBuffer);
+                socket.close();
+                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
+                             "): user " + username + " failed authentication.");
+                return null;
+
             }
             return handler;
         }

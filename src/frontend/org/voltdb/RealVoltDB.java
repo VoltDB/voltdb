@@ -277,8 +277,7 @@ public class RealVoltDB implements VoltDBInterface
             // Let the ELT system read its configuration from the catalog.
             try {
                 ELTManager.initialize(myHostId, catalog,
-                                      m_catalogContext.siteTracker,
-                                      config.m_eltPort);
+                                      m_catalogContext.siteTracker);
             } catch (ELTManager.SetupException e) {
                 hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ELTInitFailure.name(), e);
                 System.exit(-1);

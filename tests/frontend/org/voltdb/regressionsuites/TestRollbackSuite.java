@@ -728,7 +728,7 @@ public class TestRollbackSuite extends RegressionSuite {
         // CONFIG #4: Local Cluster (of processes)
         /////////////////////////////////////////////////////////////
 
-        config = new LocalCluster("rollback-cluster.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI, false);
+        config = new LocalCluster("rollback-cluster.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assert(success);
         builder.addServerConfig(config);
