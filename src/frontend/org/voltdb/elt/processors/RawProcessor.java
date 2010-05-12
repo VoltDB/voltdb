@@ -303,7 +303,12 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
 
         @Override
         public Runnable offBackPressure() {
-            return null;
+            return new Runnable() {
+                @Override
+                public void run() {
+                    m_sb.m_c.enableReadSelection();
+                }
+            };
         }
 
         @Override
