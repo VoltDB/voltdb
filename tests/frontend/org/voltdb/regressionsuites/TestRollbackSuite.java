@@ -24,6 +24,9 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+
 import junit.framework.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.client.Client;
@@ -32,6 +35,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.benchmark.tpcc.procedures.*;
 import org.voltdb.regressionsuites.rollbackprocs.*;
+import org.voltdb.types.TimestampType;
 
 public class TestRollbackSuite extends RegressionSuite {
 
@@ -47,7 +51,12 @@ public class TestRollbackSuite extends RegressionSuite {
         SinglePartitionConstraintFailureAndContinue.class,
         SelectAll.class,
         ReadMatView.class,
-        FetchNORowUsingIndex.class
+        FetchNORowUsingIndex.class,
+        InsertAllTypes.class,
+        AllTypesJavaError.class,
+        AllTypesJavaAbort.class,
+        AllTypesUpdateJavaError.class,
+        AllTypesUpdateJavaAbort.class
     };
 
     /**
@@ -216,6 +225,174 @@ public class TestRollbackSuite extends RegressionSuite {
             e.printStackTrace();
             fail();
         }
+    }
+
+    // ENG-487
+    public void allTypesTestHelper(String procName) throws IOException {
+        Client client = getClient();
+        final double EPSILON = 0.00001;
+        final BigDecimal moneyOne = new BigDecimal(BigInteger.valueOf(7700000000000L), 12);
+        final BigDecimal moneyTwo = new BigDecimal(BigInteger.valueOf(1100000000000L), 12);
+
+        try {
+            client.callProcedure("InsertAllTypes", 1, 2, 3, 4, new TimestampType(5),
+                                 0.6, moneyOne, "inlined", "uninlined");
+            client.callProcedure("InsertAllTypes", 7, 6, 5, 4, new TimestampType(3),
+                                 0.2, moneyTwo, "INLINED", "UNINLINED");
+        } catch (ProcCallException e1) {
+            e1.printStackTrace();
+            fail();
+        }
+
+        try {
+            if (procName.contains("Update"))
+                client.callProcedure(procName, 7);
+            else
+                client.callProcedure(procName);
+            fail();
+        }
+        catch (ProcCallException e) {}
+        catch (IOException e) {
+            e.printStackTrace();
+            fail();
+        }
+
+        try {
+            VoltTable[] results = client.callProcedure("@AdHoc", "SELECT * FROM ALL_TYPES ORDER BY ID ASC;").getResults();
+
+            // get the table
+            VoltTable table = results[0];
+            assertTrue(table.getRowCount() == 2);
+
+            table.advanceRow();
+            assertEquals(1, table.getLong(0));
+            assertEquals(2, table.getLong(1));
+            assertEquals(3, table.getLong(2));
+            assertEquals(4, table.getLong(3));
+            assertEquals(new TimestampType(5), table.getTimestampAsTimestamp(4));
+            assertTrue(Math.abs(0.6 - table.getDouble(5)) < EPSILON);
+            assertEquals(moneyOne, table.getDecimalAsBigDecimal(6));
+            assertTrue(table.getString(7).equals("inlined"));
+            assertTrue(table.getString(8).equals("uninlined"));
+
+            table.advanceRow();
+            assertEquals(7, table.getLong(0));
+            assertEquals(6, table.getLong(1));
+            assertEquals(5, table.getLong(2));
+            assertEquals(4, table.getLong(3));
+            assertEquals(new TimestampType(3), table.getTimestampAsTimestamp(4));
+            assertTrue(Math.abs(0.2 - table.getDouble(5)) < EPSILON);
+            assertEquals(moneyTwo, table.getDecimalAsBigDecimal(6));
+            assertTrue(table.getString(7).equals("INLINED"));
+            assertTrue(table.getString(8).equals("UNINLINED"));
+
+            // Check by using the indexes
+            results = client.callProcedure("@AdHoc", "SELECT * FROM ALL_TYPES WHERE ID > 3;").getResults();
+
+            // get the table
+            table = results[0];
+            assertTrue(table.getRowCount() == 1);
+
+            table.advanceRow();
+            assertEquals(7, table.getLong(0));
+            assertEquals(6, table.getLong(1));
+            assertEquals(5, table.getLong(2));
+            assertEquals(4, table.getLong(3));
+            assertEquals(new TimestampType(3), table.getTimestampAsTimestamp(4));
+            assertTrue(Math.abs(0.2 - table.getDouble(5)) < EPSILON);
+            assertEquals(moneyTwo, table.getDecimalAsBigDecimal(6));
+            assertTrue(table.getString(7).equals("INLINED"));
+            assertTrue(table.getString(8).equals("UNINLINED"));
+
+            // unique hash index
+            results = client.callProcedure("@AdHoc", "SELECT * FROM ALL_TYPES WHERE ID = 1;").getResults();
+
+            // get the table
+            table = results[0];
+            assertTrue(table.getRowCount() == 1);
+
+            table.advanceRow();
+            assertEquals(1, table.getLong(0));
+            assertEquals(2, table.getLong(1));
+            assertEquals(3, table.getLong(2));
+            assertEquals(4, table.getLong(3));
+            assertEquals(new TimestampType(5), table.getTimestampAsTimestamp(4));
+            assertTrue(Math.abs(0.6 - table.getDouble(5)) < EPSILON);
+            assertEquals(moneyOne, table.getDecimalAsBigDecimal(6));
+            assertTrue(table.getString(7).equals("inlined"));
+            assertTrue(table.getString(8).equals("uninlined"));
+
+            // multimap tree index
+            results = client.callProcedure("@AdHoc", "SELECT * FROM ALL_TYPES ORDER BY TINY, SMALL, BIG, T, RATIO, MONEY, INLINED DESC;").getResults();
+
+            // get the table
+            table = results[0];
+            assertTrue(table.getRowCount() == 2);
+
+            table.advanceRow();
+            assertEquals(1, table.getLong(0));
+            assertEquals(2, table.getLong(1));
+            assertEquals(3, table.getLong(2));
+            assertEquals(4, table.getLong(3));
+            assertEquals(new TimestampType(5), table.getTimestampAsTimestamp(4));
+            assertTrue(Math.abs(0.6 - table.getDouble(5)) < EPSILON);
+            assertEquals(moneyOne, table.getDecimalAsBigDecimal(6));
+            assertTrue(table.getString(7).equals("inlined"));
+            assertTrue(table.getString(8).equals("uninlined"));
+
+            table.advanceRow();
+            assertEquals(7, table.getLong(0));
+            assertEquals(6, table.getLong(1));
+            assertEquals(5, table.getLong(2));
+            assertEquals(4, table.getLong(3));
+            assertEquals(new TimestampType(3), table.getTimestampAsTimestamp(4));
+            assertTrue(Math.abs(0.2 - table.getDouble(5)) < EPSILON);
+            assertEquals(moneyTwo, table.getDecimalAsBigDecimal(6));
+            assertTrue(table.getString(7).equals("INLINED"));
+            assertTrue(table.getString(8).equals("UNINLINED"));
+
+            // multimap hash index
+            results = client.callProcedure("@AdHoc", "SELECT * FROM ALL_TYPES WHERE TINY = 6 AND SMALL = 5 AND BIG = 4;").getResults();
+
+            // get the table
+            table = results[0];
+            assertTrue(table.getRowCount() == 1);
+
+            table.advanceRow();
+            assertEquals(7, table.getLong(0));
+            assertEquals(6, table.getLong(1));
+            assertEquals(5, table.getLong(2));
+            assertEquals(4, table.getLong(3));
+            assertEquals(new TimestampType(3), table.getTimestampAsTimestamp(4));
+            assertTrue(Math.abs(0.2 - table.getDouble(5)) < EPSILON);
+            assertEquals(moneyTwo, table.getDecimalAsBigDecimal(6));
+            assertTrue(table.getString(7).equals("INLINED"));
+            assertTrue(table.getString(8).equals("UNINLINED"));
+        }
+        catch (ProcCallException e) {
+            e.printStackTrace();
+            fail();
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+            fail();
+        }
+    }
+
+    public void testAllTypesJavaError() throws IOException {
+        allTypesTestHelper("AllTypesJavaError");
+    }
+
+    public void testAllTypesJavaAbort() throws IOException {
+        allTypesTestHelper("AllTypesJavaAbort");
+    }
+
+    public void testAllTypesUpdateJavaError() throws IOException {
+        allTypesTestHelper("AllTypesUpdateJavaError");
+    }
+
+    public void testAllTypesUpdateJavaAbort() throws IOException {
+        allTypesTestHelper("AllTypesUpdateJavaAbort");
     }
 
     public void testTooLargeStringInsertAndUpdate() throws IOException {
