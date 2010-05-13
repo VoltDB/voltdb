@@ -228,7 +228,8 @@ public class TestRollbackSuite extends RegressionSuite {
     }
 
     // ENG-487
-    public void allTypesTestHelper(String procName) throws IOException {
+    public void allTypesTestHelper(String procName, int[] order, int id)
+    throws IOException {
         Client client = getClient();
         final double EPSILON = 0.00001;
         final BigDecimal moneyOne = new BigDecimal(BigInteger.valueOf(7700000000000L), 12);
@@ -245,7 +246,9 @@ public class TestRollbackSuite extends RegressionSuite {
         }
 
         try {
-            if (procName.contains("Update"))
+            if (procName.contains("MultiOps"))
+                client.callProcedure("AllTypesMultiOpsJavaError", order, id);
+            else if (procName.contains("Update"))
                 client.callProcedure(procName, 7);
             else
                 client.callProcedure(procName);
@@ -368,6 +371,9 @@ public class TestRollbackSuite extends RegressionSuite {
             assertEquals(moneyTwo, table.getDecimalAsBigDecimal(6));
             assertTrue(table.getString(7).equals("INLINED"));
             assertTrue(table.getString(8).equals("UNINLINED"));
+
+            // clean up
+            client.callProcedure("@AdHoc", "DELETE FROM ALL_TYPES");
         }
         catch (ProcCallException e) {
             e.printStackTrace();
@@ -380,19 +386,70 @@ public class TestRollbackSuite extends RegressionSuite {
     }
 
     public void testAllTypesJavaError() throws IOException {
-        allTypesTestHelper("AllTypesJavaError");
+        allTypesTestHelper("AllTypesJavaError", null, 0);
     }
 
     public void testAllTypesJavaAbort() throws IOException {
-        allTypesTestHelper("AllTypesJavaAbort");
+        allTypesTestHelper("AllTypesJavaAbort", null, 0);
     }
 
     public void testAllTypesUpdateJavaError() throws IOException {
-        allTypesTestHelper("AllTypesUpdateJavaError");
+        allTypesTestHelper("AllTypesUpdateJavaError", null, 0);
     }
 
     public void testAllTypesUpdateJavaAbort() throws IOException {
-        allTypesTestHelper("AllTypesUpdateJavaAbort");
+        allTypesTestHelper("AllTypesUpdateJavaAbort", null, 0);
+    }
+
+    // ENG-488
+    public void testAllTypesMultiOpsJavaError() throws IOException {
+        allTypesTestHelper("AllTypesMultiOpsJavaError",
+                           new int[] {AllTypesMultiOpsJavaError.INSERT,
+                                      AllTypesMultiOpsJavaError.UPDATE,
+                                      AllTypesMultiOpsJavaError.DELETE},
+                           3);
+        allTypesTestHelper("AllTypesMultiOpsJavaError",
+                           new int[] {AllTypesMultiOpsJavaError.INSERT,
+                                      AllTypesMultiOpsJavaError.UPDATE,
+                                      AllTypesMultiOpsJavaError.UPDATE,
+                                      AllTypesMultiOpsJavaError.DELETE},
+                           3);
+        allTypesTestHelper("AllTypesMultiOpsJavaError",
+                           new int[] {AllTypesMultiOpsJavaError.INSERT,
+                                      AllTypesMultiOpsJavaError.UPDATE,
+                                      AllTypesMultiOpsJavaError.UPDATE},
+                           3);
+        allTypesTestHelper("AllTypesMultiOpsJavaError",
+                           new int[] {AllTypesMultiOpsJavaError.UPDATE,
+                                      AllTypesMultiOpsJavaError.UPDATE},
+                           7);
+        allTypesTestHelper("AllTypesMultiOpsJavaError",
+                           new int[] {AllTypesMultiOpsJavaError.UPDATE,
+                                      AllTypesMultiOpsJavaError.UPDATE,
+                                      AllTypesMultiOpsJavaError.DELETE},
+                           7);
+        allTypesTestHelper("AllTypesMultiOpsJavaError",
+                           new int[] {AllTypesMultiOpsJavaError.UPDATE,
+                                      AllTypesMultiOpsJavaError.DELETE,
+                                      AllTypesMultiOpsJavaError.INSERT},
+                           7);
+        allTypesTestHelper("AllTypesMultiOpsJavaError",
+                           new int[] {AllTypesMultiOpsJavaError.DELETE,
+                                      AllTypesMultiOpsJavaError.INSERT,
+                                      AllTypesMultiOpsJavaError.UPDATE},
+                           7);
+        allTypesTestHelper("AllTypesMultiOpsJavaError",
+                           new int[] {AllTypesMultiOpsJavaError.DELETE,
+                                      AllTypesMultiOpsJavaError.INSERT,
+                                      AllTypesMultiOpsJavaError.UPDATE,
+                                      AllTypesMultiOpsJavaError.UPDATE},
+                           7);
+        allTypesTestHelper("AllTypesMultiOpsJavaError",
+                           new int[] {AllTypesMultiOpsJavaError.DELETE,
+                                      AllTypesMultiOpsJavaError.INSERT,
+                                      AllTypesMultiOpsJavaError.UPDATE,
+                                      AllTypesMultiOpsJavaError.DELETE},
+                           7);
     }
 
     public void testTooLargeStringInsertAndUpdate() throws IOException {
