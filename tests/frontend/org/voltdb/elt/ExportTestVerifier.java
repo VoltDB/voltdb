@@ -23,13 +23,10 @@
 package org.voltdb.elt;
 
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.util.ArrayDeque;
 
 import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportDecoderBase;
-import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.types.TimestampType;
 
 class ExportTestVerifier extends ExportDecoderBase
 {
@@ -71,7 +68,6 @@ class ExportTestVerifier extends ExportDecoderBase
     public boolean processRow(int rowSize, byte[] rowData)
     {
         boolean result = false;
-        final FastDeserializer fds = new FastDeserializer(rowData);
         final Object[] srcdata = m_data.poll();
 
         // no data found - an ERROR.
@@ -87,82 +83,19 @@ class ExportTestVerifier extends ExportDecoderBase
             return false;
         }
 
-        // eltxxx: verify elt headers.
-        // skip the null byte array - which length depends on the total column count
-        // see EE's TupleStreamWrapper::computeOffsets()
-        final int nullArrayLength = ((m_tableSchema.size() + 7) & -8) >> 3;
-
         try {
-            // skip the elt header (txnid, timestamp, seqno, pid, sid, 'I'/'D')
-            fds.skipBytes(nullArrayLength);
-            fds.skipBytes(41);
-
-            // iterate the schema, decode and verify the rowdata
+            Object[] decoded = decodeRow(rowData);
+            // iterate the schema, verify the row data
             // skip 6 cols into the ELT schema since it includes the ELT columns
             // but then we need to back up the index into srcdata.
-            for (int i=6; i < m_tableSchema.size(); i++) {
-                switch (m_tableSchema.get(i)) {
-                default:
-                    assert(false) : "Unknown type in verifyRow()";
-                    result = false;
+            for (int i = 6; i < m_tableSchema.size(); i++)
+            {
+                if (!(decoded[i].equals(srcdata[i-6])))
+                {
+                    System.out.println("Failed on table column: " + (i-6));
+                    System.out.println("  orig value:" + srcdata[i-6].toString());
+                    System.out.println("  elt value:" + decoded[i].toString());
                     m_rowFailed = true;
-                    return false;
-                case TINYINT:
-                    result = decodeAndCompareTinyInt(srcdata[i - 6], fds);
-                    if (!result) {
-                        m_rowFailed = true;
-                        return false;
-                    }
-                    break;
-                case SMALLINT:
-                    result = decodeAndCompareSmallInt(srcdata[i - 6], fds);
-                    if (!result) {
-                        m_rowFailed = true;
-                        return false;
-                    }
-                    break;
-                case INTEGER:
-                    result = decodeAndCompareInteger(srcdata[i - 6], fds);
-                    if (!result) {
-                        m_rowFailed = true;
-                        return false;
-                    }
-                    break;
-                case BIGINT:
-                    result = decodeAndCompareBigInt(srcdata[i - 6], fds);
-                    if (!result) {
-                        m_rowFailed = true;
-                        return false;
-                    }
-                    break;
-                case FLOAT:
-                    result = decodeAndCompareFloat(srcdata[i - 6], fds);
-                    if (!result) {
-                        m_rowFailed = true;
-                        return false;
-                    }
-                    break;
-                case TIMESTAMP:
-                    result = decodeAndCompareTimestamp(srcdata[i - 6], fds);
-                    if (!result) {
-                        m_rowFailed = true;
-                        return false;
-                    }
-                    break;
-                case STRING:
-                    result = decodeAndCompareString(srcdata[i - 6], fds);
-                    if (!result) {
-                        m_rowFailed = true;
-                        return false;
-                    }
-                    break;
-                case DECIMAL:
-                    result = decodeAndCompareDecimal(srcdata[i - 6], fds);
-                    if (!result) {
-                        m_rowFailed = true;
-                        return false;
-                    }
-                    break;
                 }
             }
         }
@@ -195,155 +128,6 @@ class ExportTestVerifier extends ExportDecoderBase
                                m_data.size() + " row failed state: " + m_rowFailed);
         }
         return result;
-    }
 
-    /**
-     * Read a decimal according to the ELT encoding specification.
-     * @param object expected result
-     * @param fds Fastdeserializer containing ELT stream data
-     * @return true if deserialized data equals expected result
-     * @throws IOException
-     */
-    private boolean decodeAndCompareDecimal(final Object object,
-                                            final FastDeserializer fds) throws IOException {
-        if (object instanceof BigDecimal) {
-            final BigDecimal bd1 = (BigDecimal)object;
-            final BigDecimal bd2 = ExportDecoderBase.decodeDecimal(fds);
-            // NOTE: not comparing scale. EE serialization of BD doesn't obey scale
-            if (bd1.compareTo(bd2) != 0) {
-                System.out.println("compare DECIMAL failed: " + bd1 + " != " + bd2);
-                return false;
-            }
-            else {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Read a string according to the ELT encoding specification
-     * @param object
-     * @param fds
-     * @return
-     * @throws IOException
-     */
-    private boolean decodeAndCompareString(final Object object,
-                                           final FastDeserializer fds) throws IOException {
-        final String str = ExportDecoderBase.decodeString(fds);
-        if (!((String)object).equals(str))
-        {
-            System.out.println("compare STRING failed: " + (String)object + " != " + str);
-        }
-        return ((String)object).equals(str);
-    }
-
-    /**
-     * Read a timestamp according to the ELT encoding specification.
-     * @param object
-     * @param fds
-     * @return
-     * @throws IOException
-     */
-    private boolean decodeAndCompareTimestamp(final Object object,
-                                              final FastDeserializer fds) throws IOException {
-        final TimestampType ts = (TimestampType)object;
-        final TimestampType dateval = ExportDecoderBase.decodeTimestamp(fds);
-        if (ts.compareTo(dateval) != 0)
-        {
-            System.out.println("compare TIMESTAMP failed: " + ts + " != " + dateval);
-        }
-        return ts.compareTo(dateval) == 0;
-    }
-
-    /**
-     * Read a float according to the ELT encoding specification
-     * @param object
-     * @param fds
-     * @return
-     * @throws IOException
-     */
-    private boolean decodeAndCompareFloat(final Object object,
-                                          final FastDeserializer fds) throws IOException {
-        final Double flt1 = (Double)object;
-        final Double flt2 = ExportDecoderBase.decodeFloat(fds);
-        if (flt1.compareTo(flt2) != 0)
-        {
-            System.out.println("compare FLOAT failed: " + flt1 + " != " + flt2);
-        }
-        return flt1.compareTo(flt2) == 0;
-    }
-
-    /**
-     * Read a bigint according to the ELT encoding specification.
-     * @param object
-     * @param fds
-     * @return
-     * @throws IOException
-     */
-    private boolean decodeAndCompareBigInt(final Object object,
-                                           final FastDeserializer fds) throws IOException {
-        final Long l1 = (Long)object;
-        final Long l2 = ExportDecoderBase.decodeBigInt(fds);
-        if (l1.compareTo(l2) != 0)
-        {
-            System.out.println("compare BIGINT failed: " + l1 + " != " + l2);
-        }
-        return l1.compareTo(l2) == 0;
-    }
-
-    /**
-     * Read an integer according to the ELT encoding specification.
-     * @param object
-     * @param fds
-     * @return
-     * @throws IOException
-     */
-    private boolean decodeAndCompareInteger(final Object object,
-                                            final FastDeserializer fds) throws IOException {
-        final Integer i1 = (Integer)object;
-        final int i2 = ExportDecoderBase.decodeInteger(fds);
-        if (i1.intValue() != i2)
-        {
-            System.out.println("compare INTEGER failed: " + i1 + " != " + i2);
-            System.out.println("remaining rows: " + m_data.size());
-        }
-        return i1.intValue() == i2;
-    }
-
-    /**
-     * Read a small int according to the ELT encoding specification.
-     * @param object
-     * @param fds
-     * @return
-     * @throws IOException
-     */
-    private boolean decodeAndCompareSmallInt(final Object object,
-                                             final FastDeserializer fds) throws IOException {
-        final Short a = (Short)object;
-        final short b = ExportDecoderBase.decodeSmallInt(fds);
-        if (a.shortValue() != b)
-        {
-            System.out.println("compare SMALLINT failed: " + a + " != " + b);
-        }
-        return a.shortValue() == b;
-    }
-
-    /**
-     * Read a tiny int according to the ELT encoding specification.
-     * @param object
-     * @param fds
-     * @return
-     * @throws IOException
-     */
-    private boolean decodeAndCompareTinyInt(final Object object,
-                                            final FastDeserializer fds) throws IOException {
-        final Byte a = (Byte)object;
-        final byte b = ExportDecoderBase.decodeTinyInt(fds);
-        if (a.byteValue() != b)
-        {
-            System.out.println("compare TINYINT failed: " + a + " != " + b);
-        }
-        return a.byteValue() == b;
     }
 }

@@ -58,6 +58,93 @@ public abstract class ExportDecoderBase
     }
 
     /**
+     * Decode a byte array of row data into an array of Objects corresponding
+     * to the schema in the AdvertisedDataSource used to construct this object
+     * @throws IOException
+     */
+    protected Object[] decodeRow(byte[] rowData) throws IOException
+    {
+        FastDeserializer fds = new FastDeserializer(rowData);
+        Object[] retval = new Object[m_tableSchema.size()];
+        boolean[] is_null = extractNullFlags(fds);
+        for (int i = 0; i < m_tableSchema.size(); i++)
+        {
+            if (is_null[i])
+            {
+                retval[i] = null;
+            }
+            else
+            {
+                retval[i] = decodeNextColumn(fds, m_tableSchema.get(i));
+            }
+        }
+        return retval;
+    }
+
+    boolean[] extractNullFlags(FastDeserializer fds) throws IOException
+    {
+        // compute the number of bytes necessary to hold one bit per
+        // schema column
+        int null_array_length = ((m_tableSchema.size() + 7) & -8) >> 3;
+        byte[] null_array = new byte[null_array_length];
+        for (int i = 0; i < null_array_length; i++)
+        {
+            null_array[i] = fds.readByte();
+        }
+        boolean[] retval = new boolean[m_tableSchema.size()];
+        // The null flags were written with this mapping to column index:
+        // given an array of octets, the index into the array for the flag is
+        // column index / 8, and the bit in that byte for the flag is
+        // 0x80 >> (column index % 8).
+        for (int i = 0; i < m_tableSchema.size(); i++)
+        {
+            int index = i >> 3;
+            int bit = i % 8;
+            byte mask = (byte)(0x80 >>> bit);
+            byte flag = (byte)(null_array[index] & mask);
+            retval[i] = (flag != 0);
+        }
+        return retval;
+    }
+
+    // This does not decode an arbitrary column because fds keeps getting consumed.
+    // Rather, it decodes the next non-null column in the FastDeserializer
+    Object decodeNextColumn(FastDeserializer fds, VoltType columnType)
+    throws IOException
+    {
+        Object retval = null;
+        switch (columnType) {
+        case TINYINT:
+            retval = decodeTinyInt(fds);
+            break;
+        case SMALLINT:
+            retval = decodeSmallInt(fds);
+            break;
+        case INTEGER:
+            retval = decodeInteger(fds);
+            break;
+        case BIGINT:
+            retval = decodeBigInt(fds);
+            break;
+        case FLOAT:
+            retval = decodeFloat(fds);
+            break;
+        case TIMESTAMP:
+            retval = decodeTimestamp(fds);
+            break;
+        case STRING:
+            retval = decodeString(fds);
+            break;
+        case DECIMAL:
+            retval = decodeDecimal(fds);
+            break;
+        default:
+            throw new IOException("Invalid column type: " + columnType);
+        };
+        return retval;
+    }
+
+    /**
      * Read a decimal according to the ELT encoding specification.
      * @param fds Fastdeserializer containing ELT stream data
      * @return decoded BigDecimal value
