@@ -292,9 +292,12 @@ size_t TupleStreamWrapper::appendTuple(int64_t lastCommittedTxnId,
     *(reinterpret_cast<int64_t*>(dataPtr)) = htonll(m_siteId);
     dataPtr += sizeof (int64_t);  // 4
 
+    // We make the ELT operation value into a long so that it can be
+    // consistently decoded in Java as a TINYINT.  Some day, when we
+    // support CHAR[1], this should get changed to be that.
     const char ins = (type == INSERT) ? 'I' : 'D';
-    *(reinterpret_cast<char*>(dataPtr)) = ins;
-    dataPtr +=  sizeof (char);    // 5
+    *(reinterpret_cast<int64_t*>(dataPtr)) = ins;
+    dataPtr +=  sizeof (int64_t);    // 5
 
     // write the tuple's data
     dataPtr += tuple.serializeToELT(METADATA_COL_CNT, nullArray, dataPtr);

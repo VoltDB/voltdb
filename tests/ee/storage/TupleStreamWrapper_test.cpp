@@ -41,12 +41,12 @@ const int COLUMN_COUNT = 5;
 // pre-computed this magic size for an ELT'd tuple of 5 integer
 // columns, which includes:
 // 5 ELT header columns * sizeof(int64_t) = 40
-// 1 ELT header column * sizeof(char) = 1
+// 1 ELT header column * sizeof(int64_t) = 8
 // 2 bytes for null mask (10 columns rounds to 16, /8 = 2) = 2
 // sizeof(int32_t) for row header = 4
 // 5 * sizeof(int64_t) for tuple data = 40
 // total: 87
-const int MAGIC_TUPLE_SIZE = 87;
+const int MAGIC_TUPLE_SIZE = 94;
 // 1k buffer
 const int BUFFER_SIZE = 1024;
 
