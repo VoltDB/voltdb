@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.elclient;
+package org.voltdb.exportclient;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -26,13 +26,13 @@ import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.types.TimestampType;
 
-public abstract class ELTDecoderBase
+public abstract class ExportDecoderBase
 {
     protected AdvertisedDataSource m_source;
     // This is available as a convenience, could go away.
     protected ArrayList<VoltType> m_tableSchema;
 
-    public ELTDecoderBase(AdvertisedDataSource source)
+    public ExportDecoderBase(AdvertisedDataSource source)
     {
         m_source = source;
         m_tableSchema = source.columnTypes();

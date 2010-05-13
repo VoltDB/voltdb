@@ -20,7 +20,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package org.voltdb.elclient;
+package org.voltdb.exportclient;
 
 import java.nio.ByteBuffer;
 
@@ -28,13 +28,15 @@ import junit.framework.TestCase;
 
 import org.voltdb.elt.ELTProtoMessage;
 import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
+import org.voltdb.exportclient.ExportDataSink;
+import org.voltdb.exportclient.ExportDecoderBase;
 
-public class TestELProtocolHandler extends TestCase {
+public class TestExportDataSink extends TestCase {
 
     static final int TABLE_ID = 1;
     static final int PARTITION_ID = 2;
 
-    class TestELTDecoder extends ELTDecoderBase
+    class TestELTDecoder extends ExportDecoderBase
     {
         public TestELTDecoder(AdvertisedDataSource source)
         {
@@ -58,8 +60,8 @@ public class TestELProtocolHandler extends TestCase {
     public void testBasicStuff()
     {
         String CONN_NAME = "ryanlovestheyankees";
-        ELDataSink dut =
-            new ELDataSink(PARTITION_ID, TABLE_ID, "coffeetable",
+        ExportDataSink dut =
+            new ExportDataSink(PARTITION_ID, TABLE_ID, "coffeetable",
                            new TestELTDecoder(new AdvertisedDataSource(PARTITION_ID,
                                                                        TABLE_ID,
                                                                        "coffeetable",

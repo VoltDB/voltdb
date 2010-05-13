@@ -36,7 +36,7 @@ import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.elt.ELTestClient;
+import org.voltdb.elt.ExportTestClient;
 import org.voltdb.regressionsuites.sqltypesprocs.Delete;
 import org.voltdb.regressionsuites.sqltypesprocs.Insert;
 import org.voltdb.regressionsuites.sqltypesprocs.RollbackInsert;
@@ -50,9 +50,9 @@ import org.voltdb.regressionsuites.sqltypesprocs.Update_ELT;
  *  DB, really needs an ELT round trip test.
  */
 
-public class TestELTSuite extends RegressionSuite {
+public class TestExportSuite extends RegressionSuite {
 
-    private ELTestClient m_tester;
+    private ExportTestClient m_tester;
 
     /** Shove a table name and pkey in front of row data */
     private Object[] convertValsToParams(String tableName, final int i,
@@ -82,7 +82,7 @@ public class TestELTSuite extends RegressionSuite {
         client.callProcedure("@Quiesce");
     }
 
-    private void quiesceAndVerify(final Client client, ELTestClient tester)
+    private void quiesceAndVerify(final Client client, ExportTestClient tester)
     throws ProcCallException, IOException
     {
         quiesce(client);
@@ -91,7 +91,7 @@ public class TestELTSuite extends RegressionSuite {
         assertTrue(tester.verifyEltOffsets());
     }
 
-    private void quiesceAndVerifyFalse(final Client client, ELTestClient tester)
+    private void quiesceAndVerifyFalse(final Client client, ExportTestClient tester)
     throws ProcCallException, IOException
     {
         quiesce(client);
@@ -103,7 +103,7 @@ public class TestELTSuite extends RegressionSuite {
     public void setUp()
     {
         super.setUp();
-        m_tester = new ELTestClient(getServerConfig().getNodeCount());
+        m_tester = new ExportTestClient(getServerConfig().getNodeCount());
         m_tester.connectToELServers();
     }
 
@@ -288,7 +288,7 @@ public class TestELTSuite extends RegressionSuite {
         quiesceAndVerify(client, m_tester);
     }
 
-    private VoltTable createLoadTableTable(boolean addToVerifier, ELTestClient tester) {
+    private VoltTable createLoadTableTable(boolean addToVerifier, ExportTestClient tester) {
 
         VoltTable loadTable = new VoltTable(new ColumnInfo("PKEY", VoltType.INTEGER),
           new ColumnInfo(TestSQLTypesSuite.m_columnNames[0], TestSQLTypesSuite.m_types[0]),
@@ -507,7 +507,7 @@ public class TestELTSuite extends RegressionSuite {
         Delete.class
     };
 
-    public TestELTSuite(final String name) {
+    public TestExportSuite(final String name) {
         super(name);
     }
 
@@ -518,10 +518,10 @@ public class TestELTSuite extends RegressionSuite {
     static public junit.framework.Test suite()
     {
         final MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestELTSuite.class);
+            new MultiConfigSuiteBuilder(TestExportSuite.class);
 
         final VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestELTSuite.class.getResource("sqltypessuite-ddl.sql"));
+        project.addSchema(TestExportSuite.class.getResource("sqltypessuite-ddl.sql"));
         // add the connector/processor (name, host, port)
         // and the exportable tables (name, export-only)
         project.addELT("org.voltdb.elt.processors.RawProcessor", true /*enabled*/);

@@ -40,7 +40,7 @@ import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
-import org.voltdb.regressionsuites.TestELTSuite;
+import org.voltdb.regressionsuites.TestExportSuite;
 import org.voltdb.utils.JarReader;
 
 public class TestVoltCompiler extends TestCase {
@@ -83,7 +83,7 @@ public class TestVoltCompiler extends TestCase {
     // that a disabled connector is really disabled and that auth data is correct.
     public void testELTSetting() throws IOException {
         final VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestELTSuite.class.getResource("sqltypessuite-ddl.sql"));
+        project.addSchema(TestExportSuite.class.getResource("sqltypessuite-ddl.sql"));
         project.addProcedures(org.voltdb.regressionsuites.sqltypesprocs.Insert.class);
         project.addPartitionInfo("NO_NULLS", "PKEY");
         project.addPartitionInfo("ALLOW_NULLS", "PKEY");

@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.elclient;
+package org.voltdb.exportclient;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -34,7 +34,7 @@ import org.voltdb.messaging.FastDeserializer;
  * Manage the connection to the server's EL port
  */
 
-public class ELConnection implements Runnable {
+public class ExportConnection implements Runnable {
 
     static final private int CLOSED = 0;
     static final private int CONNECTING = 1;
@@ -49,11 +49,11 @@ public class ELConnection implements Runnable {
     private final String m_password = "";
 
     // cached reference to ELClientBase's collection of ELDataSinks
-    private final HashMap<Integer, HashMap<Integer, ELDataSink>> m_sinks;
+    private final HashMap<Integer, HashMap<Integer, ExportDataSink>> m_sinks;
     private ArrayList<AdvertisedDataSource> m_dataSources;
 
-    public ELConnection(InetSocketAddress serverAddr,
-                        HashMap<Integer, HashMap<Integer, ELDataSink>> dataSinks)
+    public ExportConnection(InetSocketAddress serverAddr,
+                        HashMap<Integer, HashMap<Integer, ExportDataSink>> dataSinks)
     {
         m_sinks = dataSinks;
         m_serverAddr = serverAddr;
@@ -153,16 +153,16 @@ public class ELConnection implements Runnable {
 
             if (m != null && m.isPollResponse())
             {
-                ELDataSink rx_sink = m_sinks.get(m.getTableId()).get(m.getPartitionId());
+                ExportDataSink rx_sink = m_sinks.get(m.getTableId()).get(m.getPartitionId());
                 rx_sink.getRxQueue(m_connectionName).offer(m);
             }
         }
         while (m != null);
 
         // service all the ELDataSink TX queues
-        for (HashMap<Integer, ELDataSink> part_map : m_sinks.values())
+        for (HashMap<Integer, ExportDataSink> part_map : m_sinks.values())
         {
-            for (ELDataSink tx_sink : part_map.values())
+            for (ExportDataSink tx_sink : part_map.values())
             {
                 Queue<ELTProtoMessage> tx_queue =
                     tx_sink.getTxQueue(m_connectionName);

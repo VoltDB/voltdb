@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.elclient;
+package org.voltdb.exportclient;
 
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -25,12 +25,12 @@ import java.util.Map.Entry;
 import org.voltdb.elt.ELTProtoMessage;
 
 
-public class ELDataSink implements Runnable
+public class ExportDataSink implements Runnable
 {
     private int m_tableId = -1;
     private int m_partitionId = -1;
     private String m_tableName;
-    private ELTDecoderBase m_decoder;
+    private ExportDecoderBase m_decoder;
     private String m_activeConnection = null;
 
     private HashMap<String, LinkedList<ELTProtoMessage>> m_rxQueues;
@@ -38,8 +38,8 @@ public class ELDataSink implements Runnable
 
     boolean m_started = false;
 
-    public ELDataSink(int partitionId, int tableId,
-                      String tableName, ELTDecoderBase decoder)
+    public ExportDataSink(int partitionId, int tableId,
+                      String tableName, ExportDecoderBase decoder)
     {
         m_tableId = tableId;
         m_partitionId = partitionId;

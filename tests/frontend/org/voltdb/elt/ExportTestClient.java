@@ -29,18 +29,18 @@ import java.util.HashMap;
 
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
-import org.voltdb.elclient.ELClientBase;
-import org.voltdb.elclient.ELConnection;
-import org.voltdb.elclient.ELTDecoderBase;
 import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
+import org.voltdb.exportclient.ExportClientBase;
+import org.voltdb.exportclient.ExportConnection;
+import org.voltdb.exportclient.ExportDecoderBase;
 
-public class ELTestClient extends ELClientBase
+public class ExportTestClient extends ExportClientBase
 {
     // hash table name + partition to verifier
-    private final HashMap<String, ELTVerifier> m_verifiers =
-        new HashMap<String, ELTVerifier>();
+    private final HashMap<String, ExportTestVerifier> m_verifiers =
+        new HashMap<String, ExportTestVerifier>();
 
-    public ELTestClient(int nodeCount)
+    public ExportTestClient(int nodeCount)
     {
         ArrayList<InetSocketAddress> servers =
             new ArrayList<InetSocketAddress>();
@@ -52,10 +52,10 @@ public class ELTestClient extends ELClientBase
     }
 
     @Override
-    public ELTDecoderBase constructELTDecoder(AdvertisedDataSource source)
+    public ExportDecoderBase constructELTDecoder(AdvertisedDataSource source)
     {
         // create a verifier with the 'schema'
-        ELTVerifier verifier = new ELTVerifier(source);
+        ExportTestVerifier verifier = new ExportTestVerifier(source);
         // hash it by table name + partition ID
         System.out.println("Creating verifier for table: " + source.tableName() +
                            ", part ID: " + source.partitionId());
@@ -70,7 +70,7 @@ public class ELTestClient extends ELClientBase
     public void addRow(String tableName, Object partitionHash, Object[] data)
     {
         int partition = TheHashinator.hashToPartition(partitionHash);
-        ELTVerifier verifier = m_verifiers.get(tableName + partition);
+        ExportTestVerifier verifier = m_verifiers.get(tableName + partition);
         if (verifier == null)
         {
             // something horribly wrong, bail
@@ -83,14 +83,14 @@ public class ELTestClient extends ELClientBase
     private boolean done()
     {
         boolean retval = true;
-        for (ELTVerifier verifier : m_verifiers.values())
+        for (ExportTestVerifier verifier : m_verifiers.values())
         {
             if (!verifier.done())
             {
                 retval = false;
             }
         }
-        for (ELConnection connection : m_elConnections.values())
+        for (ExportConnection connection : m_elConnections.values())
         {
             if (!connection.isConnected())
             {
@@ -103,7 +103,7 @@ public class ELTestClient extends ELClientBase
     public boolean allRowsVerified()
     {
         boolean retval = true;
-        for (ELTVerifier verifier : m_verifiers.values())
+        for (ExportTestVerifier verifier : m_verifiers.values())
         {
             if (!verifier.allRowsVerified())
             {
@@ -120,7 +120,7 @@ public class ELTestClient extends ELClientBase
         HashMap<Integer, Long> table_offsets = new HashMap<Integer, Long>();
 
         // Generate polls for every connection/table/partition
-        for (ELConnection connection : m_elConnections.values())
+        for (ExportConnection connection : m_elConnections.values())
         {
             HashMap<Integer, Long> seen_responses = new HashMap<Integer, Long>();
             for (AdvertisedDataSource source : connection.getDataSources())

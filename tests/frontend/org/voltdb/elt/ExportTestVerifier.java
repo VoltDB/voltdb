@@ -26,12 +26,12 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayDeque;
 
-import org.voltdb.elclient.ELTDecoderBase;
 import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
+import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.types.TimestampType;
 
-class ELTVerifier extends ELTDecoderBase
+class ExportTestVerifier extends ExportDecoderBase
 {
     private final ArrayDeque<Object[]> m_data;
     private boolean m_rowFailed = false;
@@ -40,7 +40,7 @@ class ELTVerifier extends ELTDecoderBase
     private final String m_tableName;
     private final int m_partitionId;
 
-    ELTVerifier(AdvertisedDataSource source)
+    ExportTestVerifier(AdvertisedDataSource source)
     {
         super(source);
         m_tableName = source.tableName();
@@ -208,7 +208,7 @@ class ELTVerifier extends ELTDecoderBase
                                             final FastDeserializer fds) throws IOException {
         if (object instanceof BigDecimal) {
             final BigDecimal bd1 = (BigDecimal)object;
-            final BigDecimal bd2 = ELTDecoderBase.decodeDecimal(fds);
+            final BigDecimal bd2 = ExportDecoderBase.decodeDecimal(fds);
             // NOTE: not comparing scale. EE serialization of BD doesn't obey scale
             if (bd1.compareTo(bd2) != 0) {
                 System.out.println("compare DECIMAL failed: " + bd1 + " != " + bd2);
@@ -230,7 +230,7 @@ class ELTVerifier extends ELTDecoderBase
      */
     private boolean decodeAndCompareString(final Object object,
                                            final FastDeserializer fds) throws IOException {
-        final String str = ELTDecoderBase.decodeString(fds);
+        final String str = ExportDecoderBase.decodeString(fds);
         if (!((String)object).equals(str))
         {
             System.out.println("compare STRING failed: " + (String)object + " != " + str);
@@ -248,7 +248,7 @@ class ELTVerifier extends ELTDecoderBase
     private boolean decodeAndCompareTimestamp(final Object object,
                                               final FastDeserializer fds) throws IOException {
         final TimestampType ts = (TimestampType)object;
-        final TimestampType dateval = ELTDecoderBase.decodeTimestamp(fds);
+        final TimestampType dateval = ExportDecoderBase.decodeTimestamp(fds);
         if (ts.compareTo(dateval) != 0)
         {
             System.out.println("compare TIMESTAMP failed: " + ts + " != " + dateval);
@@ -266,7 +266,7 @@ class ELTVerifier extends ELTDecoderBase
     private boolean decodeAndCompareFloat(final Object object,
                                           final FastDeserializer fds) throws IOException {
         final Double flt1 = (Double)object;
-        final Double flt2 = ELTDecoderBase.decodeFloat(fds);
+        final Double flt2 = ExportDecoderBase.decodeFloat(fds);
         if (flt1.compareTo(flt2) != 0)
         {
             System.out.println("compare FLOAT failed: " + flt1 + " != " + flt2);
@@ -284,7 +284,7 @@ class ELTVerifier extends ELTDecoderBase
     private boolean decodeAndCompareBigInt(final Object object,
                                            final FastDeserializer fds) throws IOException {
         final Long l1 = (Long)object;
-        final Long l2 = ELTDecoderBase.decodeBigInt(fds);
+        final Long l2 = ExportDecoderBase.decodeBigInt(fds);
         if (l1.compareTo(l2) != 0)
         {
             System.out.println("compare BIGINT failed: " + l1 + " != " + l2);
@@ -302,7 +302,7 @@ class ELTVerifier extends ELTDecoderBase
     private boolean decodeAndCompareInteger(final Object object,
                                             final FastDeserializer fds) throws IOException {
         final Integer i1 = (Integer)object;
-        final int i2 = ELTDecoderBase.decodeInteger(fds);
+        final int i2 = ExportDecoderBase.decodeInteger(fds);
         if (i1.intValue() != i2)
         {
             System.out.println("compare INTEGER failed: " + i1 + " != " + i2);
@@ -321,7 +321,7 @@ class ELTVerifier extends ELTDecoderBase
     private boolean decodeAndCompareSmallInt(final Object object,
                                              final FastDeserializer fds) throws IOException {
         final Short a = (Short)object;
-        final short b = ELTDecoderBase.decodeSmallInt(fds);
+        final short b = ExportDecoderBase.decodeSmallInt(fds);
         if (a.shortValue() != b)
         {
             System.out.println("compare SMALLINT failed: " + a + " != " + b);
@@ -339,7 +339,7 @@ class ELTVerifier extends ELTDecoderBase
     private boolean decodeAndCompareTinyInt(final Object object,
                                             final FastDeserializer fds) throws IOException {
         final Byte a = (Byte)object;
-        final byte b = ELTDecoderBase.decodeTinyInt(fds);
+        final byte b = ExportDecoderBase.decodeTinyInt(fds);
         if (a.byteValue() != b)
         {
             System.out.println("compare TINYINT failed: " + a + " != " + b);

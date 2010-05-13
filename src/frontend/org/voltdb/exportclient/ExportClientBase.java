@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.elclient;
+package org.voltdb.exportclient;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -28,18 +28,18 @@ import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
  * Provides an extensible base class for writing ELT clients
  */
 
-public abstract class ELClientBase implements Runnable {
+public abstract class ExportClientBase implements Runnable {
 
     private List<InetSocketAddress> m_servers = null;
-    protected HashMap<String, ELConnection> m_elConnections;
+    protected HashMap<String, ExportConnection> m_elConnections;
 
     // First hash by table, second by partition
-    private HashMap<Integer, HashMap<Integer, ELDataSink>> m_sinks;
+    private HashMap<Integer, HashMap<Integer, ExportDataSink>> m_sinks;
 
-    public ELClientBase()
+    public ExportClientBase()
     {
-        m_sinks = new HashMap<Integer, HashMap<Integer, ELDataSink>>();
-        m_elConnections = new HashMap<String, ELConnection>();
+        m_sinks = new HashMap<Integer, HashMap<Integer, ExportDataSink>>();
+        m_elConnections = new HashMap<String, ExportConnection>();
         m_servers = null;
     }
 
@@ -58,9 +58,9 @@ public abstract class ELClientBase implements Runnable {
      * @param source
      * @return
      */
-    public abstract ELTDecoderBase constructELTDecoder(AdvertisedDataSource source);
+    public abstract ExportDecoderBase constructELTDecoder(AdvertisedDataSource source);
 
-    private void constructELTDataSinks(ELConnection elConnection)
+    private void constructELTDataSinks(ExportConnection elConnection)
     {
         for (AdvertisedDataSource source : elConnection.getDataSources())
         {
@@ -69,20 +69,20 @@ public abstract class ELClientBase implements Runnable {
             System.out.println("Creating verifier for table: " + source.tableName() +
                                ", part ID: " + source.partitionId());
             // Put the ELDataSink in our hashed collection if it doesn't exist
-            ELDataSink sink = null;
+            ExportDataSink sink = null;
             int table_id = source.tableId();
             int part_id = source.partitionId();
-            HashMap<Integer, ELDataSink> part_map =
+            HashMap<Integer, ExportDataSink> part_map =
                 m_sinks.get(table_id);
             if (part_map == null)
             {
-                part_map = new HashMap<Integer, ELDataSink>();
+                part_map = new HashMap<Integer, ExportDataSink>();
                 m_sinks.put(table_id, part_map);
             }
             if (!part_map.containsKey(part_id))
             {
-                ELTDecoderBase decoder = constructELTDecoder(source);
-                sink = new ELDataSink(source.partitionId(),
+                ExportDecoderBase decoder = constructELTDecoder(source);
+                sink = new ExportDataSink(source.partitionId(),
                                       source.tableId(),
                                       source.tableName(),
                                       decoder);
@@ -109,8 +109,8 @@ public abstract class ELClientBase implements Runnable {
         }
         for (InetSocketAddress server_addr : m_servers)
         {
-            ELConnection elConnection =
-                new ELConnection(server_addr, m_sinks);
+            ExportConnection elConnection =
+                new ExportConnection(server_addr, m_sinks);
             try {
                 elConnection.openELTConnection();
                 constructELTDataSinks(elConnection);
@@ -133,22 +133,22 @@ public abstract class ELClientBase implements Runnable {
     {
         // drain all the received connection messages into the
         // RX queues for the ELDataSinks
-        for (ELConnection el_connection : m_elConnections.values())
+        for (ExportConnection el_connection : m_elConnections.values())
         {
             el_connection.work();
         }
 
         // work all the ELDataSinks to generate outgoing messages
-        for (HashMap<Integer, ELDataSink> part_map : m_sinks.values())
+        for (HashMap<Integer, ExportDataSink> part_map : m_sinks.values())
         {
-            for (ELDataSink work_sink : part_map.values())
+            for (ExportDataSink work_sink : part_map.values())
             {
                 work_sink.work();
             }
         }
 
         // Service all the ELDataSink TX queues
-        for (ELConnection el_connection : m_elConnections.values())
+        for (ExportConnection el_connection : m_elConnections.values())
         {
             el_connection.work();
         }
