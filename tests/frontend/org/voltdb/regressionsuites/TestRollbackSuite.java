@@ -56,7 +56,8 @@ public class TestRollbackSuite extends RegressionSuite {
         AllTypesJavaError.class,
         AllTypesJavaAbort.class,
         AllTypesUpdateJavaError.class,
-        AllTypesUpdateJavaAbort.class
+        AllTypesUpdateJavaAbort.class,
+        AllTypesMultiOpsJavaError.class
     };
 
     /**
