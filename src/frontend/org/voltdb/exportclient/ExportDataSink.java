@@ -109,8 +109,8 @@ public class ExportDataSink implements Runnable
 
     private void poll()
     {
-        System.out.println("Polling table " + m_tableName +
-                           ", partition " + m_partitionId + " for new data.");
+//        System.out.println("Polling table " + m_tableName +
+//                           ", partition " + m_partitionId + " for new data.");
 
         ELTProtoMessage m = new ELTProtoMessage(m_partitionId, m_tableId);
         m.poll();
@@ -150,9 +150,9 @@ public class ExportDataSink implements Runnable
 
         // read the streamblock length prefix.
         int ttllength = m.getData().getInt();
-        System.out.println("Poller: table: " + m_tableName +
-                           ", partition: " + m_partitionId +
-                           " : data payload bytes: " + ttllength);
+//        System.out.println("Poller: table: " + m_tableName +
+//                           ", partition: " + m_partitionId +
+//                           " : data payload bytes: " + ttllength);
 
         // a stream block prefix of 0 also means empty queue.
         if (ttllength == 0) {

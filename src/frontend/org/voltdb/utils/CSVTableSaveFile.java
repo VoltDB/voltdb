@@ -18,6 +18,9 @@
 package org.voltdb.utils;
 
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
+import org.voltdb.utils.CSVEscaperUtil.Escaper;
+import org.voltdb.utils.CSVEscaperUtil.CSVEscaper;
+import org.voltdb.utils.CSVEscaperUtil.TSVEscaper;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
@@ -47,68 +50,6 @@ public class CSVTableSaveFile {
     private final TableSaveFile m_saveFile;
     private final char m_delimeter;
     private final Escaper m_escaper;
-    private static final char[] m_tsvEscapeChars = new char[] { '\t', '\n', '\r', '\\' };
-    private static final char[] m_csvEscapeChars = new char[] { ',', '"', '\n', '\r' };
-
-    public interface Escaper {
-        public String escape(String s);
-    }
-
-    private static boolean contains(final String s, final char characters[]) {
-        for (int ii = 0; ii < s.length(); ii++) {
-            char c = s.charAt(ii);
-            for (int qq = 0; qq < characters.length; qq++) {
-                if (characters[qq] == c) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    public static final class CSVEscaper implements Escaper {
-        public String escape(String s) {
-            if (!contains(s, m_csvEscapeChars)) {
-                return s;
-            }
-            StringBuffer sb = new StringBuffer(s.length() + (int)(s.length() * .10));
-            sb.append('"');
-            for (int ii = 0; ii < s.length(); ii++) {
-                char c = s.charAt(ii);
-                if (c == '"') {
-                    sb.append("\"\"");
-                } else {
-                    sb.append(c);
-                }
-            }
-            sb.append('"');
-            return sb.toString();
-        }
-    }
-
-    public static final class TSVEscaper implements Escaper {
-        public String escape(String s) {
-            if (!contains( s, m_tsvEscapeChars)) {
-                return s;
-            }
-            StringBuffer sb = new StringBuffer(s.length() + (int)(s.length() * .10));
-            for (int ii = 0; ii < s.length(); ii++) {
-                char c = s.charAt(ii);
-                if (c == '\\') {
-                    sb.append("\\\\");
-                } else if(c == '\t') {
-                    sb.append("\\t");
-                } else if (c == '\n') {
-                    sb.append("\\n");
-                } else if (c == '\r') {
-                    sb.append("\\r");
-                } else {
-                    sb.append(c);
-                }
-            }
-            return sb.toString();
-        }
-    }
 
     public CSVTableSaveFile(File saveFile, char delimeter, Escaper escaper, int partitions[]) throws IOException {
         m_delimeter = delimeter;

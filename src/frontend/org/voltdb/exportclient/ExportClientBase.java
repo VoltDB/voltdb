@@ -64,7 +64,7 @@ public abstract class ExportClientBase implements Runnable {
         {
             // Construct the app-specific decoder supplied by subclass
             // and build an ELDataSink for this data source
-            System.out.println("Creating verifier for table: " + source.tableName() +
+            System.out.println("Creating decoder for table: " + source.tableName() +
                                ", part ID: " + source.partitionId());
             // Put the ELDataSink in our hashed collection if it doesn't exist
             ExportDataSink sink = null;

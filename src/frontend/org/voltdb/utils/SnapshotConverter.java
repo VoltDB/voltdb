@@ -25,9 +25,9 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SpecificSnapshotFilter;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.TableFiles;
-import org.voltdb.utils.CSVTableSaveFile.Escaper;
-import org.voltdb.utils.CSVTableSaveFile.TSVEscaper;
-import org.voltdb.utils.CSVTableSaveFile.CSVEscaper;
+import org.voltdb.utils.CSVEscaperUtil.Escaper;
+import org.voltdb.utils.CSVEscaperUtil.TSVEscaper;
+import org.voltdb.utils.CSVEscaperUtil.CSVEscaper;
 import java.util.*;
 
 public class SnapshotConverter {
