@@ -57,35 +57,37 @@ TEST_F(NValueTest, DeserializeDecimal)
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
     ASSERT_EQ(value, TTInt(0));
-    ASSERT_FALSE(strcmp(str.c_str(), "0"));
+    // Decimals in Volt are currently hardwired with 12 fractional
+    // decimal places.
+    ASSERT_EQ(str, "0.000000000000");
 
     nv = ValueFactory::getDecimalValueFromString("0");
     deserDecHelper(nv, vt, value, str);
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
     ASSERT_EQ(value, TTInt(0));
-    ASSERT_FALSE(strcmp(str.c_str(), "0"));
+    ASSERT_EQ(str, "0.000000000000");
 
     nv = ValueFactory::getDecimalValueFromString("0.0");
     deserDecHelper(nv, vt, value, str);
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
     ASSERT_EQ(value, TTInt(0));
-    ASSERT_FALSE(strcmp(str.c_str(), "0"));
+    ASSERT_EQ(str, "0.000000000000");
 
     nv = ValueFactory::getDecimalValueFromString("1");
     deserDecHelper(nv, vt, value, str);
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
     ASSERT_EQ(value, TTInt("1000000000000"));
-    ASSERT_FALSE(strcmp(str.c_str(), "1"));
+    ASSERT_EQ(str, "1.000000000000");
 
     nv = ValueFactory::getDecimalValueFromString("-1");
     deserDecHelper(nv, vt, value, str);
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
     ASSERT_EQ(value, TTInt("-1000000000000"));
-    ASSERT_FALSE(strcmp(str.c_str(), "-1"));
+    ASSERT_EQ(str, "-1.000000000000");
 
     // min value
     nv = ValueFactory::getDecimalValueFromString("-9999999999"  //10 digits
@@ -126,28 +128,28 @@ TEST_F(NValueTest, DeserializeDecimal)
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
     ASSERT_EQ(value, TTInt(1234 * scale));
-    ASSERT_FALSE(strcmp(str.c_str(), "1234"));
+    ASSERT_EQ(str, "1234.000000000000");
 
     nv = ValueFactory::getDecimalValueFromString("12.34");
     deserDecHelper(nv, vt, value, str);
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
     ASSERT_EQ(value, TTInt(static_cast<int64_t>(12340000000000)));
-    ASSERT_FALSE(strcmp(str.c_str(), "12.34"));
+    ASSERT_EQ(str, "12.340000000000");
 
     nv = ValueFactory::getDecimalValueFromString("-1234");
     deserDecHelper(nv, vt, value, str);
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
     ASSERT_EQ(value, TTInt(-1234 * scale));
-    ASSERT_FALSE(strcmp(str.c_str(), "-1234"));
+    ASSERT_EQ(str, "-1234.000000000000");
 
     nv = ValueFactory::getDecimalValueFromString("-12.34");
     deserDecHelper(nv, vt, value, str);
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
     ASSERT_EQ(value, TTInt(static_cast<int64_t>(-12340000000000)));
-    ASSERT_FALSE(strcmp(str.c_str(), "-12.34"));
+    ASSERT_EQ(str, "-12.340000000000");
 
     // illegal deserializations
     try {
@@ -1893,10 +1895,10 @@ TEST_F(NValueTest, SerializeToELT)
     sin.unread(b);
 
     // decimal
-    nv = ValueFactory::getDecimalValueFromString("-1234567890.456123");
+    nv = ValueFactory::getDecimalValueFromString("-1234567890.456123000000");
     b = nv.serializeToELT(buf);
-    EXPECT_EQ(18 + 4, b);
-    EXPECT_EQ(18, sin.readInt()); // 32 bit length prefix
+    EXPECT_EQ(24 + 4, b);
+    EXPECT_EQ(24, sin.readInt()); // 32 bit length prefix
     EXPECT_EQ('-', sin.readChar());
     EXPECT_EQ('1', sin.readChar());
     EXPECT_EQ('2', sin.readChar());
@@ -1915,6 +1917,12 @@ TEST_F(NValueTest, SerializeToELT)
     EXPECT_EQ('1', sin.readChar());
     EXPECT_EQ('2', sin.readChar());
     EXPECT_EQ('3', sin.readChar());
+    EXPECT_EQ('0', sin.readChar());
+    EXPECT_EQ('0', sin.readChar());
+    EXPECT_EQ('0', sin.readChar());
+    EXPECT_EQ('0', sin.readChar());
+    EXPECT_EQ('0', sin.readChar());
+    EXPECT_EQ('0', sin.readChar());
     sin.unread(b);
 }
 

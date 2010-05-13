@@ -213,23 +213,15 @@ std::string NValue::createStringFromDecimal() const {
         whole.ChangeSign();
     }
     buffer << whole.ToString(10);
-    if (fractional != TTInt(0)) {
-        buffer << '.';
-        if (fractional.IsSign()) {
-            fractional.ChangeSign();
-        }
-        std::string fractionalString = fractional.ToString(10);
-        for (int ii = static_cast<int>(fractionalString.size()); ii < NValue::kMaxDecScale; ii++) {
-            buffer << '0';
-        }
-        for (int ii = static_cast<int>(fractionalString.size() - 1); ii >= 0; ii--) {
-            if (fractionalString[ii] != '0') {
-                fractionalString.resize(ii + 1);
-                break;
-            }
-        }
-        buffer << fractionalString;
+    buffer << '.';
+    if (fractional.IsSign()) {
+        fractional.ChangeSign();
     }
+    std::string fractionalString = fractional.ToString(10);
+    for (int ii = static_cast<int>(fractionalString.size()); ii < NValue::kMaxDecScale; ii++) {
+        buffer << '0';
+    }
+    buffer << fractionalString;
     return buffer.str();
 }
 

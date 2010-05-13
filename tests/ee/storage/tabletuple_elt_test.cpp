@@ -294,13 +294,23 @@ TableTupleELTTest::verSer(int cnt, char *data)
     }
     if (cnt-- >= 0)
     {
-        EXPECT_EQ(6, sin.readInt());
+        EXPECT_EQ(16, sin.readInt());
         EXPECT_EQ('-', sin.readChar());
         EXPECT_EQ('1', sin.readChar());
         EXPECT_EQ('2', sin.readChar());
         EXPECT_EQ('.', sin.readChar());
         EXPECT_EQ('3', sin.readChar());
         EXPECT_EQ('4', sin.readChar());
+        EXPECT_EQ('0', sin.readChar());
+        EXPECT_EQ('0', sin.readChar());
+        EXPECT_EQ('0', sin.readChar());
+        EXPECT_EQ('0', sin.readChar());
+        EXPECT_EQ('0', sin.readChar());
+        EXPECT_EQ('0', sin.readChar());
+        EXPECT_EQ('0', sin.readChar());
+        EXPECT_EQ('0', sin.readChar());
+        EXPECT_EQ('0', sin.readChar());
+        EXPECT_EQ('0', sin.readChar());
     }
     if (cnt-- >= 0)
     {
@@ -382,21 +392,21 @@ TEST_F(TableTupleELTTest, serToELT)
     // + decimal
     keep_offsets.push_back(i++);
     sz = serElSize(keep_offsets, nulls, data);
-    EXPECT_EQ(40 + 4 + 1 + 1 + 4, sz);  // length, radix pt, sign, prec.
+    EXPECT_EQ(40 + 14 + 1 + 1 + 4, sz);  // length, radix pt, sign, prec.
     EXPECT_EQ(0x0, nulls[0]);  // all null
     verSer(i-1, data);
 
     // + first varchar
     keep_offsets.push_back(i++);
     sz = serElSize(keep_offsets, nulls, data);
-    EXPECT_EQ(50 + 14, sz); // length, 10 chars
+    EXPECT_EQ(60 + 14, sz); // length, 10 chars
     EXPECT_EQ(0x0, nulls[0]);  // all null
     verSer(i-1, data);
 
     // + second varchar
     keep_offsets.push_back(i++);
     sz = serElSize(keep_offsets, nulls, data);
-    EXPECT_EQ(64 + 24, sz); // length, 20 chars
+    EXPECT_EQ(74 + 24, sz); // length, 20 chars
     EXPECT_EQ(0x0, nulls[0]);  // all null
     verSer(i-1, data);
 }
