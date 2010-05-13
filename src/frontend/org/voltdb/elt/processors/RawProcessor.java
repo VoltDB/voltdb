@@ -416,4 +416,12 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
         }
     }
 
+    @Override
+    public boolean isConnectorForService(String service) {
+        if (service.equalsIgnoreCase("export")) {
+            return true;
+        }
+        return false;
+    }
+
 }

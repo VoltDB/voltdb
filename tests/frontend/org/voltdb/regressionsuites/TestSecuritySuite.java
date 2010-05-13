@@ -32,8 +32,8 @@ import org.voltdb.compiler.VoltProjectBuilder.*;
 import org.voltdb.BackendTarget;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.regressionsuites.securityprocs.*;
-import org.voltdb.client.Client;
 import org.voltdb.client.*;
+import org.voltdb.elt.ExportTestClient;
 import org.voltdb.VoltTable;
 
 public class TestSecuritySuite extends RegressionSuite {
@@ -290,6 +290,40 @@ public class TestSecuritySuite extends RegressionSuite {
         assertTrue(exceptionThrown);
     }
 
+    public void testAllowedExportConnectorPermissions() throws IOException {
+        // User1 can connect (in users list)
+        ExportTestClient eclient = new ExportTestClient(1);
+        eclient.connectToELServers("user1", "password");
+        eclient.disconnectFromELServers();
+
+        // User3 can connect (in groups list)
+        eclient = new ExportTestClient(1);
+        eclient.connectToELServers("user3", "password");
+        eclient.disconnectFromELServers();
+
+        // Expected to throw an exception on failure
+        assertTrue(true);
+    }
+
+    public void testRejectedExportConnectorPermissions() {
+        boolean caught = false;
+        ExportTestClient eclient = new ExportTestClient(1);
+        try {
+            // bad user & bad group
+            eclient.connectToELServers("user6", "password");
+        }
+        catch (IOException e) {
+            caught = true;
+        }
+        assertTrue(caught);
+
+        try {
+            eclient.disconnectFromELServers();
+        }
+        catch (IOException ignored){
+        }
+    }
+
     /**
      * Build a list of the tests that will be run when TestSecuritySuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
@@ -335,6 +369,15 @@ public class TestSecuritySuite extends RegressionSuite {
         };
         project.addGroups(groups);
         project.setSecurityEnabled(true);
+
+        ArrayList<String> elusers = new ArrayList<String>();
+        elusers.add("user1");
+        ArrayList<String> elgroups = new ArrayList<String>();
+        elgroups.add("group2");
+
+        project.addELT("org.voltdb.elt.processors.RawProcessor",
+                       true /*enabled*/,
+                       elusers, elgroups);
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 1 Local Site/Partitions running on JNI backend

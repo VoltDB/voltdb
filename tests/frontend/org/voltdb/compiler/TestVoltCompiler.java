@@ -92,7 +92,7 @@ public class TestVoltCompiler extends TestCase {
         project.addPartitionInfo("EXPRESSIONS_WITH_NULLS", "PKEY");
         project.addPartitionInfo("EXPRESSIONS_NO_NULLS", "PKEY");
         project.addPartitionInfo("JUMBO_ROW", "PKEY");
-        project.addELT("org.voltdb.elt.processors.RawProcessor", false);
+        project.addELT("org.voltdb.elt.processors.RawProcessor", false, null, null);
         project.addELTTable("ALLOW_NULLS", false);   // persistent table
         project.addELTTable("WITH_DEFAULTS", true);  // streamed table
         try {

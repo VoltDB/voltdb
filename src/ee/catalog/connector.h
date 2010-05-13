@@ -28,6 +28,8 @@
 
 namespace catalog {
 
+class UserRef;
+class GroupRef;
 class ConnectorTableInfo;
 /**
  * Export connector (ELT)
@@ -41,6 +43,8 @@ protected:
 
     std::string m_loaderclass;
     bool m_enabled;
+    CatalogMap<UserRef> m_authUsers;
+    CatalogMap<GroupRef> m_authGroups;
     CatalogMap<ConnectorTableInfo> m_tableInfo;
 
     virtual void update();
@@ -54,6 +58,10 @@ public:
     const std::string & loaderclass() const;
     /** GETTER: Is the connector enabled */
     bool enabled() const;
+    /** GETTER: Users authorized to invoke this procedure */
+    const CatalogMap<UserRef> & authUsers() const;
+    /** GETTER: Groups authorized to invoke this procedure */
+    const CatalogMap<GroupRef> & authGroups() const;
     /** GETTER: Per table configuration */
     const CatalogMap<ConnectorTableInfo> & tableInfo() const;
 };

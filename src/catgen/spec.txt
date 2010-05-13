@@ -46,6 +46,8 @@ end
 begin Connector                      "Export connector (ELT)"
   string loaderclass                 "The class name of the connector"
   bool enabled                       "Is the connector enabled"
+  UserRef* authUsers        	     "Users authorized to invoke this procedure"
+  GroupRef* authGroups      	     "Groups authorized to invoke this procedure"
   ConnectorTableInfo* tableInfo      "Per table configuration"
 end
 

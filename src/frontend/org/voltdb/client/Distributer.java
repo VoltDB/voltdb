@@ -461,9 +461,8 @@ class Distributer {
             }
         }
     } else {
-        if (
-                !(((Long)m_clusterInstanceId[0]).longValue() == numbers[2]) ||
-                !(((Integer)m_clusterInstanceId[1]).longValue() == numbers[3])) {
+        if (!(((Long)m_clusterInstanceId[0]).longValue() == numbers[2]) ||
+            !(((Integer)m_clusterInstanceId[1]).longValue() == numbers[3])) {
             aChannel.close();
             throw new IOException(
                     "Cluster instance id mismatch. Current is " + m_clusterInstanceId[0] + "," + m_clusterInstanceId[1]

@@ -23,8 +23,7 @@ import java.util.ArrayList;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
-import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.*;
 import org.voltdb.utils.Encoder;
 
 import org.apache.log4j.Logger;
@@ -119,6 +118,11 @@ public class AuthSystem {
         private final HashSet<Procedure> m_authorizedProcedures = new HashSet<Procedure>();
 
         /**
+         * Set of export connectors this user is authorized to access.
+         */
+        private final HashSet<Connector> m_authorizedConnectors = new HashSet<Connector>();
+
+        /**
          *
          * @param shadowPassword SHA-1 double hashed copy of the users clear text password
          * @param name Name of the user
@@ -180,6 +184,18 @@ public class AuthSystem {
         private boolean hasGroupWithSysProcPermission() {
             for (AuthGroup group : m_groups) {
                 if (group.m_sysproc) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public boolean authorizeConnector(String connectorClass) {
+            if (connectorClass == null) {
+                return false;
+            }
+            for (Connector c : m_authorizedConnectors) {
+                if (c.getLoaderclass().equals(connectorClass)) {
                     return true;
                 }
             }
@@ -268,6 +284,34 @@ public class AuthSystem {
                 }
             }
         }
+
+        /*
+         * Iterate through the export connectors and add each connector to
+         * the authorized user objects.
+         */
+        for (org.voltdb.catalog.Connector connector : db.getConnectors()) {
+            for (org.voltdb.catalog.UserRef userRef : connector.getAuthusers()) {
+                final org.voltdb.catalog.User catalogUser = userRef.getUser();
+                final AuthUser user = m_users.get(catalogUser.getTypeName());
+                if (user == null) {
+                    //Error case. Procedure has a user listed as authorized but no such user exists
+                } else {
+                    user.m_authorizedConnectors.add(connector);
+                }
+            }
+
+            for (org.voltdb.catalog.GroupRef catalogGroupRef : connector.getAuthgroups()) {
+                final org.voltdb.catalog.Group catalogGroup = catalogGroupRef.getGroup();
+                final AuthGroup group = m_groups.get(catalogGroup.getTypeName());
+                if (group == null) {
+                    //Error case. Procedure has a group listed as authorized but no such user exists
+                } else {
+                    for (AuthUser user : group.m_users) {
+                        user.m_authorizedConnectors.add(connector);
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -278,7 +322,7 @@ public class AuthSystem {
      * @param password SHA-1 single hashed version of the users clear text password
      * @return The permission set for the user if authentication succeeds or null if authentication fails.
      */
-    AuthUser authenticate(String service, String username, byte[] password) {
+    AuthUser authenticate(String username, byte[] password) {
         if (!m_enabled) {
             return new AuthUser(null, null, false, false) {
                 @Override
@@ -293,6 +337,11 @@ public class AuthSystem {
 
                 @Override
                 public boolean hasSystemProcPermission() {
+                    return true;
+                }
+
+                @Override
+                public boolean authorizeConnector(String connectorName) {
                     return true;
                 }
             };

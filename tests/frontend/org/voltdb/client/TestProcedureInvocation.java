@@ -126,7 +126,6 @@ public class TestProcedureInvocation extends TestCase{
 
 
     public void verifySpi(StoredProcedureInvocation spi) throws Exception {
-        // Note - tryMakeCompatible converts everything to longs.
         assertEquals(spi.getClientHandle(), 10);
         assertEquals(spi.getProcName(), "invocation1");
         assertEquals(spi.getParams().toArray()[0], byteparam);

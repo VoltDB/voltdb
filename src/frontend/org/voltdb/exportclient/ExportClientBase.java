@@ -19,8 +19,7 @@ package org.voltdb.exportclient;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
 
@@ -34,7 +33,7 @@ public abstract class ExportClientBase implements Runnable {
     protected HashMap<String, ExportConnection> m_elConnections;
 
     // First hash by table, second by partition
-    private HashMap<Integer, HashMap<Integer, ExportDataSink>> m_sinks;
+    private final HashMap<Integer, HashMap<Integer, ExportDataSink>> m_sinks;
 
     public ExportClientBase()
     {
@@ -56,7 +55,6 @@ public abstract class ExportClientBase implements Runnable {
      * Allow derived clients to implement their own construction of ELTDecoders
      * for the data sources provided by the server on this EL connection.
      * @param source
-     * @return
      */
     public abstract ExportDecoderBase constructELTDecoder(AdvertisedDataSource source);
 
@@ -99,28 +97,34 @@ public abstract class ExportClientBase implements Runnable {
      * advance the EL protocol to the open state to each server, retrieve
      * each AdvertisedDataSource list, and create data sinks for every
      * table/partition pair.
+     * @throws IOException
      */
-    public void connectToELServers()
+    public void connectToELServers(String username, String password) throws IOException
     {
         if (m_servers == null || m_servers.size() == 0)
         {
             System.out.println("No servers provided for ELT, exiting...");
-            System.exit(1);
+            throw new RuntimeException("No servers provided for ELT connection");
         }
         for (InetSocketAddress server_addr : m_servers)
         {
             ExportConnection elConnection =
-                new ExportConnection(server_addr, m_sinks);
-            try {
-                elConnection.openELTConnection();
-                constructELTDataSinks(elConnection);
-            }
-            catch (IOException e) {
-                // XXX We should be smarter if it fails to connect and open
-                e.printStackTrace();
-                System.exit(1);
-            }
+                new ExportConnection(username, password, server_addr, m_sinks);
+            elConnection.openELTConnection();
+            constructELTDataSinks(elConnection);
             m_elConnections.put(elConnection.getConnectionName(), elConnection);
+        }
+    }
+
+    /**
+     * Disconnect from any connected servers.
+     * @throws IOException
+     */
+    public void disconnectFromELServers() throws IOException {
+        Set<String> keySet = m_elConnections.keySet();
+        for (String key : keySet) {
+            ExportConnection exportConnection = m_elConnections.get(key);
+            exportConnection.closeELTConnection();
         }
     }
 
@@ -156,8 +160,12 @@ public abstract class ExportClientBase implements Runnable {
 
     @Override
     public void run() {
-        connectToELServers();
-        // XXX need smarter continue condition
+        try {
+            connectToELServers(null, null);
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
         while (true)
         {
             work();

@@ -426,8 +426,12 @@ public class ClientInterface implements DumpManager.Dumpable {
             final byte password[] = new byte[20];
             message.get(password);
 
-            final AuthSystem.AuthUser user = m_catalogContext.get().authSystem.authenticate(service, username, password);
-            InputHandler handler = null;
+            /*
+             * Authenticate the user.
+             */
+            final AuthSystem.AuthUser user =
+                m_catalogContext.get().authSystem.authenticate(username, password);
+
             if (user == null) {
                 //Send negative response
                 responseBuffer.put((byte)-1).flip();
@@ -436,7 +440,13 @@ public class ClientInterface implements DumpManager.Dumpable {
                 authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
                              "): user " + username + " failed authentication.");
                 return null;
-            } else if (service.equalsIgnoreCase("database")) {
+            }
+
+            /*
+             * Create an input handler.
+             */
+            InputHandler handler = null;
+            if (service.equalsIgnoreCase("database")) {
                 handler =
                     new ClientInputHandler(
                             user,
@@ -444,6 +454,16 @@ public class ClientInterface implements DumpManager.Dumpable {
             }
             else {
                 // If no processor can handle this service, null is returned.
+                String connectorClassName = ELTManager.instance().getConnectorForService(service);
+                if (!user.authorizeConnector(connectorClassName)) {
+                    //Send negative response
+                    responseBuffer.put((byte)-1).flip();
+                    socket.write(responseBuffer);
+                    socket.close();
+                    authLog.warn("Failure to authroize user " + username + " for service " + service + ".");
+                    return null;
+                }
+
                 handler = ELTManager.instance().createInputHandler(service);
             }
 

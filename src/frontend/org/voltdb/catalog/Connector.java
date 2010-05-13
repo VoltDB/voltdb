@@ -28,12 +28,18 @@ public class Connector extends CatalogType {
 
     String m_loaderclass = new String();
     boolean m_enabled;
+    CatalogMap<UserRef> m_authUsers;
+    CatalogMap<GroupRef> m_authGroups;
     CatalogMap<ConnectorTableInfo> m_tableInfo;
 
     void setBaseValues(Catalog catalog, CatalogType parent, String path, String name) {
         super.setBaseValues(catalog, parent, path, name);
         m_fields.put("loaderclass", m_loaderclass);
         m_fields.put("enabled", m_enabled);
+        m_authUsers = new CatalogMap<UserRef>(catalog, this, path + "/" + "authUsers", UserRef.class);
+        m_childCollections.put("authUsers", m_authUsers);
+        m_authGroups = new CatalogMap<GroupRef>(catalog, this, path + "/" + "authGroups", GroupRef.class);
+        m_childCollections.put("authGroups", m_authGroups);
         m_tableInfo = new CatalogMap<ConnectorTableInfo>(catalog, this, path + "/" + "tableInfo", ConnectorTableInfo.class);
         m_childCollections.put("tableInfo", m_tableInfo);
     }
@@ -51,6 +57,16 @@ public class Connector extends CatalogType {
     /** GETTER: Is the connector enabled */
     public boolean getEnabled() {
         return m_enabled;
+    }
+
+    /** GETTER: Users authorized to invoke this procedure */
+    public CatalogMap<UserRef> getAuthusers() {
+        return m_authUsers;
+    }
+
+    /** GETTER: Groups authorized to invoke this procedure */
+    public CatalogMap<GroupRef> getAuthgroups() {
+        return m_authGroups;
     }
 
     /** GETTER: Per table configuration */

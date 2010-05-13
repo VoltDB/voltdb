@@ -68,4 +68,11 @@ public interface ELTDataProcessor  {
      * The system is terminating. Cleanup and exit the processor.
      */
     public void shutdown();
+
+    /**
+     * Allow connectors to claim responsibility for a service
+     * @param service  Service, see wire protocol login message.
+     * @return  true if connector implements the service.
+     */
+    boolean isConnectorForService(String service);
 }

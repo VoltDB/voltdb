@@ -47,16 +47,7 @@ import org.hsqldb.HSQLInterface;
 import org.voltdb.ProcInfo;
 import org.voltdb.ProcInfoData;
 import org.voltdb.TransactionIdManager;
-import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Column;
-import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Group;
-import org.voltdb.catalog.GroupRef;
-import org.voltdb.catalog.MaterializedViewInfo;
-import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.SnapshotSchedule;
-import org.voltdb.catalog.Table;
+import org.voltdb.catalog.*;
 import org.voltdb.compiler.projectfile.DatabaseType;
 import org.voltdb.compiler.projectfile.GroupsType;
 import org.voltdb.compiler.projectfile.ProceduresType;
@@ -863,6 +854,42 @@ public class VoltCompiler {
         org.voltdb.catalog.Connector catconn = catdb.getConnectors().add("0");
         catconn.setEnabled(adminstate);
         catconn.setLoaderclass(conn.getClazz());
+
+        // add authorized users and groups
+        final ArrayList<String> userslist = new ArrayList<String>();
+        final ArrayList<String> groupslist = new ArrayList<String>();
+
+        // @users
+        if (conn.getUsers() != null) {
+            for (String user : conn.getUsers().split(",")) {
+                userslist.add(user);
+            }
+        }
+
+        // @groups
+        if (conn.getGroups() != null) {
+            for (String group : conn.getGroups().split(",")) {
+                groupslist.add(group);
+            }
+        }
+
+        for (String userName : userslist) {
+            final User user = catdb.getUsers().get(userName);
+            if (user == null) {
+                throw new VoltCompilerException("Export connector " + conn.getClazz() + " has a user " + userName + " that does not exist");
+            }
+            final UserRef userRef = catconn.getAuthusers().add(userName);
+            userRef.setUser(user);
+        }
+        for (String groupName : groupslist) {
+            final Group group = catdb.getGroups().get(groupName);
+            if (group == null) {
+                throw new VoltCompilerException("Export connector " + conn.getClazz() + " has a group " + groupName + " that does not exist");
+            }
+            final GroupRef groupRef = catconn.getAuthgroups().add(groupName);
+            groupRef.setGroup(group);
+        }
+
 
         // Catalog Connector.ConnectorTableInfo
         Integer i = 0;

@@ -171,6 +171,8 @@
 	  <!-- connector attributes -->
           <xsd:attribute name="class" type="xsd:string" use="required"/>
 	  <xsd:attribute name="enabled" type="xsd:boolean" default="false"/>
+          <xsd:attribute name="users" type="xsd:string"/>
+          <xsd:attribute name="groups" type="xsd:string"/>
 	</xsd:complexType>
       </xsd:element>
     </xsd:sequence>

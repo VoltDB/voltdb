@@ -192,4 +192,19 @@ public class ELTManager
         }
         return null;
     }
+
+
+    /**
+     * Map service strings to connector class names
+     * @param service
+     * @return classname responsible for service
+     */
+    public String getConnectorForService(String service) {
+        for (ELTDataProcessor p : m_processors) {
+            if (p.isConnectorForService(service)) {
+                return p.getClass().getCanonicalName();
+            }
+        }
+        return null;
+    }
 }

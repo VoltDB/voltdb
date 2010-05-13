@@ -45,16 +45,20 @@ public class ExportConnection implements Runnable {
     private final InetSocketAddress m_serverAddr;
     private SocketChannel m_socket;
 
-    private final String m_username = "";
-    private final String m_password = "";
+    private final String m_username;
+    private final String m_password;
 
     // cached reference to ELClientBase's collection of ELDataSinks
     private final HashMap<Integer, HashMap<Integer, ExportDataSink>> m_sinks;
     private ArrayList<AdvertisedDataSource> m_dataSources;
 
-    public ExportConnection(InetSocketAddress serverAddr,
-                        HashMap<Integer, HashMap<Integer, ExportDataSink>> dataSinks)
+    public ExportConnection(
+            String username, String password,
+            InetSocketAddress serverAddr,
+            HashMap<Integer, HashMap<Integer, ExportDataSink>> dataSinks)
     {
+        m_username = username != null ? username : "";
+        m_password = password != null ? password : "";
         m_sinks = dataSinks;
         m_serverAddr = serverAddr;
         m_connectionName = serverAddr.toString();
@@ -92,6 +96,17 @@ public class ExportConnection implements Runnable {
                 m_state = CONNECTED;
             }
         }
+    }
+
+    public void closeELTConnection() throws IOException {
+        if (m_socket.isConnected()) {
+            m_socket.close();
+        }
+        // seems hard to argue with...
+        m_state = CLOSED;
+
+        // perhaps a more controversial assertion?
+        m_dataSources = null;
     }
 
     /**

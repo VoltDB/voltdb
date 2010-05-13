@@ -104,7 +104,12 @@ public class TestExportSuite extends RegressionSuite {
     {
         super.setUp();
         m_tester = new ExportTestClient(getServerConfig().getNodeCount());
-        m_tester.connectToELServers();
+        try {
+            m_tester.connectToELServers(null, null);
+        }
+        catch (IOException e){
+            throw new RuntimeException(e);
+        }
     }
 
     /**
@@ -524,7 +529,10 @@ public class TestExportSuite extends RegressionSuite {
         project.addSchema(TestExportSuite.class.getResource("sqltypessuite-ddl.sql"));
         // add the connector/processor (name, host, port)
         // and the exportable tables (name, export-only)
-        project.addELT("org.voltdb.elt.processors.RawProcessor", true /*enabled*/);
+        project.addELT("org.voltdb.elt.processors.RawProcessor",
+                       true  /*enabled*/,
+                       null, /* authUsers (off) */
+                       null  /* authGroups (off) */);
         // "WITH_DEFAULTS" is a non-elt'd persistent table
         project.addELTTable("ALLOW_NULLS", false);   // persistent table
         project.addELTTable("NO_NULLS", true);       // streamed table

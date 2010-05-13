@@ -25,12 +25,7 @@ import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -178,7 +173,10 @@ public class VoltProjectBuilder {
     final LinkedHashSet<Class<?>> m_supplementals = new LinkedHashSet<Class<?>>();
     final LinkedHashMap<String, String> m_partitionInfos = new LinkedHashMap<String, String>();
 
-    String m_elloader = null;
+    String m_elloader = null;         // loader package.Classname
+    private boolean m_elenabled;      // true if enabled; false if disabled
+    List<String> m_elAuthUsers;       // authorized users
+    List<String> m_elAuthGroups;      // authorized groups
 
     BackendTarget m_target = BackendTarget.NATIVE_EE_JNI;
     PrintStream m_compilerDebugPrintStream = null;
@@ -190,7 +188,7 @@ public class VoltProjectBuilder {
     private String m_snapshotPrefix = null;
     private String m_snapshotFrequency = null;
 
-    private boolean m_elenabled;
+
 
 
     public void addAllDefaults() {
@@ -322,9 +320,13 @@ public class VoltProjectBuilder {
         m_snapshotPrefix = prefix;
     }
 
-    public void addELT(final String loader, boolean enabled) {
+
+    public void addELT(final String loader, boolean enabled,
+            List<String> users, List<String> groups) {
         m_elloader = loader;
         m_elenabled = enabled;
+        m_elAuthUsers = users;
+        m_elAuthGroups = groups;
     }
 
     public void addELTTable(String name, boolean exportonly) {
@@ -623,6 +625,35 @@ public class VoltProjectBuilder {
             final Element conn = doc.createElement("connector");
             conn.setAttribute("class", m_elloader);
             conn.setAttribute("enabled", m_elenabled ? "true" : "false");
+
+            // turn list into stupid comma separated attribute list
+            String usersattr = "";
+            if (m_elAuthUsers != null) {
+                for (String s : m_elAuthUsers) {
+                    if (usersattr.isEmpty()) {
+                        usersattr += s;
+                    }
+                    else {
+                        usersattr += "," + s;
+                    }
+                }
+                conn.setAttribute("users", usersattr);
+            }
+
+            // turn list into stupid comma separated attribute list
+            String groupsattr = "";
+            if (m_elAuthGroups != null) {
+                for (String s : m_elAuthGroups) {
+                    if (groupsattr.isEmpty()) {
+                        groupsattr += s;
+                    }
+                    else {
+                        groupsattr += "," + s;
+                    }
+                }
+                conn.setAttribute("groups", groupsattr);
+            }
+
             exports.appendChild(conn);
 
             if (m_eltTables.size() > 0) {
