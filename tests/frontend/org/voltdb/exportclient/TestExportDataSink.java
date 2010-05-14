@@ -62,7 +62,8 @@ public class TestExportDataSink extends TestCase {
         String CONN_NAME = "ryanlovestheyankees";
         ExportDataSink dut =
             new ExportDataSink(PARTITION_ID, TABLE_ID, "coffeetable",
-                           new TestELTDecoder(new AdvertisedDataSource(PARTITION_ID,
+                           new TestELTDecoder(new AdvertisedDataSource((byte)0,
+                                                                       PARTITION_ID,
                                                                        TABLE_ID,
                                                                        "coffeetable",
                                                                        null, null)));

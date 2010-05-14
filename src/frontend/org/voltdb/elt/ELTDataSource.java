@@ -34,6 +34,7 @@ public class ELTDataSource {
 
     private final String m_database;
     private final String m_tableName;
+    private final byte m_isReplicated;
     private final int m_tableId;
     private final int m_siteId;
     private final int m_partitionId;
@@ -44,17 +45,21 @@ public class ELTDataSource {
      * Create a new data source.
      * @param db
      * @param tableName
+     * @param isReplicated
      * @param partitionId
      * @param siteId
      * @param tableId
      * @param catalogMap
      */
     public ELTDataSource(String db, String tableName,
-                int partitionId, int siteId, int tableId,
-                CatalogMap<Column> catalogMap)
+                         boolean isReplicated,
+                         int partitionId, int siteId, int tableId,
+                         CatalogMap<Column> catalogMap)
     {
         m_database = db;
         m_tableName = tableName;
+        // coerce true == 1, false == 0 for wire format
+        m_isReplicated = (byte)(isReplicated ? 1 : 0);
         m_tableId = tableId;
         m_partitionId = partitionId;
         m_siteId = siteId;
@@ -100,6 +105,10 @@ public class ELTDataSource {
 
     public String getTableName() {
         return m_tableName;
+    }
+
+    public byte getIsReplicated() {
+        return m_isReplicated;
     }
 
     public int getTableId() {

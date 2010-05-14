@@ -149,6 +149,7 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
                     // serialize an array of DataSources
                     fs.writeInt(m_sourcesArray.size());
                     for (ELTDataSource src : m_sourcesArray) {
+                        fs.writeByte(src.getIsReplicated());
                         fs.writeInt(src.getPartitionId());
                         fs.writeInt(src.getTableId());
                         fs.writeString(src.getTableName());

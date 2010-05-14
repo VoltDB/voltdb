@@ -165,9 +165,10 @@ public class TestRawProcessor extends TestCase {
             m_mockVoltDB.addColumnToTable("TableName", "COL2", VoltType.STRING, false, null, VoltType.STRING);
         }
 
-        public MockELTDataSource(String db, String tableName, int partitionId,
-                int siteId, int tableId) {
-            super(db, tableName, partitionId, siteId, tableId,
+        public MockELTDataSource(String db, String tableName, boolean isReplicated,
+                                 int partitionId, int siteId, int tableId)
+        {
+            super(db, tableName, isReplicated, partitionId, siteId, tableId,
                   m_mockVoltDB.getCatalogContext().database.getTables().get("TableName").getColumns());
         }
 
@@ -196,7 +197,7 @@ public class TestRawProcessor extends TestCase {
     @Override
     public void setUp() {
         rp = new RawProcessor();
-        ds = new MockELTDataSource("db", "table", 1, 3, 2);
+        ds = new MockELTDataSource("db", "table", false, 1, 3, 2);
         rp.addDataSource(ds);
 
         c = new MockConnection();

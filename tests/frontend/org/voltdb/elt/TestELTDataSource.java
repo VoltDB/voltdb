@@ -69,33 +69,42 @@ public class TestELTDataSource extends TestCase {
         m_mockVoltDB.addTable("TableName", false);
         m_mockVoltDB.addColumnToTable("TableName", "COL1", VoltType.INTEGER, false, null, VoltType.INTEGER);
         m_mockVoltDB.addColumnToTable("TableName", "COL2", VoltType.STRING, false, null, VoltType.STRING);
+        m_mockVoltDB.addTable("RepTableName", true);
+        m_mockVoltDB.addColumnToTable("RepTableName", "COL1", VoltType.INTEGER, false, null, VoltType.INTEGER);
+        m_mockVoltDB.addColumnToTable("RepTableName", "COL2", VoltType.STRING, false, null, VoltType.STRING);
     }
 
-    public void testELTDataSource() {
-        Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ELTDataSource s = new ELTDataSource("database",
-                                            table.getTypeName(),
-                                            m_part,
-                                            m_site,
-                                            table.getRelativeIndex(),
-                                            table.getColumns());
+    public void testELTDataSource()
+    {
+        String[] tables = {"TableName", "RepTableName"};
+        for (String table_name : tables)
+        {
+            Table table = m_mockVoltDB.getCatalogContext().database.getTables().get(table_name);
+            ELTDataSource s = new ELTDataSource("database",
+                                                table.getTypeName(),
+                                                table.getIsreplicated(),
+                                                m_part,
+                                                m_site,
+                                                table.getRelativeIndex(),
+                                                table.getColumns());
 
-        assertEquals("database", s.getDatabase());
-        assertEquals("TableName", s.getTableName());
-        assertEquals(m_part, s.getPartitionId());
-        assertEquals(m_site, s.getSiteId());
-        assertEquals(table.getRelativeIndex(), s.getTableId());
-        // There are 6 additional ELT columns added
-        assertEquals(2 + 6, s.m_columnNames.size());
-        assertEquals(2 + 6, s.m_columnTypes.size());
-        assertEquals("VOLT_TRANSACTION_ID", s.m_columnNames.get(0));
-        assertEquals("VOLT_ELT_OPERATION", s.m_columnNames.get(5));
-        assertEquals("COL1", s.m_columnNames.get(6));
-        assertEquals("COL2", s.m_columnNames.get(7));
-        assertEquals(VoltType.INTEGER.ordinal(), s.m_columnTypes.get(6).intValue());
-        assertEquals(VoltType.STRING.ordinal(), s.m_columnTypes.get(7).intValue());
+            assertEquals("database", s.getDatabase());
+            assertEquals(table_name, s.getTableName());
+            assertEquals((table_name.equals("RepTableName") ? 1 : 0), s.getIsReplicated());
+            assertEquals(m_part, s.getPartitionId());
+            assertEquals(m_site, s.getSiteId());
+            assertEquals(table.getRelativeIndex(), s.getTableId());
+            // There are 6 additional ELT columns added
+            assertEquals(2 + 6, s.m_columnNames.size());
+            assertEquals(2 + 6, s.m_columnTypes.size());
+            assertEquals("VOLT_TRANSACTION_ID", s.m_columnNames.get(0));
+            assertEquals("VOLT_ELT_OPERATION", s.m_columnNames.get(5));
+            assertEquals("COL1", s.m_columnNames.get(6));
+            assertEquals("COL2", s.m_columnNames.get(7));
+            assertEquals(VoltType.INTEGER.ordinal(), s.m_columnTypes.get(6).intValue());
+            assertEquals(VoltType.STRING.ordinal(), s.m_columnTypes.get(7).intValue());
+        }
     }
-
 
     public void testPoll() throws MessagingException, UnknownHostException {
         MockHostMessenger hm = new MockHostMessenger();
@@ -104,6 +113,7 @@ public class TestELTDataSource extends TestCase {
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
         ELTDataSource s = new ELTDataSource("database",
                                             table.getTypeName(),
+                                            table.getIsreplicated(),
                                             m_part,
                                             m_site,
                                             table.getRelativeIndex(),

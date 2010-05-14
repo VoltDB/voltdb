@@ -153,6 +153,7 @@ public class ELTManager
             newProcessor.addDataSource(
                  new ELTDataSource("database",
                                    table.getTypeName(),
+                                   table.getIsreplicated(),
                                    siteTracker.getPartitionForSite(site),
                                    site,
                                    table.getRelativeIndex(),

@@ -52,6 +52,7 @@ public class ELTProtoMessage
      * The ELT data source metadata returned in a kOpenResponse message.
      */
     static public class AdvertisedDataSource {
+        final private byte m_isReplicated;
         final private int m_partitionId;
         final private int m_tableId;
         final private String m_tableName;
@@ -60,14 +61,22 @@ public class ELTProtoMessage
 
         private ArrayList<VoltType> m_columnTypes = new ArrayList<VoltType>();
 
-        public AdvertisedDataSource(int p_id, int t_id, String t_name,
-                ArrayList<String> names, ArrayList<VoltType> types)
+        public AdvertisedDataSource(byte isReplicated,
+                                    int p_id, int t_id, String t_name,
+                                    ArrayList<String> names,
+                                    ArrayList<VoltType> types)
         {
+            m_isReplicated = isReplicated;
             m_partitionId = p_id;
             m_tableId = t_id;
             m_tableName = t_name;
             m_columnNames = names;
             m_columnTypes = types;
+        }
+
+        public boolean isReplicated()
+        {
+            return (m_isReplicated != 0);
         }
 
         public int partitionId() {
@@ -241,6 +250,7 @@ public class ELTProtoMessage
             ArrayList<VoltType> types = new ArrayList<VoltType>();
             ArrayList<String> names = new ArrayList<String>();
 
+            byte is_replicated = fds.readByte();
             int p_id = fds.readInt();
             int t_id = fds.readInt();
             String t_name = fds.readString();
@@ -249,7 +259,8 @@ public class ELTProtoMessage
                 names.add(fds.readString());
                 types.add(VoltType.get((byte)fds.readInt()));
             }
-            result.add(new AdvertisedDataSource(p_id, t_id, t_name, names, types));
+            result.add(new AdvertisedDataSource(is_replicated, p_id, t_id,
+                                                t_name, names, types));
         }
         return result;
     }
