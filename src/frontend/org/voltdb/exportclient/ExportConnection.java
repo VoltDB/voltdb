@@ -148,6 +148,12 @@ public class ExportConnection implements Runnable {
         {
             m_state = CLOSING;
         }
+
+        if (m_state == CLOSING)
+        {
+            return;
+        }
+
         // loop here to empty RX ?
         // receive data from network and hand to the proper ELProtocolHandler RX queue
         ELTProtoMessage m = null;
@@ -156,8 +162,8 @@ public class ExportConnection implements Runnable {
             try {
                 m = nextMessage();
             } catch (IOException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
+                System.err.println("Socket error: " + e.getMessage());
+                m_state = CLOSING;
             }
 
             if (m != null &&m.isError())

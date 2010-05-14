@@ -128,6 +128,21 @@ public abstract class ExportClientBase implements Runnable {
         }
     }
 
+    boolean checkConnections()
+    {
+        boolean retval = true;
+        for (String el_connection : m_elConnections.keySet())
+        {
+            if (!m_elConnections.get(el_connection).isConnected())
+            {
+                System.err.println("Lost connection: " + el_connection);
+                System.err.println("Closing...");
+                retval = false;
+            }
+        }
+        return retval;
+    }
+
     /**
      * Perform one iteration of EL Client work.
      *  Override if the specific client has strange workflow/termination conditions.
@@ -166,9 +181,11 @@ public abstract class ExportClientBase implements Runnable {
         catch (IOException e) {
             throw new RuntimeException(e);
         }
-        while (true)
+        boolean connected = true;
+        while (connected)
         {
             work();
+            connected = checkConnections();
         }
     }
 }
