@@ -175,12 +175,6 @@ public abstract class ExportClientBase implements Runnable {
 
     @Override
     public void run() {
-        try {
-            connectToELServers(null, null);
-        }
-        catch (IOException e) {
-            throw new RuntimeException(e);
-        }
         boolean connected = true;
         while (connected)
         {

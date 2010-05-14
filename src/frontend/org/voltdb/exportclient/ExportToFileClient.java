@@ -54,8 +54,6 @@ public class ExportToFileClient extends ExportClientBase
     private String m_nonce;
     private File m_outDir;
     private HashMap<String, ExportToFileDecoder> m_tableDecoders;
-    private String m_user;
-    private String m_password;
 
     // This class outputs exported rows converted to CSV or TSV values
     // for the table named in the constructor's AdvertisedDataSource
@@ -188,14 +186,11 @@ public class ExportToFileClient extends ExportClientBase
         setServerInfo(servers);
     }
 
-    public ExportToFileClient(Escaper escaper, String nonce, File outdir,
-                              String user, String password)
+    public ExportToFileClient(Escaper escaper, String nonce, File outdir)
     {
         m_escaper = escaper;
         m_nonce = nonce;
         m_outDir = outdir;
-        m_user = user;
-        m_password = password;
         m_tableDecoders = new HashMap<String, ExportToFileDecoder>();
     }
 
@@ -356,8 +351,15 @@ public class ExportToFileClient extends ExportClientBase
         }
 
         ExportToFileClient client =
-            new ExportToFileClient(escaper, nonce, outdir, user, password);
+            new ExportToFileClient(escaper, nonce, outdir);
         client.setVoltServers(volt_servers);
+        try {
+            client.connectToELServers(user, password);
+        }
+        catch (IOException e) {
+            System.err.println("Unable to connect to VoltDB servers for export");
+            System.exit(-1);
+        }
         client.run();
     }
 }
