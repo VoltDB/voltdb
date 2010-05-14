@@ -768,7 +768,7 @@ TEST CASES
 
 <!-- common junit parameters go here -->
 <macrodef name='run_junit'>
-    <attribute name='timeout' default='240000' />
+    <attribute name='timeout'/>
     <attribute name='printsummary' default='off' />
     <attribute name='showoutput' default='false' />
     <element name='tests'/>
@@ -833,7 +833,11 @@ TEST CASES
     name="junit_quick"
     description="Tests and suites that run in under 3 minutes under memcheck"
 >
-    <run_junit>
+    <condition property="timeoutLength" value="${timeoutLength}" else='240000'>
+        <isset property="timeoutLength"/>
+    </condition>
+
+    <run_junit timeout="${timeoutLength}" printsummary="no">
         <formatters>
             <formatter type="plain" unless="hudson"/>
             <formatter
@@ -872,8 +876,7 @@ TEST CASES
     <mkdir dir='${build.testoutput.dir}/report' />
     <junitreport todir="${build.testoutput.dir}">
         <fileset dir='${build.testoutput.dir}'>
-            <include name="*.xml" />
-            <exclude name='TESTS-TestSuites.xml' />
+            <include name="TEST-*.xml" />
         </fileset>
         <report format="noframes" todir="${build.testoutput.dir}/report"/>
         <report
@@ -927,8 +930,7 @@ TEST CASES
     <mkdir dir='${build.testoutput.dir}/report' />
     <junitreport todir="${build.testoutput.dir}">
         <fileset dir='${build.testoutput.dir}'>
-            <include name="*.xml" />
-            <exclude name='TESTS-TestSuites.xml' />
+            <include name="TEST-*.xml" />
         </fileset>
         <report format="noframes" todir="${build.testoutput.dir}/report"/>
         <report
@@ -943,8 +945,7 @@ TEST CASES
     </exec>
     <delete
         dir='${build.testoutput.dir}'
-        includes='*.xml'
-        excludes='TESTS-TestSuites.xml'
+        includes='TEST-*.xml'
     />
     <!-- Fail the build if there were any problems.
         This runs all the tests before failing. -->
