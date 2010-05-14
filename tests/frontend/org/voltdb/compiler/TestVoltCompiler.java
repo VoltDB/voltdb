@@ -113,6 +113,41 @@ public class TestVoltCompiler extends TestCase {
 
     }
 
+    // test that ELT configuration is insensitive to the case of the table name
+    public void testELTTableCase() throws IOException {
+        final VoltProjectBuilder project = new VoltProjectBuilder();
+        project.addSchema(TestVoltCompiler.class.getResource("ELTTester-ddl.sql"));
+        project.addStmtProcedure("Dummy", "insert into a values (?, ?, ?);",
+                                 "a.a_id: 0");
+        project.addPartitionInfo("A", "A_ID");
+        project.addPartitionInfo("B", "B_ID");
+        project.addPartitionInfo("e", "e_id");
+        project.addPartitionInfo("f", "f_id");
+        project.addELT("org.voltdb.elt.processors.RawProcessor", true, null, null);
+        project.addELTTable("A", true); // uppercase DDL, uppercase export
+        project.addELTTable("b", true); // uppercase DDL, lowercase export
+        project.addELTTable("E", true); // lowercase DDL, uppercase export
+        project.addELTTable("f", true); // lowercase DDL, lowercase export
+        try {
+            assertTrue(project.compile("/tmp/eltsettingstest.jar"));
+            final String catalogContents =
+                JarReader.readFileFromJarfile("/tmp/eltsettingstest.jar", "catalog.txt");
+            final Catalog cat = new Catalog();
+            cat.execute(catalogContents);
+            Connector connector = cat.getClusters().get("cluster").getDatabases().
+                get("database").getConnectors().get("0");
+            assertTrue(connector.getEnabled());
+            // Assert that all tables exist in the connector section of catalog
+            assertNotNull(connector.getTableinfo().get("0"));
+            assertNotNull(connector.getTableinfo().get("1"));
+            assertNotNull(connector.getTableinfo().get("2"));
+            assertNotNull(connector.getTableinfo().get("3"));
+        } finally {
+            final File jar = new File("/tmp/eltsettingstest.jar");
+            jar.delete();
+        }
+    }
+
     public void testBadPath() {
         final VoltCompiler compiler = new VoltCompiler();
         final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");

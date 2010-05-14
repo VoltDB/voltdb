@@ -25,3 +25,17 @@ CREATE TABLE D (
   D_VAL INTEGER,
   PRIMARY KEY (D_ID, D_CLIENT)
 );
+
+create table e (
+  e_client integer not null,
+  e_id integer default '0' not null,
+  e_val integer,
+  primary key (e_id, e_client)
+);
+
+create table f (
+  f_client integer not null,
+  f_id integer default '0' not null,
+  f_val integer,
+  primary key (f_id, f_client)
+);

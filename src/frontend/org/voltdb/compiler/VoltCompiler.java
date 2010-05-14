@@ -897,7 +897,7 @@ public class VoltCompiler {
             for (Tables.Table xmltable : conn.getTables().getTable()) {
                 // verify that the table exists in the catalog
                 String tablename = xmltable.getName();
-                org.voltdb.catalog.Table tableref = catdb.getTables().get(tablename);
+                org.voltdb.catalog.Table tableref = catdb.getTables().getIgnoreCase(tablename);
                 if (tableref == null) {
                     compilerLog.warn("While configuring export, table " + tablename + " was not present in " +
                     "the catalog. Export will be disabled for this table.");
