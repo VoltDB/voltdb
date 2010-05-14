@@ -22,11 +22,17 @@ import java.util.LinkedList;
 import java.util.Queue;
 import java.util.Map.Entry;
 
+import org.apache.log4j.Logger;
 import org.voltdb.elt.ELTProtoMessage;
+import org.voltdb.utils.VoltLoggerFactory;
 
 
 public class ExportDataSink implements Runnable
 {
+    private static final Logger m_logger =
+        Logger.getLogger(ExportDataSink.class.getName(),
+                         VoltLoggerFactory.instance());
+
     private int m_tableId = -1;
     private int m_partitionId = -1;
     private String m_tableName;
@@ -109,8 +115,8 @@ public class ExportDataSink implements Runnable
 
     private void poll()
     {
-//        System.out.println("Polling table " + m_tableName +
-//                           ", partition " + m_partitionId + " for new data.");
+        m_logger.trace("Polling table " + m_tableName +
+                       ", partition " + m_partitionId + " for new data.");
 
         ELTProtoMessage m = new ELTProtoMessage(m_partitionId, m_tableId);
         m.poll();
@@ -119,7 +125,8 @@ public class ExportDataSink implements Runnable
 
     private void pollAndAck(ELTProtoMessage prev)
     {
-        System.out.println("Poller, table " + m_tableName + ": pollAndAck " + prev.getAckOffset());
+        m_logger.debug("Poller, table " + m_tableName + ": pollAndAck " +
+                       prev.getAckOffset());
         ELTProtoMessage next = new ELTProtoMessage(m_partitionId, m_tableId);
         next.poll().ack(prev.getAckOffset());
         ELTProtoMessage ack = new ELTProtoMessage(m_partitionId, m_tableId);
@@ -128,12 +135,14 @@ public class ExportDataSink implements Runnable
         {
             if (connectionName.equals(m_activeConnection))
             {
-//                System.out.println("POLLANDACK: " + connectionName + ", offset: " + prev.getAckOffset());
+                m_logger.debug("POLLANDACK: " + connectionName + ", offset: " +
+                               prev.getAckOffset());
                 m_txQueues.get(m_activeConnection).offer(next);
             }
             else
             {
-//                System.out.println("ACK: " + connectionName + ", offset: " + prev.getAckOffset());
+                m_logger.debug("ACK: " + connectionName + ", offset: " +
+                               prev.getAckOffset());
                 m_txQueues.get(connectionName).offer(ack);
             }
         }
@@ -150,9 +159,9 @@ public class ExportDataSink implements Runnable
 
         // read the streamblock length prefix.
         int ttllength = m.getData().getInt();
-//        System.out.println("Poller: table: " + m_tableName +
-//                           ", partition: " + m_partitionId +
-//                           " : data payload bytes: " + ttllength);
+        m_logger.trace("Poller: table: " + m_tableName +
+                       ", partition: " + m_partitionId +
+                       " : data payload bytes: " + ttllength);
 
         // a stream block prefix of 0 also means empty queue.
         if (ttllength == 0) {

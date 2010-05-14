@@ -26,10 +26,12 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 
+import org.apache.log4j.Logger;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
 import org.voltdb.types.TimestampType;
+import org.voltdb.utils.VoltLoggerFactory;
 import org.voltdb.utils.CSVEscaperUtil.Escaper;
 import org.voltdb.utils.CSVEscaperUtil.CSVEscaper;
 import org.voltdb.utils.CSVEscaperUtil.TSVEscaper;
@@ -50,6 +52,10 @@ import org.voltdb.utils.CSVEscaperUtil.TSVEscaper;
 
 public class ExportToFileClient extends ExportClientBase
 {
+    private static final Logger m_logger =
+        Logger.getLogger(ExportClientBase.class.getName(),
+                         VoltLoggerFactory.instance());
+
     private Escaper m_escaper;
     private String m_nonce;
     private File m_outDir;
@@ -71,27 +77,27 @@ public class ExportToFileClient extends ExportClientBase
             // Create the output file for this table
             String filename =
                 nonce + "-" + source.tableName() + "." + escaper.getExtension();
-            System.out.println("Opening filename " + filename);
+            m_logger.info("Opening filename " + filename);
             m_outFile = new File(outdir.getPath() + File.separator + filename);
             boolean fail = false;
             try {
                 if (!m_outFile.createNewFile()) {
-                    System.err.println("Error: Failed to create output file " +
-                                       m_outFile.getPath() + " for table " +
-                                       source.tableName() +
-                                       "\n File already exists");
+                    m_logger.error("Error: Failed to create output file " +
+                                   m_outFile.getPath() + " for table " +
+                                   source.tableName() +
+                                   ": File already exists");
                     fail = true;
                 }
             } catch (IOException e) {
-                System.err.println(e.getMessage());
-                System.err.println("Error: Failed to create output file " +
-                                   m_outFile.getPath() + " for table " +
-                                   source.tableName());
+                m_logger.error(e.getMessage());
+                m_logger.error("Error: Failed to create output file " +
+                               m_outFile.getPath() + " for table " +
+                               source.tableName());
                 fail = true;
             }
             if (fail)
             {
-                System.err.println("Ha, writing to /dev/null");
+                m_logger.error("Ha, writing to /dev/null");
                 m_outFile = new File("/dev/null");
             }
             try
@@ -100,9 +106,9 @@ public class ExportToFileClient extends ExportClientBase
             }
             catch (FileNotFoundException e)
             {
-                System.err.println("Unable to open output file...");
-                e.printStackTrace();
-                throw new RuntimeException("Unable to open output file...");
+                String msg = "Unable to open output file: " + filename;
+                m_logger.fatal(msg);
+                throw new RuntimeException(msg);
             }
         }
 
@@ -116,8 +122,8 @@ public class ExportToFileClient extends ExportClientBase
             }
             catch (IOException e)
             {
-                System.err.println("Unable to decode row for table: " +
-                                   m_source.tableName());
+                m_logger.error("Unable to decode row for table: " +
+                               m_source.tableName());
                 return false;
             }
 
@@ -357,7 +363,7 @@ public class ExportToFileClient extends ExportClientBase
             client.connectToELServers(user, password);
         }
         catch (IOException e) {
-            System.err.println("Unable to connect to VoltDB servers for export");
+            m_logger.fatal("Unable to connect to VoltDB servers for export");
             System.exit(-1);
         }
         client.run();

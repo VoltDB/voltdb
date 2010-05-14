@@ -21,13 +21,19 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.*;
 
+import org.apache.log4j.Logger;
+
 import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
+import org.voltdb.utils.VoltLoggerFactory;
 
 /**
  * Provides an extensible base class for writing ELT clients
  */
 
 public abstract class ExportClientBase implements Runnable {
+    private static final Logger m_logger =
+        Logger.getLogger(ExportClientBase.class.getName(),
+                         VoltLoggerFactory.instance());
 
     private List<InetSocketAddress> m_servers = null;
     protected HashMap<String, ExportConnection> m_elConnections;
@@ -64,8 +70,8 @@ public abstract class ExportClientBase implements Runnable {
         {
             // Construct the app-specific decoder supplied by subclass
             // and build an ELDataSink for this data source
-            System.out.println("Creating decoder for table: " + source.tableName() +
-                               ", part ID: " + source.partitionId());
+            m_logger.info("Creating decoder for table: " + source.tableName() +
+                          ", part ID: " + source.partitionId());
             // Put the ELDataSink in our hashed collection if it doesn't exist
             ExportDataSink sink = null;
             int table_id = source.tableId();
@@ -103,7 +109,7 @@ public abstract class ExportClientBase implements Runnable {
     {
         if (m_servers == null || m_servers.size() == 0)
         {
-            System.out.println("No servers provided for ELT, exiting...");
+            m_logger.fatal("No servers provided for ELT, exiting...");
             throw new RuntimeException("No servers provided for ELT connection");
         }
         for (InetSocketAddress server_addr : m_servers)
@@ -135,8 +141,8 @@ public abstract class ExportClientBase implements Runnable {
         {
             if (!m_elConnections.get(el_connection).isConnected())
             {
-                System.err.println("Lost connection: " + el_connection);
-                System.err.println("Closing...");
+                m_logger.error("Lost connection: " + el_connection +
+                               ", Closing...");
                 retval = false;
             }
         }

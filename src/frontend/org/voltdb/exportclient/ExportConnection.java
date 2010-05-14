@@ -25,16 +25,22 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Queue;
 
+import org.apache.log4j.Logger;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.elt.ELTProtoMessage;
 import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
 import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.utils.VoltLoggerFactory;
 
 /**
  * Manage the connection to the server's EL port
  */
 
 public class ExportConnection implements Runnable {
+
+    private static final Logger m_logger =
+        Logger.getLogger(ExportDataSink.class.getName(),
+                         VoltLoggerFactory.instance());
 
     static final private int CLOSED = 0;
     static final private int CONNECTING = 1;
@@ -71,7 +77,7 @@ public class ExportConnection implements Runnable {
      */
     public void openELTConnection() throws IOException
     {
-        System.out.println("Starting EL Client socket to: " + m_connectionName);
+        m_logger.info("Starting EL Client socket to: " + m_connectionName);
         Object[] cxndata =
             ConnectionUtil.
             getAuthenticatedExportConnection(m_serverAddr.getHostName(),
@@ -162,7 +168,7 @@ public class ExportConnection implements Runnable {
             try {
                 m = nextMessage();
             } catch (IOException e) {
-                System.err.println("Socket error: " + e.getMessage());
+                m_logger.error("Socket error: " + e.getMessage());
                 m_state = CLOSING;
             }
 
@@ -219,7 +225,7 @@ public class ExportConnection implements Runnable {
 
     private void open() throws IOException
     {
-        System.out.println("Opening new EL stream connection.");
+        m_logger.info("Opening new EL stream connection.");
         ELTProtoMessage m = new ELTProtoMessage(-1, -1);
         m.open();
         sendMessage(m);
@@ -241,8 +247,8 @@ public class ExportConnection implements Runnable {
             if (lengthBuffer.position() != 0)
             {
                 // XXX don't deal with partial reads for now
-                System.out.println("Can't handle partial length read: " +
-                                   lengthBuffer.position());
+                m_logger.fatal("Can't handle partial length read: " +
+                               lengthBuffer.position());
                 System.exit(1);
             }
             return null;
