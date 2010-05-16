@@ -160,7 +160,8 @@ public class ClientVoter {
   
         for (String thisServer : voltServers) {
             try {
-                System.out.printf("Connecting to server: %s\n",thisServer);
+                thisServer = thisServer.trim();
+                System.out.printf("Connecting to server: '%s'\n",thisServer);
 
                 voltclient.createConnection(thisServer, "program", "none");
             } catch (IOException e) {
