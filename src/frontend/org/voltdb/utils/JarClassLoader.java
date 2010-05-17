@@ -65,7 +65,7 @@ public class JarClassLoader extends ClassLoader {
         }
 
         // default to parent
-        System.out.println("deferring to parent.");
+        //System.out.println("deferring to parent.");
         return getParent().loadClass(className);
     }
 
