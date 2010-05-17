@@ -904,9 +904,9 @@ public class VoltCompiler {
                     continue;
                 }
 
-                org.voltdb.catalog.ConnectorTableInfo cattable = catconn.getTableinfo().add(i.toString());
-                cattable.setAppendonly(xmltable.isExportonly());
-                cattable.setTable(tableref);
+                org.voltdb.catalog.ConnectorTableInfo connTableInfo = catconn.getTableinfo().add(i.toString());
+                connTableInfo.setAppendonly(xmltable.isExportonly());
+                connTableInfo.setTable(tableref);
                 ++i;
             }
         }

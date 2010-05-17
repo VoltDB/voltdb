@@ -51,7 +51,6 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.regressionsuites.saverestore.CatalogChangeSingleProcessServer;
 import org.voltdb.regressionsuites.saverestore.SaveRestoreTestProjectBuilder;
-import org.voltdb.types.TimestampType;
 import org.voltdb.utils.SnapshotConverter;
 import org.voltdb.utils.SnapshotVerifier;
 

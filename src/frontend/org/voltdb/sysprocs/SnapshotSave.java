@@ -484,8 +484,6 @@ public class SnapshotSave extends VoltSystemProcedure
         return results;
     }
 
-    // XXX this could maybe move to be a method on
-    // SystemProcedureExecutionContext?
     private final List<Table>
     getTablesToSave(SystemProcedureExecutionContext context)
     {
@@ -493,16 +491,13 @@ public class SnapshotSave extends VoltSystemProcedure
         ArrayList<Table> my_tables = new ArrayList<Table>();
         for (Table table : all_tables)
         {
-            // We're responsible for saving any table that isn't replicated and
-            // all the replicated tables if we're the lowest site ID on our host
-            // Also, we ignore all materialized tables as those should get
-            // regenerated when we restore
-            // NOTE: this assumes that all partitioned tables have partitions on
-            // all execution sites.
-            if (table.getMaterializer() == null)
+            // Make a list of all non-materialized, non-export only tables
+            if ((table.getMaterializer() != null) ||
+                (CatalogUtil.isTableExportOnly(context.getDatabase(), table)))
             {
-                    my_tables.add(table);
+                continue;
             }
+            my_tables.add(table);
         }
         return my_tables;
     }

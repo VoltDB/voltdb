@@ -310,4 +310,34 @@ public abstract class CatalogUtil {
 
         return ret;
     }
+
+    /**
+     * Return true if a table is a streamed / export-only table
+     * This function is duplicated in CatalogUtil.h
+     * @param database
+     * @param table
+     * @return true if a table is export-only or false otherwise
+     */
+    public static boolean isTableExportOnly(org.voltdb.catalog.Database database,
+                                            org.voltdb.catalog.Table table)
+    {
+        // no export, no export only tables
+        if (database.getConnectors().size() == 0) {
+            return false;
+        }
+
+        // there is one well-known-named connector
+        org.voltdb.catalog.Connector connector = database.getConnectors().get("0");
+
+        // iterate the connector tableinfo list looking for tableIndex
+        // tableInfo has a reference to a table - can compare the reference
+        // to the desired table by looking at the relative index. ick.
+        for (org.voltdb.catalog.ConnectorTableInfo tableInfo : connector.getTableinfo()) {
+            if (tableInfo.getTable().getRelativeIndex() == table.getRelativeIndex()) {
+                return tableInfo.getAppendonly();
+            }
+        }
+        return false;
+    }
+
 }

@@ -23,7 +23,7 @@
 
 package org.voltdb.regressionsuites;
 
-import java.io.IOException;
+import java.io.*;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
@@ -41,6 +41,7 @@ import org.voltdb.regressionsuites.sqltypesprocs.Delete;
 import org.voltdb.regressionsuites.sqltypesprocs.Insert;
 import org.voltdb.regressionsuites.sqltypesprocs.RollbackInsert;
 import org.voltdb.regressionsuites.sqltypesprocs.Update_ELT;
+import org.voltdb.utils.SnapshotVerifier;
 
 /**
  *  End to end ELT tests using the RawProcessor and the ELSinkServer.
@@ -415,7 +416,6 @@ public class TestExportSuite extends RegressionSuite {
         assertTrue(passed);
     }
 
-
     /**
      * Verify round trips of updates to a persistent table.
      */
@@ -488,9 +488,6 @@ public class TestExportSuite extends RegressionSuite {
     /**
      * Multi-table test
      */
-    /**
-     * Verify round trips of updates to a persistent table.
-     */
     public void testELTMultiTable() throws IOException, ProcCallException, InterruptedException
     {
         final Client client = getClient();
@@ -509,6 +506,53 @@ public class TestExportSuite extends RegressionSuite {
             client.callProcedure("Insert", params);
         }
         quiesceAndVerify(client, m_tester);
+    }
+
+    /*
+     * Verify that snapshot can be enabled with a streamed table present
+     */
+    public void testELTPlusSnapshot() throws IOException, ProcCallException {
+        final Client client = getClient();
+        for (int i=0; i < 10; i++) {
+            // add data to a first (persistent) table
+            Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata);
+            client.callProcedure("Insert", params);
+
+            // add data to a second (streaming) table.
+            rowdata = TestSQLTypesSuite.m_defaultValues;
+            m_tester.addRow("NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            params = convertValsToParams("NO_NULLS", i, rowdata);
+            client.callProcedure("Insert", params);
+        }
+        // this blocks until the snapshot is complete
+        client.callProcedure("@SnapshotSave", "/tmp", "testELTPlusSnapshot", (byte)1).getResults();
+
+        // verify. copped from TestSaveRestoreSysprocSuite
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PrintStream ps = new PrintStream(baos);
+        PrintStream original = System.out;
+        try {
+            System.setOut(ps);
+            String args[] = new String[] {
+                    "testELTPlusSnapshot",
+                    "--dir",
+                    "/tmp"
+            };
+            SnapshotVerifier.main(args);
+            ps.flush();
+            String reportString = baos.toString("UTF-8");
+            assertTrue(reportString.startsWith("Snapshot valid\n"));
+        } catch (UnsupportedEncodingException e) {}
+        finally {
+            System.setOut(original);
+        }
+
+        // verify the el data
+        quiesceAndVerify(client, m_tester);
+
+
     }
 
 
