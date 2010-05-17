@@ -169,6 +169,7 @@ public class ExportToFileClient extends ExportClientBase
             try
             {
                 m_fos.write(bytes);
+                m_fos.flush();
             }
             catch (IOException e)
             {
