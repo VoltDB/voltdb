@@ -53,7 +53,7 @@ import org.voltdb.utils.CSVEscaperUtil.TSVEscaper;
 public class ExportToFileClient extends ExportClientBase
 {
     private static final Logger m_logger =
-        Logger.getLogger(ExportClientBase.class.getName(),
+        Logger.getLogger("ExportToFileClient",
                          VoltLoggerFactory.instance());
 
     private Escaper m_escaper;

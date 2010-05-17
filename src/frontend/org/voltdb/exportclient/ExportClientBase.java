@@ -32,7 +32,7 @@ import org.voltdb.utils.VoltLoggerFactory;
 
 public abstract class ExportClientBase implements Runnable {
     private static final Logger m_logger =
-        Logger.getLogger(ExportClientBase.class.getName(),
+        Logger.getLogger("ExportClient",
                          VoltLoggerFactory.instance());
 
     private List<InetSocketAddress> m_servers = null;

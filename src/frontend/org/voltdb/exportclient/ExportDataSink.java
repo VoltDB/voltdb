@@ -30,7 +30,7 @@ import org.voltdb.utils.VoltLoggerFactory;
 public class ExportDataSink implements Runnable
 {
     private static final Logger m_logger =
-        Logger.getLogger(ExportDataSink.class.getName(),
+        Logger.getLogger("ExportClient",
                          VoltLoggerFactory.instance());
 
     private int m_tableId = -1;

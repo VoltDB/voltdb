@@ -39,7 +39,7 @@ import org.voltdb.utils.VoltLoggerFactory;
 public class ExportConnection implements Runnable {
 
     private static final Logger m_logger =
-        Logger.getLogger(ExportDataSink.class.getName(),
+        Logger.getLogger("ExportClient",
                          VoltLoggerFactory.instance());
 
     static final private int CLOSED = 0;
