@@ -636,7 +636,8 @@ TEST_F(TupleStreamWrapperTest, SimpleRelease)
 }
 
 /**
- * Test that attempting to release uncommitted bytes fails
+ * Test that attempting to release uncommitted bytes only returns what
+ * is committed
  */
 TEST_F(TupleStreamWrapperTest, ReleaseUncommitted)
 {
@@ -647,33 +648,40 @@ TEST_F(TupleStreamWrapperTest, ReleaseUncommitted)
     EXPECT_EQ(results->offset(), 0);
     EXPECT_EQ(results->unreleasedSize(), 0);
 
-    for (int i = 1; i < 10; i++)
+    // Add some committed tuples
+    for (int i = 1; i < 4; i++)
     {
         appendTuple(i-1, i);
     }
-    m_wrapper->periodicFlush(-1, 0, 9, 9);
 
     // now, add some uncommitted data
-    for (int i = 10; i < 20; i++)
+    for (int i = 4; i < 10; i++)
     {
-        appendTuple(9, 10);
+        appendTuple(3, 4);
     }
 
-    // release the first buffer
-    bool released = m_wrapper->releaseEltBytes((MAGIC_TUPLE_SIZE * 9));
+    // release part of the committed data
+    bool released = m_wrapper->releaseEltBytes((MAGIC_TUPLE_SIZE * 2));
     EXPECT_TRUE(released);
 
-    // now try to release the second, uncommitted tuples
-    released = m_wrapper->releaseEltBytes((MAGIC_TUPLE_SIZE * 19));
-    EXPECT_FALSE(released);
+    // now try to release everything
+    released = m_wrapper->releaseEltBytes((MAGIC_TUPLE_SIZE * 10));
+    EXPECT_TRUE(released);
 
-    // now, commit them and make sure they still exist
+    // now, poll and verify that we have moved to the end of the committed data
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * 3));
+    EXPECT_EQ(results->unreleasedUso(), (MAGIC_TUPLE_SIZE * 3));
+    EXPECT_EQ(results->offset(), 0);
+    EXPECT_EQ(results->unreleasedSize(), 0);
+
+    // now, commit everything and make sure we get the long transaction
     m_wrapper->periodicFlush(-1, 0, 19, 19);
     results = m_wrapper->getCommittedEltBytes();
-    EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * 9));
-    EXPECT_EQ(results->unreleasedUso(), (MAGIC_TUPLE_SIZE * 9));
-    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 10));
-    EXPECT_EQ(results->unreleasedSize(), (MAGIC_TUPLE_SIZE * 10));
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->unreleasedUso(), (MAGIC_TUPLE_SIZE * 3));
+    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 9));
+    EXPECT_EQ(results->unreleasedSize(), (MAGIC_TUPLE_SIZE * 6));
 }
 
 /**

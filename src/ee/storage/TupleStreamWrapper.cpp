@@ -388,17 +388,18 @@ TupleStreamWrapper::getCommittedEltBytes()
 bool
 TupleStreamWrapper::releaseEltBytes(int64_t releaseOffset)
 {
-    // if released offset is in the uncommitted bytes, return an error
-    if (releaseOffset > m_committedUso)
-    {
-        return false;
-    }
-
     // if released offset is in an already-released past, just return success
     if ((m_pendingBlocks.empty() && releaseOffset < m_currBlock->uso()) ||
         (!m_pendingBlocks.empty() && releaseOffset < m_pendingBlocks.front()->uso()))
     {
         return true;
+    }
+
+    // if released offset is in the uncommitted bytes, then set up
+    // to release everything that is committed
+    if (releaseOffset > m_committedUso)
+    {
+        releaseOffset = m_committedUso;
     }
 
     bool retval = false;
