@@ -1,28 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
-	<classpathentry kind="src" path="examples/auction/procedures"/>
-	<classpathentry kind="src" path="examples/auction/src"/>
-	<classpathentry kind="src" path="src/frontend"/>
-	<classpathentry kind="src" path="src/hsqldb19b3"/>
-	<classpathentry excluding="edu/mit/net/" kind="src" path="tests/frontend"/>
-	<classpathentry kind="src" path="tests/hsqldb"/>
-	<classpathentry excluding="ca/" kind="src" path="third_party/java/src"/>
-	<classpathentry kind="lib" path="third_party/java/jars/ant_doxygen.jar"/>
-	<classpathentry kind="lib" path="third_party/java/jars/ant-junit.jar"/>
-	<classpathentry kind="lib" path="third_party/java/jars/ant.jar"/>
-	<classpathentry kind="lib" path="third_party/java/jars/emma_ant.jar"/>
-	<classpathentry kind="lib" path="third_party/java/jars/emma.jar"/>
-	<classpathentry kind="lib" path="third_party/java/jars/junit-4.4.jar"/>
-	<classpathentry kind="lib" path="third_party/java/jars/japex.jar"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER">
-		<attributes>
-                        <!-- Update the directory value to reflect
-			your top-level project directory name, then
-			copy it to .classpath -->
-			<attribute name="org.eclipse.jdt.launching.CLASSPATH_ATTR_LIBRARY_PATH_ENTRY"
-				   value="trunk/obj/release/nativelibs"/>
-		</attributes>
-	</classpathentry>
+    <classpathentry kind="src" path="examples/auction/procedures"/>
+    <classpathentry kind="src" path="examples/auction/src"/>
+    <classpathentry kind="src" path="src/frontend"/>
+    <classpathentry kind="src" path="src/hsqldb19b3"/>
+    <classpathentry excluding="edu/mit/net/" kind="src" path="tests/frontend"/>
+    <classpathentry kind="src" path="tests/hsqldb"/>
+    <classpathentry excluding="ca/" kind="src" path="third_party/java/src"/>
+    <classpathentry kind="lib" path="third_party/java/jars/ant_doxygen.jar"/>
+    <classpathentry kind="lib" path="third_party/java/jars/ant-junit.jar"/>
+    <classpathentry kind="lib" path="third_party/java/jars/ant.jar"/>
+    <classpathentry kind="lib" path="third_party/java/jars/emma_ant.jar"/>
+    <classpathentry kind="lib" path="third_party/java/jars/emma.jar"/>
+    <classpathentry kind="lib" path="third_party/java/jars/junit-4.8.2.jar"/>
+    <classpathentry kind="lib" path="third_party/java/jars/japex.jar"/>
+    <classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER">
+        <attributes>
+            <!-- Update the directory value to reflect
+            your top-level project directory name, then
+            copy it to .classpath -->
+            <attribute name="org.eclipse.jdt.launching.CLASSPATH_ATTR_LIBRARY_PATH_ENTRY"
+                   value="trunk/obj/release/nativelibs"/>
+        </attributes>
+    </classpathentry>
         <classpathentry kind="lib" path="third_party/java/obj"/>
-	<classpathentry kind="output" path="obj/eclipse"/>
+    <classpathentry kind="output" path="obj/eclipse"/>
 </classpath>
