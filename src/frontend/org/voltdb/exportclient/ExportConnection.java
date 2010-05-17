@@ -172,9 +172,15 @@ public class ExportConnection implements Runnable {
                 m_state = CLOSING;
             }
 
-            if (m != null &&m.isError())
+            if (m != null && m.isError())
             {
                 // XXX handle error from server, just die for now
+                m_state = CLOSING;
+            }
+
+            // eltxxx need better error handling code in here
+            if (!m_socket.isConnected() || !m_socket.isOpen())
+            {
                 m_state = CLOSING;
             }
 
@@ -184,7 +190,7 @@ public class ExportConnection implements Runnable {
                 rx_sink.getRxQueue(m_connectionName).offer(m);
             }
         }
-        while (m != null);
+        while (m_state == CONNECTED && m != null);
 
         // service all the ELDataSink TX queues
         for (HashMap<Integer, ExportDataSink> part_map : m_sinks.values())
@@ -240,18 +246,38 @@ public class ExportConnection implements Runnable {
         {
             bytes_read = m_socket.read(lengthBuffer);
         }
-        while (lengthBuffer.hasRemaining() && bytes_read != 0);
+        while (lengthBuffer.hasRemaining() && bytes_read > 0);
+
+        if (bytes_read < 0)
+        {
+            // Socket closed, try to bail out
+            m_state = CLOSING;
+            return null;
+        }
 
         if (bytes_read == 0)
         {
-            if (lengthBuffer.position() != 0)
+            if (lengthBuffer.position() != 0 && m_socket.isConnected())
             {
-                // XXX don't deal with partial reads for now
-                m_logger.fatal("Can't handle partial length read: " +
-                               lengthBuffer.position());
-                System.exit(1);
+                // we're committed now, baby
+                do
+                {
+                    bytes_read = m_socket.read(lengthBuffer);
+                }
+                while (lengthBuffer.hasRemaining() && bytes_read >= 0);
+
+                if (bytes_read < 0)
+                {
+                    //  Socket closed, try to bail out
+                    m_state = CLOSING;
+                    return null;
+                }
             }
-            return null;
+            else
+            {
+                // non-blocking case
+                return null;
+            }
         }
 
         lengthBuffer.flip();
@@ -259,9 +285,16 @@ public class ExportConnection implements Runnable {
         ByteBuffer messageBuf = ByteBuffer.allocate(length);
         do
         {
-            m_socket.read(messageBuf);
+            bytes_read = m_socket.read(messageBuf);
         }
-        while (messageBuf.remaining() > 0);
+        while (messageBuf.remaining() > 0 && bytes_read >= 0);
+
+        if (bytes_read < 0)
+        {
+            //  Socket closed, try to bail out
+            m_state = CLOSING;
+            return null;
+        }
         messageBuf.flip();
         fds = new FastDeserializer(messageBuf);
         ELTProtoMessage m = ELTProtoMessage.readExternal(fds);
