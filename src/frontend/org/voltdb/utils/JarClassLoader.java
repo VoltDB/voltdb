@@ -17,9 +17,14 @@
 
 package org.voltdb.utils;
 
-import java.io.*;
-import java.util.*;
-import java.util.jar.*;
+import java.io.File;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.jar.JarEntry;
+import java.util.jar.JarInputStream;
 
 public class JarClassLoader extends ClassLoader {
     final Map<String, Class<?>> m_cache = new HashMap<String, Class<?>>();
@@ -33,12 +38,12 @@ public class JarClassLoader extends ClassLoader {
 
     @Override
     public synchronized Class<?> loadClass(String className) throws ClassNotFoundException {
-        System.out.printf("Loading %s... ", className);
+        //System.out.printf("Loading %s... ", className);
 
         // try the fast cache first
         Class<?> result;
         if (m_cache.containsKey(className)) {
-            System.out.println("found in cache.");
+            //System.out.println("found in cache.");
             return m_cache.get(className);
         }
 
@@ -46,7 +51,7 @@ public class JarClassLoader extends ClassLoader {
         if (m_classNames.contains(className)) {
             String classPath = className.replace('.', File.separatorChar) + ".class";
 
-            System.out.println("loading from jar.");
+            //System.out.println("loading from jar.");
 
             byte bytes[] = JarReader.readFileFromJarAtURL(m_jarFilePath, classPath);
             if (bytes == null)
