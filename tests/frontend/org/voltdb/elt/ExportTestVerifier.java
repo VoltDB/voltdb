@@ -86,14 +86,15 @@ class ExportTestVerifier extends ExportDecoderBase
         try {
             Object[] decoded = decodeRow(rowData);
             // iterate the schema, verify the row data
-            // skip 6 cols into the ELT schema since it includes the ELT columns
-            // but then we need to back up the index into srcdata.
-            for (int i = 6; i < m_tableSchema.size(); i++)
+            // skip 5 cols into the ELT schema since it includes the ELT columns
+            // (we check the operation type), but then we need to back up the
+            // index into srcdata.
+            for (int i = 5; i < m_tableSchema.size(); i++)
             {
-                if (!(decoded[i].equals(srcdata[i-6])))
+                if (!(decoded[i].equals(srcdata[i-5])))
                 {
-                    System.out.println("Failed on table column: " + (i-6));
-                    System.out.println("  orig value:" + srcdata[i-6].toString());
+                    System.out.println("Failed on table column: " + (i-5));
+                    System.out.println("  orig value:" + srcdata[i-5].toString());
                     System.out.println("  elt value:" + decoded[i].toString());
                     m_rowFailed = true;
                 }

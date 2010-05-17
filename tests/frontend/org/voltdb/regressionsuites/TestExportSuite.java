@@ -67,7 +67,18 @@ public class TestExportSuite extends RegressionSuite {
     }
 
     /** Push pkey into expected row data */
-    private Object[] convertValsToRow(final int i, final Object[] rowdata) {
+    private Object[] convertValsToRow(final int i, final char op,
+                                      final Object[] rowdata) {
+        final Object[] row = new Object[rowdata.length + 2];
+        row[0] = (byte)(op == 'I' ? 1 : 0);
+        row[1] = i;
+        for (int ii=0; ii < rowdata.length; ++ii)
+            row[ii+2] = rowdata[ii];
+        return row;
+    }
+
+    /** Push pkey into expected row data */
+    private Object[] convertValsToLoaderRow(final int i, final Object[] rowdata) {
         final Object[] row = new Object[rowdata.length + 1];
         row[0] = i;
         for (int ii=0; ii < rowdata.length; ++ii)
@@ -130,7 +141,7 @@ public class TestExportSuite extends RegressionSuite {
         final Client client = getClient();
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, rowdata));
+            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, 'I', rowdata));
 
             final Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
@@ -157,7 +168,7 @@ public class TestExportSuite extends RegressionSuite {
             // register only even rows with tester
             if ((i % 2) == 0)
             {
-                m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, rowdata));
+                m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, 'I', rowdata));
             }
             final Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
@@ -172,7 +183,7 @@ public class TestExportSuite extends RegressionSuite {
 
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, rowdata));
+            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, 'I', rowdata));
             final Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata);
             // Only do the first 7 inserts
             if (i < 7)
@@ -191,7 +202,7 @@ public class TestExportSuite extends RegressionSuite {
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
             // add wrong pkeys on purpose!
-            m_tester.addRow("ALLOW_NULLS", i + 10, convertValsToRow(i+10, rowdata));
+            m_tester.addRow("ALLOW_NULLS", i + 10, convertValsToRow(i+10, 'I', rowdata));
             final Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
         }
@@ -208,7 +219,7 @@ public class TestExportSuite extends RegressionSuite {
 
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_tester.addRow("NO_NULLS", i, convertValsToRow(i, rowdata));
+            m_tester.addRow("NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
             final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
         }
@@ -278,7 +289,7 @@ public class TestExportSuite extends RegressionSuite {
                 } while (!done);
             }
             else {
-                m_tester.addRow("ALLOW_NULLS", pkey, convertValsToRow(pkey, rowdata));
+                m_tester.addRow("ALLOW_NULLS", pkey, convertValsToRow(pkey, 'I', rowdata));
                 // the sync call back isn't synchronous if it isn't explicitly blocked on...
                 boolean done;
                 do {
@@ -310,9 +321,9 @@ public class TestExportSuite extends RegressionSuite {
 
         for (int i=0; i < 100; i++) {
             if (addToVerifier) {
-                tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, TestSQLTypesSuite.m_midValues));
+                tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, 'I', TestSQLTypesSuite.m_midValues));
             }
-            loadTable.addRow(convertValsToRow(i, TestSQLTypesSuite.m_midValues));
+            loadTable.addRow(convertValsToLoaderRow(i, TestSQLTypesSuite.m_midValues));
         }
         return loadTable;
     }
@@ -415,7 +426,7 @@ public class TestExportSuite extends RegressionSuite {
         // insert
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, rowdata));
+            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, 'I', rowdata));
             final Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
         }
@@ -423,7 +434,7 @@ public class TestExportSuite extends RegressionSuite {
         for (int i=0; i < 10; i++) {
             // add the full 'D' row
             Object[] rowdata_d = TestSQLTypesSuite.m_midValues;
-            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, rowdata_d));
+            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, 'D', rowdata_d));
 
             // perform the delete
             client.callProcedure("Delete", "ALLOW_NULLS", i);
@@ -441,7 +452,7 @@ public class TestExportSuite extends RegressionSuite {
         // insert
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, rowdata));
+            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, 'I', rowdata));
             final Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
         }
@@ -450,11 +461,11 @@ public class TestExportSuite extends RegressionSuite {
         for (int i=0; i < 10; i++) {
             // add the 'D' row
             Object[] rowdata_d = TestSQLTypesSuite.m_midValues;
-            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, rowdata_d));
+            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, 'D', rowdata_d));
 
             // calculate the update and add that to the m_tester
             Object[] rowdata_i = TestSQLTypesSuite.m_defaultValues;
-            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i,rowdata_i));
+            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, 'I', rowdata_i));
 
             // perform the update
             final Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata_i);
@@ -465,7 +476,7 @@ public class TestExportSuite extends RegressionSuite {
         for (int i=0; i < 10; i++) {
             // add the full 'D' row
             Object[] rowdata_d = TestSQLTypesSuite.m_defaultValues;
-            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, rowdata_d));
+            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, 'D', rowdata_d));
 
             // perform the delete
             client.callProcedure("Delete", "ALLOW_NULLS", i);
@@ -487,13 +498,13 @@ public class TestExportSuite extends RegressionSuite {
         for (int i=0; i < 10; i++) {
             // add data to a first (persistent) table
             Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, rowdata));
+            m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, 'I', rowdata));
             Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
 
             // add data to a second (streaming) table.
             rowdata = TestSQLTypesSuite.m_defaultValues;
-            m_tester.addRow("NO_NULLS", i, convertValsToRow(i, rowdata));
+            m_tester.addRow("NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
             params = convertValsToParams("NO_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
         }
