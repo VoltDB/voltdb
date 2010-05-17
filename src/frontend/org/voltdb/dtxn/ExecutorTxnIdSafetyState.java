@@ -119,7 +119,10 @@ public class ExecutorTxnIdSafetyState {
             return;
 
         SiteState ss = m_stateBySite.get(executorSiteId);
-        assert(ss != null);
+        // when a dead host is detected, the sites reside on that host are
+        // removed. So site state returned will be null.
+        if (ss == null)
+            return;
         assert(ss.siteId == executorSiteId);
 
         // check if state needs changing
