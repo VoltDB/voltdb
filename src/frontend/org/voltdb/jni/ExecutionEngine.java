@@ -354,15 +354,15 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     /**
      * Execute an ELT action against the execution engine.
-     * @param mAckAction true if this message instructs an ack.
-     * @param mPollAction true if this message instructs a poll.
-     * @param mAckTxnId if an ack, the transaction id being acked
-     * @param mTableId the table being polled or acked.
+     * @param ackAction true if this message instructs an ack.
+     * @param pollAction true if this message instructs a poll.
+     * @param ackTxnId if an ack, the transaction id being acked
+     * @param tableId the table being polled or acked.
      * @return the response ELTMessage
      */
     public abstract ELTProtoMessage eltAction(
-            boolean mAckAction, boolean mPollAction,
-            long mAckTxnId, int partitionId, int mTableId);
+            boolean ackAction, boolean pollAction, boolean resetAction,
+            long ackTxnId, int partitionId, int tableId);
 
 
     /*
@@ -603,8 +603,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     protected native long nativeELTAction(
             long pointer,
-            boolean mAckAction, boolean mPollAction,
-            long mAckOffset, int mTableId);
-
-
+            boolean ackAction,
+            boolean pollAction,
+            boolean resetAction,
+            long mAckOffset,
+            int mTableId);
 }

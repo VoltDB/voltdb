@@ -1285,14 +1285,15 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public ELTProtoMessage eltAction(boolean mAckAction, boolean mPollAction,
-            long mAckTxnId, int partitionId, int mTableId) {
+    public ELTProtoMessage eltAction(boolean ackAction, boolean pollAction,
+            boolean resetAction, long ackOffset, int partitionId, int mTableId) {
         try {
             m_data.clear();
             m_data.putInt(Commands.ELTAction.m_id);
-            m_data.putInt(mAckAction ? 1 : 0);
-            m_data.putInt(mPollAction ? 1 : 0);
-            m_data.putLong(mAckTxnId);
+            m_data.putInt(ackAction ? 1 : 0);
+            m_data.putInt(pollAction ? 1 : 0);
+            m_data.putInt(resetAction ? 1 : 0);
+            m_data.putLong(ackOffset);
             m_data.putInt(mTableId);
             m_data.flip();
             m_connection.write();
@@ -1311,7 +1312,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             data.flip();
 
             ELTProtoMessage reply = null;
-            if (mPollAction) {
+            if (pollAction) {
                 reply = new ELTProtoMessage(partitionId, mTableId);
                 reply.pollResponse(result_offset, data);
             }

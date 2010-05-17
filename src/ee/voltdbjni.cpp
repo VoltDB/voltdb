@@ -1127,6 +1127,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeELTA
    jlong engine_ptr,
    jboolean ackAction,
    jboolean pollAction,
+   jboolean resetAction,
    jlong ackOffset,
    jint tableId) {
     VOLT_DEBUG("nativeELTAction in C++ called");
@@ -1135,7 +1136,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeELTA
     try {
         try {
             engine->resetReusedResultOutputBuffer();
-            return engine->eltAction(ackAction, pollAction, ackOffset, tableId);
+            return engine->eltAction(ackAction, pollAction, resetAction, ackOffset, tableId);
         } catch (SQLException e) {
             throwFatalException("%s", e.message().c_str());
         }

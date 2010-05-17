@@ -182,6 +182,7 @@ class PersistentTable : public Table {
     virtual void flushOldTuples(int64_t timeInMillis);
     virtual StreamBlock* getCommittedEltBytes();
     virtual bool releaseEltBytes(int64_t releaseOffset);
+    virtual void resetPollMarker();
 
     /** At EE setup time, add the list of views driven from this table */
     void setMaterializedViews(const std::vector<MaterializedViewMetadata*> &views);

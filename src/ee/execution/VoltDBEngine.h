@@ -356,8 +356,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * @return the universal offset for any poll results (results
          * returned separatedly via QueryResults buffer)
          */
-        long eltAction(bool ackAction, bool pollAction, long ackOffset,
-                       int tableId);
+        long eltAction(bool ackAction, bool pollAction, bool resetAction,
+                       long ackOffset, int tableId);
 
     protected:
         /*

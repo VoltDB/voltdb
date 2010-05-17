@@ -166,6 +166,7 @@ typedef struct {
     struct ipc_command cmd;
     int32_t isAck;
     int32_t isPoll;
+    int32_t isReset;
     int64_t offset;
     int32_t tableId;
 }__attribute__((packed)) elt_action;
@@ -995,6 +996,7 @@ void VoltDBIPC::eltAction(struct ipc_command *cmd) {
     m_engine->resetReusedResultOutputBuffer();
     long result = m_engine->eltAction(action->isAck,
                                       action->isPoll,
+                                      action->isReset,
                                       ntohll(action->offset),
                                       ntohl(action->tableId));
     int buflength = m_engine->getResultsSize();

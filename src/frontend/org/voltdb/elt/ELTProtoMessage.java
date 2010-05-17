@@ -115,7 +115,7 @@ public class ELTProtoMessage
      * Note that this expects the length preceding value was already
      * read (probably how the buffer length was originally determined).
      * @param fds
-     * @return
+     * @return new ELTProtoMessage from deserializer contents
      * @throws IOException
      */
     public static ELTProtoMessage readExternal(FastDeserializer fds)

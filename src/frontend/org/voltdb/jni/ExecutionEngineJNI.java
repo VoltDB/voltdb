@@ -499,12 +499,13 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      */
     @Override
     public ELTProtoMessage eltAction(boolean ackAction, boolean pollAction,
-            long ackTxnId, int partitionId, int tableId)
+            boolean resetAction, long ackTxnId, int partitionId, int tableId)
     {
         deserializer.clear();
         ELTProtoMessage result = null;
         try {
-            long offset = nativeELTAction(pointer, ackAction, pollAction, ackTxnId, tableId);
+            long offset = nativeELTAction(pointer, ackAction, pollAction, resetAction,
+                                          ackTxnId, tableId);
             if (offset < 0) {
                 result = new ELTProtoMessage(partitionId, tableId);
                 result.error();

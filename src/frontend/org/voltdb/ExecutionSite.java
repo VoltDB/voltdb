@@ -724,6 +724,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             ELTProtoMessage response =
                 ee.eltAction(eltm.m_m.isAck(),
                              eltm.m_m.isPoll(),
+                             eltm.m_m.isClose(),
                              eltm.m_m.getAckOffset(),
                              eltm.m_m.getPartitionId(),
                              eltm.m_m.getTableId());

@@ -145,6 +145,15 @@ StreamedTable::releaseEltBytes(int64_t releaseOffset)
     return false;
 }
 
+void
+StreamedTable::resetPollMarker()
+{
+    if (m_wrapper)
+    {
+        m_wrapper->resetPollMarker();
+    }
+}
+
 void StreamedTable::undo(size_t mark)
 {
     if (m_wrapper) {

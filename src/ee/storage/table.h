@@ -218,6 +218,13 @@ public:
     }
 
     /**
+     * Reset the elt poll marker
+     */
+    virtual void resetPollMarker() {
+        // default, do nothing.
+    }
+
+    /**
      * Flush tuple stream wrappers. A negative time instructs an
      * immediate flush.
      */

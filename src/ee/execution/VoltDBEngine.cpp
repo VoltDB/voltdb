@@ -1210,8 +1210,8 @@ int VoltDBEngine::cowSerializeMore(ReferenceSerializeOutput *out, const CatalogI
 }
 
 long
-VoltDBEngine::eltAction(bool ackAction, bool pollAction, long ackOffset,
-                        int tableId)
+VoltDBEngine::eltAction(bool ackAction, bool pollAction, bool resetAction,
+                        long ackOffset, int tableId)
 {
     Table* table_for_el = m_tables[tableId];
     if (table_for_el == NULL)
@@ -1225,6 +1225,11 @@ VoltDBEngine::eltAction(bool ackAction, bool pollAction, long ackOffset,
         {
             return -1;
         }
+    }
+
+    // perform resets after acks
+    if (resetAction) {
+        table_for_el->resetPollMarker();
     }
 
     // ack was successful.  Get the next buffer of committed ELT bytes

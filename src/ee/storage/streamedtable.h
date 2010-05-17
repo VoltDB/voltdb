@@ -54,6 +54,7 @@ class StreamedTable : public Table {
     virtual void flushOldTuples(int64_t timeInMillis);
     virtual StreamBlock* getCommittedEltBytes();
     virtual bool releaseEltBytes(int64_t releaseOffset);
+    virtual void resetPollMarker();
 
     virtual std::string tableType() const {
         return "StreamedTable";

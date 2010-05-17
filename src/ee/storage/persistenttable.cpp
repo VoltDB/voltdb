@@ -742,6 +742,15 @@ PersistentTable::releaseEltBytes(int64_t releaseOffset)
     return false;
 }
 
+void
+PersistentTable::resetPollMarker()
+{
+    if (m_exportEnabled && m_wrapper)
+    {
+        m_wrapper->resetPollMarker();
+    }
+}
+
 voltdb::TableStats* PersistentTable::getTableStats() {
     return &stats_;
 }

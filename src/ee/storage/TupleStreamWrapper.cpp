@@ -337,9 +337,11 @@ TupleStreamWrapper::computeOffsets(TableTuple &tuple,
 void
 TupleStreamWrapper::resetPollMarker()
 {
-    StreamBlock *oldest_block = m_pendingBlocks.front();
-    if (oldest_block != NULL) {
-        m_firstUnpolledUso = oldest_block->unreleasedUso();
+    if (m_pendingBlocks.empty() != true) {
+        StreamBlock *oldest_block = m_pendingBlocks.front();
+        if (oldest_block != NULL) {
+            m_firstUnpolledUso = oldest_block->unreleasedUso();
+        }
     }
 }
 

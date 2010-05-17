@@ -140,8 +140,8 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public ELTProtoMessage eltAction(boolean mAckAction, boolean mPollAction,
-            long mAckTxnId, int partitionId, int mTableId) {
+    public ELTProtoMessage eltAction(boolean ackAction, boolean pollAction,
+            boolean resetAction, long ackOffset, int partitionId, int mTableId) {
         // TODO Auto-generated method stub
         return null;
     }
