@@ -95,12 +95,37 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
             m_state = RawProcessor.CLOSED;
         }
 
+        /**
+         * This is the only valid method to transition state to closed
+         * @throws MessagingException
+         */
+        void closeConnection() {
+            m_state = RawProcessor.CLOSED;
+            for (ELTDataSource ds : m_sourcesArray) {
+                ELTProtoMessage m =
+                    new ELTProtoMessage(ds.getPartitionId(), ds.getTableId()).close();
+                try {
+                    ds.eltAction(new ELTInternalMessage(this, m));
+                } catch (Exception e) {
+                    //
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+
+        /**
+         * Produce a protocol error.
+         * @param m message that caused the error
+         * @param string error message
+         * @throws MessagingException
+         */
         void protocolError(ELTProtoMessage m, String string)
         {
             if (m_logger != null) {
                 m_logger.error("Closing ELT connection with error: " + string);
             }
-            m_state = RawProcessor.CLOSED;
+            closeConnection();
+
             final ELTProtoMessage r =
                 new ELTProtoMessage(m.getPartitionId(), m.getTableId());
             r.error();
@@ -197,7 +222,7 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
                     return;
                 }
                 try {
-                    source.poll(new ELTInternalMessage(this, m));
+                    source.eltAction(new ELTInternalMessage(this, m));
                     return;
                 } catch (MessagingException e) {
                     protocolError(m, e.getMessage());
@@ -206,14 +231,14 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
             }
 
             else if (m.isClose()) {
-                // don't respond to close. maybe should set the execution site
-                // state accordingly so that it can re-set its poll point?
-                m_state = RawProcessor.CLOSED;
+                // no  response to CLOSE
+                closeConnection();
                 return;
             }
 
             else if (m.isPollResponse()) {
-                // Forward this response to the IO system.
+                // Forward this response to the IO system. It originated at an
+                // ExecutionSite that processed an eltAction.
                 m_c.writeStream().enqueue(
                     new DeferredSerialization() {
                         @Override

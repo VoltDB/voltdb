@@ -173,7 +173,7 @@ public class TestRawProcessor extends TestCase {
         }
 
         @Override
-        public void poll(RawProcessor.ELTInternalMessage m) throws MessagingException {
+        public void eltAction(RawProcessor.ELTInternalMessage m) throws MessagingException {
             // Simulate what ExecutionEngineJNI and ExecutionSite do.
             if (m.m_m.isPoll()) {
                 ELTProtoMessage r =

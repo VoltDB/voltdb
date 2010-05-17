@@ -122,7 +122,7 @@ public class TestELTDataSource extends TestCase {
         ELTProtoMessage m = new ELTProtoMessage(m_part, table.getRelativeIndex());
         RawProcessor.ELTInternalMessage pair = new RawProcessor.ELTInternalMessage(null, m);
 
-        s.poll(pair);
+        s.eltAction(pair);
 
         assertEquals(m_site, hm.siteId);
         assertEquals(0, hm.mailboxId);

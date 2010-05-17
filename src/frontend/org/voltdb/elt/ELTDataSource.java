@@ -92,10 +92,9 @@ public class ELTDataSource {
 
     /**
      * Obtain next block of data from source
-     * @return next ByteBuffer or null if source is empty.
      * @throws MessagingException
      */
-    public void poll(RawProcessor.ELTInternalMessage m) throws MessagingException {
+    public void eltAction(RawProcessor.ELTInternalMessage m) throws MessagingException {
         VoltDB.instance().getHostMessenger().send(m_siteId, 0, m);
     }
 
