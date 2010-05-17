@@ -897,7 +897,7 @@ TEST CASES
 
 <target name="junit" description="Run testcases for Java classes.">
     <!-- Run the unit tests -->
-    <condition property="timeoutLength" value="${timeoutLength}" else='600000'>
+    <condition property="timeoutLength" value="${timeoutLength}" else='900000'>
         <isset property="timeoutLength"/>
     </condition>
 
