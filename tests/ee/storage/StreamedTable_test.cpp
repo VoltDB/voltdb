@@ -132,10 +132,7 @@ public:
         delete m_tuple;
         if (m_schema)
             TupleSchema::freeTupleSchema(m_schema);
-
-        m_table->cleanupManagedBuffers(m_topend);
         delete m_table;
-
         delete m_context;
         m_quantum->release();
         delete m_pool;

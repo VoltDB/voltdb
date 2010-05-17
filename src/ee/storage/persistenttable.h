@@ -112,13 +112,6 @@ class PersistentTable : public Table {
 
   public:
     virtual ~PersistentTable();
-
-    virtual void cleanupManagedBuffers(Topend *cxt) {
-        if (m_wrapper) {
-            m_wrapper->cleanupManagedBuffers(cxt);
-        }
-    }
-
     virtual CatalogId tableId() const { return m_id; }
 
     // ------------------------------------------------------------------

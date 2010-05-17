@@ -44,7 +44,6 @@ class StreamedTable : public Table {
     static StreamedTable* createForTest(size_t, ExecutorContext*);
 
     virtual ~StreamedTable();
-    virtual void cleanupManagedBuffers(Topend *topend);
 
     // virtual Table functions
     virtual void deleteAllTuples(bool freeAllocatedStrings);

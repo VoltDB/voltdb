@@ -75,9 +75,6 @@ class TempTable : public Table {
   public:
         virtual ~TempTable();
 
-        virtual void cleanupManagedBuffers(Topend *cxt) {
-        }
-
         // ------------------------------------------------------------------
         // OPERATIONS
         // ------------------------------------------------------------------

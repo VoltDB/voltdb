@@ -119,8 +119,6 @@ class Table {
 
 public:
     virtual ~Table();
-    /** Release EL or checkpoint buffers associated to the table */
-    virtual void cleanupManagedBuffers(Topend *) = 0;
 
     // ------------------------------------------------------------------
     // ACCESS METHODS

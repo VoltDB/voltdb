@@ -55,13 +55,6 @@ StreamedTable::~StreamedTable()
     delete m_wrapper;
 }
 
-void StreamedTable::cleanupManagedBuffers(Topend *topend)
-{
-    if (m_wrapper) {
-        m_wrapper->cleanupManagedBuffers(topend);
-    }
-}
-
 void StreamedTable::deleteAllTuples(bool freeAllocatedStrings)
 {
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
