@@ -28,22 +28,14 @@
 
 package com;
 
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.ClientFactory;
-import org.voltdb.client.NullCallback;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
-import org.voltdb.VoltType;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-
-import java.util.Date;
-import java.util.ArrayList;
-import java.util.*;
-import java.text.SimpleDateFormat;
+import java.util.concurrent.locks.ReentrantLock;
 
 import java.io.IOException;
 
@@ -59,70 +51,74 @@ public class ClientVoter {
 
     public static boolean checkLatency = false;
 
+    public static final ReentrantLock counterLock = new ReentrantLock();
     static class AsyncCallback implements ProcedureCallback {
         @Override
-        public synchronized void clientCallback(ClientResponse clientResponse) {
+        public void clientCallback(ClientResponse clientResponse) {
             final byte status = clientResponse.getStatus();
-
             if (status != ClientResponse.SUCCESS) {
                 System.err.println("Failed to execute!!!");
                 System.err.println(clientResponse.getStatusString());
                 System.err.println(clientResponse.getException());
                 System.exit(-1);
             } else {
-                tot_executions++;
-                pClientCallback(clientResponse.getResults(), clientResponse.getClientRoundtrip());
+                counterLock.lock();
+                try {
+                    tot_executions++;
+                    VoltTable vtResults[] = clientResponse.getResults();
+                    int vote_result = (int) vtResults[0].fetchRow(0).getLong(0);
+
+                    vote_result_counter[vote_result]++;
+
+                    if (checkLatency) {
+                        long execution_time =  clientResponse.getClientRoundtrip();
+
+                        tot_executions_latency++;
+                        tot_execution_milliseconds += execution_time;
+
+                        if (execution_time < min_execution_milliseconds) {
+                            min_execution_milliseconds = execution_time;
+                        }
+
+                        if (execution_time > max_execution_milliseconds) {
+                            max_execution_milliseconds = execution_time;
+                        }
+
+                        // change latency to bucket
+                        int latency_bucket = (int) (execution_time / 25l);
+                        if (latency_bucket > 8) {
+                            latency_bucket = 8;
+                        }
+                        latency_counter[latency_bucket]++;
+                    }
+                } finally {
+                    counterLock.unlock();
+                }
             }
         }
-        
-        protected void pClientCallback(VoltTable[] vtResults, int clientRoundtrip) {
-            int vote_result = (int) vtResults[0].fetchRow(0).getLong(0);
-
-            vote_result_counter[vote_result]++;
-
-            if (checkLatency) {
-                long execution_time =  (long) clientRoundtrip;
-
-                tot_executions_latency++;
-                tot_execution_milliseconds += execution_time;
-
-                if (execution_time < min_execution_milliseconds) {
-                    min_execution_milliseconds = execution_time;
-                }
-
-                if (execution_time > max_execution_milliseconds) {
-                    max_execution_milliseconds = execution_time;
-                }
-
-                // change latency to bucket
-                int latency_bucket = (int) (execution_time / 25l);
-                if (latency_bucket > 8) {
-                    latency_bucket = 8;
-                }
-                latency_counter[latency_bucket]++;
-            }
-        };
     }
 
 
     public static void main(String args[]) {
         if (args.length != 7) {
-            System.err.println("ClientVoter [number of contestants] [votes per phone number] [transactions per second] [client feedback interval (seconds)] [test duration (seconds)] [server list (comma separated)] [lag record delay (seconds)] ");
+            System.err.println("ClientVoter [number of contestants] [votes per phone number] " +
+                    "[transactions per second] [client feedback interval (seconds)] " +
+                    "[test duration (seconds)] [server list (comma separated)] [lag record delay (seconds)] ");
             System.exit(1);
         }
 
-        int maxContestant = (int) Integer.valueOf(args[0]);
+        int maxContestant = Integer.valueOf(args[0]);
         if ((maxContestant < 1) || (maxContestant > 12)) {
             System.err.println("Number of contestants must be between 1 and 12");
             System.exit(1);
         }
 
-        long maxVotesPerPhoneNumber = (long) Long.valueOf(args[1]);
-        long transactions_per_second = (long) Long.valueOf(args[2]);
+        long maxVotesPerPhoneNumber = Long.valueOf(args[1]);
+        long transactions_per_second = Long.valueOf(args[2]);
         long transactions_per_milli = transactions_per_second / 1000l;
-        long client_feedback_interval_secs = (long) Long.valueOf(args[3]);
-        long test_duration_secs = (long) Long.valueOf(args[4]);
-        long lag_latency_seconds = (long) Long.valueOf(args[5]);
+        long client_feedback_interval_secs = Long.valueOf(args[3]);
+        long test_duration_secs = Long.valueOf(args[4]);
+        long lag_latency_seconds = Long.valueOf(args[5]);
         String serverList = args[6];
         long lag_latency_millis = lag_latency_seconds * 1000l;
         long thisOutstanding = 0;
@@ -153,11 +149,11 @@ public class ClientVoter {
         long transactions_this_second = 0;
         long last_millisecond = System.currentTimeMillis();
         long this_millisecond = System.currentTimeMillis();
-  
+
         final org.voltdb.client.Client voltclient = ClientFactory.createClient();
 
         String[] voltServers = serverList.split(",");
-  
+
         for (String thisServer : voltServers) {
             try {
                 thisServer = thisServer.trim();
@@ -171,8 +167,12 @@ public class ClientVoter {
         }
 
         try {
-            // initialize the database if this is the first connecting client, otherwise get existing configuration information
-            VoltTable[] vtInitialize = voltclient.callProcedure("Initialize", maxContestant, contestantNames).getResults();
+            /*
+             * Initialize the database if this is the first connecting client,
+             *  otherwise get existing configuration information
+             */
+            VoltTable[] vtInitialize =
+                voltclient.callProcedure("Initialize", maxContestant, contestantNames).getResults();
             maxContestant = (int) vtInitialize[0].fetchRow(0).getLong(0);
             System.out.printf("Running for %d contestant(s)\n",maxContestant);
         } catch (ProcCallException e) {
@@ -183,7 +183,6 @@ public class ClientVoter {
             System.exit(-1);
         }
 
-        // make random object totally random (set my milliseconds) so we can have multiple clients running simultaneously
         java.util.Random rand = new java.util.Random();
 
         long startTime = System.currentTimeMillis();
@@ -193,7 +192,7 @@ public class ClientVoter {
         long num_sp_calls = 0;
         long startRecordingLatency = startTime + lag_latency_millis;
 
-        AsyncCallback callBack = new AsyncCallback();        
+        AsyncCallback callBack = new AsyncCallback();
 
         while (endTime > currentTime) {
             num_sp_calls++;
@@ -206,23 +205,14 @@ public class ClientVoter {
             }
 
             try {
-                boolean queued = false;
-                while (!queued) {
-                    queued = voltclient.callProcedure(callBack, "Vote", phoneNumber, contestantNumber, maxVotesPerPhoneNumber);
-
-                    if (!queued) {
-                        try {
-                            voltclient.backpressureBarrier();
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                            System.exit(-1);
-                        }
-                    }
-                }
+                voltclient.callProcedure(callBack, "Vote", phoneNumber, contestantNumber, maxVotesPerPhoneNumber);
             } catch (java.io.IOException e) {
                 e.printStackTrace();
+                if (e instanceof NoConnectionsException) {
+                    System.exit(-1);
+                }
             }
-          
+
             transactions_this_second++;
             if (transactions_this_second >= transactions_per_milli) {
                 this_millisecond = System.currentTimeMillis();
@@ -241,29 +231,32 @@ public class ClientVoter {
             }
 
             if (currentTime >= (lastFeedbackTime + (client_feedback_interval_secs * 1000))) {
-                synchronized(callBack) {
-                    lastFeedbackTime = currentTime;
+                final long elapsedTimeMillis2 = System.currentTimeMillis()-startTime;
+                lastFeedbackTime = currentTime;
 
-                    long elapsedTimeMillis2 = System.currentTimeMillis()-startTime;
-                    float elapsedTimeSec2 = elapsedTimeMillis2/1000F;
+                final long runTimeMillis = endTime - startTime;
 
-                    if (tot_executions_latency == 0) {
-                        tot_executions_latency = 1;
-                    }
+                float elapsedTimeSec2 = elapsedTimeMillis2/1000F;
+                if (tot_executions_latency == 0) {
+                    tot_executions_latency = 1;
+                }
+
+                double percentComplete = ((double) elapsedTimeMillis2 / (double) runTimeMillis) * 100;
+                if (percentComplete > 100.0) {
+                    percentComplete = 100.0;
+                }
+
+                counterLock.lock();
+                try {
                     thisOutstanding = num_sp_calls - tot_executions;
 
-                    long runTimeMillis = endTime - startTime;
-
-                    double percentComplete = ((double) elapsedTimeMillis2 / (double) runTimeMillis) * 100;
-                    if (percentComplete > 100.0) {
-                        percentComplete = 100.0;
-                    }
-
                     double avgLatency = (double) tot_execution_milliseconds / (double) tot_executions_latency;
-                    
+
                     System.out.printf("%.3f%% Complete | SP Calls: %,d at %,.2f SP/sec | outstanding = %d (%d) | min = %d | max = %d | avg = %.2f\n",percentComplete, num_sp_calls, (num_sp_calls / elapsedTimeSec2), thisOutstanding,(thisOutstanding - lastOutstanding), min_execution_milliseconds, max_execution_milliseconds, avgLatency);
 
                     lastOutstanding = thisOutstanding;
+                } finally {
+                    counterLock.unlock();
                 }
             }
         }
@@ -291,14 +284,13 @@ public class ClientVoter {
         long winnerVotes = -1;
 
         try {
-            // initialize the database if this is the first connecting client, otherwise get existing configuration information
             VoltTable[] vtResults = voltclient.callProcedure("Results").getResults();
 
             int rowCount = vtResults[0].getRowCount();
             if (rowCount == 0) {
                 System.out.println(" - No results to report.");
             } else {
-                for (int ii = 0; ii < rowCount; ii++) {  
+                for (int ii = 0; ii < rowCount; ii++) {
                     VoltTableRow row = vtResults[0].fetchRow(ii);
                     String resultName = row.getString(0);
                     long resultVotes = row.getLong(1);
@@ -329,7 +321,7 @@ public class ClientVoter {
         System.out.printf(" - Ran for %,.2f seconds\n",elapsedTimeSec);
         System.out.printf(" - Performed %,d Stored Procedure calls\n",num_sp_calls);
         System.out.printf(" - At %,.2f calls per second\n",num_sp_calls / elapsedTimeSec);
-        System.out.printf(" - Average Latency = %.2f ms\n",(double) ((double) tot_execution_milliseconds / (double) tot_executions_latency));
+        System.out.printf(" - Average Latency = %.2f ms\n",((double) tot_execution_milliseconds / (double) tot_executions_latency));
         System.out.printf(" -   Latency   0ms -  25ms = %,d\n",latency_counter[0]);
         System.out.printf(" -   Latency  25ms -  50ms = %,d\n",latency_counter[1]);
         System.out.printf(" -   Latency  50ms -  75ms = %,d\n",latency_counter[2]);
@@ -342,7 +334,7 @@ public class ClientVoter {
 
         try {
             voltclient.close();
-        } catch (Exception e) {
+        } catch (InterruptedException e) {
             e.printStackTrace();
             System.exit(-1);
         }

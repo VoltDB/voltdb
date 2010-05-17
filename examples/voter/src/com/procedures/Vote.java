@@ -73,7 +73,7 @@ public class Vote extends VoltProcedure {
 
         if (validContestant && validVoter) {
             voltQueueSQL(insertVote, phoneNumber, contestantNumber);
-            VoltTable results2[] = voltExecuteSQL();
+            voltExecuteSQL();
             returnValue = 0;
         } else if (!validContestant) {
             returnValue = 1;
@@ -94,4 +94,4 @@ public class Vote extends VoltProcedure {
 
         return vtReturn;
     }
-} 
+}

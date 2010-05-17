@@ -61,7 +61,7 @@ public class Board extends JPanel {
 
         //Read in the world map
         try { worldmap =  ImageIO.read(new File("worldmap.jpg"));   }
-        catch (Exception e) {
+        catch (IOException e) {
             e.printStackTrace();
             System.exit(1);
         }
@@ -75,7 +75,7 @@ public class Board extends JPanel {
             satpics.put("india", ImageIO.read(new File("in.gif")));
 
             }
-        catch (Exception e) {
+        catch (IOException e) {
             e.printStackTrace();
             System.exit(1);
         }

@@ -105,6 +105,7 @@ public class Client {
             infoResult = infoResultSet[0];
         } catch (Exception e) {
             e.printStackTrace();
+            System.exit(-1);
         }
         double oldBidAmount = infoResult.fetchRow(0).getDouble("BIDPRICE");
 
@@ -120,6 +121,7 @@ public class Client {
             bidResult = bidResultSet[0];
         } catch (Exception e) {
             e.printStackTrace();
+            System.exit(-1);
         }
 
         // return the result of the bid procedure

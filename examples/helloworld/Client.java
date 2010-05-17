@@ -1,55 +1,43 @@
 import org.voltdb.*;
-import org.voltdb.client.ClientFactory;
+import org.voltdb.client.*;
 
 public class Client {
 
-   public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
 
-              /*
-               * Instantiate a client and connect to the database.
-               */
-    org.voltdb.client.Client myApp = null;
-    try {
-            myApp = ClientFactory.createClient();
-            myApp.createConnection("localhost", "program", "password");
-        } catch (java.io.IOException e) {
-            e.printStackTrace();
-            System.exit(-1);
-        };
-               /*
-               * Load the database.
-               */
-    VoltTable[] results = null;
-    try {
-       results = myApp.callProcedure("Insert","Hello",  "World", "English").getResults();
-       results = myApp.callProcedure("Insert","Bonjour","Monde", "French").getResults();
-       results = myApp.callProcedure("Insert","Hola",   "Mundo", "Spanish").getResults();
-       results = myApp.callProcedure("Insert","Hej",    "Verden","Danish").getResults();
-       results = myApp.callProcedure("Insert","Ciao",   "Mondo", "Italian").getResults();
-        } catch (Exception e) {
-            e.printStackTrace();
-            System.exit(-1);
-        };
- 
-              /*
-             * Retrieve the message.
-             */
-    try {
-       results = myApp.callProcedure("Select", "Spanish").getResults();
-        } catch (Exception e) {
-            e.printStackTrace();
-            System.exit(-1);
-        };
+        /*
+         * Instantiate a client and connect to the database.
+         */
+        final org.voltdb.client.Client myApp = ClientFactory.createClient();
+        myApp.createConnection("localhost", "program", "password");
 
-  if (results.length != 1) {
-      System.out.printf("I can't say Hello in that language.");
-      System.exit(-1);
-       }
- 
-  VoltTable resultTable = results[0];
-  VoltTableRow row = resultTable.fetchRow(0);
-  System.out.printf("%s, %s!\n", 
-                    row.getString("hello"),  
-                    row.getString("world"));
-  }
+        /*
+         * Load the database.
+         */
+        myApp.callProcedure("Insert", "Hello", "World", "English");
+        myApp.callProcedure("Insert", "Bonjour", "Monde", "French");
+        myApp.callProcedure("Insert", "Hola", "Mundo", "Spanish");
+        myApp.callProcedure("Insert", "Hej", "Verden", "Danish");
+        myApp.callProcedure("Insert", "Ciao", "Mondo", "Italian");
+
+        /*
+         * Retrieve the message.
+         */
+        final ClientResponse response = myApp.callProcedure("Select", "Spanish");
+        if (response.getStatus() != ClientResponse.SUCCESS){
+            System.err.println(response.getStatusString());
+            System.exit(-1);
+        }
+
+        final VoltTable results[] = response.getResults();
+        if (results.length != 1) {
+            System.out.printf("I can't say Hello in that language.");
+            System.exit(-1);
+        }
+
+        VoltTable resultTable = results[0];
+        VoltTableRow row = resultTable.fetchRow(0);
+        System.out.printf("%s, %s!\n", row.getString("hello"), row
+                .getString("world"));
+    }
 }

@@ -46,7 +46,7 @@ public class Initialize extends VoltProcedure {
         String[] contestantArray
     ) {
         int numContestants = 1;
- 
+
         voltQueueSQL(checkContestant);
         VoltTable results1[] = voltExecuteSQL();
 
@@ -56,7 +56,7 @@ public class Initialize extends VoltProcedure {
                 voltQueueSQL(insertContestant, contestantArray[i], i+1);
             }
 
-            VoltTable results2[] = voltExecuteSQL();
+            voltExecuteSQL();
 
             numContestants = maxContestant;
         } else {
@@ -73,4 +73,4 @@ public class Initialize extends VoltProcedure {
 
         return vtReturn;
     }
-} 
+}

@@ -6,6 +6,7 @@ import javax.swing.*;
 
 import org.voltdb.*;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.NoConnectionsException;
 
 import procedures.*;
 
@@ -45,13 +46,16 @@ public class UserInterface {
 
         //First fetch all the location data
         try {
-            locationresult = db.callProcedure(GetLocationData.class.getSimpleName() );
+            locationresult = db.callProcedure(GetLocationData.class.getSimpleName() ).getResults();
             //assert locationresult.length == 1;
             rowCount = locationresult[0].getRowCount();
 
         }
         catch (java.io.IOException e) {
             e.printStackTrace();
+            if (e instanceof NoConnectionsException) {
+                System.exit(-1);
+            }
         }
         catch (org.voltdb.client.ProcCallException e) {
             System.out.println("Get Location data failed: " + e.getMessage());
@@ -74,12 +78,15 @@ public class UserInterface {
                 int satrowCount = 0;
                 VoltTable[] satelliteresult = null;
                 try {
-                    satelliteresult = db.callProcedure(GetSatelliteData.class.getSimpleName(),id );
+                    satelliteresult = db.callProcedure(GetSatelliteData.class.getSimpleName(),id ).getResults();
                     assert satelliteresult.length == 1;
                     satrowCount = satelliteresult[0].getRowCount();
                 }
                 catch (java.io.IOException e) {
                     e.printStackTrace();
+                    if (e instanceof NoConnectionsException) {
+                        System.exit(-1);
+                    }
                 }
                 catch (org.voltdb.client.ProcCallException e) {
                     System.out.println("Get Satellite data failed: " + e.getMessage());
@@ -131,7 +138,7 @@ public class UserInterface {
         try {
             Thread.sleep((long) (secs*1000) );
         }
-        catch (Exception e) {
+        catch (InterruptedException e) {
             System.out.print(e.getMessage());
             System.exit(1);
         }
