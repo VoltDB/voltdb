@@ -883,6 +883,119 @@ TEST_F(TupleStreamWrapperTest, ReleaseInCurrentBlock)
     EXPECT_EQ(results->unreleasedSize(), (MAGIC_TUPLE_SIZE * 5));
 }
 
+/**
+ * Test that reset allows re-polling data
+ */
+TEST_F(TupleStreamWrapperTest, ResetInFirstBlock)
+{
+    // Fill the current buffer with some stuff
+    for (int i = 1; i < 10; i++)
+    {
+        appendTuple(i-1, i);
+    }
+
+    // Flush all data
+    m_wrapper->periodicFlush(-1, 0, 10, 10);
+
+    // Poll and verify that data is returned
+    StreamBlock* results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->unreleasedUso(), 0);
+    EXPECT_EQ(results->offset(), MAGIC_TUPLE_SIZE * 9);
+    EXPECT_EQ(results->unreleasedSize(), MAGIC_TUPLE_SIZE * 9);
+
+    // Poll again and see that an empty block is returned
+    // (Not enough data to require more than one block)
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), MAGIC_TUPLE_SIZE * 9);
+    EXPECT_EQ(results->offset(), 0);
+    EXPECT_EQ(results->unreleasedUso(), results->uso());
+
+    // Reset the stream and get the first poll again
+    m_wrapper->resetPollMarker();
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->unreleasedUso(), 0);
+    EXPECT_EQ(results->offset(), MAGIC_TUPLE_SIZE * 9);
+    EXPECT_EQ(results->unreleasedSize(), MAGIC_TUPLE_SIZE * 9);
+}
+
+TEST_F(TupleStreamWrapperTest, ResetInPartiallyAckedBlock)
+{
+    // Fill the current buffer with some stuff
+    for (int i = 1; i < 10; i++) {
+        appendTuple(i-1, i);
+    }
+
+    // Ack the first 4 tuples.
+    bool released = m_wrapper->releaseEltBytes(MAGIC_TUPLE_SIZE * 4);
+    EXPECT_TRUE(released);
+
+    // Poll and verify that we get a StreamBlock that indicates that
+    // there's no data available at the new release point
+    // (because the full block is not committed)
+    StreamBlock* results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * 4));
+    EXPECT_EQ(results->unreleasedUso(), (MAGIC_TUPLE_SIZE * 4));
+    EXPECT_EQ(results->offset(), 0);
+    EXPECT_EQ(results->unreleasedSize(), 0);
+
+    // reset the poll point; this should not change anything.
+    m_wrapper->resetPollMarker();
+
+    // Same verification as above.
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * 4));
+    EXPECT_EQ(results->unreleasedUso(), (MAGIC_TUPLE_SIZE * 4));
+    EXPECT_EQ(results->offset(), 0);
+    EXPECT_EQ(results->unreleasedSize(), 0);
+}
+
+TEST_F(TupleStreamWrapperTest, ResetInPartiallyAckedCommittedBlock)
+{
+    // write some, committing as tuples are added
+    int i = 0;  // keep track of the current txnid
+    for (i = 1; i < 10; i++) {
+        appendTuple(i-1, i);
+    }
+
+    // partially ack the buffer
+    bool released = m_wrapper->releaseEltBytes(MAGIC_TUPLE_SIZE * 4);
+    EXPECT_TRUE(released);
+
+    // wrap and require a new buffer
+    int tuples_to_fill = BUFFER_SIZE / MAGIC_TUPLE_SIZE + 10;
+    for (int j = 0; j < tuples_to_fill; j++, i++) {
+        appendTuple(i, i+1);
+    }
+
+    // poll - should get the content post release (in the old buffer)
+    StreamBlock* results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->unreleasedUso(), MAGIC_TUPLE_SIZE * 4);
+    EXPECT_TRUE(results->offset() > 0);
+
+    // poll again.
+     m_wrapper->getCommittedEltBytes();
+
+    // reset. Aftwards, should be able to get original block back
+    m_wrapper->resetPollMarker();
+
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->unreleasedUso(), MAGIC_TUPLE_SIZE * 4);
+    EXPECT_TRUE(results->offset() > 0);
+
+    // flush should also not change the reset base poll point
+    m_wrapper->periodicFlush(-1, 0, i, i);
+    m_wrapper->resetPollMarker();
+
+    results = m_wrapper->getCommittedEltBytes();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->unreleasedUso(), MAGIC_TUPLE_SIZE * 4);
+    EXPECT_TRUE(results->offset() > 0);
+}
+
 int main() {
     return TestSuite::globalInstance()->runAll();
 }

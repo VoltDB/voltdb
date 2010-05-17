@@ -90,7 +90,10 @@ public:
      */
     bool releaseEltBytes(int64_t releaseOffset);
 
-private:
+    /**
+     * Reset polling offset to the ack point
+     */
+    void resetPollMarker();
 
     size_t computeOffsets(TableTuple &tuple,size_t *rowHeaderSz);
     void extendBufferChain(size_t minLength);

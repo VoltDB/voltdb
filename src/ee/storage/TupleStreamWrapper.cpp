@@ -334,6 +334,15 @@ TupleStreamWrapper::computeOffsets(TableTuple &tuple,
     return *rowHeaderSz + metadataSz + dataSz;
 }
 
+void
+TupleStreamWrapper::resetPollMarker()
+{
+    StreamBlock *oldest_block = m_pendingBlocks.front();
+    if (oldest_block != NULL) {
+        m_firstUnpolledUso = oldest_block->unreleasedUso();
+    }
+}
+
 StreamBlock*
 TupleStreamWrapper::getCommittedEltBytes()
 {
