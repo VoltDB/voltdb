@@ -61,7 +61,7 @@ TupleStreamWrapper::setDefaultCapacity(size_t capacity)
         throwFatalException("setDefaultCapacity only callable before "
                             "TupleStreamWrapper is used");
     }
-    cleanupManagedBuffers(NULL);
+    cleanupManagedBuffers();
     m_defaultCapacity = capacity;
     extendBufferChain(m_defaultCapacity);
 }
@@ -71,7 +71,7 @@ TupleStreamWrapper::setDefaultCapacity(size_t capacity)
 /*
  * Essentially, shutdown.
  */
-void TupleStreamWrapper::cleanupManagedBuffers(Topend *)
+void TupleStreamWrapper::cleanupManagedBuffers()
 {
     StreamBlock *sb = NULL;
 

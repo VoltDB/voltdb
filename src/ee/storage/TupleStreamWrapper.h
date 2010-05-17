@@ -40,14 +40,14 @@ public:
                        CatalogId tableId, int64_t createTime);
 
     ~TupleStreamWrapper() {
-        cleanupManagedBuffers(NULL);
+        cleanupManagedBuffers();
     }
 
     /**
      * Drop and release all claimed buffers. Intended for use at
      * shutdown to achieve full memory deallocation for valgrind.
      */
-    void cleanupManagedBuffers(Topend *);
+    void cleanupManagedBuffers();
 
     /**
      * Configure the buffer size requested from JNI pool.

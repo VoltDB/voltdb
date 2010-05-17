@@ -101,7 +101,7 @@ public:
     }
 
     virtual ~TupleStreamWrapperTest() {
-        m_wrapper->cleanupManagedBuffers(NULL);
+        m_wrapper->cleanupManagedBuffers();
         delete m_wrapper;
         delete m_tuple;
         if (m_schema)
