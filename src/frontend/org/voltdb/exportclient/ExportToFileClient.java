@@ -75,29 +75,38 @@ public class ExportToFileClient extends ExportClientBase
             super(source);
             m_escaper = escaper;
             // Create the output file for this table
-            String filename =
-                nonce + "-" + source.tableName() + "." + escaper.getExtension();
-            m_logger.info("Opening filename " + filename);
-            m_outFile = new File(outdir.getPath() + File.separator + filename);
-            boolean fail = false;
-            try {
-                if (!m_outFile.createNewFile()) {
+            String filename = null;
+            if (outdir != null)
+            {
+                filename =
+                    nonce + "-" + source.tableName() + "." + escaper.getExtension();
+                m_logger.info("Opening filename " + filename);
+                m_outFile = new File(outdir.getPath() + File.separator + filename);
+                boolean fail = false;
+                try {
+                    if (!m_outFile.createNewFile()) {
+                        m_logger.error("Error: Failed to create output file " +
+                                       m_outFile.getPath() + " for table " +
+                                       source.tableName() +
+                        ": File already exists");
+                        fail = true;
+                    }
+                } catch (IOException e) {
+                    m_logger.error(e.getMessage());
                     m_logger.error("Error: Failed to create output file " +
                                    m_outFile.getPath() + " for table " +
-                                   source.tableName() +
-                                   ": File already exists");
+                                   source.tableName());
                     fail = true;
                 }
-            } catch (IOException e) {
-                m_logger.error(e.getMessage());
-                m_logger.error("Error: Failed to create output file " +
-                               m_outFile.getPath() + " for table " +
-                               source.tableName());
-                fail = true;
+                if (fail)
+                {
+                    throw new RuntimeException();
+                }
             }
-            if (fail)
+            else
             {
-                m_logger.error("Ha, writing to /dev/null");
+                m_logger.error("--discard provided, data will be dumped to /dev/null");
+                filename = "/dev/null";
                 m_outFile = new File("/dev/null");
             }
             try
@@ -224,8 +233,12 @@ public class ExportToFileClient extends ExportClientBase
         System.out.println("java -cp <classpath> -Djava.library.path=<library path> org.voltdb.exportclient.ExportToFileClient --help");
         System.out.println("java -cp <classpath> -Djava.library.path=<library path> org.voltdb.exportclient.ExportToFileClient " +
                            "--servers server1,server2,... --type CSV|TSV " +
-                           "--outdir dir --nonce any_string --user export_username " +
-                           "--password export_password");
+                           "--outdir dir --nonce any_string " +
+                           "--user export_username --password export_password");
+        System.out.println("java -cp <classpath> -Djava.library.path=<library path> org.voltdb.exportclient.ExportToFileClient " +
+                           "--servers server1,server2,... --type CSV|TSV " +
+                           "--discard" +
+                           "--user export_username --password export_password");
         System.exit(code);
     }
 
@@ -237,6 +250,7 @@ public class ExportToFileClient extends ExportClientBase
         String nonce = null;
         Escaper escaper = null;
         File outdir = null;
+        boolean discard = false;
 
         for (int ii = 0; ii < args.length; ii++)
         {
@@ -244,6 +258,10 @@ public class ExportToFileClient extends ExportClientBase
             if (arg.equals("--help"))
             {
                 printHelpAndQuit(0);
+            }
+            else if (arg.equals("--discard"))
+            {
+                discard = true;
             }
             else if (arg.equals("--servers"))
             {
@@ -347,16 +365,23 @@ public class ExportToFileClient extends ExportClientBase
             System.err.println("ExportToFile: must provide an output type");
             printHelpAndQuit(-1);
         }
-        if (nonce == null)
+        if (!discard)
         {
-            System.err.println("ExportToFile: must provide a filename nonce");
-            printHelpAndQuit(-1);
+            if (nonce == null)
+            {
+                System.err.println("ExportToFile: must provide a filename nonce");
+                printHelpAndQuit(-1);
+            }
+            if (outdir == null)
+            {
+                outdir = new File(".");
+            }
         }
-        if (outdir == null)
+        else
         {
-            outdir = new File(".");
+            outdir = null;
+            nonce = null;
         }
-
         ExportToFileClient client =
             new ExportToFileClient(escaper, nonce, outdir);
         client.setVoltServers(volt_servers);
