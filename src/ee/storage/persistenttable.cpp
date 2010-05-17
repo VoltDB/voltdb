@@ -427,7 +427,6 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
     if (m_COWContext.get() != NULL) {
         m_COWContext->markTupleDirty(target, false);
     }
-    m_tmpTarget1.isDirty();
 
     /*
      * Create and register an undo action.
