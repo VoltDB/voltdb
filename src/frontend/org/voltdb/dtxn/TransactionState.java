@@ -78,6 +78,13 @@ public abstract class TransactionState implements Comparable<TransactionState> {
         return false;
     }
 
+    /**
+     * Indicate whether or not the transaction represented by this
+     * TransactionState is single-partition.  Should be overridden to provide
+     * sane results by subclasses.
+     */
+    public abstract boolean isSinglePartition();
+
     public abstract boolean doWork();
 
     public boolean shouldResumeProcedure() {

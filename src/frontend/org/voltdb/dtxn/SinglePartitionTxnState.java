@@ -43,6 +43,12 @@ public class SinglePartitionTxnState extends TransactionState {
     }
 
     @Override
+    public boolean isSinglePartition()
+    {
+        return true;
+    }
+
+    @Override
     public boolean doWork() {
         if (!m_done) {
             m_site.beginNewTxn(m_task.getTxnId(), isReadOnly);

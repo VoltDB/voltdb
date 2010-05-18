@@ -95,6 +95,12 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     }
 
     @Override
+    public boolean isSinglePartition()
+    {
+        return false;
+    }
+
+    @Override
     public boolean doWork() {
         if (m_done) {
             return true;
