@@ -55,8 +55,6 @@ public class ForeignHost {
     private boolean m_isUp;
 
     private long m_lastMessageMillis;
-    private int[] m_histo;
-    private int m_deltas;
 
     /** ForeignHost's implementation of InputHandler */
     public class FHInputHandler extends VoltProtocolHandler {
@@ -122,8 +120,6 @@ public class ForeignHost {
         m_closing = false;
         m_isUp = true;
         m_lastMessageMillis = Long.MAX_VALUE;
-        m_histo = new int[11];
-        m_deltas = 0;
     }
 
     void close()
