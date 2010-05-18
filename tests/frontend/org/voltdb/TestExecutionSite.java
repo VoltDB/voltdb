@@ -36,17 +36,9 @@ import junit.framework.TestCase;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
-import org.voltdb.dtxn.DtxnConstants;
-import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
-import org.voltdb.dtxn.SinglePartitionTxnState;
-import org.voltdb.dtxn.TransactionState;
+import org.voltdb.dtxn.*;
 import org.voltdb.fault.FaultDistributor;
-import org.voltdb.messaging.FastSerializer;
-import org.voltdb.messaging.FragmentTaskMessage;
-import org.voltdb.messaging.InitiateTaskMessage;
-import org.voltdb.messaging.MockMailbox;
-import org.voltdb.messaging.MultiPartitionParticipantMessage;
-import org.voltdb.messaging.VoltMessage;
+import org.voltdb.messaging.*;
 
 public class TestExecutionSite extends TestCase {
 
@@ -60,6 +52,27 @@ public class TestExecutionSite extends TestCase {
     // catalog identifiers (siteX also used as array offset)
     int host1 = 0; int site1 = 0; int initiator1 = 100;
     int host2 = 1; int site2 = 1; int initiator2 = 200;
+
+    /* Fake RestrictedPriorityQueue implementation */
+    public static class RestrictedPriorityARRR
+    extends RestrictedPriorityQueue
+    {
+        private static final long serialVersionUID = 1L;
+
+        /**
+         * Initialize the RPQ with the set of initiators in the system and
+         * the corresponding execution site's mailbox. Ugh.
+         * @param initiatorSiteIds
+         * @param siteId
+         * @param mbox
+         */
+        public
+        RestrictedPriorityARRR(int[] initiatorSiteIds, int siteId, Mailbox mbox)
+        {
+            super(initiatorSiteIds, siteId, mbox);
+        }
+    }
+
 
     /* Single partition write */
     public static class MockSPVoltProcedure extends VoltProcedure

@@ -365,11 +365,12 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox, final int siteId)
     {
-        this(voltdb, mailbox, siteId, null);
+        this(voltdb, mailbox, siteId, null, null);
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
-                  final int siteId, String serializedCatalog)
+                  final int siteId, String serializedCatalog,
+                  RestrictedPriorityQueue transactionQueue)
     {
         m_siteId = siteId;
 
@@ -407,7 +408,10 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
 
         m_systemProcedureContext = new SystemProcedureContext();
         m_mailbox = mailbox;
-        m_transactionQueue = initializeTransactionQueue(siteId);
+
+        // allow dependency injection of the transaction queue implementation
+        m_transactionQueue =
+            (transactionQueue != null) ? transactionQueue : initializeTransactionQueue(siteId);
 
         loadProceduresFromCatalog(voltdb.getBackendTargetType());
         m_snapshotter = new SnapshotSiteProcessor();

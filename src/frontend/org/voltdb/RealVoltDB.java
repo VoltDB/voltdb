@@ -124,7 +124,10 @@ public class RealVoltDB implements VoltDBInterface
 
             m_siteObj =
                 new ExecutionSite(VoltDB.instance(),
-                                  mailbox, m_siteId, m_serializedCatalog);
+                                  mailbox,
+                                  m_siteId,
+                                  m_serializedCatalog,
+                                  null);
             synchronized (this) {
                 m_isSiteCreated = true;
                 this.notifyAll();
@@ -327,7 +330,8 @@ public class RealVoltDB implements VoltDBInterface
                 new ExecutionSite(VoltDB.instance(),
                                   VoltDB.instance().getMessenger().createMailbox(siteId, VoltDB.DTXN_MAILBOX_ID, null),
                                   siteId,
-                                  serializedCatalog);
+                                  serializedCatalog,
+                                  null);
             m_localSites.put(Integer.parseInt(siteForThisThread.getTypeName()), siteObj);
             m_currentThreadSite = siteObj;
 
