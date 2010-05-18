@@ -394,5 +394,17 @@ public class TestDistributer extends TestCase {
         }
     }
 
+    public void testUnresolvedHost() throws IOException {
+        final String hostname = "doesnotexist";
+        boolean threwException = false;
+        try {
+            ConnectionUtil.getAuthenticatedConnection(hostname, "", "", 32);
+        } catch (java.net.UnknownHostException e) {
+            threwException = true;
+            assertTrue(e.getMessage().equals(hostname));
+        }
+        assertTrue(threwException);
+    }
+
 }
 

@@ -29,6 +29,7 @@ import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.client.ConnectionUtil;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.sysprocs.SnapshotRegistry.Snapshot;
@@ -62,12 +63,7 @@ public class SnapshotStatus extends VoltSystemProcedure {
     executePlanFragment(HashMap<Integer, List<VoltTable>> dependencies, long fragmentId, ParameterSet params,
                         final SystemProcedureExecutionContext context)
     {
-        String hn = "";
-        try {
-            java.net.InetAddress localMachine = java.net.InetAddress.getLocalHost();
-            hn = localMachine.getHostName();
-        } catch (java.net.UnknownHostException uhe) {
-        }
+        String hn = ConnectionUtil.getHostnameOrAddress();
         final String hostname = hn;
         final VoltTable results = constructFragmentResultsTable();
         if (fragmentId == SysProcFragmentId.PF_scanSnapshotRegistries)

@@ -32,6 +32,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.zip.CRC32;
 
 import org.apache.log4j.Logger;
+import org.voltdb.client.ConnectionUtil;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.VoltLoggerFactory;
@@ -106,12 +107,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             final long createTime,
             int version[]
             ) throws IOException {
-        String hostname = "";
-        try {
-            java.net.InetAddress localMachine = java.net.InetAddress.getLocalHost();
-            hostname = localMachine.getHostName();
-        } catch (java.net.UnknownHostException uhe) {
-        }
+        String hostname = ConnectionUtil.getHostnameOrAddress();;
         m_tableName = tableName;
         m_fos = new FileOutputStream(file);
         m_channel = m_fos.getChannel();

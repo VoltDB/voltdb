@@ -33,6 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 import org.voltdb.VoltDB;
+import org.voltdb.client.ConnectionUtil;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DeferredSerialization;
@@ -138,12 +139,7 @@ public class HostMessenger implements Messenger {
     }
 
     public String getHostname() {
-        String hostname = "";
-        try {
-            java.net.InetAddress localMachine = java.net.InetAddress.getLocalHost();
-            hostname = localMachine.getHostName();
-        } catch (java.net.UnknownHostException uhe) {
-        }
+        String hostname = ConnectionUtil.getHostnameOrAddress();
         return hostname;
     }
 

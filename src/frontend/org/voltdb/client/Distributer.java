@@ -395,13 +395,7 @@ class Distributer {
         m_expectedOutgoingMessageSize = expectedOutgoingMessageSize;
         m_network.start();
         m_pool = new DBBPool(false, arenaSizes, false);
-        String hostname = "";
-        try {
-            java.net.InetAddress localMachine = java.net.InetAddress.getLocalHost();
-            hostname = localMachine.getHostName();
-        } catch (java.net.UnknownHostException uhe) {
-        }
-        m_hostname = hostname;
+        m_hostname = ConnectionUtil.getHostnameOrAddress();;
 
 //        new Thread() {
 //            @Override

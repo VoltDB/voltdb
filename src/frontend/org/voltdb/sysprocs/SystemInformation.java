@@ -26,6 +26,7 @@ import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.client.ConnectionUtil;
 import org.voltdb.dtxn.DtxnConstants;
 
 /*
@@ -52,15 +53,11 @@ public class SystemInformation extends VoltSystemProcedure {
                 new ColumnInfo("VALUE", VoltType.STRING));
 
         // host name and IP address.
-        try {
-            InetAddress addr = InetAddress.getLocalHost();
-            vt.addRow(VoltDB.instance().getHostMessenger().getHostId(),
-                    "ipaddress", addr.getHostAddress());
-            vt.addRow(VoltDB.instance().getHostMessenger().getHostId(),
-                    "hostname", addr.getHostName());
-        }
-        catch (java.net.UnknownHostException ex) {
-        }
+        InetAddress addr = org.voltdb.client.ConnectionUtil.getLocalAddress();
+        vt.addRow(VoltDB.instance().getHostMessenger().getHostId(),
+                "ipaddress", addr.getHostAddress());
+        vt.addRow(VoltDB.instance().getHostMessenger().getHostId(),
+                "hostname", addr.getHostName());
 
         // build string
         vt.addRow(VoltDB.instance().getHostMessenger().getHostId(),

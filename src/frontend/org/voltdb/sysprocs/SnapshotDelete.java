@@ -28,6 +28,7 @@ import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.client.ConnectionUtil;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.utils.VoltLoggerFactory;
 
@@ -64,12 +65,7 @@ public class SnapshotDelete extends VoltSystemProcedure {
     executePlanFragment(HashMap<Integer, List<VoltTable>> dependencies, long fragmentId, ParameterSet params,
                         final SystemProcedureExecutionContext context)
     {
-        String hostname = "";
-        try {
-            java.net.InetAddress localMachine = java.net.InetAddress.getLocalHost();
-            hostname = localMachine.getHostName();
-        } catch (java.net.UnknownHostException uhe) {
-        }
+        String hostname = ConnectionUtil.getHostnameOrAddress();
         errorString = null;
         VoltTable result = constructFragmentResultsTable();
         if (fragmentId == SysProcFragmentId.PF_snapshotDelete)

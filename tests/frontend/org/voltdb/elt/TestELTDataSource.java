@@ -23,7 +23,7 @@
 
 package org.voltdb.elt;
 
-import java.net.InetAddress;
+import org.voltdb.client.ConnectionUtil;
 import java.net.UnknownHostException;
 
 import org.voltdb.*;
@@ -38,7 +38,7 @@ public class TestELTDataSource extends TestCase {
     private static class MockHostMessenger extends HostMessenger {
         public MockHostMessenger() throws UnknownHostException {
             super(null, // VoltNetwork
-                  InetAddress.getLocalHost(), // Coordinator IP
+                  ConnectionUtil.getLocalAddress(), // Coordinator IP
                   1,    // expected hosts,
                   0,    // catalogCRC
                   null); // hostLog);

@@ -45,6 +45,7 @@ import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Host;
+import org.voltdb.client.ConnectionUtil;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltLoggerFactory;
@@ -97,12 +98,7 @@ public class SnapshotSave extends VoltSystemProcedure
     executePlanFragment(HashMap<Integer, List<VoltTable>> dependencies, long fragmentId, ParameterSet params,
                         SystemProcedureExecutionContext context)
     {
-        String hostname = "";
-        try {
-            java.net.InetAddress localMachine = java.net.InetAddress.getLocalHost();
-            hostname = localMachine.getHostName();
-        } catch (java.net.UnknownHostException uhe) {
-        }
+        String hostname = ConnectionUtil.getHostnameOrAddress();
         if (fragmentId == SysProcFragmentId.PF_saveTest)
         {
             assert(params.toArray()[0] != null);

@@ -18,7 +18,7 @@
 package org.voltdb.client;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
+import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.security.MessageDigest;
@@ -108,13 +108,72 @@ public class ConnectionUtil {
         return getAuthenticatedConnection("export", host, username, password, port);
     }
 
+    public static String getHostnameOrAddress() {
+        try {
+            final InetAddress addr = InetAddress.getLocalHost();
+            return addr.getHostName();
+        } catch (UnknownHostException e) {
+            try {
+                Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+                if (interfaces == null) {
+                    return "";
+                }
+                NetworkInterface intf = interfaces.nextElement();
+                Enumeration<InetAddress> addresses = intf.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    InetAddress address = addresses.nextElement();
+                    if (address instanceof Inet4Address) {
+                        return address.getHostAddress();
+                    }
+                }
+                interfaces = NetworkInterface.getNetworkInterfaces();
+                while (addresses.hasMoreElements()) {
+                    return addresses.nextElement().getHostAddress();
+                }
+                return "";
+            } catch (SocketException e1) {
+                return "";
+            }
+        }
+    }
 
+    public static InetAddress getLocalAddress() {
+        try {
+            final InetAddress addr = InetAddress.getLocalHost();
+            return addr;
+        } catch (UnknownHostException e) {
+            try {
+                Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+                if (interfaces == null) {
+                    return null;
+                }
+                NetworkInterface intf = interfaces.nextElement();
+                Enumeration<InetAddress> addresses = intf.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    InetAddress address = addresses.nextElement();
+                    if (address instanceof Inet4Address) {
+                        return address;
+                    }
+                }
+                interfaces = NetworkInterface.getNetworkInterfaces();
+                while (addresses.hasMoreElements()) {
+                    return addresses.nextElement();
+                }
+                return null;
+            } catch (SocketException e1) {
+                return null;
+            }
+        }
+    }
     private static Object[] getAuthenticatedConnection(
             String service, String host, String username, String password, int port)
     throws IOException {
         Object returnArray[] = new Object[3];
         boolean success = false;
         InetSocketAddress addr = new InetSocketAddress(host, port);
+        if (addr.isUnresolved()) {
+            throw new java.net.UnknownHostException(host);
+        }
         SocketChannel aChannel = SocketChannel.open(addr);
         returnArray[0] = aChannel;
         assert(aChannel.isConnected());

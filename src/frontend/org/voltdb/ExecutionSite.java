@@ -40,6 +40,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ConnectionUtil;
 import org.voltdb.debugstate.ExecutorContext;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
@@ -458,11 +459,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     private ExecutionEngine
     initializeEE(BackendTarget target, String serializedCatalog)
     {
-        String hostname = "";
-        try {
-            hostname = java.net.InetAddress.getLocalHost().getHostName();
-        } catch (java.net.UnknownHostException uhe) {
-        }
+        String hostname = ConnectionUtil.getHostnameOrAddress();
 
         ExecutionEngine eeTemp = null;
         try {

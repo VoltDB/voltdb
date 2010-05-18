@@ -19,12 +19,12 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 
 import org.apache.log4j.Logger;
 import org.voltdb.VoltDB;
+import org.voltdb.client.ConnectionUtil;
 import org.voltdb.fault.NodeFailureFault;
 import org.voltdb.network.Connection;
 import org.voltdb.network.QueueMonitor;
@@ -219,14 +219,7 @@ public class ForeignHost {
      * to mailbox -1.
      */
     void sendReadyMessage() {
-        InetAddress addr = null;
-        try {
-            addr = InetAddress.getLocalHost();
-        } catch (UnknownHostException e) {
-            e.printStackTrace();
-            VoltDB.crashVoltDB();
-        }
-        String hostname = addr.getHostName();
+        String hostname = ConnectionUtil.getHostnameOrAddress();
         byte hostnameBytes[] = hostname.getBytes();
         ByteBuffer out = ByteBuffer.allocate(12 + hostnameBytes.length);
         // length prefix int

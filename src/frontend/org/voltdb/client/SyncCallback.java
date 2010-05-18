@@ -18,8 +18,6 @@
 package org.voltdb.client;
 import java.util.concurrent.Semaphore;
 
-import org.voltdb.VoltTable;
-
 /**
  * A utility class that allows a client to queue a stored procedure invocation asynchronously and then poll
  * or join on the response. Useful when invoking multiple stored procedures synchronously

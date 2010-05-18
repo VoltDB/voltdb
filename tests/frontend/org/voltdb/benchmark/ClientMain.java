@@ -45,6 +45,7 @@ import org.voltdb.benchmark.Verification.Expression;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ConnectionUtil;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.StatsUploaderSettings;
@@ -866,12 +867,7 @@ public abstract class ClientMain {
             System.err.println("Checking table " + tableName);
 
             // Copy the file over
-            String localhostName = null;
-            try {
-                localhostName = InetAddress.getLocalHost().getHostName();
-            } catch (UnknownHostException e1) {
-                localhostName = "localhost";
-            }
+            String localhostName =  ConnectionUtil.getHostnameOrAddress();
             if (!hostName.equals("localhost") && !hostName.equals(localhostName)) {
                 if (!SSHTools.copyFromRemote(file, m_username, hostName, file.getPath())) {
                     System.err.println("Failed to copy the snapshot file " + file.getPath()
