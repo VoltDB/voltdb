@@ -455,12 +455,22 @@ public class ClientInterface implements DumpManager.Dumpable {
             else {
                 // If no processor can handle this service, null is returned.
                 String connectorClassName = ELTManager.instance().getConnectorForService(service);
+                if (connectorClassName == null) {
+                    //Send negative response
+                    responseBuffer.put((byte)-1).flip();
+                    socket.write(responseBuffer);
+                    socket.close();
+                    authLog.warn("Failure to authorize user " + username +
+                                 " for disabled or unconfigured service " +
+                                 service + ".");
+                    return null;
+                }
                 if (!user.authorizeConnector(connectorClassName)) {
                     //Send negative response
                     responseBuffer.put((byte)-1).flip();
                     socket.write(responseBuffer);
                     socket.close();
-                    authLog.warn("Failure to authroize user " + username + " for service " + service + ".");
+                    authLog.warn("Failure to authorize user " + username + " for service " + service + ".");
                     return null;
                 }
 
