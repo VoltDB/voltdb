@@ -285,13 +285,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
             if ((newState == QueueState.BLOCKED_ORDERING) || (newState == QueueState.BLOCKED_SAFETY)) {
                 m_blockTime = System.currentTimeMillis();
             }
-            /*if (newState == QueueState.UNBLOCKED) {
-                if ((m_state == QueueState.BLOCKED_ORDERING) || (m_state == QueueState.BLOCKED_SAFETY)) {
-                    long blockedFor = System.currentTimeMillis() - m_blockTime;
-                    System.out.printf("Queue unblocked. Was blocked for %d ms\n", blockedFor);
-                    System.out.flush();
-                }
-            }*/
+
             if ((m_state == QueueState.BLOCKED_ORDERING) || (m_state == QueueState.BLOCKED_SAFETY)) {
                 assert(m_state != QueueState.BLOCKED_EMPTY);
             }
@@ -312,15 +306,13 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
         // mailbox might be null in testing
         if (m_mailbox == null) return;
 
-        HeartbeatResponseMessage hbr = new HeartbeatResponseMessage(m_siteId, lid.m_lastSeenTxnId, true);
+        HeartbeatResponseMessage hbr =
+            new HeartbeatResponseMessage(m_siteId, lid.m_lastSeenTxnId, true);
         try {
             m_mailbox.send(ts.initiatorSiteId, VoltDB.DTXN_MAILBOX_ID, hbr);
         } catch (MessagingException e) {
             // I really hope this doesn't happen
             throw new RuntimeException(e);
         }
-
-        //System.out.println("Sent response based on queue block.");
-        //System.out.flush();
     }
 }
