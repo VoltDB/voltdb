@@ -303,6 +303,14 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
             m_sb = new ProtoStateBlock(c);
         }
 
+        /**
+         * Called by VoltNetwork when the port is unregistered.
+         */
+        @Override
+        public void stopping(Connection c) {
+            m_sb.closeConnection();
+        }
+
         @Override
         public int getExpectedOutgoingMessageSize() {
             // roughly 2MB plus the message metadata
