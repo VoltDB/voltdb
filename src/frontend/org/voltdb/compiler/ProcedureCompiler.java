@@ -223,6 +223,17 @@ public abstract class ProcedureCompiler {
             else
                 param.setIsarray(false);
 
+            // boxed types are not supported parameters at this time
+            if ((cls == Long.class) || (cls == Integer.class) || (cls == Short.class) ||
+                (cls == Byte.class) || (cls == Double.class) || (cls == Float.class) ||
+                (cls == Character.class) || (cls == Boolean.class))
+            {
+                String msg = "Procedure: " + shortName + " has a parameter with a boxed type: ";
+                msg += cls.getSimpleName();
+                msg += ". Replace this parameter with the corresponding primitive type and the procedure may compile.";
+                throw compiler.new VoltCompilerException(msg);
+            }
+
             VoltType type;
             try {
                 type = VoltType.typeFromClass(cls);
