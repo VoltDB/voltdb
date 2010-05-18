@@ -124,6 +124,11 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     // The time in ms since epoch of the last call to tick()
     long lastTickTime = 0;
     long lastCommittedTxnId = 0;
+    // The transaction ID of the last committed multi-partition transaction is
+    // tracked so that participants can determine whether or not to commit or
+    // roll back if the coordinator fails while notifying each participant of
+    // the final outcome for the txn.
+    long lastCommittedMultiPartTxnId = 0;
 
     private final static long kInvalidUndoToken = -1L;
     private long txnBeginUndoToken = kInvalidUndoToken;
@@ -631,6 +636,10 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         // resolution.
         if (txnState.txnId > lastCommittedTxnId) {
             lastCommittedTxnId = txnState.txnId;
+            if (!txnState.isSinglePartition())
+            {
+                lastCommittedMultiPartTxnId = txnState.txnId;
+            }
         }
     }
 
@@ -785,7 +794,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
 
 
     /**
-     * Find the global commit point and the global initiator point for the
+     * Find the global multi-partition commit point and the global initiator point for the
      * failed host.
      *
      * @param failedHostId the host id of the failed node.
@@ -803,8 +812,9 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     }
 
     /**
-     * Send one message to each surviving execution site providing this site's commit
-     * point and this site's safe txnid (the receiver will filter the later for its
+     * Send one message to each surviving execution site providing this site's
+     * multi-partition commit point and this site's safe txnid
+     * (the receiver will filter the later for its
      * own partition). Do this once for each newly failed initiator.
      */
     private int discoverGlobalFaultData_send(int failedHostId)
@@ -821,7 +831,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                                                      failedHostId,
                                                      site,
                                                      m_transactionQueue.getNewestSafeTransactionForInitiator(site),
-                                                     lastCommittedTxnId);
+                                                     lastCommittedMultiPartTxnId);
 
                     m_mailbox.send(survivors, 0, srcmsg);
                     expectedResponses += (survivors.length);
@@ -887,12 +897,13 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
      * handleNodeFault.
      *
      * @param hostId the failed node's host id.
-     * @param globalCommitPoint the surviving cluster's greatest committed transaction id
+     * @param globalCommitPoint the surviving cluster's greatest committed multi-partition transaction id
      * @param globalInitiationPoint the greatest transaction id acknowledged as globally
      * 2PC to any surviving cluster execution site by the failed initiator.
      *
      */
-    void handleNodeFault(int hostId, long globalCommitPoint, long globalInitiationPoint) {
+    void handleNodeFault(int hostId, long globalMultiPartCommitPoint,
+                         long globalInitiationPoint) {
 
         // Fix safe transaction scoreboard in transaction queue
         ArrayList<Integer> failedSites =
@@ -935,13 +946,13 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                      failedSites.contains(ts.coordinatorSiteId))
             {
                 MultiPartitionParticipantTxnState mpts = (MultiPartitionParticipantTxnState) ts;
-                if (ts.isInProgress() && ts.txnId <= globalCommitPoint)
+                if (ts.isInProgress() && ts.txnId <= globalMultiPartCommitPoint)
                 {
                     FragmentTaskMessage ft = mpts.createConcludingFragmentTask();
                     ft.setShouldUndo(false);
                     m_mailbox.deliver(ft);
                 }
-                else if (ts.isInProgress() && ts.txnId > globalCommitPoint) {
+                else if (ts.isInProgress() && ts.txnId > globalMultiPartCommitPoint) {
                     FragmentTaskMessage ft = mpts.createConcludingFragmentTask();
                     ft.setShouldUndo(true);
                     m_mailbox.deliver(ft);

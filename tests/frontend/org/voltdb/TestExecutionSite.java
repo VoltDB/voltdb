@@ -256,11 +256,15 @@ public class TestExecutionSite extends TestCase {
         int callcheck = MockSPVoltProcedure.m_called;
 
         assertFalse(tx1.isDone());
+        assertEquals(0, m_sites[site1].lastCommittedTxnId);
+        assertEquals(0, m_sites[site1].lastCommittedMultiPartTxnId);
         m_sites[site1].m_transactionsById.put(tx1.txnId, tx1);
         m_sites[site1].recursableRun(tx1);
         assertTrue(tx1.isDone());
         assertEquals(null, m_sites[site1].m_transactionsById.get(tx1.txnId));
         assertEquals((++callcheck), MockSPVoltProcedure.m_called);
+        assertEquals(1000, m_sites[site1].lastCommittedTxnId);
+        assertEquals(0, m_sites[site1].lastCommittedMultiPartTxnId);
     }
 
     /*
@@ -322,6 +326,10 @@ public class TestExecutionSite extends TestCase {
         int callcheck = MockMPVoltProcedure.m_called;
         assertFalse(tx1_1.isDone());
         assertFalse(tx1_2.isDone());
+        assertEquals(0, m_sites[site1].lastCommittedTxnId);
+        assertEquals(0, m_sites[site1].lastCommittedMultiPartTxnId);
+        assertEquals(0, m_sites[site2].lastCommittedTxnId);
+        assertEquals(0, m_sites[site2].lastCommittedMultiPartTxnId);
         m_sites[site1].m_transactionsById.put(tx1_1.txnId, tx1_1);
         m_sites[site2].m_transactionsById.put(tx1_2.txnId, tx1_2);
 
@@ -342,6 +350,10 @@ public class TestExecutionSite extends TestCase {
         assertTrue(tx1_2.isDone());
         assertEquals(null, m_sites[site1].m_transactionsById.get(tx1_1.txnId));
         assertEquals(null, m_sites[site2].m_transactionsById.get(tx1_2.txnId));
+        assertEquals(1000, m_sites[site1].lastCommittedTxnId);
+        assertEquals(1000, m_sites[site1].lastCommittedMultiPartTxnId);
+        assertEquals(1000, m_sites[site2].lastCommittedTxnId);
+        assertEquals(1000, m_sites[site2].lastCommittedMultiPartTxnId);
         assertEquals((++callcheck), MockMPVoltProcedure.m_called);
     }
 
@@ -361,8 +373,8 @@ public class TestExecutionSite extends TestCase {
 
         // Want to commit this participant. Global commit pt must
         // be GT than the running txnid.
-        m_sites[site1].lastCommittedTxnId = DtxnConstants.DUMMY_LAST_SEEN_TXN_ID + 1;
-        m_sites[site2].lastCommittedTxnId = DtxnConstants.DUMMY_LAST_SEEN_TXN_ID + 1;
+        m_sites[site1].lastCommittedMultiPartTxnId = DtxnConstants.DUMMY_LAST_SEEN_TXN_ID + 1;
+        m_sites[site2].lastCommittedMultiPartTxnId = DtxnConstants.DUMMY_LAST_SEEN_TXN_ID + 1;
 
         boolean test_rollback = false;
         multipartitionNodeFailure(test_rollback, DtxnConstants.DUMMY_LAST_SEEN_TXN_ID);
@@ -383,8 +395,8 @@ public class TestExecutionSite extends TestCase {
 
         // Want to NOT commit this participant. Global commit pt must
         // be LT than the running txnid.
-        m_sites[site1].lastCommittedTxnId =  DtxnConstants.DUMMY_LAST_SEEN_TXN_ID - 1;
-        m_sites[site2].lastCommittedTxnId =  DtxnConstants.DUMMY_LAST_SEEN_TXN_ID - 1;
+        m_sites[site1].lastCommittedMultiPartTxnId =  DtxnConstants.DUMMY_LAST_SEEN_TXN_ID - 1;
+        m_sites[site2].lastCommittedMultiPartTxnId =  DtxnConstants.DUMMY_LAST_SEEN_TXN_ID - 1;
 
         boolean test_rollback = true;
         multipartitionNodeFailure(test_rollback, DtxnConstants.DUMMY_LAST_SEEN_TXN_ID);
