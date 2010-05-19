@@ -630,7 +630,7 @@ public class TestVoltCompiler extends TestCase {
             "  <schemas><schema path='" + schemaPath + "' /></schemas>" +
             "  <procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
             "  <exports><connector class='org.voltdb.VerticaLoader'> " +
-            "             <tables><table name='foo' exportonly='true'/></tables>" +
+            "             <tables><table name='books' exportonly='true'/></tables>" +
             "           </connector>" +
             "  </exports>" +
             " </database>" +
