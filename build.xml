@@ -1014,7 +1014,10 @@ TEST CASES
     <arg line="-b ${src.ee.parent.dir}"/>
   </exec>
   <!-- Run the tests -->
-  <antcall target="${lcov.target}">
+  <antcall target="lcov-unit-tests">
+    <param name="build.dir.suffix" value="-coverage" />
+  </antcall>
+  <antcall target="sqlcoverage">
     <param name="build.dir.suffix" value="-coverage" />
   </antcall>
   <!-- Get test coverage -->
@@ -1045,7 +1048,7 @@ TEST CASES
 
 <target name='lcov-report' description=''>
     <property name="lcov.dir" location="${build.dir}-coverage/lcov" />
-    <property name="lcov.target" value="sqlcoverage" />
+    <!-- <property name="lcov.target" value="sqlcoverage" /> -->
     <antcall target="with.lcov" />
 </target>
 
@@ -1059,16 +1062,16 @@ TEST CASES
     </exec>
 </target>
 
-<target
-    name='lcov-unit-tests-report'
-    description="Generate C++ unit test coverage reports.">
-    <property
-        name="lcov.dir"
-        location="${build.dir}-coverage/lcov-unit-tests"
-    />
-    <property name="lcov.target" value="lcov-unit-tests" />
-    <antcall target="with.lcov" />
-</target>
+<!-- <target -->
+<!--     name='lcov-unit-tests-report' -->
+<!--     description="Generate C++ unit test coverage reports."> -->
+<!--     <property -->
+<!--         name="lcov.dir" -->
+<!--         location="${build.dir}-coverage/lcov-unit-tests" -->
+<!--     /> -->
+<!--     <property name="lcov.target" value="lcov-unit-tests" /> -->
+<!--     <antcall target="with.lcov" /> -->
+<!-- </target> -->
 
 <target
     name='testability-report'
