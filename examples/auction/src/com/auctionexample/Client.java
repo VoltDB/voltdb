@@ -55,11 +55,11 @@ public class Client {
     static final int statusPeriodInSeconds = 10;
 
     // list of all currently running auction ids
-    static ArrayList<Long> activeAuctionIds = new ArrayList<Long>();
+    static ArrayList<Integer> activeAuctionIds = new ArrayList<Integer>();
     // list of all auction ids
-    static ArrayList<Long> allAuctionIds;
+    static ArrayList<Integer> allAuctionIds;
     // list of all user ids
-    static ArrayList<Long> userIds;
+    static ArrayList<Integer> userIds;
 
     // random number generator
     static Random random = new Random();
@@ -67,7 +67,7 @@ public class Client {
     // This is hackish, but we insert bids with ids generated on the client side, due
     // to a missing "auto-increment" feature. It's actually a tough feature to implement
     // given our design, but we think we can add an "auto-unique" without much trouble.
-    static long nextBidId = -1;
+    static int nextBidId = -1;
 
     /**
      * Get a random new bid amound based on an old bid amount.
@@ -94,7 +94,7 @@ public class Client {
      * @param userId The id of the user making the bid.
      * @return A status code which can be found at the top of this class.
      */
-    static long doBid(org.voltdb.client.Client client, long auctionId, long userId) {
+    static int doBid(org.voltdb.client.Client client, int auctionId, int userId) {
         ///////////////////////////////////////
         // get the current bid price of an item
         ///////////////////////////////////////
@@ -126,7 +126,7 @@ public class Client {
 
         // return the result of the bid procedure
         // we're primarily interested in POST_CLOSE_BID
-        return bidResult.asScalarLong();
+        return (int)bidResult.asScalarLong();
     }
 
     /**
@@ -140,8 +140,8 @@ public class Client {
             try { Thread.sleep(random.nextInt(maxSleepMillis)); } catch (Exception e) {}
 
             // get a random value from the active auctions and users lists
-            long itemId = activeAuctionIds.get(random.nextInt(activeAuctionIds.size()));
-            long userId = userIds.get(random.nextInt(userIds.size()));
+            int itemId = activeAuctionIds.get(random.nextInt(activeAuctionIds.size()));
+            int userId = userIds.get(random.nextInt(userIds.size()));
             // make a bid
             long status = doBid(client, itemId, userId);
 
@@ -184,7 +184,7 @@ public class Client {
                 "-----------------------------------------------+\n");
 
                 // loop over all auction ids, printing a row of status for each one
-                for (long auctionId : allAuctionIds) {
+                for (int auctionId : allAuctionIds) {
                     VoltTable[] statusResultSet = client.callProcedure("AuctionStatus", auctionId).getResults();
                     if (statusResultSet.length != 1) throw new Exception("AuctionStatus returned no results");
                     VoltTable statusTable = statusResultSet[0];

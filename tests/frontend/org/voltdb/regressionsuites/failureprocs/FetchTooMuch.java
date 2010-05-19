@@ -33,7 +33,7 @@ public class FetchTooMuch extends VoltProcedure {
 
     public final SQLStmt fetchTooMuch = new SQLStmt("SELECT COUNT(P) FROM WIDE WHERE P > -1;");
 
-    public VoltTable[] run(long p) {
+    public VoltTable[] run(int p) {
         voltQueueSQL(fetchTooMuch);
         return voltExecuteSQL();
     }

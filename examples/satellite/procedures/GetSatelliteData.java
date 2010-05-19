@@ -12,7 +12,7 @@ public class GetSatelliteData extends VoltProcedure {
         new SQLStmt("SELECT MODEL_NUMBER, COUNTRY " +
                     "FROM SATELLITE WHERE ID=?;");
 
-    public VoltTable[] run(long id) throws VoltAbortException {
+    public VoltTable[] run(int id) throws VoltAbortException {
         // Add a SQL statement to the current execution queue. Queries
         // and DMLs may not be mixed in one batch.
         voltQueueSQL( selectItem, id );

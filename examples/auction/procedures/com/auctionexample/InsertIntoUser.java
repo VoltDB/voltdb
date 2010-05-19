@@ -49,7 +49,7 @@ public class InsertIntoUser extends VoltProcedure {
      * @return The number of rows affected.
      * @throws VoltAbortException
      */
-    public VoltTable[] run(long userid, String lastname, String firstname, String streetaddress, String city, String state, String zip, String email) throws VoltAbortException {
+    public VoltTable[] run(int userid, String lastname, String firstname, String streetaddress, String city, String state, String zip, String email) throws VoltAbortException {
         voltQueueSQL(insert, userid, lastname, firstname, streetaddress, city, state, zip, email);
         return voltExecuteSQL();
     }

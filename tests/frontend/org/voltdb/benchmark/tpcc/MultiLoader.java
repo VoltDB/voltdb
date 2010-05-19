@@ -858,7 +858,11 @@ public class MultiLoader extends ClientMain {
                 System.exit(-1);
             }
         }
-        m_voltClient.drain();
+        try {
+            m_voltClient.drain();
+        } catch (InterruptedException e) {
+            return;
+        }
     }
 
     @Override

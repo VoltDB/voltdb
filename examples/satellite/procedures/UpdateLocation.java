@@ -13,7 +13,7 @@ public class UpdateLocation extends VoltProcedure {
                     "SET LATITUDE=?, LONGITUDE=? " +
                     "WHERE ID=?;");
 
-    public VoltTable[] run( long id, double latitude, double longitude) throws VoltAbortException {
+    public VoltTable[] run( int id, double latitude, double longitude) throws VoltAbortException {
         // Add a SQL statement to the execution queue. Queries
         // and DMLs may not be mixed in one batch.
         voltQueueSQL( updateItem, latitude, longitude, id);

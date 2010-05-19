@@ -37,7 +37,7 @@ public class Delete extends VoltProcedure {
     public final SQLStmt d_allow_nulls = new SQLStmt
     ("DELETE FROM ALLOW_NULLS WHERE PKEY = ?;");
 
-    public VoltTable[] run(String tablename, long pkey) {
+    public VoltTable[] run(String tablename, int pkey) {
 
         if (tablename.equals("ALLOW_NULLS")) {
             voltQueueSQL(d_allow_nulls, pkey);

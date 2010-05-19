@@ -32,7 +32,7 @@ import org.voltdb.*;
 public class DeletePerson extends VoltProcedure {
     public final SQLStmt delete = new SQLStmt("DELETE FROM PEOPLE WHERE ID = ?;");
 
-    public VoltTable[] run(long partition, long id) {
+    public VoltTable[] run(int partition, long id) {
         voltQueueSQL(delete, id);
         return voltExecuteSQL();
     }

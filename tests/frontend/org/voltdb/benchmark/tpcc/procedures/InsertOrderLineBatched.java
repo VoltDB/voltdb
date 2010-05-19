@@ -64,7 +64,7 @@ public class InsertOrderLineBatched extends VoltProcedure {
 
     public final SQLStmt insert = new SQLStmt("INSERT INTO ORDER_LINE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
-    public VoltTable[] run(long[] ol_o_id, long[] ol_d_id, long ol_w_id, long[] ol_number,
+    public VoltTable[] run(long[] ol_o_id, long[] ol_d_id, short ol_w_id, long[] ol_number,
         long[] ol_i_id, long[] ol_supply_w_id, TimestampType[] ol_delivery_d, long[] ol_quantity,
         double[] ol_amount, String[] ol_dist_info) {
 

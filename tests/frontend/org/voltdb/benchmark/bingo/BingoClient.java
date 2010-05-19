@@ -165,6 +165,8 @@ public class BingoClient extends ClientMain {
             m_voltClient.drain();
         } catch (IOException e) {
             return false;
+        } catch (InterruptedException e) {
+            return false;
         }
         return true;
     }

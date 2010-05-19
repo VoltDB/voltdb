@@ -27,7 +27,7 @@ public class Select extends VoltProcedure {
       new SQLStmt("SELECT ##upper_project_name##_ID,  ##upper_project_name##_ITEM " +
                   "FROM ##upper_project_name## WHERE  ##upper_project_name##_ID = ?");
 
-    public VoltTable[] run( long ##upper_project_name##_ID ) throws VoltAbortException {
+    public VoltTable[] run( int ##upper_project_name##_ID ) throws VoltAbortException {
         // Add a SQL statement to the current execution queue
         voltQueueSQL( selectItem, ##upper_project_name##_ID );
 

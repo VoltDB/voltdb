@@ -33,7 +33,7 @@ public class FetchNORowUsingIndex extends VoltProcedure {
 
     public final SQLStmt select = new SQLStmt("SELECT * FROM NEW_ORDER WHERE NO_D_ID = ? AND NO_W_ID = ? AND NO_O_ID = ?");
 
-    public VoltTable[] run(long w_id, long d_id, long o_id) {
+    public VoltTable[] run(byte w_id, long d_id, long o_id) {
         voltQueueSQL(select, d_id, w_id, o_id);
         return voltExecuteSQL();
     }

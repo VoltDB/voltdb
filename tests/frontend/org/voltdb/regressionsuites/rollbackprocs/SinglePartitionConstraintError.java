@@ -33,7 +33,7 @@ public class SinglePartitionConstraintError extends VoltProcedure {
 
     public final SQLStmt insert = new SQLStmt("INSERT INTO NEW_ORDER VALUES (?, ?, ?);");
 
-    public VoltTable[] run(long w_id) {
+    public VoltTable[] run(byte w_id) {
         voltQueueSQL(insert, w_id, w_id, w_id);
         long tuplesChanged1 = voltExecuteSQL()[0].asScalarLong();
 

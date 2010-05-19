@@ -38,7 +38,7 @@ public class SelectEmptyTable extends VoltProcedure
     public final SQLStmt makeReadWrite =
         new SQLStmt("insert into P1 VALUES (?, 'bung', 1, 1.0);");
 
-    public VoltTable[] run(long id)
+    public VoltTable[] run(int id)
     {
 
         VoltTable empty1 = new VoltTable(new VoltTable.ColumnInfo("column1",VoltType.BIGINT),

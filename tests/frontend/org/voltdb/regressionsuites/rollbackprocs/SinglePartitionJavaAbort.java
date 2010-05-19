@@ -33,7 +33,7 @@ public class SinglePartitionJavaAbort extends VoltProcedure {
 
     public final SQLStmt insert = new SQLStmt("INSERT INTO NEW_ORDER VALUES (?, ?, ?);");
 
-    public VoltTable[] run(long w_id) throws VoltAbortException {
+    public VoltTable[] run(byte w_id) throws VoltAbortException {
         voltQueueSQL(insert, w_id, w_id, w_id);
         long tuplesChanged = voltExecuteSQL()[0].asScalarLong();
         assert(tuplesChanged > 0);

@@ -146,7 +146,7 @@ public interface Client {
      * or there are no more connections to the cluster
      * @throws NoConnectionsException
      */
-    public void drain() throws NoConnectionsException;
+    public void drain() throws NoConnectionsException, InterruptedException;
 
     /**
      * Shutdown the {@link Client} closing all network connections and release all memory resources.

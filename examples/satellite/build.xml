@@ -91,7 +91,7 @@ SERVER & CLIENT TARGETS
 -->
 
 <target name="server"
-    description="Example: ant server    Start a VoltDB server with the satellite catalog.">
+    description="Example: ant server    Start a VoltDB server with the satellite catalog." depends="main" >
     <java fork="yes" classname="org.voltdb.VoltDB" >
         <jvmarg value="-Djava.library.path=../../voltdb" />
         <jvmarg value="-server" />
@@ -104,7 +104,8 @@ SERVER & CLIENT TARGETS
 </target>
 
 <target name="client"
-    description="Example: ant client    Run Satellite signal client.">
+    description="Example: ant client    Run Satellite signal client."
+    depends="main">
     <java fork="yes" classname="signal.Client" >
      <arg value="5"/>    <!-- number of satellites -->
     <arg value="usa"/>    <!-- country -->

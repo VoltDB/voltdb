@@ -32,7 +32,7 @@ import org.voltdb.*;
 public class SelectAllPeople extends VoltProcedure {
     public final SQLStmt get = new SQLStmt("SELECT * FROM PEOPLE;");
 
-    public VoltTable[] run(long id) {
+    public VoltTable[] run(int id) {
         voltQueueSQL(get);
         return voltExecuteSQL();
     }

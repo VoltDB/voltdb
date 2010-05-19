@@ -148,18 +148,18 @@ public class TestOrderBySuite extends RegressionSuite {
         }
     }
 
-    private void loadWithDupes(Client client) throws NoConnectionsException, ProcCallException, IOException {
-        client.callProcedure(new SyncCallback(), "InsertO1", new Long(1), new Long(1), "Alice", "AlphaBitters");
-        client.callProcedure(new SyncCallback(), "InsertO1", new Long(2), new Long(2), "Alice", "CrunchTubers");
-        client.callProcedure(new SyncCallback(), "InsertO1", new Long(3), new Long(3), "Alice", "BetaBuildingBlocks");
+    private void loadWithDupes(Client client) throws Exception {
+        client.callProcedure("InsertO1", 1, new Long(1), "Alice", "AlphaBitters");
+        client.callProcedure("InsertO1", 2, new Long(2), "Alice", "CrunchTubers");
+        client.callProcedure("InsertO1", 3, new Long(3), "Alice", "BetaBuildingBlocks");
 
-        client.callProcedure(new SyncCallback(), "InsertO1", new Long(4), new Long(1), "Betty", "CrunchTubers");
-        client.callProcedure(new SyncCallback(), "InsertO1", new Long(5), new Long(2), "Betty", "AlphaBitters");
-        client.callProcedure(new SyncCallback(), "InsertO1", new Long(6), new Long(3), "Betty", "BetaBuildingBlocks");
+        client.callProcedure("InsertO1", 4, new Long(1), "Betty", "CrunchTubers");
+        client.callProcedure("InsertO1", 5, new Long(2), "Betty", "AlphaBitters");
+        client.callProcedure("InsertO1", 6, new Long(3), "Betty", "BetaBuildingBlocks");
 
-        client.callProcedure(new SyncCallback(), "InsertO1", new Long(7), new Long(1), "Chris", "BetaBuildingBlocks");
-        client.callProcedure(new SyncCallback(), "InsertO1", new Long(8), new Long(2), "Chris", "CrunchTubers");
-        client.callProcedure(new SyncCallback(), "InsertO1", new Long(9), new Long(3), "Chris", "AlphaBitters");
+        client.callProcedure("InsertO1", 7, new Long(1), "Chris", "BetaBuildingBlocks");
+        client.callProcedure("InsertO1", 8, new Long(2), "Chris", "CrunchTubers");
+        client.callProcedure("InsertO1", 9, new Long(3), "Chris", "AlphaBitters");
 
         client.drain();
     }
@@ -315,7 +315,7 @@ public class TestOrderBySuite extends RegressionSuite {
          *   9      3       Chris      AlphaBitters
          */
 
-    public void testMultiColumnOrderBy() throws NoConnectionsException, ProcCallException, IOException {
+    public void testMultiColumnOrderBy() throws Exception {
         VoltTable vt;
         Client client = this.getClient();
         loadWithDupes(client);
@@ -420,7 +420,7 @@ public class TestOrderBySuite extends RegressionSuite {
         }
     }
 
-    public void testAggOrderByGroupBy() throws IOException, ProcCallException, InterruptedException
+    public void testAggOrderByGroupBy() throws Exception
     {
         VoltTable vt;
         Client client = this.getClient();

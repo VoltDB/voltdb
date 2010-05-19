@@ -31,7 +31,6 @@ import org.voltdb.VoltType;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
@@ -88,14 +87,14 @@ public class TestExportSuite extends RegressionSuite {
     }
 
     private void quiesce(final Client client)
-    throws ProcCallException, NoConnectionsException, IOException
+    throws Exception
     {
         client.drain();
         client.callProcedure("@Quiesce");
     }
 
     private void quiesceAndVerify(final Client client, ExportTestClient tester)
-    throws ProcCallException, IOException
+    throws Exception
     {
         quiesce(client);
         tester.work();
@@ -104,7 +103,7 @@ public class TestExportSuite extends RegressionSuite {
     }
 
     private void quiesceAndVerifyFalse(final Client client, ExportTestClient tester)
-    throws ProcCallException, IOException
+    throws Exception
     {
         quiesce(client);
         tester.work();
@@ -115,6 +114,7 @@ public class TestExportSuite extends RegressionSuite {
     public void setUp()
     {
         super.setUp();
+        callbackSucceded = true;
         m_tester = new ExportTestClient(getServerConfig().getNodeCount());
         try {
             m_tester.connectToELServers(null, null);
@@ -124,10 +124,16 @@ public class TestExportSuite extends RegressionSuite {
         }
     }
 
+    @Override
+    public void tearDown() throws Exception {
+        super.tearDown();
+        assertTrue(callbackSucceded);
+    }
+
     /**
      * Verify safe startup (we can connect clients and poll empty tables)
      */
-    public void testELTSafeStartup() throws IOException, ProcCallException, InterruptedException
+    public void testELTSafeStartup() throws Exception
     {
         final Client client = getClient();
         quiesceAndVerify(client, m_tester);
@@ -137,7 +143,7 @@ public class TestExportSuite extends RegressionSuite {
      * Sends ten tuples to an EL enabled VoltServer and verifies the receipt
      * of those tuples after a quiesce (shutdown). Base case.
      */
-    public void testELTRoundTripPersistentTable() throws IOException, ProcCallException, InterruptedException
+    public void testELTRoundTripPersistentTable() throws Exception
     {
         final Client client = getClient();
         for (int i=0; i < 10; i++) {
@@ -150,7 +156,7 @@ public class TestExportSuite extends RegressionSuite {
         quiesceAndVerify(client, m_tester);
     }
 
-    public void testELTLocalServerTooMany() throws IOException, ProcCallException, InterruptedException
+    public void testELTLocalServerTooMany() throws Exception
     {
         final Client client = getClient();
         for (int i=0; i < 10; i++) {
@@ -161,7 +167,7 @@ public class TestExportSuite extends RegressionSuite {
         quiesceAndVerifyFalse(client, m_tester);
     }
 
-    public void testELTLocalServerTooMany2() throws IOException, ProcCallException, InterruptedException
+    public void testELTLocalServerTooMany2() throws Exception
     {
         final Client client = getClient();
         for (int i=0; i < 10; i++) {
@@ -178,7 +184,7 @@ public class TestExportSuite extends RegressionSuite {
     }
 
     /** Verify test infrastructure fails a test that sends too few rows */
-    public void testELTLocalServerTooFew() throws IOException, ProcCallException, InterruptedException
+    public void testELTLocalServerTooFew() throws Exception
     {
         final Client client = getClient();
 
@@ -196,7 +202,7 @@ public class TestExportSuite extends RegressionSuite {
     }
 
     /** Verify test infrastructure fails a test that sends mismatched data */
-    public void testELTLocalServerBadData() throws IOException, ProcCallException, InterruptedException
+    public void testELTLocalServerBadData() throws Exception
     {
         final Client client = getClient();
 
@@ -214,7 +220,7 @@ public class TestExportSuite extends RegressionSuite {
      * Sends ten tuples to an EL enabled VoltServer and verifies the receipt
      * of those tuples after a quiesce (shutdown). Base case.
      */
-    public void testELTRoundTripStreamedTable() throws IOException, ProcCallException, InterruptedException
+    public void testELTRoundTripStreamedTable() throws Exception
     {
         final Client client = getClient();
 
@@ -228,7 +234,7 @@ public class TestExportSuite extends RegressionSuite {
     }
 
     /** Test that a table w/o ELT enabled does not produce ELT content */
-    public void testThatTablesOptIn() throws IOException, ProcCallException, InterruptedException
+    public void testThatTablesOptIn() throws Exception
     {
         final Client client = getClient();
 
@@ -248,12 +254,13 @@ public class TestExportSuite extends RegressionSuite {
         quiesceAndVerify(client, m_tester);
     }
 
-
+    private boolean callbackSucceded = true;
     class RollbackCallback implements ProcedureCallback {
         @Override
         public void clientCallback(ClientResponse clientResponse) {
             if (clientResponse.getStatus() != ClientResponse.USER_ABORT) {
-                fail();
+                callbackSucceded = false;
+                System.err.println(clientResponse.getException());
             }
         }
     }
@@ -263,7 +270,7 @@ public class TestExportSuite extends RegressionSuite {
      * of each in the EL stream. Some procedures rollback (after a real insert).
      * Tests that streams are correct in the face of rollback.
      */
-    public void testELTRollback() throws IOException, ProcCallException, InterruptedException {
+    public void testELTRollback() throws Exception {
         final Client client = getClient();
 
         double rollbackPerc = 0.15;
@@ -332,7 +339,7 @@ public class TestExportSuite extends RegressionSuite {
     /*
      * Verify that allowELT = no is obeyed for @LoadMultipartitionTable
      */
-    public void testLoadMultiPartitionTableELTOff() throws IOException, ProcCallException
+    public void testLoadMultiPartitionTableELTOff() throws Exception
     {
         // allow ELT is off. no rows added to the verifier
         VoltTable loadTable = createLoadTableTable(false, m_tester);
@@ -344,7 +351,7 @@ public class TestExportSuite extends RegressionSuite {
     /*
      * Verify that allowELT = yes is obeyed for @LoadMultipartitionTable
      */
-    public void testLoadMultiPartitionTableELTOn() throws IOException, ProcCallException
+    public void testLoadMultiPartitionTableELTOn() throws Exception
     {
         // allow ELT is on. rows added to the verifier
         VoltTable loadTable = createLoadTableTable(true, m_tester);
@@ -356,7 +363,7 @@ public class TestExportSuite extends RegressionSuite {
     /*
      * Verify that allowELT = yes is obeyed for @LoadMultipartitionTable
      */
-    public void testLoadMultiPartitionTableELTOn2() throws IOException, ProcCallException
+    public void testLoadMultiPartitionTableELTOn2() throws Exception
     {
         // allow ELT is on but table is not opted in to ELT.
         VoltTable loadTable = createLoadTableTable(false, m_tester);
@@ -419,7 +426,7 @@ public class TestExportSuite extends RegressionSuite {
     /**
      * Verify round trips of updates to a persistent table.
      */
-    public void testELTDeletes() throws IOException, ProcCallException, InterruptedException
+    public void testELTDeletes() throws Exception
     {
         final Client client = getClient();
 
@@ -445,7 +452,7 @@ public class TestExportSuite extends RegressionSuite {
     /**
      * Verify round trips of updates to a persistent table.
      */
-    public void testELTUpdates() throws IOException, ProcCallException, InterruptedException
+    public void testELTUpdates() throws Exception
     {
         final Client client = getClient();
 
@@ -488,7 +495,7 @@ public class TestExportSuite extends RegressionSuite {
     /**
      * Multi-table test
      */
-    public void testELTMultiTable() throws IOException, ProcCallException, InterruptedException
+    public void testELTMultiTable() throws Exception
     {
         final Client client = getClient();
 
@@ -511,7 +518,7 @@ public class TestExportSuite extends RegressionSuite {
     /*
      * Verify that snapshot can be enabled with a streamed table present
      */
-    public void testELTPlusSnapshot() throws IOException, ProcCallException {
+    public void testELTPlusSnapshot() throws Exception {
         final Client client = getClient();
         for (int i=0; i < 10; i++) {
             // add data to a first (persistent) table

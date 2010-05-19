@@ -78,7 +78,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
     }
 
     @Override
-    public void tearDown() throws InterruptedException
+    public void tearDown() throws Exception
     {
         deleteTestFiles();
         super.tearDown();

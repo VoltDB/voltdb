@@ -44,7 +44,7 @@ public class InsertIntoCategory extends VoltProcedure {
      * @return The number of rows affected.
      * @throws VoltAbortException
      */
-    public VoltTable[] run(long catid, String catname, String catdescription) throws VoltAbortException {
+    public VoltTable[] run(byte catid, String catname, String catdescription) throws VoltAbortException {
         voltQueueSQL(insert, catid, catname, catdescription);
         return voltExecuteSQL();
     }

@@ -32,7 +32,7 @@ import org.voltdb.*;
 public class AggAges extends VoltProcedure {
     public final SQLStmt agg = new SQLStmt("SELECT * FROM MATPEOPLE;");
 
-    public VoltTable[] run(long id) {
+    public VoltTable[] run(int id) {
         voltQueueSQL(agg);
         return voltExecuteSQL();
     }

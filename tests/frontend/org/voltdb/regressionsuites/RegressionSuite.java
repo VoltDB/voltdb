@@ -74,7 +74,7 @@ public class RegressionSuite extends TestCase {
      * stop the VoltDB server using the VoltServerConfig instance provided.
      */
     @Override
-    public void tearDown() throws InterruptedException {
+    public void tearDown() throws Exception {
         final List<String> valgrindErrors = m_config.shutDown();
         if (valgrindErrors != null) {
             String failString = "";

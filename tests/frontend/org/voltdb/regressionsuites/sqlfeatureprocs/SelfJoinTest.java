@@ -34,7 +34,7 @@ public class SelfJoinTest extends VoltProcedure {
     public final SQLStmt selfJoin = new SQLStmt("SELECT NO_D_ID FROM NEW_ORDER " +
             "WHERE NO_O_ID = NO_W_ID AND NO_W_ID = 1;");
 
-    public VoltTable[] run(long wid) {
+    public VoltTable[] run(byte wid) {
         voltQueueSQL(selfJoin);
         return voltExecuteSQL();
     }

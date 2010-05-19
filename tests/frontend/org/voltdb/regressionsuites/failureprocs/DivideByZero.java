@@ -36,7 +36,7 @@ public class DivideByZero extends VoltProcedure {
 
     public final SQLStmt divideByZero = new SQLStmt("SELECT NO_O_ID FROM NEW_ORDER WHERE NO_O_ID / NO_D_ID = 0;");
 
-    public long run(long no_o_id, long no_d_id, long no_w_id) {
+    public long run(long no_o_id, long no_d_id, byte no_w_id) {
         voltQueueSQL(insert, no_o_id, no_d_id, no_w_id);
         long count = voltExecuteSQL()[0].asScalarLong();
         long retval = count;

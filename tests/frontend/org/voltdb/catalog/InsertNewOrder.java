@@ -69,7 +69,7 @@ public class InsertNewOrder extends VoltProcedure {
 
     public final SQLStmt insert = new SQLStmt("INSERT INTO HISTORY VALUES (?, ?, ?, ?, ?, ?, ?, ?);");
 
-    public long run(long h_c_id, long h_c_d_id, long h_c_w_id, long h_d_id, long h_w_id,
+    public long run(long h_c_id, long h_c_d_id, long h_c_w_id, long h_d_id, short h_w_id,
             long h_date, double h_amount, String h_data) {
 
         // some dummy code

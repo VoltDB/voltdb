@@ -32,7 +32,7 @@ import org.voltdb.*;
 public class AddPerson extends VoltProcedure {
     public final SQLStmt insert = new SQLStmt("INSERT INTO PEOPLE VALUES (?, ?, ?, ?, ?);");
 
-    public VoltTable[] run(long partition, long id, long age, double salary, long children) {
+    public VoltTable[] run(int partition, long id, long age, double salary, long children) {
         voltQueueSQL(insert, partition, id, age, salary, children);
         return voltExecuteSQL();
     }

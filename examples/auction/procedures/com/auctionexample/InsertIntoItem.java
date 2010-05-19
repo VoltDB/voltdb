@@ -51,7 +51,7 @@ public class InsertIntoItem extends VoltProcedure {
      * @return The number of rows affected.
      * @throws VoltAbortException
      */
-    public VoltTable[] run(long itemId, String itemName, String itemDescription, long sellerId, long categoryId, long highBidId, double startPrice, TimestampType startTime,
+    public VoltTable[] run(int itemId, String itemName, String itemDescription, long sellerId, long categoryId, long highBidId, double startPrice, TimestampType startTime,
         TimestampType endTime) throws VoltAbortException {
         voltQueueSQL(insert, itemId, itemName, itemDescription, sellerId, categoryId, highBidId, startPrice, startTime, endTime);
         return voltExecuteSQL();

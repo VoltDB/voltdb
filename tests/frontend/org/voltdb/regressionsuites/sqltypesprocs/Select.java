@@ -55,7 +55,7 @@ public class Select extends VoltProcedure {
     public final SQLStmt i_jumbo_row = new SQLStmt
     ("SELECT * FROM JUMBO_ROW WHERE PKEY = ?;");
 
-    public VoltTable[] run(String tablename, long pkey) {
+    public VoltTable[] run(String tablename, int pkey) {
 
         if (tablename.equals("NO_NULLS")) {
             voltQueueSQL(i_no_nulls, pkey);

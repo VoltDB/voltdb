@@ -37,7 +37,7 @@ public class InsertO1 extends VoltProcedure {
     public final SQLStmt insert = new SQLStmt
      ("INSERT INTO O1 VALUES(?, ?, ?, ?);");
 
-    public VoltTable[] run(long k, long a, String b, String c) {
+    public VoltTable[] run(int k, long a, String b, String c) {
         voltQueueSQL(insert, k, a, b, c);
         return voltExecuteSQL();
     }

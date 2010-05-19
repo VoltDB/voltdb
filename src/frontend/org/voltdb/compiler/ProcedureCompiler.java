@@ -269,6 +269,16 @@ public abstract class ProcedureCompiler {
                 if (partitionType == candidate)
                     found = true;
             }
+
+            VoltType columnType = VoltType.get((byte)procedure.getPartitioncolumn().getType());
+            VoltType paramType = VoltType.typeFromClass(partitionType);
+            if (columnType != paramType) {
+                String msg = "Mismatch between partition column and partition parameter for procedure " +
+                    procedure.getClassname() + "\nPartition column is type " + columnType +
+                    " and partition parameter is type " + paramType;
+                throw compiler.new VoltCompilerException(msg);
+            }
+
             // assume on of the two tests above passes and one fails
             if (!found) {
                 String msg = "PartitionInfo parameter must be a String or Number for procedure: " + procedure.getClassname();

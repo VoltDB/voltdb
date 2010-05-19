@@ -36,7 +36,7 @@ public class AddBook extends VoltProcedure {
     public final SQLStmt
     sqlAddBook = new SQLStmt("insert into books (cash, title) values (?, ?);");
 
-    public VoltTable[] run(long isbn, String title, String author)
+    public VoltTable[] run(int isbn, String title, String author)
     throws VoltAbortException {
         voltQueueSQL(sqlAddBook, isbn, title);
         voltExecuteSQL();

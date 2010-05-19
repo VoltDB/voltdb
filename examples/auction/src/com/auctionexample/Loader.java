@@ -68,9 +68,9 @@ class Loader {
      * @return An ArrayList of ids of newly inserted objects.
      * @throws Exception Rethrows any exceptions thrown from within.
      */
-    static ArrayList<Long> loadItems(org.voltdb.client.Client client) throws Exception {
+    static ArrayList<Integer> loadItems(org.voltdb.client.Client client) throws Exception {
         System.out.printf("Loading ITEM Table\n");
-        ArrayList<Long> itemIds = new ArrayList<Long>();
+        ArrayList<Integer> itemIds = new ArrayList<Integer>();
         CSVReader reader = getReaderForPath("datafiles/items.txt");
 
         String[] nextLine = null;
@@ -82,11 +82,11 @@ class Loader {
                 throw new Exception("Malformed CSV Line for ITEM table.");
 
             // get the values of the tuple to insert
-            long itemId = Long.valueOf(nextLine[0]);
+            int itemId = Integer.valueOf(nextLine[0]);
             String itemName = nextLine[1];
             String itemDescription = nextLine[2];
-            long sellerId = Long.valueOf(nextLine[3]);
-            long categoryId = Long.valueOf(nextLine[4]);
+            int sellerId = Integer.valueOf(nextLine[3]);
+            int categoryId = Integer.valueOf(nextLine[4]);
             double startPrice = Double.valueOf(nextLine[5]);
 
             // figure out auction start and end times
@@ -126,9 +126,9 @@ class Loader {
      * @return An ArrayList of ids of newly inserted objects.
      * @throws Exception Rethrows any exceptions thrown from within.
      */
-    static ArrayList<Long> loadCategories(org.voltdb.client.Client client) throws Exception {
+    static ArrayList<Byte> loadCategories(org.voltdb.client.Client client) throws Exception {
         System.out.printf("Loading CATEGORY Table\n");
-        ArrayList<Long> categoryIds = new ArrayList<Long>();
+        ArrayList<Byte> categoryIds = new ArrayList<Byte>();
         CSVReader reader = getReaderForPath("datafiles/categories.txt");
 
         String[] nextLine = null;
@@ -140,7 +140,7 @@ class Loader {
                 throw new Exception("Malformed CSV Line for CATEGORY table.");
 
             // get the values of the tuple to insert
-            long catId = Long.valueOf(nextLine[0]);
+            Byte catId = Byte.valueOf(nextLine[0]);
             String catName = nextLine[1];
             String catDescription = nextLine[2];
 
@@ -167,9 +167,9 @@ class Loader {
      * @return An ArrayList of ids of newly inserted objects.
      * @throws Exception Rethrows any exceptions thrown from within.
      */
-    static ArrayList<Long> loadUsers(org.voltdb.client.Client client) throws Exception {
+    static ArrayList<Integer> loadUsers(org.voltdb.client.Client client) throws Exception {
         System.out.printf("Loading USER Table\n");
-        ArrayList<Long> userIds = new ArrayList<Long>();
+        ArrayList<Integer> userIds = new ArrayList<Integer>();
         CSVReader reader = getReaderForPath("datafiles/users.txt");
 
         String[] nextLine = null;
@@ -181,7 +181,7 @@ class Loader {
                 throw new Exception("Malformed CSV Line for USER table.");
 
             // get the values of the tuple to insert
-            long userId = Long.valueOf(nextLine[0]);
+            int userId = Integer.valueOf(nextLine[0]);
             String lastName = nextLine[1];
             String firstName = nextLine[2];
             String streetAddress = nextLine[3];

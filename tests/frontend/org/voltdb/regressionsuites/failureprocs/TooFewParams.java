@@ -32,7 +32,7 @@ import org.voltdb.*;
 public class TooFewParams extends VoltProcedure {
     public final SQLStmt select = new SQLStmt("SELECT * FROM NEW_ORDER WHERE NO_W_ID = ?;");
 
-    public VoltTable[] run(String nada, long pkey) {
+    public VoltTable[] run(String nada, byte pkey) {
         voltQueueSQL(select);
         return voltExecuteSQL();
     }

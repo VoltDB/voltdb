@@ -38,7 +38,7 @@ import org.voltdb.VoltTable.ColumnInfo;
 )
 public class EvilDeterminism extends VoltProcedure {
 
-    public VoltTable run(long id)
+    public VoltTable run(int id)
     {
         // Get a deterministic date and a non-deterministic date and
         // verify they're within ten seconds of each other as a basic

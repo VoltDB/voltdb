@@ -32,7 +32,7 @@ import org.voltdb.*;
 public class UpdatePerson extends VoltProcedure {
     public final SQLStmt update = new SQLStmt("UPDATE PEOPLE SET AGE = ?, SALARY = ?, CHILDREN = ? WHERE ID = ?;");
 
-    public VoltTable[] run(long partition, long id, long age, double salary, long children) {
+    public VoltTable[] run(int partition, long id, long age, double salary, long children) {
         voltQueueSQL(update, age, salary, children, id);
         return voltExecuteSQL();
     }

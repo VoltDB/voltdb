@@ -83,6 +83,8 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
     AtomicInteger m_outstandingCalls = new AtomicInteger(0);
 
+    boolean callbackSuccess;
+
     class CatTestCallback implements ProcedureCallback {
 
         final byte m_expectedStatus;
@@ -100,7 +102,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
                     System.err.println(clientResponse.getStatusString());
                 if (clientResponse.getException() != null)
                     clientResponse.getException().printStackTrace();
-                assertTrue(false);
+                callbackSuccess = false;
             }
         }
     }
@@ -111,26 +113,25 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
     public void testUpdate() throws Exception {
         Client client = getClient();
-
         String newCatalogURL;
         VoltTable[] results;
         CatTestCallback callback;
 
         loadSomeData(client, 0, 25);
         client.drain();
-
+        assertTrue(callbackSuccess);
         testStuffThatShouldObviouslyFail(client);
-
+        assertTrue(callbackSuccess);
         // asynchronously call some random inserts
         loadSomeData(client, 25, 25);
-
+        assertTrue(callbackSuccess);
         // add a procedure "InsertOrderLineBatched"
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.jar");
         callback = new CatTestCallback(ClientResponse.SUCCESS);
         client.callProcedure(callback, "@UpdateApplicationCatalog", newCatalogURL);
 
         client.drain();
-
+        assertTrue(callbackSuccess);
         // don't care if this succeeds or fails.
         // calling the new proc before the cat change returns is not guaranteed to work
         // we just hope it doesn't crash anything
@@ -145,27 +146,27 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // make sure the previous catalog change has completed
         client.drain();
-
+        assertTrue(callbackSuccess);
         // now calling the new proc better work
         x = 2;
         client.callProcedure(org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class.getSimpleName(),
-                new long[] {x}, new long[] {x}, x, new long[] {x},
+                new long[] {x}, new long[] {x}, (short)x, new long[] {x},
                 new long[] {x}, new long[] {x}, new TimestampType[] { new TimestampType() }, new long[] {x},
                 new double[] {x}, new String[] {"a"});
 
         loadSomeData(client, 50, 5);
-
+        assertTrue(callbackSuccess);
         // this is a do nothing change... shouldn't affect anything
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.jar");
         results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL).getResults();
         assertTrue(results.length == 1);
 
         client.drain();
-
+        assertTrue(callbackSuccess);
         // now calling the new proc better work
         x = 4;
         client.callProcedure(org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class.getSimpleName(),
-                new long[] {x}, new long[] {x}, x, new long[] {x},
+                new long[] {x}, new long[] {x}, (short)x, new long[] {x},
                 new long[] {x}, new long[] {x}, new TimestampType[] { new TimestampType() }, new long[] {x},
                 new double[] {x}, new String[] {"a"});
 
@@ -181,20 +182,20 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         cb = new SyncCallback();
         client.callProcedure(cb,
                 org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class.getSimpleName(),
-                new long[] {x}, new long[] {x}, x, new long[] {x},
+                new long[] {x}, new long[] {x}, (short)x, new long[] {x},
                 new long[] {x}, new long[] {x}, new TimestampType[] { new TimestampType() }, new long[] {x},
                 new double[] {x}, new String[] {"a"});
         cb.waitForResponse();
 
         // make sure the previous catalog change has completed
         client.drain();
-
+        assertTrue(callbackSuccess);
         // now calling the new proc better fail
         x = 5;
         cb = new SyncCallback();
         client.callProcedure(cb,
                 org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class.getSimpleName(),
-                new long[] {x}, new long[] {x}, x, new long[] {x},
+                new long[] {x}, new long[] {x}, (short)x, new long[] {x},
                 new long[] {x}, new long[] {x}, new TimestampType[] { new TimestampType() }, new long[] {x},
                 new double[] {x}, new String[] {"a"});
         cb.waitForResponse();
@@ -208,7 +209,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         assertTrue(results.length == 1);
 
         // call the new proc and make sure the one we want gets run
-        results = client.callProcedure(InsertNewOrder.class.getSimpleName(), 100, 100, 100, 100, 100, 100, 1.0, "a").getResults();
+        results = client.callProcedure(InsertNewOrder.class.getSimpleName(), 100, 100, 100, 100, (short)100, 100, 1.0, "a").getResults();
         assertEquals(1, results.length);
         assertEquals(1776, results[0].asScalarLong());
 
@@ -220,14 +221,14 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         loadSomeData(client, 65, 5);
 
         client.drain();
-
+        assertTrue(callbackSuccess);
         assertTrue(true);
     }
 
     public void loadSomeData(Client client, int start, int count) throws IOException, ProcCallException {
         for (int i = start; i < (start + count); i++) {
             CatTestCallback callback = new CatTestCallback(ClientResponse.SUCCESS);
-            client.callProcedure(callback, InsertNewOrder.class.getSimpleName(), i, i, i);
+            client.callProcedure(callback, InsertNewOrder.class.getSimpleName(), i, i, (short)i);
         }
     }
 
@@ -335,5 +336,17 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         config.compile(project);
 
         return builder;
+    }
+
+    @Override
+    public void tearDown() throws Exception {
+        super.tearDown();
+        assertTrue(callbackSuccess);
+    }
+
+    @Override
+    public void setUp() {
+        super.setUp();
+        callbackSuccess = true;
     }
 }

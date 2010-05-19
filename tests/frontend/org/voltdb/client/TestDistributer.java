@@ -275,7 +275,7 @@ public class TestDistributer extends TestCase {
     }
 
     @Test
-    public void testQueue() {
+    public void testQueue() throws Exception {
 
         // Uncongested connections get round-robin use.
         MockVolt volt0, volt1, volt2;
@@ -290,17 +290,9 @@ public class TestDistributer extends TestCase {
             volt2.start();
 
             Distributer dist = new Distributer();
-            try {
-                dist.createConnection("localhost", "", "", 20000);
-                dist.createConnection("localhost", "", "", 20001);
-                dist.createConnection("localhost", "", "", 20002);
-            } catch (UnknownHostException e) {
-                e.printStackTrace();
-                fail();
-            } catch (IOException e) {
-                e.printStackTrace();
-                fail();
-            }
+            dist.createConnection("localhost", "", "", 20000);
+            dist.createConnection("localhost", "", "", 20001);
+            dist.createConnection("localhost", "", "", 20002);
 
             assertTrue(volt1.handler != null);
             assertTrue(volt0.handler != null);
@@ -328,26 +320,19 @@ public class TestDistributer extends TestCase {
             assertEquals(2, volt2.handler.roundTrips.get());
 
 
-        } catch (IOException e) {
-            e.printStackTrace();
-            fail();
         }
         finally {
-            try {
-                if (volt0 != null) {
-                    volt0.shutdown();
-                    volt0.join();
-                }
-                if (volt1 != null) {
-                    volt1.shutdown();
-                    volt1.join();
-                }
-                if (volt2 != null) {
-                    volt2.shutdown();
-                    volt2.join();
-                }
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+            if (volt0 != null) {
+                volt0.shutdown();
+                volt0.join();
+            }
+            if (volt1 != null) {
+                volt1.shutdown();
+                volt1.join();
+            }
+            if (volt2 != null) {
+                volt2.shutdown();
+                volt2.join();
             }
         }
     }
@@ -372,13 +357,7 @@ public class TestDistributer extends TestCase {
             clt.drain();
             assertEquals(2, volt.handler.roundTrips.get());
 
-        } catch (UnknownHostException e) {
-            e.printStackTrace();
-            fail();
-        } catch (IOException e) {
-            e.printStackTrace();
-            fail();
-        } catch (ProcCallException e) {
+        } catch (Exception e) {
             e.printStackTrace();
             fail();
         }

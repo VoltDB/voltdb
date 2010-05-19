@@ -84,7 +84,7 @@ public class BidOnAuction extends VoltProcedure {
      * of final longs declared just above this method, or the final longs declared in client.java.
      * @throws VoltAbortException
      */
-    public long run(long itemId, long userId, double newBidAmount, long newBidId) throws VoltAbortException {
+    public long run(int itemId, int userId, double newBidAmount, int newBidId) throws VoltAbortException {
         voltQueueSQL(getHighBid, itemId);
         VoltTable highBidResult = voltExecuteSQL()[0];
 

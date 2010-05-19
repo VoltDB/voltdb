@@ -56,60 +56,42 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         super(name);
     }
 
-    public void testUpdates() throws IOException {
+    public void testUpdates() throws Exception {
         Client client = getClient();
 
-        try {
-            client.callProcedure("InsertOrderLine", 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1.5, "poo");
-            client.callProcedure("UpdateTests", 1L);
-            VoltTable[] results = client.callProcedure("FeaturesSelectAll").getResults();
+        client.callProcedure("InsertOrderLine", (byte)1, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1.5, "poo");
+        client.callProcedure("UpdateTests", (byte)1);
+        VoltTable[] results = client.callProcedure("FeaturesSelectAll").getResults();
 
-            assertEquals(5, results.length);
+        assertEquals(5, results.length);
 
-            // get the order line table
-            VoltTable table = results[2];
-            assertEquals(table.getColumnName(0), "OL_O_ID");
-            assertTrue(table.getRowCount() == 1);
-            VoltTableRow row = table.fetchRow(0);
-            assertEquals(row.getLong("OL_O_ID"), 1);
-            assertEquals(row.getLong("OL_D_ID"), 6);
-            assertEquals(row.getLong("OL_W_ID"), 1);
-            assertEquals(row.getLong("OL_QUANTITY"), 1);
-            assertEquals(row.getLong("OL_SUPPLY_W_ID"), 5);
+        // get the order line table
+        VoltTable table = results[2];
+        assertEquals(table.getColumnName(0), "OL_O_ID");
+        assertTrue(table.getRowCount() == 1);
+        VoltTableRow row = table.fetchRow(0);
+        assertEquals(row.getLong("OL_O_ID"), 1);
+        assertEquals(row.getLong("OL_D_ID"), 6);
+        assertEquals(row.getLong("OL_W_ID"), 1);
+        assertEquals(row.getLong("OL_QUANTITY"), 1);
+        assertEquals(row.getLong("OL_SUPPLY_W_ID"), 5);
 
-            assertTrue(true);
-
-        } catch (ProcCallException e) {
-            e.printStackTrace();
-            fail();
-        } catch (IOException e) {
-            e.printStackTrace();
-            fail();
-        }
+        assertTrue(true);
     }
 
-    public void testSelfJoins() throws IOException {
+    public void testSelfJoins() throws Exception {
         Client client = getClient();
 
-        try {
-            client.callProcedure("InsertNewOrder", 1L, 3L, 1L);
-            VoltTable[] results = client.callProcedure("SelfJoinTest", 1L).getResults();
+        client.callProcedure("InsertNewOrder", (byte)1, 3L, 1L);
+        VoltTable[] results = client.callProcedure("SelfJoinTest", (byte)1).getResults();
 
-            assertEquals(results.length, 1);
+        assertEquals(results.length, 1);
 
-            // get the new order table
-            VoltTable table = results[0];
-            assertTrue(table.getRowCount() == 1);
-            VoltTableRow row = table.fetchRow(0);
-            assertEquals(row.getLong("NO_D_ID"), 3);
-
-        } catch (ProcCallException e) {
-            e.printStackTrace();
-            fail();
-        } catch (IOException e) {
-            e.printStackTrace();
-            fail();
-        }
+        // get the new order table
+        VoltTable table = results[0];
+        assertTrue(table.getRowCount() == 1);
+        VoltTableRow row = table.fetchRow(0);
+        assertEquals(row.getLong("NO_D_ID"), 3);
     }
 
     /** Verify that non-latin-1 characters can be stored and retrieved */
@@ -205,7 +187,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         assertEquals(0, row.getString(2).compareTo(longString));
     }
 
-    public void testStringAsByteArrayParam() throws IOException {
+    public void testStringAsByteArrayParam() throws Exception {
         final int STRLEN = 5000;
 
         Client client = getClient();
@@ -218,13 +200,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         assertEquals(STRLEN, longString.length());
 
 
-        VoltTable[] results = null;
-        try {
-            results = client.callProcedure("PassByteArrayArg", 1, 2, longString.getBytes("UTF-8")).getResults();
-        } catch (ProcCallException e) {
-            e.printStackTrace();
-            fail();
-        }
+        VoltTable[] results = client.callProcedure("PassByteArrayArg", (byte)1, 2, longString.getBytes("UTF-8")).getResults();
         assertEquals(1, results.length);
         VoltTableRow row = results[0].fetchRow(0);
 

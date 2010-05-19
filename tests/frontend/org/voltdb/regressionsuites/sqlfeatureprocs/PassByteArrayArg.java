@@ -37,7 +37,7 @@ public class PassByteArrayArg extends VoltProcedure {
 
     public final SQLStmt selectStringData = new SQLStmt("SELECT * FROM FIVEK_STRING WHERE ID = ?");
 
-    public VoltTable[] run(long wid, int foo, byte stringData[]) {
+    public VoltTable[] run(byte wid, int foo, byte stringData[]) {
         voltQueueSQL( insertString, wid, wid, stringData);
         voltExecuteSQL();
         voltQueueSQL( selectStringData, wid);

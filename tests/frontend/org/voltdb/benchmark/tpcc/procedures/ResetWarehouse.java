@@ -81,7 +81,7 @@ public class ResetWarehouse extends VoltProcedure {
     public final SQLStmt insertNewOrder =
         new SQLStmt("INSERT INTO NEW_ORDER VALUES (?, ?, ?);");
 
-    public VoltTable[] run(long w_id, long districtsPerWarehouse, long customersPerDistrict, long newOrdersPerDistrict) {
+    public VoltTable[] run(short w_id, long districtsPerWarehouse, long customersPerDistrict, long newOrdersPerDistrict) {
         voltQueueSQL(cleanOrders, w_id, customersPerDistrict);
         voltQueueSQL(cleanOrderLines, w_id, customersPerDistrict);
         voltQueueSQL(cleanNewOrder, w_id);

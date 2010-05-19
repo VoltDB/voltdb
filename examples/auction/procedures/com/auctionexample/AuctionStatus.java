@@ -73,7 +73,7 @@ public class AuctionStatus extends VoltProcedure {
      *  (item, bidder, seller, bidcount, price, endtime, status)
      * @throws VoltAbortException Currently doesn't abort.
      */
-    public VoltTable[] run(long itemId) throws VoltAbortException {
+    public VoltTable[] run(int itemId) throws VoltAbortException {
         // create a new VoltTable to store our results
         VoltTable retval = new VoltTable(
                 new VoltTable.ColumnInfo("item", VoltType.STRING),

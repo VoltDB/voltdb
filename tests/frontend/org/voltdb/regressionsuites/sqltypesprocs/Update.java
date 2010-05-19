@@ -48,7 +48,7 @@ public class Update extends VoltProcedure {
 
     public VoltTable[] run(
             String tablename,
-            long pkey,
+            int pkey,
             long a_tinyint,
             long a_smallint,
             long a_integer,

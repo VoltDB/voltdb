@@ -91,7 +91,7 @@ public class TestRollbackSuite extends RegressionSuite {
             assertTrue(table.getRowCount() == 0);
 
             // check the mat view
-            results = client.callProcedure("ReadMatView", 2).getResults();
+            results = client.callProcedure("ReadMatView", (byte)2).getResults();
             assertEquals(results.length, 1);
             assertTrue(results[0].getRowCount() == 0);
 
@@ -110,7 +110,7 @@ public class TestRollbackSuite extends RegressionSuite {
         Client client = getClient();
 
         try {
-            client.callProcedure("SinglePartitionJavaAbort", 2);
+            client.callProcedure("SinglePartitionJavaAbort", (byte)2);
             fail();
         }
         catch (ProcCallException e) {}
@@ -129,7 +129,7 @@ public class TestRollbackSuite extends RegressionSuite {
             assertTrue(table.getRowCount() == 0);
 
             // check the mat view
-            results = client.callProcedure("ReadMatView", 2).getResults();
+            results = client.callProcedure("ReadMatView", (byte)2).getResults();
             assertEquals(results.length, 1);
             assertTrue(results[0].getRowCount() == 0);
         }
@@ -147,7 +147,7 @@ public class TestRollbackSuite extends RegressionSuite {
         Client client = getClient();
 
         try {
-            client.callProcedure("SinglePartitionConstraintError", 2);
+            client.callProcedure("SinglePartitionConstraintError", (byte)2);
             fail();
         }
         catch (ProcCallException e) {}
@@ -166,7 +166,7 @@ public class TestRollbackSuite extends RegressionSuite {
             assertTrue(table.getRowCount() == 0);
 
             // check the mat view
-            results = client.callProcedure("ReadMatView", 2).getResults();
+            results = client.callProcedure("ReadMatView", (byte)2).getResults();
             assertEquals(results.length, 1);
             assertTrue(results[0].getRowCount() == 0);
         }
@@ -188,7 +188,7 @@ public class TestRollbackSuite extends RegressionSuite {
 
         try {
 
-            client.callProcedure("SinglePartitionUpdateConstraintError", 2);
+            client.callProcedure("SinglePartitionUpdateConstraintError", (byte)2);
             fail();
         }
         catch (ProcCallException e) {}
@@ -211,7 +211,7 @@ public class TestRollbackSuite extends RegressionSuite {
             assertEquals(2, table.getLong(2));
 
             // check the mat view
-            results = client.callProcedure("ReadMatView", 2).getResults();
+            results = client.callProcedure("ReadMatView", (byte)2).getResults();
             assertEquals(results.length, 1);
             assertTrue(results[0].getRowCount() == 1);
             results[0].advanceRow();
@@ -702,7 +702,7 @@ public class TestRollbackSuite extends RegressionSuite {
             assertEquals(2, table.getLong(2));
 
             // check the mat view
-            results = client.callProcedure("ReadMatView", 2).getResults();
+            results = client.callProcedure("ReadMatView", (byte)2).getResults();
             assertEquals(results.length, 1);
             table = results[0];
             table.advanceRow();
@@ -721,7 +721,7 @@ public class TestRollbackSuite extends RegressionSuite {
         }
 
         try {
-            VoltTable[] results = client.callProcedure("FetchNORowUsingIndex", 2, 3, 1).getResults();
+            VoltTable[] results = client.callProcedure("FetchNORowUsingIndex", (byte)2, 3, 1).getResults();
 
             assertEquals(results.length, 1);
             VoltTable table = results[0];
@@ -782,7 +782,7 @@ public class TestRollbackSuite extends RegressionSuite {
             assertEquals(2, table.getLong(2));
 
             // check the mat view
-            results = client.callProcedure("ReadMatView", 2).getResults();
+            results = client.callProcedure("ReadMatView", (byte)2).getResults();
             assertEquals(results.length, 1);
             table = results[0];
             table.advanceRow();
@@ -801,7 +801,7 @@ public class TestRollbackSuite extends RegressionSuite {
         }
 
         try {
-            VoltTable[] results = client.callProcedure("FetchNORowUsingIndex", 2, 4, 3).getResults();
+            VoltTable[] results = client.callProcedure("FetchNORowUsingIndex", (byte)2, 4, 3).getResults();
 
             assertEquals(results.length, 1);
             VoltTable table = results[0];
@@ -863,7 +863,7 @@ public class TestRollbackSuite extends RegressionSuite {
             assertEquals(2, table.getLong(2));
 
             // check the mat view
-            results = client.callProcedure("ReadMatView", 2).getResults();
+            results = client.callProcedure("ReadMatView", (byte)2).getResults();
             assertEquals(results.length, 1);
             table = results[0];
             table.advanceRow();
@@ -882,7 +882,7 @@ public class TestRollbackSuite extends RegressionSuite {
         }
 
         try {
-            VoltTable[] results = client.callProcedure("FetchNORowUsingIndex", 2, 4, 3).getResults();
+            VoltTable[] results = client.callProcedure("FetchNORowUsingIndex", (byte)2, 4, 3).getResults();
 
             assertEquals(results.length, 1);
             VoltTable table = results[0];

@@ -39,7 +39,7 @@ public class LoadWarehouseReplicated extends VoltProcedure {
 
     public final SQLStmt checkItemExists = new SQLStmt("SELECT * FROM ITEM LIMIT 1");
 
-    public VoltTable[] run(long w_id, VoltTable items, VoltTable customerNames)
+    public VoltTable[] run(short w_id, VoltTable items, VoltTable customerNames)
     throws VoltAbortException {
         int allowELT = 0;
         if (items != null) {

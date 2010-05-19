@@ -36,7 +36,7 @@ public class SinglePartitionConstraintFailureAndContinue extends VoltProcedure {
 
     public final SQLStmt select = new SQLStmt("SELECT * FROM NEW_ORDER");
 
-    public VoltTable[] run(long w_id) {
+    public VoltTable[] run(byte w_id) {
         voltQueueSQL(insert, w_id, w_id, w_id);
         try {
             // this second insert should fail

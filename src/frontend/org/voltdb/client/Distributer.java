@@ -231,7 +231,17 @@ class Distributer {
 
             if (cb != null) {
                 response.setClientRoundtrip(delta);
-                cb.clientCallback(response);
+                try {
+                    cb.clientCallback(response);
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                    if (t instanceof OutOfMemoryError ||
+                        t instanceof StackOverflowError ||
+                        t instanceof ThreadDeath ||
+                        t instanceof VirtualMachineError) {
+                        System.exit(-1);
+                    }
+                }
             }
             else if (m_isConnected) {
                 // TODO: what's the right error path here?
@@ -355,7 +365,7 @@ class Distributer {
         }
     }
 
-    void drain() throws NoConnectionsException {
+    void drain() throws NoConnectionsException, InterruptedException {
         boolean more;
         do {
             more = false;
@@ -366,7 +376,9 @@ class Distributer {
                     }
                 }
             }
-            Thread.yield();
+            if (more) {
+                Thread.sleep(5);
+            }
         } while(more);
 
         synchronized (this) {

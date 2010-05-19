@@ -245,11 +245,8 @@ import org.voltdb.utils.Pair;
     /** Instruct the network to stop after the current loop */
     public void shutdown() throws InterruptedException {
         if (m_thread != null) {
-            synchronized (this) {
-                m_shouldStop = true;
-                m_selector.wakeup();
-                wait();
-            }
+            m_shouldStop = true;
+            m_selector.wakeup();
             m_thread.join();
         } else {
             m_shouldStop = true;
@@ -338,25 +335,27 @@ import org.voltdb.utils.Pair;
 
     @Override
     public void run() {
-        while (m_shouldStop == false) {
-            try {
-                while (m_shouldStop == false) {
-                    waitForRegistrationLock();
-                    if (m_useBlockingSelect) {
-                        m_selector.select(5);
-                    } else {
-                        m_selector.selectNow();
+        try {
+            while (m_shouldStop == false) {
+                try {
+                    while (m_shouldStop == false) {
+                        waitForRegistrationLock();
+                        if (m_useBlockingSelect) {
+                            m_selector.select(5);
+                        } else {
+                            m_selector.selectNow();
+                        }
+                        installInterests();
+                        invokeCallbacks();
+                        EstTimeUpdater.update(System.currentTimeMillis());
                     }
-                    installInterests();
-                    invokeCallbacks();
-                    EstTimeUpdater.update(System.currentTimeMillis());
+                } catch (Exception ex) {
+                    m_logger.error(null, ex);
                 }
-            } catch (Exception ex) {
-                m_logger.error(null, ex);
             }
+        } finally {
+            p_shutdown();
         }
-
-        p_shutdown();
     }
 
     private synchronized void p_shutdown() {

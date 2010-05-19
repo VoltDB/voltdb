@@ -33,7 +33,7 @@ public class SinglePartitionJavaError extends VoltProcedure {
 
     public final SQLStmt insert = new SQLStmt("INSERT INTO NEW_ORDER VALUES (?, ?, ?);");
 
-    public long run(long w_id) {
+    public long run(byte w_id) {
         voltQueueSQL(insert, w_id, w_id, w_id);
         long tuplesChanged = voltExecuteSQL()[0].asScalarLong();
         assert(tuplesChanged > 0);

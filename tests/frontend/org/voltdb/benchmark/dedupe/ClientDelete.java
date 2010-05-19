@@ -144,7 +144,7 @@ public class ClientDelete {
 
         try {
             voltclient.drain();
-        } catch (NoConnectionsException e) {
+        } catch (Exception e) {
             e.printStackTrace();
             System.exit(-1);
         }

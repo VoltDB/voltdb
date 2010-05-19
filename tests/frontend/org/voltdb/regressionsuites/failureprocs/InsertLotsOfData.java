@@ -36,7 +36,7 @@ public class InsertLotsOfData extends VoltProcedure {
             "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? " +
             ");");
 
-    public long run(long p, long initialId) {
+    public long run(int p, long initialId) {
         final int STRLEN = 62;
 
         int totalBytes = 0;

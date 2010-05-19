@@ -27,7 +27,7 @@ public class Client {
      * @throws java.io.IOException on client communication error.
      * @throws org.voltdb.client.Client.ProcCallException on VoltDB server error.
      */
-    private void doSelect(long id) {
+    private void doSelect(int id) {
         System.out.println("Select(" + id + ")");
         try {
             VoltTable[] result = client.callProcedure(Select.class.getSimpleName(), id).getResults();
@@ -70,7 +70,7 @@ public class Client {
      * @throws java.io.IOException on client communication error.
      * @throws org.voltdb.client.Client.ProcCallException on VoltDB server error.
      */
-    private void doInsert(long id, long item) {
+    private void doInsert(int id, long item) {
         System.out.println("Insert(" + id + "," + item + ")");
         try {
             VoltTable[] result = client.callProcedure(Insert.class.getSimpleName(), id, item).getResults();
@@ -96,7 +96,7 @@ public class Client {
      * @throws java.io.IOException on client communication error.
      * @throws org.voltdb.client.Client.ProcCallException on VoltDB server error, expected in this example.
      */
-    private void tryInvalidInsert(long id) {
+    private void tryInvalidInsert(int id) {
         System.out.println("Insert(" + id + ")");
         try {
             VoltTable[] result = client.callProcedure(Insert.class.getSimpleName(), id).getResults();
@@ -122,7 +122,7 @@ public class Client {
      * @throws java.io.IOException on client communication error.
      * @throws org.voltdb.client.Client.ProcCallException on VoltDB server error, expected in this example.
      */
-    private void doDelete(long id) {
+    private void doDelete(int id) {
         System.out.println("Delete (" + id + ")");
         try {
             VoltTable[] result = client.callProcedure(Delete.class.getSimpleName(), id).getResults();

@@ -34,7 +34,7 @@ public class SinglePartitionUpdateConstraintError extends VoltProcedure {
     public final SQLStmt insert = new SQLStmt("INSERT INTO NEW_ORDER VALUES (?, ?, ?);");
     public final SQLStmt update = new SQLStmt("UPDATE NEW_ORDER SET NO_O_ID = ?, NO_D_ID = ? WHERE NO_O_ID = ?;");
 
-    public VoltTable[] run(long w_id) {
+    public VoltTable[] run(byte w_id) {
         voltQueueSQL(insert, w_id + 1, w_id + 1, w_id);
         long tuplesChanged1 = voltExecuteSQL()[0].asScalarLong();
 

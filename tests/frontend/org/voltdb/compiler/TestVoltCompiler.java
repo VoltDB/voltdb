@@ -23,9 +23,7 @@
 
 package org.voltdb.compiler;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
+import java.io.*;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.HashMap;
@@ -42,8 +40,92 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.regressionsuites.TestExportSuite;
 import org.voltdb.utils.JarReader;
-
 public class TestVoltCompiler extends TestCase {
+
+    public void testMismatchedPartitionParams() throws IOException {
+        String output = checkPartitionParam("CREATE TABLE PKEY_BIGINT ( PKEY BIGINT NOT NULL, PRIMARY KEY (PKEY) );",
+                "org.voltdb.compiler.procedures.PartitionParamBigint",
+                "PKEY_BIGINT");
+        assertTrue(
+                output.contains(
+                    "Mismatch between partition column and partition parameter for procedure " +
+                    "org.voltdb.compiler.procedures.PartitionParamBigint\n" +
+                    "Partition column is type VoltType.BIGINT and partition parameter " +
+                    "is type VoltType.STRING"));
+        output = checkPartitionParam("CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );",
+                "org.voltdb.compiler.procedures.PartitionParamInteger",
+                "PKEY_INTEGER");
+        assertTrue(
+                output.contains(
+                    "Mismatch between partition column and partition parameter for procedure " +
+                    "org.voltdb.compiler.procedures.PartitionParamInteger\n" +
+                    "Partition column is type VoltType.INTEGER and partition parameter " +
+                    "is type VoltType.BIGINT"));
+        output = checkPartitionParam("CREATE TABLE PKEY_SMALLINT ( PKEY SMALLINT NOT NULL, PRIMARY KEY (PKEY) );",
+                "org.voltdb.compiler.procedures.PartitionParamSmallint",
+                "PKEY_SMALLINT");
+        assertTrue(
+                output.contains(
+                    "Mismatch between partition column and partition parameter for procedure " +
+                    "org.voltdb.compiler.procedures.PartitionParamSmallint\n" +
+                    "Partition column is type VoltType.SMALLINT and partition parameter " +
+                    "is type VoltType.BIGINT"));
+        output = checkPartitionParam("CREATE TABLE PKEY_TINYINT ( PKEY TINYINT NOT NULL, PRIMARY KEY (PKEY) );",
+                "org.voltdb.compiler.procedures.PartitionParamTinyint",
+                "PKEY_TINYINT");
+        assertTrue(
+                output.contains(
+                    "Mismatch between partition column and partition parameter for procedure " +
+                    "org.voltdb.compiler.procedures.PartitionParamTinyint\n" +
+                    "Partition column is type VoltType.TINYINT and partition parameter " +
+                    "is type VoltType.SMALLINT"));
+        output = checkPartitionParam("CREATE TABLE PKEY_STRING ( PKEY VARCHAR(32) NOT NULL, PRIMARY KEY (PKEY) );",
+                "org.voltdb.compiler.procedures.PartitionParamString",
+                "PKEY_STRING");
+        assertTrue(
+                output.contains(
+                    "Mismatch between partition column and partition parameter for procedure " +
+                    "org.voltdb.compiler.procedures.PartitionParamString\n" +
+                    "Partition column is type VoltType.STRING and partition parameter " +
+                    "is type VoltType.INTEGER"));
+    }
+
+    private static String checkPartitionParam(String ddl, String procedureClass, String table) {
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl);
+        final String schemaPath = schemaFile.getPath();
+
+        final String simpleProject =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "<database name='database'>" +
+            "<schemas>" +
+            "<schema path='" + schemaPath + "' />" +
+            "</schemas>" +
+            "<procedures>" +
+            "<procedure class='" + procedureClass + "' />" +
+            "</procedures>" +
+            "<partitions>" +
+            "<partition table='" + table + "' column='PKEY' />" +
+            "</partitions>" +
+            "</database>" +
+            "</project>";
+
+        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
+        final String projectPath = projectFile.getPath();
+
+        final VoltCompiler compiler = new VoltCompiler();
+        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PrintStream ps = new PrintStream(baos);
+        final boolean success = compiler.compile(projectPath, cluster_config,
+                                                 "testout.jar", ps, null);
+        ps.flush();
+        String str = baos.toString();
+        System.out.println(str);
+        assertFalse(success);
+        return str;
+    }
 
     public void testSnapshotSettings() throws IOException {
         String schemaPath = "";

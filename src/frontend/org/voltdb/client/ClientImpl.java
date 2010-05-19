@@ -215,7 +215,7 @@ final class ClientImpl implements Client {
         }
     }
 
-    public void drain() throws NoConnectionsException {
+    public void drain() throws NoConnectionsException, InterruptedException {
         if (m_isShutdown) {
             return;
         }

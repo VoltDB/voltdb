@@ -33,7 +33,7 @@ public class SinglePartition extends VoltProcedure {
 
     public final SQLStmt insertP1 = new SQLStmt("INSERT INTO P1 VALUES (?, ?);");
 
-    public VoltTable[] run(long id, long p) {
+    public VoltTable[] run(long id, int p) {
         voltQueueSQL(insertP1, id, p);
         return voltExecuteSQL();
     }

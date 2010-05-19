@@ -34,7 +34,7 @@ public class InsertF extends VoltProcedure {
     public final SQLStmt ins = new SQLStmt
      ("INSERT INTO F VALUES (?, ?, ?, ?, ?, ?, ?);");
 
-    public VoltTable[] run(long a, long b, long c, long d, long e, long f, long g) {
+    public VoltTable[] run(int a, long b, long c, long d, long e, long f, long g) {
         voltQueueSQL(ins, a, b, c, d, e , f, g);
         return voltExecuteSQL();
     }

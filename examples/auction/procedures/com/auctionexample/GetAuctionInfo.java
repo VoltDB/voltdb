@@ -48,7 +48,7 @@ public class GetAuctionInfo extends VoltProcedure {
      * @return An VoltTable with one row having fields BIDDERID and BIDPRICE, 
      * @throws VoltAbortException
      */
-    public VoltTable[] run(long itemId) throws VoltAbortException {
+    public VoltTable[] run(int itemId) throws VoltAbortException {
         voltQueueSQL(getHighBid, itemId);
         return voltExecuteSQL();
     }

@@ -72,7 +72,7 @@ public class TestSneakyExecutionOrderSuite extends RegressionSuite {
         }
     }
 
-    public void testSneakingInAProc() throws IOException {
+    public void testSneakingInAProc() throws Exception {
         System.out.println("STARTING testSneakingInAProc");
         Client client = getClient();
 

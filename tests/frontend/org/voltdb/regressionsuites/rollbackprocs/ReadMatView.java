@@ -33,7 +33,7 @@ public class ReadMatView extends VoltProcedure {
 
     public final SQLStmt select = new SQLStmt("SELECT * FROM MATVIEW_N_O");
 
-    public VoltTable[] run(long w_id) {
+    public VoltTable[] run(byte w_id) {
         voltQueueSQL(select);
         return voltExecuteSQL();
     }

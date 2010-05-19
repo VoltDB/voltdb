@@ -97,7 +97,7 @@ public class TestFailuresSuite extends RegressionSuite {
         System.out.println("STARTING testVoilateUniquenessAndCatchException");
         VoltTable[] results = null;
         try {
-            results = client.callProcedure("ViolateUniquenessAndCatchException", 1L, 1L, 1L).getResults();
+            results = client.callProcedure("ViolateUniquenessAndCatchException", 1L, 1L, (byte)1).getResults();
             assertTrue(results.length == 1);
             System.out.println("PASSED testVoilateUandCE");
         } catch (ProcCallException e) {
@@ -158,7 +158,7 @@ public class TestFailuresSuite extends RegressionSuite {
 
         VoltTable[] results = null;
         try {
-            results = client.callProcedure("DivideByZero", 0L, 0L, 1L).getResults();
+            results = client.callProcedure("DivideByZero", 0L, 0L, (byte)1).getResults();
             System.out.println("DivideByZero client response received");
             assertEquals(results.length, 0);
         } catch (ProcCallException e) {
@@ -283,11 +283,11 @@ public class TestFailuresSuite extends RegressionSuite {
 
         VoltTable[] results = null;
 
-        results = client.callProcedure("CleanupFail", 0, 0, 0).getResults();
+        results = client.callProcedure("CleanupFail", 0, 0, (byte)0).getResults();
         assertEquals(1, results.length);
         assertEquals(1, results[0].asScalarLong());
 
-        results = client.callProcedure("CleanupFail", 2, 2, 2).getResults();
+        results = client.callProcedure("CleanupFail", 2, 2, (byte)2).getResults();
         assertEquals(1, results.length);
         assertEquals(1, results[0].asScalarLong());
     }

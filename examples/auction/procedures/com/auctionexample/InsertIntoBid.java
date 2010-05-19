@@ -52,7 +52,7 @@ public class InsertIntoBid extends VoltProcedure {
      * @return The number of rows affected.
      * @throws VoltAbortException
      */
-    public VoltTable[] run(long bidid, long itemid, long bidderid, TimestampType bidtime, double bidprice) throws VoltAbortException {
+    public VoltTable[] run(int bidid, int itemid, int bidderid, TimestampType bidtime, double bidprice) throws VoltAbortException {
         voltQueueSQL(insert, bidid, itemid, bidderid, bidtime, bidprice);
         return voltExecuteSQL();
     }

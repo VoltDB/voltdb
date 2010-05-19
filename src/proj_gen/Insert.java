@@ -25,7 +25,7 @@ public class Insert extends VoltProcedure {
 
     public final SQLStmt insertItem = new SQLStmt("INSERT INTO ##project_name## VALUES (?, ?);");
 
-    public long run( long ##upper_project_name##_ID, long ##upper_project_name##_ITEM ) throws VoltAbortException {
+    public long run( int ##upper_project_name##_ID, long ##upper_project_name##_ITEM ) throws VoltAbortException {
         // Add a SQL statement to the execution queue.
         voltQueueSQL( insertItem, ##upper_project_name##_ID, ##upper_project_name##_ITEM );
 

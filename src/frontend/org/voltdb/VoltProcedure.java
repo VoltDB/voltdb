@@ -263,7 +263,7 @@ public abstract class VoltProcedure {
                 if (type == VoltType.SMALLINT) type = VoltType.BIGINT;
                 if (type == VoltType.TINYINT) type = VoltType.BIGINT;
                 paramTypes[param.getIndex()] = type.classFromType();
-                paramTypeIsPrimitive[param.getIndex()] = true;
+                paramTypeIsPrimitive[param.getIndex()] = paramTypes[param.getIndex()].isPrimitive();
                 paramTypeIsArray[param.getIndex()] = param.getIsarray();
                 assert(paramTypeIsArray[param.getIndex()] == false);
                 paramTypeComponentType[param.getIndex()] = null;

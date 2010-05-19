@@ -35,7 +35,7 @@ public class UpdateTests extends VoltProcedure {
     public final SQLStmt updateParitalIndex = new SQLStmt("UPDATE ORDER_LINE SET OL_D_ID = 6");
     //public final SQLStmt updateFullIndex = new SQLStmt("UPDATE ORDER_LINE SET OL_W_ID = 7, OL_D_ID = 10, OL_O_ID = 50, OL_NUMBER = 12;");
 
-    public VoltTable[] run(long wid) {
+    public VoltTable[] run(byte wid) {
         voltQueueSQL(updateNoIndexes);
         voltQueueSQL(updateParitalIndex);
         //voltQueueQuery(updateFullIndex);

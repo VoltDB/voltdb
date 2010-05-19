@@ -62,7 +62,7 @@ import org.voltdb.VoltTable;
  */
 public class LoadWarehouse extends VoltProcedure {
 
-    public VoltTable[] run(long w_id, VoltTable warehouses, VoltTable districts, VoltTable customers,
+    public VoltTable[] run(short w_id, VoltTable warehouses, VoltTable districts, VoltTable customers,
         VoltTable stocks, VoltTable orders, VoltTable neworders, VoltTable orderLines, VoltTable histories)
     throws VoltAbortException {
         final int allowELT = 0;
