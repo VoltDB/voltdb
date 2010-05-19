@@ -35,7 +35,7 @@ class TableTupleELTTest : public Test {
 
   protected:
     // some utility functions to verify
-    size_t maxElSize(std::vector<uint16_t> &keep_offsets);
+    size_t maxElSize(std::vector<uint16_t> &keep_offsets, bool useNullStrings=false);
     size_t serElSize(std::vector<uint16_t> &keep_offsets, uint8_t*, char*, bool nulls=false);
     void verSer(int, char*);
 
@@ -86,7 +86,8 @@ class TableTupleELTTest : public Test {
 
 // helper to make a schema, a tuple and calculate EL size
 size_t
-TableTupleELTTest::maxElSize(std::vector<uint16_t> &keep_offsets)
+TableTupleELTTest::maxElSize(std::vector<uint16_t> &keep_offsets,
+                             bool useNullStrings)
 {
     TableTuple *tt;
     TupleSchema *ts;
@@ -100,11 +101,19 @@ TableTupleELTTest::maxElSize(std::vector<uint16_t> &keep_offsets)
     // storage and choosing set* api accordingly here.
     if (ts->columnCount() > 6) {
         NValue nv = ValueFactory::getStringValue("ABCDEabcde"); // 10 char
+        if (useNullStrings)
+        {
+            nv.free(); nv.setNull();
+        }
         tt->setNValueAllocateForObjectCopies(6, nv, NULL);
         nv.free();
     }
     if (ts->columnCount() > 7) {
         NValue nv = ValueFactory::getStringValue("abcdeabcdeabcdeabcde"); // 20 char
+        if (useNullStrings)
+        {
+            nv.free(); nv.setNull();
+        }
         tt->setNValueAllocateForObjectCopies(7, nv, NULL);
         nv.free();
     }
@@ -119,7 +128,6 @@ TableTupleELTTest::maxElSize(std::vector<uint16_t> &keep_offsets)
 
     return sz;
 }
-
 
 /*
  * Verify that the max tuple size returns expected result
@@ -172,6 +180,57 @@ TEST_F(TableTupleELTTest, maxELTSerSize_tiny) {
     EXPECT_EQ(98 + 24, sz); // length, 20 chars
 }
 
+/*
+ * Verify that the max tuple size returns expected result using null strings
+ */
+TEST_F(TableTupleELTTest, maxELTSerSize_withNulls) {
+
+    // create a schema by selecting a column from the super-set.
+    size_t sz = 0;
+    std::vector<uint16_t> keep_offsets;
+    uint16_t i = 0;
+
+    // just tinyint in schema
+    keep_offsets.push_back(i++);
+    sz = maxElSize(keep_offsets);
+    EXPECT_EQ(8, sz);
+
+    // tinyint + smallint
+    keep_offsets.push_back(i++);
+    sz = maxElSize(keep_offsets);
+    EXPECT_EQ(16, sz);
+
+    // + integer
+    keep_offsets.push_back(i++);
+    sz = maxElSize(keep_offsets);
+    EXPECT_EQ(24, sz);
+
+    // + bigint
+    keep_offsets.push_back(i++);
+    sz = maxElSize(keep_offsets);
+    EXPECT_EQ(32, sz);
+
+    // + timestamp
+    keep_offsets.push_back(i++);
+    sz = maxElSize(keep_offsets);
+    EXPECT_EQ(40, sz);
+
+    // + decimal
+    keep_offsets.push_back(i++);
+    sz = maxElSize(keep_offsets);
+    EXPECT_EQ(40 + 4 + 1 + 1 + 38, sz);  // length, radix pt, sign, prec.
+
+    // + first varchar
+    keep_offsets.push_back(i++);
+    sz = maxElSize(keep_offsets, true);
+    EXPECT_EQ(84 + 4, sz); // we add the length-length since we don't
+                           // know null-ness in time to avoid it
+
+    // + second varchar
+    keep_offsets.push_back(i++);
+    sz = maxElSize(keep_offsets, true);
+    EXPECT_EQ(88 + 4, sz);
+}
 
 // helper to make a schema, a tuple and serialize to a buffer
 size_t
