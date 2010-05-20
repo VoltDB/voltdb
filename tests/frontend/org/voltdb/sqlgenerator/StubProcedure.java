@@ -35,7 +35,7 @@ public class StubProcedure extends VoltProcedure {
             "SELECT * FROM P1;"
     );
 
-    public VoltTable[] run(long id) {
+    public VoltTable[] run(int id) {
         voltQueueSQL(getInfo, id);
         return voltExecuteSQL();
     }
