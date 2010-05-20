@@ -712,7 +712,7 @@ public class MultiLoader extends ClientMain {
 
         private void commitDataTables_VoltDB(long w_id) {
             Object[] params = new Object[data_tables.length + 1];
-            params[0] = w_id;
+            params[0] = (short)w_id;
             for (int i = 0; i < data_tables.length; ++i) {
                 if (data_tables[i] != null && data_tables[i].getRowCount() > 0) {
                     params[i + 1] = data_tables[i];
