@@ -300,6 +300,12 @@ public class TestSQLTypesSuite extends RegressionSuite {
     };
 
 
+    public void testPassingNullObjectToSingleStmtProcedure() throws Exception {
+        final Client client = this.getClient();
+
+        client.callProcedure("PassObjectNull", 0, 0, 0, 0, 0, 0.0, null, null, null, null, null, null);
+    }
+
     //
     // Insert strings that violate the VARCHAR size limit.
     //
@@ -1049,7 +1055,6 @@ public class TestSQLTypesSuite extends RegressionSuite {
         helper_testInvalidParameterSerializations(client, params);
     }
 
-
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -1072,7 +1077,9 @@ public class TestSQLTypesSuite extends RegressionSuite {
         project.addPartitionInfo("EXPRESSIONS_NO_NULLS", "PKEY");
         project.addPartitionInfo("JUMBO_ROW", "PKEY");
         project.addProcedures(PROCEDURES);
-
+        project.addStmtProcedure("PassObjectNull",
+                "insert into ALLOW_NULLS values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+                "NO_NULLS.PKEY: 0");
 
  /*     // CONFIG #1: Local Site/Partitions running on IPC backend
         config = new LocalSingleProcessServer("sqltypes-onesite.jar", 1, BackendTarget.NATIVE_EE_IPC);
