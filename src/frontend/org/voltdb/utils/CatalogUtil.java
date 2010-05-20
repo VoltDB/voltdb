@@ -17,12 +17,28 @@
 
 package org.voltdb.utils;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.TreeMap;
+
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-import org.voltdb.*;
-import org.voltdb.catalog.*;
-import org.voltdb.types.*;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.CatalogType;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Constraint;
+import org.voltdb.catalog.ConstraintRef;
+import org.voltdb.catalog.Index;
+import org.voltdb.catalog.PlanFragment;
+import org.voltdb.catalog.Table;
+import org.voltdb.types.ConstraintType;
+import org.voltdb.types.IndexType;
 
 /**
  *
@@ -340,4 +356,19 @@ public abstract class CatalogUtil {
         return false;
     }
 
+    /**
+     * Return true if a table is the source table for a materialized view.
+     */
+    public static boolean isTableMaterializeViewSource(org.voltdb.catalog.Database database,
+                                                       org.voltdb.catalog.Table table)
+    {
+        CatalogMap<Table> tables = database.getTables();
+        for (Table t : tables) {
+            Table matsrc = t.getMaterializer();
+            if ((matsrc != null) && (matsrc.getRelativeIndex() == table.getRelativeIndex())) {
+                return true;
+            }
+        }
+        return false;
+    }
 }

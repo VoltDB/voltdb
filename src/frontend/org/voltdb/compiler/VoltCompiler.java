@@ -47,7 +47,18 @@ import org.hsqldb.HSQLInterface;
 import org.voltdb.ProcInfo;
 import org.voltdb.ProcInfoData;
 import org.voltdb.TransactionIdManager;
-import org.voltdb.catalog.*;
+import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Group;
+import org.voltdb.catalog.GroupRef;
+import org.voltdb.catalog.MaterializedViewInfo;
+import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.catalog.Table;
+import org.voltdb.catalog.User;
+import org.voltdb.catalog.UserRef;
 import org.voltdb.compiler.projectfile.DatabaseType;
 import org.voltdb.compiler.projectfile.GroupsType;
 import org.voltdb.compiler.projectfile.ProceduresType;
@@ -59,6 +70,7 @@ import org.voltdb.compiler.projectfile.UsersType;
 import org.voltdb.compiler.projectfile.ClassdependenciesType.Classdependency;
 import org.voltdb.compiler.projectfile.ExportsType.Connector;
 import org.voltdb.compiler.projectfile.ExportsType.Connector.Tables;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.JarReader;
 import org.voltdb.utils.LogKeys;
@@ -901,6 +913,12 @@ public class VoltCompiler {
                 if (tableref == null) {
                     throw new VoltCompilerException("While configuring export, table " + tablename + " was not present in " +
                     "the catalog.");
+                }
+                if (xmltable.isExportonly() &&
+                    CatalogUtil.isTableMaterializeViewSource(catdb, tableref)) {
+                    compilerLog.error("While configuring export, table " + tablename + " is a source table " +
+                            "for a materialized view. Export only tables do not support views.");
+                    throw new VoltCompilerException("Export-only table configured with materialized view.");
                 }
 
                 org.voltdb.catalog.ConnectorTableInfo connTableInfo = catconn.getTableinfo().add(i.toString());

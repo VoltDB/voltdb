@@ -161,7 +161,7 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
-    // TestELTSuite tests most of these options end-to-end; however need to test
+    // TestELTSuite tests most of these options are tested end-to-end; however need to test
     // that a disabled connector is really disabled and that auth data is correct.
     public void testELTSetting() throws IOException {
         final VoltProjectBuilder project = new VoltProjectBuilder();
@@ -229,6 +229,23 @@ public class TestVoltCompiler extends TestCase {
             jar.delete();
         }
     }
+
+    // test than export-only table with a view is rejected by the compiler.
+    public void testELTTableWithView() throws IOException {
+        final VoltProjectBuilder project = new VoltProjectBuilder();
+        project.addSchema(TestVoltCompiler.class.getResource("ELTTesterWithView-ddl.sql"));
+        project.addStmtProcedure("Dummy", "select * from v_table1r_el_only");
+        project.addELT("org.voltdb.elt.processors.RawProcessor", true, null, null);
+        project.addELTTable("table1r_el_only", true);
+        try {
+            assertFalse(project.compile("/tmp/elttestview.jar"));
+        }
+        finally {
+            final File jar = new File("/tmp/elttestview.jar");
+            jar.delete();
+        }
+    }
+
 
     public void testBadPath() {
         final VoltCompiler compiler = new VoltCompiler();
