@@ -245,8 +245,10 @@ import org.voltdb.utils.Pair;
     /** Instruct the network to stop after the current loop */
     public void shutdown() throws InterruptedException {
         if (m_thread != null) {
-            m_shouldStop = true;
-            m_selector.wakeup();
+            synchronized (this) {
+                m_shouldStop = true;
+                m_selector.wakeup();
+            }
             m_thread.join();
         } else {
             m_shouldStop = true;
