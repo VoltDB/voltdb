@@ -233,14 +233,8 @@ class Distributer {
                 response.setClientRoundtrip(delta);
                 try {
                     cb.clientCallback(response);
-                } catch (Throwable t) {
+                } catch (Exception t) {
                     t.printStackTrace();
-                    if (t instanceof OutOfMemoryError ||
-                        t instanceof StackOverflowError ||
-                        t instanceof ThreadDeath ||
-                        t instanceof VirtualMachineError) {
-                        System.exit(-1);
-                    }
                 }
             }
             else if (m_isConnected) {
