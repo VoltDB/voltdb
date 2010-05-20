@@ -157,10 +157,13 @@ public:
                 break;
 
               case VALUE_TYPE_VARCHAR:
-                // 32 bit length preceding value and
-                // actual character data without null string terminator.
-                bytes += (sizeof (int32_t) +
-                          ValuePeeker::peekObjectLength(getNValue(i)));
+                  // 32 bit length preceding value and
+                  // actual character data without null string terminator.
+                  if (!getNValue(i).isNull())
+                  {
+                      bytes += (sizeof (int32_t) +
+                                ValuePeeker::peekObjectLength(getNValue(i)));
+                  }
                 break;
               default:
                 // let caller handle this error

@@ -223,13 +223,12 @@ TEST_F(TableTupleELTTest, maxELTSerSize_withNulls) {
     // + first varchar
     keep_offsets.push_back(i++);
     sz = maxElSize(keep_offsets, true);
-    EXPECT_EQ(84 + 4, sz); // we add the length-length since we don't
-                           // know null-ness in time to avoid it
+    EXPECT_EQ(84, sz);
 
     // + second varchar
     keep_offsets.push_back(i++);
     sz = maxElSize(keep_offsets, true);
-    EXPECT_EQ(88 + 4, sz);
+    EXPECT_EQ(84, sz);
 }
 
 // helper to make a schema, a tuple and serialize to a buffer
