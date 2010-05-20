@@ -190,7 +190,7 @@ public class DDLCompiler {
                     continue;
                 if (newline.startsWith("--"))
                     continue;
-                stmt += newline + "\n";
+                stmt += " " + newline + "\n";
             }
 
             retval.statement = stmt;

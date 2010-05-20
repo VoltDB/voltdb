@@ -42,6 +42,49 @@ import org.voltdb.regressionsuites.TestExportSuite;
 import org.voltdb.utils.JarReader;
 public class TestVoltCompiler extends TestCase {
 
+    public void testBrokenLineParsing() throws IOException {
+        final String simpleSchema1 =
+            "create table table1r_el  (pkey integer, column2_integer integer, PRIMARY KEY(pkey));\n" +
+            "create view v_table1r_el (column2_integer, num_rows) as\n" +
+            "select column2_integer as column2_integer,\n" +
+                   "count(*) as num_rows\n" +
+            "from table1r_el\n" +
+            "group by column2_integer;\n" +
+            "create view v_table1r_el2 (column2_integer, num_rows) as\n" +
+            "select column2_integer as column2_integer,\n" +
+                   "count(*) as num_rows\n" +
+            "from table1r_el\n" +
+            "group by column2_integer\n;\n";
+
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema1);
+        final String schemaPath = schemaFile.getPath();
+
+        final String simpleProject =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "<database name='database'>" +
+            "<schemas>" +
+            "<schema path='" + schemaPath + "' />" +
+            "</schemas>" +
+            "<procedures>" +
+            "<procedure class='Foo'>" +
+            "<sql>select * from table1r_el;</sql>" +
+            "</procedure>" +
+            "</procedures>" +
+            "</database>" +
+            "</project>";
+
+        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
+        final String projectPath = projectFile.getPath();
+
+        final VoltCompiler compiler = new VoltCompiler();
+        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
+
+        final boolean success = compiler.compile(projectPath, cluster_config,
+                                                 "testout.jar", System.out, null);
+        assertTrue(success);
+    }
+
     public void testMismatchedPartitionParams() throws IOException {
         String output = checkPartitionParam("CREATE TABLE PKEY_BIGINT ( PKEY BIGINT NOT NULL, PRIMARY KEY (PKEY) );",
                 "org.voltdb.compiler.procedures.PartitionParamBigint",
