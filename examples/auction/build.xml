@@ -92,7 +92,7 @@ JAVA & CATALOG COMPILATION
 
 <!--
 ***************************************
-SERVER & CLIENT TARGETS
+SERVER, EXPORT, & CLIENT TARGETS
 ***************************************
 -->
 
@@ -103,6 +103,26 @@ SERVER & CLIENT TARGETS
         <jvmarg value="-Xmx512m" />
         <arg value="catalog"/>
         <arg value="auction.jar"/>
+        <classpath refid='project.classpath' />
+        <assertions><disable /></assertions>
+    </java>
+</target>
+
+<target name="export" depends='' description="Example: ant export    Start a VoltDB export receiver for the auction catalog.">
+    <java fork="yes" classname="org.voltdb.exportclient.ExportToFileClient" >
+        <jvmarg value="-Djava.library.path=../../voltdb" />
+        <jvmarg value="-server" />
+        <jvmarg value="-Xmx512m" />
+        <arg value="--servers"/>
+       <arg value="localhost"/>
+        <arg value="--type"/>
+        <arg value="csv"/>
+        <arg value="--nonce"/>
+        <arg value="EXPORTDEMO"/>
+        <arg value="--user"/>
+        <arg value="voltdb"/>
+        <arg value="--password"/>
+        <arg value="demo"/>
         <classpath refid='project.classpath' />
         <assertions><disable /></assertions>
     </java>

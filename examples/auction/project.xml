@@ -21,5 +21,13 @@
             <partition table='ITEM' column='ITEMID' />
             <partition table='BID' column='ITEMID' />
         </partitions>
+        <exports>
+            <connector class="org.voltdb.elt.processors.RawProcessor" enabled="false">
+                <tables>
+                    <table name="ITEM"/>
+                    <table name="BID"/>
+                </tables>
+            </connector>
+        </exports>
     </database>
 </project>
