@@ -920,6 +920,13 @@ public class VoltCompiler {
                             "for a materialized view. Export only tables do not support views.");
                     throw new VoltCompilerException("Export-only table configured with materialized view.");
                 }
+                if (xmltable.isExportonly() &&
+                    tableref.getMaterializer() != null)
+                {
+                    compilerLog.error("While configuring export, table " + tablename + " is a " +
+                                                "materialized view.  A view cannot be an export-only table.");
+                    throw new VoltCompilerException("View configured as an export-only table");
+                }
 
                 org.voltdb.catalog.ConnectorTableInfo connTableInfo = catconn.getTableinfo().add(i.toString());
                 connTableInfo.setAppendonly(xmltable.isExportonly());

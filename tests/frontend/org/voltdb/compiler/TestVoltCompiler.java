@@ -273,8 +273,8 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
-    // test than export-only table with a view is rejected by the compiler.
-    public void testELTTableWithView() throws IOException {
+    // test that the source table for a view is not export only
+    public void testViewSourceNotExportOnly() throws IOException {
         final VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestVoltCompiler.class.getResource("ELTTesterWithView-ddl.sql"));
         project.addStmtProcedure("Dummy", "select * from v_table1r_el_only");
@@ -289,6 +289,21 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
+    // test that a view is not export only
+    public void testViewNotExportOnly() throws IOException {
+        final VoltProjectBuilder project = new VoltProjectBuilder();
+        project.addSchema(TestVoltCompiler.class.getResource("ELTTesterWithView-ddl.sql"));
+        project.addStmtProcedure("Dummy", "select * from table1r_el_only");
+        project.addELT("org.voltdb.elt.processors.RawProcessor", true, null, null);
+        project.addELTTable("v_table1r_el_only", true);
+        try {
+            assertFalse(project.compile("/tmp/elttestview.jar"));
+        }
+        finally {
+            final File jar = new File("/tmp/elttestview.jar");
+            jar.delete();
+        }
+    }
 
     public void testBadPath() {
         final VoltCompiler compiler = new VoltCompiler();
