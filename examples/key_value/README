@@ -1,0 +1,67 @@
+Key-Value application
+===========================
+
+This example application demonstrates how to create a "Key-Value" in VoltDB.
+
+Many attributes of the application are customizable through arguments passed to the client, including: 
+
+  - The maximum number of transactions the client will attempt per second
+  - How long the sample client runs
+  - When to start recording performance statistics
+  - How frequently to report those statistics
+  - "Key" size
+  - Minimum and Maximum "Value" size (Value sizes will be randomly distributed between min and max)
+  - Percentage of transactions that are "Gets" (out of 100%, the rest are "Puts")
+  - Whether or not to initialize the database (load the initial state before benchmarking)
+  - Store the "Value" as is (text), Base64 encode the "Value" (uncompressible binary), or Compress/Base64 encode the "Value" (compressible binary)
+
+
+These attributes can be adjusted by modifying the arguments to the "client-init", "client", "client-threaded-init", and "client-threaded" targets in the Ant build script.
+
+
+While this example application demonstrates how to implement a Key-Value system using VoltDB, it also implements the following:
+
+Measuring Performance - Client Network Bandwidth
+------------------------------------------------
+
+The "Voter" example application implemented extended benchmark display.  Key-Value also displays the amount of client network bandwidth (MB in and out).
+
+
+Logging
+------------------------------------------------
+
+This application supports logging using log4j and is delivered with log4j configuration files for both the client (log-client.xml) and server (log-server.xml).
+
+
+Interpreting the Results
+------------------------
+
+Increasing the total number of servers or number of partitions on a server may not improve the performance of your VoltDB cluster for this application.
+Keep an eye on your client bandwidth to see if you are using all your available network bandwidth.
+
+
+Multi-Threaded Client
+------------------------
+
+We have included a multi-threaded client (ClientThreadedKV.java) that creates a pool of threads to perform the compression and Base64 encoding (and Base64 decoding and decompression).
+
+
+ant targets described
+---------------------
+
+ant                        : compile all Java clients and stored procedures, build the catalog
+
+ant server                 : start the server
+
+ant client-init            : start the client, initialize the given number of key-value pairs (only puts) prior to starting normal client processing (gets and puts)
+
+ant client                 : start the client (normal client processing, gets and puts)
+
+ant client-threaded-init   : start the multi-threaded client, initialize the given number of key-value pairs (only puts) prior to starting normal client processing (gets and puts)
+
+ant client-init            : start the multi-threaded client (normal client processing, gets and puts)
+
+ant catalog                : build the catalog
+
+ant clean                  : remove compiled files
+    

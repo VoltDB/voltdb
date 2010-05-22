@@ -10,6 +10,9 @@ auction
 helloworld
   This directory contains the sources for the "Hello World" tutorial from the book Getting Started With VoltDB.
 
+key_value
+  This directory contains the sources for the "Key-Value" implementation in VoltDB.
+
 satellite
   This example is a simulation of satellite tracking.
 

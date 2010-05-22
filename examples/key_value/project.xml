@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<project>
+    <database name='database'>
+        <schemas>
+            <schema path='ddl.sql' />
+        </schemas>
+        <procedures>
+            <procedure class='com.procedures.Get' />
+            <procedure class='com.procedures.Put' />
+        </procedures>
+        <partitions>
+            <partition table='key_value' column='key_column' />
+        </partitions>
+    </database>
+</project>
