@@ -8,7 +8,8 @@ public class Client {
         /*
          * Instantiate a client and connect to the database.
          */
-        final org.voltdb.client.Client myApp = ClientFactory.createClient();
+        org.voltdb.client.Client myApp;
+        myApp = ClientFactory.createClient();
         myApp.createConnection("localhost", "program", "password");
 
         /*
@@ -23,7 +24,8 @@ public class Client {
         /*
          * Retrieve the message.
          */
-        final ClientResponse response = myApp.callProcedure("Select", "Spanish");
+        final ClientResponse response = myApp.callProcedure("Select", 
+                                                            "Spanish");
         if (response.getStatus() != ClientResponse.SUCCESS){
             System.err.println(response.getStatusString());
             System.exit(-1);
@@ -37,7 +39,7 @@ public class Client {
 
         VoltTable resultTable = results[0];
         VoltTableRow row = resultTable.fetchRow(0);
-        System.out.printf("%s, %s!\n", row.getString("hello"), row
-                .getString("world"));
+        System.out.printf("%s, %s!\n", row.getString("hello"), 
+                                       row.getString("world"));
     }
 }
