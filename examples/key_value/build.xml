@@ -43,30 +43,6 @@ PRIMARY ENTRY POINTS
     </java>
 </target>
 
-<target name="client-init" depends="srccompile" description="Start a key-value client, initialize the key-value pairs, single threaded.">
-    <java fork="yes" classname="com.ClientKV">
-        <jvmarg value="-Xmx1024m"/>
-        <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError" />
-        <jvmarg value="-XX:HeapDumpPath=/tmp" />
-        <jvmarg value="-XX:-ReduceInitialCardMarks" />
-        <jvmarg value="-Dlog4j.configuration=file:log-client.xml" />
-        <arg value="999999999"/>                                   <!-- maximum transactions per second -->
-        <arg value="5"/>                                           <!-- feedback interval (seconds) -->
-        <arg value="120"/>                                         <!-- test duration after initialization (seconds) -->
-        <arg value="3"/>                                           <!-- seconds to wait before recording latency information -->
-        <arg value="localhost"/>                                   <!-- servers to connect to -->
-        <arg value="50"/>                                          <!-- key size (max 250) -->
-        <arg value="12000"/>                                       <!-- min value size (max 1048576) -->
-        <arg value="12000"/>                                       <!-- max value size (max 1048576) -->
-        <arg value="100000"/>                                      <!-- number of initial keys/values to populate -->
-        <arg value="75"/>                                          <!-- percentage of gets (vs. puts) once populated -->
-        <arg value="1"/>                                           <!-- initialize state (0 = yes, 1 = no) -->
-        <arg value="1"/>                                           <!-- 1 = store payload (text), 2 = base64 encode payload (binary), 3 = base64 encode and compress payload -->
-        <classpath refid='project.classpath'/>
-        <assertions><disable/></assertions>
-    </java>
-</target>
-
 <target name="client" depends="srccompile" description="Start a key-value client, assume key-value pairs already initialized, single threaded.">
     <java fork="yes" classname="com.ClientKV">
         <jvmarg value="-Xmx1024m"/>
@@ -84,31 +60,6 @@ PRIMARY ENTRY POINTS
         <arg value="12000"/>                                       <!-- max value size (max 1048576) -->
         <arg value="100000"/>                                      <!-- number of initial keys/values to populate -->
         <arg value="75"/>                                          <!-- percentage of gets (vs. puts) once populated -->
-        <arg value="0"/>                                           <!-- initialize state (0 = yes, 1 = no) -->
-        <arg value="1"/>                                           <!-- 1 = store payload (text), 2 = base64 encode payload (binary), 3 = base64 encode and compress payload -->
-        <classpath refid='project.classpath'/>
-        <assertions><disable/></assertions>
-    </java>
-</target>
-
-<target name="client-threaded-init" depends="srccompile" description="Start a key-value client, initialize the key-value pairs, multi-threaded (1 thread per processor core).">
-    <java fork="yes" classname="com.ClientThreadedKV">
-        <jvmarg value="-Xmx1024m"/>
-        <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError" />
-        <jvmarg value="-XX:HeapDumpPath=/tmp" />
-        <jvmarg value="-XX:-ReduceInitialCardMarks" />
-        <jvmarg value="-Dlog4j.configuration=file:log-client.xml" />
-        <arg value="999999999"/>                                   <!-- maximum transactions per second -->
-        <arg value="5"/>                                           <!-- feedback interval (seconds) -->
-        <arg value="120"/>                                         <!-- test duration after initialization (seconds) -->
-        <arg value="3"/>                                           <!-- seconds to wait before recording latency information -->
-        <arg value="localhost"/>                                   <!-- servers to connect to -->
-        <arg value="50"/>                                          <!-- key size (max 250) -->
-        <arg value="12000"/>                                       <!-- min value size (max 1048576) -->
-        <arg value="12000"/>                                       <!-- max value size (max 1048576) -->
-        <arg value="100000"/>                                      <!-- number of initial keys/values to populate -->
-        <arg value="75"/>                                          <!-- percentage of gets (vs. puts) once populated -->
-        <arg value="1"/>                                           <!-- initialize state (0 = yes, 1 = no) -->
         <arg value="1"/>                                           <!-- 1 = store payload (text), 2 = base64 encode payload (binary), 3 = base64 encode and compress payload -->
         <classpath refid='project.classpath'/>
         <assertions><disable/></assertions>
@@ -132,7 +83,6 @@ PRIMARY ENTRY POINTS
         <arg value="12000"/>                                       <!-- max value size (max 1048576) -->
         <arg value="100000"/>                                      <!-- number of initial keys/values to populate -->
         <arg value="75"/>                                          <!-- percentage of gets (vs. puts) once populated -->
-        <arg value="0"/>                                           <!-- initialize state (0 = yes, 1 = no) -->
         <arg value="1"/>                                           <!-- 1 = store payload (text), 2 = base64 encode payload (binary), 3 = base64 encode and compress payload -->
         <classpath refid='project.classpath'/>
         <assertions><disable/></assertions>

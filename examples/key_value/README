@@ -12,11 +12,10 @@ Many attributes of the application are customizable through arguments passed to 
   - "Key" size
   - Minimum and Maximum "Value" size (Value sizes will be randomly distributed between min and max)
   - Percentage of transactions that are "Gets" (out of 100%, the rest are "Puts")
-  - Whether or not to initialize the database (load the initial state before benchmarking)
   - Store the "Value" as is (text), Base64 encode the "Value" (uncompressible binary), or Compress/Base64 encode the "Value" (compressible binary)
 
 
-These attributes can be adjusted by modifying the arguments to the "client-init", "client", "client-threaded-init", and "client-threaded" targets in the Ant build script.
+These attributes can be adjusted by modifying the arguments to the "client" and "client-threaded" targets in the Ant build script.
 
 
 While this example application demonstrates how to implement a Key-Value system using VoltDB, it also implements the following:
@@ -49,19 +48,15 @@ We have included a multi-threaded client (ClientThreadedKV.java) that creates a 
 ant targets described
 ---------------------
 
-ant                        : compile all Java clients and stored procedures, build the catalog
+ant                   : compile all Java clients and stored procedures, build the catalog
 
-ant server                 : start the server
+ant server            : start the server
 
-ant client-init            : start the client, initialize the given number of key-value pairs (only puts) prior to starting normal client processing (gets and puts)
+ant client            : start the client, [if needed, initialize the given number of key-value pairs (puts),] begin normal client processing (gets and puts)
 
-ant client                 : start the client (normal client processing, gets and puts)
+ant client-threaded   : start the multi-threaded client, [if needed, initialize the given number of key-value pairs (puts),] begin normal client processing (gets and puts)
 
-ant client-threaded-init   : start the multi-threaded client, initialize the given number of key-value pairs (only puts) prior to starting normal client processing (gets and puts)
+ant catalog           : build the catalog
 
-ant client-init            : start the multi-threaded client (normal client processing, gets and puts)
-
-ant catalog                : build the catalog
-
-ant clean                  : remove compiled files
+ant clean             : remove compiled files
     

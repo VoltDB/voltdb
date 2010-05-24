@@ -23,7 +23,7 @@
 
 // Client application for "KeyValue" sample application
 //
-//   Connects to server, optionally initializes database, generates gets and puts
+//   Connects to server, initialize database if needed, generate gets and puts
 
 
 package com;
@@ -35,6 +35,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.utils.Encoder;
 
 import java.util.ArrayList;
@@ -164,8 +165,7 @@ public class ClientKV {
         int max_value_size = (int) Integer.valueOf(args[7]);
         long initial_size = (long) Long.valueOf(args[8]);
         int percent_gets = (int) Integer.valueOf(args[9]);
-        int initialize_data = (int) Integer.valueOf(args[10]);
-        final int behavior_type = Integer.valueOf(args[11]);
+        final int behavior_type = Integer.valueOf(args[10]);
 
         long thisOutstanding = 0;
         long lastOutstanding = 0;
@@ -181,11 +181,6 @@ public class ClientKV {
         m_logger.info(String.format("Maximum Value size = %,d",max_value_size));
         m_logger.info(String.format("Initial number of keys/values = %,d",initial_size));
         m_logger.info(String.format("Percentage Gets (vs. puts) = %,d",percent_gets));
-        if (initialize_data == 1) {
-            m_logger.info(String.format("Client will initialize beginning state."));
-        } else {
-            m_logger.info(String.format("Client WILL NOT initialize beginning state."));
-        }
         if (behavior_type == 1) {
             m_logger.info(String.format("Payload stored as is."));
             behavior = Behavior.NONE;
@@ -239,19 +234,39 @@ public class ClientKV {
 
         byte[] baGenericValue = new byte[max_value_size];
 
-         for (int i=0; i < max_value_size; i++) {
-             if (behavior == Behavior.NONE){
-                 try {
-                     baGenericValue[i] = "b".getBytes("UTF-8")[0];
-                 } catch (UnsupportedEncodingException e) {
-                     // TODO Auto-generated catch block
-                     e.printStackTrace();
-                 }
-             } else {
-                 // set the "64" to whatever number of "values" from 256 you want included in the payload, the lower the number the more compressible the payload
-                 baGenericValue[i] = (byte) rand.nextInt(64);
-             }
-         }
+        for (int i=0; i < max_value_size; i++) {
+            if (behavior == Behavior.NONE){
+                try {
+                    baGenericValue[i] = "b".getBytes("UTF-8")[0];
+                } catch (UnsupportedEncodingException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+            } else {
+                // set the "64" to whatever number of "values" from 256 you want included in the payload, the lower the number the more compressible the payload
+                baGenericValue[i] = (byte) rand.nextInt(64);
+            }
+        }
+
+        // test if database needs initialization
+        int initialize_data = 0;
+
+        try {
+            String init_key = String.format("%d",initial_size) + "0123456789012345678901234567890123456789";
+            VoltTable[] vtInit = voltclient.callProcedure("Get", init_key).getResults();
+            if (vtInit[0].getRowCount() == 0) {
+                // database is not fully initialized, do initialization
+                initialize_data = 1;
+            }
+        } catch (ProcCallException e) {
+            m_logger.error("ProcCallException");
+            m_logger.error(e.toString());
+            System.exit(-1);
+        } catch (IOException e) {
+            m_logger.error("IOException");
+            m_logger.error(e.toString());
+            System.exit(-1);
+        }
 
         if (initialize_data == 1) {
             // ***********************************************************************************************************************************************
