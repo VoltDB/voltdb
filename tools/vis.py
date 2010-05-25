@@ -36,45 +36,39 @@ class Stat:
         self.conn.close()
 
 class LatencyStat(Stat):
-    INSTANCES = """
-SELECT ma_instances.instanceId AS id,
-       ma_instances.numHosts AS hosts,
-       ma_instances.startTime as time
-FROM ma_instances
-WHERE ma_instances.startTime >= '%s'
-      AND ma_instances.applicationName = 'org.voltdb.benchmark.tpcc.TPCCClient'
-ORDER BY ma_instances.startTime DESC
+    LATENCIES = """
+SELECT startTime AS time, numHosts AS hosts, AVG(latencies) AS latency
+FROM ma_instances AS runs
+    JOIN ma_clientInstances AS clients ON clusterStartTime = startTime
+    JOIN (SELECT instanceId, AVG(clusterRoundtripAvg) AS latencies
+          FROM ma_clientProcedureStats
+          GROUP BY instanceId) AS stats ON stats.instanceId = clientInstanceId
+WHERE runs.startTime >= '%s'
+    AND runs.numKSafety = 0
+    AND runs.numPartitionsPerHost = 12
+    AND clients.applicationName = "TPC-C"
+    AND clients.subApplicationName = "Client"
+GROUP BY startTime
 LIMIT %u
-"""
-    LATENCY = """
-SELECT AVG(cs.clusterRoundtripAvg) AS latency
-FROM ma_clientInstances ci, ma_clientProcedureStats cs
-WHERE ci.clusterStartTime = %u
-      AND ci.subApplicationName = 'Client'
-      AND ci.clientInstanceId = cs.instanceId
 """
 
     def get_latencies(self, start_time, count):
         res = []
-        # (date, numHosts) as key
         latencies = {}
 
-        self.cursor.execute(self.INSTANCES % (start_time, count))
+        self.cursor.execute(self.LATENCIES % (start_time, count))
         res = list(self.cursor.fetchall())
 
         for i in res:
-            start_time = i["time"]
-            hosts = i["hosts"]
-            self.cursor.execute(self.LATENCY % (start_time))
-            latency = self.cursor.fetchone()
-            i["time"] = datetime.date.fromtimestamp(start_time / 1000.0)
-            i.update(latency)
+            i["time"] = datetime.date.fromtimestamp(i["time"] / 1000.0)
 
-            key = (i["time"], hosts)
-            if latency["latency"] == None:
+            key = (i["time"], i["hosts"])
+            if i["latency"] == None:
+                continue
+            if float(i["latency"]) > 40 * i["hosts"]:
                 continue
             if key not in latencies \
-                    or latency["latency"] < latencies[key]["latency"]:
+                    or i["latency"] < latencies[key]["latency"]:
                 latencies[key] = i
 
         return latencies.values()
@@ -88,6 +82,7 @@ SELECT resultid as id,
 FROM results
 WHERE time >= '%s'
       AND benchmarkname = 'org.voltdb.benchmark.tpcc.TPCCClient'
+      AND txnpersecond >= hostcount * 30000
 GROUP BY hostcount, DATE(time)
 ORDER BY time DESC
 LIMIT %u
@@ -194,7 +189,7 @@ def main():
     volt_stat.close()
 
     latency_map = {}
-    latencies.sort(key=lambda x: x["id"])
+    latencies.sort(key=lambda x: x["time"])
     for v in latencies:
         if v["time"] == None or v["latency"] == None:
             continue
@@ -226,6 +221,7 @@ def main():
         if v["hosts"] not in throughput_map:
             throughput_map[v["hosts"]] = {"time": [], "tps": []}
         datenum = matplotlib.dates.date2num(v["time"])
+        print "hosts", v["hosts"], "time", v["time"], "tps", v["tps"]
         throughput_map[v["hosts"]]["time"].append(datenum)
         throughput_map[v["hosts"]]["tps"].append(v["tps"])
 
