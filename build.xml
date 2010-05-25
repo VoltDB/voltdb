@@ -860,7 +860,6 @@ TEST CASES
                 <exclude name="**/*$*.class"/>
                 <exclude name="**/TestMaliciousClientSuite.class" />
                 <exclude name="**/TestELTSuite.class" />
-                <exclude name="**/TestFailuresSuite.class" />
                 <exclude name="**/TestFixedSQLSuite.class" />
                 <exclude name="**/TestPlansGroupBySuite.class" />
                 <exclude name="**/TestRollbackSuite.class" />
@@ -868,6 +867,12 @@ TEST CASES
                 <exclude name="**/TestSQLFeaturesSuite.class" />
                 <exclude name="**/TestSQLTypesSuite.class" />
                 <exclude name="**/TestSqlUpdateSuite.class" />
+                <exclude name="**/TestIndexesSuite.class" />
+                <exclude name="**/TestExportSuite.class" />
+                <exclude name="**/TestFailureDetectSuite.class" />
+                <exclude name="**/TestReplicationSuite.class" />
+                <exclude name="**/TestSqlAggregateSuite.class" />
+                <exclude name="**/TestOrderBySuite.class" />
                 <exclude name="**/TestTPCCSuite.class" />
             </fileset>
         </tests>
