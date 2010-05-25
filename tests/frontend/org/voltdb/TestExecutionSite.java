@@ -25,9 +25,7 @@ package org.voltdb;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import junit.framework.TestCase;
@@ -648,5 +646,84 @@ public class TestExecutionSite extends TestCase {
         assertFalse(tx1_1.didRollback());
         assertEquals(null, m_sites[0].m_transactionsById.get(tx1_1.txnId));
         assertEquals((++callcheck), MockMPVoltProcedure.m_called);
+    }
+
+    /*
+     * FUZZ TESTS FOLLOW
+     *
+     * Driven directly through the ExecutionSite mailboxes.
+     * Mailboxes can terminate a sender (at random) instead of delivering a message.
+     * Verification is performed using the execution site trace logger.
+     */
+
+    private void createSPInitiation(
+            boolean readOnly,
+            long txn_id,
+            int initiator_id,
+            int partition_id,
+            int coordinator_id)
+    {
+        final StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        spi.setProcName("org.voltdb.TestExecutionSite$MockSPVoltProcedure");
+        spi.setParams(new Integer(partition_id));
+
+        List<Integer> sitesForPartition = getSiteIdsForPartitionId(partition_id);
+        for (int i : sitesForPartition) {
+            final InitiateTaskMessage itm =
+                new InitiateTaskMessage(initiator_id,
+                                        coordinator_id,
+                                        txn_id,
+                                        readOnly,
+                                        true,         // single partition
+                                        spi,
+                                        txn_id);      // last safe txnid
+            m_mboxes[i].deliver(itm);
+        }
+    }
+
+
+    public void testFuzzedTransactions() {
+
+        // single partitions round-robined across partitions.
+        for (int i=1; i < 1001; ++i) {
+            boolean readOnly = true;
+            int txnid = i + 10000;
+            int initiator = getInitiatorIdForSiteId(i % SITE_COUNT);
+            int partition = i % PARTITION_COUNT;
+            int coordinator = getSiteIdsForPartitionId(partition).get(0);
+            createSPInitiation(readOnly, txnid, initiator, partition, coordinator);
+        }
+
+        Thread siteThreads[] = new Thread[SITE_COUNT];
+
+        for (int i=0; i < SITE_COUNT; ++i) {
+            final int site_id = i;
+            siteThreads[i] = new Thread(new Runnable() {
+               @Override
+               public void run() {
+                   m_sites[site_id].runLoop();
+               }
+            });
+        }
+        for (int i=0; i < SITE_COUNT; ++i) {
+            siteThreads[i].start();
+        }
+
+        for (int i=0; i < SITE_COUNT; ++i) {
+            boolean stopped = false;
+            do {
+                try {
+                    siteThreads[i].join();
+                }
+                catch (InterruptedException e) {
+                }
+                if (siteThreads[i].isAlive() == false) {
+                    System.out.println("Joined site " + i);
+                    // just make sure at least one transaction was done
+                    assertTrue(m_sites[i].lastCommittedTxnId > 10000);
+                    stopped = true;
+                }
+            } while (!stopped);
+        }
     }
 }

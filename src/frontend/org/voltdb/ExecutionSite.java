@@ -616,6 +616,33 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         shutdown();
     }
 
+    /**
+     * Run the execution site execution loop, for tests currently.
+     * Will integrate this in to the real run loop soon.. ish.
+     */
+    public void runLoop() {
+        while (true) {
+            TransactionState currentTxnState = m_transactionQueue.poll();
+            if (currentTxnState == null) {
+                // poll the messaging layer for a while as this site has nothing to do
+                // this will likely have a message/several messages immediately in a heavy workload
+                VoltMessage message = m_mailbox.recv();
+                tick();
+                if (message != null) {
+                    handleMailboxMessage(message);
+                }
+                else {
+                    // Terminate run loop on empty mailbox AND no currentTxnState
+                    return;
+                }
+            }
+            if (currentTxnState != null) {
+                System.out.println("ExecutionSite " + getSiteId() + " running txnid " + currentTxnState.txnId);
+                recursableRun(currentTxnState);
+            }
+        }
+    }
+
     private void completeTransaction(TransactionState txnState) {
         if (!txnState.isReadOnly) {
             assert(latestUndoToken != kInvalidUndoToken);
