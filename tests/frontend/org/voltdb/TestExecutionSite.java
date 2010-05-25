@@ -51,6 +51,8 @@ public class TestExecutionSite extends TestCase {
     RestrictedPriorityQueue m_rpqs[] = new RestrictedPriorityQueue[SITE_COUNT];
     ExecutionSite m_sites[] = new ExecutionSite[SITE_COUNT];
     MockMailbox m_mboxes[] = new MockMailbox[SITE_COUNT];
+    Thread m_siteThreads[] = new Thread[SITE_COUNT];
+
 
     @Override
     protected void setUp() throws Exception
@@ -137,11 +139,26 @@ public class TestExecutionSite extends TestCase {
         return ids;
     }
 
+    /* Random initiator */
+    private int selectRandomInitiator(Random rand) {
+        int site =  rand.nextInt(SITE_COUNT);
+        return getInitiatorIdForSiteId(site);
+    }
+
     /* Host ids are site ids + 10,000 */
     int getHostIdForSiteId(int siteId) {
         return siteId + 10000;
     }
 
+    List<Integer> getSiteIdsForPartitionId(int partitionId) {
+        ArrayList<Integer> result = new ArrayList<Integer>();
+        for (int ss=0; ss < SITE_COUNT; ++ss) {
+            if (getPartitionIdForSiteId(ss) == partitionId) {
+                result.add(ss);
+            }
+        }
+        return result;
+    }
 
     /* Fake RestrictedPriorityQueue implementation */
     public static class RestrictedPriorityARRR
@@ -656,9 +673,13 @@ public class TestExecutionSite extends TestCase {
      * Verification is performed using the execution site trace logger.
      */
 
+    /**
+     * Create a single partition transaction.
+     */
     private void createSPInitiation(
             boolean readOnly,
             long txn_id,
+            long safe_txn_id,
             int initiator_id,
             int partition_id,
             int coordinator_id)
@@ -674,56 +695,114 @@ public class TestExecutionSite extends TestCase {
                                         coordinator_id,
                                         txn_id,
                                         readOnly,
-                                        true,         // single partition
+                                        true,          // single partition
                                         spi,
-                                        txn_id);      // last safe txnid
+                                        safe_txn_id);  // last safe txnid
             m_mboxes[i].deliver(itm);
         }
     }
 
+    /**
+     * Create a heartbeat for initiator_id.
+     * Currently sent to all up sites (also what simple dtxn does).
+     * @param txn_id
+     * @param safe_txn_id
+     * @param initiator_id
+     */
+    private void createHeartBeat(
+            long txn_id,
+            long safe_txn_id,
+            int initiator_id)
+    {
+        HeartbeatMessage hbm =
+            new HeartbeatMessage(initiator_id, txn_id, safe_txn_id);
+        int[] upExecutionSites =
+            m_voltdb.getCatalogContext().siteTracker.getUpExecutionSites();
 
-    public void testFuzzedTransactions() {
+        for (int i : upExecutionSites) {
+            m_mboxes[i].deliver(hbm);
+        }
+    }
 
-        // single partitions round-robined across partitions.
-        for (int i=1; i < 1001; ++i) {
+
+    /*
+     * Pick a random thing to do. If doing the last transaction,
+     * send a heartbeat to flush all the queues.
+     */
+    private void queueTransactions(long firstTxnId, int totalTransactions, Random rand)
+    {
+        for (int i=0; i <= totalTransactions; ++i) {
             boolean readOnly = true;
-            int txnid = i + 10000;
-            int initiator = getInitiatorIdForSiteId(i % SITE_COUNT);
+            long txnid = i + firstTxnId;
+            long safe_txnid = txnid;
+            int initiator = selectRandomInitiator(rand);
             int partition = i % PARTITION_COUNT;
             int coordinator = getSiteIdsForPartitionId(partition).get(0);
-            createSPInitiation(readOnly, txnid, initiator, partition, coordinator);
+
+            int wheelOfDestiny = rand.nextInt(100);
+            if (i == totalTransactions) {
+                System.out.println("Queueing final heartbeat.");
+                int offset = 0;
+                for (int inid : getInitiatorIds()) {
+                    createHeartBeat(txnid + offset, txnid + offset, inid);
+                    ++offset;
+                }
+            }
+            else if (wheelOfDestiny < 80) {
+                createSPInitiation(readOnly, txnid, safe_txnid, initiator, partition, coordinator);
+            }
+            else {
+                createHeartBeat(txnid, safe_txnid, initiator);
+            }
         }
+    }
 
-        Thread siteThreads[] = new Thread[SITE_COUNT];
 
+    /*
+     * Run the mailboxes / sites to completion.
+     */
+    private void createAndRunSiteThreads()
+    {
         for (int i=0; i < SITE_COUNT; ++i) {
             final int site_id = i;
-            siteThreads[i] = new Thread(new Runnable() {
+            m_siteThreads[i] = new Thread(new Runnable() {
                @Override
                public void run() {
                    m_sites[site_id].runLoop();
                }
             });
         }
-        for (int i=0; i < SITE_COUNT; ++i) {
-            siteThreads[i].start();
-        }
 
+        for (int i=0; i < SITE_COUNT; ++i) {
+            m_siteThreads[i].start();
+        }
+    }
+
+    public void testFuzzedTransactions()
+    {
+        final int totalTransactions = 1000;
+        final long firstTxnId = 10000;
+        final Random rand = new Random();
+        queueTransactions(firstTxnId, totalTransactions, rand);
+        createAndRunSiteThreads();
+
+        // wait for all the sites to terminate runLoops
         for (int i=0; i < SITE_COUNT; ++i) {
             boolean stopped = false;
             do {
                 try {
-                    siteThreads[i].join();
+                    m_siteThreads[i].join();
                 }
                 catch (InterruptedException e) {
                 }
-                if (siteThreads[i].isAlive() == false) {
+                if (m_siteThreads[i].isAlive() == false) {
                     System.out.println("Joined site " + i);
                     // just make sure at least one transaction was done
-                    assertTrue(m_sites[i].lastCommittedTxnId > 10000);
+                    assertTrue(m_sites[i].lastCommittedTxnId > firstTxnId);
                     stopped = true;
                 }
             } while (!stopped);
         }
+
     }
 }

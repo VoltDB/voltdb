@@ -107,7 +107,10 @@ public class MockMailbox implements Mailbox {
 
     @Override
     public VoltMessage recv(Subject s) {
-        throw new UnsupportedOperationException();
+        if (s == Subject.DEFAULT)
+            return incomingMessages.poll();
+        else
+            return m_failureNoticeMessages.poll();
     }
 
     @Override
