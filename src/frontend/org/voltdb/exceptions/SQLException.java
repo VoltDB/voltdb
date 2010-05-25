@@ -45,6 +45,10 @@ public class SQLException extends SerializableException {
         m_sqlState = new String(sqlStateBytes);
     }
 
+    public SQLException(String sqlState) {
+        m_sqlState = sqlState;
+    }
+
     /**
      * Retrieve the SQLState code for the error that generated this exception.
      * @return Five character SQLState code.

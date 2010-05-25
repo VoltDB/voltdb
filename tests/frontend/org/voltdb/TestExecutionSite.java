@@ -34,6 +34,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
 import org.voltdb.dtxn.*;
+import org.voltdb.exceptions.SerializableException;
 import org.voltdb.fault.FaultDistributor;
 import org.voltdb.messaging.*;
 
@@ -43,7 +44,7 @@ public class TestExecutionSite extends TestCase {
     static { EELibraryLoader.loadExecutionEngineLibrary(true); }
 
     // Topology parameters
-    private static final int K_FACTOR = 1;
+    private static final int K_FACTOR = 3;
     private static final int PARTITION_COUNT = 3;
     private static final int SITE_COUNT = PARTITION_COUNT * (K_FACTOR + 1);
 
@@ -93,6 +94,10 @@ public class TestExecutionSite extends TestCase {
         proc.setSinglepartition(true);
 
         proc = m_voltdb.addProcedureForTest(MockMPVoltProcedure.class.getName());
+        proc.setReadonly(false);
+        proc.setSinglepartition(false);
+
+        proc = m_voltdb.addProcedureForTest(MockMPVoltProcedureRollbackParticipant.class.getName());
         proc.setReadonly(false);
         proc.setSinglepartition(false);
 
@@ -230,6 +235,12 @@ public class TestExecutionSite extends TestCase {
         }
     }
 
+    public static class MockMPVoltProcedureRollbackParticipant extends MockMPVoltProcedure
+    {
+        @Override
+        boolean rollbackParticipant() { return true; }
+    }
+
     /* Multi-partition - mock VoltProcedure.slowPath() */
     public static class MockMPVoltProcedure extends VoltProcedure
     {
@@ -239,10 +250,19 @@ public class TestExecutionSite extends TestCase {
         // by the procedure (since they're static...)
         public static boolean simulate_coordinator_dies_during_commit = false;
 
+        // Counter for test cases that want to see if the procedure ran.
         public static int m_called = 0;
 
-        boolean finalTask() { return false; }
-        boolean nonTransactional() { return false; }
+        // Some functions that can be overridden by subclasses to change behavior.
+        boolean finalTask()             { return false; }
+        boolean nonTransactional()      { return false; }
+        boolean rollbackParticipant()   { return false; }
+
+        /* TODO: implement these.
+        boolean rollbackCoordinator()   { return false; }
+        boolean userRollbackProcStart() { return false; }
+        boolean userRollbackProcEnd()   { return false; }
+        */
 
         /** Helper to turn object list into parameter set buffer */
         private ByteBuffer createParametersBuffer(Object... paramList) {
@@ -263,57 +283,67 @@ public class TestExecutionSite extends TestCase {
         @Override
         ClientResponseImpl call(TransactionState txnState, Object... paramList)
         {
-            ByteBuffer paramBuf = createParametersBuffer(paramList);
+            try {
+                ByteBuffer paramBuf = createParametersBuffer(paramList);
 
-            // Build the aggregator and the distributed tasks.
-            int localTask_startDep = txnState.getNextDependencyId() | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-            int localTask_outputDep = txnState.getNextDependencyId();
+                // Build the aggregator and the distributed tasks.
+                int localTask_startDep = txnState.getNextDependencyId() | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+                int localTask_outputDep = txnState.getNextDependencyId();
 
-            FragmentTaskMessage localTask =
-                new FragmentTaskMessage(txnState.initiatorSiteId,
-                                 txnState.coordinatorSiteId,
-                                 txnState.txnId,
-                                 txnState.isReadOnly,
-                                 new long[] {0},
-                                 new int[] {localTask_outputDep},
-                                 new ByteBuffer[] {paramBuf},
-                                 finalTask());
+                FragmentTaskMessage localTask =
+                    new FragmentTaskMessage(txnState.initiatorSiteId,
+                                            txnState.coordinatorSiteId,
+                                            txnState.txnId,
+                                            txnState.isReadOnly,
+                                            new long[] {0},
+                                            new int[] {localTask_outputDep},
+                                            new ByteBuffer[] {paramBuf},
+                                            finalTask());
 
-            localTask.addInputDepId(0, localTask_startDep);
+                localTask.addInputDepId(0, localTask_startDep);
 
-            FragmentTaskMessage distributedTask =
-                new FragmentTaskMessage(txnState.initiatorSiteId,
-                                 txnState.coordinatorSiteId,
-                                 txnState.txnId,
-                                 txnState.isReadOnly,
-                                 new long[] {0},
-                                 new int[] {localTask_startDep},
-                                 new ByteBuffer[] {paramBuf},
-                                 finalTask());
+                FragmentTaskMessage distributedTask =
+                    new FragmentTaskMessage(txnState.initiatorSiteId,
+                                            txnState.coordinatorSiteId,
+                                            txnState.txnId,
+                                            txnState.isReadOnly,
+                                            rollbackParticipant() ? new long[] {101} : new long[] {0},   // MAGIC - see MockExecutionEngine. frag id > 100 causes rollback
+                                                                  new int[] {localTask_startDep},
+                                                                  new ByteBuffer[] {paramBuf},
+                                                                  finalTask());
 
-            txnState.createLocalFragmentWork(localTask, nonTransactional() && finalTask());
-            txnState.createAllParticipatingFragmentWork(distributedTask);
-            txnState.setupProcedureResume(finalTask(), new int[] {localTask_outputDep});
+                txnState.createLocalFragmentWork(localTask, nonTransactional() && finalTask());
+                txnState.createAllParticipatingFragmentWork(distributedTask);
+                txnState.setupProcedureResume(finalTask(), new int[] {localTask_outputDep});
 
-            final Map<Integer, List<VoltTable>> resultDeps =
-                m_site.recursableRun(txnState);
-            assertTrue(resultDeps != null);
+                final Map<Integer, List<VoltTable>> resultDeps =
+                    m_site.recursableRun(txnState);
+                assertTrue(resultDeps != null);
 
-            ++m_called;
+                ++m_called;
 
-            // simulate node failure: no commit sent to participant
-            if (simulate_coordinator_dies_during_commit) {
-                // turn off the fault for the next time through
-                simulate_coordinator_dies_during_commit = false;
-                Thread.currentThread().stop();
+                // simulate node failure: no commit sent to participant
+                if (simulate_coordinator_dies_during_commit) {
+                    // turn off the fault for the next time through
+                    simulate_coordinator_dies_during_commit = false;
+                    Thread.currentThread().stop();
+                }
+
+                // Return a made up table (no EE interaction anyway.. )
+                VoltTable[] vta = new VoltTable[1];
+                vta[0] = new VoltTable(new VoltTable.ColumnInfo("", VoltType.INTEGER));
+                vta[0].addRow(new Integer(1));
+
+                return new ClientResponseImpl(ClientResponse.SUCCESS, vta, null);
             }
-
-            // Return a made up table (no EE interaction anyway.. )
-            VoltTable[] vta = new VoltTable[1];
-            vta[0] = new VoltTable(new VoltTable.ColumnInfo("", VoltType.INTEGER));
-            vta[0].addRow(new Integer(1));
-
-            return new ClientResponseImpl(ClientResponse.SUCCESS, vta, null);
+            // VoltProcedure's call method converts invocation exceptions
+            // to this error path. Do the same here.
+            catch (SerializableException ex) {
+                byte status = 0;
+                return new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
+                                              status, "", new VoltTable[0],
+                                              "Intentional fuzz failure.", ex);
+            }
         }
     }
 
@@ -727,6 +757,7 @@ public class TestExecutionSite extends TestCase {
      * Create a multiple partition transaction
      */
     private void createMPInitiation(
+            boolean rollback,
             boolean readOnly,
             long txn_id,
             long safe_txn_id,
@@ -736,7 +767,13 @@ public class TestExecutionSite extends TestCase {
             List<Integer> participants)
     {
         final StoredProcedureInvocation spi = new StoredProcedureInvocation();
-        spi.setProcName("org.voltdb.TestExecutionSite$MockMPVoltProcedure");
+        if (!rollback) {
+            spi.setProcName("org.voltdb.TestExecutionSite$MockMPVoltProcedure");
+        }
+        else {
+            spi.setProcName("org.voltdb.TestExecutionSite$MockMPVoltProcedureRollbackParticipant");
+        }
+
         spi.setParams(new Integer(partition_id));
 
         final InitiateTaskMessage itm =
@@ -793,6 +830,7 @@ public class TestExecutionSite extends TestCase {
     private void queueTransactions(long firstTxnId, int totalTransactions, Random rand)
     {
         for (int i=0; i <= totalTransactions; ++i) {
+            boolean rollback = rand.nextBoolean();
             boolean readOnly = true;
             long txnid = i + firstTxnId;
             long safe_txnid = txnid;
@@ -808,13 +846,13 @@ public class TestExecutionSite extends TestCase {
                     ++offset;
                 }
             }
-            else if (wheelOfDestiny < 80) {
+            else if (wheelOfDestiny < 50) {
                 createSPInitiation(readOnly, txnid, safe_txnid, initiator, partition);
             }
-            else if (wheelOfDestiny < 90) {
+            else if (wheelOfDestiny < 70) {
                 List<Integer> participants = new ArrayList<Integer>();
                 int coordinator = selectCoordinatorAndParticipants(rand, partition, initiator, participants);
-                createMPInitiation(readOnly, txnid, safe_txnid, initiator, partition, coordinator, participants);
+                createMPInitiation(rollback, readOnly, txnid, safe_txnid, initiator, partition, coordinator, participants);
             }
             else {
                 createHeartBeat(txnid, safe_txnid, initiator);

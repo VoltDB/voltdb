@@ -49,9 +49,6 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse {
 
     /**
      * Used in the successful procedure invocation case.
-     * @param status
-     * @param results
-     * @param extra
      */
     public ClientResponseImpl(byte status, byte appStatus, String appStatusString, VoltTable[] results, String statusString) {
         this(status, appStatus, appStatusString, results, statusString, -1, null);
@@ -59,9 +56,6 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse {
 
     /**
      * Constructor used for tests and error responses.
-     * @param status
-     * @param results
-     * @param extra
      */
     public ClientResponseImpl(byte status, VoltTable[] results, String statusString) {
         this(status, Byte.MIN_VALUE, null, results, statusString, -1, null);
@@ -69,10 +63,6 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse {
 
     /**
      * Another constructor for test and error responses
-     * @param status
-     * @param results
-     * @param extra
-     * @param handle
      */
     public ClientResponseImpl(byte status, VoltTable[] results, String statusString, long handle) {
         this(status, Byte.MIN_VALUE, null, results, statusString, handle, null);
@@ -82,7 +72,6 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse {
      * And another....
      * @param status
      * @param results
-     * @param extra
      * @param e
      */
     public ClientResponseImpl(byte status, VoltTable[] results, String statusString, SerializableException e) {

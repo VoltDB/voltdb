@@ -18,9 +18,8 @@
 package org.voltdb.jni;
 
 import org.voltdb.*;
-import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.elt.ELTProtoMessage;
-import org.voltdb.exceptions.EEException;
+import org.voltdb.exceptions.*;
 import org.voltdb.utils.DBBPool.BBContainer;
 
 public class MockExecutionEngine extends ExecutionEngine {
@@ -34,12 +33,30 @@ public class MockExecutionEngine extends ExecutionEngine {
             int inputDepIdfinal, ParameterSet parameterSet, final long txnId,
             final long lastCommittedTxnId, final long undoToken) throws EEException
     {
-        // Create a mocked up dependency pair. Required by some tests
+        // TestExecutionSite uses this mock site. A plan fragment id greater than 100
+        // indicates a desired rollback. Otherwise, return a made up depedendency pair.
         VoltTable vt;
-        vt = new VoltTable(new ColumnInfo[] {
-                           new ColumnInfo("foo", VoltType.INTEGER)});
-        vt.addRow(new Integer(1));
-        return new DependencyPair(outputDepId, vt);
+        if (planFragmentId > 100) {
+            System.out.println("Throwing exception for rollback.");
+            throwExceptionForError(ERRORCODE_ERROR);
+            // satisfy the compiler. Can't reach this point
+            return null;
+        }
+        else {
+            vt = new VoltTable(
+             new VoltTable.ColumnInfo[] {
+                  new VoltTable.ColumnInfo("foo", VoltType.INTEGER)
+             });
+            vt.addRow(new Integer(1));
+            return new DependencyPair(outputDepId, vt);
+        }
+    }
+
+    @Override
+    protected void throwExceptionForError(int errorCode) {
+        if (errorCode == ERRORCODE_ERROR) {
+            throw new SQLException("66666");
+        }
     }
 
     @Override
@@ -145,5 +162,4 @@ public class MockExecutionEngine extends ExecutionEngine {
         // TODO Auto-generated method stub
         return null;
     }
-
 }

@@ -73,11 +73,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     /**
      * Utility method to generate an EEXception that can be overridden by
-     * derived classes
-     **/
-    protected void throwExceptionForError(final int errorCode) {
-        throw new EEException(errorCode);
-    }
+     * derived classes. This needs to be implemented by each interface
+     * as data is required from the execution engine.
+     */
+    abstract protected void throwExceptionForError(final int errorCode);
 
     @Override
     public void deserializedBytes(final int numBytes) {

@@ -1369,7 +1369,9 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                             e.toString()));
         }
         catch (final Exception e) {
-            // Show the WHOLE exception in the log
+            // Should not be able to reach here. VoltProcedure.call caught all invocation target exceptions
+            // and converted them to error responses. Java errors are re-thrown, and not caught by this
+            // exception clause. A truly unexpected exception reached this point. Crash. It's a defect.
             hostLog.l7dlog( Level.ERROR, LogKeys.host_ExecutionSite_UnexpectedProcedureException.name(), e);
             VoltDB.crashVoltDB();
         }
