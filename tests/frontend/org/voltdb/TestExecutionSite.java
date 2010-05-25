@@ -53,7 +53,6 @@ public class TestExecutionSite extends TestCase {
     MockMailbox m_mboxes[] = new MockMailbox[SITE_COUNT];
     Thread m_siteThreads[] = new Thread[SITE_COUNT];
 
-
     @Override
     protected void setUp() throws Exception
     {
@@ -130,6 +129,13 @@ public class TestExecutionSite extends TestCase {
         return  siteId + 1000;
     }
 
+    /* Get a site on the same "host" as the initiator */
+    int getSiteIdForInitiatorId(int initiatorId) {
+        int siteId = initiatorId - 1000;
+        assert(getInitiatorIdForSiteId(siteId) == initiatorId);
+        return siteId;
+    }
+
     /* return a new array of initiator ids */
     int[] getInitiatorIds() {
         int[] ids = new int[SITE_COUNT];
@@ -143,6 +149,22 @@ public class TestExecutionSite extends TestCase {
     private int selectRandomInitiator(Random rand) {
         int site =  rand.nextInt(SITE_COUNT);
         return getInitiatorIdForSiteId(site);
+    }
+
+    /* Given a partition, return a coordinator by value
+       and the participants by out-param. */
+    private int selectCoordinatorAndParticipants(Random rand, int partition, int initiator, List<Integer> participants) {
+        List<Integer> allSites = getSiteIdsForPartitionId(partition);
+
+        // Failure detection relies on the assumption that coordinator and initiator are co-located
+        int coordinator = getSiteIdForInitiatorId(initiator);
+        for (int i=0; i < allSites.size(); i++) {
+            if (allSites.get(i) == coordinator)
+                continue;
+            else
+                participants.add(allSites.get(i));
+        }
+        return coordinator;
     }
 
     /* Host ids are site ids + 10,000 */
@@ -681,8 +703,7 @@ public class TestExecutionSite extends TestCase {
             long txn_id,
             long safe_txn_id,
             int initiator_id,
-            int partition_id,
-            int coordinator_id)
+            int partition_id)
     {
         final StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.setProcName("org.voltdb.TestExecutionSite$MockSPVoltProcedure");
@@ -692,13 +713,54 @@ public class TestExecutionSite extends TestCase {
         for (int i : sitesForPartition) {
             final InitiateTaskMessage itm =
                 new InitiateTaskMessage(initiator_id,
-                                        coordinator_id,
+                                        i,             // each site is its own coordinator
                                         txn_id,
                                         readOnly,
                                         true,          // single partition
                                         spi,
                                         safe_txn_id);  // last safe txnid
             m_mboxes[i].deliver(itm);
+        }
+    }
+
+    /**
+     * Create a multiple partition transaction
+     */
+    private void createMPInitiation(
+            boolean readOnly,
+            long txn_id,
+            long safe_txn_id,
+            int initiator_id,
+            int partition_id,
+            int coordinator_id,
+            List<Integer> participants)
+    {
+        final StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        spi.setProcName("org.voltdb.TestExecutionSite$MockMPVoltProcedure");
+        spi.setParams(new Integer(partition_id));
+
+        final InitiateTaskMessage itm =
+            new InitiateTaskMessage(initiator_id,
+                                    coordinator_id,
+                                    txn_id,
+                                    readOnly,
+                                    false,         // multi-partition
+                                    spi,
+                                    safe_txn_id);  // last safe txnid
+
+        // just turn the list into an array .. grrr
+        int[] participants_arr = new int[participants.size()];
+        for (int i=0; i < participants.size(); ++i)
+            participants_arr[i] = participants.get(i);
+
+        itm.setNonCoordinatorSites(participants_arr);
+        m_mboxes[coordinator_id].deliver(itm);
+
+        for (int participant : participants) {
+            final MultiPartitionParticipantMessage mppm =
+                new MultiPartitionParticipantMessage
+                (initiator_id, coordinator_id, txn_id, readOnly);
+            m_mboxes[participant].deliver(mppm);
         }
     }
 
@@ -724,7 +786,6 @@ public class TestExecutionSite extends TestCase {
         }
     }
 
-
     /*
      * Pick a random thing to do. If doing the last transaction,
      * send a heartbeat to flush all the queues.
@@ -737,7 +798,6 @@ public class TestExecutionSite extends TestCase {
             long safe_txnid = txnid;
             int initiator = selectRandomInitiator(rand);
             int partition = i % PARTITION_COUNT;
-            int coordinator = getSiteIdsForPartitionId(partition).get(0);
 
             int wheelOfDestiny = rand.nextInt(100);
             if (i == totalTransactions) {
@@ -749,13 +809,19 @@ public class TestExecutionSite extends TestCase {
                 }
             }
             else if (wheelOfDestiny < 80) {
-                createSPInitiation(readOnly, txnid, safe_txnid, initiator, partition, coordinator);
+                createSPInitiation(readOnly, txnid, safe_txnid, initiator, partition);
+            }
+            else if (wheelOfDestiny < 90) {
+                List<Integer> participants = new ArrayList<Integer>();
+                int coordinator = selectCoordinatorAndParticipants(rand, partition, initiator, participants);
+                createMPInitiation(readOnly, txnid, safe_txnid, initiator, partition, coordinator, participants);
             }
             else {
                 createHeartBeat(txnid, safe_txnid, initiator);
             }
         }
     }
+
 
 
     /*
@@ -803,6 +869,5 @@ public class TestExecutionSite extends TestCase {
                 }
             } while (!stopped);
         }
-
     }
 }
