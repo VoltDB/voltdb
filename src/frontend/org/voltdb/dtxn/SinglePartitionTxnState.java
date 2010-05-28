@@ -51,12 +51,10 @@ public class SinglePartitionTxnState extends TransactionState {
     @Override
     public boolean doWork() {
         if (!m_done) {
-            m_site.beginNewTxn(m_task.getTxnId(), isReadOnly);
+            m_site.beginNewTxn(this);
             InitiateResponseMessage response = m_site.processInitiateTask(this, m_task);
             if (response.shouldCommit() == false) {
-                if (!isReadOnly) {
-                    m_site.rollbackTransaction(isReadOnly);
-                }
+                m_needsRollback = true;
             }
 
             try {

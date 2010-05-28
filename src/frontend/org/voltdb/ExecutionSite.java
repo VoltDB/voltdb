@@ -97,6 +97,7 @@ import org.voltdb.utils.VoltLoggerFactory;
 public class ExecutionSite
 implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProcedureConnection
 {
+    private Logger m_txnlog;
     private static final Logger log = Logger.getLogger(ExecutionSite.class.getName(), VoltLoggerFactory.instance());
     private static final Logger hostLog = Logger.getLogger("HOST", VoltLoggerFactory.instance());
     private static AtomicInteger siteIndexCounter = new AtomicInteger(0);
@@ -131,9 +132,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     // the final outcome for the txn.
     long lastCommittedMultiPartTxnId = 0;
 
-    private final static long kInvalidUndoToken = -1L;
-    private long txnBeginUndoToken = kInvalidUndoToken;
-    private long batchBeginUndoToken = kInvalidUndoToken;
+    public final static long kInvalidUndoToken = -1L;
     private long latestUndoToken = 0L;
 
     public long getNextUndoToken() {
@@ -373,6 +372,9 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                   RestrictedPriorityQueue transactionQueue)
     {
         m_siteId = siteId;
+        String txnlog_name = ExecutionSite.class.getName() + "." + m_siteId;
+        m_txnlog =
+            Logger.getLogger(txnlog_name, VoltLoggerFactory.instance());
 
         hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_Initializing.name(),
                         new Object[] { String.valueOf(siteId) }, null);
@@ -637,26 +639,29 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 }
             }
             if (currentTxnState != null) {
-                System.out.println("ExecutionSite " + getSiteId() + " running txnid " + currentTxnState.txnId);
+                //System.out.println("ExecutionSite " + getSiteId() + " running txnid " + currentTxnState.txnId);
                 recursableRun(currentTxnState);
             }
         }
     }
 
     private void completeTransaction(TransactionState txnState) {
+        if (m_txnlog.isTraceEnabled())
+        {
+            m_txnlog.trace("FUZZTEST completeTransaction " + txnState.txnId);
+        }
         if (!txnState.isReadOnly) {
             assert(latestUndoToken != kInvalidUndoToken);
-            assert(txnBeginUndoToken != kInvalidUndoToken);
-            assert(latestUndoToken >= txnBeginUndoToken);
+            assert(txnState.getBeginUndoToken() != kInvalidUndoToken);
+            assert(latestUndoToken >= txnState.getBeginUndoToken());
 
             // release everything through the end of the current window.
-            if (latestUndoToken > txnBeginUndoToken) {
+            if (latestUndoToken > txnState.getBeginUndoToken()) {
                 ee.releaseUndoToken(latestUndoToken);
             }
 
             // reset for error checking purposes
-            txnBeginUndoToken = kInvalidUndoToken;
-            batchBeginUndoToken = kInvalidUndoToken;
+            txnState.setBeginUndoToken(kInvalidUndoToken);
         }
 
         // advance the committed transaction point. Necessary for both ELT
@@ -717,7 +722,17 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
 
             // Every non-heartbeat notice requires a transaction state.
             TransactionState ts = m_transactionsById.get(info.getTxnId());
-            if (ts == null) {
+
+            // Check for a rollback FragmentTask.  Would eventually like to
+            // replace the overloading of FragmentTask with a separate
+            // TransactionCompletionMessage (or something similarly named)
+            boolean isRollback = false;
+            if (message instanceof FragmentTaskMessage)
+            {
+                isRollback = ((FragmentTaskMessage) message).shouldUndo();
+            }
+            // don't create a new transaction state
+            if (ts == null && !isRollback) {
                 if (info.isSinglePartition()) {
                     ts = new SinglePartitionTxnState(m_mailbox, this, info);
                 }
@@ -728,8 +743,11 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 m_transactionsById.put(ts.txnId, ts);
             }
 
-            if (message instanceof FragmentTaskMessage) {
-                ts.createLocalFragmentWork((FragmentTaskMessage)message, false);
+            if (ts != null)
+            {
+                if (message instanceof FragmentTaskMessage) {
+                    ts.createLocalFragmentWork((FragmentTaskMessage)message, false);
+                }
             }
         }
         else if (message instanceof FragmentResponseMessage) {
@@ -932,6 +950,10 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
      */
     void handleNodeFault(int hostId, long globalMultiPartCommitPoint,
                          long globalInitiationPoint) {
+        if (m_txnlog.isTraceEnabled())
+        {
+            m_txnlog.trace("FUZZTEST handleNodeFault " + hostId);
+        }
 
         // Fix safe transaction scoreboard in transaction queue
         ArrayList<Integer> failedSites =
@@ -1191,6 +1213,10 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         do
         {
             if (currentTxnState.doWork()) {
+                if (currentTxnState.needsRollback())
+                {
+                    rollbackTransaction(currentTxnState);
+                }
                 completeTransaction(currentTxnState);
                 TransactionState ts = m_transactionsById.remove(currentTxnState.txnId);
                 assert(ts != null);
@@ -1230,25 +1256,34 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
      * when the transaction ID changes.
      */
     @Override
-    public final void beginNewTxn(long txnId, boolean readOnly) {
-        if (!readOnly) {
-            assert(txnBeginUndoToken == kInvalidUndoToken);
-            assert(batchBeginUndoToken == kInvalidUndoToken);
-            txnBeginUndoToken = latestUndoToken;
-            assert(txnBeginUndoToken != kInvalidUndoToken);
+    public final void beginNewTxn(TransactionState txnState)
+    {
+        if (m_txnlog.isTraceEnabled())
+        {
+            m_txnlog.trace("FUZZTEST beginNewTxn " + txnState.txnId + " " +
+                           (txnState.isSinglePartition() ? "single" : "multi"));
+        }
+        if (!txnState.isReadOnly) {
+            assert(txnState.getBeginUndoToken() == kInvalidUndoToken);
+            txnState.setBeginUndoToken(latestUndoToken);
+            assert(txnState.getBeginUndoToken() != kInvalidUndoToken);
         }
     }
 
-    @Override
-    public final void rollbackTransaction(boolean readOnly) {
-        if (!readOnly) {
+    public final void rollbackTransaction(TransactionState txnState)
+    {
+        if (m_txnlog.isTraceEnabled())
+        {
+            m_txnlog.trace("FUZZTEST rollbackTransaction " + txnState.txnId);
+        }
+        if (!txnState.isReadOnly) {
             assert(latestUndoToken != kInvalidUndoToken);
-            assert(txnBeginUndoToken != kInvalidUndoToken);
-            assert(latestUndoToken >= txnBeginUndoToken);
+            assert(txnState.getBeginUndoToken() != kInvalidUndoToken);
+            assert(latestUndoToken >= txnState.getBeginUndoToken());
 
             // don't go to the EE if no work was done
-            if (latestUndoToken > txnBeginUndoToken) {
-                ee.undoUndoToken(txnBeginUndoToken);
+            if (latestUndoToken > txnState.getBeginUndoToken()) {
+                ee.undoUndoToken(txnState.getBeginUndoToken());
             }
         }
     }

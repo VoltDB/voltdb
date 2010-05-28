@@ -46,6 +46,8 @@ public abstract class TransactionState implements Comparable<TransactionState> {
     protected final Mailbox m_mbox;
     protected final SiteTransactionConnection m_site;
     protected boolean m_done = false;
+    protected long m_beginUndoToken;
+    protected boolean m_needsRollback = false;
 
     /**
      * Set up the final member variables from the parameters. This will
@@ -64,6 +66,7 @@ public abstract class TransactionState implements Comparable<TransactionState> {
         initiatorSiteId = notice.getInitiatorSiteId();
         coordinatorSiteId = notice.getCoordinatorSiteId();
         isReadOnly = notice.isReadOnly();
+        m_beginUndoToken = ExecutionSite.kInvalidUndoToken;
     }
 
     /**
@@ -89,6 +92,21 @@ public abstract class TransactionState implements Comparable<TransactionState> {
 
     public boolean shouldResumeProcedure() {
         return false;
+    }
+
+    public void setBeginUndoToken(long undoToken)
+    {
+        m_beginUndoToken = undoToken;
+    }
+
+    public long getBeginUndoToken()
+    {
+        return m_beginUndoToken;
+    }
+
+    public boolean needsRollback()
+    {
+        return m_needsRollback;
     }
 
     public void createFragmentWork(int[] partitions, FragmentTaskMessage task) {

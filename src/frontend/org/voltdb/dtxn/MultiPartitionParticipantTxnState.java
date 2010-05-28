@@ -102,13 +102,13 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
 
     @Override
     public boolean doWork() {
-        if (m_done) {
-            return true;
+        if (!m_hasStartedWork) {
+            m_site.beginNewTxn(this);
+            m_hasStartedWork = true;
         }
 
-        if (!m_hasStartedWork) {
-            m_site.beginNewTxn(txnId, isReadOnly);
-            m_hasStartedWork = true;
+        if (m_done) {
+            return true;
         }
 
         WorkUnit wu = m_readyWorkUnits.poll();
@@ -216,11 +216,11 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
 
         if (!response.shouldCommit()) {
             if (m_missingDependencies != null)
+            {
                 m_missingDependencies.clear();
-            if (!isReadOnly) {
-                m_site.rollbackTransaction(isReadOnly);
-                m_didRollback = true;
             }
+            m_needsRollback = true;
+            m_didRollback = true;
         }
 
         try {
@@ -260,7 +260,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
             }
             else
             {
-                m_site.rollbackTransaction(isReadOnly);
+                m_needsRollback = true;
                 m_didRollback = true;
                 m_done = true;
             }
@@ -336,7 +336,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                 m_missingDependencies.clear();
             }
             m_readyWorkUnits.clear();
-            m_site.rollbackTransaction(isReadOnly);
+            m_needsRollback = true;
             m_didRollback = true;
             m_done = true;
             return;
@@ -405,7 +405,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
             }
             else
             {
-                m_site.rollbackTransaction(isReadOnly);
+                m_needsRollback = true;
                 m_didRollback = true;
                 m_done = true;
             }

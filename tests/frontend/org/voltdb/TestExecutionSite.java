@@ -24,12 +24,17 @@
 package org.voltdb;
 
 import java.io.IOException;
+import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import junit.framework.TestCase;
 
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+import org.apache.log4j.SimpleLayout;
+import org.apache.log4j.WriterAppender;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
@@ -37,6 +42,7 @@ import org.voltdb.dtxn.*;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.fault.FaultDistributor;
 import org.voltdb.messaging.*;
+import org.voltdb.utils.VoltLoggerFactory;
 
 public class TestExecutionSite extends TestCase {
 
@@ -44,20 +50,25 @@ public class TestExecutionSite extends TestCase {
     static { EELibraryLoader.loadExecutionEngineLibrary(true); }
 
     // Topology parameters
-    private static final int K_FACTOR = 3;
+    private static final int K_FACTOR = 1;
     private static final int PARTITION_COUNT = 3;
     private static final int SITE_COUNT = PARTITION_COUNT * (K_FACTOR + 1);
 
     MockVoltDB m_voltdb;
+    ExecutionSiteFuzzChecker m_checker;
     RestrictedPriorityQueue m_rpqs[] = new RestrictedPriorityQueue[SITE_COUNT];
     ExecutionSite m_sites[] = new ExecutionSite[SITE_COUNT];
     MockMailbox m_mboxes[] = new MockMailbox[SITE_COUNT];
     Thread m_siteThreads[] = new Thread[SITE_COUNT];
+    Logger[] m_siteLogger = new Logger[SITE_COUNT];
+    StringWriter[] m_siteResults = new StringWriter[SITE_COUNT];
 
     @Override
     protected void setUp() throws Exception
     {
         super.setUp();
+        m_checker = new ExecutionSiteFuzzChecker();
+
         m_voltdb = new MockVoltDB();
         m_voltdb.setFaultDistributor(new FaultDistributor());
 
@@ -68,6 +79,14 @@ public class TestExecutionSite extends TestCase {
                              getHostIdForSiteId(ss),
                              getPartitionIdForSiteId(ss),
                              false);
+            // Configure log4j so that ExecutionSite generates FUZZTEST output
+            String logname = ExecutionSite.class.getName() + "." + ss;
+            m_siteLogger[ss] = Logger.getLogger(logname,
+                                                VoltLoggerFactory.instance());
+            m_siteResults[ss] = new StringWriter();
+            m_siteLogger[ss].addAppender(new WriterAppender(new SimpleLayout(),
+                                                            m_siteResults[ss]));
+            m_siteLogger[ss].setLevel(Level.TRACE);
         }
 
         // create k+1 sites per partition
@@ -76,6 +95,7 @@ public class TestExecutionSite extends TestCase {
             m_voltdb.addPartition(pp);
             for (int kk=0; kk < (K_FACTOR + 1); kk++) {
                 m_voltdb.addSite(siteid, getHostIdForSiteId(siteid), pp, true);
+                m_checker.addSite(siteid, pp, m_siteResults[siteid]);
                 ++siteid;
             }
         }
@@ -122,6 +142,7 @@ public class TestExecutionSite extends TestCase {
             m_mboxes[i] = null;
         }
         m_voltdb = null;
+        m_checker = null;
     }
 
     /* Partitions are assigned to sites in sequence: a,a,b,b,c,c.. */
@@ -158,16 +179,18 @@ public class TestExecutionSite extends TestCase {
 
     /* Given a partition, return a coordinator by value
        and the participants by out-param. */
-    private int selectCoordinatorAndParticipants(Random rand, int partition, int initiator, List<Integer> participants) {
-        List<Integer> allSites = getSiteIdsForPartitionId(partition);
-
-        // Failure detection relies on the assumption that coordinator and initiator are co-located
+    private int selectCoordinatorAndParticipants(Random rand, int partition,
+                                                 int initiator,
+                                                 List<Integer> participants)
+    {
+        // Failure detection relies on the assumption that coordinator and
+        // initiator are co-located
         int coordinator = getSiteIdForInitiatorId(initiator);
-        for (int i=0; i < allSites.size(); i++) {
-            if (allSites.get(i) == coordinator)
+        for (int i=0; i < SITE_COUNT; i++) {
+            if (i == coordinator)
                 continue;
             else
-                participants.add(allSites.get(i));
+                participants.add(i);
         }
         return coordinator;
     }
@@ -774,6 +797,8 @@ public class TestExecutionSite extends TestCase {
             spi.setProcName("org.voltdb.TestExecutionSite$MockMPVoltProcedureRollbackParticipant");
         }
 
+        System.out.println("Creating MP proc, TXN ID: " + txn_id + ", participants: " + participants.toString());
+
         spi.setParams(new Integer(partition_id));
 
         final InitiateTaskMessage itm =
@@ -831,7 +856,7 @@ public class TestExecutionSite extends TestCase {
     {
         for (int i=0; i <= totalTransactions; ++i) {
             boolean rollback = rand.nextBoolean();
-            boolean readOnly = true;
+            boolean readOnly = rand.nextBoolean();
             long txnid = i + firstTxnId;
             long safe_txnid = txnid;
             int initiator = selectRandomInitiator(rand);
@@ -884,7 +909,7 @@ public class TestExecutionSite extends TestCase {
 
     public void testFuzzedTransactions()
     {
-        final int totalTransactions = 1000;
+        final int totalTransactions = 10000;
         final long firstTxnId = 10000;
         final Random rand = new Random();
         queueTransactions(firstTxnId, totalTransactions, rand);
@@ -907,5 +932,8 @@ public class TestExecutionSite extends TestCase {
                 }
             } while (!stopped);
         }
+
+        m_checker.dumpLogs();
+        m_checker.validateLogs();
     }
 }

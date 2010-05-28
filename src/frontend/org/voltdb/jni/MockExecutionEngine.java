@@ -37,7 +37,7 @@ public class MockExecutionEngine extends ExecutionEngine {
         // indicates a desired rollback. Otherwise, return a made up depedendency pair.
         VoltTable vt;
         if (planFragmentId > 100) {
-            System.out.println("Throwing exception for rollback.");
+            //System.out.println("Throwing exception for rollback.");
             throwExceptionForError(ERRORCODE_ERROR);
             // satisfy the compiler. Can't reach this point
             return null;

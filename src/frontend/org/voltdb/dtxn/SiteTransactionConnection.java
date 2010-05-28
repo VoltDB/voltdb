@@ -41,9 +41,7 @@ public interface SiteTransactionConnection {
             TransactionState txnState,
             final VoltMessage task);
 
-    public void beginNewTxn(long txnId, boolean readOnly);
-    public void rollbackTransaction(boolean readOnly);
-
+    public void beginNewTxn(TransactionState txnState);
 
     // Multi-partition procedures currently decide when optimizations are
     // viable. This work should happen in recursableRun() based on
