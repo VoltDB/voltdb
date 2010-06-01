@@ -42,7 +42,7 @@ public class measureOverhead extends VoltProcedure {
 
     public final SQLStmt getID = new SQLStmt("SELECT NO_O_ITEM FROM NEWORDER WHERE NO_O_ID = ?;");
 
-    public VoltTable[] run(long no_o_id) {
+    public VoltTable[] run(int no_o_id) {
         voltQueueSQL(getID, no_o_id);
         return voltExecuteSQL(true);
     }
