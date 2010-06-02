@@ -35,7 +35,7 @@ PRIMARY ENTRY POINTS
     <copy file="ddl.sql" toDir="obj/com" />
     <java fork="yes" classname="org.voltdb.benchmark.BenchmarkController" >
         <jvmarg value="-Djava.library.path=${env.VOLTBIN}" />
-        <arg value="CLIENT=com.ClientBenchmark" />
+        <arg value="CLIENT=org.voltdb.benchmark.dedupe.ClientBenchmark" />
         <arg value="HOSTCOUNT=${hostcount}" />
         <arg value="SITESPERHOST=${sitesperhost}"/>
         <arg value="CLIENTCOUNT=${clientcount}" />
