@@ -51,6 +51,7 @@
 #include "common/Pool.hpp"
 #include "common/ValuePeeker.hpp"
 #include "common/FatalException.hpp"
+#include "common/ELTSerializeIo.h"
 #include <ostream>
 
 #include <iostream>
@@ -256,7 +257,8 @@ public:
 
     void deserializeFrom(voltdb::SerializeInput &tupleIn, Pool *stringPool);
     void serializeTo(voltdb::SerializeOutput &output);
-    size_t serializeToELT(int colOffset, uint8_t *nullArray, char *dataPtr);
+    void serializeToELT(voltdb::ELTSerializeOutput &io,
+                          int colOffset, uint8_t *nullArray);
 
     void freeObjectColumns();
     size_t hashCode() const;
@@ -545,14 +547,14 @@ inline void TableTuple::serializeTo(voltdb::SerializeOutput &output) {
 }
 
 inline
-size_t
-TableTuple::serializeToELT(int colOffset, uint8_t *nullArray, char *dataPtr)
+void
+TableTuple::serializeToELT(ELTSerializeOutput &io,
+                           int colOffset, uint8_t *nullArray)
 {
-    char *currDataPtr = dataPtr;
     int columnCount = sizeInValues();
     for (int i = 0; i < columnCount; i++) {
         // NULL doesn't produce any bytes for the NValue
-        // handle it here to consolidate manipulation of
+        // Handle it here to consolidate manipulation of
         // the nullarray.
         if (isNull(i)) {
             // turn on i'th bit of nullArray
@@ -562,9 +564,8 @@ TableTuple::serializeToELT(int colOffset, uint8_t *nullArray, char *dataPtr)
             nullArray[byte] = (uint8_t)(nullArray[byte] | mask);
             continue;
         }
-        currDataPtr += getNValue(i).serializeToELT(currDataPtr);
+        getNValue(i).serializeToELT(io);
     }
-    return currDataPtr - dataPtr;
 }
 
 inline bool TableTuple::equals(const TableTuple &other) const {

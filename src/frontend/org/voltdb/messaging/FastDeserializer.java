@@ -57,6 +57,11 @@ public class FastDeserializer implements DataInput {
         assert(buffer.order() == ByteOrder.BIG_ENDIAN);
     }
 
+    public FastDeserializer(final byte[] in, ByteOrder order) {
+        buffer = ByteBuffer.wrap(in);
+        buffer.order(order);
+    }
+
     /** Create a <code>FastDeserializer</code> from a ByteBuffer.
      * @param in The ByteBuffer that will be part of this FastDeserializer. */
     public FastDeserializer(final ByteBuffer in) {

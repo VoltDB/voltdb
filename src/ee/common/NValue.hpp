@@ -22,6 +22,7 @@
 #include "common/SQLException.h"
 #include "common/debuglog.h"
 #include "common/serializeio.h"
+#include "common/ELTSerializeIo.h"
 #include "common/types.h"
 #include "common/value_defs.h"
 #include "common/FatalException.hpp"
@@ -175,7 +176,7 @@ class NValue {
     void serializeTo(SerializeOutput &output) const;
 
     /* Serialize this NValue to an ELT stream */
-    size_t serializeToELT(char *) const;
+    void serializeToELT(ELTSerializeOutput&) const;
 
     /* Check if the value represents SQL NULL */
     bool isNull() const;
@@ -2021,7 +2022,7 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
     }
 }
 
-inline size_t NValue::serializeToELT(char *dataPtr) const
+inline void NValue::serializeToELT(ELTSerializeOutput &io) const
 {
     switch (getValueType()) {
       case VALUE_TYPE_TINYINT:
@@ -2031,31 +2032,27 @@ inline size_t NValue::serializeToELT(char *dataPtr) const
       case VALUE_TYPE_TIMESTAMP:
       {
           int64_t val = castAsBigIntAndGetValue();
-          *(reinterpret_cast<int64_t*>(dataPtr)) = htonll(val);
-          return sizeof(int64_t);
+          io.writeLong(val);
+          return;
       }
       case VALUE_TYPE_DOUBLE:
       {
-          int64_t data;
           double value = getDouble();
-          ::memcpy(&data, &value, sizeof(data));
-          *(reinterpret_cast<int64_t*>(dataPtr)) = htonll(data);
-          return sizeof(int64_t);
+          io.writeDouble(value);
+          return;
       }
       case VALUE_TYPE_VARCHAR:
       {
-          int32_t objectLength = getObjectLength();
-          *(reinterpret_cast<int32_t*>(dataPtr)) = htonl(objectLength);
-          ::memcpy((dataPtr+4), getObjectValue(), objectLength);
-          return sizeof(int32_t) + objectLength;
+          // requires (and uses) bytecount not character count
+          io.writeBinaryString(getObjectValue(), getObjectLength());
+          return;
       }
       case VALUE_TYPE_DECIMAL:
       {
           std::string decstr = createStringFromDecimal();
           int32_t objectLength = (int32_t)decstr.length();
-          *(reinterpret_cast<int32_t*>(dataPtr)) = htonl(objectLength);
-          ::memcpy((dataPtr+4), decstr.c_str(), objectLength);
-          return sizeof(int32_t) + objectLength;
+          io.writeBinaryString(decstr.data(), objectLength);
+          return;
       }
       case VALUE_TYPE_INVALID:
       case VALUE_TYPE_NULL:

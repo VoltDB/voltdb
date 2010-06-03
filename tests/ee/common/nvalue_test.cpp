@@ -1761,124 +1761,136 @@ TEST_F(NValueTest, SerializeToELT)
     // NULL values and buffer length checking are done
     // before this primitive function.
 
-    // all the ELT ints are in network byte order.
-    // reference serialize in reads in network order;
-    // it makes a decent read verifier, therefore.
-
     NValue nv;
-    size_t b;
 
     // a plenty-large-buffer(tm)
     char buf[1024];
-    ReferenceSerializeInput sin(buf, 1024);
+    ELTSerializeInput sin(buf, 1024);
+    ELTSerializeOutput out(buf, 1024);
 
     // tinyint
     nv = ValueFactory::getTinyIntValue(-50);
-    b = nv.serializeToELT(buf);
-    EXPECT_EQ(8, b);
+    nv.serializeToELT(out);
+    EXPECT_EQ(8, out.position());
     EXPECT_EQ(-50, sin.readLong());
-    sin.unread(b);
+    sin.unread(out.position());
+    out.position(0);
 
     nv = ValueFactory::getTinyIntValue(0);
-    b = nv.serializeToELT(buf);
-    EXPECT_EQ(8, b);
+    nv.serializeToELT(out);
+    EXPECT_EQ(8, out.position());
     EXPECT_EQ(0, sin.readLong());
-    sin.unread(b);
+    sin.unread(out.position());
+    out.position(0);
 
     nv = ValueFactory::getTinyIntValue(50);
-    b = nv.serializeToELT(buf);
-    EXPECT_EQ(8, b);
+    nv.serializeToELT(out);
+    EXPECT_EQ(8, out.position());
     EXPECT_EQ(50, sin.readLong());
-    sin.unread(b);
+    sin.unread(out.position());
+    out.position(0);
 
     // smallint
     nv = ValueFactory::getSmallIntValue(-128);
-    b = nv.serializeToELT(buf);
-    EXPECT_EQ(8, b);
+    nv.serializeToELT(out);
+    EXPECT_EQ(8, out.position());
     EXPECT_EQ(-128, sin.readLong());
-    sin.unread(b);
+    sin.unread(out.position());
+    out.position(0);
 
     nv = ValueFactory::getSmallIntValue(0);
-    b = nv.serializeToELT(buf);
-    EXPECT_EQ(8, b);
+    nv.serializeToELT(out);
+    EXPECT_EQ(8, out.position());
     EXPECT_EQ(0, sin.readLong());
-    sin.unread(b);
+    sin.unread(out.position());
+    out.position(0);
 
     nv = ValueFactory::getSmallIntValue(128);
-    b = nv.serializeToELT(buf);
-    EXPECT_EQ(8, b);
+    nv.serializeToELT(out);
+    EXPECT_EQ(8, out.position());
     EXPECT_EQ(128, sin.readLong());
-    sin.unread(b);
+    sin.unread(out.position());
+    out.position(0);
 
     // int
     nv = ValueFactory::getIntegerValue(-4999999);
-    b = nv.serializeToELT(buf);
-    EXPECT_EQ(8, b);
+    nv.serializeToELT(out);
+    EXPECT_EQ(8, out.position());
     EXPECT_EQ(-4999999, sin.readLong());
-    sin.unread(b);
+    sin.unread(out.position());
+    out.position(0);
 
     nv = ValueFactory::getIntegerValue(0);
-    b = nv.serializeToELT(buf);
-    EXPECT_EQ(8, b);
+    nv.serializeToELT(out);
+    EXPECT_EQ(8, out.position());
     EXPECT_EQ(0, sin.readLong());
-    sin.unread(b);
+    sin.unread(out.position());
+    out.position(0);
 
     nv = ValueFactory::getIntegerValue(128);
-    b = nv.serializeToELT(buf);
-    EXPECT_EQ(8, b);
+    nv.serializeToELT(out);
+    EXPECT_EQ(8, out.position());
     EXPECT_EQ(128, sin.readLong());
-    sin.unread(b);
+    sin.unread(out.position());
+    out.position(0);
 
     // bigint
     nv = ValueFactory::getBigIntValue(-4999999);
-    b = nv.serializeToELT(buf);
-    EXPECT_EQ(8, b);
+    nv.serializeToELT(out);
+    EXPECT_EQ(8, out.position());
     EXPECT_EQ(-4999999, sin.readLong());
-    sin.unread(b);
+    sin.unread(out.position());
+    out.position(0);
 
     nv = ValueFactory::getBigIntValue(0);
-    b = nv.serializeToELT(buf);
-    EXPECT_EQ(8, b);
+    nv.serializeToELT(out);
+    EXPECT_EQ(8, out.position());
     EXPECT_EQ(0, sin.readLong());
-    sin.unread(b);
+    sin.unread(out.position());
+    out.position(0);
 
     nv = ValueFactory::getBigIntValue(128);
-    b = nv.serializeToELT(buf);
-    EXPECT_EQ(8, b);
+    nv.serializeToELT(out);
+    EXPECT_EQ(8, out.position());
     EXPECT_EQ(128, sin.readLong());
-    sin.unread(b);
+    sin.unread(out.position());
+    out.position(0);
 
     // timestamp
     nv = ValueFactory::getTimestampValue(99999999);
-    b = nv.serializeToELT(buf);
-    EXPECT_EQ(8, b);
+    nv.serializeToELT(out);
+    EXPECT_EQ(8, out.position());
     EXPECT_EQ(99999999, sin.readLong());
-    sin.unread(b);
+    sin.unread(out.position());
+    out.position(0);
 
     // double
     nv = ValueFactory::getDoubleValue(-5.5555);
-    b = nv.serializeToELT(buf);
-    EXPECT_EQ(8, b);
+    nv.serializeToELT(out);
+    EXPECT_EQ(8, out.position());
     EXPECT_EQ(-5.5555, sin.readDouble());
-    sin.unread(b);
+    sin.unread(out.position());
+    out.position(0);
 
     nv = ValueFactory::getDoubleValue(0.0);
-    b = nv.serializeToELT(buf);
-    EXPECT_EQ(8, b);
+    nv.serializeToELT(out);
+    EXPECT_EQ(8, out.position());
     EXPECT_EQ(0.0, sin.readDouble());
-    sin.unread(b);
+    sin.unread(out.position());
+    out.position(0);
 
     nv = ValueFactory::getDoubleValue(128.256);
-    b = nv.serializeToELT(buf);
-    EXPECT_EQ(8, b);
+    nv.serializeToELT(out);
+    EXPECT_EQ(8, out.position());
     EXPECT_EQ(128.256, sin.readDouble());
-    sin.unread(b);
+    sin.unread(out.position());
+    out.position(0);
 
     // varchar
     nv = ValueFactory::getStringValue("ABCDEFabcdef");
-    b = nv.serializeToELT(buf);
+    nv.serializeToELT(out);
     nv.free();
-    EXPECT_EQ(12 + 4, b);         // chardata plus prefix
+    EXPECT_EQ(12 + 4, out.position());         // chardata plus prefix
     EXPECT_EQ(12, sin.readInt()); // 32 bit length prefix
     EXPECT_EQ('A', sin.readChar());
     EXPECT_EQ('B', sin.readChar());
@@ -1892,12 +1904,13 @@ TEST_F(NValueTest, SerializeToELT)
     EXPECT_EQ('d', sin.readChar());
     EXPECT_EQ('e', sin.readChar());
     EXPECT_EQ('f', sin.readChar());
-    sin.unread(b);
+    sin.unread(out.position());
+    out.position(0);
 
     // decimal
     nv = ValueFactory::getDecimalValueFromString("-1234567890.456123000000");
-    b = nv.serializeToELT(buf);
-    EXPECT_EQ(24 + 4, b);
+    nv.serializeToELT(out);
+    EXPECT_EQ(24 + 4, out.position());
     EXPECT_EQ(24, sin.readInt()); // 32 bit length prefix
     EXPECT_EQ('-', sin.readChar());
     EXPECT_EQ('1', sin.readChar());
@@ -1923,7 +1936,8 @@ TEST_F(NValueTest, SerializeToELT)
     EXPECT_EQ('0', sin.readChar());
     EXPECT_EQ('0', sin.readChar());
     EXPECT_EQ('0', sin.readChar());
-    sin.unread(b);
+    sin.unread(out.position());
+    out.position(0);
 }
 
 int main() {

@@ -22,6 +22,7 @@
 #include "common/NValue.hpp"
 #include "common/ValuePeeker.hpp"
 #include "common/tabletuple.h"
+#include "common/ELTSerializeIo.h"
 
 #include <cstdio>
 #include <iostream>
@@ -265,50 +266,45 @@ size_t TupleStreamWrapper::appendTuple(int64_t lastCommittedTxnId,
     if ((m_currBlock->offset() + tupleMaxLength) > m_defaultCapacity) {
         extendBufferChain(tupleMaxLength);
     }
-    char *basePtr = m_currBlock->mutableDataPtr();
-    size_t offset = m_currBlock->offset();
 
     // initialize the full row header to 0. This also
     // has the effect of setting each column non-null.
-    ::memset(basePtr + offset, 0, rowHeaderSz);
+    ::memset(m_currBlock->mutableDataPtr(), 0, rowHeaderSz);
 
-    char *startPtr  = basePtr + offset;
-    uint8_t *nullArray = reinterpret_cast<uint8_t*>(basePtr + offset + sizeof (int32_t));
-    char *dataPtr = basePtr + offset + rowHeaderSz;
+    // the nullarray lives in rowheader after the 4 byte header length prefix
+    uint8_t *nullArray =
+      reinterpret_cast<uint8_t*>(m_currBlock->mutableDataPtr() + sizeof (int32_t));
+
+    // position the serializer after the full rowheader
+    ELTSerializeOutput io(m_currBlock->mutableDataPtr() + rowHeaderSz,
+                          m_currBlock->remaining() - rowHeaderSz);
 
     // write metadata columns
-    *(reinterpret_cast<int64_t*>(dataPtr)) = htonll(txnId);
-    dataPtr += sizeof (int64_t);  // 0
-
-    *(reinterpret_cast<int64_t*>(dataPtr)) = htonll(timestamp);
-    dataPtr += sizeof (int64_t);  // 1
-
-    *(reinterpret_cast<int64_t*>(dataPtr)) = htonll(seqNo);
-    dataPtr += sizeof (int64_t);  // 2
-
-    *(reinterpret_cast<int64_t*>(dataPtr)) = htonll(m_partitionId);
-    dataPtr += sizeof (int64_t);  // 3
-
-    *(reinterpret_cast<int64_t*>(dataPtr)) = htonll(m_siteId);
-    dataPtr += sizeof (int64_t);  // 4
+    io.writeLong(txnId);
+    io.writeLong(timestamp);
+    io.writeLong(seqNo);
+    io.writeLong(m_partitionId);
+    io.writeLong(m_siteId);
 
     // use 1 for INSERT ELT op, 0 for DELETE ELT op
-    const int64_t ins = (type == INSERT) ? 1 : 0;
-    *(reinterpret_cast<int64_t*>(dataPtr)) = htonll(ins);
-    dataPtr +=  sizeof (int64_t);    // 5
+    io.writeLong((type == INSERT) ? 1L : 0L);
 
     // write the tuple's data
-    dataPtr += tuple.serializeToELT(METADATA_COL_CNT, nullArray, dataPtr);
+    tuple.serializeToELT(io, METADATA_COL_CNT, nullArray);
 
     // write the row size in to the row header
     // rowlength does not include the 4 byte row header
-    *(reinterpret_cast<int32_t*>(startPtr)) = htonl(((int32_t)(dataPtr - (startPtr + 4))));
+    // but does include the null array.
+    ELTSerializeOutput hdr(m_currBlock->mutableDataPtr(), 4);
+    hdr.writeInt((int32_t)(io.position()) + (int32_t)rowHeaderSz - 4);
 
-    // success: move m_offset.
-    m_currBlock->consumed(dataPtr - startPtr);
-    size_t startingOffset = m_uso;
-    m_uso += (dataPtr - startPtr);
-    return startingOffset;
+    // update m_offset
+    m_currBlock->consumed(rowHeaderSz + io.position());
+
+    // update uso.
+    const size_t startingUso = m_uso;
+    m_uso += (rowHeaderSz + io.position());
+    return startingUso;
 }
 
 size_t

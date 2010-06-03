@@ -26,6 +26,7 @@
 #include "common/TupleSchema.h"
 #include "common/ValueFactory.hpp"
 #include "common/serializeio.h"
+#include "common/ELTSerializeIo.h"
 
 #include <cstdlib>
 
@@ -313,20 +314,21 @@ TableTupleELTTest::serElSize(std::vector<uint16_t> &keep_offsets,
     }
 
     // The function under test!
-    size_t sz = tt->serializeToELT(0, nullArray, dataPtr);
+    ELTSerializeOutput io(dataPtr, 2048);
+    tt->serializeToELT(io, 0, nullArray);
 
     // and cleanup
     tt->freeObjectColumns();
     delete tt;
     TupleSchema::freeTupleSchema(ts);
-    return sz;
+    return io.position();
 }
 
 // helper to verify the data that was serialized to the buffer
 void
 TableTupleELTTest::verSer(int cnt, char *data)
 {
-    ReferenceSerializeInput sin(data, 2048);
+    ELTSerializeInput sin(data, 2048);
 
     if (cnt-- >= 0)
     {

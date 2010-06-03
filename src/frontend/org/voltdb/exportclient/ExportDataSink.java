@@ -17,6 +17,7 @@
 
 package org.voltdb.exportclient;
 
+import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Queue;
@@ -35,12 +36,12 @@ public class ExportDataSink implements Runnable
 
     private int m_tableId = -1;
     private int m_partitionId = -1;
-    private String m_tableName;
-    private ExportDecoderBase m_decoder;
+    private final String m_tableName;
+    private final ExportDecoderBase m_decoder;
     private String m_activeConnection = null;
 
-    private HashMap<String, LinkedList<ELTProtoMessage>> m_rxQueues;
-    private HashMap<String, LinkedList<ELTProtoMessage>> m_txQueues;
+    private final HashMap<String, LinkedList<ELTProtoMessage>> m_rxQueues;
+    private final HashMap<String, LinkedList<ELTProtoMessage>> m_txQueues;
 
     boolean m_started = false;
 
@@ -150,35 +151,42 @@ public class ExportDataSink implements Runnable
 
     private void handlePollResponse(ELTProtoMessage m)
     {
-        // if a poll returns no data, this process is complete.
-        if (m.getData().remaining() == 0) {
-            m_decoder.noDataReceived(m.getAckOffset());
-            poll();
-            return;
+        // Poll data is all encoded little endian.
+        m.getData().order(ByteOrder.LITTLE_ENDIAN);
+        try {
+            // if a poll returns no data, this process is complete.
+            if (m.getData().remaining() == 0) {
+                m_decoder.noDataReceived(m.getAckOffset());
+                poll();
+                return;
+            }
+
+            // read the streamblock length prefix.
+            int ttllength = m.getData().getInt();
+            m_logger.trace("Poller: table: " + m_tableName +
+                           ", partition: " + m_partitionId +
+                           " : data payload bytes: " + ttllength);
+
+            // a stream block prefix of 0 also means empty queue.
+            if (ttllength == 0) {
+                m_decoder.noDataReceived(m.getAckOffset());
+                poll();
+                return;
+            }
+
+            // run the verifier until m.getData() is consumed
+            while (m.getData().hasRemaining()) {
+                int length = m.getData().getInt();
+                byte[] rowdata = new byte[length];
+                m.getData().get(rowdata, 0, length);
+                m_decoder.processRow(length, rowdata);
+            }
+
+            // ack the old block and poll the next
+            pollAndAck(m);
         }
-
-        // read the streamblock length prefix.
-        int ttllength = m.getData().getInt();
-        m_logger.trace("Poller: table: " + m_tableName +
-                       ", partition: " + m_partitionId +
-                       " : data payload bytes: " + ttllength);
-
-        // a stream block prefix of 0 also means empty queue.
-        if (ttllength == 0) {
-            m_decoder.noDataReceived(m.getAckOffset());
-            poll();
-            return;
+        finally {
+            m.getData().order(ByteOrder.BIG_ENDIAN);
         }
-
-        // run the verifier until m.getData() is consumed
-        while (m.getData().hasRemaining()) {
-            int length = m.getData().getInt();
-            byte[] rowdata = new byte[length];
-            m.getData().get(rowdata, 0, length);
-            m_decoder.processRow(length, rowdata);
-        }
-
-        // ack the old block and poll the next.
-        pollAndAck(m);
     }
 }

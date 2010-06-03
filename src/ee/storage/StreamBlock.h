@@ -66,6 +66,13 @@ namespace voltdb
         }
 
         /**
+         * Number of bytes left in the buffer
+         */
+        const size_t remaining() const {
+            return m_capacity - m_offset;
+        }
+
+        /**
          * Returns the USO of the first unreleased octet in this block
          */
         const size_t unreleasedUso()
@@ -83,7 +90,7 @@ namespace voltdb
 
     private:
         char* mutableDataPtr() {
-            return m_data;
+            return m_data + m_offset;
         }
 
         // The USO for octets up to which are being released
@@ -116,9 +123,9 @@ namespace voltdb
 
         char *m_data;
         const size_t m_capacity;
-        size_t m_offset;  // position for next write.
+        size_t m_offset;         // position for next write.
         size_t m_releaseOffset;  // position for next read.
-        size_t m_uso;     // universal stream offset of m_offset 0.
+        size_t m_uso;            // universal stream offset of m_offset 0.
 
         friend class TupleStreamWrapper;
     };

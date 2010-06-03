@@ -19,6 +19,7 @@ package org.voltdb.exportclient;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 
 import org.voltdb.VoltType;
@@ -64,7 +65,7 @@ public abstract class ExportDecoderBase
      */
     protected Object[] decodeRow(byte[] rowData) throws IOException
     {
-        FastDeserializer fds = new FastDeserializer(rowData);
+        FastDeserializer fds = new FastDeserializer(rowData, ByteOrder.LITTLE_ENDIAN);
         Object[] retval = new Object[m_tableSchema.size()];
         boolean[] is_null = extractNullFlags(fds);
         for (int i = 0; i < m_tableSchema.size(); i++)
@@ -170,7 +171,6 @@ public abstract class ExportDecoderBase
     /**
      * Read a string according to the ELT encoding specification
      * @param fds
-     * @return
      * @throws IOException
      */
     static public String decodeString(final FastDeserializer fds) throws IOException
@@ -184,7 +184,6 @@ public abstract class ExportDecoderBase
     /**
      * Read a timestamp according to the ELT encoding specification.
      * @param fds
-     * @return
      * @throws IOException
      */
     static public TimestampType decodeTimestamp(final FastDeserializer fds) throws IOException
@@ -196,7 +195,6 @@ public abstract class ExportDecoderBase
     /**
      * Read a float according to the ELT encoding specification
      * @param fds
-     * @return
      * @throws IOException
      */
     static public double decodeFloat(final FastDeserializer fds) throws IOException
@@ -207,7 +205,6 @@ public abstract class ExportDecoderBase
     /**
      * Read a bigint according to the ELT encoding specification.
      * @param fds
-     * @return
      * @throws IOException
      */
     static public long decodeBigInt(final FastDeserializer fds) throws IOException
@@ -218,7 +215,6 @@ public abstract class ExportDecoderBase
     /**
      * Read an integer according to the ELT encoding specification.
      * @param fds
-     * @return
      * @throws IOException
      */
     static public int decodeInteger(final FastDeserializer fds) throws IOException
@@ -229,7 +225,6 @@ public abstract class ExportDecoderBase
     /**
      * Read a small int according to the ELT encoding specification.
      * @param fds
-     * @return
      * @throws IOException
      */
     static public short decodeSmallInt(final FastDeserializer fds) throws IOException
@@ -240,7 +235,6 @@ public abstract class ExportDecoderBase
     /**
      * Read a tiny int according to the ELT encoding specification.
      * @param fds
-     * @return
      * @throws IOException
      */
     static public byte decodeTinyInt(final FastDeserializer fds) throws IOException
