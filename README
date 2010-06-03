@@ -1,7 +1,7 @@
 % VoltDB
 
-Thank you for your interest in VoltDB! The VoltDB project
-is managed at https://voltdb.com/.
+Thank you for your interest in VoltDB! The VoltDB project is managed at 
+http://voltdb.com/.
 
 What is VoltDB?
 ====================
@@ -23,25 +23,15 @@ Getting Started
 'ant doc'        Generate Javadoc in doc/java-api:
 
 'ant dist'       Create a .tar.gz distribution with example apps
-                 in obj/release/volt-version.tar.gz.
+                 in obj/release/voltdb-version.tar.gz.
 
-There are three example projects which can be compiled and run.  See
-https://voltdb.com/svn/repos/build/newtrunk/examples/README for details.
+There are several example projects which can be compiled and run.  See
+https://svn.voltdb.com/eng/trunk/examples/README for details.
 
 
 Documentation
 =============
-doc/user_guide         Getting started using VoltDB.
+Documentation on using VoltDB to build OLTP applications is available from the VoltDB community site at http://community.voltdb.com/downloads/
 
-doc/developer_guide    Design overview and how to contribute.
 
-doc/developer_tools    Help using Eclipse, KDevelop, debugging...
-
-Additional documentation is available in SVN at:
-TODO: need documentation source.
-
-Design specifications are in SVN and are available online at:
-TODO: need documentation source.
-
-This content is available at
-https://voltdb.com/eng/trunk/README.
+This content is available at https://svn.voltdb.com/eng/trunk/README.
