@@ -1338,12 +1338,14 @@ BENCHMARKS
     </antcall>
 </target>
 
-<target name="benchmarkone"
+<target name="benchmarklocal"
     description="Call the standard benchmark target configured to use one node of the test cluster.">
     <antcall target="benchmark" inheritAll='true'>
         <param name="hostcount" value="1"/>
+        <param name="host1" value="localhost"/>
         <param name="sitesperhost" value="2"/>
         <param name="clientcount" value="1"/>
+        <param name="clienthost1" value="localhost"/>
         <param name="processesperclient" value="1"/>
         <param name="warehouses" value="2"/>
         <param name="volt.server.memory" value="2048"/>
