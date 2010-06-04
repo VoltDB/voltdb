@@ -11,7 +11,8 @@ prunelist = ('hsqldb19b3',
              'org_voltdb_utils_ThreadUtils.h',
              'xml2',
              'simplejson',
-             'projectfile')
+             'projectfile',
+             'xml')
 
 def verifyLicense(f, content, approvedLicensesJavaC, approvedLicensesPython):
     if f.endswith('.py'):
