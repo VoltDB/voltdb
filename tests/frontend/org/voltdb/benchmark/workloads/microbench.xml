@@ -1,0 +1,50 @@
+<?xml version="1.0" ?>
+<microbenchmark mbName="MB">
+    <loader loaderName="Loader1">
+        <loaderClass pathName="benchmarkGenerator.RandomLoader" />
+    </loader>
+    <workload wlName="MixedLoad">
+        <procedure procName="Insert" percOfWL="33">
+            <param type="INTEGER">
+                <value generator="random" />
+            </param>
+            <param type="VARCHAR(100)">
+                <value generator="random" />
+            </param>
+        </procedure>
+        <procedure procName="Select" percOfWL="33">
+            <param type="INTEGER">
+                <value generator="random" />
+            </param>
+        </procedure>
+        <procedure procName="Delete" percOfWL="34">
+            <param type="INTEGER">
+                <value generator="random" />
+            </param>
+        </procedure>
+    </workload>
+    <workload wlName="Inserts">
+        <procedure procName="Insert" percOfWL="100">
+            <param type="INTEGER">
+                <value generator="random" />
+            </param>
+            <param type="VARCHAR(100)">
+                <value generator="random" />
+            </param>
+        </procedure>
+    </workload>
+    <workload wlName="Selects">
+        <procedure procName="Select" percOfWL="100">
+            <param type="INTEGER">
+                <value generator="random" />
+            </param>
+        </procedure>
+    </workload>
+    <workload wlName="Deletes">
+        <procedure procName="Delete" percOfWL="100">
+            <param type="INTEGER">
+                <value generator="random" />
+            </param>
+        </procedure>
+    </workload>
+</microbenchmark>
