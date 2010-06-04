@@ -149,7 +149,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     // Trigger if shutdown has been run already.
     private boolean haveShutdownAlready;
 
-
+    private final StarvationTracker m_starvationTracker;
     private final Watchdog m_watchdog;
     private class Watchdog extends Thread {
         private volatile boolean m_shouldContinue = true;
@@ -360,6 +360,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         m_snapshotter = null;
         m_mailbox = null;
         m_transactionQueue = null;
+        m_starvationTracker = null;
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox, final int siteId)
@@ -417,8 +418,11 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
 
         loadProceduresFromCatalog(voltdb.getBackendTargetType());
         m_snapshotter = new SnapshotSiteProcessor();
-
-
+        m_starvationTracker = new StarvationTracker(String.valueOf(getCorrespondingSiteId()), getCorrespondingSiteId());
+        VoltDB.instance().getStatsAgent().registerStatsSource(
+                SysProcSelector.STARVATION,
+                Integer.parseInt(getCorrespondingCatalogSite().getTypeName()),
+                m_starvationTracker);
     }
 
     private RestrictedPriorityQueue initializeTransactionQueue(final int siteId)
@@ -599,10 +603,16 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 if (currentTxnState == null) {
                     // poll the messaging layer for a while as this site has nothing to do
                     // this will likely have a message/several messages immediately in a heavy workload
-                    VoltMessage message = m_mailbox.recvBlocking(5);
+                    // Before blocking record the starvation
+                    VoltMessage message = m_mailbox.recv();
+                    if (message == null) {
+                        m_starvationTracker.beginStarvation();
+                        message = m_mailbox.recvBlocking(5);
+                    }
                     // do periodic work
                     tick();
                     if (message != null) {
+                        m_starvationTracker.endStarvation();
                         handleMailboxMessage(message);
                     }
                 }

@@ -19,6 +19,7 @@ package org.voltdb;
 public enum SysProcSelector {
     TABLE,            // invoked as @stat table
     PROCEDURE,        // invoked as @stat procedure
+    STARVATION,
     INITIATOR,         // invoked as @stat initiator
     PARTITIONCOUNT,
     IOSTATS,

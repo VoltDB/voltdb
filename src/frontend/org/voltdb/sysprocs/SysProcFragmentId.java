@@ -27,6 +27,8 @@ public class SysProcFragmentId
     public static final long PF_updateLoggers = 3;
 
     // @Statistics
+    public static final long PF_starvationData = 4;
+    public static final long PF_starvationDataAggregator = 5;
     public static final long PF_tableData = 11;
     public static final long PF_tableAggregator = 12;
     public static final long PF_procedureData = 13;

@@ -10,7 +10,7 @@ import socket
 import traceback
 
 # volt server IP address and port
-volt_server_ip = 'localhost'
+volt_server_ip = 'volt3a'
 volt_server_port = 21212
 
 # volt username/password if database security is enabled
@@ -76,6 +76,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 self.wfile.write('  <input type=submit name="bsubmit" value="Initiators">\n')
                 self.wfile.write('  <input type=submit name="bsubmit" value="SystemInfo">\n')
                 self.wfile.write('  <input type=submit name="bsubmit" value="IO">\n')
+                self.wfile.write('  <input type=submit name="bsubmit" value="Starvation">\n')
                 self.wfile.write('  <input type=submit name="bsubmit" value="Management">\n')
                 self.wfile.write('  <input type=submit name="bsubmit" value="Snapshot status" />\n' )
                 self.wfile.write('  <input type=checkbox name="interval_poll">Report counters since last poll</input>\n' )
@@ -158,6 +159,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 elif (button_clicked == 'IO'):
                     self.wfile.write('IO Statistics<br>\n');
                     response = client.execute('stat iostats %d' % (interval_poll))
+                elif (button_clicked == 'STARVATION'):
+                    self.wfile.write('Starvation Statistics<br>\n');
+                    response = client.execute('stat starvation %d' % (interval_poll))
                 elif (button_clicked == 'MANAGEMENT'):
                     self.wfile.write('Management statistics<br>\n');
                     response = client.execute('stat management %d' % (interval_poll))

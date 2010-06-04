@@ -66,6 +66,11 @@ public class Statistics extends VoltSystemProcedure {
     static final int DEP_ioDataAggregator = (int)
         SysProcFragmentId.PF_ioDataAggregator;
 
+    static final int DEP_starvationData = (int)
+    SysProcFragmentId.PF_starvationData | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+    static final int DEP_starvationDataAggregator = (int)
+        SysProcFragmentId.PF_starvationDataAggregator;
+
     static final int DEP_partitionCount = (int)
         SysProcFragmentId.PF_partitionCount;
 //    static final int DEP_initiatorAggregator = (int)
@@ -87,6 +92,8 @@ public class Statistics extends VoltSystemProcedure {
                                   this);
         site.registerPlanFragment(SysProcFragmentId.PF_ioData, this);
         site.registerPlanFragment(SysProcFragmentId.PF_ioDataAggregator, this);
+        site.registerPlanFragment(SysProcFragmentId.PF_starvationData, this);
+        site.registerPlanFragment(SysProcFragmentId.PF_starvationDataAggregator, this);
     }
 
     @Override
@@ -144,7 +151,28 @@ public class Statistics extends VoltSystemProcedure {
             VoltTable result = unionTables(dependencies.get(DEP_procedureData));
             return new DependencyPair(DEP_procedureAggregator, result);
         }
-
+        //  STARVATION statistics
+        else if (fragmentId == SysProcFragmentId.PF_starvationData) {
+            // starvation stats are registered to VoltDB's statsagent with the site's catalog id.
+            // piece this information together and the stats agent returns a table. pretty sweet.
+            assert(params.toArray().length == 2);
+            final boolean interval =
+                ((Byte)params.toArray()[0]).byteValue() == 0 ? false : true;
+            final Long now = (Long)params.toArray()[1];
+            ArrayList<Integer> catalogIds = new ArrayList<Integer>();
+            catalogIds.add(Integer.parseInt(context.getSite().getTypeName()));
+            VoltTable result = VoltDB.instance().
+                    getStatsAgent().getStats(
+                            SysProcSelector.STARVATION,
+                            catalogIds,
+                            interval,
+                            now);
+            return new DependencyPair(DEP_starvationData, result);
+        }
+        else if (fragmentId == SysProcFragmentId.PF_starvationDataAggregator) {
+            VoltTable result = unionTables(dependencies.get(DEP_starvationData));
+            return new DependencyPair(DEP_starvationDataAggregator, result);
+        }
         //INITIATOR statistics
         else if (fragmentId == SysProcFragmentId.PF_initiatorData) {
             // initiator stats are registered to VoltDB's statsagent with the initiators index.
@@ -272,16 +300,20 @@ public class Statistics extends VoltSystemProcedure {
             results = getPartitionCountData();
         } else if (selector.toUpperCase().equals(SysProcSelector.IOSTATS.name())) {
             results = getIOStatsData(interval, now);
+        } else if (selector.toUpperCase().equals(SysProcSelector.STARVATION.name())) {
+            results = getStarvationData(interval, now);
         } else if (selector.toUpperCase().equals(SysProcSelector.MANAGEMENT.name())){
             VoltTable[] tableResults = getTableData(interval, now);
             VoltTable[] procedureResults = getProcedureData(interval, now);
             VoltTable[] initiatorResults = getInitiatorData(interval, now);
             VoltTable[] ioResults = getIOStatsData(interval, now);
+            VoltTable[] starvationResults = getIOStatsData(interval, now);
             results = new VoltTable[] {
                     initiatorResults[0],
                     procedureResults[0],
                     ioResults[0],
-                    tableResults[0]
+                    tableResults[0],
+                    starvationResults[0]
             };
             final long endTime = System.currentTimeMillis();
             final long delta = endTime - now;
@@ -390,6 +422,34 @@ public class Statistics extends VoltSystemProcedure {
         // aggregator's output dependency table.
         results =
             executeSysProcPlanFragments(pfs, DEP_procedureAggregator);
+        return results;
+    }
+
+    private VoltTable[] getStarvationData(long interval, final long now) {
+        VoltTable[] results;
+        SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
+        // create a work fragment to gather procedure data from each of the sites.
+        pfs[1] = new SynthesizedPlanFragment();
+        pfs[1].fragmentId = SysProcFragmentId.PF_starvationData;
+        pfs[1].outputDepId = DEP_starvationData;
+        pfs[1].inputDepIds = new int[]{};
+        pfs[1].multipartition = true;
+        pfs[1].parameters = new ParameterSet();
+        pfs[1].parameters.setParameters((byte)interval, now);
+
+        // create a work fragment to aggregate the results.
+        // Set the MULTIPARTITION_DEPENDENCY bit to require a dependency from every site.
+        pfs[0] = new SynthesizedPlanFragment();
+        pfs[0].fragmentId = SysProcFragmentId.PF_starvationDataAggregator;
+        pfs[0].outputDepId = DEP_starvationDataAggregator;
+        pfs[0].inputDepIds = new int[]{DEP_starvationData};
+        pfs[0].multipartition = false;
+        pfs[0].parameters = new ParameterSet();
+
+        // distribute and execute these fragments providing pfs and id of the
+        // aggregator's output dependency table.
+        results =
+            executeSysProcPlanFragments(pfs, DEP_starvationDataAggregator);
         return results;
     }
 
