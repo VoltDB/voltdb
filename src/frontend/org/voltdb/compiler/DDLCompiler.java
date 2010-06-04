@@ -643,7 +643,8 @@ public class DDLCompiler {
         String msg = "Materialized view \"" + viewName + "\" ";
 
         if (stmt.tableList.size() != 1) {
-            msg += "has " + String.valueOf(stmt.tableList.size()) + " when only 1 is allowed.";
+            msg += "has " + String.valueOf(stmt.tableList.size()) + " sources. " +
+            "Only one source view or source table is allowed.";
             throw m_compiler.new VoltCompilerException(msg);
         }
 
