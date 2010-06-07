@@ -59,7 +59,7 @@ public class EELibraryLoader {
                     voltSharedLibraryLoaded = true;
                     hostLog.info("Successfully loaded native VoltDB library " + libname +
                     ".");
-                } catch (Exception e) {
+                } catch (Throwable e) {
                     if (mustSuccede) {
                         hostLog.fatal("Library VOLTDB JNI shared library loading failed. Library path "
                                 + System.getProperty("java.library.path"));
