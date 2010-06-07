@@ -48,7 +48,6 @@ import org.voltdb.benchmark.workloads.xml.*;
 
 
 //COMMAND: xjc -p benchmarkGenerator.xml /home/voltdb/mstarobinets/Desktop/Useful/MB/microbenchmark1.xsd -d /home/voltdb/mstarobinets/Desktop/Useful/MB
-//ADDRESS: /home/voltdb/mstarobinets/Desktop/Useful/MB/microbenchmark1.xml
 public class Generator extends ClientMain
 {
     public class Workload
@@ -74,7 +73,7 @@ public class Generator extends ClientMain
         }
     }
 
- // Retrieved via reflection by BenchmarkController
+    //Retrieved via reflection by BenchmarkController
     public static final Class<? extends VoltProjectBuilder> m_projectBuilderClass = ProjectBuilderX.class;
 
     //Retrieved via reflection by BenchmarkController
@@ -117,39 +116,45 @@ public class Generator extends ClientMain
 
     private void runBenchmark()
     {
-        connect();
+        //connect();
 
-        mb = unmarshal(getXMLFile());
+        //File xmlFile = getXMLFile();
+        File xmlFile = new File("/home/voltdb/mstarobinets/workspace/voltdb/tests/frontend/org/voltdb/benchmark/workloads/microbench.xml");
+        mb = unmarshal(xmlFile);
 
         boolean loaded = runLoader(mb);
         testPrint();
 
-        if (loaded || userTrueFalse("Continue?", "yes", "no"))
-            if (buildWorkloads(mb))
+        //if (loaded || userTrueFalse("Continue?", "yes", "no"))
+        if (!loaded)
+            System.err.println("No loading took place.");
+        if (buildWorkloads(mb))
+        {
+            ListIterator<Workload> iter = workloads.listIterator();
+            while (iter.hasNext())
             {
-                ListIterator<Workload> iter = workloads.listIterator();
-                while (iter.hasNext())
+                currWorkload = iter.next();
+                try
                 {
-                    currWorkload = iter.next();
-                    try
-                    {
-                        System.out.println("About to run workload " + currWorkload.name);
-                        runRandomizedWorkload(currWorkload, getTotalTime());
-                        testPrint();
-                    }
-                    catch (Exception e)
-                    {
-                        System.out.println("Invalid inputs in xml file for workload \"" + currWorkload.name + "\".");
-                    }
+                    System.err.println("About to run workload " + currWorkload.name);
+                    //long totalTime = getTotalTime();
+                    long totalTime = (long)10000000000.;
+                    runRandomizedWorkload(currWorkload, totalTime);
+                    testPrint();
+                }
+                catch (Exception e)
+                {
+                    System.err.println("Invalid inputs in xml file for workload \"" + currWorkload.name + "\".");
                 }
             }
+        }
 
-        disconnect();
+        //disconnect();
     }
 
     public void connect()
     {
-        System.out.println("Client started");
+        System.err.println("Client started");
 
         try
         {
@@ -178,7 +183,7 @@ public class Generator extends ClientMain
         {
             m_voltClient.drain();
             m_voltClient.close();
-            System.out.println("Client finished");
+            System.err.println("Client finished");
         }
         catch (InterruptedException e)
         {
@@ -186,7 +191,7 @@ public class Generator extends ClientMain
         }
         catch (NoConnectionsException e)
         {
-            System.out.println("No connection exception: " + e.getMessage());
+            System.err.println("No connection exception: " + e.getMessage());
         }
     }
 
@@ -229,7 +234,7 @@ public class Generator extends ClientMain
                 currentTime = System.nanoTime();
             }
             long timeElapsed = currentTime - startTime;
-            System.out.println("Workload " + currWorkload.name +
+            System.err.println("Workload " + currWorkload.name +
                     " made " + numProcCalls + " procedure calls in time: " +
                     (timeElapsed / ((long)1000000000 * 60 * 60)) + "h" +
                     (timeElapsed % ((long)1000000000 * 60 * 60) / ((long)1000000000 * 60)) + "m" +
@@ -246,7 +251,7 @@ public class Generator extends ClientMain
         boolean inputValid = false;
         while (!inputValid)
         {
-            System.out.print("Enter duration of workload with units in descending order (ex. 1h2m3s4n, 3m 1n, etc.): ");
+            System.err.print("Enter duration of workload with units in descending order (ex. 1h2m3s4n, 3m 1n, etc.): ");
             scan = new Scanner(System.in);
             String input = scan.nextLine();
             //do try catch, negative values...
@@ -262,7 +267,7 @@ public class Generator extends ClientMain
                         long value = Integer.parseInt(input.substring(0, index));
                         if ((Long.MAX_VALUE - nanoTime) / 1000000000. / 60 / 60 < value)
                         {
-                            System.out.println("Value exceeds limit of about 2.5 million total hours");
+                            System.err.println("Value exceeds limit of about 2.5 million total hours");
                             throw new Exception();
                         }
                         else
@@ -277,7 +282,7 @@ public class Generator extends ClientMain
                         long value = Integer.parseInt(input.substring(0, index));
                         if ((Long.MAX_VALUE - nanoTime) / 1000000000. / 60 < value)
                         {
-                            System.out.println("Value exceeds limit of about 150 million total minutes");
+                            System.err.println("Value exceeds limit of about 150 million total minutes");
                             throw new Exception();
                         }
                         else
@@ -292,7 +297,7 @@ public class Generator extends ClientMain
                         long value = Integer.parseInt(input.substring(0, index));
                         if ((Long.MAX_VALUE - nanoTime) / 1000000000. < value)
                         {
-                            System.out.println("Value exceeds limit of about 9 billion total seconds");
+                            System.err.println("Value exceeds limit of about 9 billion total seconds");
                             throw new Exception();
                         }
                         else
@@ -307,7 +312,7 @@ public class Generator extends ClientMain
                         long value = Integer.parseInt(input.substring(0, index));
                         if ((Long.MAX_VALUE - nanoTime) < value)
                         {
-                            System.out.println("Value exceeds limit of about 9 quintillion total nanoseconds");
+                            System.err.println("Value exceeds limit of about 9 quintillion total nanoseconds");
                             throw new Exception();
                         }
                         else
@@ -321,12 +326,12 @@ public class Generator extends ClientMain
                 }
                 catch (Exception e)
                 {
-                    System.out.println("Parse error.");
+                    System.err.println("Parse error.");
                 }
             }
             else
             {
-                System.out.println("Regex error.");
+                System.err.println("Regex error.");
             }
         }
 
@@ -339,6 +344,8 @@ public class Generator extends ClientMain
         try
         {
             m_voltClient.callProcedure(callback, procName, params);
+            //i believe the array index should = procIndex, not just 0
+            m_counts[0].getAndIncrement();
         }
         catch (IOException e)
         {
@@ -347,7 +354,7 @@ public class Generator extends ClientMain
         /*
         catch (ProcCallException e)
         {
-            System.out.println("Procedure call error: " + e.getMessage());
+            System.err.println("Procedure call error: " + e.getMessage());
         }
         */
     }
@@ -410,7 +417,7 @@ public class Generator extends ClientMain
                 Microbenchmark.Workload wl = wlLI.next();
                 Workload myWL = new Workload(wl.getWlName());
 
-                System.out.println("Building workload " + myWL.name);
+                System.err.println("Building workload " + myWL.name);
 
                 List<Microbenchmark.Workload.Procedure> procList = wl.getProcedure();
                 myWL.procs = new String[procList.size()];
@@ -446,12 +453,12 @@ public class Generator extends ClientMain
                 workloads.add(myWL);
             }
 
-            System.out.println("All workloads successfully built.");
+            System.err.println("All workloads successfully built.");
             return true;
         }
         catch (Exception e)
         {
-            System.out.println("Building failed due to syntax errors in XML file.");
+            System.err.println("Building failed due to syntax errors in XML file.");
             return false;
         }
     }
@@ -462,7 +469,7 @@ public class Generator extends ClientMain
             return false;
 
         Microbenchmark.Loader loader = mb.getLoader();
-        System.out.println("Running loader " + loader.getLoaderName());
+        System.err.println("Running loader " + loader.getLoaderName());
         List<Microbenchmark.Loader.LoaderClass> loaderClasses = loader.getLoaderClass();
 
         ListIterator<Microbenchmark.Loader.LoaderClass> loaderClassLI = loaderClasses.listIterator();
@@ -476,20 +483,20 @@ public class Generator extends ClientMain
                 Class<?> loaderClass = Class.forName(pathName);
                 Method[] methods = loaderClass.getMethods();
                 //for (int i = 0; i < methods.length; i++)
-                //    System.out.println(i + ": " + methods[i].getName());
+                //    System.err.println(i + ": " + methods[i].getName());
                 //Method run = loaderClass.getMethod("run", m_voltClient.getClass());
                 Method run = methods[0];
                 run.invoke(null, m_voltClient);
             }
             catch (Exception e)
             {
-                System.out.println("Retrieving loader class with path name " + pathName + " failed.");
+                System.err.println("Retrieving loader class with path name " + pathName + " failed.");
                 e.printStackTrace();
                 return false;
             }
         }
 
-        System.out.println("All loading successfully completed.");
+        System.err.println("All loading successfully completed.");
         return true;
     }
 
@@ -603,13 +610,13 @@ public class Generator extends ClientMain
         while (!fileFound)
         {
             scan = new Scanner(System.in);
-            System.out.print("Enter absolute path for XML file: ");
+            System.err.print("Enter absolute path for XML file: ");
             pathName = scan.nextLine();
             file = new File(pathName);
             fileFound = file.exists() && pathName.toLowerCase().endsWith(".xml");
         }
 
-        System.out.println("XML file found.");
+        System.err.println("XML file found.");
         return file;
     }
 
@@ -618,7 +625,7 @@ public class Generator extends ClientMain
         Microbenchmark mb = null;
         try
         {
-            JAXBContext jc = JAXBContext.newInstance("benchmarkGenerator.xml");
+            JAXBContext jc = JAXBContext.newInstance("org.voltdb.benchmark.workloads.xml");
             Unmarshaller unmarshaller = jc.createUnmarshaller();
             //ADD SYNTAX VALIDATION
             mb = (Microbenchmark)unmarshaller.unmarshal(xmlFile);
@@ -639,13 +646,13 @@ public class Generator extends ClientMain
             int numRows = table.getRowCount();
 /*
             for (int i = 0; i < numRows; i++)
-                System.out.println("ID " + table.fetchRow(i).get(0, table.getColumnType(0)) + " with item " + table.fetchRow(i).get(1, table.getColumnType(1)));
+                System.err.println("ID " + table.fetchRow(i).get(0, table.getColumnType(0)) + " with item " + table.fetchRow(i).get(1, table.getColumnType(1)));
 */
-            System.out.println(numRows + " ids total.");
+            System.err.println(numRows + " ids total.");
         }
         catch (VoltAbortException e)
         {
-            System.out.println("ERROR");
+            System.err.println("ERROR");
         }
         catch (ConnectException e)
         {
@@ -659,7 +666,7 @@ public class Generator extends ClientMain
         }
         catch (ProcCallException e)
         {
-            System.out.println("Procedure call error: " + e.getMessage());
+            System.err.println("Procedure call error: " + e.getMessage());
         }
     }
 
@@ -670,7 +677,7 @@ public class Generator extends ClientMain
         while (!input.equals(trueString) && !input.equals(falseString))
         {
             scan = new Scanner(System.in);
-            System.out.print(message + " (" + trueString + "/" + falseString + "): ");
+            System.err.print(message + " (" + trueString + "/" + falseString + "): ");
             input = scan.nextLine();
         }
         if (input.equals(trueString))

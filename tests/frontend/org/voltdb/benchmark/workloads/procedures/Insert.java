@@ -41,17 +41,18 @@ import org.voltdb.*;
  * metadata, and correct use the Volt query interface.
 */
 @ProcInfo(
-    partitionInfo = "MINIBENCHMARK.MINIBENCHMARK_ID: 0",
+    partitionInfo = "MICROBENCHMARK.MICROBENCHMARK_ID: 0",
     singlePartition = true
 )
 public class Insert extends VoltProcedure {
 
-    public final SQLStmt insertItem = new SQLStmt("INSERT INTO MiniBenchmark VALUES (?, ?);");
+    public final SQLStmt insertItem =
+        new SQLStmt("INSERT INTO MICROBENCHMARK VALUES (?, ?);");
 
-    public long run( int MINIBENCHMARK_ID, String MINIBENCHMARK_ITEM ) throws VoltAbortException
+    public long run( int MICROBENCHMARK_ID, String MICROBENCHMARK_ITEM ) throws VoltAbortException
     {
         // Add a SQL statement to the execution queue.
-        voltQueueSQL( insertItem, MINIBENCHMARK_ID, MINIBENCHMARK_ITEM );
+        voltQueueSQL( insertItem, MICROBENCHMARK_ID, MICROBENCHMARK_ITEM );
 
         // Run all queued queries.
         // Passing true parameter since this is the last voltExecuteSQL for this procedure.

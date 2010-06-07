@@ -32,8 +32,8 @@ public class SelectAll extends VoltProcedure
 {
       public final SQLStmt selectItem = new SQLStmt
       (
-          "SELECT MINIBENCHMARK_ID,  MINIBENCHMARK_ITEM " +
-          "FROM MINIBENCHMARK;"
+          "SELECT MICROBENCHMARK_ID, MICROBENCHMARK_ITEM " +
+          "FROM MICROBENCHMARK;"
       );
 
       public VoltTable[] run()

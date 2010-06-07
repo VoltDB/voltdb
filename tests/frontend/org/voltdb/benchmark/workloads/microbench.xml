@@ -1,7 +1,7 @@
 <?xml version="1.0" ?>
 <microbenchmark mbName="MB">
     <loader loaderName="Loader1">
-        <loaderClass pathName="benchmarkGenerator.RandomLoader" />
+        <loaderClass pathName="org.voltdb.benchmark.workloads.RandomLoader" />
     </loader>
     <workload wlName="MixedLoad">
         <procedure procName="Insert" percOfWL="33">

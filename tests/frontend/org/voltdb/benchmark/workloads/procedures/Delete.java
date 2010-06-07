@@ -42,17 +42,17 @@ import org.voltdb.*;
 @ProcInfo
 (
     singlePartition = true,
-    partitionInfo = "MINIBENCHMARK.MINIBENCHMARK_ID: 0"
+    partitionInfo = "MICROBENCHMARK.MICROBENCHMARK_ID: 0"
 )
 public class Delete extends VoltProcedure
 {
     public final SQLStmt deleteItem =
-      new SQLStmt("DELETE FROM MINIBENCHMARK " +
-                  "WHERE MINIBENCHMARK_ID = ?");
+      new SQLStmt("DELETE FROM MICROBENCHMARK " +
+                  "WHERE MICROBENCHMARK_ID = ?");
 
-    public long run( int MINIBENCHMARK_ID ) throws VoltAbortException {
+    public long run( int MICROBENCHMARK_ID ) throws VoltAbortException {
         // Add a SQL statement to the execution queue.
-        voltQueueSQL( deleteItem, MINIBENCHMARK_ID );
+        voltQueueSQL( deleteItem, MICROBENCHMARK_ID );
 
         // Run all queued queries.
         // Passing true parameter since this is the last voltExecuteSQL for this procedure.

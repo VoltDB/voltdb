@@ -24,6 +24,7 @@
 package org.voltdb.benchmark.workloads;
 
 import java.math.BigDecimal;
+//Use TimestampType
 import org.voltdb.types.*;
 
 public class RandomValues

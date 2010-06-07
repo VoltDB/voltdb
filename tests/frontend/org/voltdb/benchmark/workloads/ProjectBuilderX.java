@@ -45,11 +45,11 @@ public class ProjectBuilderX extends VoltProjectBuilder
         ProjectBuilderX.class
     };
 
-    public static final URL m_ddlURL = ProjectBuilderX.class.getResource("MiniBenchmark-ddl.sql");
+    public static final URL m_ddlURL = ProjectBuilderX.class.getResource("MicroBenchmark-ddl.sql");
 
     public static String m_partitioning[][] = new String[][]
     {
-        {"MINIBENCHMARK", "MINIBENCHMARK_ID"}
+        {"MICROBENCHMARK", "MICROBENCHMARK_ID"}
     };
 
     @Override

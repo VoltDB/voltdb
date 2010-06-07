@@ -40,18 +40,18 @@ import org.voltdb.*;
  * metadata, and correct use the Volt query interface.
 */
 @ProcInfo(
-    partitionInfo = "MINIBENCHMARK.MINIBENCHMARK_ID: 0",
+    partitionInfo = "MICROBENCHMARK.MICROBENCHMARK_ID: 0",
     singlePartition = true
 )
 public class Select extends VoltProcedure {
 
     public final SQLStmt selectItem =
-      new SQLStmt("SELECT MINIBENCHMARK_ID,  MINIBENCHMARK_ITEM " +
-                  "FROM MINIBENCHMARK WHERE  MINIBENCHMARK_ID = ?");
+      new SQLStmt("SELECT MICROBENCHMARK_ID,  MICROBENCHMARK_ITEM " +
+                  "FROM MICROBENCHMARK WHERE  MICROBENCHMARK_ID = ?");
 
-    public VoltTable[] run( int MINIBENCHMARK_ID ) throws VoltAbortException {
+    public VoltTable[] run( int MICROBENCHMARK_ID ) throws VoltAbortException {
         // Add a SQL statement to the current execution queue
-        voltQueueSQL( selectItem, MINIBENCHMARK_ID );
+        voltQueueSQL( selectItem, MICROBENCHMARK_ID );
 
         // Run all queued queries.
         // Passing true parameter since this is the last voltExecuteSQL for this procedure.
