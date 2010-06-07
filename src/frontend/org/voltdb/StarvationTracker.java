@@ -112,7 +112,7 @@ public class StarvationTracker extends SiteStatsSource {
             rowValues[columnNameToIndex.get("MAX")] = m_lastMax;
             m_lastMax = 0;
             m_lastMin = Long.MAX_VALUE;
-            rowValues[columnNameToIndex.get("STDDEV")] = Math.sqrt(sumOfSquares / count - uSecs * uSecs);
+            rowValues[columnNameToIndex.get("STDDEV")] = (long)Math.sqrt(sumOfSquares / count - uSecs * uSecs);
         } else {
             final long totalTime = System.nanoTime() - m_startTime;
             rowValues[columnNameToIndex.get("COUNT")] = m_count;
@@ -121,7 +121,7 @@ public class StarvationTracker extends SiteStatsSource {
             rowValues[columnNameToIndex.get("AVG")] = (m_totalTime / m_count) / 1000;
             rowValues[columnNameToIndex.get("MIN")] = m_min;
             rowValues[columnNameToIndex.get("MAX")] = m_max;
-            rowValues[columnNameToIndex.get("STDDEV")] = Math.sqrt(m_sumOfSquares / m_count - uSecs * uSecs);
+            rowValues[columnNameToIndex.get("STDDEV")] = (long)Math.sqrt(m_sumOfSquares / m_count - uSecs * uSecs);
         }
         super.updateStatsRow(rowKey, rowValues);
     }

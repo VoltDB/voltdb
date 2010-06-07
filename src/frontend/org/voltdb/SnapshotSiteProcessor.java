@@ -251,14 +251,23 @@ public class SnapshotSiteProcessor {
                     new Thread("Snapshot terminator") {
                     @Override
                     public void run() {
-                        for (final SnapshotDataTarget t : snapshotTargets) {
-                            try {
-                                t.close();
-                            } catch (IOException e) {
-                                throw new RuntimeException(e);
-                            } catch (InterruptedException e) {
-                                throw new RuntimeException(e);
+                        try {
+                            for (final SnapshotDataTarget t : snapshotTargets) {
+                                try {
+                                    t.close();
+                                } catch (IOException e) {
+                                    throw new RuntimeException(e);
+                                } catch (InterruptedException e) {
+                                    throw new RuntimeException(e);
+                                }
                             }
+                        } finally {
+                            /**
+                             * Set it to -1 indicating the system is ready to perform another snapshot.
+                             * Changed to wait until all the previous snapshot work has finished so
+                             * that snapshot initiation doesn't wait on the file system
+                             */
+                            ExecutionSitesCurrentlySnapshotting.decrementAndGet();
                         }
                     }
                 };
@@ -268,12 +277,6 @@ public class SnapshotSiteProcessor {
                 }
 
                 terminatorThread.start();
-
-                /**
-                 * Sets it to -1 indicating the system is ready to perform anothe snapshot.
-                 * The terminator threads may still run for some time while data flushes to disk
-                 */
-                ExecutionSitesCurrentlySnapshotting.decrementAndGet();
             }
         }
         return retval;
