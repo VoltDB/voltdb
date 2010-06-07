@@ -940,7 +940,7 @@ public abstract class Type implements SchemaObject, Cloneable {
         //typeNames.put("FLOAT", Types.SQL_FLOAT);
         typeNames.put("FLOAT", Types.SQL_DOUBLE);
         typeNames.put("DECIMAL", Types.SQL_DECIMAL);
-        typeNames.put("CHAR", Types.SQL_CHAR);
+        // typeNames.put("CHAR", Types.SQL_CHAR);
         typeNames.put("VARCHAR", Types.SQL_VARCHAR);
         typeNames.put("TIMESTAMP", Types.SQL_TIMESTAMP);
 

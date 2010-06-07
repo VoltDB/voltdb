@@ -56,10 +56,12 @@ public class TestVoltType extends TestCase {
         assertEquals(VoltType.TIMESTAMP, VoltType.typeFromString("TIMESTAMP"));
         assertEquals(VoltType.STRING, VoltType.typeFromString("STRING"));
         assertEquals(VoltType.VOLTTABLE, VoltType.typeFromString("VOLTTABLE"));
-        assertEquals(VoltType.STRING, VoltType.typeFromString("CHAR"));
         assertEquals(VoltType.STRING, VoltType.typeFromString("VARCHAR"));
+        // Need to be able to turn CHAR SqlStmt paramters into varchars.
+        assertEquals(VoltType.STRING, VoltType.typeFromString("CHAR"));
         assertEquals(VoltType.TIMESTAMP, VoltType.typeFromString("TIMESTAMP"));
         assertEquals(VoltType.DECIMAL, VoltType.typeFromString("DECIMAL"));
+
         boolean caught = false;
         try {
             VoltType.typeFromString("Muhahaha");

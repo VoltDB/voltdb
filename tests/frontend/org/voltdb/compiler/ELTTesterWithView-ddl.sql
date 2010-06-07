@@ -5,7 +5,6 @@ create table table1r_el_only (
  column4_tinyint     tinyint,
  column5_float       float,
  column6_decimal     decimal,
- column7_char        char(10),
  column8_varchar     varchar(100),
  column9_timestamp   timestamp,
  column10_bigint     bigint,

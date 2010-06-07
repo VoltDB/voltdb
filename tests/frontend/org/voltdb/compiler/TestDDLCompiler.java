@@ -43,7 +43,7 @@ public class TestDDLCompiler extends TestCase {
             "\"w_street_1\" varchar(32) default NULL, " +
             "\"w_street_2\" varchar(32) default NULL, " +
             "\"w_city\" varchar(32) default NULL, " +
-            "\"w_state\" char(2) default NULL, " +
+            "\"w_state\" varchar(2) default NULL, " +
             "\"w_zip\" varchar(9) default NULL, " +
             "\"w_tax\" float default NULL, " +
             "PRIMARY KEY  (\"w_id\") " +
@@ -58,6 +58,23 @@ public class TestDDLCompiler extends TestCase {
         assertTrue(xml != null);
 
         hsql.close();
+    }
+
+    public void testCharIsNotAllowed() {
+        String ddl1 =
+            "CREATE TABLE \"warehouse\" ( " +
+            "\"w_street_1\" char(32) default NULL, " +
+            ");";
+
+        HSQLInterface hsql = HSQLInterface.loadHsqldb();
+        try {
+            hsql.runDDLCommand(ddl1);
+        }
+        catch (HSQLParseException e) {
+            assertTrue(true);
+            return;
+        }
+        fail();
     }
 
     /**

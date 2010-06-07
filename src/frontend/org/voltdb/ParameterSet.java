@@ -274,7 +274,7 @@ import org.voltdb.types.VoltDecimalHelper;
                     return decimal_val;
                 }
                 default:
-                    throw new RuntimeException("ParameterSet doesn't support type" + nextType);
+                    throw new RuntimeException("ParameterSet doesn't support type " + nextType);
             }
         }
     }
