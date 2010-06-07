@@ -165,16 +165,12 @@ public class ProcessSetManager {
         return m_output.poll();
     }
 
-    public void writeToProcess(String processName, String data) {
+    public void writeToProcess(String processName, String data) throws IOException {
         ProcessData pd = m_processes.get(processName);
         assert(pd != null);
         OutputStreamWriter out = new OutputStreamWriter(pd.process.getOutputStream());
-        try {
-            out.write(data);
-            out.flush();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        out.write(data);
+        out.flush();
     }
 
     public int joinProcess(String processName) {

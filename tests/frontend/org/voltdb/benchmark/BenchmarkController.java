@@ -29,12 +29,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.UnknownHostException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -543,6 +538,23 @@ public class BenchmarkController {
         m_serverPSM.killAll();
     }
 
+    private void writeToClientProcesses(String cmd) {
+        Iterator<String> iterator = m_clients.iterator();
+        while (iterator.hasNext()) {
+            String clientName = iterator.next();
+            try {
+                m_clientPSM.writeToProcess(clientName, cmd);
+            }
+            catch (IOException e) {
+                System.out.println("BenchmarkController failed write to client: " +
+                                   clientName + " at time " + new Date() +
+                                   " Removing failed client from BenchmarkController.");
+                e.printStackTrace();
+                iterator.remove();
+            }
+        }
+    }
+
     public void runBenchmark() {
         m_currentResults =
             new BenchmarkResults(m_config.interval, m_config.duration, m_clients.size());
@@ -557,8 +569,7 @@ public class BenchmarkController {
             Thread.yield();
 
         // start up all the clients
-        for (String clientName : m_clients)
-            m_clientPSM.writeToProcess(clientName, "START\n");
+        writeToClientProcesses("START\n");
 
         long startTime = System.currentTimeMillis();
         nextIntervalTime += startTime;
@@ -570,8 +581,7 @@ public class BenchmarkController {
                 m_pollIndex.incrementAndGet();
 
                 // make all the clients poll
-                for (String clientName : m_clients)
-                    m_clientPSM.writeToProcess(clientName, "POLL\n");
+                writeToClientProcesses("POLL\n");
 
                 // get ready for the next interval
                 nextIntervalTime = m_config.interval * (m_pollIndex.get() + 1) + startTime;
@@ -590,8 +600,8 @@ public class BenchmarkController {
         }
 
         // shut down all the clients
-        for (String clientName : m_clients)
-            m_clientPSM.writeToProcess(clientName, "STOP\n");
+        writeToClientProcesses("STOP\n");
+
         for (String clientName : m_clients)
             m_clientPSM.joinProcess(clientName);
 
