@@ -139,7 +139,7 @@ public class ELTManager
             eltLog.l7dlog( Level.ERROR, LogKeys.elt_ELTManager_NoLoaderExtensions.name(), e);
             throw new ELTManager.SetupException(e.getMessage());
         }
-        catch (final Throwable e) {
+        catch (final Exception e) {
             throw new ELTManager.SetupException(e.getMessage());
         }
     }

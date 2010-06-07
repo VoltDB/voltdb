@@ -1000,7 +1000,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
             // this doesn't prove definitively that the string is UTF-8
             // but will find many cases...
             new String(strbytes, "UTF-8");
-        } catch (Throwable ex) {
+        } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
         return true;
