@@ -41,6 +41,7 @@
 <property name='dist.dir'                    location='${build.dir}/dist' />
 <property name='dist.examples.dir'           location='${dist.dir}/examples' />
 <property name='dist.examples.auction.dir'   location='${dist.examples.dir}/auction' />
+<property name='dist.examples.game_of_life.dir' location='${dist.examples.dir}/game_of_life' />
 <property name='dist.examples.key_value.dir' location='${dist.examples.dir}/key_value' />
 <property name='dist.examples.satellite.dir' location='${dist.examples.dir}/satellite' />
 <property name='dist.examples.twitter.dir'   location='${dist.examples.dir}/twitter' />
@@ -1175,6 +1176,14 @@ TEST CASES
     <!-- make sure auction example compiles -->
     <ant
         dir='${dist.examples.auction.dir}'
+        inheritAll='false'
+        inheritRefs='false'
+        target='main'
+    />
+
+    <!-- make sure game_of_life example compiles -->
+    <ant
+        dir='${dist.examples.game_of_life.dir}'
         inheritAll='false'
         inheritRefs='false'
         target='main'

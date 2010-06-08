@@ -7,6 +7,9 @@ The following projects are included in the examples directory:
 auction
   This example contains a set of schema, clients, and procedures for running auction related transactions. 
 
+game_of_life
+  This example implements Conway's Game of Life. 
+
 helloworld
   This directory contains the sources for the "Hello World" tutorial from the book Getting Started With VoltDB.
 
@@ -23,7 +26,7 @@ voter
   This example is a simulation of a telephone based voting process where callers are allowed a limited number of votes.
 
 
-Each example includes a DDL file and a project.xml that lists the DDL file and the stored procedures names. The auction, satellite, twitter, and voter examples 
+Each example includes a DDL file and a project.xml that lists the DDL file and the stored procedures names. The auction, game of life, satellite, twitter, and voter examples 
 also include an Ant build file. (Helloworld is the exception. See the README in the helloworld folder for an explanation of how to build that example.)
 
 The command "ant -p" will print a description of the available targets for each example. The targets "client" and "server" let you run a client and server for 
