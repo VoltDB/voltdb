@@ -1,0 +1,113 @@
+<?xml version="1.0" ?>
+<project default="main" name="twitter build file">
+
+<!--
+***************************************
+PATHS AND PROPERTIES
+***************************************
+-->
+
+<property name='build.dir'             location='obj/' />
+<property name='src.dir'               location='src/' />
+<property name='debugoutput.dir'       location='debugoutput/' />
+<property name='junit.haltonfailure'   value='true' />
+
+<path id='project.classpath'>
+    <fileset dir='../../voltdb' >
+        <include name='voltdb*.jar' />
+    </fileset>
+    <pathelement location='${build.dir}' />
+    <fileset dir='.' >
+        <include name='twitter4j-core-*.jar' />
+    </fileset>
+    <pathelement path="${java.class.path}"/>
+</path>
+
+<!--
+***************************************
+PRIMARY ENTRY POINTS
+***************************************
+-->
+
+<target name="main" depends="srccompile, compile" description="default. Compile Java stored procedures and and then run the VoltDB compiler on the stored procedures and schema to generate a catalog" />
+
+<target name="server" depends="srccompile, compile" description="Start the server and load the catalog." >
+    <java fork="yes" classname="org.voltdb.VoltDB" >
+        <arg value="polite" /> <!-- polite level profiling (delete to disable profiling) -->
+        <jvmarg value="-Djava.library.path=../../voltdb" />
+        <jvmarg value="-server" />
+        <jvmarg value="-Xmx512m" />
+        <jvmarg value="-XX:-ReduceInitialCardMarks" />
+        <classpath refid='project.classpath' />
+        <assertions><disable /></assertions>
+    </java>
+</target>
+
+<target name="client" depends="srccompile" description="Start the client who will connect to the specified server(s) and start calling procedures" >
+    <java fork="yes" classname="org.voltdb.twitter.drivers.Trends" >
+        <jvmarg value="-Xmx512m" />
+        <jvmarg value="-Dtwitter4j.loggerFactory=twitter4j.internal.logging.StdOutLoggerFactory" />
+        <arg value="YOUR_TWITTER_USERNAME" />               <!-- twitter login username -->
+        <arg value="YOUR_TWITTER_PASSWORD" />               <!-- twitter login password -->
+        <arg value="12345" />                               <!-- port to listen to for web server -->
+        <arg value="20" />                                  <!-- number of hashtags to show in each table -->
+        <arg value="localhost" />                           <!-- comma separated list of volt servers to connect to -->
+        <classpath refid='project.classpath' />
+        <assertions><disable /></assertions>
+    </java>
+</target>
+
+<target name="cull" depends="srccompile" description="Start the cull background process to discard old tweets" >
+    <java fork="yes" classname="org.voltdb.twitter.drivers.Cull" >
+        <jvmarg value="-Xmx512m" />
+        <jvmarg value="-Dtwitter4j.loggerFactory=twitter4j.internal.logging.StdOutLoggerFactory" />
+        <arg value="4" />                                   <!-- how long to retain tweets for (in hours) -->
+        <arg value="1" />                                   <!-- how often to cull tweets (in hours) -->
+        <arg value="localhost" />                           <!-- comma separated list of volt servers to connect to -->
+        <classpath refid='project.classpath' />
+        <assertions><disable /></assertions>
+    </java>
+</target>
+
+<target name="compile" depends="srccompile" description="Compile the catalog using the schema and the DDL file" >
+    <java fork="yes" failonerror="true" classname="org.voltdb.compiler.VoltCompiler" >
+        <arg value="project.xml"/> <!-- project file -->
+        <arg value="1"/>           <!-- hosts -->
+        <arg value="2"/>           <!-- sites -->
+        <arg value="localhost"/>   <!-- leader -->
+        <arg value="catalog.jar"/> <!-- output -->
+        <classpath refid='project.classpath' />
+        <assertions><disable /></assertions>
+    </java>
+</target>
+
+<!--
+***************************************
+CLEANING
+***************************************
+-->
+
+<target name='clean' description="remove all compiled files">
+    <delete includeemptydirs="true" failonerror='false'>
+        <fileset dir="${build.dir}" includes="**/*" />
+        <fileset dir="${debugoutput.dir}" includes="**/*" />
+        <fileset dir="." defaultexcludes="yes" >
+            <include name="catalog.jar" />
+        </fileset>
+    </delete>
+</target>
+
+<!--
+***************************************
+JAVA COMPILATION
+***************************************
+-->
+
+<target name="srccompile">
+    <mkdir dir='${build.dir}' />
+    <javac target="1.6" srcdir="${src.dir}" destdir='${build.dir}' debug='true'>
+        <classpath refid="project.classpath" />
+    </javac>
+</target>
+
+</project>

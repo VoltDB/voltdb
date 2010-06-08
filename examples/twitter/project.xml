@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<project>
+    <database name='database'>
+        <schemas>
+            <schema path='twitter-ddl.sql' />
+        </schemas>
+        <procedures>
+            <procedure class='org.voltdb.twitter.database.procedures.Insert' />
+            <procedure class='org.voltdb.twitter.database.procedures.Select' />
+            <procedure class='org.voltdb.twitter.database.procedures.Delete' />
+        </procedures>
+        <partitions>
+            <partition table='hashtags' column='hashtag' />
+            <partition table='partitioner' column='gotoall' />
+        </partitions>
+    </database>
+</project>

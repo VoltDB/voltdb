@@ -1,0 +1,75 @@
+body, h1, h2, h3, h4, h5, h6, p, form, fieldset, img, div, span {
+    margin: 0px;
+    padding: 0px;
+}
+
+body {
+    font-family: Verdana, Geneva, Arial, sans-serif;
+    font-size: 8pt;
+    text-align: center;
+    background-color: #eeeeee;
+}
+
+a, a:visited {
+    color: #224466;
+}
+
+a:hover, a:focus {
+    text-decoration: none;
+}
+
+#top {
+    background-color: #5599bb;
+    padding: 20px 0px;
+}
+
+#middle {
+    background-color: #224466;
+    color: #ddeeff;
+    padding: 5px 0px;
+}
+
+#bottom {
+    padding-top: 5px;
+    background-color: #eeeeee;
+}
+
+table {
+    margin: 0px auto;
+}
+
+td {
+    vertical-align: top;
+    padding: 0px 10px;
+}
+
+table.hashtags {
+    border-collapse: collapse;
+    margin: 5px auto;
+    background-color: white;
+}
+
+.hashtags th {
+    background-color: #5599bb;
+    color: #ddeeff;
+    width: 100px;
+}
+
+.hashtags th, .hashtags td {
+    padding: 5px;
+    border: 1px solid black;
+}
+
+.hashtag-bar {
+    background-color: pink;
+    position: absolute;
+    top: -5px;
+    left: -5px;
+    height: 23px;
+    z-index: 1;
+}
+
+.hashtag-count {
+    position: absolute;
+    z-index: 2;
+}

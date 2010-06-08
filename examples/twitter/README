@@ -1,0 +1,35 @@
+Twitter application
+===================
+
+This example application uses the Twitter API to monitor a stream of tweets and parse out hashtags. Hashtag trends are calculated and made available via a web interface.
+
+Many attributes of the application are customizable through arguments passed to the client, including: 
+
+  - The twitter login username.
+  - The twitter login password.
+  - The local web server port.
+  - The number of hash tags to show in each table.
+
+These attributes can be adjusted by modifying the arguments to the "client" target in the Ant build script. 
+
+  *** Note *** that you MUST change the username and password to your own valid credentials for this application to work.
+
+Additionally, a second client target "cull" can be run that will periodically delete old hashtags. This too has customizable parameters:
+
+  - The retention range in hours.
+  - The frequency with which to perform the delete in hours.
+
+ant targets
+-----------
+
+ant                 : compile all Java clients and stored procedures, build the catalog
+
+ant server          : start the server
+
+ant client          : start the client
+
+ant cull            : start the cull process
+
+ant catalog         : build the catalog
+
+ant clean           : remove compiled files
