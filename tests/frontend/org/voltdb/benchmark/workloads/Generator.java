@@ -31,6 +31,7 @@ import org.voltdb.benchmark.*;
 
 import java.io.*;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.lang.reflect.*;
 
 import java.net.UnknownHostException;
@@ -45,7 +46,6 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.VoltProcedure.VoltAbortException;
 
 import org.voltdb.benchmark.workloads.xml.*;
-
 
 //COMMAND: xjc -p benchmarkGenerator.xml /home/voltdb/mstarobinets/Desktop/Useful/MB/microbenchmark1.xsd -d /home/voltdb/mstarobinets/Desktop/Useful/MB
 public class Generator extends ClientMain
@@ -83,43 +83,38 @@ public class Generator extends ClientMain
     public static final String m_jarFileName = "catalog.jar";
 
     private Microbenchmark mb;
-    private final LinkedList<Workload> workloads;
+    private LinkedList<Workload> workloads;
     private Workload currWorkload;
+    private int firstWLProcIndex;
+
+    private String xmlFilePath = "/home/voltdb/mstarobinets/workspace/voltdb/tests/frontend/org/voltdb/benchmark/workloads/microbench.xml";
+    private boolean built;
 
     private final GenericCallback callback = new GenericCallback();
 
     public Generator(String[] args)
     {
         super(args);
-
+/*
         mb = null;
         workloads = new LinkedList<Workload>();
         currWorkload = null;
+*/
     }
 
     public static void main(String[] args)
     {
+        //ADD SOMETHING HERE TO HANDLE MULTIPLE WORKLOADS...?
         ClientMain.main(Generator.class, args, false);
-/*
-        Generator g = new Generator();
-        try
-        {
-            g.runLoop();
-        }
-        catch (IOException e)
-        {
-            e.printStackTrace();
-            System.exit(-1);
-        }
-*/
     }
 
     private void runBenchmark()
     {
+/*
         //connect();
 
         //File xmlFile = getXMLFile();
-        File xmlFile = new File("/home/voltdb/mstarobinets/workspace/voltdb/tests/frontend/org/voltdb/benchmark/workloads/microbench.xml");
+        File xmlFile = new File(xmlFilePath);
         mb = unmarshal(xmlFile);
 
         boolean loaded = runLoader(mb);
@@ -129,11 +124,15 @@ public class Generator extends ClientMain
         if (!loaded)
             System.err.println("No loading took place.");
         if (buildWorkloads(mb))
+*/
+        firstWLProcIndex = 0;
+        if (built)
         {
             ListIterator<Workload> iter = workloads.listIterator();
             while (iter.hasNext())
             {
                 currWorkload = iter.next();
+
                 try
                 {
                     System.err.println("About to run workload " + currWorkload.name);
@@ -146,6 +145,7 @@ public class Generator extends ClientMain
                 {
                     System.err.println("Invalid inputs in xml file for workload \"" + currWorkload.name + "\".");
                 }
+                firstWLProcIndex += currWorkload.procs.length;
             }
         }
 
@@ -229,7 +229,7 @@ public class Generator extends ClientMain
 
                 for (int i = 0; i < currWorkload.params[index].length; i++)
                     setParams(currWorkload, index, i);
-                callProc(currWorkload.procs[index], currWorkload.params[index]);
+                callProc(currWorkload.procs[index], currWorkload.params[index]/*ADDED*/, index + firstWLProcIndex);
                 numProcCalls++;
                 currentTime = System.nanoTime();
             }
@@ -338,14 +338,14 @@ public class Generator extends ClientMain
         return nanoTime;
     }
 
-    private void callProc(String procName, Object[] params)
+    private void callProc(String procName, Object[] params/*ADDED*/, int procIndex)
     {
         //check procName validity with catch statement
         try
         {
             m_voltClient.callProcedure(callback, procName, params);
-            //i believe the array index should = procIndex, not just 0
-            m_counts[0].getAndIncrement();
+            //index used to just be 0
+            m_counts[procIndex].getAndIncrement();
         }
         catch (IOException e)
         {
@@ -362,43 +362,77 @@ public class Generator extends ClientMain
     //should these be public or protected?
     @Override
     public void runLoop()
-        throws IOException
     {
         runBenchmark();
+        try
+        {
+            while (true)
+            {
+                m_voltClient.drain();
+            }
+        }
+        catch (Exception e)
+        {
+            return;
+        }
     }
 
     @Override
     public String[] getTransactionDisplayNames()
     {
-        if (currWorkload == null || currWorkload.procs == null)
+        workloads = new LinkedList<Workload>();
+
+        File xmlFile = new File("/home/voltdb/mstarobinets/workspace/voltdb/tests/frontend/org/voltdb/benchmark/workloads/microbench.xml");
+        mb = unmarshal(xmlFile);
+
+        boolean loaded = runLoader(mb);
+        testPrint();
+
+        if (!loaded)
+            System.err.println("No loading took place.");
+        if (!buildWorkloads(mb))
         {
-            String[] displayNames = new String[1];
-            displayNames[0] = "Loading or building workloads.";
+            built = false;
+            System.err.println("Building workloads failed.");
+            return null;
+        }
+        else
+        {
+            built = true;
+            /*
+            currWorkload = workloads.getFirst();
+            String[] displayNames = new String[currWorkload.procs.length];
+            for (int i = 0; i < displayNames.length; i++)
+                displayNames[i] = currWorkload.procs[i];
+            return displayNames;
+            */
+            //FOR MULTIPLE WORKLOADS:
+            int numProcs = 0;
+            for (Workload w : workloads)
+                numProcs += w.procs.length;
+            //MAYBE CHECK FOR DUPLICATES??
+            String[] displayNames = new String[numProcs];
+            int index = 0;
+            for (Workload w : workloads)
+                for (int i = 0; i < w.procs.length; i++)
+                {
+                    displayNames[index] = w.procs[i];
+                    index++;
+                }
             return displayNames;
         }
-
-        String[] displayNames = new String[currWorkload.procs.length];
-        for (int i = 0; i < displayNames.length; i++)
-            displayNames[i] = currWorkload.procs[i];
-        return displayNames;
     }
 
     @Override
     public String getApplicationName()
     {
-        if (mb == null)
-            return "Building microbenchmark.";
-        else
-            return "Microbenchmark: " + mb.getMbName();
+        return "Microbenchmark.";
     }
 
     @Override
     public String getSubApplicationName()
     {
-        if (currWorkload == null)
-            return "Loading or building workloads.";
-        else
-            return "Workload: " + currWorkload.name;
+        return "Workload.";
     }
 
     //ADD FEEDBACK: PRINTOUTS/FILEWRITES ABOUT CREATED WORKLOADS
@@ -457,7 +491,7 @@ public class Generator extends ClientMain
             return true;
         }
         catch (Exception e)
-        {
+        {e.printStackTrace();
             System.err.println("Building failed due to syntax errors in XML file.");
             return false;
         }

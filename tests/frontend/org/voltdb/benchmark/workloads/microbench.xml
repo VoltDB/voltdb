@@ -12,12 +12,12 @@
                 <value generator="random" />
             </param>
         </procedure>
-        <procedure procName="Select" percOfWL="33">
+        <procedure procName="Select" percOfWL="34">
             <param type="INTEGER">
                 <value generator="random" />
             </param>
         </procedure>
-        <procedure procName="Delete" percOfWL="34">
+        <procedure procName="Delete" percOfWL="33">
             <param type="INTEGER">
                 <value generator="random" />
             </param>
