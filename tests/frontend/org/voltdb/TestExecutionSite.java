@@ -279,9 +279,12 @@ public class TestExecutionSite extends TestCase {
     private static final int SITE_COUNT = PARTITION_COUNT * (K_FACTOR + 1);
     // These are to hack around the fact that we don't handle concurrent
     // failures gracefully.  If we see a fail, we prevent the RussianRouletteMailbox
-    // from inducing another failure for 300 messages per site, which should be enough
+    // from inducing another failure for 5000 messages per site, which should be enough
     // for the failure handling to resolve itself
-    private static final int SAFE_SENDS = 300 * SITE_COUNT;
+    // This number is large because there appears to be a message flood
+    // on failures.  rbetts and I speculate some sort of heartbeat response flail, as yet
+    // unconfirmed.
+    private static final int SAFE_SENDS = 5000 * SITE_COUNT;
 
     MockVoltDB m_voltdb;
     ExecutionSiteFuzzChecker m_checker;
