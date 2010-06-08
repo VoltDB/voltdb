@@ -17,6 +17,8 @@
 
 package org.voltdb.jni;
 
+import java.util.Random;
+
 import org.voltdb.*;
 import org.voltdb.elt.ELTProtoMessage;
 import org.voltdb.exceptions.*;
@@ -33,23 +35,45 @@ public class MockExecutionEngine extends ExecutionEngine {
             int inputDepIdfinal, ParameterSet parameterSet, final long txnId,
             final long lastCommittedTxnId, final long undoToken) throws EEException
     {
-        // TestExecutionSite uses this mock site. A plan fragment id greater than 100
-        // indicates a desired rollback. Otherwise, return a made up depedendency pair.
         VoltTable vt;
-        if (planFragmentId > 100) {
-            //System.out.println("Throwing exception for rollback.");
-            throwExceptionForError(ERRORCODE_ERROR);
-            // satisfy the compiler. Can't reach this point
-            return null;
+        // TestExecutionSite uses this mock site.
+        //
+        // For interesting things to happen, the first parameter used by the fuzz
+        // tester must be a string indicating what transaction outcome should be simulated
+        // by the mock EE.
+        //
+        // rollback_all : every execution site should throw an exception for rollback
+        // rollback_random : each execution site should randomly decide to rollback
+        //                   This includes the final aggregating execution site call.
+
+        if (parameterSet.toArray().length > 0 && parameterSet.toArray()[0] instanceof String)
+        {
+            String txn_outcome = (String)parameterSet.toArray()[0];
+
+            if (txn_outcome.equals("rollback_all"))
+            {
+                //System.out.println("Throwing MASSIVE exception for rollback.");
+                throwExceptionForError(ERRORCODE_ERROR);
+            }
+            else if (txn_outcome.equals("rollback_random"))
+            {
+                Random rand = new Random(System.currentTimeMillis());
+                if (rand.nextInt(100) < 20)
+                {
+                    //System.out.println("Throwing exception for rollback");
+                    //if (planFragmentId == 1)
+                    //{
+                    //    System.out.println("ROLLING BACK COORDINATOR");
+                    //}
+                    throwExceptionForError(ERRORCODE_ERROR);
+                }
+            }
         }
-        else {
-            vt = new VoltTable(
-             new VoltTable.ColumnInfo[] {
+        vt = new VoltTable(new VoltTable.ColumnInfo[] {
                   new VoltTable.ColumnInfo("foo", VoltType.INTEGER)
-             });
-            vt.addRow(new Integer(1));
-            return new DependencyPair(outputDepId, vt);
-        }
+        });
+        vt.addRow(new Integer(1));
+        return new DependencyPair(outputDepId, vt);
     }
 
     @Override

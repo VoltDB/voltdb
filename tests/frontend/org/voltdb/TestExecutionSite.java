@@ -26,7 +26,11 @@ package org.voltdb;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import junit.framework.TestCase;
@@ -38,35 +42,265 @@ import org.apache.log4j.WriterAppender;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
-import org.voltdb.dtxn.*;
+import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
+import org.voltdb.dtxn.RestrictedPriorityQueue;
+import org.voltdb.dtxn.SinglePartitionTxnState;
+import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.SerializableException;
+import org.voltdb.executionsitefuzz.ExecutionSiteFuzzChecker;
 import org.voltdb.fault.FaultDistributor;
-import org.voltdb.messaging.*;
+import org.voltdb.messaging.FailureSiteUpdateMessage;
+import org.voltdb.messaging.FastSerializer;
+import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.HeartbeatMessage;
+import org.voltdb.messaging.InitiateTaskMessage;
+import org.voltdb.messaging.Mailbox;
+import org.voltdb.messaging.MessagingException;
+import org.voltdb.messaging.MultiPartitionParticipantMessage;
+import org.voltdb.messaging.Subject;
+import org.voltdb.messaging.VoltMessage;
 import org.voltdb.utils.VoltLoggerFactory;
 
 public class TestExecutionSite extends TestCase {
+
+    private static int messagesSinceFail = 0;
+
+    private static final int FAIL_RANGE = 80000;
+
+    private static HashMap<Integer, RussianRouletteMailbox> postoffice =
+        new HashMap<Integer, RussianRouletteMailbox>();
+
+
+    private void registerMailbox(int siteId, RussianRouletteMailbox mbox)
+    {
+        postoffice.put(siteId, mbox);
+    }
+
+    // A Mailbox implementation that will randomly simulate node failure by
+    // killing a site instead of sending a message.
+    // TODO: The failure decision is "tuned" to generate a decent number of
+    // site failures but not so many as to kill every site in rapid succession.
+    // Still fragile and could use some more work.
+    class RussianRouletteMailbox implements Mailbox
+    {
+        int m_totalSends;
+        private final Integer m_siteId;
+        // Queue for DEFAULT Messages
+        private final LinkedBlockingQueue<VoltMessage> incomingMessages;
+        // Queue for FAILURE_SITE_UPDATE Messages
+        private final LinkedBlockingQueue<VoltMessage> m_failureNoticeMessages;
+        private final int m_failureProb;
+
+        public RussianRouletteMailbox(LinkedBlockingQueue<VoltMessage> queue,
+                                      Integer siteId, int failureProb)
+        {
+            incomingMessages = queue;
+            m_failureNoticeMessages = new LinkedBlockingQueue<VoltMessage>();
+            m_failureProb = failureProb;
+            m_siteId = siteId;
+            m_totalSends = 0;
+        }
+
+        // Synchronized so messagesSinceFail changes are thread-safe
+        // across execution site accesses
+        synchronized boolean shouldFail(boolean broadcast)
+        {
+            boolean fail = false;
+
+            if (messagesSinceFail >= SAFE_SENDS)
+            {
+                messagesSinceFail = 0;
+                System.out.println("Resetting safe count at site: " + m_siteId);
+                fail = false;
+            }
+            else if (messagesSinceFail > 0)
+            {
+                messagesSinceFail++;
+                return false;
+            }
+
+            int failchance = m_failureProb;
+            if (broadcast)
+            {
+                failchance *= 10;
+            }
+            if (m_rand.nextInt(FAIL_RANGE) >= (FAIL_RANGE - failchance))
+            {
+                if (messagesSinceFail == 0)
+                {
+                    messagesSinceFail++;
+                    System.out.println("Starting safe count at site: " + m_siteId);
+                    fail = true;
+                }
+            }
+
+            return fail;
+        }
+
+        public void send(int siteId, int mailboxId, VoltMessage message) throws MessagingException {
+            m_totalSends++;
+            if (shouldFail(false))
+            {
+                killSite();
+                return;
+            }
+
+            RussianRouletteMailbox dest = postoffice.get(siteId);
+            if (dest != null) {
+                dest.deliver(message);
+            }
+        }
+
+        public void send(int[] siteIds, int mailboxId, VoltMessage message) throws MessagingException {
+            for (int i=0; siteIds != null && i < siteIds.length; ++i)
+            {
+                m_totalSends++;
+                // There are more single send() rather than these broadcast
+                // send()s, so we increase the chance of these because
+                // there's more interesting behavior here.
+                if (shouldFail(true))
+                {
+                    //System.out.println("FAILING NODE MID-BROADCAST");
+                    killSite();
+                    return;
+                }
+
+                RussianRouletteMailbox dest = postoffice.get(siteIds[i]);
+                if (dest != null) {
+                    dest.deliver(message);
+                }
+            }
+        }
+
+        public int getWaitingCount() {
+            throw new UnsupportedOperationException();
+        }
+
+        public VoltMessage recv() {
+            return recv(Subject.DEFAULT);
+        }
+
+        public VoltMessage recvBlocking() {
+            return recvBlocking(Subject.DEFAULT);
+        }
+
+        @Override
+        public VoltMessage recvBlocking(long timeout) {
+            return recvBlocking(Subject.DEFAULT, timeout);
+        }
+
+        @Override
+        public VoltMessage recv(Subject s) {
+            if (s == Subject.DEFAULT)
+                return incomingMessages.poll();
+            else
+                return m_failureNoticeMessages.poll();
+        }
+
+        @Override
+        public VoltMessage recvBlocking(Subject s) {
+            try {
+                if (s == Subject.DEFAULT)
+                    return incomingMessages.take();
+
+                else
+                    return m_failureNoticeMessages.take();
+            }
+            catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+
+        }
+
+        @Override
+        public VoltMessage recvBlocking(Subject s, long timeout) {
+            do {
+                try {
+                    if (s == Subject.DEFAULT)
+                        return incomingMessages.take();
+                    else
+                        return m_failureNoticeMessages.take();
+                }
+                catch (InterruptedException e) {
+                    e.printStackTrace();
+                    throw new RuntimeException(e);
+                }
+            } while (true);
+        }
+
+        @Override
+        public void deliver(VoltMessage message) {
+            if (message.getSubject() == Subject.DEFAULT.getId())
+                incomingMessages.offer(message);
+            else
+            {
+                m_failureNoticeMessages.offer(message);
+            }
+        }
+
+        // Unfortunately uses Thread.stop() to swiftly slay an execution site
+        // like ninja...easiest way I found to kill the site and not allow it to
+        // finish sending the messages for whatever transaction it was
+        // involved in.
+        @SuppressWarnings("deprecation")
+        void killSite()
+        {
+            // Log breadcrumbs for validator
+            m_siteLogger[m_siteId].trace("FUZZTEST selfNodeFailure " + getHostIdForSiteId(m_siteId));
+            // mark the site as down in the catalog
+            //System.out.println("KILLING SITE: " + m_siteId);
+            m_sites[m_siteId].shutdown();
+            m_voltdb.killSite(m_siteId);
+            // send failure message to all remaining sites
+            int[] site_ids = m_voltdb.getCatalogContext().siteTracker.getUpExecutionSites();
+            for (int site_id : site_ids)
+            {
+                RussianRouletteMailbox dest = postoffice.get(site_id);
+                if (dest != null)
+                {
+                    //System.out.println("Sending Failure Notification to site: " + site_id);
+                    dest.deliver(new ExecutionSite.ExecutionSiteNodeFailureMessage(getHostIdForSiteId(m_siteId)));
+                }
+            }
+            // remove this site from the postoffice
+            postoffice.remove(m_siteId);
+            // stop/join this site's thread
+            m_siteThreads[m_siteId].stop();
+        }
+    }
 
     // ExecutionSite's snapshot processor requires the shared library
     static { EELibraryLoader.loadExecutionEngineLibrary(true); }
 
     // Topology parameters
-    private static final int K_FACTOR = 1;
+    private static final int K_FACTOR = 2;
     private static final int PARTITION_COUNT = 3;
     private static final int SITE_COUNT = PARTITION_COUNT * (K_FACTOR + 1);
+    // These are to hack around the fact that we don't handle concurrent
+    // failures gracefully.  If we see a fail, we prevent the RussianRouletteMailbox
+    // from inducing another failure for 300 messages per site, which should be enough
+    // for the failure handling to resolve itself
+    private static final int SAFE_SENDS = 300 * SITE_COUNT;
 
     MockVoltDB m_voltdb;
     ExecutionSiteFuzzChecker m_checker;
     RestrictedPriorityQueue m_rpqs[] = new RestrictedPriorityQueue[SITE_COUNT];
     ExecutionSite m_sites[] = new ExecutionSite[SITE_COUNT];
-    MockMailbox m_mboxes[] = new MockMailbox[SITE_COUNT];
+    RussianRouletteMailbox m_mboxes[] = new RussianRouletteMailbox[SITE_COUNT];
     Thread m_siteThreads[] = new Thread[SITE_COUNT];
     Logger[] m_siteLogger = new Logger[SITE_COUNT];
     StringWriter[] m_siteResults = new StringWriter[SITE_COUNT];
+    Random m_rand;
 
     @Override
     protected void setUp() throws Exception
     {
         super.setUp();
+        messagesSinceFail = 0;
+        long seed = System.currentTimeMillis();
+        //System.out.println("FUZZ SEED: " + seed);
+        m_rand = new Random(seed);
         m_checker = new ExecutionSiteFuzzChecker();
 
         m_voltdb = new MockVoltDB();
@@ -126,10 +360,11 @@ public class TestExecutionSite extends TestCase {
 
         // Create the real objects
         for (int ss=0; ss < SITE_COUNT; ++ss) {
-            m_mboxes[ss] = new MockMailbox(new LinkedBlockingQueue<VoltMessage>());
+            m_mboxes[ss] = new RussianRouletteMailbox(new LinkedBlockingQueue<VoltMessage>(),
+                                                      ss, 1);
             m_rpqs[ss] = new RestrictedPriorityARRR(getInitiatorIds(), ss, m_mboxes[ss]);
             m_sites[ss] = new ExecutionSite(m_voltdb, m_mboxes[ss], ss, null, m_rpqs[ss]);
-            MockMailbox.registerMailbox(ss, m_mboxes[ss]);
+            registerMailbox(ss, m_mboxes[ss]);
         }
     }
 
@@ -197,7 +432,7 @@ public class TestExecutionSite extends TestCase {
 
     /* Host ids are site ids + 10,000 */
     int getHostIdForSiteId(int siteId) {
-        return siteId + 10000;
+        return siteId + 66000;
     }
 
     List<Integer> getSiteIdsForPartitionId(int partitionId) {
@@ -318,7 +553,7 @@ public class TestExecutionSite extends TestCase {
                                             txnState.coordinatorSiteId,
                                             txnState.txnId,
                                             txnState.isReadOnly,
-                                            new long[] {0},
+                                            new long[] {1},
                                             new int[] {localTask_outputDep},
                                             new ByteBuffer[] {paramBuf},
                                             finalTask());
@@ -330,10 +565,10 @@ public class TestExecutionSite extends TestCase {
                                             txnState.coordinatorSiteId,
                                             txnState.txnId,
                                             txnState.isReadOnly,
-                                            rollbackParticipant() ? new long[] {101} : new long[] {0},   // MAGIC - see MockExecutionEngine. frag id > 100 causes rollback
-                                                                  new int[] {localTask_startDep},
-                                                                  new ByteBuffer[] {paramBuf},
-                                                                  finalTask());
+                                            new long[] {0},
+                                            new int[] {localTask_startDep},
+                                            new ByteBuffer[] {paramBuf},
+                                            finalTask());
 
                 txnState.createLocalFragmentWork(localTask, nonTransactional() && finalTask());
                 txnState.createAllParticipatingFragmentWork(distributedTask);
@@ -384,7 +619,7 @@ public class TestExecutionSite extends TestCase {
         // Or maybe a difference in what ClientInterface does?
         final StoredProcedureInvocation tx1_spi = new StoredProcedureInvocation();
         tx1_spi.setProcName("org.voltdb.TestExecutionSite$MockSPVoltProcedure");
-        tx1_spi.setParams(new Integer(0));
+        tx1_spi.setParams("commit", new Integer(0));
 
         final InitiateTaskMessage tx1_mn =
             new InitiateTaskMessage(getInitiatorIdForSiteId(0),
@@ -418,7 +653,7 @@ public class TestExecutionSite extends TestCase {
 
         final StoredProcedureInvocation tx1_spi = new StoredProcedureInvocation();
         tx1_spi.setProcName("org.voltdb.TestExecutionSite$MockROSPVoltProcedure");
-        tx1_spi.setParams(new Integer(0));
+        tx1_spi.setParams("commit", new Integer(0));
 
         final InitiateTaskMessage tx1_mn =
             new InitiateTaskMessage(getInitiatorIdForSiteId(0), 0, 1000, readOnly, singlePartition, tx1_spi, Long.MAX_VALUE);
@@ -446,7 +681,7 @@ public class TestExecutionSite extends TestCase {
 
         final StoredProcedureInvocation tx1_spi = new StoredProcedureInvocation();
         tx1_spi.setProcName("org.voltdb.TestExecutionSite$MockMPVoltProcedure");
-        tx1_spi.setParams(new Integer(0));
+        tx1_spi.setParams("commit", new Integer(0));
 
         // site 1 is the coordinator
         final InitiateTaskMessage tx1_mn_1 =
@@ -561,7 +796,7 @@ public class TestExecutionSite extends TestCase {
 
         final StoredProcedureInvocation tx1_spi = new StoredProcedureInvocation();
         tx1_spi.setProcName("org.voltdb.TestExecutionSite$MockMPVoltProcedure");
-        tx1_spi.setParams(new Integer(0));
+        tx1_spi.setParams("commit", new Integer(0));
 
         // site 1 is the coordinator
         final InitiateTaskMessage tx1_mn_1 =
@@ -629,7 +864,7 @@ public class TestExecutionSite extends TestCase {
         StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.setClientHandle(25);
         spi.setProcName("johnisgreat");
-        spi.setParams(57, "gooniestoo");
+        spi.setParams("commit", 57, "gooniestoo");
         InitiateTaskMessage mn = new InitiateTaskMessage(-1, -1, -1, false, false, spi, Long.MIN_VALUE);
         mn.setNonCoordinatorSites(new int[] {1,2,3,4,5});
 
@@ -689,7 +924,7 @@ public class TestExecutionSite extends TestCase {
 
         final StoredProcedureInvocation tx1_spi = new StoredProcedureInvocation();
         tx1_spi.setProcName("org.voltdb.TestExecutionSite$MockMPVoltProcedure");
-        tx1_spi.setParams(new Integer(0));
+        tx1_spi.setParams("commit", new Integer(0));
 
         // site 1 is the coordinator. Use the txn id (DUMMY...) that the R.P.Q.
         // thinks is a valid safe-to-run txnid.
@@ -760,7 +995,7 @@ public class TestExecutionSite extends TestCase {
     {
         final StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.setProcName("org.voltdb.TestExecutionSite$MockSPVoltProcedure");
-        spi.setParams(new Integer(partition_id));
+        spi.setParams("commit", new Integer(partition_id));
 
         List<Integer> sitesForPartition = getSiteIdsForPartitionId(partition_id);
         for (int i : sitesForPartition) {
@@ -781,6 +1016,7 @@ public class TestExecutionSite extends TestCase {
      */
     private void createMPInitiation(
             boolean rollback,
+            boolean rollback_all,
             boolean readOnly,
             long txn_id,
             long safe_txn_id,
@@ -792,14 +1028,22 @@ public class TestExecutionSite extends TestCase {
         final StoredProcedureInvocation spi = new StoredProcedureInvocation();
         if (!rollback) {
             spi.setProcName("org.voltdb.TestExecutionSite$MockMPVoltProcedure");
+            spi.setParams("commit", new Integer(partition_id));
         }
         else {
-            spi.setProcName("org.voltdb.TestExecutionSite$MockMPVoltProcedureRollbackParticipant");
+            if (rollback_all)
+            {
+                spi.setProcName("org.voltdb.TestExecutionSite$MockMPVoltProcedureRollbackParticipant");
+                spi.setParams("rollback_all", new Integer(partition_id));
+            }
+            else
+            {
+                spi.setProcName("org.voltdb.TestExecutionSite$MockMPVoltProcedureRollbackParticipant");
+                spi.setParams("rollback_random", new Integer(partition_id));
+            }
         }
 
         System.out.println("Creating MP proc, TXN ID: " + txn_id + ", participants: " + participants.toString());
-
-        spi.setParams(new Integer(partition_id));
 
         final InitiateTaskMessage itm =
             new InitiateTaskMessage(initiator_id,
@@ -856,6 +1100,9 @@ public class TestExecutionSite extends TestCase {
     {
         for (int i=0; i <= totalTransactions; ++i) {
             boolean rollback = rand.nextBoolean();
+            // Disabling this as it results in too many all-failures currently
+            //boolean rollback_all = rand.nextBoolean();
+            boolean rollback_all = false;
             boolean readOnly = rand.nextBoolean();
             long txnid = i + firstTxnId;
             long safe_txnid = txnid;
@@ -877,7 +1124,9 @@ public class TestExecutionSite extends TestCase {
             else if (wheelOfDestiny < 70) {
                 List<Integer> participants = new ArrayList<Integer>();
                 int coordinator = selectCoordinatorAndParticipants(rand, partition, initiator, participants);
-                createMPInitiation(rollback, readOnly, txnid, safe_txnid, initiator, partition, coordinator, participants);
+                createMPInitiation(rollback, rollback_all, readOnly, txnid,
+                                   safe_txnid, initiator, partition,
+                                   coordinator, participants);
             }
             else {
                 createHeartBeat(txnid, safe_txnid, initiator);
@@ -909,10 +1158,9 @@ public class TestExecutionSite extends TestCase {
 
     public void testFuzzedTransactions()
     {
-        final int totalTransactions = 10000;
+        final int totalTransactions = 20000;
         final long firstTxnId = 10000;
-        final Random rand = new Random();
-        queueTransactions(firstTxnId, totalTransactions, rand);
+        queueTransactions(firstTxnId, totalTransactions, m_rand);
         createAndRunSiteThreads();
 
         // wait for all the sites to terminate runLoops
@@ -926,14 +1174,17 @@ public class TestExecutionSite extends TestCase {
                 }
                 if (m_siteThreads[i].isAlive() == false) {
                     System.out.println("Joined site " + i);
-                    // just make sure at least one transaction was done
-                    assertTrue(m_sites[i].lastCommittedTxnId > firstTxnId);
                     stopped = true;
                 }
             } while (!stopped);
         }
 
+        for (int i = 0; i < SITE_COUNT; ++i)
+        {
+            System.out.println("sends for mailbox: " + i + ": " + m_mboxes[i].m_totalSends);
+        }
+
         m_checker.dumpLogs();
-        m_checker.validateLogs();
+        assertTrue(m_checker.validateLogs());
     }
 }

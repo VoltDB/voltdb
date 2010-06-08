@@ -633,7 +633,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
      * Will integrate this in to the real run loop soon.. ish.
      */
     public void runLoop() {
-        while (true) {
+        while (m_shouldContinue) {
             TransactionState currentTxnState = m_transactionQueue.poll();
             if (currentTxnState == null) {
                 // poll the messaging layer for a while as this site has nothing to do
@@ -677,11 +677,14 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         // advance the committed transaction point. Necessary for both ELT
         // commit tracking and for fault detection transaction partial-transaction
         // resolution.
-        if (txnState.txnId > lastCommittedTxnId) {
-            lastCommittedTxnId = txnState.txnId;
-            if (!txnState.isSinglePartition())
-            {
-                lastCommittedMultiPartTxnId = txnState.txnId;
+        if (!txnState.needsRollback())
+        {
+            if (txnState.txnId > lastCommittedTxnId) {
+                lastCommittedTxnId = txnState.txnId;
+                if (!txnState.isSinglePartition())
+                {
+                    lastCommittedMultiPartTxnId = txnState.txnId;
+                }
             }
         }
     }
@@ -780,8 +783,11 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         else if (message instanceof CheckTxnStateCompletionMessage) {
             long txn_id = ((CheckTxnStateCompletionMessage)message).m_txnId;
             TransactionState txnState = m_transactionsById.get(txn_id);
-            assert(txnState instanceof MultiPartitionParticipantTxnState);
-            ((MultiPartitionParticipantTxnState)txnState).checkWorkUnits();
+            if (txnState != null)
+            {
+                assert(txnState instanceof MultiPartitionParticipantTxnState);
+                ((MultiPartitionParticipantTxnState)txnState).checkWorkUnits();
+            }
         }
         else if (message instanceof RawProcessor.ELTInternalMessage) {
             RawProcessor.ELTInternalMessage eltm =
