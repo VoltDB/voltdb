@@ -30,6 +30,10 @@ public class VoltDB {
 
     /** Global constants */
     public static final int DEFAULT_PORT = 21212;
+    public static final int DEFAULT_INTERNAL_PORT = 3021;
+    public static final String DEFAULT_EXTERNAL_INTERFACE = "";
+    public static final String DEFAULT_INTERNAL_INTERFACE = "";
+
     static final int INITIATOR_SITE_ID = 0;
     public static final int DTXN_MAILBOX_ID = 0;
 
@@ -56,21 +60,35 @@ public class VoltDB {
 
         /** use normal JNI backend or optional IPC or HSQLDB backends */
         public BackendTarget m_backend = BackendTarget.NATIVE_EE_JNI;
+
         /** name of the m_catalog JAR file */
         public String m_pathToCatalog = "catalog.jar";
+
         /** level of internal transaction profiling (for testing) */
         public ProcedureProfiler.Level m_profilingLevel =
             ProcedureProfiler.Level.DISABLED;
+
         /** false if voltdb.so shouldn't be loaded (for example if JVM is
          *  started by voltrun).
          */
         public boolean m_noLoadLibVOLTDB = false;
+
         /** if set to true each execution site will tie its thread to a core
          *  in a round robin fashion
          */
         public boolean m_useThreadAffinity = false;
+
         /** port number for the first client interface for each server */
         public int m_port = DEFAULT_PORT;
+
+        /** port number to use to build intra-cluster mesh */
+        public int m_internalPort = DEFAULT_INTERNAL_PORT;
+
+        /** interface to listen to clients on (default: any) */
+        public String m_externalInterface = DEFAULT_EXTERNAL_INTERFACE;
+
+        /** interface to use for backchannel comm (default: any) */
+        public String m_internalInterface = DEFAULT_INTERNAL_INTERFACE;
 
         public boolean listenForDumpRequests = false;
 
@@ -126,6 +144,26 @@ public class VoltDB {
                 else if (arg.startsWith("port ")) {
                     m_port = Integer.parseInt(arg.substring("port ".length()));
                 }
+                else if (arg.equals("internalport")) {
+                    m_internalPort = Integer.parseInt(args[++i]);
+                }
+                else if (arg.startsWith("internalport ")) {
+                    m_internalPort = Integer.parseInt(arg.substring("internalport ".length()));
+                }
+
+                else if (arg.equals("externalinterface")) {
+                    m_externalInterface = args[++i].trim();
+                }
+                else if (arg.startsWith("externalinterface ")) {
+                    m_externalInterface = arg.substring("externalinterface ".length()).trim();
+                }
+                else if (arg.equals("internalinterface")) {
+                    m_internalInterface = args[++i].trim();
+                }
+                else if (arg.startsWith("internalinterface ")) {
+                    m_internalInterface = arg.substring("internalinterface ".length()).trim();
+                }
+
                 else if (arg.equals("catalog")) {
                     m_pathToCatalog = args[++i];
                 }

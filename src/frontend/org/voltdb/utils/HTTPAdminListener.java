@@ -31,6 +31,9 @@ public class HTTPAdminListener extends NanoHTTPD {
 
     @Override
     public Response serve(String uri, String method, Properties header, Properties parms) {
+
+
+
         // code for debugging
         //System.out.println( method + " '" + uri + "' " );
 

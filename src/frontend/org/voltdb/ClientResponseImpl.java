@@ -19,17 +19,21 @@ package org.voltdb;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import org.voltdb.messaging.*;
-import org.voltdb.exceptions.SerializableException;
-import org.voltdb.VoltTable;
+import org.json.JSONException;
+import org.json.JSONString;
+import org.json.JSONStringer;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.exceptions.SerializableException;
+import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.messaging.FastSerializable;
+import org.voltdb.messaging.FastSerializer;
 
 /**
  * Packages up the data to be sent back to the client as a stored
  * procedure response in one FastSerialziable object.
  *
  */
-public class ClientResponseImpl implements FastSerializable, ClientResponse {
+public class ClientResponseImpl implements FastSerializable, ClientResponse, JSONString {
     private boolean setProperly = false;
     private byte status = 0;
     private String statusString = null;
@@ -40,6 +44,16 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse {
     private int clusterRoundTripTime = 0;
     private int clientRoundTripTime = 0;
     private SerializableException m_exception = null;
+
+    // JSON KEYS FOR SERIALIZATION
+    static final String JSON_STATUS_KEY = "status";
+    static final String JSON_STATUSSTRING_KEY = "data";
+    static final String JSON_APPSTATUS_KEY = "schema";
+    static final String JSON_APPSTATUSSTRING_KEY = "schema";
+    static final String JSON_RESULTS_KEY = "name";
+    static final String JSON_TYPE_KEY = "type";
+
+
 
 
     /** opaque data optionally provided by and returned to the client */
@@ -227,4 +241,25 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse {
         return appStatusString;
     }
 
+    @Override
+    public String toJSONString() {
+        JSONStringer js = new JSONStringer();
+        try {
+            js.object();
+
+            js.key("results");
+            js.array();
+            for (VoltTable o : results) {
+                js.value(o);
+            }
+            js.endArray();
+
+            js.endObject();
+        }
+        catch (JSONException e) {
+            e.printStackTrace();
+            throw new RuntimeException("Failed to serialized a parameter set to JSON.", e);
+        }
+        return js.toString();
+    }
 }

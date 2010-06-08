@@ -33,6 +33,7 @@ import java.util.Hashtable;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltDBInterface;
 
 /** SocketJoiner runs at startup to create a fully meshed cluster.
  * The primary (aka: leader, coordinater) node listens on BASE_PORT.
@@ -45,8 +46,7 @@ import org.voltdb.VoltDB;
 public class SocketJoiner extends Thread {
 
     private static final Logger LOG = Logger.getLogger(SocketJoiner.class.getName());
-    static final int BASE_PORT = 3021;
-    static final int CONTROL_PORT = 23895;
+    //static final int BASE_PORT = 3021;
     static final int COORD_HOSTID = 0;
     static final int COMMAND_NONE = 0;
     static final int COMMAND_CONNECT = 1; // followed by hostId, hostId
@@ -70,6 +70,10 @@ public class SocketJoiner extends Thread {
     long m_timestamp;//Part of instanceId
     Integer m_addr;
     long m_catalogCRC;
+
+    // from configuation data
+    int m_internalPort;
+    String m_internalInterface;
 
     // helper so all streams in inputs are wrapped uniformly
     private DataInputStream addToInputs(Integer hostId, InputStream s) {
@@ -108,10 +112,26 @@ public class SocketJoiner extends Thread {
 
     @Override
     public void run() {
+        // set defaults
+        VoltDB.Configuration unsetConfig = new VoltDB.Configuration();
+        m_internalPort = unsetConfig.m_internalPort;
+        m_internalInterface = unsetConfig.m_internalInterface;
+
+        // if there is config info, use it
+        VoltDBInterface vdbinst = VoltDB.instance();
+        if (vdbinst != null) {
+            VoltDB.Configuration config = vdbinst.getConfig();
+            if (config != null) {
+                m_internalPort = unsetConfig.m_internalPort;
+                m_internalInterface = unsetConfig.m_internalInterface;
+            }
+        }
+
         // Try to become primary regardless of configuration.
         try {
             m_listenerSocket = ServerSocketChannel.open();
-            m_listenerSocket.socket().bind(new InetSocketAddress(m_coordIp, BASE_PORT));
+            InetSocketAddress inetsockaddr = new InetSocketAddress(m_coordIp, m_internalPort);
+            m_listenerSocket.socket().bind(inetsockaddr);
             m_listenerSocket.socket().setPerformancePreferences(0, 2, 1);
         }
         catch (IOException e) {
@@ -307,9 +327,12 @@ public class SocketJoiner extends Thread {
         try {
             LOG.debug("Non-Primary Starting");
             LOG.debug("Non-Primary Connecting to Primary");
+
+            InetSocketAddress inetsockaddr = new InetSocketAddress(m_coordIp, m_internalPort);
+
             while (socket == null) {
                 try {
-                    socket = SocketChannel.open(new InetSocketAddress(m_coordIp, BASE_PORT));
+                    socket = SocketChannel.open(inetsockaddr);
                 }
                 catch (java.net.ConnectException e) {
                     LOG.warn("Joining primary failed: " + e.getMessage() + " retrying..");
@@ -335,12 +358,19 @@ public class SocketJoiner extends Thread {
             m_addr = instanceId.getInt();
             m_sockets.put(COORD_HOSTID, socket);
 
-            // start the server socket on the main
+            // start the server socket on the right interface
             LOG.debug("Non-Primary Creating its Listener Socket");
             m_listenerSocket = ServerSocketChannel.open();
-            m_listenerSocket.socket().bind(new InetSocketAddress(BASE_PORT + m_localHostId));
+
+            if ((m_internalInterface == null) || (m_internalInterface.length() == 0)) {
+                inetsockaddr = new InetSocketAddress(m_internalPort + m_localHostId);
+            }
+            else {
+                inetsockaddr = new InetSocketAddress(m_internalInterface, m_internalPort + m_localHostId);
+            }
+            m_listenerSocket.socket().bind(inetsockaddr);
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Non-Primary Listening on port:" + (BASE_PORT + m_localHostId));
+                LOG.debug("Non-Primary Listening on port:" + (m_internalPort + m_localHostId));
             }
 
             out = getOutputForHost(COORD_HOSTID);
@@ -367,7 +397,8 @@ public class SocketJoiner extends Thread {
                     in.readFully(ipBytes);
                     InetAddress ip = InetAddress.getByAddress(ipBytes);
                     LOG.debug("Opening non-primary socket: " + ip.toString());
-                    newSock = SocketChannel.open(new InetSocketAddress(ip, BASE_PORT + hostId));
+                    inetsockaddr = new InetSocketAddress(ip, m_internalPort + hostId);
+                    newSock = SocketChannel.open(inetsockaddr);
                 }
                 if (command == COMMAND_LISTEN) {
                     LOG.debug("Non-Primary Listen Request");

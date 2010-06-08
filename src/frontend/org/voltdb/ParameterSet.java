@@ -21,6 +21,10 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONString;
+import org.json.JSONStringer;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.FastSerializer;
@@ -32,7 +36,7 @@ import org.voltdb.types.VoltDecimalHelper;
  * a stored procedure OR a plan fragment.
  *
  */
- public class ParameterSet implements FastSerializable {
+ public class ParameterSet implements FastSerializable, JSONString {
 
     static final byte ARRAY = -99;
 
@@ -222,6 +226,37 @@ import org.voltdb.types.VoltDecimalHelper;
             }
         }
         return new String(b);
+    }
+
+    @Override
+    public String toJSONString() {
+        JSONStringer js = new JSONStringer();
+        try {
+            js.array();
+            for (Object o : m_params) {
+                js.value(o);
+            }
+            js.endArray();
+        }
+        catch (JSONException e) {
+            e.printStackTrace();
+            throw new RuntimeException("Failed to serialized a parameter set to JSON.", e);
+        }
+        return js.toString();
+    }
+
+    public static ParameterSet fromJSONString(String json) throws JSONException {
+        JSONArray jArray = new JSONArray(json);
+        return fromJSONArray(jArray);
+    }
+
+    public static ParameterSet fromJSONArray(JSONArray paramArray) throws JSONException {
+        ParameterSet pset = new ParameterSet();
+        pset.m_params = new Object[paramArray.length()];
+        for (int i = 0; i < paramArray.length(); i++) {
+            pset.m_params[i] = paramArray.get(i);
+        }
+        return pset;
     }
 
     static private Object readOneParameter(FastDeserializer in) throws IOException {

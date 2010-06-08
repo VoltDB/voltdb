@@ -21,6 +21,8 @@ import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 
+import org.json.JSONException;
+import org.json.JSONStringer;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 
@@ -581,6 +583,71 @@ public abstract class VoltTableRow {
     public BigDecimal getDecimalAsBigDecimal(String columnName) {
         int colIndex = getColumnIndex(columnName);
         return getDecimalAsBigDecimal(colIndex);
+    }
+
+    /**
+     *
+     * @param columnIndex
+     * @param js
+     * @throws JSONException
+     */
+    void putJSONRep(int columnIndex, JSONStringer js) throws JSONException {
+        long value; double dvalue;
+
+        switch (getColumnType(columnIndex)) {
+        case TINYINT:
+            value = getLong(columnIndex);
+            if (value == VoltType.NULL_TINYINT)
+                js.value(null);
+            else
+                js.value(value);
+            break;
+        case SMALLINT:
+            value = getLong(columnIndex);
+            if (value == VoltType.NULL_SMALLINT)
+                js.value(null);
+            else
+                js.value(value);
+            break;
+        case INTEGER:
+            value = getLong(columnIndex);
+            if (value == VoltType.NULL_INTEGER)
+                js.value(null);
+            else
+                js.value(value);
+            break;
+        case BIGINT:
+            value = getLong(columnIndex);
+            if (value == VoltType.NULL_BIGINT)
+                js.value(null);
+            else
+                js.value(value);
+            break;
+        case TIMESTAMP:
+            value = getTimestampAsLong(columnIndex);
+            if (value == VoltType.NULL_BIGINT)
+                js.value(null);
+            else
+                js.value(value);
+            break;
+        case FLOAT:
+            dvalue = getDouble(columnIndex);
+            if (dvalue == VoltType.NULL_FLOAT)
+                js.value(null);
+            else
+                js.value(dvalue);
+            break;
+        case STRING:
+            js.value(getString(columnIndex));
+            break;
+        case DECIMAL:
+            Object dec = getDecimalAsBigDecimal(columnIndex);
+            if (dec == null)
+                js.value("NULL");
+            else
+                js.value(dec.toString());
+            break;
+        }
     }
 
     /** Validates that type and columnIndex match and are valid. */
