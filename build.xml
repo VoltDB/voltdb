@@ -1473,6 +1473,7 @@ BENCHMARKS
     <antcall target="benchmark" inheritAll='true'>
         <param name="local" value="false"/>
         <param name="client" value="${env.BMCLIENT}"/>
+        <param name="remotepath" value="${env.VOLTBIN}"/>
 
         <param name="hostcount" value="${env.BMHOSTCOUNT}"/>
         <param name="sitesperhost" value="${env.BMSITESPERHOST}"/>
