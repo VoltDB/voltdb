@@ -28,19 +28,17 @@ public class ConnectorTableInfo extends CatalogType {
 
     boolean m_appendOnly;
 
-    @Override
     void setBaseValues(Catalog catalog, CatalogType parent, String path, String name) {
         super.setBaseValues(catalog, parent, path, name);
         m_fields.put("table", null);
         m_fields.put("appendOnly", m_appendOnly);
     }
 
-    @Override
     void update() {
         m_appendOnly = (Boolean) m_fields.get("appendOnly");
     }
 
-    /** GETTER: Reference to the table being amended */
+    /** GETTER: Reference to the table being ammended */
     public Table getTable() {
         Object o = getField("table");
         if (o instanceof UnresolvedInfo) {
@@ -58,7 +56,7 @@ public class ConnectorTableInfo extends CatalogType {
         return m_appendOnly;
     }
 
-    /** SETTER: Reference to the table being amended */
+    /** SETTER: Reference to the table being ammended */
     public void setTable(Table value) {
         m_fields.put("table", value);
     }
