@@ -139,6 +139,7 @@
         <nexthosthelper h1="volt4a" h2="volt4b" p1="@{prop}" p2="@{next}" />
         <nexthosthelper h1="volt4b" h2="volt4c" p1="@{prop}" p2="@{next}" />
         <nexthosthelper h1="volt4c" h2="volt2"  p1="@{prop}" p2="@{next}" />
+        <nexthosthelper h1="volt2"  h2="volt1"  p1="@{prop}" p2="@{next}" />
 
         <nexthosthelper h1="volt5a" h2="volt5b" p1="@{prop}" p2="@{next}" />
         <nexthosthelper h1="volt5b" h2="volt5c" p1="@{prop}" p2="@{next}" />
@@ -163,6 +164,7 @@
 <nexthostprop prop="clienthost1" next="clienthost2" />
 <nexthostprop prop="clienthost2" next="clienthost3" />
 <nexthostprop prop="clienthost3" next="clienthost4" />
+<nexthostprop prop="clienthost4" next="clienthost5" />
 
 <target name="testnexthostprop">
     <fail>
@@ -170,7 +172,7 @@
             <not>
                 <and>
                     <equals arg1="${host12}" arg2="volt3l" />
-                    <equals arg1="${clienthost4}" arg2="volt2" />
+                    <equals arg1="${clienthost5}" arg2="volt1" />
                 </and>
             </not>
         </condition>
