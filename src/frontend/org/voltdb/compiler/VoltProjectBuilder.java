@@ -25,7 +25,13 @@ import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -429,8 +435,8 @@ public class VoltProjectBuilder {
             return false;
         }
 
-        //String xml = result.getWriter().toString();
-        //System.out.println(xml);
+        String xml = result.getWriter().toString();
+        System.out.println(xml);
 
         final File projectFile =
             writeStringToTempFile(result.getWriter().toString());
@@ -515,7 +521,6 @@ public class VoltProjectBuilder {
             schema.setAttribute("path", schemaPath);
             schemas.appendChild(schema);
         }
-
 
         // /project/database/procedures
         final Element procedures = doc.createElement("procedures");

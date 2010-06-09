@@ -24,6 +24,11 @@ import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.json.JSONString;
+import org.json.JSONStringer;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.FastSerializer;
@@ -103,7 +108,7 @@ rely on the garbage collector.
  * t.addRow(-9, "moreData");
  * </code>
  */
-public final class VoltTable extends VoltTableRow implements FastSerializable {
+public final class VoltTable extends VoltTableRow implements FastSerializable, JSONString {
 
     /**
      * Size in bytes of the maximum length for a VoltDB tuple.
@@ -124,6 +129,13 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
     int m_rowCount = -1;
     int m_colCount = -1;
 
+    // JSON KEYS FOR SERIALIZATION
+    static final String JSON_NAME_KEY = "name";
+    static final String JSON_TYPE_KEY = "type";
+    static final String JSON_SCHEMA_KEY = "schema";
+    static final String JSON_DATA_KEY = "data";
+    static final String JSON_STATUS_KEY = "status";
+
     /**
      * <p>Object that represents the name and schema for a {@link VoltTable} column.
      * Primarily used to construct in the constructor {@link VoltTable#VoltTable(ColumnInfo...)}
@@ -141,7 +153,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
     public static final class ColumnInfo {
 
         /**
-         * Construct and immutable <tt>ColumnInfo</tt> instance.
+         * Construct an immutable <tt>ColumnInfo</tt> instance.
          *
          * @param name The name of the column (ASCII).
          * @param type The type of the column. Note that not all types are
@@ -149,6 +161,17 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
          */
         public ColumnInfo(String name, VoltType type) {
             this.name = name; this.type = type;
+        }
+
+        /**
+         * Construct an immutable <tt>ColumnInfo</tt> instance from JSON.
+         *
+         * @param jsonCol The JSON object representing the column schema
+         * @throws JSONException if the JSON data is not correct.
+         */
+        ColumnInfo(JSONObject jsonCol) throws JSONException {
+            this.name = jsonCol.getString(JSON_NAME_KEY);
+            this.type = VoltType.get((byte) jsonCol.getInt(JSON_TYPE_KEY));
         }
 
         // immutable actual data
@@ -805,6 +828,19 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
         // Note: some of the snapshot and save/restore code makes assumptions
         // about the binary layout of tables.
 
+        // test json
+        String jsonString = toJSONString();
+        //System.err.println(jsonString);
+        try {
+            VoltTable copy = VoltTable.fromJSONString(jsonString);
+            jsonString = copy.toJSONString();
+            //System.err.println(jsonString);
+            assert(hasSameContents(copy));
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.exit(-1);
+        }
+
         assert(verifyTableInvariants());
         final ByteBuffer buffer = m_buffer.duplicate();
         final int pos = buffer.position();
@@ -910,6 +946,118 @@ public final class VoltTable extends VoltTableRow implements FastSerializable {
 
         assert(verifyTableInvariants());
         return buffer.toString();
+    }
+
+    /**
+     * Get a JSON representation of this table.
+     * @return A string containing a JSON representation of this table.
+     */
+    @Override
+    public String toJSONString() {
+        JSONStringer js = new JSONStringer();
+        try {
+
+            js.object();
+
+            // status code (1 byte)
+            js.key(JSON_STATUS_KEY).value(getStatusCode());
+
+            // column schema
+            js.key(JSON_SCHEMA_KEY).array();
+            for (int i = 0; i < getColumnCount(); i++) {
+                js.object();
+                js.key(JSON_NAME_KEY).value(getColumnName(i));
+                js.key(JSON_TYPE_KEY).value(getColumnType(i).getValue());
+                js.endObject();
+            }
+            js.endArray();
+
+            // row data
+            js.key(JSON_DATA_KEY).array();
+            VoltTableRow row = cloneRow();
+            row.resetRowPosition();
+            while (row.advanceRow()) {
+                js.array();
+                for (int i = 0; i < getColumnCount(); i++) {
+                    row.putJSONRep(i, js);
+                }
+                js.endArray();
+            }
+            js.endArray();
+
+            js.endObject();
+        }
+        catch (JSONException e) {
+            e.printStackTrace();
+            throw new RuntimeException("Failed to serialized a table to JSON.", e);
+        }
+        return js.toString();
+    }
+
+    public static VoltTable fromJSONString(String json) throws JSONException, IOException {
+        JSONObject jsonObj = new JSONObject(json);
+        return fromJSONObject(jsonObj);
+    }
+
+    public static VoltTable fromJSONObject(JSONObject json) throws JSONException, IOException {
+        // extract the schema and creat an empty table
+        JSONArray jsonCols = json.getJSONArray(JSON_SCHEMA_KEY);
+        ColumnInfo[] columns = new ColumnInfo[jsonCols.length()];
+        for (int i = 0; i < jsonCols.length(); i++) {
+            JSONObject jsonCol = jsonCols.getJSONObject(i);
+            String name = jsonCol.getString(JSON_NAME_KEY);
+            VoltType type = VoltType.get((byte) jsonCol.getInt(JSON_TYPE_KEY));
+            columns[i] = new ColumnInfo(name, type);
+        }
+        VoltTable t = new VoltTable(columns);
+
+        // set the status byte
+        byte status = (byte) json.getInt(JSON_STATUS_KEY);
+        t.setStatusCode(status);
+
+        // load the row data
+        JSONArray data = json.getJSONArray(JSON_DATA_KEY);
+        for (int i = 0; i < data.length(); i++) {
+            JSONArray jsonRow = data.getJSONArray(i);
+            assert(jsonRow.length() == jsonCols.length());
+            Object[] row = new Object[jsonRow.length()];
+            for (int j = 0; j < jsonRow.length(); j++) {
+                row[j] = jsonRow.get(j);
+                if (row[j] == JSONObject.NULL)
+                    row[j] = null;
+                VoltType type = columns[j].type;
+
+                // convert strings to numbers
+                if (row[j] != null) {
+                    switch (type) {
+                    case BIGINT:
+                    case INTEGER:
+                    case SMALLINT:
+                    case TINYINT:
+                    case TIMESTAMP:
+                        if (row[j] instanceof String) {
+                            row[j] = Long.parseLong((String) row[j]);
+                        }
+                        assert(row[j] instanceof Number);
+                        break;
+                    case DECIMAL:
+                        String decVal;
+                        if (row[j] instanceof String)
+                            decVal = (String) row[j];
+                        else
+                            decVal = row[j].toString();
+                        if (decVal.compareToIgnoreCase("NULL") == 0)
+                            row[j] = null;
+                        else
+                            row[j] = VoltDecimalHelper.deserializeBigDecimalFromString(decVal);
+                        break;
+                    }
+                }
+            }
+            t.addRow(row);
+        }
+
+        return t;
     }
 
     /**

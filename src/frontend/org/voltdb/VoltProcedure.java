@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -354,8 +355,6 @@ public abstract class VoltProcedure {
                     parameterSets = new ParameterSet[MAX_BATCH_SIZE];
                     Object rawResult = procMethod.invoke(this, paramList);
                     results = getResultsFromRawResults(rawResult);
-                    if (results == null)
-                        results = new VoltTable[0];
                 } catch (IllegalAccessException e) {
                     // If reflection fails, invoke the same error handling that other exceptions do
                     throw new InvocationTargetException(e);
@@ -429,14 +428,25 @@ public abstract class VoltProcedure {
 
     /**
      * Given the results of a procedure, convert it into a sensible array of VoltTables.
+     * @throws InvocationTargetException
      */
-    final private VoltTable[] getResultsFromRawResults(Object result) {
-        if (result == null)
+    final private VoltTable[] getResultsFromRawResults(Object result) throws InvocationTargetException {
+        if (result == null) {
             return new VoltTable[0];
-        if (result instanceof VoltTable[])
-            return (VoltTable[]) result;
-        if (result instanceof VoltTable)
+        }
+        if (result instanceof VoltTable[]) {
+            VoltTable[] retval = (VoltTable[]) result;
+            for (VoltTable table : retval)
+                if (table == null) {
+                    Exception e = new RuntimeException("VoltTable arrays with non-zero length cannot contain null values.");
+                    throw new InvocationTargetException(e);
+                }
+
+            return retval;
+        }
+        if (result instanceof VoltTable) {
             return new VoltTable[] { (VoltTable) result };
+        }
         if (result instanceof Long) {
             VoltTable t = new VoltTable(new VoltTable.ColumnInfo("", VoltType.BIGINT));
             t.addRow(result);
@@ -475,13 +485,21 @@ public abstract class VoltProcedure {
             Class<?> sSubCls = paramTypeComponentType[paramTypeIndex];
             if (pSubCls == sSubCls) {
                 return param;
-            } else {
+            }
+            // if it's an empty array, let it through
+            // this is a bit ugly as it might hide passing
+            //  arrays of the wrong type, but it "does the right thing"
+            //  more often that not I guess...
+            else if (Array.getLength(param) == 0) {
+                return Array.newInstance(sSubCls, 0);
+            }
+            else {
                 /*
                  * Arrays can be quite large so it doesn't make sense to silently do the conversion
                  * and incur the performance hit. The client should serialize the correct invocation
                  * parameters
                  */
-                new Exception(
+                throw new Exception(
                         "tryScalarMakeCompatible: Unable to match parameter array:"
                         + sSubCls.getName() + " to provided " + pSubCls.getName());
             }

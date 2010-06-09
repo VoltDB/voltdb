@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 
 import org.json.JSONArray;
 import org.json.JSONException;
+import org.json.JSONObject;
 import org.json.JSONString;
 import org.json.JSONStringer;
 import org.voltdb.messaging.FastDeserializer;
@@ -123,7 +124,17 @@ import org.voltdb.types.VoltDecimalHelper;
                 }
 
                 out.writeByte(ARRAY);
-                VoltType type = VoltType.typeFromClass(cls.getComponentType());
+
+                VoltType type;
+                try {
+                    type = VoltType.typeFromClass(cls.getComponentType());
+                }
+                catch (VoltTypeException e) {
+                    obj = getAKosherArray((Object[]) obj);
+                    cls = obj.getClass();
+                    type = VoltType.typeFromClass(cls.getComponentType());
+                }
+
                 out.writeByte(type.getValue());
                 switch (type) {
                     case TINYINT:
@@ -213,6 +224,85 @@ import org.voltdb.types.VoltDecimalHelper;
         }
     }
 
+    static Object getAKosherArray(Object[] array) {
+        int tables = 0;
+        int integers = 0;
+        int strings = 0;
+        int doubles = 0;
+
+        // handle empty arrays (too bad this is ints...)
+        if (array.length == 0)
+            return new int[0];
+
+        // first pass counts value types
+        for (int i = 0; i < array.length; i++) {
+            if (array[i] instanceof VoltTable) tables++;
+            else if (array[i] instanceof Double) doubles++;
+            else if (array[i] instanceof Float) doubles++;
+            else if (array[i] instanceof Byte) integers++;
+            else if (array[i] instanceof Short) integers++;
+            else if (array[i] instanceof Integer) integers++;
+            else if (array[i] instanceof Long) integers++;
+            else if (array[i] instanceof String) strings++;
+            else {
+                String msg = String.format("Type %s not supported in parameter set arrays.",
+                        array[i].getClass().toString());
+                throw new RuntimeException(msg);
+            }
+        }
+
+        // validate and choose type
+
+        if (tables > 0) {
+            if ((integers + strings + doubles) > 0) {
+                String msg = "Cannot mix tables and other types in parameter set arrays.";
+                throw new RuntimeException(msg);
+            }
+            assert(tables == array.length);
+            VoltTable[] retval = new VoltTable[tables];
+            for (int i = 0; i < array.length; i++)
+                retval[i] = (VoltTable) array[i];
+            return retval;
+        }
+
+        // note: there can't be any tables past this point
+
+        if (strings > 0) {
+            if ((integers + doubles) > 0) {
+                String msg = "Cannot mix strings and numbers in parameter set arrays.";
+                throw new RuntimeException(msg);
+            }
+            assert(strings == array.length);
+            String[] retval = new String[strings];
+            for (int i = 0; i < array.length; i++)
+                retval[i] = (String) array[i];
+            return retval;
+        }
+
+        // note: there can't be any strings past this point
+
+        if (doubles > 0) {
+            // note, ok to mix integers and doubles
+            assert((doubles + integers) == array.length);
+            double[] retval = new double[array.length];
+            for (int i = 0; i < array.length; i++) {
+                Number numberval = (Number) array[i];
+                retval[i] = numberval.doubleValue();
+            }
+            return retval;
+        }
+
+        // all ints from here out
+
+        assert(integers == array.length);
+        long[] retval = new long[array.length];
+        for (int i = 0; i < array.length; i++) {
+            Number numberval = (Number) array[i];
+            retval[i] = numberval.longValue();
+        }
+        return retval;
+    }
+
     @Override
     public String toString() {
         StringBuffer b = new StringBuffer();
@@ -245,18 +335,35 @@ import org.voltdb.types.VoltDecimalHelper;
         return js.toString();
     }
 
-    public static ParameterSet fromJSONString(String json) throws JSONException {
+    public static ParameterSet fromJSONString(String json) throws JSONException, IOException {
         JSONArray jArray = new JSONArray(json);
         return fromJSONArray(jArray);
     }
 
-    public static ParameterSet fromJSONArray(JSONArray paramArray) throws JSONException {
+    public static ParameterSet fromJSONArray(JSONArray paramArray) throws JSONException, IOException {
         ParameterSet pset = new ParameterSet();
         pset.m_params = new Object[paramArray.length()];
         for (int i = 0; i < paramArray.length(); i++) {
-            pset.m_params[i] = paramArray.get(i);
+            pset.m_params[i] = paramFromPossibleJSON(paramArray.get(i));
         }
         return pset;
+    }
+
+    static Object paramFromPossibleJSON(Object value) throws JSONException, IOException {
+        if (value instanceof JSONObject) {
+            JSONObject jsonObj = (JSONObject) value;
+            return VoltTable.fromJSONObject(jsonObj);
+        }
+        if (value instanceof JSONArray) {
+            JSONArray array = (JSONArray) value;
+            Object[] retval = new Object[array.length()];
+            for (int i = 0; i < array.length(); i++) {
+                Object valueAtIndex = array.get(i);
+                retval[i] = paramFromPossibleJSON(valueAtIndex);
+            }
+            return retval;
+        }
+        return value;
     }
 
     static private Object readOneParameter(FastDeserializer in) throws IOException {

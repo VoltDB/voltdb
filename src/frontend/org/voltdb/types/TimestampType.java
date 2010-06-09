@@ -20,7 +20,9 @@ package org.voltdb.types;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-public class TimestampType {
+import org.json.JSONString;
+
+public class TimestampType implements JSONString {
 
     /**
      * Create a TimestampType from microseconds from epoch.
@@ -119,7 +121,11 @@ public class TimestampType {
         return (Date) m_date.clone();
     }
 
+    @Override
+    public String toJSONString() {
+        return String.valueOf(getTime());
+    }
+
     private final Date m_date;     // stores milliseconds from epoch.
     private final short m_usecs;   // stores microsecond within date's millisecond.
-
 }

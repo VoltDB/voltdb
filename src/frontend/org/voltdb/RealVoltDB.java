@@ -204,7 +204,7 @@ public class RealVoltDB implements VoltDBInterface
 
             // start the admin console
             int port;
-            for (port = 8080; true; port++) {
+            for (port = config.m_httpAdminPort; true; port++) {
                 try {
                     m_adminListener = new HTTPAdminListener(port);
                     break;

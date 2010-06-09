@@ -90,6 +90,9 @@ public class VoltDB {
         /** interface to use for backchannel comm (default: any) */
         public String m_internalInterface = DEFAULT_INTERNAL_INTERFACE;
 
+        /** port number to run the http admin and json interface on */
+        public int m_httpAdminPort = 8080;
+
         public boolean listenForDumpRequests = false;
 
         /**
@@ -162,6 +165,13 @@ public class VoltDB {
                 }
                 else if (arg.startsWith("internalinterface ")) {
                     m_internalInterface = arg.substring("internalinterface ".length()).trim();
+                }
+
+                else if (arg.equals("httpadminport")) {
+                    m_port = Integer.parseInt(args[++i]);
+                }
+                else if (arg.startsWith("httpadminport ")) {
+                    m_httpAdminPort = Integer.parseInt(arg.substring("httpadminport ".length()));
                 }
 
                 else if (arg.equals("catalog")) {

@@ -209,8 +209,13 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
                 // race conditions with the ByteBuffer metadata
                 for (int i = 0; i < curr_results.length; ++i)
                 {
-                    saved_results[i] =
-                        PrivateVoltTableFactory.createVoltTableFromBuffer(curr_results[i].getTableDataReference(), true);
+                    if (curr_results[i] == null) {
+                        saved_results[i] = null;
+                    }
+                    else {
+                        saved_results[i] = PrivateVoltTableFactory.createVoltTableFromBuffer(
+                                curr_results[i].getTableDataReference(), true);
+                    }
                 }
                 m_txnIdResults.put(r.getTxnId(), saved_results);
                 m_txnIdResponses.put(r.getTxnId(), r);

@@ -21,9 +21,12 @@ import java.io.IOException;
 import java.util.Properties;
 
 import org.voltdb.CatalogContext;
+import org.voltdb.HTTPClientInterface;
 import org.voltdb.VoltDB;
 
 public class HTTPAdminListener extends NanoHTTPD {
+
+    HTTPClientInterface httpClientInterface = new HTTPClientInterface();
 
     public HTTPAdminListener(int port) throws IOException {
         super(port);
@@ -32,7 +35,10 @@ public class HTTPAdminListener extends NanoHTTPD {
     @Override
     public Response serve(String uri, String method, Properties header, Properties parms) {
 
-
+        if (uri.contains("/api")) {
+            String msg = httpClientInterface.process(uri, method, header, parms);
+            return new NanoHTTPD.Response(HTTP_OK, MIME_PLAINTEXT, msg);
+        }
 
         // code for debugging
         //System.out.println( method + " '" + uri + "' " );

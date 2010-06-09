@@ -25,31 +25,30 @@ import org.voltdb.client.ClientResponse;
 
 public class HTTPClientInterface {
 
-    public HTTPClientInterface() {
-
-    }
+    Client m_client = null;
 
     public String process(String uri, String method, Properties header, Properties parms) {
-
-        String username = parms.getProperty("User");
-        String password = parms.getProperty("Password");
-        String params = parms.getProperty("Parameters");
-        String procName = parms.getProperty("Procedure");
-
         String msg;
-        ClientResponse response = null;
 
         try {
-            Client client = ClientFactory.createClient();
+            if (m_client == null) {
+                m_client = ClientFactory.createClient();
+                m_client.createConnection("localhost", null, null);
+            }
 
-            client.createConnection("localhost", username, password);
+            //String username = parms.getProperty("User");
+            //String password = parms.getProperty("Password");
+            String procName = parms.getProperty("Procedure");
+            String params = parms.getProperty("Parameters");
+
+            ClientResponse response = null;
 
             if (params != null) {
                 ParameterSet paramSet = ParameterSet.fromJSONString(params);
-                response = client.callProcedure(procName, paramSet.toArray());
+                response = m_client.callProcedure(procName, paramSet.toArray());
             }
             else {
-                response = client.callProcedure(procName);
+                response = m_client.callProcedure(procName);
             }
 
             ClientResponseImpl rimpl = (ClientResponseImpl) response;
@@ -58,6 +57,7 @@ public class HTTPClientInterface {
         catch (Exception e) {
             msg = e.getMessage();
             e.printStackTrace();
+            m_client = null;
         }
 
         return msg;
