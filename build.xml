@@ -87,6 +87,9 @@
         <include name='*.jar' />
         <exclude name='ant.jar' />
     </fileset>
+    <fileset dir='${env.HOME}/voltbin'>
+       <include name='mysql.jar'/>
+    </fileset>
     <pathelement path="${java.class.path}"/>
     <fileset refid="voltpro.classpath"/>
 </path>
@@ -1453,6 +1456,11 @@ BENCHMARKS
         <!-- multisite parameters -->
         <arg value="sf=${sf}"/>
         <arg value="multipartition=${multipartition}"/>
+
+        <!-- workload xml file -->
+        <arg value="configfile=${configfile}"/>
+        <!-- workload name -->
+        <arg value="workload=${workload}"/>
 
         <!-- automatic online snapshot parameters -->
         <arg value="SNAPSHOTPATH=${snapshotPath}" />

@@ -46,7 +46,7 @@ public class RandomLoader// implements Loader
 
     public static void run(Client client)
     {
-        int numInserts = Short.MAX_VALUE;
+        int numInserts = 100000;
         try
         {
             String randString;

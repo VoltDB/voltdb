@@ -84,10 +84,10 @@ public class Generator extends ClientMain
 
     private Microbenchmark mb;
     private LinkedList<Workload> workloads;
+    private static String workloadToBuild;
     private Workload currWorkload;
-    private int firstWLProcIndex;
 
-    private String xmlFilePath = "/home/voltdb/mstarobinets/workspace/voltdb/tests/frontend/org/voltdb/benchmark/workloads/microbench.xml";
+    private static String xmlFilePath;
     private boolean built;
 
     private final GenericCallback callback = new GenericCallback();
@@ -95,114 +95,47 @@ public class Generator extends ClientMain
     public Generator(String[] args)
     {
         super(args);
-/*
-        mb = null;
-        workloads = new LinkedList<Workload>();
-        currWorkload = null;
-*/
     }
 
     public static void main(String[] args)
     {
-        //ADD SOMETHING HERE TO HANDLE MULTIPLE WORKLOADS...?
+        xmlFilePath = "/home/voltdb/mstarobinets/workspace/voltdb/tests/frontend/org/voltdb/benchmark/workloads/microbench.xml";
+        for (int i = 0; i < args.length; i++)
+            if (args[i].startsWith("configfile="))
+            {
+                //check that path is valid using getXMLFile() method?
+                xmlFilePath = args[i].split("=")[1];
+                break;
+            }
+
+        workloadToBuild = null;
+        for (int i = 0; i < args.length; i++)
+            if (args[i].startsWith("workload="))
+            {
+                workloadToBuild = args[i].split("=")[1];
+                break;
+            }
+
         ClientMain.main(Generator.class, args, false);
     }
 
     private void runBenchmark()
     {
-/*
-        //connect();
-
-        //File xmlFile = getXMLFile();
-        File xmlFile = new File(xmlFilePath);
-        mb = unmarshal(xmlFile);
-
-        boolean loaded = runLoader(mb);
-        testPrint();
-
-        //if (loaded || userTrueFalse("Continue?", "yes", "no"))
-        if (!loaded)
-            System.err.println("No loading took place.");
-        if (buildWorkloads(mb))
-*/
-        firstWLProcIndex = 0;
         if (built)
         {
-            ListIterator<Workload> iter = workloads.listIterator();
-            while (iter.hasNext())
-            {
-                currWorkload = iter.next();
-
-                try
-                {
-                    System.err.println("About to run workload " + currWorkload.name);
-                    //long totalTime = getTotalTime();
-                    long totalTime = (long)10000000000.;
-                    runRandomizedWorkload(currWorkload, totalTime);
-                    testPrint();
-                }
-                catch (Exception e)
-                {
-                    System.err.println("Invalid inputs in xml file for workload \"" + currWorkload.name + "\".");
-                }
-                firstWLProcIndex += currWorkload.procs.length;
-            }
-        }
-
-        //disconnect();
-    }
-
-    public void connect()
-    {
-        System.err.println("Client started");
-
-        try
-        {
-            m_voltClient.createConnection("localhost", "program", "none");
-        }
-        catch (UnknownHostException e)
-        {
-            e.printStackTrace();
-            System.exit(-1);
-        }
-        catch (ConnectException e)
-        {
-            e.printStackTrace();
-            System.exit(-1);
-        }
-        catch (IOException e)
-        {
-            e.printStackTrace();
-            System.exit(-1);
+            System.err.println("About to run workload " + currWorkload.name);
+            runRandomizedWorkload(currWorkload);
         }
     }
 
-    public void disconnect()
+    public void runRandomizedWorkload(Workload currWorkload)
     {
-        try
-        {
-            m_voltClient.drain();
-            m_voltClient.close();
-            System.err.println("Client finished");
-        }
-        catch (InterruptedException e)
-        {
-            e.printStackTrace();
-        }
-        catch (NoConnectionsException e)
-        {
-            System.err.println("No connection exception: " + e.getMessage());
-        }
-    }
-
-    //first two parameters are specified in config file
-    //last parameter entered from command line by user (total time in nanoseconds)
-    public void runRandomizedWorkload(Workload currWorkload, long totalTime)
-        throws Exception
-    {
-        //if procArray.length != percArray.length throw error
+        //if procArray.length != percArray.length throw error?
         if (!(currWorkload.procs.length == currWorkload.percs.length && currWorkload.percs.length == currWorkload.params.length))
-            throw new Exception();
+        {
+            System.err.println("Invalid inputs in xml file for workload \"" + currWorkload.name + "\".");
+            return;
+        }
 
         if (currWorkload.procs.length > 0)
             //throw new Exception();
@@ -213,13 +146,13 @@ public class Generator extends ClientMain
                 cumPercArray[i] = cumPercArray[i - 1] + currWorkload.percs[i];
 
             if (cumPercArray[cumPercArray.length - 1] != 100.)
-                throw new Exception();
+            {
+                System.err.println("Invalid inputs in xml file for workload \"" + currWorkload.name + "\".");
+                return;
+            }
 
             double randomVal;
-            final long startTime = System.nanoTime();
-            long currentTime = System.nanoTime();
-            int numProcCalls = 0;
-            while (currentTime - startTime < totalTime)
+            while (true)
             {
                 randomVal = Math.random() * 100;
                 int index = 0;
@@ -229,17 +162,8 @@ public class Generator extends ClientMain
 
                 for (int i = 0; i < currWorkload.params[index].length; i++)
                     setParams(currWorkload, index, i);
-                callProc(currWorkload.procs[index], currWorkload.params[index]/*ADDED*/, index + firstWLProcIndex);
-                numProcCalls++;
-                currentTime = System.nanoTime();
+                callProc(currWorkload.procs[index], currWorkload.params[index], index);
             }
-            long timeElapsed = currentTime - startTime;
-            System.err.println("Workload " + currWorkload.name +
-                    " made " + numProcCalls + " procedure calls in time: " +
-                    (timeElapsed / ((long)1000000000 * 60 * 60)) + "h" +
-                    (timeElapsed % ((long)1000000000 * 60 * 60) / ((long)1000000000 * 60)) + "m" +
-                    (timeElapsed % ((long)1000000000 * 60) / (long)1000000000) + "s" +
-                    (timeElapsed % (long)1000000000) + "n");
         }
     }
 
@@ -338,13 +262,12 @@ public class Generator extends ClientMain
         return nanoTime;
     }
 
-    private void callProc(String procName, Object[] params/*ADDED*/, int procIndex)
+    private void callProc(String procName, Object[] params, int procIndex)
     {
         //check procName validity with catch statement
         try
         {
             m_voltClient.callProcedure(callback, procName, params);
-            //index used to just be 0
             m_counts[procIndex].getAndIncrement();
         }
         catch (IOException e)
@@ -359,11 +282,19 @@ public class Generator extends ClientMain
         */
     }
 
-    //should these be public or protected?
     @Override
-    public void runLoop()
+    protected void runLoop()
     {
-        runBenchmark();
+        try
+        {
+            runBenchmark();
+        }
+        catch (Exception e)
+        {
+            return;
+        }
+/*
+        //This code should really never be reached, since txns/sec would decrease due to null activity.
         try
         {
             while (true)
@@ -375,14 +306,15 @@ public class Generator extends ClientMain
         {
             return;
         }
+*/
     }
 
     @Override
-    public String[] getTransactionDisplayNames()
+    protected String[] getTransactionDisplayNames()
     {
         workloads = new LinkedList<Workload>();
 
-        File xmlFile = new File("/home/voltdb/mstarobinets/workspace/voltdb/tests/frontend/org/voltdb/benchmark/workloads/microbench.xml");
+        File xmlFile = new File(xmlFilePath);
         mb = unmarshal(xmlFile);
 
         boolean loaded = runLoader(mb);
@@ -390,53 +322,56 @@ public class Generator extends ClientMain
 
         if (!loaded)
             System.err.println("No loading took place.");
-        if (!buildWorkloads(mb))
+        if (!buildWorkload(mb, workloadToBuild))
         {
             built = false;
-            System.err.println("Building workloads failed.");
+            System.err.println("Building workload + " + workloadToBuild + " failed.");
             return null;
         }
         else
         {
             built = true;
-            /*
             currWorkload = workloads.getFirst();
             String[] displayNames = new String[currWorkload.procs.length];
             for (int i = 0; i < displayNames.length; i++)
                 displayNames[i] = currWorkload.procs[i];
             return displayNames;
-            */
+            /*
             //FOR MULTIPLE WORKLOADS:
             int numProcs = 0;
             for (Workload w : workloads)
                 numProcs += w.procs.length;
-            //MAYBE CHECK FOR DUPLICATES??
             String[] displayNames = new String[numProcs];
+            int workloadNum = 0;
             int index = 0;
             for (Workload w : workloads)
+            {
                 for (int i = 0; i < w.procs.length; i++)
                 {
-                    displayNames[index] = w.procs[i];
+                    displayNames[index] = "WL" + workloadNum + ": " + w.name + " - Proc" + i + ": " + w.procs[i];
                     index++;
                 }
+                workloadNum++;
+            }
             return displayNames;
+            */
         }
     }
 
     @Override
-    public String getApplicationName()
+    protected String getApplicationName()
     {
         return "Microbenchmark.";
     }
 
     @Override
-    public String getSubApplicationName()
+    protected String getSubApplicationName()
     {
         return "Workload.";
     }
 
     //ADD FEEDBACK: PRINTOUTS/FILEWRITES ABOUT CREATED WORKLOADS
-    private boolean buildWorkloads(Microbenchmark mb)
+    private boolean buildWorkload(Microbenchmark mb, String workloadToBuild)
     {
         if (mb == null)
             return false;
@@ -444,50 +379,58 @@ public class Generator extends ClientMain
         try
         {
             List<Microbenchmark.Workload> wlList = mb.getWorkload();
+            Microbenchmark.Workload toBuild = wlList.get(0);
 
-            ListIterator<Microbenchmark.Workload> wlLI = wlList.listIterator();
-            while (wlLI.hasNext())
+            if (workloadToBuild != null)
             {
-                Microbenchmark.Workload wl = wlLI.next();
-                Workload myWL = new Workload(wl.getWlName());
-
-                System.err.println("Building workload " + myWL.name);
-
-                List<Microbenchmark.Workload.Procedure> procList = wl.getProcedure();
-                myWL.procs = new String[procList.size()];
-                myWL.percs = new double[procList.size()];
-                myWL.paramTypes = new String[procList.size()][];
-                myWL.generatorTypes = new GeneratorType[procList.size()][];
-                myWL.params = new Object[procList.size()][];
-
-                ListIterator<Microbenchmark.Workload.Procedure> procLI = procList.listIterator();
-                int procIndex = 0;
-                while (procLI.hasNext())
+                ListIterator<Microbenchmark.Workload> wlLI = wlList.listIterator();
+                while (wlLI.hasNext())
                 {
-                    Microbenchmark.Workload.Procedure proc = procLI.next();
-                    myWL.procs[procIndex] = proc.getProcName();
-                    myWL.percs[procIndex] = proc.getPercOfWL().doubleValue();
-                    List<Microbenchmark.Workload.Procedure.Param> paramList = proc.getParam();
-                    myWL.paramTypes[procIndex] = new String[paramList.size()];
-                    myWL.generatorTypes[procIndex] = new GeneratorType[paramList.size()];
-                    myWL.params[procIndex] = new Object[paramList.size()];
-
-                    ListIterator<Microbenchmark.Workload.Procedure.Param> paramLI = paramList.listIterator();
-                    int paramIndex = 0;
-                    while (paramLI.hasNext())
+                    Microbenchmark.Workload wl = wlLI.next();
+                    if (wl.getWlName().equals(workloadToBuild))
                     {
-                        Microbenchmark.Workload.Procedure.Param param = paramLI.next();
-                        myWL.paramTypes[procIndex][paramIndex] = param.getType();
-                        myWL.generatorTypes[procIndex][paramIndex] = param.getValue().getGenerator();
-
-                        paramIndex++;
+                        toBuild = wl;
+                        break;
                     }
-                    procIndex++;
                 }
-                workloads.add(myWL);
             }
+            Workload myWL = new Workload(toBuild.getWlName());
 
-            System.err.println("All workloads successfully built.");
+            System.err.println("Building workload " + myWL.name);
+
+            List<Microbenchmark.Workload.Procedure> procList = toBuild.getProcedure();
+            myWL.procs = new String[procList.size()];
+            myWL.percs = new double[procList.size()];
+            myWL.paramTypes = new String[procList.size()][];
+            myWL.generatorTypes = new GeneratorType[procList.size()][];
+            myWL.params = new Object[procList.size()][];
+
+            ListIterator<Microbenchmark.Workload.Procedure> procLI = procList.listIterator();
+            int procIndex = 0;
+            while (procLI.hasNext())
+            {
+                Microbenchmark.Workload.Procedure proc = procLI.next();
+                myWL.procs[procIndex] = proc.getProcName();
+                myWL.percs[procIndex] = proc.getPercOfWL().doubleValue();
+                List<Microbenchmark.Workload.Procedure.Param> paramList = proc.getParam();
+                myWL.paramTypes[procIndex] = new String[paramList.size()];
+                myWL.generatorTypes[procIndex] = new GeneratorType[paramList.size()];
+                myWL.params[procIndex] = new Object[paramList.size()];
+
+                ListIterator<Microbenchmark.Workload.Procedure.Param> paramLI = paramList.listIterator();
+                int paramIndex = 0;
+                while (paramLI.hasNext())
+                {
+                    Microbenchmark.Workload.Procedure.Param param = paramLI.next();
+                    myWL.paramTypes[procIndex][paramIndex] = param.getType();
+                    myWL.generatorTypes[procIndex][paramIndex] = param.getValue().getGenerator();
+
+                    paramIndex++;
+                }
+                procIndex++;
+            }
+            workloads.add(myWL);
+            System.err.println("Workload " + myWL.name + " successfully built.");
             return true;
         }
         catch (Exception e)
@@ -702,21 +645,5 @@ public class Generator extends ClientMain
         {
             System.err.println("Procedure call error: " + e.getMessage());
         }
-    }
-
-    private static boolean userTrueFalse(String message, String trueString, String falseString)
-    {
-        Scanner scan;
-        String input = "";
-        while (!input.equals(trueString) && !input.equals(falseString))
-        {
-            scan = new Scanner(System.in);
-            System.err.print(message + " (" + trueString + "/" + falseString + "): ");
-            input = scan.nextLine();
-        }
-        if (input.equals(trueString))
-            return true;
-        else
-            return false;
     }
 }
