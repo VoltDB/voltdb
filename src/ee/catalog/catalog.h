@@ -74,6 +74,9 @@ protected:
 
     void addUnresolvedInfo(std::string path, CatalogType *type, std::string fieldName);
 
+private:
+    void resolveUnresolvedInfo(std::string path);
+
 public:
     /**
      * Create a new Catalog hierarchy.

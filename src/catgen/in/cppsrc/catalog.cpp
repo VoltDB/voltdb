@@ -43,8 +43,9 @@ Catalog::~Catalog() {
     boost::unordered_map<std::string, CatalogType*>::iterator iter;
     for (iter = m_allCatalogObjects.begin(); iter != m_allCatalogObjects.end(); iter++) {
         CatalogType *ct = iter->second;
-        if (ct != this)
+        if (ct != this) {
             delete ct;
+        }
     }
 }
 
@@ -53,73 +54,80 @@ void Catalog::execute(const string &stmts) {
     for (int32_t i = 0; i < lines.size(); ++i) {
         executeOne(lines[i]);
     }
-    std::map<std::string, UnresolvedInfo>::const_iterator iter;
-    if (m_unresolved.size() > 0)
+
+    if (m_unresolved.size() > 0) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       "failed to execute catalog");
+    }
 }
 
-void Catalog::executeOne(const string &stmt) {
-    // FORMAT:
+/*
+ * Produce constituent elements of catalog command.
+ */
+static void parse(const string &stmt,
+                  string &command,
+                  string &ref,
+                  string &coll,
+                  string &child)
+{
+    // stmt is formatted as one of:
     // add ref collection name
     // set ref fieldname value
     // ref = path | guid
-    // parsed as: (command ref a b)
+    // parsed into strings: command ref coll child
 
-    // parse
     size_t pos = 0;
     size_t end = stmt.find(' ', pos);
-    string command = stmt.substr(pos, end - pos);
+    command = stmt.substr(pos, end - pos);
     pos = end + 1;
     end = stmt.find(' ', pos);
-    string ref = stmt.substr(pos, end - pos);
+    ref = stmt.substr(pos, end - pos);
     pos = end + 1;
     end = stmt.find(' ', pos);
-    string a = stmt.substr(pos, end - pos);
+    coll = stmt.substr(pos, end - pos);
     pos = end + 1;
     end = stmt.length() + 1;
-    string b = stmt.substr(pos, end - pos);
+    child = stmt.substr(pos, end - pos);
 
-    //cout << "Command: " << command << endl;
-    //cout << "Ref: " << ref << endl;
-    //cout << "A: " << a << endl;
-    //cout << "B: " << b << endl;
+    // cout << std::endl << "Configuring catalog: " << std::endl;
+    // cout << "Command: " << command << endl;
+    // cout << "Ref: " << ref << endl;
+    // cout << "A: " << coll << endl;
+    // cout << "B: " << child << endl;
+}
+
+/*
+ * Run one catalog command.
+ */
+void Catalog::executeOne(const string &stmt) {
+    string command, ref, coll, child;
+    parse(stmt, command, ref, coll, child);
 
     CatalogType *item = itemForRef(ref);
-    assert(item != NULL);
+    if (item == NULL) {
+        std::string errmsg = "Catalog reference for " + ref + " not found.";
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      errmsg);
+    }
 
     // execute
     if (command.compare("add") == 0) {
-        CatalogType *type = item->addChild(a, b);
-        if (type == NULL)
+        CatalogType *type = item->addChild(coll, child);
+        if (type == NULL) {
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                          "failed to add child");
-        std::string path = type->path();
-        if (m_unresolved.count(path) != 0) {
-            //printf("catalog unresolved has a match for path: %s\n", path.c_str());
-            //fflush(stdout);
-            std::list<UnresolvedInfo> lui = m_unresolved[path];
-            m_unresolved.erase(path);
-            std::list<UnresolvedInfo>::const_iterator iter;
-            for (iter = lui.begin(); iter != lui.end(); iter++) {
-                UnresolvedInfo ui = *iter;
-                std::string path2 = "set " + ui.type->path() + " "
-                    + ui.field + " " + path;
-                //printf("running unresolved command:\n    %s\n", path2.c_str());
-                //fflush(stdout);
-                executeOne(path2);
-            }
+                                           "Catalog failed to add child.");
         }
+        resolveUnresolvedInfo(type->path());
     }
     else if (command.compare("set") == 0) {
-        item->set(a, b);
+        item->set(coll, child);
     }
     else if (command.compare("delete") == 0) {
-        item->removeChild(a, b);
+        item->removeChild(coll, child);
     }
     else {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "command isn't 'set' or 'add'.");
+                                      "Invalid catalog command.");
     }
 }
 
@@ -202,6 +210,10 @@ vector<string> Catalog::splitToTwoString(const string &str, char delimiter) {
     return vec;
 }
 
+/*
+ * Add a path to the unresolved list to be processed when
+ * the referenced value appears
+ */
 void Catalog::addUnresolvedInfo(std::string path, CatalogType *type, std::string fieldName) {
     assert(type != NULL);
 
@@ -212,6 +224,23 @@ void Catalog::addUnresolvedInfo(std::string path, CatalogType *type, std::string
     std::list<UnresolvedInfo> lui = m_unresolved[path];
     lui.push_back(ui);
     m_unresolved[path] = lui;
+}
+
+/*
+ * Clean up any resolved binding for path.
+ */
+void Catalog::resolveUnresolvedInfo(string path) {
+    if (m_unresolved.count(path) != 0) {
+        std::list<UnresolvedInfo> lui = m_unresolved[path];
+        m_unresolved.erase(path);
+        std::list<UnresolvedInfo>::const_iterator iter;
+        for (iter = lui.begin(); iter != lui.end(); iter++) {
+            UnresolvedInfo ui = *iter;
+            std::string path2 = "set " + ui.type->path() + " "
+              + ui.field + " " + path;
+            executeOne(path2);
+        }
+    }
 }
 
 CatalogType *Catalog::addChild(const string &collectionName, const string &childName) {
