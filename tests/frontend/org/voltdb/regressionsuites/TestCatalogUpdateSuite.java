@@ -107,10 +107,6 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         }
     }
 
-    public void blockUntilNoOutstandingTransactions() {
-
-    }
-
     public void testUpdate() throws Exception {
         Client client = getClient();
         String newCatalogURL;
@@ -120,18 +116,19 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         loadSomeData(client, 0, 25);
         client.drain();
         assertTrue(callbackSuccess);
-        testStuffThatShouldObviouslyFail(client);
+
+        negativeTests(client);
         assertTrue(callbackSuccess);
+
         // asynchronously call some random inserts
         loadSomeData(client, 25, 25);
         assertTrue(callbackSuccess);
+
         // add a procedure "InsertOrderLineBatched"
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.jar");
         callback = new CatTestCallback(ClientResponse.SUCCESS);
         client.callProcedure(callback, "@UpdateApplicationCatalog", newCatalogURL);
 
-        client.drain();
-        assertTrue(callbackSuccess);
         // don't care if this succeeds or fails.
         // calling the new proc before the cat change returns is not guaranteed to work
         // we just hope it doesn't crash anything
@@ -147,6 +144,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         // make sure the previous catalog change has completed
         client.drain();
         assertTrue(callbackSuccess);
+
         // now calling the new proc better work
         x = 2;
         client.callProcedure(org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class.getSimpleName(),
@@ -156,13 +154,14 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         loadSomeData(client, 50, 5);
         assertTrue(callbackSuccess);
+
         // this is a do nothing change... shouldn't affect anything
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.jar");
         results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL).getResults();
         assertTrue(results.length == 1);
-
         client.drain();
         assertTrue(callbackSuccess);
+
         // now calling the new proc better work
         x = 4;
         client.callProcedure(org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class.getSimpleName(),
@@ -190,6 +189,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         // make sure the previous catalog change has completed
         client.drain();
         assertTrue(callbackSuccess);
+
         // now calling the new proc better fail
         x = 5;
         cb = new SyncCallback();
@@ -232,13 +232,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         }
     }
 
-
-
-    public void queryAndVerifySomeData() {
-
-    }
-
-    public void testStuffThatShouldObviouslyFail(Client client) throws UnsupportedEncodingException {
+    public void negativeTests(Client client) throws UnsupportedEncodingException {
         // this fails because it tries to change schema
         String newCatalogURL;
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtables.jar");
