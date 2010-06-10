@@ -265,44 +265,6 @@ public class PlanAssembler {
         }
     }
 
-    ParsedSelectStmt.ParsedColInfo
-    removeAggregation(ParsedSelectStmt.ParsedColInfo column)
-    {
-        ParsedSelectStmt.ParsedColInfo retval =
-            new ParsedSelectStmt.ParsedColInfo();
-        retval.alias = column.alias;
-        retval.columnName = column.columnName;
-        retval.tableName = column.tableName;
-        retval.finalOutput = column.finalOutput;
-        retval.ascending = column.ascending;
-        retval.index = column.index;
-        retval.orderBy = column.orderBy;
-        retval.ascending = column.ascending;
-        retval.groupBy = column.groupBy;
-
-        if ((column.expression.getExpressionType() ==
-                ExpressionType.AGGREGATE_AVG) ||
-            (column.expression.getExpressionType() ==
-                ExpressionType.AGGREGATE_COUNT) ||
-            (column.expression.getExpressionType() ==
-                ExpressionType.AGGREGATE_COUNT_STAR) ||
-            (column.expression.getExpressionType() ==
-                ExpressionType.AGGREGATE_MAX) ||
-            (column.expression.getExpressionType() ==
-                ExpressionType.AGGREGATE_MIN) ||
-            (column.expression.getExpressionType() ==
-                ExpressionType.AGGREGATE_SUM))
-        {
-            retval.expression = column.expression.getLeft();
-        }
-        else
-        {
-            retval.expression = column.expression;
-        }
-
-        return retval;
-    }
-
     /**
      * Generate a unique and correct plan for the current SQL statement context.
      * This method gets called repeatedly until it returns null, meaning there
