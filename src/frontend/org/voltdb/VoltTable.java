@@ -829,7 +829,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
         // about the binary layout of tables.
 
         // test json
-        String jsonString = toJSONString();
+        /*String jsonString = toJSONString();
         //System.err.println(jsonString);
         try {
             VoltTable copy = VoltTable.fromJSONString(jsonString);
@@ -839,7 +839,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
         } catch (Exception e) {
             e.printStackTrace();
             System.exit(-1);
-        }
+        }*/
 
         assert(verifyTableInvariants());
         final ByteBuffer buffer = m_buffer.duplicate();

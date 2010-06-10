@@ -750,7 +750,7 @@ TEST CASES
     <property name='classpath' refid='project.classpath' />
     <property name='echoserver.command' value="java
     -Djava.library.path=${build.dir}${build.dir.suffix}/nativelibs -classpath
-    ${classpath} -server -Xmx64m -XX:+AggressiveOpts -ea
+    ${classpath} -server -Xmx256m -ea
     org.voltdb.messaging.EchoServer" />
     <exec dir='tests/scripts/' executable='python' failonerror='true'>
         <arg line="Testfastserializer.py"/>
