@@ -90,16 +90,21 @@ public class TestExecutionSite extends TestCase {
         private final LinkedBlockingQueue<VoltMessage> incomingMessages;
         // Queue for FAILURE_SITE_UPDATE Messages
         private final LinkedBlockingQueue<VoltMessage> m_failureNoticeMessages;
-        private final int m_failureProb;
+        private int m_failureProb;
 
         public RussianRouletteMailbox(LinkedBlockingQueue<VoltMessage> queue,
-                                      Integer siteId, int failureProb)
+                                      Integer siteId)
         {
             incomingMessages = queue;
             m_failureNoticeMessages = new LinkedBlockingQueue<VoltMessage>();
-            m_failureProb = failureProb;
+            m_failureProb = 0;
             m_siteId = siteId;
             m_totalSends = 0;
+        }
+
+        void setFailureLikelihood(int failChance)
+        {
+            m_failureProb = failChance;
         }
 
         // Synchronized so messagesSinceFail changes are thread-safe
@@ -364,7 +369,7 @@ public class TestExecutionSite extends TestCase {
         // Create the real objects
         for (int ss=0; ss < SITE_COUNT; ++ss) {
             m_mboxes[ss] = new RussianRouletteMailbox(new LinkedBlockingQueue<VoltMessage>(),
-                                                      ss, 1);
+                                                      ss);
             m_rpqs[ss] = new RestrictedPriorityARRR(getInitiatorIds(), ss, m_mboxes[ss]);
             m_sites[ss] = new ExecutionSite(m_voltdb, m_mboxes[ss], ss, null, m_rpqs[ss]);
             registerMailbox(ss, m_mboxes[ss]);
@@ -1163,6 +1168,9 @@ public class TestExecutionSite extends TestCase {
     {
         final int totalTransactions = 20000;
         final long firstTxnId = 10000;
+        for (int i=0; i < SITE_COUNT; ++i) {
+            m_mboxes[i].setFailureLikelihood(1);
+        }
         queueTransactions(firstTxnId, totalTransactions, m_rand);
         createAndRunSiteThreads();
 
