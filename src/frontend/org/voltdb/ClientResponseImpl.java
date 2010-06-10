@@ -47,14 +47,12 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse, JSO
 
     // JSON KEYS FOR SERIALIZATION
     static final String JSON_STATUS_KEY = "status";
-    static final String JSON_STATUSSTRING_KEY = "data";
-    static final String JSON_APPSTATUS_KEY = "schema";
-    static final String JSON_APPSTATUSSTRING_KEY = "schema";
-    static final String JSON_RESULTS_KEY = "name";
+    static final String JSON_STATUSSTRING_KEY = "statusstring";
+    static final String JSON_APPSTATUS_KEY = "appstatus";
+    static final String JSON_APPSTATUSSTRING_KEY = "appstatusstring";
+    static final String JSON_RESULTS_KEY = "results";
     static final String JSON_TYPE_KEY = "type";
-
-
-
+    static final String JSON_EXCEPTION_KEY = "exception";
 
     /** opaque data optionally provided by and returned to the client */
     private long clientHandle = -1;
@@ -247,7 +245,22 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse, JSO
         try {
             js.object();
 
-            js.key("results");
+            js.key(JSON_STATUS_KEY);
+            js.value(status);
+            js.key(JSON_APPSTATUS_KEY);
+            js.value(appStatus);
+            js.key(JSON_STATUSSTRING_KEY);
+            js.value(statusString);
+            js.key(JSON_APPSTATUSSTRING_KEY);
+            js.value(appStatusString);
+            js.key(JSON_EXCEPTION_KEY);
+            if (m_exception != null) {
+                js.value(m_exception);
+            }
+            else {
+                js.value(null);
+            }
+            js.key(JSON_RESULTS_KEY);
             js.array();
             for (VoltTable o : results) {
                 js.value(o);

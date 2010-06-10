@@ -125,7 +125,7 @@ public class TestJSONInterface extends TestCase {
 
         String varString = getHTTPVarString(params);
 
-        URL jsonAPIURL = new URL("http://localhost:8095/api/");
+        URL jsonAPIURL = new URL("http://localhost:8095/api/1.0/");
         HttpURLConnection conn = (HttpURLConnection) jsonAPIURL.openConnection();
         conn.setDoOutput(true);
 

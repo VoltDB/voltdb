@@ -35,7 +35,8 @@ public class HTTPAdminListener extends NanoHTTPD {
     @Override
     public Response serve(String uri, String method, Properties header, Properties parms) {
 
-        if (uri.contains("/api")) {
+        // kick over to the HTTP/JSON interface
+        if (uri.contains("/api/1.0/")) {
             String msg = httpClientInterface.process(uri, method, header, parms);
             return new NanoHTTPD.Response(HTTP_OK, MIME_PLAINTEXT, msg);
         }

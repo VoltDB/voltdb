@@ -23,6 +23,8 @@ import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 
+import org.json.JSONString;
+import org.json.JSONStringer;
 import org.voltdb.VoltProcedure;
 
 /**
@@ -30,7 +32,7 @@ import org.voltdb.VoltProcedure;
  * serialization mechanism
  *
  */
-public class SerializableException extends VoltProcedure.VoltAbortException {
+public class SerializableException extends VoltProcedure.VoltAbortException implements JSONString {
 
     /**
      *
@@ -191,5 +193,23 @@ public class SerializableException extends VoltProcedure.VoltAbortException {
     @Override
     public void printStackTrace(PrintWriter p) {
         p.print(getMessage());
+    }
+
+    @Override
+    public String toJSONString() {
+        try {
+            JSONStringer js = new JSONStringer();
+
+            js.object();
+            js.key("type");
+            js.value(getExceptionType().ordinal());
+            js.key("message");
+            js.value(m_message);
+
+            return js.toString();
+        }
+        catch (Exception e) {
+            return "{ error: \"Unable to serialize exception.\" }";
+        }
     }
 }
