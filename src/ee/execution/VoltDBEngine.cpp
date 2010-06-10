@@ -100,9 +100,7 @@
 #include "voltdbipc.h"
 #include "common/FailureInjection.h"
 
-using namespace catalog;
 using namespace std;
-
 namespace voltdb {
 
 const int64_t AD_HOC_FRAG_ID = -1;
@@ -133,9 +131,9 @@ bool VoltDBEngine::initialize(
         int32_t siteId,
         int32_t partitionId,
         int32_t hostId,
-        std::string hostname) {
+        string hostname) {
     // Be explicit about running in the standard C locale for now.
-    std::locale::global(std::locale("C"));
+    locale::global(locale("C"));
     m_clusterIndex = clusterIndex;
     m_siteId = siteId;
     m_partitionId = partitionId;
@@ -214,7 +212,7 @@ catalog::Catalog *VoltDBEngine::getCatalog() const {
 
 Table* VoltDBEngine::getTable(int32_t tableId) const {
     // Caller responsible for checking null return value.
-    std::map<int32_t, Table*>::const_iterator lookup =
+    map<int32_t, Table*>::const_iterator lookup =
         m_tables.find(tableId);
     if (lookup != m_tables.end()) {
         return lookup->second;
@@ -222,9 +220,9 @@ Table* VoltDBEngine::getTable(int32_t tableId) const {
     return NULL;
 }
 
-Table* VoltDBEngine::getTable(std::string name) const {
+Table* VoltDBEngine::getTable(string name) const {
     // Caller responsible for checking null return value.
-    std::map<std::string, Table*>::const_iterator lookup =
+    map<string, Table*>::const_iterator lookup =
         m_tablesByName.find(name);
     if (lookup != m_tablesByName.end()) {
         return lookup->second;
@@ -234,7 +232,7 @@ Table* VoltDBEngine::getTable(std::string name) const {
 
 bool VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput* out) const {
     // Just look in our list of tables
-    std::map<int32_t, Table*>::const_iterator lookup =
+    map<int32_t, Table*>::const_iterator lookup =
         m_tables.find(tableId);
     if (lookup != m_tables.end()) {
         Table* table = lookup->second;
@@ -281,7 +279,7 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
      * number of produced depenencies may not be known in advance.
      */
     m_numResultDependencies = 0;
-    std::size_t numResultDependenciesCountOffset = m_resultOutput.reserveBytes(4);
+    size_t numResultDependenciesCountOffset = m_resultOutput.reserveBytes(4);
 
     // configure the execution context.
     m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(),
@@ -294,7 +292,7 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
     // execution lists for planfragments are cached by planfragment id
     assert (planfragmentId >= -1);
     //printf("Looking to execute fragid %jd\n", (intmax_t)planfragmentId);
-    std::map<int64_t, boost::shared_ptr<ExecutorVector> >::const_iterator iter = m_executorMap.find(planfragmentId);
+    map<int64_t, boost::shared_ptr<ExecutorVector> >::const_iterator iter = m_executorMap.find(planfragmentId);
     assert (iter != m_executorMap.end());
     boost::shared_ptr<ExecutorVector> execsForFrag = iter->second;
 
@@ -381,7 +379,7 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
  * catalog with all the necessary tables needs to already have been
  * loaded.
  */
-int VoltDBEngine::executePlanFragment(std::string fragmentString,
+int VoltDBEngine::executePlanFragment(string fragmentString,
                                       int32_t outputDependencyId,
                                       int32_t inputDependencyId,
                                       int64_t txnId,
@@ -397,13 +395,13 @@ int VoltDBEngine::executePlanFragment(std::string fragmentString,
 
     boost::scoped_array<char> buffer(new char[fragmentString.size() * 2 + 1]);
     catalog::Catalog::hexEncodeString(fragmentString.c_str(), buffer.get());
-    std::string hexEncodedFragment(buffer.get());
+    string hexEncodedFragment(buffer.get());
 
     try
     {
         if (initPlanFragment(AD_HOC_FRAG_ID, hexEncodedFragment))
         {
-            voltdb::NValueArray parameterValueArray(0);
+            NValueArray parameterValueArray(0);
             retval = executeQuery(AD_HOC_FRAG_ID, outputDependencyId,
                                   inputDependencyId, parameterValueArray,
                                   txnId, lastCommittedTxnId, true, true);
@@ -463,20 +461,17 @@ int VoltDBEngine::loadNextDependency(Table* destination) {
 // -------------------------------------------------
 // Catalog Functions
 // -------------------------------------------------
-bool VoltDBEngine::loadCatalog(const std::string &catalogPayload) {
-    assert(m_catalog != NULL); // the engine must be initialized
+bool VoltDBEngine::loadCatalog(const string &catalogPayload) {
+    assert(m_catalog != NULL);
     VOLT_DEBUG("Loading catalog...");
-    //cout << catalogPayload << endl;
-    // TODO : how do we treat an error of catalog loading?
-
     m_catalog->execute(catalogPayload);
 
-    // get a reference to the database and cluster
     catalog::Cluster *cluster = m_catalog->clusters().get("cluster");
     if (!cluster) {
         VOLT_ERROR("Unable to find cluster catalog information");
         return false;
     }
+
     m_database = cluster->databases().get("database");
     if (!m_database) {
         VOLT_ERROR("Unable to find database catalog information");
@@ -500,7 +495,7 @@ bool VoltDBEngine::loadCatalog(const std::string &catalogPayload) {
     }
 
     // Loop through all the tables...
-    std::map<std::string, catalog::Table*>::const_iterator table_iterator;
+    map<string, catalog::Table*>::const_iterator table_iterator;
     for (table_iterator = m_database->tables().begin();
          table_iterator != m_database->tables().end(); table_iterator++) {
         if (!initTable(m_database->relativeIndex(), table_iterator->second)) {
@@ -525,7 +520,7 @@ bool VoltDBEngine::loadCatalog(const std::string &catalogPayload) {
     return true;
 }
 
-bool VoltDBEngine::updateCatalog(const std::string &catalogPayload) {
+bool VoltDBEngine::updateCatalog(const string &catalogPayload) {
     assert(m_catalog != NULL); // the engine must be initialized
     VOLT_DEBUG("Updating catalog...");
 
@@ -594,13 +589,13 @@ bool VoltDBEngine::clearAndLoadAllPlanFragments() {
     m_executorMap.clear();
 
     // initialize all the planfragments.
-    std::map<std::string, catalog::Procedure*>::const_iterator proc_iterator;
+    map<string, catalog::Procedure*>::const_iterator proc_iterator;
     for (proc_iterator = m_database->procedures().begin();
          proc_iterator != m_database->procedures().end(); proc_iterator++) {
         // Procedure
         const catalog::Procedure *catalog_proc = proc_iterator->second;
         VOLT_DEBUG("proc: %s", catalog_proc->name().c_str());
-        std::map<std::string, catalog::Statement*>::const_iterator stmt_iterator;
+        map<string, catalog::Statement*>::const_iterator stmt_iterator;
         for (stmt_iterator = catalog_proc->statements().begin();
              stmt_iterator != catalog_proc->statements().end();
              stmt_iterator++) {
@@ -609,11 +604,11 @@ bool VoltDBEngine::clearAndLoadAllPlanFragments() {
             VOLT_DEBUG("  stmt: %s : %s", catalogStmt->name().c_str(),
                        catalogStmt->sqltext().c_str());
 
-            std::map<std::string, catalog::PlanFragment*>::const_iterator pf_iterator;
+            map<string, catalog::PlanFragment*>::const_iterator pf_iterator;
             for (pf_iterator = catalogStmt->fragments().begin();
                  pf_iterator!= catalogStmt->fragments().end(); pf_iterator++) {
                 int64_t fragId = uniqueIdForFragment(pf_iterator->second);
-                std::string planNodeTree = pf_iterator->second->plannodetree();
+                string planNodeTree = pf_iterator->second->plannodetree();
                 if (!initPlanFragment(fragId, planNodeTree)) {
                     VOLT_ERROR("Failed to initialize plan fragment '%s' from"
                                " catalogs\nFailed SQL Statement: %s",
@@ -632,11 +627,11 @@ bool VoltDBEngine::clearAndLoadAllPlanFragments() {
 // Initialization Functions
 // -------------------------------------------------
 bool VoltDBEngine::initPlanFragment(const int64_t fragId,
-                                    const std::string planNodeTree) {
+                                    const string planNodeTree) {
 
     // Deserialize the PlanFragment and stick in our local map
 
-    std::map<int64_t, boost::shared_ptr<ExecutorVector> >::const_iterator iter = m_executorMap.find(fragId);
+    map<int64_t, boost::shared_ptr<ExecutorVector> >::const_iterator iter = m_executorMap.find(fragId);
     if (iter != m_executorMap.end()) {
         VOLT_ERROR("Duplicate PlanNodeList entry for PlanFragment '%jd' during"
                    " initialization", (intmax_t)fragId);
@@ -697,7 +692,7 @@ bool VoltDBEngine::initPlanNode(const int64_t fragId, AbstractPlanNode* node, in
     // have internal Projections), then we need to make sure that we set that
     // internal node's executor as well
     if (node->getInlinePlanNodes().size() > 0) {
-        std::map<PlanNodeType, AbstractPlanNode*>::iterator internal_it;
+        map<PlanNodeType, AbstractPlanNode*>::iterator internal_it;
         for (internal_it = node->getInlinePlanNodes().begin();
              internal_it != node->getInlinePlanNodes().end(); internal_it++) {
             AbstractPlanNode* inline_node = internal_it->second;
@@ -741,16 +736,16 @@ bool VoltDBEngine::initTable(const int32_t databaseId,
     // Column is stored as map<String, Column*> in Catalog. We have to
     // sort it by Column index to preserve column order.
     const int numColumns = static_cast<int>(catalogTable->columns().size());
-    std::vector<voltdb::ValueType> columnTypes(numColumns);
-    std::vector<int32_t> columnLengths(numColumns);
-    std::vector<bool> columnAllowNull(numColumns);
-    std::map<std::string, catalog::Column*>::const_iterator col_iterator;
-    std::string *columnNames = new std::string[numColumns];
+    vector<ValueType> columnTypes(numColumns);
+    vector<int32_t> columnLengths(numColumns);
+    vector<bool> columnAllowNull(numColumns);
+    map<string, catalog::Column*>::const_iterator col_iterator;
+    string *columnNames = new string[numColumns];
     for (col_iterator = catalogTable->columns().begin();
          col_iterator != catalogTable->columns().end(); col_iterator++) {
         const catalog::Column *catalog_column = col_iterator->second;
         const int columnIndex = catalog_column->index();
-        const voltdb::ValueType type = static_cast<voltdb::ValueType>(catalog_column->type());
+        const ValueType type = static_cast<ValueType>(catalog_column->type());
         columnTypes[columnIndex] = type;
         const int32_t size = static_cast<int32_t>(catalog_column->size());
         //Strings length is provided, other lengths are derived from type
@@ -766,13 +761,13 @@ bool VoltDBEngine::initTable(const int32_t databaseId,
                                                          columnAllowNull, true);
 
     // Indexes
-    std::map<std::string, TableIndexScheme> index_map;
-    std::map<std::string, catalog::Index*>::const_iterator idx_iterator;
+    map<string, TableIndexScheme> index_map;
+    map<string, catalog::Index*>::const_iterator idx_iterator;
     for (idx_iterator = catalogTable->indexes().begin();
          idx_iterator != catalogTable->indexes().end(); idx_iterator++) {
         catalog::Index *catalog_index = idx_iterator->second;
-        std::vector<int> index_columns;
-        std::vector<ValueType> column_types;
+        vector<int> index_columns;
+        vector<ValueType> column_types;
 
         // The catalog::Index object now has a list of columns that are to be
         // used
@@ -791,7 +786,7 @@ bool VoltDBEngine::initTable(const int32_t databaseId,
         index_columns.resize(catalog_index->columns().size());
         column_types.resize(catalog_index->columns().size());
         bool isIntsOnly = true;
-        std::map<std::string, catalog::ColumnRef*>::const_iterator colref_iterator;
+        map<string, catalog::ColumnRef*>::const_iterator colref_iterator;
         for (colref_iterator = catalog_index->columns().begin();
              colref_iterator != catalog_index->columns().end();
              colref_iterator++) {
@@ -823,8 +818,8 @@ bool VoltDBEngine::initTable(const int32_t databaseId,
     }
 
     // Constraints
-    std::string pkey_index_id;
-    std::map<std::string, catalog::Constraint*>::const_iterator constraint_iterator;
+    string pkey_index_id;
+    map<string, catalog::Constraint*>::const_iterator constraint_iterator;
     for (constraint_iterator = catalogTable->constraints().begin();
          constraint_iterator != catalogTable->constraints().end();
          constraint_iterator++) {
@@ -891,9 +886,9 @@ bool VoltDBEngine::initTable(const int32_t databaseId,
     }
 
     // Build the index array
-    std::vector<TableIndexScheme> indexes;
+    vector<TableIndexScheme> indexes;
     TableIndexScheme pkey_index;
-    std::map<std::string, TableIndexScheme>::const_iterator index_iterator;
+    map<string, TableIndexScheme>::const_iterator index_iterator;
     for (index_iterator = index_map.begin(); index_iterator != index_map.end();
          index_iterator++) {
         // Exclude the primary key
@@ -911,15 +906,15 @@ bool VoltDBEngine::initTable(const int32_t databaseId,
     if (partitionColumn != NULL)
         partitionColumnIndex = partitionColumn->index();
 
-    voltdb::Table* table;
+    Table* table;
     if (pkey_index_id.size() == 0) {
-        table = voltdb::TableFactory::getPersistentTable(databaseId, table_id, m_executorContext,
+        table = TableFactory::getPersistentTable(databaseId, table_id, m_executorContext,
                                                          catalogTable->name(), schema, columnNames,
                                                          indexes, partitionColumnIndex,
                                                          isExportEnabledForTable(m_database, table_id),
                                                          isTableExportOnly(m_database, table_id));
     } else {
-        table = voltdb::TableFactory::getPersistentTable(databaseId, table_id, m_executorContext,
+        table = TableFactory::getPersistentTable(databaseId, table_id, m_executorContext,
                                                          catalogTable->name(), schema, columnNames,
                                                          pkey_index, indexes, partitionColumnIndex,
                                                          isExportEnabledForTable(m_database, table_id),
@@ -937,17 +932,17 @@ bool VoltDBEngine::initTable(const int32_t databaseId,
 
 bool VoltDBEngine::initMaterializedViews() {
 
-    std::map<PersistentTable*, std::vector<MaterializedViewMetadata*> > allViews;
+    map<PersistentTable*, vector<MaterializedViewMetadata*> > allViews;
 
     // build all the materialized view metadata structure
     // start by iterating over all the tables in the catalog
-    std::map<std::string, catalog::Table*>::const_iterator tableIterator;
+    map<string, catalog::Table*>::const_iterator tableIterator;
     for (tableIterator = m_database->tables().begin(); tableIterator != m_database->tables().end(); tableIterator++) {
         catalog::Table *srcCatalogTable = tableIterator->second;
         PersistentTable *srcTable = dynamic_cast<PersistentTable*>(m_tables[srcCatalogTable->relativeIndex()]);
 
         // for each table look for any materialized views and iterate over them
-        std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator matviewIterator;
+        map<string, catalog::MaterializedViewInfo*>::const_iterator matviewIterator;
         for (matviewIterator = srcCatalogTable->views().begin(); matviewIterator != srcCatalogTable->views().end(); matviewIterator++) {
             catalog::MaterializedViewInfo *catalogView = matviewIterator->second;
 
@@ -961,7 +956,7 @@ bool VoltDBEngine::initMaterializedViews() {
     }
 
     // get the lists of views for each table and stick them in there
-    std::map<PersistentTable*, std::vector<MaterializedViewMetadata*> >::const_iterator viewListIterator;
+    map<PersistentTable*, vector<MaterializedViewMetadata*> >::const_iterator viewListIterator;
     for (viewListIterator = allViews.begin(); viewListIterator != allViews.end(); viewListIterator++) {
         PersistentTable *srcTable = viewListIterator->first;
         srcTable->setMaterializedViews(viewListIterator->second);
@@ -973,17 +968,17 @@ bool VoltDBEngine::initMaterializedViews() {
 bool VoltDBEngine::initCluster(const catalog::Cluster *catalogCluster) {
 
     // Find the partition id for this execution site.
-    std::map<std::string, catalog::Site*>::const_iterator site_it;
+    map<string, catalog::Site*>::const_iterator site_it;
     for (site_it = catalogCluster->sites().begin();
          site_it != catalogCluster->sites().end();
          site_it++)
     {
         catalog::Site *site = site_it->second;
         assert (site);
-        std::string sname = site->name();
+        string sname = site->name();
         if (atoi(sname.c_str()) == m_siteId) {
             assert(site->partition());
-            std::string pname = site->partition()->name();
+            string pname = site->partition()->name();
             m_partitionId = atoi(pname.c_str());
             break;
         }
@@ -1017,17 +1012,17 @@ void VoltDBEngine::setBuffers(char *parameterBuffer, int parameterBuffercapacity
 // -------------------------------------------------
 
 void VoltDBEngine::printReport() {
-    std::cout << "==========" << std::endl;
-    std::cout << "Report for Planfragment # " << m_pfCount << std::endl;
-    typedef std::pair<int32_t, voltdb::Table*> TablePair;
+    cout << "==========" << endl;
+    cout << "Report for Planfragment # " << m_pfCount << endl;
+    typedef pair<int32_t, Table*> TablePair;
     BOOST_FOREACH (TablePair table, m_tables) {
-        std::vector<TableIndex*> indexes = table.second->allIndexes();
+        vector<TableIndex*> indexes = table.second->allIndexes();
         if (!indexes.empty()) continue;
         BOOST_FOREACH (TableIndex *index, indexes) {
             index->printReport();
         }
     }
-    std::cout << "==========" << std::endl << std::endl;
+    cout << "==========" << endl << endl;
 }
 
 bool VoltDBEngine::isLocalSite(int64_t value) {
@@ -1045,7 +1040,7 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedTxnId) {
     m_executorContext->setupForTick(lastCommittedTxnId, timeInMillis);
 
     // pass the tick to any tables that are interested
-    typedef std::pair<int32_t, voltdb::Table*> TablePair;
+    typedef pair<int32_t, Table*> TablePair;
     BOOST_FOREACH (TablePair table, m_tables) {
         table.second->flushOldTuples(timeInMillis);
     }
@@ -1054,16 +1049,16 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedTxnId) {
 /** For now, bring the ELT system to a steady state with no buffers with content */
 void VoltDBEngine::quiesce(int64_t lastCommittedTxnId) {
     m_executorContext->setupForQuiesce(lastCommittedTxnId);
-    typedef std::pair<int32_t, voltdb::Table*> TablePair;
+    typedef pair<int32_t, Table*> TablePair;
     BOOST_FOREACH (TablePair table, m_tables) {
         table.second->flushOldTuples(-1L);
     }
 }
 
-std::string VoltDBEngine::debug(void) const {
-    std::stringstream output(std::stringstream::in | std::stringstream::out);
-    std::map<int64_t, boost::shared_ptr<ExecutorVector> >::const_iterator iter;
-    std::vector<AbstractExecutor*>::const_iterator executorIter;
+string VoltDBEngine::debug(void) const {
+    stringstream output(stringstream::in | stringstream::out);
+    map<int64_t, boost::shared_ptr<ExecutorVector> >::const_iterator iter;
+    vector<AbstractExecutor*>::const_iterator executorIter;
 
     for (iter = m_executorMap.begin(); iter != m_executorMap.end(); iter++) {
         output << "Fragment ID: " << iter->first << ", "
@@ -1081,7 +1076,7 @@ std::string VoltDBEngine::debug(void) const {
     return output.str();
 }
 
-voltdb::StatsAgent& VoltDBEngine::getStatsManager() {
+StatsAgent& VoltDBEngine::getStatsManager() {
     return m_statsManager;
 }
 
@@ -1103,20 +1098,20 @@ voltdb::StatsAgent& VoltDBEngine::getStatsManager() {
  */
 int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
                            bool interval, int64_t now) {
-    voltdb::Table *resultTable = NULL;
-    std::vector<voltdb::CatalogId> locatorIds;
+    Table *resultTable = NULL;
+    vector<CatalogId> locatorIds;
 
     for (int ii = 0; ii < numLocators; ii++) {
-        voltdb::CatalogId locator = static_cast<voltdb::CatalogId>(locators[ii]);
+        CatalogId locator = static_cast<CatalogId>(locators[ii]);
         locatorIds.push_back(locator);
     }
-    std::size_t lengthPosition = m_resultOutput.reserveBytes(sizeof(int32_t));
+    size_t lengthPosition = m_resultOutput.reserveBytes(sizeof(int32_t));
 
     try {
         switch (selector) {
         case STATISTICS_SELECTOR_TYPE_TABLE:
             for (int ii = 0; ii < numLocators; ii++) {
-                voltdb::CatalogId locator = static_cast<voltdb::CatalogId>(locators[ii]);
+                CatalogId locator = static_cast<CatalogId>(locators[ii]);
                 if (m_tables[locator] == NULL) {
                     char message[256];
                     sprintf(message, "getStats() called with selector %d, and"
@@ -1128,7 +1123,7 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
             }
 
             resultTable = m_statsManager.getStats(
-                (voltdb::StatisticsSelectorType) selector,
+                (StatisticsSelectorType) selector,
                 locatorIds, interval, now);
 
             break;
