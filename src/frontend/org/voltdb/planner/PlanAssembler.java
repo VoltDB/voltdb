@@ -497,15 +497,6 @@ public class PlanAssembler {
 
             // fix the receive node's output columns
             recvNode.updateOutputColumns(m_catalogDb);
-            /*
-             * recvNode.getOutputColumnNames().clear();
-             * recvNode.getOutputColumnSizes().clear();
-             * recvNode.getOutputColumnTypes().clear(); for (OutputColumnInfo
-             * oci : recvNode.m_outputColumns) {
-             * recvNode.getOutputColumnNames().add(oci.name);
-             * recvNode.getOutputColumnSizes().add(oci.size);
-             * recvNode.getOutputColumnTypes().add(oci.type); }
-             */
 
             // add a sum and send on top of the union
             return addSumAndSendToDMLNode(subSelectRoot);
@@ -599,15 +590,6 @@ public class PlanAssembler {
 
             // fix the receive node's output columns
             recvNode.updateOutputColumns(m_catalogDb);
-            /*
-             * recvNode.getOutputColumnNames().clear();
-             * recvNode.getOutputColumnSizes().clear();
-             * recvNode.getOutputColumnTypes().clear(); for (OutputColumnInfo
-             * oci : recvNode.m_outputColumns) {
-             * recvNode.getOutputColumnNames().add(oci.name);
-             * recvNode.getOutputColumnSizes().add(oci.size);
-             * recvNode.getOutputColumnTypes().add(oci.type); }
-             */
 
             // add a count and send on top of the union
             return addSumAndSendToDMLNode(subSelectRoot);
@@ -940,8 +922,6 @@ public class PlanAssembler {
                     ++offset;
                 }
                 if (!found) {
-                    // rtb: would like to throw here but doing so breaks sqlcoverage suite.
-                    // for now - make this error obvious at least.
                     System.out.println("PLANNER ERROR: could not match tve column alias");
                     System.out.println(getSQLText());
                     throw new RuntimeException("Could not match TVE column alias.");
