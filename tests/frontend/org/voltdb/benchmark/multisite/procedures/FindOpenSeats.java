@@ -34,7 +34,7 @@ public class FindOpenSeats extends VoltProcedure {
     public final SQLStmt GET_SEATS =
         new SQLStmt("select FID, RID, SEAT from RESERVATIONS where FID = ?");
 
-    public VoltTable[] run(long fid) {
+    public VoltTable[] run(int fid) {
 
         // 150 seats
         final long seatmap[] = new long[]

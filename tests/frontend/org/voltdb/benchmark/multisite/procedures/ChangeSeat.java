@@ -44,7 +44,7 @@ public class ChangeSeat extends VoltProcedure {
         new SQLStmt("update RESERVATIONS set SEAT = ? where FID = ? and CID = ?");
 
 
-    public VoltTable[] run(long fid, long cid, long seatnum) throws VoltAbortException {
+    public VoltTable[] run(int fid, int cid, long seatnum) throws VoltAbortException {
 
         // check if the seat is occupied
         // check if the customer has multiple seats on this flight
