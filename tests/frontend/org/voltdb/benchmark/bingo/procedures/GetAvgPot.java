@@ -43,7 +43,7 @@ public class GetAvgPot extends VoltProcedure {
             "R.T_ID = ? OR " +
             "R.T_ID = ?");
 
-    public VoltTable[] run(long tournament_ids[]) throws VoltAbortException {
+    public VoltTable[] run(int tournament_ids[]) throws VoltAbortException {
         voltQueueSQL(getAvgPotValue,
                 tournament_ids[0],
                 tournament_ids[1],

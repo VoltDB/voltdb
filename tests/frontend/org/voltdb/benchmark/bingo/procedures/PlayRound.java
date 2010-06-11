@@ -46,7 +46,7 @@ public class PlayRound extends VoltProcedure {
     private final java.util.Random r = new java.util.Random();
 
     /* create a new round in R and update the last value for all boards in this T */
-    public VoltTable[] run(long t_id, long r_id, String val) throws VoltAbortException {
+    public VoltTable[] run(int t_id, int r_id, String val) throws VoltAbortException {
 
         voltQueueSQL(getPotValue, t_id);
         VoltTable potValue[] = voltExecuteSQL();

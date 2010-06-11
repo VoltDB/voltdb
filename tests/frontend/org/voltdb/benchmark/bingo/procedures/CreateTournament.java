@@ -39,7 +39,7 @@ public class CreateTournament extends VoltProcedure {
 
     private final java.util.Random r = new java.util.Random();
     /* Create a new T entry and create b_per_t board entries in B */
-    public VoltTable[] run(long t_id, long b_per_t) throws VoltAbortException {
+    public VoltTable[] run(int t_id, int b_per_t) throws VoltAbortException {
         StringBuilder sb = new StringBuilder(300);
         for (int ii = 0; ii < 300; ii++) {
             sb.append(r.nextInt(9));
@@ -47,7 +47,7 @@ public class CreateTournament extends VoltProcedure {
 
         voltQueueSQL(insertT, t_id, sb.toString());
 
-        for (long i=0; i < b_per_t; i++) {
+        for (int i=0; i < b_per_t; i++) {
             voltQueueSQL(insertB, t_id, i, "INITIAL VALUE");
         }
         return voltExecuteSQL();

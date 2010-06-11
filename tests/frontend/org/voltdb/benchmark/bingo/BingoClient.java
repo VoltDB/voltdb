@@ -30,7 +30,6 @@ import org.voltdb.benchmark.ClientMain;
 import org.voltdb.benchmark.Verification;
 import org.voltdb.benchmark.Verification.Expression;
 
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.NullCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -160,7 +159,7 @@ public class BingoClient extends ClientMain {
                 m_voltClient.callProcedure(
                         new NullCallback(),
                         "DeleteTournament",
-                        (long)t.tid);
+                        t.tid);
             }
             m_voltClient.drain();
         } catch (IOException e) {
@@ -269,8 +268,8 @@ public class BingoClient extends ClientMain {
             queued = m_voltClient.callProcedure(
                     callback,
                     "CreateTournament",
-                    (long)t.tid,
-                    (long)boardsPerTournament);
+                    t.tid,
+                    boardsPerTournament);
         }
         // tournament is over, DELETE, mark uninitialized and at round 0.
         else if (!(t.round < maxRounds)) {
@@ -291,7 +290,7 @@ public class BingoClient extends ClientMain {
             queued = m_voltClient.callProcedure(
                     callback,
                     "DeleteTournament",
-                    (long)t.tid);
+                    t.tid);
         }
         // increment round and PLAY
         else {
@@ -304,7 +303,7 @@ public class BingoClient extends ClientMain {
                 /*
                  * Retrieve 9 more tournaments to be included in the average
                  */
-                final long tourneyIds[] = new long[10];
+                final int tourneyIds[] = new int[10];
                 final Tourney tourneys[] = new Tourney[9];
                 synchronized (tournaments) {
                     for (int ii = 0; ii < 9; ii++) {
@@ -363,8 +362,8 @@ public class BingoClient extends ClientMain {
 
                 queued = m_voltClient.callProcedure(
                         callback,
-                        "PlayRound", (long)t.tid,
-                        (long)t.round,
+                        "PlayRound", t.tid,
+                        t.round,
                         "A7 Again!?");
             }
         }

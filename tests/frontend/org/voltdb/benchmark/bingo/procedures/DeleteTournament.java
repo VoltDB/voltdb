@@ -41,7 +41,7 @@ public class DeleteTournament extends VoltProcedure {
             new SQLStmt("DELETE FROM R WHERE T_ID = ?");
 
     /* create a new round in R and update the last value for all boards in this T */
-    public VoltTable[] run(long t_id) throws VoltAbortException {
+    public VoltTable[] run(int t_id) throws VoltAbortException {
         voltQueueSQL(deleteT, t_id);
         voltQueueSQL(deleteB, t_id);
         voltQueueSQL(deleteR, t_id);
