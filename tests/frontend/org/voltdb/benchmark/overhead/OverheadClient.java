@@ -128,7 +128,7 @@ public class OverheadClient extends ClientMain {
         return names;
     }
 
-    long invocations = 0;
+    int invocations = 0;
 
     @Override
     protected boolean runOnce() throws IOException {
@@ -161,7 +161,7 @@ public class OverheadClient extends ClientMain {
                 (transactionToInvoke == Transaction.MEASURE_OVERHEAD_MULTIPARTITION_TWOSTMTS)) {
 
                 return m_voltClient.callProcedure( new MeasureOverheadCallback(),
-                        transactionToInvoke.callName, new Object[] { new Long(invocations++) });
+                        transactionToInvoke.callName, new Object[] { new Integer(invocations++) });
             } else {
                 Object argObjects[] = new Object[42];
                 argObjects[0] = invocations++;

@@ -35,7 +35,7 @@ public class measureOverheadMultipartitionTwoStatements extends VoltProcedure {
     public final SQLStmt getID1 = new SQLStmt("SELECT NO_O_ITEM FROM NEWORDER WHERE NO_O_ID = ?;");
     public final SQLStmt getID2 = new SQLStmt("SELECT NO_O_ITEM FROM NEWORDER WHERE NO_O_ID = ?;");
 
-    public VoltTable[] run(long no_o_id) {
+    public VoltTable[] run(int no_o_id) {
         voltQueueSQL(getID1, no_o_id);
         voltExecuteSQL(true);
 
