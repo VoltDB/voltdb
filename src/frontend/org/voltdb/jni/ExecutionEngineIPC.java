@@ -1299,24 +1299,36 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             m_connection.write();
 
             ByteBuffer data = null;
-            ByteBuffer results = ByteBuffer.allocate(12);
+            ByteBuffer results = ByteBuffer.allocate(8);
             while (results.remaining() > 0)
                 m_connection.m_socketChannel.read(results);
             results.flip();
             long result_offset = results.getLong();
-            int result_sz = results.getInt();
-            data = ByteBuffer.allocate(result_sz + 4);
-            data.putInt(result_sz);
-            while (data.remaining() > 0)
-                m_connection.m_socketChannel.read(data);
-            data.flip();
-
-            ELTProtoMessage reply = null;
-            if (pollAction) {
+            if (result_offset < 0) {
+                ELTProtoMessage reply = null;
                 reply = new ELTProtoMessage(partitionId, mTableId);
-                reply.pollResponse(result_offset, data);
+                reply.error();
+                return reply;
             }
-            return reply;
+            else {
+                results = ByteBuffer.allocate(4);
+                while (results.remaining() > 0)
+                    m_connection.m_socketChannel.read(results);
+                results.flip();
+                int result_sz = results.getInt();
+                data = ByteBuffer.allocate(result_sz + 4);
+                data.putInt(result_sz);
+                while (data.remaining() > 0)
+                    m_connection.m_socketChannel.read(data);
+                data.flip();
+
+                ELTProtoMessage reply = null;
+                if (pollAction) {
+                    reply = new ELTProtoMessage(partitionId, mTableId);
+                    reply.pollResponse(result_offset, data);
+                }
+                return reply;
+            }
 
         } catch (final IOException e) {
             throw new RuntimeException(e);
