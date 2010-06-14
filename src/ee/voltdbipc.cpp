@@ -180,6 +180,9 @@ using namespace voltdb;
 static void writeOrDie(int fd, unsigned char *data, ssize_t sz) {
     ssize_t written = 0;
     ssize_t last = 0;
+    if (sz == 0) {
+        return;
+    }
     do {
         last = write(fd, data + written, sz - written);
         if (last < 0) {
