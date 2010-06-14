@@ -386,6 +386,12 @@ CLEANING
   </exec>
 </target>
 
+<target name='cleantmp' description="Remove all data files Volt generated in /tmp.">
+  <exec dir='.' executable='/bin/sh'>
+    <arg line="-c 'rm -rf /tmp/myApp*.tmp *.vpt *.digest'"/>
+  </exec>
+</target>
+
 <!--
 ***************************************
 JAR BUILDING
