@@ -104,11 +104,11 @@ voltdb::TableTuple* StatsSource::getStatsTuple(bool interval, int64_t now) {
     if (m_statsTable == NULL) {
         return NULL;
     }
-    m_statsTuple.setNValue(0, ValueFactory::getBigIntValue(m_hostId));
-    m_statsTuple.setNValue(1, m_hostname);
-    m_statsTuple.setNValue(2, ValueFactory::getBigIntValue(m_siteId));
-    m_statsTuple.setNValue(3, ValueFactory::getBigIntValue(m_partitionId));
-    m_statsTuple.setNValue(4, ValueFactory::getBigIntValue(now));
+    m_statsTuple.setNValue(0, ValueFactory::getBigIntValue(now));
+    m_statsTuple.setNValue(1, ValueFactory::getBigIntValue(m_hostId));
+    m_statsTuple.setNValue(2, m_hostname);
+    m_statsTuple.setNValue(3, ValueFactory::getBigIntValue(m_siteId));
+    m_statsTuple.setNValue(4, ValueFactory::getBigIntValue(m_partitionId));
     updateStatsTuple(&m_statsTuple);
     m_statsTable->insertTuple(m_statsTuple);
     //assert (success);
@@ -122,11 +122,11 @@ voltdb::TableTuple* StatsSource::getStatsTuple(bool interval, int64_t now) {
  */
 std::vector<std::string> StatsSource::generateStatsColumnNames() {
     std::vector<std::string> columnNames;
+    columnNames.push_back("TIMESTAMP");
     columnNames.push_back("HOST_ID");
     columnNames.push_back("HOSTNAME");
     columnNames.push_back("SITE_ID");
     columnNames.push_back("PARTITION_ID");
-    columnNames.push_back("TIMESTAMP");
     return columnNames;
 }
 
@@ -152,8 +152,8 @@ std::string StatsSource::toString() {
  */
 void StatsSource::populateSchema(std::vector<voltdb::ValueType> &types, std::vector<int32_t> &columnLengths, std::vector<bool> &allowNull) {
     types.push_back(voltdb::VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT)); allowNull.push_back(false);
-    types.push_back(voltdb::VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);
     types.push_back(voltdb::VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT)); allowNull.push_back(false);
+    types.push_back(voltdb::VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);
     types.push_back(voltdb::VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT)); allowNull.push_back(false);
     types.push_back(voltdb::VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT)); allowNull.push_back(false);
 }

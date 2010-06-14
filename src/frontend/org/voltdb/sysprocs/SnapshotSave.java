@@ -119,7 +119,7 @@ public class SnapshotSave extends VoltSystemProcedure
 
                 if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() != -1) {
                     result.addRow(
-                                  context.getSite().getHost().getTypeName(),
+                                  Integer.parseInt(context.getSite().getHost().getTypeName()),
                                   hostname,
                                   "",
                                   "FAILURE",
@@ -160,7 +160,7 @@ public class SnapshotSave extends VoltSystemProcedure
                             "RESULTED IN IOException: " + ex.getMessage();
                         }
                     }
-                    result.addRow(context.getSite().getHost().getTypeName(),
+                    result.addRow(Integer.parseInt(context.getSite().getHost().getTypeName()),
                                   hostname,
                                   table.getTypeName(),
                                   file_valid,
@@ -290,7 +290,7 @@ public class SnapshotSave extends VoltSystemProcedure
                             "RESULTED IN IOException: " + ex.getMessage();
                         }
 
-                        result.addRow(context.getSite().getHost().getTypeName(),
+                        result.addRow(Integer.parseInt(context.getSite().getHost().getTypeName()),
                                 hostname,
                                 table.getTypeName(),
                                 canSnapshot,
@@ -319,7 +319,7 @@ public class SnapshotSave extends VoltSystemProcedure
                     }
                 } catch (Exception ex) {
                     result.addRow(
-                            context.getSite().getHost().getTypeName(),
+                            Integer.parseInt(context.getSite().getHost().getTypeName()),
                             hostname,
                             "",
                             "FAILURE",
@@ -334,7 +334,7 @@ public class SnapshotSave extends VoltSystemProcedure
             try {
                 m_snapshotPermits.acquire();
             } catch (Exception e) {
-                result.addRow(context.getSite().getHost().getTypeName(),
+                result.addRow(Integer.parseInt(context.getSite().getHost().getTypeName()),
                         hostname,
                         "",
                         "FAILURE",
@@ -382,9 +382,9 @@ public class SnapshotSave extends VoltSystemProcedure
 
                 if (failures.isEmpty()) {
                     blockingResult.addRow(
-                            context.getSite().getHost().getTypeName(),
+                            Integer.parseInt(context.getSite().getHost().getTypeName()),
                             hostname,
-                            context.getSite().getTypeName(),
+                            Integer.parseInt(context.getSite().getTypeName()),
                             status,
                             err);
                 } else {
@@ -393,9 +393,9 @@ public class SnapshotSave extends VoltSystemProcedure
                         err = e.toString();
                     }
                     blockingResult.addRow(
-                            context.getSite().getHost().getTypeName(),
+                            Integer.parseInt(context.getSite().getHost().getTypeName()),
                             hostname,
-                            context.getSite().getTypeName(),
+                            Integer.parseInt(context.getSite().getTypeName()),
                             status,
                             err);
                 }
@@ -408,9 +408,22 @@ public class SnapshotSave extends VoltSystemProcedure
             TRACE_LOG.trace("Aggregating create snapshot target results");
             assert (dependencies.size() > 0);
             List<VoltTable> dep = dependencies.get(DEP_createSnapshotTargets);
-            VoltTable result = constructNodeResultsTable();
+            VoltTable result = null;
             for (VoltTable table : dep)
             {
+                /**
+                 * XXX Ning: There are two different tables here. We have to
+                 * detect which table we are looking at in order to create the
+                 * result table with the proper schema. Maybe we should make the
+                 * result table consistent?
+                 */
+                if (result == null) {
+                    if (table.getColumnType(2).equals(VoltType.INTEGER))
+                        result = constructPartitionResultsTable();
+                    else
+                        result = constructNodeResultsTable();
+                }
+
                 while (table.advanceRow())
                 {
                     // this will add the active row of table
@@ -542,7 +555,7 @@ public class SnapshotSave extends VoltSystemProcedure
     }
 
     public static final ColumnInfo nodeResultsColumns[] = new ColumnInfo[] {
-        new ColumnInfo("HOST_ID", VoltType.STRING),
+        new ColumnInfo(CNAME_HOST_ID, CTYPE_ID),
         new ColumnInfo("HOSTNAME", VoltType.STRING),
         new ColumnInfo("TABLE", VoltType.STRING),
         new ColumnInfo("RESULT", VoltType.STRING),
@@ -550,9 +563,9 @@ public class SnapshotSave extends VoltSystemProcedure
     };
 
     public static final ColumnInfo partitionResultsColumns[] = new ColumnInfo[] {
-        new ColumnInfo("HOST_ID", VoltType.STRING),
+        new ColumnInfo(CNAME_HOST_ID, CTYPE_ID),
         new ColumnInfo("HOSTNAME", VoltType.STRING),
-        new ColumnInfo("SITE_ID", VoltType.STRING),
+        new ColumnInfo(CNAME_SITE_ID, CTYPE_ID),
         new ColumnInfo("RESULT", VoltType.STRING),
         new ColumnInfo("ERR_MSG", VoltType.STRING)
     };

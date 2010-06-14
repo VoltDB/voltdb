@@ -103,7 +103,7 @@ public class SnapshotScan extends VoltSystemProcedure {
                 List<File> relevantFiles = retrieveRelevantFiles(path);
                 if (relevantFiles == null) {
                     results.addRow(
-                                   context.getSite().getHost().getTypeName(),
+                                   Integer.parseInt(context.getSite().getHost().getTypeName()),
                                    hostname,
                                    "",
                                    "",
@@ -142,7 +142,7 @@ public class SnapshotScan extends VoltSystemProcedure {
                                     }
 
                                     results.addRow(
-                                                   context.getSite().getHost().getTypeName(),
+                                                   Integer.parseInt(context.getSite().getHost().getTypeName()),
                                                    hostname,
                                                    f.getParent(),
                                                    f.getName(),
@@ -167,7 +167,7 @@ public class SnapshotScan extends VoltSystemProcedure {
                             }
                         } else {
                             results.addRow(
-                                           context.getSite().getHost().getTypeName(),
+                                           Integer.parseInt(context.getSite().getHost().getTypeName()),
                                            hostname,
                                            f.getParent(),
                                            f.getName(),
@@ -219,7 +219,7 @@ public class SnapshotScan extends VoltSystemProcedure {
                 List<File> relevantFiles = retrieveRelevantFiles(path);
                 if (relevantFiles == null) {
                     results.addRow(
-                                   context.getSite().getHost().getTypeName(),
+                                   Integer.parseInt(context.getSite().getHost().getTypeName()),
                                    "",
                                    "",
                                    "",
@@ -240,7 +240,7 @@ public class SnapshotScan extends VoltSystemProcedure {
                                         sw.append(',');
                                     }
                                 }
-                                results.addRow(context.getSite().getHost().getTypeName(),
+                                results.addRow(Integer.parseInt(context.getSite().getHost().getTypeName()),
                                                path,
                                                f.getName(),
                                                sw.toString(),
@@ -290,7 +290,7 @@ public class SnapshotScan extends VoltSystemProcedure {
                     final long total = dir.getTotalSpace();
                     final long used = total - free;
                     results.addRow(
-                                   context.getSite().getHost().getTypeName(),
+                                   Integer.parseInt(context.getSite().getHost().getTypeName()),
                                    hostname,
                                    path,
                                    total,
@@ -300,7 +300,7 @@ public class SnapshotScan extends VoltSystemProcedure {
                     "");
                 } else {
                     results.addRow(
-                                   context.getSite().getHost().getTypeName(),
+                                   Integer.parseInt(context.getSite().getHost().getTypeName()),
                                    hostname,
                                    path,
                                    0,
@@ -334,7 +334,7 @@ public class SnapshotScan extends VoltSystemProcedure {
     private VoltTable constructFragmentResultsTable() {
         ColumnInfo[] result_columns = new ColumnInfo[14];
         int ii = 0;
-        result_columns[ii++] = new ColumnInfo("HOST_ID", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo(CNAME_HOST_ID, CTYPE_ID);
         result_columns[ii++] = new ColumnInfo("HOSTNAME", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("PATH", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("NAME", VoltType.STRING);
@@ -355,7 +355,7 @@ public class SnapshotScan extends VoltSystemProcedure {
     private VoltTable constructDigestResultsTable() {
         ColumnInfo[] result_columns = new ColumnInfo[6];
         int ii = 0;
-        result_columns[ii++] = new ColumnInfo("HOST_ID", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo(CNAME_HOST_ID, CTYPE_ID);
         result_columns[ii++] = new ColumnInfo("PATH", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("NAME", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("TABLES", VoltType.STRING);
@@ -383,7 +383,7 @@ public class SnapshotScan extends VoltSystemProcedure {
     private VoltTable constructDiskFreeResultsTable() {
         ColumnInfo[] result_columns = new ColumnInfo[8];
         int ii = 0;
-        result_columns[ii++] = new ColumnInfo("HOST_ID", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo(CNAME_HOST_ID, CTYPE_ID);
         result_columns[ii++] = new ColumnInfo("HOSTNAME", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("PATH", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("TOTAL", VoltType.BIGINT);

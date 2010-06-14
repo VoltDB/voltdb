@@ -424,7 +424,7 @@ public class TestSnapshotDaemon {
             @Override
             public VoltTable[] getResults() {
                 VoltTable result = new VoltTable(SnapshotSave.nodeResultsColumns);
-                result.addRow("0", "desktop", "0", "FAILURE", "epic fail");
+                result.addRow(0, "desktop", "0", "FAILURE", "epic fail");
                 return new VoltTable[] { result };
             }
 

@@ -55,17 +55,17 @@ public class SystemInformation extends VoltSystemProcedure {
         // host name and IP address.
         InetAddress addr = org.voltdb.client.ConnectionUtil.getLocalAddress();
         vt.addRow(VoltDB.instance().getHostMessenger().getHostId(),
-                "ipaddress", addr.getHostAddress());
+                  "IPADDRESS", addr.getHostAddress());
         vt.addRow(VoltDB.instance().getHostMessenger().getHostId(),
-                "hostname", addr.getHostName());
+                  "HOSTNAME", addr.getHostName());
 
         // build string
         vt.addRow(VoltDB.instance().getHostMessenger().getHostId(),
-                "buildstring", VoltDB.instance().getBuildString());
+                  "BUILDSTRING", VoltDB.instance().getBuildString());
 
         // version
         vt.addRow(VoltDB.instance().getHostMessenger().getHostId(),
-                  "version", VoltDB.instance().getVersionString());
+                  "VERSION", VoltDB.instance().getVersionString());
 
         return vt;
     }
@@ -100,9 +100,9 @@ public class SystemInformation extends VoltSystemProcedure {
             else
             {
                 result = new VoltTable(
-                                       new ColumnInfo("node_id", VoltType.INTEGER),
-                                       new ColumnInfo("key", VoltType.STRING),
-                                       new ColumnInfo("value", VoltType.STRING));
+                                       new ColumnInfo(CNAME_HOST_ID, CTYPE_ID),
+                                       new ColumnInfo("KEY", VoltType.STRING),
+                                       new ColumnInfo("VALUE", VoltType.STRING));
             }
             return new DependencyPair(DEP_DISTRIBUTE, result);
         }

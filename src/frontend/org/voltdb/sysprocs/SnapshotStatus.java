@@ -82,7 +82,7 @@ public class SnapshotStatus extends VoltSystemProcedure {
                         @Override
                         public void next(Table t) {
                             results.addRow(
-                                           context.getSite().getHost().getTypeName(),
+                                           Integer.parseInt(context.getSite().getHost().getTypeName()),
                                            hostname,
                                            t.name,
                                            s.path,
@@ -147,7 +147,7 @@ public class SnapshotStatus extends VoltSystemProcedure {
 
         ColumnInfo[] result_columns = new ColumnInfo[10];
         int ii = 0;
-        result_columns[ii++] = new ColumnInfo("HOST_ID", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo(CNAME_HOST_ID, CTYPE_ID);
         result_columns[ii++] = new ColumnInfo("HOSTNAME", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("TABLE", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("PATH", VoltType.STRING);

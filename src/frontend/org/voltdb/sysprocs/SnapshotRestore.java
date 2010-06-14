@@ -655,11 +655,11 @@ public class SnapshotRestore extends VoltSystemProcedure
     {
         ColumnInfo[] result_columns = new ColumnInfo[7];
         int ii = 0;
-        result_columns[ii++] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
+        result_columns[ii++] = new ColumnInfo(CNAME_HOST_ID, CTYPE_ID);
         result_columns[ii++] = new ColumnInfo("HOSTNAME", VoltType.STRING);
-        result_columns[ii++] = new ColumnInfo("SITE_ID", VoltType.INTEGER);
+        result_columns[ii++] = new ColumnInfo(CNAME_SITE_ID, CTYPE_ID);
         result_columns[ii++] = new ColumnInfo("TABLE", VoltType.STRING);
-        result_columns[ii++] = new ColumnInfo("PARTITION", VoltType.INTEGER);
+        result_columns[ii++] = new ColumnInfo(CNAME_PARTITION_ID, CTYPE_ID);
         result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
         return new VoltTable(result_columns);

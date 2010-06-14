@@ -207,7 +207,7 @@ public class Statistics extends VoltSystemProcedure {
             VoltTable result = unionTables(dependencies.get(DEP_initiatorData));
             return new DependencyPair(DEP_initiatorAggregator, result);
         } else if (fragmentId == SysProcFragmentId.PF_partitionCount) {
-            VoltTable result = new VoltTable(new VoltTable.ColumnInfo("Partition count", VoltType.INTEGER));
+            VoltTable result = new VoltTable(new VoltTable.ColumnInfo("PARTITION_COUNT", VoltType.INTEGER));
             result.addRow(context.getCluster().getPartitions().size());
             return new DependencyPair(DEP_partitionCount, result);
         } else if (fragmentId == SysProcFragmentId.PF_ioData) {

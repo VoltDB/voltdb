@@ -317,7 +317,7 @@ class SnapshotDaemon {
         while (result.advanceRow()) {
             if (!result.getString("RESULT").equals("SUCCESS")) {
                 hostLog.error("Snapshot save feasability test failed for host "
-                        + result.getString("HOST_ID") + " table " + result.getString("TABLE") +
+                        + result.getLong("HOST_ID") + " table " + result.getString("TABLE") +
                         " with error message " + result.getString("ERR_MSG"));
             }
         }

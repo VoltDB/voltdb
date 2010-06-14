@@ -92,7 +92,7 @@ public class SnapshotDelete extends VoltSystemProcedure {
                     List<File> relevantFiles = retrieveRelevantFiles(paths[ii], nonces[ii]);
                     if (relevantFiles == null) {
                         result.addRow(
-                                      context.getSite().getHost().getTypeName(),
+                                      Integer.parseInt(context.getSite().getHost().getTypeName()),
                                       hostname,
                                       paths[ii],
                                       nonces[ii],
@@ -106,7 +106,7 @@ public class SnapshotDelete extends VoltSystemProcedure {
                             long size = f.length();
                             boolean deleted = f.delete();
                             result.addRow(
-                                          context.getSite().getHost().getTypeName(),
+                                          Integer.parseInt(context.getSite().getHost().getTypeName()),
                                           hostname,
                                           paths[ii],
                                           nonces[ii],
@@ -146,7 +146,7 @@ public class SnapshotDelete extends VoltSystemProcedure {
 
         ColumnInfo[] result_columns = new ColumnInfo[9];
         int ii = 0;
-        result_columns[ii++] = new ColumnInfo("HOST_ID", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo(CNAME_HOST_ID, CTYPE_ID);
         result_columns[ii++] = new ColumnInfo("HOSTNAME", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("PATH", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("NONCE", VoltType.STRING);
