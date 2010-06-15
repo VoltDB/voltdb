@@ -380,7 +380,7 @@ CLEANING
 ***************************************
 -->
 
-<target name='clean' description="Remove all compiled files.">
+<target name='clean' description="Remove all compiled files." depends="cleantmp">
   <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf obj/*'"/>
   </exec>
