@@ -73,12 +73,12 @@ class ThroughputStat(Stat):
     THROUGHPUT = """
 SELECT resultid as id,
        hostcount as hosts,
-       time,
-       txnpersecond as tps
+       date(time) as time,
+       avg(txnpersecond) as tps
 FROM results
 WHERE time >= '%s'
       AND benchmarkname = 'org.voltdb.benchmark.workloads.Generator'
-GROUP BY hostcount, time
+GROUP BY hostcount, date(time)
 ORDER BY time DESC
 LIMIT %u
 """

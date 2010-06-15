@@ -47,6 +47,7 @@ import org.voltdb.VoltProcedure.VoltAbortException;
 
 import org.voltdb.benchmark.workloads.xml.*;
 
+//CLASSPATH=/home/mstarobinets/voltbin/mysql.jar  ant benchmarkcluster -Dclient=org.voltdb.benchmark.workloads.Generator -Dworkload=MixedLoad -Dhostcount=4 -Dclientcount=2 -Dhost1=volt3i -Dhost2=volt3j -Dhost3=volt3k -Dhost4=volt3l -Dclienthost1=volt1 -Dclienthost2=volt4a
 //COMMAND: xjc -p benchmarkGenerator.xml /home/voltdb/mstarobinets/Desktop/Useful/MB/microbenchmark1.xsd -d /home/voltdb/mstarobinets/Desktop/Useful/MB
 public class Generator extends ClientMain
 {
@@ -99,7 +100,7 @@ public class Generator extends ClientMain
 
     public static void main(String[] args)
     {
-        xmlFilePath = "/home/voltdb/mstarobinets/workspace/voltdb/tests/frontend/org/voltdb/benchmark/workloads/microbench.xml";
+        xmlFilePath = "../workspace/voltdb/tests/frontend/org/voltdb/benchmark/workloads/microbench.xml";
         for (int i = 0; i < args.length; i++)
             if (args[i].startsWith("configfile="))
             {
@@ -314,7 +315,20 @@ public class Generator extends ClientMain
     {
         workloads = new LinkedList<Workload>();
 
+        //FOR SOME WEIRD REASON, USING .getParentFile() IS NOT WORKING...
         File xmlFile = new File(xmlFilePath);
+        String currFilePath = (new File("dummyName")).getAbsolutePath();
+        while (!currFilePath.endsWith("/"))
+            currFilePath = currFilePath.substring(0, currFilePath.length() - 1);
+        currFilePath = currFilePath.substring(0, currFilePath.length() - 1);
+        while (xmlFilePath.startsWith("../"))
+        {
+            xmlFilePath = xmlFilePath.substring(3);
+            while (!currFilePath.endsWith("/"))
+                currFilePath = currFilePath.substring(0, currFilePath.length() - 1);
+            currFilePath = currFilePath.substring(0, currFilePath.length() - 1);
+            xmlFile = new File(currFilePath, xmlFilePath);
+        }
         mb = unmarshal(xmlFile);
 
         boolean loaded = runLoader(mb);
