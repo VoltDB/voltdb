@@ -1425,10 +1425,14 @@ BENCHMARKS
         <arg value="HOST=${host10}" />
         <arg value="HOST=${host11}" />
         <arg value="HOST=${host12}" />
+        <arg value="CLIENTHOST=${manualclient1}" />
+        <arg value="CLIENTHOST=${manualclient2}" />
+        <arg value="CLIENTHOST=${manualclient3}" />
         <arg value="CLIENTHOST=${clienthost1}" />
         <arg value="CLIENTHOST=${clienthost2}" />
         <arg value="CLIENTHOST=${clienthost3}" />
         <arg value="CLIENTHOST=${clienthost4}" />
+        <arg value="CLIENTHOST=${clienthost5}" />
         <arg value="LISTENFORDEBUGGER=${debug}" />
         <arg value="USEPROFILE=${useprofile}" />
         <arg value="CHECKTRANSACTION=${checktransaction}" />
@@ -1499,6 +1503,9 @@ BENCHMARKS
         <param name="clientcount" value="${env.BMCLIENTCOUNT}"/>
         <param name="processesperclient" value="1"/>
         <!-- use env.FIRSTCLIENT to override clienthost1 from volt4a -->
+        <param name="manualclient1" value="${env.CLIENT1}"/>
+        <param name="manualclient2" value="${env.CLIENT2}"/>
+        <param name="manualclient3" value="${env.CLIENT3}"/>
 
         <param name="duration" value="${env.BMDURATION}000"/>
         <param name="interval" value="${env.BMINTERVAL}000"/>
