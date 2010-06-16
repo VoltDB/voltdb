@@ -22,7 +22,6 @@ VoltDB catalog code generator.
 
 from catalog_utils import *
 from string import Template
-from subprocess import check_call as run
 from subprocess import Popen
 
 #
