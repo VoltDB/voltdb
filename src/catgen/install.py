@@ -22,12 +22,12 @@ import os
 # avoid unecessarily dirtying build dependencies when no
 # changes are necessary
 
-exit_status = os.system("diff -x .fake out/cppsrc/ ../ee/catalog/")
+exit_status = os.system("diff -x .svn -x .fake out/cppsrc/ ../ee/catalog/")
 if (exit_status != 0):
     os.system("rm ../ee/catalog/*")
     os.system("cp out/cppsrc/* ../ee/catalog/")
 
-exit_status = os.system("diff -x gui  -x package.html out/javasrc/ ../frontend/org/voltdb/catalog/")
+exit_status = os.system("diff -x .svn -x gui  -x package.html out/javasrc/ ../frontend/org/voltdb/catalog/")
 if (exit_status != 0):
     os.system("rm ../frontend/org/voltdb/catalog/*.java")
     os.system("cp out/javasrc/* ../frontend/org/voltdb/catalog/")
