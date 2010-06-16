@@ -394,7 +394,7 @@ CLEANING
 </target>
 
 <target name='cleantmp' description="Remove all data files Volt generated in /tmp.">
-  <exec dir='.' executable='/bin/sh'>
+  <exec dir='.' executable='/bin/sh' failonerror='false'>
     <arg line="-c 'rm -rf /tmp/myApp*.tmp *.vpt *.digest'"/>
   </exec>
 </target>
