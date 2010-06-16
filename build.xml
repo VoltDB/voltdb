@@ -58,6 +58,7 @@
 <property name='vendor.obj.dir'              location='third_party/java/obj'  />
 <property name='src.ee.parent.dir'           location='src/ee' />
 <property name='src.ee.dir'                  location='src/ee' />
+<property name='src.catalog.dir'             location='src/catgen' />
 <property name='m1catalog'                   location='${src.test.dir}/org/voltdb/catalog/catalog.txt' />
 <property name='depcache'                    value='.depcache' />
 
@@ -384,6 +385,12 @@ CLEANING
   <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf obj/*'"/>
   </exec>
+  <exec dir='.' executable='/bin/sh'>
+    <arg line="-c 'rm -rf src/ee/catalog/*'"/>
+  </exec>
+  <exec dir='.' executable='/bin/sh'>
+    <arg line="-c 'rm -rf src/frontend/org/voltdb/catalog/*.java'"/>
+  </exec>
 </target>
 
 <target name='cleantmp' description="Remove all data files Volt generated in /tmp.">
@@ -491,7 +498,7 @@ JAVA COMPILATION
 ***************************************
 -->
 
-<target name="compile" depends="compile_core, compile_pro"
+<target name="compile" depends="catalog, compile_core, compile_pro"
         description="Compile all Java source and test classes"/>
 
 <target name="compile_core">
@@ -631,6 +638,16 @@ NATIVE EE STUFF
 ***************************************
 -->
 
+<target name='catalog'
+        description="Generate catalog source code.">
+  <exec dir="${src.catalog.dir}" executable='python' failonerror='true'>
+    <arg line="catalog.py"/>
+  </exec>
+  <exec dir="${src.catalog.dir}" executable='python' failonerror='true'>
+    <arg line="install.py"/>
+  </exec>
+</target>
+
 <target name='jnicompile'
     depends='compile, jnicompile_temp, uptodate_jni_h.check'
     description="Build C++ JNI library."
@@ -713,7 +730,7 @@ NATIVE EE STUFF
     </exec>
 </target>
 
-<target name='ee' depends="jnicompile"
+<target name='ee' depends="catalog, jnicompile"
     description="Build C++ JNI library and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
         <arg line="build.py ${build}" />
