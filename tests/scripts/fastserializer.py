@@ -655,7 +655,7 @@ class FastSerializer:
                              % (scale))
         rest = precision - scale
         if rest > 26:
-            raise ValueError("Precision to the left ot the decimal point is %d"
+            raise ValueError("Precision to the left of the decimal point is %d"
                              " and the max is 26" % (rest))
         scale_factor = self.__class__.DEFAULT_DECIMAL_SCALE - scale
         unscaled_int = int(decimal.Decimal((0, digits, scale_factor)))
