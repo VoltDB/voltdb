@@ -499,33 +499,14 @@ public class Generator extends ClientMain
         Object randVal = null;
 
         //ADD CHAR() AND VARCHAR() HANDLING
-        if (type.equals("CHAR"))
-        {
-            switch (generator)
-            {
-                case RANDOM: randVal = RandomValues.getString(1, true); break;
-                //case USER: Handle TYPE errors
-            }
-        }
-        else if (type.startsWith("CHAR("))
-        {
-            int index = type.indexOf(')');
-            String temp = type.substring(5, index);
-            int length = Integer.valueOf(temp);
-            switch (generator)
-            {
-                case RANDOM: randVal = RandomValues.getString(length, true); break;
-                //case USER: Handle TYPE errors
-            }
-        }
-        else if (type.startsWith("VARCHAR("))
+        if (type.startsWith("VARCHAR("))
         {
             int index = type.indexOf(')');
             String temp = type.substring(8, index);
             int length = Integer.valueOf(temp);
             switch (generator)
             {
-                case RANDOM: randVal = RandomValues.getString(length, false); break;
+                case RANDOM: randVal = RandomValues.getString(length); break;
                 //case USER: Handle TYPE errors
             }
         }
@@ -561,7 +542,7 @@ public class Generator extends ClientMain
                 //case USER: //
             }
         }
-        else if (type.equals("SHORTINT"))
+        else if (type.equals("SMALLINT"))
         {
             switch (generator)
             {

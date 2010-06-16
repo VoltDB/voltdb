@@ -77,5 +77,29 @@ public class TestTheHashinator extends TestCase {
             assertTrue(eehash < partitionCount);
         }
     }
+
+    public void testNulls() {
+        ExecutionEngine ee = new ExecutionEngineJNI(null, 1, 1, 0, 0, "");
+
+        int jHash = TheHashinator.hashToPartition(new Short(Short.MIN_VALUE), 2);
+        int cHash = ee.hashinate(Short.MIN_VALUE, 2);
+        assertEquals(jHash, cHash);
+        System.out.println("jhash " + jHash + " chash " + cHash);
+
+        jHash = TheHashinator.hashToPartition(new Integer(Integer.MIN_VALUE), 2);
+        cHash = ee.hashinate(Integer.MIN_VALUE, 2);
+        assertEquals(jHash, cHash);
+        System.out.println("jhash " + jHash + " chash " + cHash);
+
+        jHash = TheHashinator.hashToPartition(new Long(Long.MIN_VALUE), 2);
+        cHash = ee.hashinate(Long.MIN_VALUE, 2);
+        assertEquals(jHash, cHash);
+        System.out.println("jhash " + jHash + " chash " + cHash);
+
+        jHash = TheHashinator.hashToPartition(new Byte(Byte.MIN_VALUE), 2);
+        cHash = ee.hashinate(Byte.MIN_VALUE, 2);
+        assertEquals(jHash, cHash);
+        System.out.println("jhash " + jHash + " chash " + cHash);
+    }
 }
 

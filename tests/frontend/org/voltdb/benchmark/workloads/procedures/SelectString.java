@@ -23,37 +23,28 @@
 package org.voltdb.benchmark.workloads.procedures;
 
 import org.voltdb.*;
+import org.voltdb.VoltProcedure.VoltAbortException;
 
 @ProcInfo
 (
     partitionInfo = "ALL_TYPES.SHORT_ITEM: 0",
     singlePartition = true
 )
-public class Delete extends VoltProcedure
+public class SelectString extends VoltProcedure
 {
-    public final SQLStmt deleteItem =
-      new SQLStmt("DELETE FROM ALL_TYPES " +
-                  "WHERE SHORT_ITEM = ?");
+    public final SQLStmt selectItem =
+        new SQLStmt("SELECT * " +
+                    "FROM ALL_TYPES " +
+                    "WHERE SHORT_ITEM = ? AND STRING_ITEM = ?");
 
-    public long run(short shortItem)
-        throws VoltAbortException
-    {
-        // Add a SQL statement to the execution queue.
-        voltQueueSQL(deleteItem, shortItem);
+      public VoltTable[] run(short shortItem, String stringItem)
+          throws VoltAbortException
+      {
+          // Add a SQL statement to the current execution queue
+          voltQueueSQL(selectItem, shortItem, stringItem);
 
-        // Run all queued queries.
-        // Passing true parameter since this is the last voltExecuteSQL for this procedure.
-        VoltTable[] retval = voltExecuteSQL(true);
-
-        // Ensure there is one table as expected
-        assert(retval.length == 1);
-        // Use a convenience method to get one
-        long modifiedTuples = retval[0].asScalarLong();
-        // Check that one tuple was modified
-        assert(modifiedTuples == 1);
-
-        // This will be converted into an array of VoltTable for the client.
-        // It will contain one table, with one column and one row.
-        return modifiedTuples;
-    }
+          // Run all queued queries.
+          // Passing true parameter since this is the last voltExecuteSQL for this procedure.
+          return voltExecuteSQL(true);
+      }
 }

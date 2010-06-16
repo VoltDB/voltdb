@@ -189,7 +189,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
                         reinterpret_cast<char*>(ValuePeeker::peekObjectValue(value)),
                                 ValuePeeker::peekObjectLength(value));
             } else {
-                int64_t intvalue = ValuePeeker::peekAsBigInt(value);
+                int64_t intvalue = ValuePeeker::peekAsRawInt64(value);
                 isLocal = m_engine->isLocalSite(intvalue);
             }
 

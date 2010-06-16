@@ -149,7 +149,7 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
                         reinterpret_cast<char*>(ValuePeeker::peekObjectValue(value)),
                         ValuePeeker::peekObjectLength(value));
             } else {
-                isLocal = m_engine->isLocalSite(ValuePeeker::peekAsBigInt(value));
+                isLocal = m_engine->isLocalSite(ValuePeeker::peekAsRawInt64(value));
             }
 
             // if it doesn't map to this site

@@ -24,35 +24,24 @@
 package org.voltdb.benchmark.workloads.procedures;
 
 import org.voltdb.*;
+import java.math.BigDecimal;
+import org.voltdb.types.*;
 
-/** A VoltDB stored procedure is a Java class defining one or
- * more SQL statements and implementing a <code>public
- * VoltTable[] run</code> method. VoltDB requires a
- * <code>ProcInfo</code> annotation providing metadata for the
- * procedure.  The <code>run</code> method is
- * defined to accept one or more parameters. These parameters take the
- * values the client passes via the
- * <code>VoltClient.callProcedure</code> invocation.
- *
- * <a
- * href="https://hzproject.com/svn/repos/doc/trunk/Stored%20Procedure%20API.docx">Stored
- * Procedure API</a> specifies valid stored procedure definitions,
- * including valid run method parameter types, required annotation
- * metadata, and correct use the Volt query interface.
-*/
-@ProcInfo(
-    partitionInfo = "MICROBENCHMARK.MICROBENCHMARK_ID: 0",
+@ProcInfo
+(
+    partitionInfo = "ALL_TYPES.SHORT_ITEM: 2",
     singlePartition = true
 )
-public class Insert extends VoltProcedure {
-
+public class Insert extends VoltProcedure
+{
     public final SQLStmt insertItem =
-        new SQLStmt("INSERT INTO MICROBENCHMARK VALUES (?, ?);");
+        new SQLStmt("INSERT INTO ALL_TYPES VALUES (?, ?, ?, ?, ?, ?, ?, ?);");
 
-    public long run( int MICROBENCHMARK_ID, String MICROBENCHMARK_ITEM ) throws VoltAbortException
+    public long run(int intItem, byte byteItem, short shortItem, long longItem, double doubleItem, BigDecimal decimalItem, TimestampType timeItem, String stringItem)
+        throws VoltAbortException
     {
         // Add a SQL statement to the execution queue.
-        voltQueueSQL( insertItem, MICROBENCHMARK_ID, MICROBENCHMARK_ITEM );
+        voltQueueSQL(insertItem, intItem, byteItem, shortItem, longItem, doubleItem, decimalItem, timeItem, stringItem);
 
         // Run all queued queries.
         // Passing true parameter since this is the last voltExecuteSQL for this procedure.

@@ -24,46 +24,22 @@
 package org.voltdb.benchmark.workloads;
 
 import java.math.BigDecimal;
-//Use TimestampType
-import org.voltdb.types.*;
+import org.voltdb.types.TimestampType;
 
 public class RandomValues
 {
-    private static double probabilityOfEndingString = .01;
     private static double coinToss = .5;
 
-    //THIS METHOD CURRENTLY TAKES A VERY SLOW APPROACH!!!
-    public static String getString()
+    //improve randomization of length
+    public static String getString(int maxLength)
     {
         String randomString = "";
 
         double rand = Math.random();
-        while (probabilityOfEndingString < rand)
+        while ((double)randomString.length() / maxLength < rand)
         {
             randomString += getChar();
             rand = Math.random();
-        }
-
-        return randomString;
-    }
-
-    public static String getString(int maxLength, boolean exactLength)
-    {
-        String randomString = "";
-
-        if (exactLength)
-        {
-            for (int i = 0; i < maxLength; i++)
-                randomString += getChar();
-        }
-        else
-        {
-            double rand = Math.random();
-            while ((double)randomString.length() / maxLength < rand)
-            {
-                randomString += getChar();
-                rand = Math.random();
-            }
         }
 
         return randomString;
@@ -80,7 +56,7 @@ public class RandomValues
     {
         byte randomByte = (byte)(Math.random() * Byte.MAX_VALUE);
         if (Math.random() < coinToss)
-            return (byte)(randomByte + Byte.MIN_VALUE);
+            return (byte)(randomByte + 1 - Byte.MAX_VALUE);
         else
             return randomByte;
     }
@@ -89,7 +65,7 @@ public class RandomValues
     {
         short randomShort = (short)(Math.random() * Short.MAX_VALUE);
         if (Math.random() < coinToss)
-            return (short)(randomShort + Short.MIN_VALUE);
+            return (short)(randomShort + 1 - Short.MAX_VALUE);
         else
             return randomShort;
     }
@@ -98,7 +74,7 @@ public class RandomValues
     {
         long randomLong = (long)(Math.random() * Long.MAX_VALUE);
         if (Math.random() < coinToss)
-            return (long)(randomLong + Long.MIN_VALUE);
+            return (long)(randomLong + (long)1 - Long.MAX_VALUE);
         else
             return randomLong;
     }
@@ -107,7 +83,7 @@ public class RandomValues
     {
         int randomInt = (int)(Math.random() * Integer.MAX_VALUE);
         if (Math.random() < coinToss)
-            return (int)(randomInt + Integer.MIN_VALUE);
+            return (int)(randomInt + 1 - Integer.MAX_VALUE);
         else
             return randomInt;
     }
@@ -116,22 +92,28 @@ public class RandomValues
     {
         double randomDouble = (double)(Math.random() * Double.MAX_VALUE);
         if (Math.random() < coinToss)
-            return (double)(randomDouble + Double.MIN_VALUE);
+            return (double)(randomDouble + 1. - Double.MAX_VALUE);
         else
             return randomDouble;
     }
 
-    //UNFINISHED
+    //CHECK FOR PRECISION CORRECTNESS
     public static BigDecimal getBigDecimal()
     {
-        //BigDecimal randomBigDecimal = new BigDecimal();
-        return null;
+        String temp = "";
+        if (Math.random() < coinToss)
+            temp += "-";
+        for (int i = 0; i < 26; i++)
+            temp += (int)(Math.random() * 10);
+        temp += ".";
+        for (int i = 0; i < 12; i++)
+            temp += (int)(Math.random() * 10);
+        return new BigDecimal(temp);
     }
 
-    //UNFINISHED
+    //HOW TO IMPROVE?
     public static TimestampType getTimestamp()
     {
-        //TimestampType randomTimestampType = new TimestampType();
-        return null;
+        return new TimestampType();
     }
 }

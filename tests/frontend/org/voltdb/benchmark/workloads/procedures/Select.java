@@ -24,34 +24,23 @@ package org.voltdb.benchmark.workloads.procedures;
 
 import org.voltdb.*;
 
-/** A VoltDB stored procedure is a Java class defining one or
- * more SQL statements and implementing a <code>public
- * VoltTable[] run</code> method. VoltDB requires a
- * <code>ProcInfo</code> annotation providing metadata for the
- * procedure.  The <code>run</code> method is
- * defined to accept one or more parameters. These parameters take the
- * values the client passes via the
- * <code>VoltClient.callProcedure</code> invocation.
- *
- * <a
- * href="https://hzproject.com/svn/repos/doc/trunk/Stored%20Procedure%20API.docx">Stored
- * Procedure API</a> specifies valid stored procedure definitions,
- * including valid run method parameter types, required annotation
- * metadata, and correct use the Volt query interface.
-*/
-@ProcInfo(
-    partitionInfo = "MICROBENCHMARK.MICROBENCHMARK_ID: 0",
+@ProcInfo
+(
+    partitionInfo = "ALL_TYPES.SHORT_ITEM: 0",
     singlePartition = true
 )
-public class Select extends VoltProcedure {
-
+public class Select extends VoltProcedure
+{
     public final SQLStmt selectItem =
-      new SQLStmt("SELECT MICROBENCHMARK_ID,  MICROBENCHMARK_ITEM " +
-                  "FROM MICROBENCHMARK WHERE  MICROBENCHMARK_ID = ?");
+      new SQLStmt("SELECT * " +
+                  "FROM ALL_TYPES " +
+                  "WHERE SHORT_ITEM = ?");
 
-    public VoltTable[] run( int MICROBENCHMARK_ID ) throws VoltAbortException {
+    public VoltTable[] run(short shortItem)
+        throws VoltAbortException
+    {
         // Add a SQL statement to the current execution queue
-        voltQueueSQL( selectItem, MICROBENCHMARK_ID );
+        voltQueueSQL(selectItem, shortItem);
 
         // Run all queued queries.
         // Passing true parameter since this is the last voltExecuteSQL for this procedure.

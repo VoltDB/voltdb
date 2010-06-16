@@ -24,12 +24,16 @@
 package org.voltdb.benchmark.workloads;
 
 import java.io.IOException;
+
 import java.net.ConnectException;
 import java.net.UnknownHostException;
 
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.Client;
+
+import java.math.BigDecimal;
+import org.voltdb.types.TimestampType;
 
 public class RandomLoader// implements Loader
 {
@@ -49,13 +53,35 @@ public class RandomLoader// implements Loader
         int numInserts = 100000;
         try
         {
+            int randInt;
+            byte randByte;
+            short randShort;
+            long randLong;
+            double randDouble;
+            BigDecimal randBigDecimal;
+            TimestampType randTimestamp;
             String randString;
-            //int randInt;
             for (int i = 0; i < numInserts; i++)
             {
-                randString = RandomValues.getString(100, true);
-                //randInt = RandomValues.getInt();
-                client.callProcedure(new GenericCallback(), "Insert", (int)(Math.random() * numInserts), randString);
+                randInt = RandomValues.getInt();
+                randByte = RandomValues.getByte();
+                randShort = RandomValues.getShort();
+                randLong = RandomValues.getLong();
+                randDouble = RandomValues.getDouble();
+                randBigDecimal = RandomValues.getBigDecimal();
+                randTimestamp = RandomValues.getTimestamp();
+                randString = RandomValues.getString(100);
+
+                client.callProcedure(   new GenericCallback(),
+                                        "Insert",
+                                        randInt,
+                                        randByte,
+                                        randShort,
+                                        randLong,
+                                        randDouble,
+                                        randBigDecimal,
+                                        randTimestamp,
+                                        randString);
             }
         }
         catch (UnknownHostException e)

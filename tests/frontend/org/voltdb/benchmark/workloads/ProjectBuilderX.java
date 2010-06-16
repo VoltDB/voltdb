@@ -36,7 +36,8 @@ public class ProjectBuilderX extends VoltProjectBuilder
         Delete.class,
         Insert.class,
         Select.class,
-        SelectAll.class
+        SelectAll.class,
+        SelectString.class
     };
 
     public static final Class<?> m_supplementalClasses[] = new Class<?>[]
@@ -49,7 +50,7 @@ public class ProjectBuilderX extends VoltProjectBuilder
 
     public static String m_partitioning[][] = new String[][]
     {
-        {"MICROBENCHMARK", "MICROBENCHMARK_ID"}
+        {"ALL_TYPES", "SHORT_ITEM"}
     };
 
     @Override

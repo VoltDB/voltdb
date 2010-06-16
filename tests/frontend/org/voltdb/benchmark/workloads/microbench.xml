@@ -8,17 +8,35 @@
             <param type="INTEGER">
                 <value generator="random" />
             </param>
+            <param type="TINYINT">
+                <value generator="random" />
+            </param>
+            <param type="SMALLINT">
+                <value generator="random" />
+            </param>
+            <param type="BIGINT">
+                <value generator="random" />
+            </param>
+            <param type="FLOAT">
+                <value generator="random" />
+            </param>
+            <param type="DECIMAL">
+                <value generator="random" />
+            </param>
+            <param type="TIMESTAMP">
+                <value generator="random" />
+            </param>
             <param type="VARCHAR(100)">
                 <value generator="random" />
             </param>
         </procedure>
         <procedure procName="Select" percOfWL="34">
-            <param type="INTEGER">
+            <param type="SMALLINT">
                 <value generator="random" />
             </param>
         </procedure>
         <procedure procName="Delete" percOfWL="33">
-            <param type="INTEGER">
+            <param type="SMALLINT">
                 <value generator="random" />
             </param>
         </procedure>
@@ -28,6 +46,24 @@
             <param type="INTEGER">
                 <value generator="random" />
             </param>
+            <param type="TINYINT">
+                <value generator="random" />
+            </param>
+            <param type="SMALLINT">
+                <value generator="random" />
+            </param>
+            <param type="BIGINT">
+                <value generator="random" />
+            </param>
+            <param type="FLOAT">
+                <value generator="random" />
+            </param>
+            <param type="DECIMAL">
+                <value generator="random" />
+            </param>
+            <param type="TIMESTAMP">
+                <value generator="random" />
+            </param>
             <param type="VARCHAR(100)">
                 <value generator="random" />
             </param>
@@ -35,14 +71,24 @@
     </workload>
     <workload wlName="Selects">
         <procedure procName="Select" percOfWL="100">
-            <param type="INTEGER">
+            <param type="SMALLINT">
                 <value generator="random" />
             </param>
         </procedure>
     </workload>
     <workload wlName="Deletes">
         <procedure procName="Delete" percOfWL="100">
-            <param type="INTEGER">
+            <param type="SMALLINT">
+                <value generator="random" />
+            </param>
+        </procedure>
+    </workload>
+    <workload wlName="SelectStrings">
+        <procedure procName="SelectString" percOfWL="100">
+            <param type="SMALLINT">
+                <value generator="random" />
+            </param>
+            <param type="VARCHAR(100)">
                 <value generator="random" />
             </param>
         </procedure>
