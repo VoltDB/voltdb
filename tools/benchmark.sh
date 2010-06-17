@@ -1,11 +1,11 @@
 # required environment variables:
+#   BMCLIENT         The client to run.  Defaults to TPCC.
 #   BMDURATION       The number of seconds for which to run the benchmark.
+#   BMHOSTCOUNT      How many servers to use.
+#   BMKFACTOR        The k-safety factor to use.
 #   MULTINODE_HELPER The name of a multinode helper job with an appropriate
 #                    timeout, such as multinode-CentOS-90m.
-#   BMHOSTCOUNT      How many servers to use.
 # optional environment variables:
-#   BMKFACTOR        The k-safety factor to use.
-#   BMCLIENT         The client to run.  Defaults to TPCC.
 #   EXTRAENV         A string containing extra options, typically used for
 #                    snapshot setup or rate limiting.
 

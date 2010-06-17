@@ -6,7 +6,7 @@ if [ $COUNT -eq 1 ]; then
   # execute the command
   HOST1=`hostname` eval $COMMAND 2>&1 > $OUTPUTFILE
   # wait for possible NFS delays so that all output flushes to calling console
-  sleep 15
+  sleep 60
   # kill calling console's tail -f process
   rm $OUTPUTFILE
 else

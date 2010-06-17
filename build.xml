@@ -71,7 +71,7 @@
 </condition>
 
 <!-- Default heap size for Volt clients+loaders (MB)  -->
-<condition property="volt.client.memory" value="1024">
+<condition property="volt.client.memory" value="2048">
     <not><isset property="volt.client.memory"/></not>
 </condition>
 
