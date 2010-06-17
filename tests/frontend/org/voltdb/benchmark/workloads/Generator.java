@@ -146,6 +146,7 @@ public class Generator extends ClientMain
             for (int i = 1; i < currWorkload.percs.length; i++)
                 cumPercArray[i] = cumPercArray[i - 1] + currWorkload.percs[i];
 
+            //ADDING DOUBLES IS NOT PRECISE! EDIT THIS...
             if (cumPercArray[cumPercArray.length - 1] != 100.)
             {
                 System.err.println("Invalid inputs in xml file for workload \"" + currWorkload.name + "\".");
@@ -294,20 +295,6 @@ public class Generator extends ClientMain
         {
             return;
         }
-/*
-        //This code should really never be reached, since txns/sec would decrease due to null activity.
-        try
-        {
-            while (true)
-            {
-                m_voltClient.drain();
-            }
-        }
-        catch (Exception e)
-        {
-            return;
-        }
-*/
     }
 
     @Override
@@ -375,13 +362,16 @@ public class Generator extends ClientMain
     @Override
     protected String getApplicationName()
     {
-        return "Microbenchmark.";
+        return "Microbenchmark";
     }
 
     @Override
     protected String getSubApplicationName()
     {
-        return "Workload.";
+        if (workloadToBuild != null)
+            return workloadToBuild;
+        else
+            return "FirstWorkload";
     }
 
     //ADD FEEDBACK: PRINTOUTS/FILEWRITES ABOUT CREATED WORKLOADS

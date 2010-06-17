@@ -70,7 +70,7 @@ public class RandomLoader// implements Loader
                 randDouble = RandomValues.getDouble();
                 randBigDecimal = RandomValues.getBigDecimal();
                 randTimestamp = RandomValues.getTimestamp();
-                randString = RandomValues.getString(100);
+                randString = RandomValues.getString(5);
 
                 client.callProcedure(   new GenericCallback(),
                                         "Insert",

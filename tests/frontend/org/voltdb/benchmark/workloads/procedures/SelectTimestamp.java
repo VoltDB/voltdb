@@ -24,24 +24,25 @@ package org.voltdb.benchmark.workloads.procedures;
 
 import org.voltdb.*;
 import org.voltdb.VoltProcedure.VoltAbortException;
+import org.voltdb.types.TimestampType;
 
 @ProcInfo
 (
     partitionInfo = "ALL_TYPES.SHORT_ITEM: 0",
     singlePartition = true
 )
-public class SelectString extends VoltProcedure
+public class SelectTimestamp extends VoltProcedure
 {
     public final SQLStmt selectItem =
         new SQLStmt("SELECT * " +
                     "FROM ALL_TYPES " +
-                    "WHERE SHORT_ITEM = ? AND STRING_ITEM = ?");
+                    "WHERE SHORT_ITEM = ? AND TIME_ITEM = ?");
 
-    public VoltTable[] run(short shortItem, String stringItem)
+    public VoltTable[] run(short shortItem, TimestampType timeItem)
         throws VoltAbortException
     {
         // Add a SQL statement to the current execution queue
-        voltQueueSQL(selectItem, shortItem, stringItem);
+        voltQueueSQL(selectItem, shortItem, timeItem);
 
         // Run all queued queries.
         // Passing true parameter since this is the last voltExecuteSQL for this procedure.

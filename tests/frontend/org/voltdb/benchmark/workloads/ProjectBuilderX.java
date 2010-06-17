@@ -37,7 +37,13 @@ public class ProjectBuilderX extends VoltProjectBuilder
         Insert.class,
         Select.class,
         SelectAll.class,
-        SelectString.class
+        SelectString.class,
+        SelectLong.class,
+        SelectDecimal.class,
+        SelectTimestamp.class,
+        SelectDouble.class,
+        SelectInt.class,
+        SelectByte.class
     };
 
     public static final Class<?> m_supplementalClasses[] = new Class<?>[]

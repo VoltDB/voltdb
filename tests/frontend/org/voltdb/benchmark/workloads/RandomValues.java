@@ -25,6 +25,7 @@ package org.voltdb.benchmark.workloads;
 
 import java.math.BigDecimal;
 import org.voltdb.types.TimestampType;
+import java.util.Random;
 
 public class RandomValues
 {
@@ -56,7 +57,7 @@ public class RandomValues
     {
         byte randomByte = (byte)(Math.random() * Byte.MAX_VALUE);
         if (Math.random() < coinToss)
-            return (byte)(randomByte + 1 - Byte.MAX_VALUE);
+            return (byte)(randomByte - Byte.MAX_VALUE);
         else
             return randomByte;
     }
@@ -65,7 +66,7 @@ public class RandomValues
     {
         short randomShort = (short)(Math.random() * Short.MAX_VALUE);
         if (Math.random() < coinToss)
-            return (short)(randomShort + 1 - Short.MAX_VALUE);
+            return (short)(randomShort - Short.MAX_VALUE);
         else
             return randomShort;
     }
@@ -74,7 +75,7 @@ public class RandomValues
     {
         long randomLong = (long)(Math.random() * Long.MAX_VALUE);
         if (Math.random() < coinToss)
-            return (long)(randomLong + (long)1 - Long.MAX_VALUE);
+            return (long)(randomLong - Long.MAX_VALUE);
         else
             return randomLong;
     }
@@ -83,7 +84,7 @@ public class RandomValues
     {
         int randomInt = (int)(Math.random() * Integer.MAX_VALUE);
         if (Math.random() < coinToss)
-            return (int)(randomInt + 1 - Integer.MAX_VALUE);
+            return (int)(randomInt - Integer.MAX_VALUE);
         else
             return randomInt;
     }
@@ -92,7 +93,7 @@ public class RandomValues
     {
         double randomDouble = (double)(Math.random() * Double.MAX_VALUE);
         if (Math.random() < coinToss)
-            return (double)(randomDouble + 1. - Double.MAX_VALUE);
+            return (double)(randomDouble - Double.MAX_VALUE);
         else
             return randomDouble;
     }

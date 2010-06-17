@@ -30,18 +30,18 @@ import org.voltdb.VoltProcedure.VoltAbortException;
     partitionInfo = "ALL_TYPES.SHORT_ITEM: 0",
     singlePartition = true
 )
-public class SelectString extends VoltProcedure
+public class SelectDouble extends VoltProcedure
 {
     public final SQLStmt selectItem =
         new SQLStmt("SELECT * " +
                     "FROM ALL_TYPES " +
-                    "WHERE SHORT_ITEM = ? AND STRING_ITEM = ?");
+                    "WHERE SHORT_ITEM = ? AND DOUBLE_ITEM = ?");
 
-    public VoltTable[] run(short shortItem, String stringItem)
+    public VoltTable[] run(short shortItem, double doubleItem)
         throws VoltAbortException
     {
         // Add a SQL statement to the current execution queue
-        voltQueueSQL(selectItem, shortItem, stringItem);
+        voltQueueSQL(selectItem, shortItem, doubleItem);
 
         // Run all queued queries.
         // Passing true parameter since this is the last voltExecuteSQL for this procedure.
