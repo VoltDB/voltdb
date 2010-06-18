@@ -543,6 +543,13 @@ JAVA COMPILATION
         </fileset>
     </copy>
 
+    <!-- copy file containing workloads for voltdbfat.jar -->
+    <copy flatten='false' todir='${build.test.dir}'>
+        <fileset dir="${src.test.dir}">
+            <include name="**/microbench.xml"/>
+        </fileset>
+    </copy>
+
     <copy todir='${build.test.dir}/org/hsqldb'>
         <fileset dir="${src.hsqldb.test.dir}/org/hsqldb">
             <include name="*.sql"/>

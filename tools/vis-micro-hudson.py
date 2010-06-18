@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
-# This is a visualizer which pulls TPC-C benchmark results from the MySQL
-# databases and visualizes them. Four graphs will be generated, latency graph on
-# sinigle node and multiple nodes, and throughput graph on single node and
-# multiple nodes.
+# This is a visualizer which pulls microbenchmark results from the MySQL
+# databases and visualizes them. Four graphs will be generated per workload,
+# latency graphs on single node and multiple nodes, and throughput graphs
+# on single node and multiple nodes.
 #
 # Run it without any arguments to see what arguments are needed.
 

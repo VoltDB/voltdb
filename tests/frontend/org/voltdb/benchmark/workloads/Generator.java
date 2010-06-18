@@ -34,6 +34,9 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.lang.reflect.*;
 
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.net.URLDecoder;
 import java.net.UnknownHostException;
 import java.net.ConnectException;
 
@@ -100,7 +103,8 @@ public class Generator extends ClientMain
 
     public static void main(String[] args)
     {
-        xmlFilePath = "../workspace/voltdb/tests/frontend/org/voltdb/benchmark/workloads/microbench.xml";
+        //xmlFilePath = "../workspace/voltdb/tests/frontend/org/voltdb/benchmark/workloads/microbench.xml";
+        xmlFilePath = null;
         for (int i = 0; i < args.length; i++)
             if (args[i].startsWith("configfile="))
             {
@@ -302,21 +306,18 @@ public class Generator extends ClientMain
     {
         workloads = new LinkedList<Workload>();
 
-        //FOR SOME WEIRD REASON, USING .getParentFile() IS NOT WORKING...
-        File xmlFile = new File(xmlFilePath);
-        String currFilePath = (new File("dummyName")).getAbsolutePath();
-        while (!currFilePath.endsWith("/"))
-            currFilePath = currFilePath.substring(0, currFilePath.length() - 1);
-        currFilePath = currFilePath.substring(0, currFilePath.length() - 1);
-        while (xmlFilePath.startsWith("../"))
+        File xmlFile = null;
+
+        if (xmlFilePath == null)
         {
-            xmlFilePath = xmlFilePath.substring(3);
-            while (!currFilePath.endsWith("/"))
-                currFilePath = currFilePath.substring(0, currFilePath.length() - 1);
-            currFilePath = currFilePath.substring(0, currFilePath.length() - 1);
-            xmlFile = new File(currFilePath, xmlFilePath);
+            InputStream iStream = this.getClass().getResourceAsStream("microbench.xml");
+            mb = unmarshal(iStream);
         }
-        mb = unmarshal(xmlFile);
+        else
+        {
+            xmlFile = new File(xmlFilePath);
+            mb = unmarshal(xmlFile);
+        }
 
         boolean loaded = runLoader(mb);
         testPrint();
@@ -591,6 +592,24 @@ public class Generator extends ClientMain
             Unmarshaller unmarshaller = jc.createUnmarshaller();
             //ADD SYNTAX VALIDATION
             mb = (Microbenchmark)unmarshaller.unmarshal(xmlFile);
+        }
+        catch (JAXBException e)
+        {
+            e.printStackTrace();
+            System.exit(-1);
+        }
+        return mb;
+    }
+
+    private Microbenchmark unmarshal(InputStream iStream)
+    {
+        Microbenchmark mb = null;
+        try
+        {
+            JAXBContext jc = JAXBContext.newInstance("org.voltdb.benchmark.workloads.xml");
+            Unmarshaller unmarshaller = jc.createUnmarshaller();
+            //ADD SYNTAX VALIDATION
+            mb = (Microbenchmark)unmarshaller.unmarshal(iStream);
         }
         catch (JAXBException e)
         {
