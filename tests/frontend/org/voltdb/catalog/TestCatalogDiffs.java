@@ -245,6 +245,25 @@ public class TestCatalogDiffs extends TestCase {
         assertEquals(updatedOriginalSerialized, updatedSerialized);
     }
 
+    public void testUnallowedChange() {
+        String original = compile("base", BASEPROCS);
+        Catalog catOriginal = catalogForJar(original);
+
+        // compile an invalid change (add ELT, in this case)
+        TPCCProjectBuilder builder = new TPCCProjectBuilder();
+        builder.addDefaultSchema();
+        builder.addDefaultPartitioning();
+        builder.addDefaultELT();
+        builder.addProcedures(BASEPROCS);
+        String updated = "tpcc-catalogcheck-invalid.jar";
+        builder.compile(updated);
+        Catalog catUpdated = catalogForJar(updated);
+
+        // and verify the allowed flag
+        CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
+        assertFalse(diff.supported());
+    }
+
     public void testIsUpIgnored() {
         String original = compile("base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
