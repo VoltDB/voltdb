@@ -26,6 +26,8 @@ package org.voltdb.catalog;
 import junit.framework.TestCase;
 
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
+import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
+import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.utils.CatalogUtil;
 
 public class TestCatalogDiffs extends TestCase {
@@ -43,10 +45,20 @@ public class TestCatalogDiffs extends TestCase {
                                  org.voltdb.benchmark.tpcc.procedures.delivery.class };
 
     protected String compile(String name, Class<?>... procList) {
+        return  compileWithGroups(null, null, name, procList);
+    }
+
+    protected String compileWithGroups(GroupInfo[] gi, UserInfo[] ui, String name, Class<?>... procList) {
         TPCCProjectBuilder builder = new TPCCProjectBuilder();
         builder.addDefaultSchema();
         builder.addDefaultPartitioning();
         builder.addProcedures(procList);
+
+        if (gi != null && gi.length > 0)
+            builder.addGroups(gi);
+        if (ui != null && ui.length > 0)
+            builder.addUsers(ui);
+
         String retval = "tpcc-catalogcheck-" + name + ".jar";
         builder.compile(retval);
         return retval;
@@ -92,6 +104,137 @@ public class TestCatalogDiffs extends TestCase {
         String original = compile("base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
         String updated = compile("fewer", FEWERPROCS);
+        Catalog catUpdated = catalogForJar(updated);
+        String updatedSerialized = catUpdated.serialize();
+
+        CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
+        catOriginal.execute(diff.commands());
+        assertTrue(diff.supported());
+        String updatedOriginalSerialized = catOriginal.serialize();
+        assertEquals(updatedOriginalSerialized, updatedSerialized);
+    }
+
+    public void testAddGroup() {
+        String original = compile("base", BASEPROCS);
+        Catalog catOriginal = catalogForJar(original);
+
+        GroupInfo gi[] = new GroupInfo[1];
+        gi[0] = new GroupInfo("group1", true, true);
+        String updated = compileWithGroups(gi, null, "base", BASEPROCS);
+        Catalog catUpdated = catalogForJar(updated);
+        String updatedSerialized = catUpdated.serialize();
+
+        CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
+        catOriginal.execute(diff.commands());
+        assertTrue(diff.supported());
+        String updatedOriginalSerialized = catOriginal.serialize();
+        assertEquals(updatedOriginalSerialized, updatedSerialized);
+    }
+
+    public void testAddGroupAndUser() {
+        String original = compile("base", BASEPROCS);
+        Catalog catOriginal = catalogForJar(original);
+
+        GroupInfo gi[] = new GroupInfo[1];
+        gi[0] = new GroupInfo("group1", true, true);
+
+        UserInfo ui[] = new UserInfo[1];
+        ui[0] = new UserInfo("user1", true, true, "password", new String[] {"group1"});
+
+        String updated = compileWithGroups(gi, ui, "base", BASEPROCS);
+        Catalog catUpdated = catalogForJar(updated);
+        String updatedSerialized = catUpdated.serialize();
+
+        CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
+        catOriginal.execute(diff.commands());
+        assertTrue(diff.supported());
+        String updatedOriginalSerialized = catOriginal.serialize();
+        assertEquals(updatedOriginalSerialized, updatedSerialized);
+    }
+
+    public void testModifyUser() {
+        GroupInfo gi[] = new GroupInfo[1];
+        gi[0] = new GroupInfo("group1", true, true);
+
+        UserInfo ui[] = new UserInfo[1];
+        ui[0] = new UserInfo("user1", true, true, "password", new String[] {"group1"});
+
+        String original = compileWithGroups(gi, ui, "base", BASEPROCS);
+        Catalog catOriginal = catalogForJar(original);
+
+        // change a user.
+        ui[0] = new UserInfo("user1", false, false, "drowssap", new String[] {"group1"});
+        String updated = compileWithGroups(gi, ui, "base", BASEPROCS);
+        Catalog catUpdated = catalogForJar(updated);
+        String updatedSerialized = catUpdated.serialize();
+
+        CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
+        catOriginal.execute(diff.commands());
+        assertTrue(diff.supported());
+        String updatedOriginalSerialized = catOriginal.serialize();
+        assertEquals(updatedOriginalSerialized, updatedSerialized);
+    }
+
+    public void testDeleteUser() {
+        GroupInfo gi[] = new GroupInfo[1];
+        gi[0] = new GroupInfo("group1", true, true);
+
+        UserInfo ui[] = new UserInfo[1];
+        ui[0] = new UserInfo("user1", true, true, "password", new String[] {"group1"});
+
+        String original = compileWithGroups(gi, ui, "base", BASEPROCS);
+        Catalog catOriginal = catalogForJar(original);
+
+        // no users this time
+        String updated = compileWithGroups(gi, null, "base", BASEPROCS);
+        Catalog catUpdated = catalogForJar(updated);
+        String updatedSerialized = catUpdated.serialize();
+
+        CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
+        catOriginal.execute(diff.commands());
+        assertTrue(diff.supported());
+        String updatedOriginalSerialized = catOriginal.serialize();
+        assertEquals(updatedOriginalSerialized, updatedSerialized);
+    }
+
+    public void testDeleteGroupAndUser() {
+        GroupInfo gi[] = new GroupInfo[1];
+        gi[0] = new GroupInfo("group1", true, true);
+
+        UserInfo ui[] = new UserInfo[1];
+        ui[0] = new UserInfo("user1", true, true, "password", new String[] {"group1"});
+
+        String original = compileWithGroups(gi, ui, "base", BASEPROCS);
+        Catalog catOriginal = catalogForJar(original);
+
+        // no groups or users this time
+        String updated = compileWithGroups(null, null, "base", BASEPROCS);
+        Catalog catUpdated = catalogForJar(updated);
+        String updatedSerialized = catUpdated.serialize();
+
+        CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
+        catOriginal.execute(diff.commands());
+        assertTrue(diff.supported());
+        String updatedOriginalSerialized = catOriginal.serialize();
+        assertEquals(updatedOriginalSerialized, updatedSerialized);
+    }
+
+    public void testChangeUsersAssignedGroups() {
+        GroupInfo gi[] = new GroupInfo[2];
+        gi[0] = new GroupInfo("group1", true, true);
+        gi[1] = new GroupInfo("group2", true, true);
+
+        UserInfo ui[] = new UserInfo[2];
+        ui[0] = new UserInfo("user1", true, true, "password", new String[] {"group1"});
+        ui[1] = new UserInfo("user2", true, true, "password", new String[] {"group2"});
+
+        String original = compileWithGroups(gi, ui, "base", BASEPROCS);
+        Catalog catOriginal = catalogForJar(original);
+
+        // swap the user's group assignments
+        ui[0] = new UserInfo("user1", true, true, "password", new String[] {"group2"});
+        ui[1] = new UserInfo("user2", true, true, "password", new String[] {"group1"});
+        String updated = compileWithGroups(gi, ui, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
         String updatedSerialized = catUpdated.serialize();
 
