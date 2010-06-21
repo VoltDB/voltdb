@@ -296,14 +296,14 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
             // store the version of the catalog the diffs were created against
             retval.expectedCatalogVersion = context.catalog.getSubTreeVersion();
 
-            // compute the diff
-            String diffCommands = CatalogDiffEngine.getCommandsToDiff(context.catalog, newCatalog);
-
-            if (verifyCatalogChangesAreAllowed(diffCommands) == false)
+            // compute the diff in StringBuilder
+            CatalogDiffEngine diff = new CatalogDiffEngine(context.catalog, newCatalog);
+            if (!diff.supported()) {
                 throw new Exception("The requested catalog change is not a supported change at this time.");
+            }
 
             // since diff commands can be stupidly big, compress them here
-            retval.encodedDiffCommands = Encoder.compressAndBase64Encode(diffCommands);
+            retval.encodedDiffCommands = Encoder.compressAndBase64Encode(diff.commands());
             // check if the resulting string is small enough to fit in our parameter sets (about 2mb)
             if (retval.encodedDiffCommands.length() > (2 * 1000 * 1000)) {
                 throw new Exception("The requested catalog change is too large for this version of VoltDB. " +
@@ -319,38 +319,4 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
         return retval;
     }
 
-    private boolean verifyCatalogChangesAreAllowed(String diffCommands) {
-        String[] allowedCommandPrefixes = { "set /clusters[cluster]/databases[database]/users[",
-                                            "set /clusters[cluster]/databases[database]/groups[",
-                                            "set /clusters[cluster]/databases[database]/procedures[",
-                                            "add /clusters[cluster]/databases[database] users ",
-                                            "add /clusters[cluster]/databases[database] groups",
-                                            "add /clusters[cluster]/databases[database] procedures ",
-                                            "delete /clusters[cluster]/databases[database] users ",
-                                            "delete /clusters[cluster]/databases[database] groups ",
-                                            "delete /clusters[cluster]/databases[database] procedures ",
-                                            "add /clusters[cluster]/databases[database]/users[",
-                                            "add /clusters[cluster]/databases[database]/groups[",
-                                            "add /clusters[cluster]/databases[database]/procedures[",
-                                            "delete /clusters[cluster]/databases[database]/users[",
-                                            "delete /clusters[cluster]/databases[database]/groups[",
-                                            "delete /clusters[cluster]/databases[database]/procedures[" };
-
-        for (String command : diffCommands.split("\r\n|\r|\n")) {
-            command = command.trim();
-            if (command.length() == 0)
-                continue;
-            boolean foundMatch = false;
-
-            for (String prefix : allowedCommandPrefixes) {
-                if (command.startsWith(prefix))
-                    foundMatch = true;
-            }
-
-            if (foundMatch == false)
-                return false;
-        }
-
-        return true;
-    }
 }

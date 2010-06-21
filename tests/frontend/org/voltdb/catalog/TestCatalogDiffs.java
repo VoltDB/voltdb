@@ -32,10 +32,13 @@ public class TestCatalogDiffs extends TestCase {
 
     Class<?>[] BASEPROCS =     { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
                                  org.voltdb.benchmark.tpcc.procedures.delivery.class };
+
     Class<?>[] EXPANDEDPROCS = { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
                                  org.voltdb.benchmark.tpcc.procedures.delivery.class,
                                  org.voltdb.benchmark.tpcc.procedures.slev.class };
+
     Class<?>[] FEWERPROCS =    { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class };
+
     Class<?>[] CONFLICTPROCS = { org.voltdb.catalog.InsertNewOrder.class,
                                  org.voltdb.benchmark.tpcc.procedures.delivery.class };
 
@@ -64,8 +67,9 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catUpdated = catalogForJar(updated);
         String updatedSerialized = catUpdated.serialize();
 
-        String diffCommands = CatalogDiffEngine.getCommandsToDiff(catOriginal, catUpdated);
-        catOriginal.execute(diffCommands);
+        CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
+        assertTrue(diff.supported());
+        catOriginal.execute(diff.commands());
         String updatedOriginalSerialized = catOriginal.serialize();
         assertEquals(updatedOriginalSerialized, updatedSerialized);
     }
@@ -77,8 +81,9 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catUpdated = catalogForJar(updated);
         String updatedSerialized = catUpdated.serialize();
 
-        String diffCommands = CatalogDiffEngine.getCommandsToDiff(catOriginal, catUpdated);
-        catOriginal.execute(diffCommands);
+        CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
+        catOriginal.execute(diff.commands());
+        assertTrue(diff.supported());
         String updatedOriginalSerialized = catOriginal.serialize();
         assertEquals(updatedOriginalSerialized, updatedSerialized);
     }
@@ -90,24 +95,29 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catUpdated = catalogForJar(updated);
         String updatedSerialized = catUpdated.serialize();
 
-        String diffCommands = CatalogDiffEngine.getCommandsToDiff(catOriginal, catUpdated);
-        catOriginal.execute(diffCommands);
+        CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
+        catOriginal.execute(diff.commands());
+        assertTrue(diff.supported());
         String updatedOriginalSerialized = catOriginal.serialize();
         assertEquals(updatedOriginalSerialized, updatedSerialized);
     }
 
-    public void testIsUpIgnored()
-    {
+    public void testIsUpIgnored() {
         String original = compile("base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
         catOriginal.getClusters().get("cluster").getSites().add("999");
         catOriginal.getClusters().get("cluster").getSites().get("999").set("isUp", "true");
         Catalog cat_copy = catOriginal.deepCopy();
-        String null_diff = CatalogDiffEngine.getCommandsToDiff(catOriginal, cat_copy);
+
+        CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, cat_copy);
+        String null_diff = diff.commands();
+        assertTrue(diff.supported());
         assertEquals("", null_diff);
+
         cat_copy.getClusters().get("cluster").getSites().get("999").set("isUp", "false");
-        null_diff = CatalogDiffEngine.getCommandsToDiff(catOriginal, cat_copy);
-        assertEquals("", null_diff);
+        diff = new CatalogDiffEngine(catOriginal, cat_copy);
+        assertTrue(diff.supported());
+        assertEquals("", diff.commands());
     }
 
 }
