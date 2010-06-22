@@ -27,15 +27,10 @@ import org.voltdb.planner.PlannerContext;
 import org.voltdb.planner.StatsField;
 import org.voltdb.types.*;
 
-/**
- *
- */
 public class SeqScanPlanNode extends AbstractScanPlanNode {
-    /**
-     * @param id
-     */
-    public SeqScanPlanNode(PlannerContext context, Integer id) {
-        super(context, id);
+
+    public SeqScanPlanNode(PlannerContext context) {
+        super(context);
     }
 
     @Override

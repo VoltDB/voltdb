@@ -29,9 +29,6 @@ import org.voltdb.planner.PlannerContext;
 import org.voltdb.planner.PlanColumn.SortOrder;
 import org.voltdb.utils.CatalogUtil;
 
-/**
- *
- */
 public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
     public enum Members {
@@ -45,11 +42,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     protected String m_targetTableName = "";
     protected String m_targetTableAlias = null;
 
-    /**
-     * @param id
-     */
-    protected AbstractScanPlanNode(PlannerContext context, Integer id) {
-        super(context, id);
+    protected AbstractScanPlanNode(PlannerContext context) {
+        super(context);
     }
 
     @Override

@@ -70,21 +70,6 @@ import org.voltdb.utils.CatalogUtil;
  */
 public class PlanAssembler {
 
-    private static final int MAX_LOCAL_ID = 1000000;
-    private static boolean m_useGlobalIds = true;
-
-    /**
-     * Internal PlanNodeId counter. Note that this member is static, which means
-     * all PlanNodes will have a unique id
-     */
-    private static int NEXT_PLAN_NODE_ID = 1;
-    private static int NEXT_LOCAL_PLAN_NODE_ID = 1;
-
-    /**
-     * Dependency id counter. This is only used for connection send and receive
-     * nodes in plan fragments
-     */
-
     /** convenience pointer to the cluster object in the catalog */
     final Cluster m_catalogCluster;
     /** convenience pointer to the database object in the catalog */
@@ -131,23 +116,6 @@ public class PlanAssembler {
         m_catalogCluster = catalogCluster;
         m_catalogDb = catalogDb;
         m_partitionCount = m_catalogCluster.getPartitions().size();
-    }
-
-    static void setUseGlobalIds(boolean useGlobalIds) {
-        if (useGlobalIds) {
-            m_useGlobalIds = true;
-            NEXT_LOCAL_PLAN_NODE_ID = 1;
-        } else {
-            m_useGlobalIds = false;
-        }
-    }
-
-    public static int getNextPlanNodeId() {
-        assert ((NEXT_LOCAL_PLAN_NODE_ID + 1) <= MAX_LOCAL_ID);
-        if (m_useGlobalIds)
-            return NEXT_PLAN_NODE_ID++;
-        else
-            return NEXT_LOCAL_PLAN_NODE_ID++;
     }
 
     String getSQLText() {
@@ -389,7 +357,7 @@ public class PlanAssembler {
         if ((m_parsedSelect.limit != -1) || (m_parsedSelect.limitParameterId != -1) ||
             (m_parsedSelect.offset > 0) || (m_parsedSelect.offsetParameterId != -1))
         {
-            LimitPlanNode limit = new LimitPlanNode(m_context, getNextPlanNodeId());
+            LimitPlanNode limit = new LimitPlanNode(m_context);
             limit.setLimit((int) m_parsedSelect.limit);
             limit.setOffset((int) m_parsedSelect.offset);
 
@@ -407,7 +375,7 @@ public class PlanAssembler {
             root = limit;
         }
 
-        SendPlanNode sendNode = new SendPlanNode(m_context, getNextPlanNodeId());
+        SendPlanNode sendNode = new SendPlanNode(m_context);
 
         // connect the nodes to build the graph
         sendNode.addAndLinkChild(root);
@@ -436,10 +404,10 @@ public class PlanAssembler {
             return null;
 
         // generate the delete node with the right target table
-        DeletePlanNode deleteNode = new DeletePlanNode(m_context, getNextPlanNodeId());
+        DeletePlanNode deleteNode = new DeletePlanNode(m_context);
         deleteNode.setTargetTableName(targetTable.getTypeName());
 
-        ProjectionPlanNode projectionNode = new ProjectionPlanNode(m_context, getNextPlanNodeId());
+        ProjectionPlanNode projectionNode = new ProjectionPlanNode(m_context);
         AbstractExpression addressExpr = new TupleAddressExpression();
         PlanColumn colInfo = m_context.getPlanColumn(addressExpr, "tuple_address");
         projectionNode.appendOutputColumn(colInfo);
@@ -523,12 +491,12 @@ public class PlanAssembler {
         if (subSelectRoot == null)
             return null;
 
-        UpdatePlanNode updateNode = new UpdatePlanNode(m_context, getNextPlanNodeId());
+        UpdatePlanNode updateNode = new UpdatePlanNode(m_context);
         updateNode.setTargetTableName(targetTable.getTypeName());
         // set this to false until proven otherwise
         updateNode.setUpdateIndexes(false);
 
-        ProjectionPlanNode projectionNode = new ProjectionPlanNode(m_context, getNextPlanNodeId());
+        ProjectionPlanNode projectionNode = new ProjectionPlanNode(m_context);
         TupleAddressExpression tae = new TupleAddressExpression();
         PlanColumn colInfo = m_context.getPlanColumn(tae, "tuple_address");
         projectionNode.appendOutputColumn(colInfo);
@@ -622,14 +590,14 @@ public class PlanAssembler {
         }
 
         // the root of the insert plan is always an InsertPlanNode
-        InsertPlanNode insertNode = new InsertPlanNode(m_context, getNextPlanNodeId());
+        InsertPlanNode insertNode = new InsertPlanNode(m_context);
         insertNode.setTargetTableName(targetTable.getTypeName());
         insertNode.setMultiPartition(m_singlePartition == false);
 
         // the materialize node creates a tuple to insert (which is frankly not
         // always optimal)
         MaterializePlanNode materializeNode =
-            new MaterializePlanNode(m_context, getNextPlanNodeId());
+            new MaterializePlanNode(m_context);
 
         // get the ordered list of columns for the targettable using a helper
         // function they're not guaranteed to be in order in the catalog
@@ -690,12 +658,12 @@ public class PlanAssembler {
             rootNode = insertCountInDMLPlan(rootNode);
 
 
-            SendPlanNode sendNode = new SendPlanNode(m_context, getNextPlanNodeId());
+            SendPlanNode sendNode = new SendPlanNode(m_context);
             // this will make the child planfragment be sent to all partitions
             sendNode.isMultiPartition = true;
             sendNode.addAndLinkChild(rootNode);
 
-            ReceivePlanNode recvNode = new ReceivePlanNode(m_context, getNextPlanNodeId());
+            ReceivePlanNode recvNode = new ReceivePlanNode(m_context);
             recvNode.addAndLinkChild(sendNode);
             rootNode = recvNode;
 
@@ -718,7 +686,7 @@ public class PlanAssembler {
         // update the output columns in case our caller hasn't
         dmlRoot.updateOutputColumns(m_catalogDb);
         // Add an aggregate count.
-        AggregatePlanNode countNode = new AggregatePlanNode(m_context, getNextPlanNodeId());
+        AggregatePlanNode countNode = new AggregatePlanNode(m_context);
         List<String> countColumnNames = new ArrayList<String>();
         List<Integer> countColumnGuids = new ArrayList<Integer>();
         List<ExpressionType> countColumnTypes = new ArrayList<ExpressionType>();
@@ -755,8 +723,8 @@ public class PlanAssembler {
         dmlRoot.updateOutputColumns(m_catalogDb);
 
         // create the nodes being pushed on top of dmlRoot.
-        AggregatePlanNode countNode = new AggregatePlanNode(m_context, getNextPlanNodeId());
-        SendPlanNode sendNode = new SendPlanNode(m_context, getNextPlanNodeId());
+        AggregatePlanNode countNode = new AggregatePlanNode(m_context);
+        SendPlanNode sendNode = new SendPlanNode(m_context);
 
         // configure the count aggregate (sum) node to produce a single
         // output column containing the result of the sum.
@@ -815,7 +783,7 @@ public class PlanAssembler {
         rootNode.updateOutputColumns(m_catalogDb);
 
         ProjectionPlanNode projectionNode =
-            new ProjectionPlanNode(m_context, PlanAssembler.getNextPlanNodeId());
+            new ProjectionPlanNode(m_context);
 
         // The input to this projection MUST include all the columns needed
         // to satisfy any TupleValueExpression in the parsed select statement's
@@ -944,7 +912,7 @@ public class PlanAssembler {
     AbstractPlanNode addOrderBy(AbstractPlanNode root) {
         assert (m_parsedSelect != null);
 
-        OrderByPlanNode orderByNode = new OrderByPlanNode(m_context, getNextPlanNodeId());
+        OrderByPlanNode orderByNode = new OrderByPlanNode(m_context);
         for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.orderColumns) {
             orderByNode.getSortColumnNames().add(col.alias);
             orderByNode.getSortColumns().add(col.index);
@@ -991,7 +959,7 @@ public class PlanAssembler {
             containsAggregateExpression = true;
 
         if (containsAggregateExpression) {
-            aggNode = new HashAggregatePlanNode(m_context, getNextPlanNodeId());
+            aggNode = new HashAggregatePlanNode(m_context);
 
             for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.groupByColumns) {
                 aggNode.getGroupByColumns().add(col.index);
@@ -1123,7 +1091,7 @@ public class PlanAssembler {
     AbstractPlanNode addDistinctNode(AbstractPlanNode root,
                                      TupleValueExpression expr)
     {
-        DistinctPlanNode distinctNode = new DistinctPlanNode(m_context, getNextPlanNodeId());
+        DistinctPlanNode distinctNode = new DistinctPlanNode(m_context);
         distinctNode.setDistinctColumnName(expr.getColumnAlias());
 
         PlanColumn distinctColumn =

@@ -22,20 +22,13 @@ import org.json.JSONStringer;
 import org.voltdb.planner.PlannerContext;
 import org.voltdb.types.*;
 
-
-/**
- *
- */
 public class SendPlanNode extends AbstractPlanNode {
 
     // used for planning
     public boolean isMultiPartition = false;
 
-    /**
-     * @param id
-     */
-    public SendPlanNode(PlannerContext context, Integer id) {
-        super(context, id);
+    public SendPlanNode(PlannerContext context) {
+        super(context);
     }
 
     @Override

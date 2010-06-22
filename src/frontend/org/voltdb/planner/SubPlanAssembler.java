@@ -470,12 +470,12 @@ public abstract class SubPlanAssembler {
      */
     protected AbstractPlanNode addSendReceivePair(AbstractPlanNode scanNode) {
 
-        SendPlanNode sendNode = new SendPlanNode(m_context, PlanAssembler.getNextPlanNodeId());
+        SendPlanNode sendNode = new SendPlanNode(m_context);
         // this will make the child planfragment be sent to all partitions
         sendNode.isMultiPartition = true;
         sendNode.addAndLinkChild(scanNode);
 
-        ReceivePlanNode recvNode = new ReceivePlanNode(m_context, PlanAssembler.getNextPlanNodeId());
+        ReceivePlanNode recvNode = new ReceivePlanNode(m_context);
         recvNode.addAndLinkChild(sendNode);
 
         // receive node requires the schema of its output table
@@ -503,7 +503,7 @@ public abstract class SubPlanAssembler {
         Index index = path.index;
 
         // build the list of search-keys for the index in question
-        IndexScanPlanNode scanNode = new IndexScanPlanNode(m_context, PlanAssembler.getNextPlanNodeId());
+        IndexScanPlanNode scanNode = new IndexScanPlanNode(m_context);
         List<AbstractExpression> searchKeys = scanNode.getSearchKeyExpressions();
         for (AbstractExpression expr : path.indexExprs) {
             AbstractExpression expr2 = ExpressionUtil.getOtherTableExpression(expr, table.getTypeName());
@@ -548,7 +548,7 @@ public abstract class SubPlanAssembler {
             localWhere = ExpressionUtil.combine(exprs);
 
         // build the scan node
-        SeqScanPlanNode scanNode = new SeqScanPlanNode(m_context, PlanAssembler.getNextPlanNodeId());
+        SeqScanPlanNode scanNode = new SeqScanPlanNode(m_context);
         scanNode.setTargetTableName(table.getTypeName());
         scanNode.setPredicate(localWhere);
         AbstractPlanNode rootNode = scanNode;

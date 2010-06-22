@@ -19,13 +19,9 @@ package org.voltdb.plannodes;
 
 import org.json.JSONException;
 import org.json.JSONStringer;
-import org.voltdb.planner.PlanAssembler;
 import org.voltdb.planner.PlannerContext;
-import org.voltdb.types.*;
+import org.voltdb.types.PlanNodeType;
 
-/**
- *
- */
 public class DistinctPlanNode extends AbstractPlanNode {
 
     public enum Members {
@@ -40,8 +36,8 @@ public class DistinctPlanNode extends AbstractPlanNode {
     protected int m_distinctColumnGuid;
     protected String m_distinctColumnName;
 
-    public DistinctPlanNode(PlannerContext context, Integer id) {
-        super(context, id);
+    public DistinctPlanNode(PlannerContext context) {
+        super(context);
     }
 
     /**
@@ -50,7 +46,7 @@ public class DistinctPlanNode extends AbstractPlanNode {
      * @return copy
      */
     public DistinctPlanNode produceCopyForTransformation() {
-        DistinctPlanNode copy = new DistinctPlanNode(m_context, PlanAssembler.getNextPlanNodeId());
+        DistinctPlanNode copy = new DistinctPlanNode(m_context);
         super.produceCopyForTransformation(copy);
         copy.m_distinctColumnGuid = m_distinctColumnGuid;
         copy.m_distinctColumnName = m_distinctColumnName;

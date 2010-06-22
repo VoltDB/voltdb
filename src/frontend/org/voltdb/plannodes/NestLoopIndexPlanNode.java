@@ -23,15 +23,10 @@ import org.voltdb.catalog.Database;
 import org.voltdb.planner.PlannerContext;
 import org.voltdb.types.*;
 
-/**
- *
- */
 public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
-    /**
-     * @param id
-     */
-    public NestLoopIndexPlanNode(PlannerContext context, Integer id) {
-        super(context, id);
+
+    public NestLoopIndexPlanNode(PlannerContext context) {
+        super(context);
     }
 
     @Override

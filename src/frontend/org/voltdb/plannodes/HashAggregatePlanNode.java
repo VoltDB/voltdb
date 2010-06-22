@@ -25,8 +25,8 @@ import org.voltdb.types.PlanNodeType;
  *
  */
 public class HashAggregatePlanNode extends AggregatePlanNode {
-    public HashAggregatePlanNode(PlannerContext context, Integer id) {
-        super(context, id);
+    public HashAggregatePlanNode(PlannerContext context) {
+        super(context);
     }
 
     @Override

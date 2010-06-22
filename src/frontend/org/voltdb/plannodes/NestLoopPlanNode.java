@@ -20,15 +20,10 @@ package org.voltdb.plannodes;
 import org.voltdb.planner.PlannerContext;
 import org.voltdb.types.*;
 
-/**
- *
- */
 public class NestLoopPlanNode extends AbstractJoinPlanNode {
-    /**
-     * @param id
-     */
-    public NestLoopPlanNode(PlannerContext context, Integer id) {
-        super(context, id);
+
+    public NestLoopPlanNode(PlannerContext context) {
+        super(context);
     }
 
     @Override

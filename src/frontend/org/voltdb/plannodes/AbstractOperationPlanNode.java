@@ -21,9 +21,6 @@ import org.json.JSONException;
 import org.json.JSONStringer;
 import org.voltdb.planner.PlannerContext;
 
-/**
- *
- */
 public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
 
     public enum Members {
@@ -33,8 +30,8 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
     // The target table is the table that the plannode wants to perform some operation on.
     protected String m_targetTableName = "";
 
-    protected AbstractOperationPlanNode(PlannerContext context, Integer id) {
-        super(context, id);
+    protected AbstractOperationPlanNode(PlannerContext context) {
+        super(context);
     }
 
     protected String debugInfo(String spacer) {

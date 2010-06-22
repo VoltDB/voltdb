@@ -22,9 +22,6 @@ import org.json.JSONStringer;
 import org.voltdb.planner.PlannerContext;
 import org.voltdb.types.*;
 
-/**
- *
- */
 public class MaterializePlanNode extends ProjectionPlanNode {
 
     public enum Members {
@@ -33,11 +30,8 @@ public class MaterializePlanNode extends ProjectionPlanNode {
 
     protected boolean m_batched = false;
 
-    /**
-     * @param id
-     */
-    public MaterializePlanNode(PlannerContext context, Integer id) {
-        super(context, id);
+    public MaterializePlanNode(PlannerContext context) {
+        super(context);
     }
 
     @Override

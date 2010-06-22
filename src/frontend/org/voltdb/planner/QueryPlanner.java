@@ -97,7 +97,7 @@ public class QueryPlanner {
         m_recentErrorMsg = null;
 
         // set the usage of global ids in the plan assembler
-        PlanAssembler.setUseGlobalIds(m_useGlobalIds);
+        AbstractPlanNode.setUseGlobalIds(m_useGlobalIds);
 
         // use HSQLDB to get XML that describes the semantics of the statement
         // this is much easier to parse than SQL and is checked against the catalog

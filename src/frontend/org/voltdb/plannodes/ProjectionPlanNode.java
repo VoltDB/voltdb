@@ -30,16 +30,10 @@ import org.voltdb.planner.PlanStatistics;
 import org.voltdb.planner.PlannerContext;
 import org.voltdb.types.*;
 
-/**
- *
- */
 public class ProjectionPlanNode extends AbstractPlanNode {
 
-    /**
-     * @param id
-     */
-    public ProjectionPlanNode(PlannerContext context, Integer id) {
-        super(context, id);
+    public ProjectionPlanNode(PlannerContext context) {
+        super(context);
     }
 
     @Override

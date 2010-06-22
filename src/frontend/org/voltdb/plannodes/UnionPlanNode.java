@@ -20,15 +20,10 @@ package org.voltdb.plannodes;
 import org.voltdb.planner.PlannerContext;
 import org.voltdb.types.*;
 
-/**
- *
- */
 public class UnionPlanNode extends AbstractPlanNode {
-    /**
-     * @param id
-     */
-    public UnionPlanNode(PlannerContext context, Integer id) {
-        super(context, id);
+
+    public UnionPlanNode(PlannerContext context) {
+        super(context);
     }
 
     @Override

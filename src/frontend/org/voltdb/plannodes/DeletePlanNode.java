@@ -22,9 +22,6 @@ import org.json.JSONStringer;
 import org.voltdb.planner.PlannerContext;
 import org.voltdb.types.*;
 
-/**
- *
- */
 public class DeletePlanNode extends AbstractOperationPlanNode {
 
     public enum Members {
@@ -34,11 +31,8 @@ public class DeletePlanNode extends AbstractOperationPlanNode {
     /** true if all tuples are deleted. */
     boolean m_truncate = false;
 
-    /**
-     * @param id
-     */
-    public DeletePlanNode(PlannerContext context, Integer id) {
-        super(context, id);
+    public DeletePlanNode(PlannerContext context) {
+        super(context);
     }
 
     @Override

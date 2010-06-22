@@ -24,9 +24,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.planner.PlannerContext;
 import org.voltdb.types.PlanNodeType;
 
-/**
- *
- */
 public class LimitPlanNode extends AbstractPlanNode {
 
     public enum Members {
@@ -43,11 +40,8 @@ public class LimitPlanNode extends AbstractPlanNode {
     private long m_limitParameterId = -1;
     private long m_offsetParameterId = -1;
 
-    /**
-     * @param id
-     */
-    public LimitPlanNode(PlannerContext context, Integer id) {
-        super(context, id);
+    public LimitPlanNode(PlannerContext context) {
+        super(context);
     }
 
     @Override

@@ -22,9 +22,6 @@ import org.json.JSONStringer;
 import org.voltdb.planner.PlannerContext;
 import org.voltdb.types.*;
 
-/**
- *
- */
 public class InsertPlanNode extends AbstractOperationPlanNode {
 
     public enum Members {
@@ -33,11 +30,8 @@ public class InsertPlanNode extends AbstractOperationPlanNode {
 
     protected boolean m_multiPartition = false;
 
-    /**
-     * @param id
-     */
-    public InsertPlanNode(PlannerContext context, Integer id) {
-        super(context, id);
+    public InsertPlanNode(PlannerContext context) {
+        super(context);
     }
 
     public boolean getMultiPartition() {

@@ -217,7 +217,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
         AbstractPlanNode retval = null;
         if (nljAccessPlan instanceof IndexScanPlanNode) {
-            NestLoopIndexPlanNode nlijNode = new NestLoopIndexPlanNode(m_context, PlanAssembler.getNextPlanNodeId());
+            NestLoopIndexPlanNode nlijNode = new NestLoopIndexPlanNode(m_context);
 
             nlijNode.setJoinType(JoinType.INNER);
 
@@ -274,7 +274,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             retval = nlijNode;
         }
         else {
-            NestLoopPlanNode nljNode = new NestLoopPlanNode(m_context, PlanAssembler.getNextPlanNodeId());
+            NestLoopPlanNode nljNode = new NestLoopPlanNode(m_context);
             if ((joinClauses != null) && (joinClauses.size() > 0))
                 nljNode.setPredicate(ExpressionUtil.combine(joinClauses));
             nljNode.setJoinType(JoinType.LEFT);

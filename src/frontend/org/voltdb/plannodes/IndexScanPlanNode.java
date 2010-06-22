@@ -32,9 +32,6 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 
-/**
- *
- */
 public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     public enum Members {
@@ -74,11 +71,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // The sorting direction
     protected SortDirectionType m_sortDirection = SortDirectionType.INVALID;
 
-    /**
-     * @param id
-     */
-    public IndexScanPlanNode(PlannerContext context, Integer id) {
-        super(context, id);
+    public IndexScanPlanNode(PlannerContext context) {
+        super(context);
     }
 
     @Override

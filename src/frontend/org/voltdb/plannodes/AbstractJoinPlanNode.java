@@ -23,9 +23,6 @@ import org.voltdb.expressions.*;
 import org.voltdb.planner.PlannerContext;
 import org.voltdb.types.*;
 
-/**
- *
- */
 public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
 
     public enum Members {
@@ -36,11 +33,8 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     protected JoinType m_joinType = JoinType.INNER;
     protected AbstractExpression m_predicate;
 
-    /**
-     * @param id
-     */
-    protected AbstractJoinPlanNode(PlannerContext context, Integer id) {
-        super(context, id);
+    protected AbstractJoinPlanNode(PlannerContext context) {
+        super(context);
     }
 
     @Override

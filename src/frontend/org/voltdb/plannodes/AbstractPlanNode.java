@@ -34,6 +34,33 @@ import org.voltdb.types.*;
 
 public abstract class AbstractPlanNode implements JSONString, Comparable<AbstractPlanNode> {
 
+    /**
+     * Internal PlanNodeId counter. Note that this member is static, which means
+     * all PlanNodes will have a unique id
+     */
+    private static int NEXT_PLAN_NODE_ID = 1;
+    private static int NEXT_LOCAL_PLAN_NODE_ID = 1;
+
+    private static final int MAX_LOCAL_ID = 1000000;
+    private static boolean m_useGlobalIds = true;
+
+    public static void setUseGlobalIds(boolean useGlobalIds) {
+        if (useGlobalIds) {
+            m_useGlobalIds = true;
+            NEXT_LOCAL_PLAN_NODE_ID = 1;
+        } else {
+            m_useGlobalIds = false;
+        }
+    }
+
+    static int getNextPlanNodeId() {
+        assert ((NEXT_LOCAL_PLAN_NODE_ID + 1) <= MAX_LOCAL_ID);
+        if (m_useGlobalIds)
+            return NEXT_PLAN_NODE_ID++;
+        else
+            return NEXT_LOCAL_PLAN_NODE_ID++;
+    }
+
     public enum Members {
         ID,
         PLAN_NODE_TYPE,
@@ -65,13 +92,11 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
     /**
      * Instantiates a new plan node.
-     *
-     * @param id the id
      */
-    protected AbstractPlanNode(PlannerContext context, int id) {
+    protected AbstractPlanNode(PlannerContext context) {
         assert(context != null);
         m_context = context;
-        m_id = id;
+        m_id = getNextPlanNodeId();
     }
 
     public void overrideId(int newId) {

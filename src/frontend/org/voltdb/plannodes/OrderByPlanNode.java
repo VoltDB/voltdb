@@ -23,9 +23,6 @@ import org.json.JSONStringer;
 import org.voltdb.planner.PlannerContext;
 import org.voltdb.types.*;
 
-/**
- *
- */
 public class OrderByPlanNode extends AbstractPlanNode {
 
     public enum Members {
@@ -47,11 +44,8 @@ public class OrderByPlanNode extends AbstractPlanNode {
      */
     protected List<SortDirectionType> m_sortDirections = new Vector<SortDirectionType>();
 
-    /**
-     * @param id
-     */
-    public OrderByPlanNode(PlannerContext context, Integer id) {
-        super(context, id);
+    public OrderByPlanNode(PlannerContext context) {
+        super(context);
     }
 
     @Override

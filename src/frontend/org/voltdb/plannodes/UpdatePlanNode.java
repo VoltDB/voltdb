@@ -22,9 +22,6 @@ import org.json.JSONStringer;
 import org.voltdb.planner.PlannerContext;
 import org.voltdb.types.*;
 
-/**
- *
- */
 public class UpdatePlanNode extends AbstractOperationPlanNode {
 
     public enum Members {
@@ -33,11 +30,8 @@ public class UpdatePlanNode extends AbstractOperationPlanNode {
 
     boolean m_updatesIndexes = false;
 
-    /**
-     * @param id
-     */
-    public UpdatePlanNode(PlannerContext context, Integer id) {
-        super(context, id);
+    public UpdatePlanNode(PlannerContext context) {
+        super(context);
     }
 
     public boolean doesUpdateIndexes() {

@@ -25,9 +25,6 @@ import org.voltdb.planner.PlanColumn;
 import org.voltdb.planner.PlannerContext;
 import org.voltdb.types.*;
 
-/**
- *
- */
 public class AggregatePlanNode extends AbstractPlanNode {
 
     public enum Members {
@@ -56,8 +53,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
     protected List<Integer> m_groupByColumnGuids = new ArrayList<Integer>();
     protected List<String> m_groupByColumnNames = new ArrayList<String>();
 
-    public AggregatePlanNode(PlannerContext context, Integer id) {
-        super(context, id);
+    public AggregatePlanNode(PlannerContext context) {
+        super(context);
     }
 
     @Override
