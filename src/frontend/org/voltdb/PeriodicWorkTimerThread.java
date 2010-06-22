@@ -30,9 +30,14 @@ import java.util.concurrent.TimeUnit;
 public class PeriodicWorkTimerThread extends Thread {
 
     ArrayList<ClientInterface> m_clientInterfaces;
+    StatsManager m_statsManager;
+    private long m_lastTime;
 
-    public PeriodicWorkTimerThread(ArrayList<ClientInterface> clientInterfaces) {
+    public PeriodicWorkTimerThread(ArrayList<ClientInterface> clientInterfaces,
+                                   StatsManager statsManager) {
         m_clientInterfaces = clientInterfaces;
+        m_statsManager = statsManager;
+        m_lastTime = System.currentTimeMillis();
     }
 
     @Override
@@ -51,6 +56,16 @@ public class PeriodicWorkTimerThread extends Thread {
             for (ClientInterface ci : m_clientInterfaces) {
                 ci.processPeriodicWork();
             }
+
+            // Ask the statistics manager to send out change notifications if
+            // enough time has passed
+            final long currentTime = System.currentTimeMillis();
+            if (m_statsManager != null
+                    && (currentTime - m_lastTime) >= StatsManager.POLL_INTERVAL) {
+                m_lastTime = currentTime;
+                m_statsManager.sendNotification();
+            }
+
             //long duration = System.nanoTime() - beforeTime;
             //double millis = duration / 1000000.0;
             //System.out.printf("TICK %.2f\n", millis);

@@ -149,6 +149,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     // Trigger if shutdown has been run already.
     private boolean haveShutdownAlready;
 
+    private final TableStats m_tableStats;
     private final StarvationTracker m_starvationTracker;
     private final Watchdog m_watchdog;
     private class Watchdog extends Thread {
@@ -317,6 +318,27 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         // do other periodic work
         m_snapshotter.doSnapshotWork(ee);
         m_watchdog.pet();
+
+        /*
+         * grab the table statistics from ee and put it into the statistics
+         * agent if at least 1/3 of the statistics broadcast interval has past.
+         * This ensures that when the statistics are broadcasted, they are
+         * relatively up-to-date.
+         */
+        if (m_tableStats != null
+                && (time - lastTickTime) >= StatsManager.POLL_INTERVAL / 3) {
+            CatalogMap<Table> tables = m_context.database.getTables();
+            int[] tableGuids = new int[tables.size()];
+            int i = 0;
+            for (Table table : tables)
+                tableGuids[i++] = table.getRelativeIndex();
+            final VoltTable[] s = ee.getStats(SysProcSelector.TABLE,
+                                              tableGuids,
+                                              false,
+                                              System.currentTimeMillis());
+            if (s != null)
+                m_tableStats.setStatsTable(s[0]);
+        }
     }
 
 
@@ -361,6 +383,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         m_mailbox = null;
         m_transactionQueue = null;
         m_starvationTracker = null;
+        m_tableStats = null;
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox, final int siteId)
@@ -418,11 +441,16 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
 
         loadProceduresFromCatalog(voltdb.getBackendTargetType());
         m_snapshotter = new SnapshotSiteProcessor();
+        final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
         m_starvationTracker = new StarvationTracker(String.valueOf(getCorrespondingSiteId()), getCorrespondingSiteId());
-        VoltDB.instance().getStatsAgent().registerStatsSource(
-                SysProcSelector.STARVATION,
-                Integer.parseInt(getCorrespondingCatalogSite().getTypeName()),
-                m_starvationTracker);
+        statsAgent.registerStatsSource(SysProcSelector.STARVATION,
+                                       Integer.parseInt(getCorrespondingCatalogSite().getTypeName()),
+                                       m_starvationTracker);
+        m_tableStats = new TableStats(String.valueOf(getCorrespondingSiteId()), getCorrespondingSiteId());
+        statsAgent.registerStatsSource(SysProcSelector.TABLE,
+                                       Integer.parseInt(getCorrespondingCatalogSite().getTypeName()),
+                                       m_tableStats);
+
     }
 
     private RestrictedPriorityQueue initializeTransactionQueue(final int siteId)

@@ -34,6 +34,12 @@ public abstract class StatsSource {
     private final String m_hostname;
 
     /**
+     * Statistics from ee are already formatted in VoltTable
+     */
+    private final boolean m_isEEStats;
+    private VoltTable m_table = null;
+
+    /**
      * Column schema for statistical result rows
      */
     private final ArrayList<ColumnInfo> columns = new ArrayList<ColumnInfo>();
@@ -48,8 +54,9 @@ public abstract class StatsSource {
      * Initialize this source of statistical information with the specified name. Populate the column schema by calling populateColumnSchema
      * on the derived class and use it to populate the columnNameToIndex map.
      * @param name
+     * @param isEE If this source represents statistics from EE
      */
-    public StatsSource(String name) {
+    public StatsSource(String name, boolean isEE) {
         populateColumnSchema(columns);
 
         for (int ii = 0; ii < columns.size(); ii++) {
@@ -68,6 +75,8 @@ public abstract class StatsSource {
         m_hostId = hostId;
 
         this.name = name;
+
+        m_isEEStats = isEE;
     }
 
     /**
@@ -78,7 +87,8 @@ public abstract class StatsSource {
      */
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
         columns.add(new ColumnInfo("TIMESTAMP", VoltType.BIGINT));
-        columns.add(new ColumnInfo("HOST_ID", VoltType.INTEGER));
+        columns.add(new ColumnInfo(VoltSystemProcedure.CNAME_HOST_ID,
+                                   VoltSystemProcedure.CTYPE_ID));
         columns.add(new ColumnInfo("HOSTNAME", VoltType.STRING));
     }
 
@@ -119,6 +129,36 @@ public abstract class StatsSource {
             }
             return rows.toArray(new Object[0][]);
         }
+    }
+
+    /**
+     * If this source contains statistics from EE. EE statistics are already
+     * formatted in VoltTable, so use getStatsTable() to get the result.
+     */
+    public boolean isEEStats() {
+        return m_isEEStats;
+    }
+
+    /**
+     * For some sources like TableStats, they use VoltTable to keep track of
+     * statistics. This method will return it directly.
+     *
+     * @return If the return value is null, you should fall back to using
+     *         getStatsRows()
+     */
+    public VoltTable getStatsTable() {
+        return m_table;
+    }
+
+    /**
+     * Sets the VoltTable which contains the statistics. Only sources which use
+     * VoltTable to keep track of statistics need to use this.
+     *
+     * @param statsTable
+     *            The VoltTable which contains the statistics.
+     */
+    public void setStatsTable(VoltTable statsTable) {
+        m_table = statsTable;
     }
 
     private Long now = System.currentTimeMillis();

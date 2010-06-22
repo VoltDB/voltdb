@@ -25,7 +25,6 @@ import java.util.ArrayList;
  *
  */
 public class StatsAgent {
-
     private final HashMap<SysProcSelector, HashMap<Integer, ArrayList<StatsSource>>> registeredStatsSources =
         new HashMap<SysProcSelector, HashMap<Integer, ArrayList<StatsSource>>>();
 
@@ -66,7 +65,24 @@ public class StatsAgent {
         assert catalogIdToStatsSources.get(catalogIds.get(0)) != null;
         ArrayList<StatsSource> statsSources = catalogIdToStatsSources.get(catalogIds.get(0));
         assert statsSources != null && statsSources.size() > 0;
-        final VoltTable.ColumnInfo columns[] = statsSources.get(0).getColumnSchema().toArray(new VoltTable.ColumnInfo[0]);
+
+        /*
+         * Some sources like TableStats use VoltTable to keep track of
+         * statistics. We need to use the table schema the VoltTable has in this
+         * case.
+         */
+        VoltTable.ColumnInfo columns[] = null;
+        if (!statsSources.get(0).isEEStats())
+            columns = statsSources.get(0).getColumnSchema().toArray(new VoltTable.ColumnInfo[0]);
+        else {
+            final VoltTable table = statsSources.get(0).getStatsTable();
+            if (table == null)
+                return null;
+            columns = new VoltTable.ColumnInfo[table.getColumnCount()];
+            for (int i = 0; i < columns.length; i++)
+                columns[i] = new VoltTable.ColumnInfo(table.getColumnName(i),
+                                                      table.getColumnType(i));
+        }
         final VoltTable resultTable = new VoltTable(columns);
 
         for (Integer catalogId : catalogIds) {
@@ -74,9 +90,20 @@ public class StatsAgent {
             assert statsSources != null;
             for (final StatsSource ss : statsSources) {
                 assert ss != null;
-                Object statsRows[][] = ss.getStatsRows(interval, now);
-                for (Object[] row : statsRows) {
-                    resultTable.addRow(row);
+
+                /*
+                 * Some sources like TableStats use VoltTable to keep track of
+                 * statistics
+                 */
+                if (ss.isEEStats()) {
+                    final VoltTable table = ss.getStatsTable();
+                    while (table != null && table.advanceRow())
+                        resultTable.add(table);
+                } else {
+                    Object statsRows[][] = ss.getStatsRows(interval, now);
+                    for (Object[] row : statsRows) {
+                        resultTable.addRow(row);
+                    }
                 }
             }
         }

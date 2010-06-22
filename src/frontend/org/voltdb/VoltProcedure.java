@@ -943,7 +943,7 @@ public abstract class VoltProcedure {
          */
         public ProcedureStatsCollector() {
             super(m_site.getCorrespondingSiteId() + " " + catProc.getClassname(),
-                  m_site.getCorrespondingSiteId());
+                  m_site.getCorrespondingSiteId(), false);
         }
 
         /**

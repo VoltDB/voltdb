@@ -159,6 +159,9 @@ public class RealVoltDB implements VoltDBInterface
     private StatsAgent m_statsAgent = new StatsAgent();
     private FaultDistributor m_faultManager;
     private Object m_instanceId[];
+    private PartitionCountStats m_partitionCountStats = null;
+    private IOStats m_ioStats = null;
+    private StatsManager m_statsManager = null;
 
     // Synchronize initialize and shutdown.
     private final Object m_startAndStopLock = new Object();
@@ -402,6 +405,22 @@ public class RealVoltDB implements VoltDBInterface
                 }
             }
 
+            m_partitionCountStats = new PartitionCountStats("Partition Count Stats",
+                                                            m_catalogContext.numberOfPartitions);
+            m_statsAgent.registerStatsSource(SysProcSelector.PARTITIONCOUNT,
+                                             0, m_partitionCountStats);
+            m_ioStats = new IOStats("IO Stats");
+            m_statsAgent.registerStatsSource(SysProcSelector.IOSTATS,
+                                             0, m_ioStats);
+            // Create the statistics manager and register it to JMX registry
+            m_statsManager = null;
+            try {
+                final Class<?> statsManagerClass =
+                    Class.forName("org.voltdb.management.JMXStatsManager");
+                m_statsManager = (StatsManager)statsManagerClass.newInstance();
+                m_statsManager.initialize(new ArrayList<Integer>(m_localSites.keySet()));
+            } catch (Exception e) {}
+
             // Start running the socket handlers
             hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartingNetwork.name(), null);
             m_network.start();
@@ -409,7 +428,8 @@ public class RealVoltDB implements VoltDBInterface
             m_messenger.sendReadyMessage();
             m_messenger.waitForAllHostsToBeReady();
 
-            fivems = new PeriodicWorkTimerThread(m_clientInterfaces);
+            fivems = new PeriodicWorkTimerThread(m_clientInterfaces,
+                                                 m_statsManager);
             fivems.start();
 
             hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null);

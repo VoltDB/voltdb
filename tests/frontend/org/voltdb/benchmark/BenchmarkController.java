@@ -310,6 +310,9 @@ public class BenchmarkController {
                         "-XX:+HeapDumpOnOutOfMemoryError",
                         "-XX:HeapDumpPath=/tmp",
                         "-Djava.library.path=.",
+                        "-Dcom.sun.management.jmxremote.port=9090",
+                        "-Dcom.sun.management.jmxremote.authenticate=false",
+                        "-Dcom.sun.management.jmxremote.ssl=false",
                         "-Dlog4j.configuration=log.xml",
                         debugString,
                         /*
