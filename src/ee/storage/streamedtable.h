@@ -20,6 +20,8 @@
 
 #include "common/ids.h"
 #include "table.h"
+#include "storage/StreamedTableStats.h"
+#include "storage/TableStats.h"
 
 namespace voltdb {
 
@@ -37,6 +39,7 @@ class TupleStreamWrapper;
 
 class StreamedTable : public Table {
     friend class TableFactory;
+    friend class StreamedTableStats;
 
   public:
     StreamedTable(ExecutorContext *ctx, bool exportEnabled);
@@ -62,6 +65,11 @@ class StreamedTable : public Table {
 
     // undo interface particular to streamed table.
     void undo(size_t mark);
+
+  protected:
+    // Stats
+    voltdb::StreamedTableStats stats_;
+    voltdb::TableStats *getTableStats();
 
   private:
     ExecutorContext *m_executorContext;

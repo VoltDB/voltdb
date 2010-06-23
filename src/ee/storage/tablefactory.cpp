@@ -104,33 +104,35 @@ Table* TableFactory::getPersistentTable(
             bool exportEnabled,
             bool exportOnly)
 {
+    Table *table = NULL;
+
     if (exportOnly) {
-        Table *table = new StreamedTable(ctx, exportEnabled);
+        table = new StreamedTable(ctx, exportEnabled);
         TableFactory::initCommon(databaseId, table, name, schema, columnNames, true);
-        return table;
     }
     else {
-        PersistentTable* table = new PersistentTable(ctx, exportEnabled);
-        TableFactory::initCommon(databaseId, table, name, schema, columnNames, true);
-        table->m_indexCount = (int)indexes.size();
-        table->m_indexes = new TableIndex*[indexes.size()];
-        table->m_partitionColumn = partitionColumn;
+        table = new PersistentTable(ctx, exportEnabled);
+        PersistentTable *pTable = dynamic_cast<PersistentTable*>(table);
+        TableFactory::initCommon(databaseId, pTable, name, schema, columnNames, true);
+        pTable->m_indexCount = (int)indexes.size();
+        pTable->m_indexes = new TableIndex*[indexes.size()];
+        pTable->m_partitionColumn = partitionColumn;
 
-        table->m_id = tableId;
+        pTable->m_id = tableId;
 
         for (int i = 0; i < indexes.size(); ++i) {
-            table->m_indexes[i] = TableIndexFactory::getInstance(indexes[i]);
+            pTable->m_indexes[i] = TableIndexFactory::getInstance(indexes[i]);
         }
-        initConstraints(table);
-        table->stats_.configure(
-                name + " stats",
-                ctx->m_hostId,
-                ctx->m_hostname,
-                ctx->m_siteId,
-                ctx->m_partitionId,
-                databaseId);
-        return dynamic_cast<Table*>(table);
+        initConstraints(pTable);
     }
+
+    table->getTableStats()->configure(name + " stats",
+                                      ctx->m_hostId,
+                                      ctx->m_hostname,
+                                      ctx->m_siteId,
+                                      ctx->m_partitionId,
+                                      databaseId);
+    return dynamic_cast<Table*>(table);
 }
 
 Table* TableFactory::getPersistentTable(
@@ -146,37 +148,39 @@ Table* TableFactory::getPersistentTable(
             bool exportEnabled,
             bool exportOnly)
 {
+    Table *table = NULL;
+
     if (exportOnly) {
-        Table *table = new StreamedTable(ctx, exportEnabled);
+        table = new StreamedTable(ctx, exportEnabled);
         TableFactory::initCommon(databaseId, table, name, schema, columnNames, true);
-        return table;
     }
     else {
-        PersistentTable* table = new PersistentTable(ctx, exportEnabled);
-        table->m_pkeyIndex = TableIndexFactory::getInstance(pkeyIndex);
-        TableFactory::initCommon(databaseId, table, name, schema, columnNames, true);
-        table->m_partitionColumn = partitionColumn;
+        table = new PersistentTable(ctx, exportEnabled);
+        PersistentTable *pTable = dynamic_cast<PersistentTable*>(table);
+        pTable->m_pkeyIndex = TableIndexFactory::getInstance(pkeyIndex);
+        TableFactory::initCommon(databaseId, pTable, name, schema, columnNames, true);
+        pTable->m_partitionColumn = partitionColumn;
 
         // one for pkey + all the other indexes
-        table->m_indexCount = 1 + (int)indexes.size();
-        table->m_indexes = new TableIndex*[1 + indexes.size()];
-        table->m_indexes[0] = table->m_pkeyIndex;
+        pTable->m_indexCount = 1 + (int)indexes.size();
+        pTable->m_indexes = new TableIndex*[1 + indexes.size()];
+        pTable->m_indexes[0] = pTable->m_pkeyIndex;
 
-        table->m_id = tableId;
+        pTable->m_id = tableId;
 
         for (int i = 0; i < indexes.size(); ++i) {
-            table->m_indexes[i + 1] = TableIndexFactory::getInstance(indexes[i]);
+            pTable->m_indexes[i + 1] = TableIndexFactory::getInstance(indexes[i]);
         }
-        initConstraints(table);
-        table->stats_.configure(
-                name + " stats",
-                ctx->m_hostId,
-                ctx->m_hostname,
-                ctx->m_siteId,
-                ctx->m_partitionId,
-                databaseId);
-        return dynamic_cast<Table*>(table);
+        initConstraints(pTable);
     }
+
+    table->getTableStats()->configure(name + " stats",
+                                      ctx->m_hostId,
+                                      ctx->m_hostname,
+                                      ctx->m_siteId,
+                                      ctx->m_partitionId,
+                                      databaseId);
+    return dynamic_cast<Table*>(table);
 }
 
 TempTable* TableFactory::getTempTable(

@@ -81,7 +81,6 @@ import org.voltdb.messaging.SiteMailbox;
 import org.voltdb.messaging.Subject;
 import org.voltdb.messaging.TransactionInfoBaseMessage;
 import org.voltdb.messaging.VoltMessage;
-import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.Encoder;
@@ -329,20 +328,10 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         if (m_tableStats != null
                 && (time - lastTickTime) >= StatsManager.POLL_INTERVAL / 3) {
             CatalogMap<Table> tables = m_context.database.getTables();
-            List<Integer> tmpIds = new ArrayList<Integer>();
-            for (Table table : tables) {
-                /*
-                 * TODO: (Ning) avoid getting stats of export-only tables for
-                 * now, revert this once stats for this kind of table is
-                 * implemented.
-                 */
-                if (!CatalogUtil.isTableExportOnly(m_context.database, table))
-                    tmpIds.add(table.getRelativeIndex());
-            }
-            int[] tableIds = new int[tmpIds.size()];
+            int[] tableIds = new int[tables.size()];
             int i = 0;
-            for (Integer id : tmpIds)
-                tableIds[i++] = id;
+            for (Table table : tables)
+                tableIds[i++] = table.getRelativeIndex();
             final VoltTable[] s = ee.getStats(SysProcSelector.TABLE,
                                               tableIds,
                                               false,

@@ -268,6 +268,7 @@ CTX.INPUT['storage'] = """
  PersistentTableUndoDeleteAction.cpp
  PersistentTableUndoInsertAction.cpp
  PersistentTableUndoUpdateAction.cpp
+ StreamedTableStats.cpp
  streamedtable.cpp
  table.cpp
  tablefactory.cpp
