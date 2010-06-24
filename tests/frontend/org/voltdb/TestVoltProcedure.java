@@ -50,12 +50,14 @@
 
 package org.voltdb;
 
+import java.math.BigDecimal;
 import java.util.Date;
 
 import junit.framework.TestCase;
 
 import org.voltdb.catalog.Catalog;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.types.TimestampType;
 
 public class TestVoltProcedure extends TestCase {
     static class DateProcedure extends NullProcedureWrapper {
@@ -67,6 +69,60 @@ public class TestVoltProcedure extends TestCase {
         public static Date arg;
     }
 
+    static class TimestampProcedure extends NullProcedureWrapper {
+        public static VoltTable[] run(TimestampType arg1) {
+            arg = arg1;
+            return new VoltTable[0];
+        }
+
+        public static TimestampType arg;
+    }
+
+    static class StringProcedure extends NullProcedureWrapper {
+        public static VoltTable[] run(String arg1) {
+            arg = arg1;
+            return new VoltTable[0];
+        }
+
+        public static String arg;
+    }
+
+    static class DecimalProcedure extends NullProcedureWrapper {
+        public static VoltTable[] run(BigDecimal arg1) {
+            arg = arg1;
+            return new VoltTable[0];
+        }
+
+        public static BigDecimal arg;
+    }
+
+    static class ByteProcedure extends NullProcedureWrapper {
+        public static VoltTable[] run(byte arg1) {
+            arg = arg1;
+            return new VoltTable[0];
+        }
+
+        public static byte arg;
+    }
+
+    static class ShortProcedure extends NullProcedureWrapper {
+        public static VoltTable[] run(short arg1) {
+            arg = arg1;
+            return new VoltTable[0];
+        }
+
+        public static short arg;
+    }
+
+    static class IntegerProcedure extends NullProcedureWrapper {
+        public static VoltTable[] run(int arg1) {
+            arg = arg1;
+            return new VoltTable[0];
+        }
+
+        public static int arg;
+    }
+
     static class LongProcedure extends NullProcedureWrapper {
         public static VoltTable[] run(long arg1) {
             arg = arg1;
@@ -74,6 +130,15 @@ public class TestVoltProcedure extends TestCase {
         }
 
         public static long arg;
+    }
+
+    static class DoubleProcedure extends NullProcedureWrapper {
+        public static VoltTable[] run(double arg1) {
+            arg = arg1;
+            return new VoltTable[0];
+        }
+
+        public static double arg;
     }
 
     static class LongArrayProcedure extends NullProcedureWrapper {
@@ -132,7 +197,14 @@ public class TestVoltProcedure extends TestCase {
         manager.setStatsAgent(agent);
         VoltDB.replaceVoltDBInstanceForTest(manager);
         manager.addProcedureForTest(DateProcedure.class.getName());
+        manager.addProcedureForTest(TimestampProcedure.class.getName());
+        manager.addProcedureForTest(StringProcedure.class.getName());
+        manager.addProcedureForTest(DecimalProcedure.class.getName());
+        manager.addProcedureForTest(ByteProcedure.class.getName());
+        manager.addProcedureForTest(ShortProcedure.class.getName());
+        manager.addProcedureForTest(IntegerProcedure.class.getName());
         manager.addProcedureForTest(LongProcedure.class.getName());
+        manager.addProcedureForTest(DoubleProcedure.class.getName());
         manager.addProcedureForTest(LongArrayProcedure.class.getName());
         manager.addProcedureForTest(NPEProcedure.class.getName());
         site = new MockExecutionSite(1, VoltDB.instance().getCatalogContext().catalog.serialize());
@@ -140,16 +212,62 @@ public class TestVoltProcedure extends TestCase {
         nullParam.setParameters(new Object[]{null});
     }
 
+    /**
+     * XXX (Ning) I'm not sure this test is still useful since we don't support
+     * Java Date object anymore.
+     */
     public void testNullDate() {
         ClientResponse r = call(DateProcedure.class);
         assertEquals(null, DateProcedure.arg);
         assertEquals(ClientResponse.SUCCESS, r.getStatus());
     }
 
+    public void testNullTimestamp() {
+        ClientResponse r = call(TimestampProcedure.class);
+        assertEquals(null, TimestampProcedure.arg);
+        assertEquals(ClientResponse.SUCCESS, r.getStatus());
+    }
+
+    public void testNullString() {
+        ClientResponse r = call(StringProcedure.class);
+        assertEquals(null, StringProcedure.arg);
+        assertEquals(ClientResponse.SUCCESS, r.getStatus());
+    }
+
+    public void testNullDecimal() {
+        ClientResponse r = call(DecimalProcedure.class);
+        assertEquals(null, DecimalProcedure.arg);
+        assertEquals(ClientResponse.SUCCESS, r.getStatus());
+    }
+
+    public void testNullByte() {
+        ClientResponse r = call(ByteProcedure.class);
+        assertEquals(VoltType.NULL_TINYINT, ByteProcedure.arg);
+        assertEquals(ClientResponse.SUCCESS, r.getStatus());
+    }
+
+    public void testNullShort() {
+        ClientResponse r = call(ShortProcedure.class);
+        assertEquals(VoltType.NULL_SMALLINT, ShortProcedure.arg);
+        assertEquals(ClientResponse.SUCCESS, r.getStatus());
+    }
+
+    public void testNullInteger() {
+        ClientResponse r = call(IntegerProcedure.class);
+        assertEquals(VoltType.NULL_INTEGER, IntegerProcedure.arg);
+        assertEquals(ClientResponse.SUCCESS, r.getStatus());
+    }
+
     public void testNullLong() {
         ClientResponse r = call(LongProcedure.class);
-        assertEquals(ClientResponse.GRACEFUL_FAILURE, r.getStatus());
-        assertTrue(r.getStatusString().contains("cannot be null"));
+        assertEquals(VoltType.NULL_BIGINT, LongProcedure.arg);
+        assertEquals(ClientResponse.SUCCESS, r.getStatus());
+    }
+
+    public void testNullDouble() {
+        ClientResponse r = call(DoubleProcedure.class);
+        assertEquals(VoltType.NULL_FLOAT, DoubleProcedure.arg);
+        assertEquals(ClientResponse.SUCCESS, r.getStatus());
     }
 
     public void testNullLongArray() {

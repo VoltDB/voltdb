@@ -460,9 +460,16 @@ public abstract class VoltProcedure {
         if (param == null || param == VoltType.NULL_STRING ||
             param == VoltType.NULL_DECIMAL)
         {
-            // Passing a null where we expect a primitive is a Java compile time error.
             if (paramTypeIsPrimitive[paramTypeIndex]) {
-                throw new Exception("Primitive type " + paramTypes[paramTypeIndex] + " cannot be null");
+                VoltType type = VoltType.typeFromClass(paramTypes[paramTypeIndex]);
+                switch (type) {
+                case TINYINT:
+                case SMALLINT:
+                case INTEGER:
+                case BIGINT:
+                case FLOAT:
+                    return type.getNullValue();
+                }
             }
 
             // Pass null reference to the procedure run() method. These null values will be
