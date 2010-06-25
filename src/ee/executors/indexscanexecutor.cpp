@@ -144,7 +144,7 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
         m_node->
             setOutputTable(TableFactory::
                            getCopiedTempTable(m_node->databaseId(),
-                                              m_node->getTargetTable()->name() + " index",
+                                              "temp",
                                               m_node->getTargetTable(),
                                               tempTableMemoryInBytes));
     }
