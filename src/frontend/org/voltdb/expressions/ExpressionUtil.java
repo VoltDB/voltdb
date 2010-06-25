@@ -356,43 +356,6 @@ public abstract class ExpressionUtil {
         return ret;
     }
 
-    public static void
-    setAndOffsetColumnIndexes(PlannerContext context,
-                              AbstractExpression input,
-                              int offset,
-                              String tableName,
-                              List<Integer> outputColumns)
-    {
-        // recursive stopping step
-        if (input == null)
-            return;
-
-        // recursive call
-        setAndOffsetColumnIndexes(context, input.m_left, offset, tableName, outputColumns);
-        setAndOffsetColumnIndexes(context, input.m_right, offset, tableName, outputColumns);
-
-        // actual work
-        if (input instanceof TupleValueExpression) {
-            TupleValueExpression expr = (TupleValueExpression) input;
-            if (expr.m_tableName.equals(tableName)) {
-                expr.m_columnIndex += offset;
-            }
-            final String exprTableName = expr.getTableName();
-            final String columnName = expr.getColumnName();
-            int ii = 0;
-            for (Integer colGuid : outputColumns) {
-                PlanColumn info = context.get(colGuid);
-                if (info.originTableName().equals(exprTableName)) {
-                    if (info.displayName().equals(columnName)) {
-                        expr.setColumnIndex(ii);
-                        return;
-                    }
-                }
-                ii++;
-            }
-        }
-    }
-
     /**
      * An AbstractExpression may be applied to a tuple that is a result of several joins and projections. Until the
      * order of joins and projections is known it is not possible to determine the column index of the value a TupleValueExpression

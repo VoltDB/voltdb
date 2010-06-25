@@ -45,12 +45,14 @@
 
 #include <vector>
 #include <string>
+#include <stack>
 #include "nestloopindexexecutor.h"
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 #include "execution/VoltDBEngine.h"
 #include "expressions/abstractexpression.h"
+#include "expressions/tuplevalueexpression.h"
 #include "plannodes/nestloopindexnode.h"
 #include "plannodes/indexscannode.h"
 #include "storage/table.h"
@@ -60,7 +62,103 @@
 #include "storage/tableiterator.h"
 #include "storage/tablefactory.h"
 
+using namespace std;
 using namespace voltdb;
+
+namespace
+{
+    // FUTURE: the planner should be able to make this decision and
+    // add that info to TupleValueExpression rather than having to
+    // play the name game here.  These two methods are currently duped
+    // in nestloopexecutor because (a) there wasn't an obvious
+    // common locale to put them and (b) I hope to make them go away
+    // soon.
+    bool
+    assignTupleValueIndex(AbstractExpression *ae,
+                          const std::string &oname,
+                          const std::string &iname)
+    {
+        VOLT_TRACE("assignTupleValueIndex with tables:\n outer: %s, inner %s", oname.c_str(), iname.c_str());
+
+        // if an exact table name match is found, do the obvious
+        // thing. Otherwise, assign to the table named "temp".
+        // If both tables are named temp, barf; planner purports
+        // not accept joins of two temp tables.
+
+        // tuple index 0 is always the outer table.
+        // tuple index 1 is always the inner table.
+        TupleValueExpression *tve = dynamic_cast<TupleValueExpression*>(ae);
+        std::string tname = tve->getTableName();
+
+        if (oname == "temp" && iname == "temp") {
+            VOLT_ERROR("Unsuported join on two temp tables.");
+            return false;
+        }
+
+        if (tname == oname)
+            tve->setTupleIndex(0);
+        else if (tname == iname)
+            tve->setTupleIndex(1);
+        else if (oname == "temp")
+            tve->setTupleIndex(0);
+        else if (iname == "temp")
+            tve->setTupleIndex(1);
+        else {
+            VOLT_ERROR("TableTupleValue in join with unknown table name:\n outer: %s, inner %s", oname.c_str(), iname.c_str());
+            return false;
+        }
+
+        return true;
+    }
+
+    bool
+    assignTupleValueIndexes(AbstractExpression* expression,
+                            const string& outer_name,
+                            const string& inner_name)
+    {
+        // for each tuple value expression in the expression, determine
+        // which tuple is being represented. Tuple could come from outer
+        // table or inner table. Configure the predicate to use the correct
+        // eval() tuple parameter. By convention, eval's first parameter
+        // will always be the outer table and its second parameter the inner
+        const AbstractExpression* predicate = expression;
+        std::stack<const AbstractExpression*> stack;
+        while (predicate != NULL) {
+            const AbstractExpression *left = predicate->getLeft();
+            const AbstractExpression *right = predicate->getRight();
+
+            if (right != NULL) {
+                if (right->getExpressionType() == EXPRESSION_TYPE_VALUE_TUPLE) {
+                    if (!assignTupleValueIndex(const_cast<AbstractExpression*>(right),
+                                               outer_name,
+                                               inner_name))
+                    {
+                        return false;
+                    }
+                }
+                // remember the right node - must visit its children
+                stack.push(right);
+            }
+            if (left != NULL) {
+                if (left->getExpressionType() == EXPRESSION_TYPE_VALUE_TUPLE) {
+                    if (!assignTupleValueIndex(const_cast<AbstractExpression*>(left),
+                                               outer_name,
+                                               inner_name))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            predicate = left;
+            if (!predicate && !stack.empty()) {
+                predicate = stack.top();
+                stack.pop();
+            }
+        }
+        return true;
+    }
+}
 
 bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstract_node,
                                    const catalog::Database* catalog_db, int* tempTableMemoryInBytes)
@@ -177,7 +275,23 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstract_node,
     index_values.move( index_values_backing_store - TUPLE_HEADER_SIZE);
     index_values.setAllNulls();
 
-    return true;
+    // for each tuple value expression in the predicate, determine
+    // which tuple is being represented. Tuple could come from outer
+    // table or inner table. Configure the predicate to use the correct
+    // eval() tuple parameter. By convention, eval's first parameter
+    // will always be the outer table and its second parameter the inner
+
+    bool retval =
+        assignTupleValueIndexes(inline_node->getPredicate(),
+                                node->getInputTables()[0]->name(),
+                                inline_node->getTargetTable()->name());
+
+    retval &=
+        assignTupleValueIndexes(inline_node->getEndExpression(),
+                                node->getInputTables()[0]->name(),
+                                inline_node->getTargetTable()->name());
+
+    return retval;
 }
 
 bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
@@ -254,17 +368,11 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
         assert (index_values.getSchema()->columnCount() == num_of_searchkeys || m_lookupType == INDEX_LOOKUP_TYPE_GT);
         for (int ctr = num_of_searchkeys - 1; ctr >= 0 ; --ctr) {
             index_values.
-              setNValue(ctr,
+                setNValue(ctr,
                         inline_node->getSearchKeyExpressions()[ctr]->eval(&outer_tuple, NULL));
         }
         VOLT_TRACE("Searching %s", index_values.debug("").c_str());
 
-        //
-        // In order to apply the Expression trees in our join, we need
-        // to put the outer and inner tuples together into a single
-        // tuple.  The column references in the Expressions have
-        // already been offset to accomodate this
-        //
         for (int col_ctr = 0; col_ctr < num_of_outer_cols; ++col_ctr) {
             join_tuple.setNValue(col_ctr, outer_tuple.getNValue(col_ctr));
         }
@@ -303,22 +411,12 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
 
             VOLT_TRACE("inner_tuple:%s",
                        inner_tuple.debug(inner_table->name()).c_str());
-            //
-            // Append the inner values to the end of our join tuple
-            //
-            for (int col_ctr = 0; col_ctr < num_of_inner_cols; ++col_ctr)
-            {
-                join_tuple.setNValue(col_ctr + num_of_outer_cols,
-                                     inner_tuple.getNValue(col_ctr));
-            }
-            VOLT_TRACE("join_tuple tuple: %s",
-                       join_tuple.debug(output_table->name()).c_str());
 
             //
             // First check whether the end_expression is now false
             //
             if (end_expression != NULL &&
-                end_expression->eval(&join_tuple, NULL).isFalse())
+                end_expression->eval(&outer_tuple, &inner_tuple).isFalse())
             {
                 VOLT_TRACE("End Expression evaluated to false, stopping scan");
                 break;
@@ -327,11 +425,22 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
             // Then apply our post-predicate to do further filtering
             //
             if (post_expression == NULL ||
-                post_expression->eval(&join_tuple, NULL).isTrue())
+                post_expression->eval(&outer_tuple, &inner_tuple).isTrue())
             {
                 //
                 // Try to put the tuple into our output table
                 //
+                //
+                // Append the inner values to the end of our join tuple
+                //
+                for (int col_ctr = 0; col_ctr < num_of_inner_cols; ++col_ctr)
+                {
+                    join_tuple.setNValue(col_ctr + num_of_outer_cols,
+                                         inner_tuple.getNValue(col_ctr));
+                }
+                VOLT_TRACE("join_tuple tuple: %s",
+                           join_tuple.debug(output_table->name()).c_str());
+
                 VOLT_TRACE("MATCH: %s",
                            join_tuple.debug(output_table->name()).c_str());
                 output_table->insertTupleNonVirtual(join_tuple);

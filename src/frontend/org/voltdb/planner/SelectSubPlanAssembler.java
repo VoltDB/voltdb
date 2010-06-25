@@ -228,17 +228,15 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             //
             subPlan.updateOutputColumns(m_db);
             final List<Integer> outputColumns = subPlan.m_outputColumns;
-            final int offset = outputColumns.size();
             if (innerNode.getPredicate() != null) {
                 try {
                     innerNode.setPredicate(ExpressionUtil.clone(innerNode.getPredicate()));
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-                ExpressionUtil.setAndOffsetColumnIndexes(
+                ExpressionUtil.setColumnIndexes(
                         m_context,
                         innerNode.getPredicate(),
-                        offset, joinOrder[0].getTypeName(),
                         outputColumns);
             }
 
@@ -248,8 +246,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-                ExpressionUtil.setAndOffsetColumnIndexes(
-                        m_context, innerNode.getEndExpression(), offset, joinOrder[0].getTypeName(), outputColumns);
+                ExpressionUtil.setColumnIndexes(
+                        m_context, innerNode.getEndExpression(), outputColumns);
             }
 
             ArrayList<AbstractExpression> searchKeyExpressions = new ArrayList<AbstractExpression>(innerNode.getSearchKeyExpressions());

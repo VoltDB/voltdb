@@ -64,42 +64,100 @@
 #include <unistd.h>
 #endif
 
-namespace voltdb {
+using namespace std;
+using namespace voltdb;
 
-bool
-assignTupleValueIndex(AbstractExpression *ae,
-                      const std::string &oname,
-                      const std::string &iname)
+namespace
 {
-    // if an exact table name match is found, do the obvious
-    // thing. Otherwise, assign to the table named "temp".
-    // If both tables are named temp, barf; planner purports
-    // not accept joins of two temp tables.
+    // FUTURE: the planner should be able to make this decision and
+    // add that info to TupleValueExpression rather than having to
+    // play the name game here.  These two methods are currently duped
+    // in nestloopindexexecutor because (a) there wasn't an obvious
+    // common locale to put them and (b) I hope to make them go away
+    // soon.
+    bool
+    assignTupleValueIndex(AbstractExpression *ae,
+                          const std::string &oname,
+                          const std::string &iname)
+    {
+        // if an exact table name match is found, do the obvious
+        // thing. Otherwise, assign to the table named "temp".
+        // If both tables are named temp, barf; planner purports
+        // not accept joins of two temp tables.
 
-    // tuple index 0 is always the outer table.
-    // tuple index 1 is always the inner table.
-    TupleValueExpression *tve = dynamic_cast<TupleValueExpression*>(ae);
-    std::string tname = tve->getTableName();
+        // tuple index 0 is always the outer table.
+        // tuple index 1 is always the inner table.
+        TupleValueExpression *tve = dynamic_cast<TupleValueExpression*>(ae);
+        std::string tname = tve->getTableName();
 
-    if (oname == "temp" && iname == "temp") {
-        VOLT_ERROR("Unsuported join on two temp tables.");
-        return false;
+        if (oname == "temp" && iname == "temp") {
+            VOLT_ERROR("Unsuported join on two temp tables.");
+            return false;
+        }
+
+        if (tname == oname)
+            tve->setTupleIndex(0);
+        else if (tname == iname)
+            tve->setTupleIndex(1);
+        else if (oname == "temp")
+            tve->setTupleIndex(0);
+        else if (iname == "temp")
+            tve->setTupleIndex(1);
+        else {
+            VOLT_ERROR("TableTupleValue in join with unknown table name.");
+            return false;
+        }
+
+        return true;
     }
 
-    if (tname == oname)
-        tve->setTupleIndex(0);
-    else if (tname == iname)
-        tve->setTupleIndex(1);
-    else if (oname == "temp")
-        tve->setTupleIndex(0);
-    else if (iname == "temp")
-        tve->setTupleIndex(1);
-    else {
-        VOLT_ERROR("TableTupleValue in join with unknown table name.");
-        return false;
-    }
+    bool
+    assignTupleValueIndexes(AbstractExpression* expression,
+                            const string& outer_name,
+                            const string& inner_name)
+    {
+        // for each tuple value expression in the expression, determine
+        // which tuple is being represented. Tuple could come from outer
+        // table or inner table. Configure the predicate to use the correct
+        // eval() tuple parameter. By convention, eval's first parameter
+        // will always be the outer table and its second parameter the inner
+        const AbstractExpression* predicate = expression;
+        std::stack<const AbstractExpression*> stack;
+        while (predicate != NULL) {
+            const AbstractExpression *left = predicate->getLeft();
+            const AbstractExpression *right = predicate->getRight();
 
-    return true;
+            if (right != NULL) {
+                if (right->getExpressionType() == EXPRESSION_TYPE_VALUE_TUPLE) {
+                    if (!assignTupleValueIndex(const_cast<AbstractExpression*>(right),
+                                               outer_name,
+                                               inner_name))
+                    {
+                        return false;
+                    }
+                }
+                // remember the right node - must visit its children
+                stack.push(right);
+            }
+            if (left != NULL) {
+                if (left->getExpressionType() == EXPRESSION_TYPE_VALUE_TUPLE) {
+                    if (!assignTupleValueIndex(const_cast<AbstractExpression*>(left),
+                                               outer_name,
+                                               inner_name))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            predicate = left;
+            if (!predicate && !stack.empty()) {
+                predicate = stack.top();
+                stack.pop();
+            }
+        }
+        return true;
+    }
 }
 
 bool NestLoopExecutor::p_init(AbstractPlanNode* abstract_node, const catalog::Database* catalog_db, int* tempTableMemoryInBytes) {
@@ -146,44 +204,12 @@ bool NestLoopExecutor::p_init(AbstractPlanNode* abstract_node, const catalog::Da
     // table or inner table. Configure the predicate to use the correct
     // eval() tuple parameter. By convention, eval's first parameter
     // will always be the outer table and its second parameter the inner
-    const AbstractExpression *predicate = node->getPredicate();
-    std::stack<const AbstractExpression*> stack;
-    while (predicate != NULL) {
-        const AbstractExpression *left = predicate->getLeft();
-        const AbstractExpression *right = predicate->getRight();
-
-        if (right != NULL) {
-            if (right->getExpressionType() == EXPRESSION_TYPE_VALUE_TUPLE) {
-                if (!assignTupleValueIndex(const_cast<AbstractExpression*>(right),
-                                           node->getInputTables()[0]->name(),
-                                           node->getInputTables()[1]->name())) {
-                    delete [] columnNames;
-                    return false;
-                }
-            }
-            // remember the right node - must visit its children
-            stack.push(right);
-        }
-        if (left != NULL) {
-            if (left->getExpressionType() == EXPRESSION_TYPE_VALUE_TUPLE) {
-                if (!assignTupleValueIndex(const_cast<AbstractExpression*>(left),
-                                           node->getInputTables()[0]->name(),
-                                           node->getInputTables()[1]->name())) {
-                    delete [] columnNames;
-                    return false;
-                }
-            }
-        }
-
-        predicate = left;
-        if (!predicate && !stack.empty()) {
-            predicate = stack.top();
-            stack.pop();
-        }
-    }
+    bool retval = assignTupleValueIndexes(node->getPredicate(),
+                                          node->getInputTables()[0]->name(),
+                                          node->getInputTables()[1]->name());
 
     delete[] columnNames;
-    return true;
+    return retval;
 }
 
 
@@ -249,6 +275,4 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     }
 
     return (true);
-}
-
 }
