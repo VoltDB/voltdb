@@ -1041,7 +1041,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         if (interval) {
             m_data.put((byte)1);
         } else {
-            m_data.put((byte)1);
+            m_data.put((byte)0);
         }
         m_data.putLong(now);
         m_data.putInt(locators.length);
