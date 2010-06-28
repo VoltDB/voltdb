@@ -141,6 +141,51 @@ public class TestVoltProcedure extends TestCase {
         public static double arg;
     }
 
+    static class BoxedByteProcedure extends NullProcedureWrapper {
+        public static VoltTable[] run(Byte arg1) {
+            arg = arg1;
+            return new VoltTable[0];
+        }
+
+        public static Byte arg;
+    }
+
+    static class BoxedShortProcedure extends NullProcedureWrapper {
+        public static VoltTable[] run(Short arg1) {
+            arg = arg1;
+            return new VoltTable[0];
+        }
+
+        public static Short arg;
+    }
+
+    static class BoxedIntegerProcedure extends NullProcedureWrapper {
+        public static VoltTable[] run(Integer arg1) {
+            arg = arg1;
+            return new VoltTable[0];
+        }
+
+        public static Integer arg;
+    }
+
+    static class BoxedLongProcedure extends NullProcedureWrapper {
+        public static VoltTable[] run(Long arg1) {
+            arg = arg1;
+            return new VoltTable[0];
+        }
+
+        public static Long arg;
+    }
+
+    static class BoxedDoubleProcedure extends NullProcedureWrapper {
+        public static VoltTable[] run(Double arg1) {
+            arg = arg1;
+            return new VoltTable[0];
+        }
+
+        public static Double arg;
+    }
+
     static class LongArrayProcedure extends NullProcedureWrapper {
         public static VoltTable[] run(long[] arg1) {
             arg = arg1;
@@ -205,6 +250,11 @@ public class TestVoltProcedure extends TestCase {
         manager.addProcedureForTest(IntegerProcedure.class.getName());
         manager.addProcedureForTest(LongProcedure.class.getName());
         manager.addProcedureForTest(DoubleProcedure.class.getName());
+        manager.addProcedureForTest(BoxedByteProcedure.class.getName());
+        manager.addProcedureForTest(BoxedShortProcedure.class.getName());
+        manager.addProcedureForTest(BoxedIntegerProcedure.class.getName());
+        manager.addProcedureForTest(BoxedLongProcedure.class.getName());
+        manager.addProcedureForTest(BoxedDoubleProcedure.class.getName());
         manager.addProcedureForTest(LongArrayProcedure.class.getName());
         manager.addProcedureForTest(NPEProcedure.class.getName());
         site = new MockExecutionSite(1, VoltDB.instance().getCatalogContext().catalog.serialize());
@@ -267,6 +317,36 @@ public class TestVoltProcedure extends TestCase {
     public void testNullDouble() {
         ClientResponse r = call(DoubleProcedure.class);
         assertEquals(VoltType.NULL_FLOAT, DoubleProcedure.arg);
+        assertEquals(ClientResponse.SUCCESS, r.getStatus());
+    }
+
+    public void testNullBoxedByte() {
+        ClientResponse r = call(BoxedByteProcedure.class);
+        assertEquals(null, BoxedByteProcedure.arg);
+        assertEquals(ClientResponse.SUCCESS, r.getStatus());
+    }
+
+    public void testNullBoxedShort() {
+        ClientResponse r = call(BoxedShortProcedure.class);
+        assertEquals(null, BoxedShortProcedure.arg);
+        assertEquals(ClientResponse.SUCCESS, r.getStatus());
+    }
+
+    public void testNullBoxedInteger() {
+        ClientResponse r = call(BoxedIntegerProcedure.class);
+        assertEquals(null, BoxedIntegerProcedure.arg);
+        assertEquals(ClientResponse.SUCCESS, r.getStatus());
+    }
+
+    public void testNullBoxedLong() {
+        ClientResponse r = call(BoxedLongProcedure.class);
+        assertEquals(null, BoxedLongProcedure.arg);
+        assertEquals(ClientResponse.SUCCESS, r.getStatus());
+    }
+
+    public void testNullBoxedDouble() {
+        ClientResponse r = call(BoxedDoubleProcedure.class);
+        assertEquals(null, BoxedDoubleProcedure.arg);
         assertEquals(ClientResponse.SUCCESS, r.getStatus());
     }
 
