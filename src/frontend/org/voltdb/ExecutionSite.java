@@ -326,7 +326,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
          * relatively up-to-date.
          */
         if (m_tableStats != null
-                && (time - lastTickTime) >= StatsManager.POLL_INTERVAL / 3) {
+                && (time - lastTickTime) >= StatsManager.POLL_INTERVAL * 2) {
             CatalogMap<Table> tables = m_context.database.getTables();
             int[] tableIds = new int[tables.size()];
             int i = 0;
