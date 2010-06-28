@@ -109,6 +109,7 @@ public class TestJSONInterface extends TestCase {
 
         ParameterSet pset = new ParameterSet();
         pset.setParameters(1,
+                           5,
                            new double[] { 1.5, 6.0, 4 },
                            new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT)),
                            new BigDecimal[] {},

@@ -542,6 +542,54 @@ public abstract class VoltProcedure {
         if (slot == VoltTable.class && pclass == VoltTable.class) {
             return param;
         }
+
+        // handle truncation for integers
+
+        // Long targeting int parameter
+        if ((slot == int.class) && (pclass == Long.class)) {
+            long val = ((Number) param).longValue();
+
+            // if it's null for the big type passed in...
+            if (val == VoltType.NULL_BIGINT)
+                return VoltType.NULL_INTEGER;
+
+            // if it's in the right range, and not null (target null), crop the value and return
+            if ((val <= Integer.MAX_VALUE) && (val >= Integer.MIN_VALUE) && (val != VoltType.NULL_INTEGER))
+                return ((Number) param).intValue();
+        }
+
+        // Long or Integer targeting short parameter
+        if ((slot == short.class) && (pclass == Long.class || pclass == Integer.class)) {
+            long val = ((Number) param).longValue();
+
+            // if it's null for the big type passed in...
+            if ((pclass == Long.class) && (val == VoltType.NULL_BIGINT))
+                return VoltType.NULL_SMALLINT;
+            if ((pclass == Integer.class) && (val == VoltType.NULL_INTEGER))
+                return VoltType.NULL_SMALLINT;
+
+            // if it's in the right range, and not null (target null), crop the value and return
+            if ((val <= Short.MAX_VALUE) && (val >= Short.MIN_VALUE) && (val != VoltType.NULL_SMALLINT))
+                return ((Number) param).shortValue();
+        }
+
+        // Long, Integer or Short targeting byte parameter
+        if ((slot == byte.class) && (pclass == Long.class || pclass == Integer.class || pclass == Short.class)) {
+            long val = ((Number) param).longValue();
+
+            // if it's null for the big type passed in...
+            if ((pclass == Long.class) && (val == VoltType.NULL_BIGINT))
+                return VoltType.NULL_TINYINT;
+            if ((pclass == Integer.class) && (val == VoltType.NULL_INTEGER))
+                return VoltType.NULL_TINYINT;
+            if ((pclass == Short.class) && (val == VoltType.NULL_SMALLINT))
+                return VoltType.NULL_TINYINT;
+
+            // if it's in the right range, and not null (target null), crop the value and return
+            if ((val <= Byte.MAX_VALUE) && (val >= Byte.MIN_VALUE) && (val != VoltType.NULL_TINYINT))
+                return ((Number) param).byteValue();
+        }
+
         throw new Exception(
                 "tryToMakeCompatible: Unable to match parameters:"
                 + slot.getName() + " to provided " + pclass.getName());

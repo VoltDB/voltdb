@@ -37,7 +37,7 @@ import org.voltdb.types.TimestampType;
 )
 public class CrazyBlahProc extends VoltProcedure {
 
-    public VoltTable[] run(long ival, double[] ivals, VoltTable tval, BigDecimal[] decvals, TimestampType timeval) {
+    public VoltTable[] run(long ival, int ival2, double[] dvals, VoltTable tval, BigDecimal[] decvals, TimestampType timeval) {
         VoltTable[] retval = new VoltTable[3];
 
         retval[0] = new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT));
