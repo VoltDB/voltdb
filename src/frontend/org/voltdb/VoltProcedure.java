@@ -526,6 +526,17 @@ public abstract class VoltProcedure {
         if (slot == TimestampType.class) {
             if (pclass == Long.class) return new TimestampType((Long)param);
             if (pclass == TimestampType.class) return param;
+            // if a string is given for a date, use java's JDBC parsing
+            if (pclass == String.class) {
+                try {
+                    java.sql.Timestamp sqlTS = java.sql.Timestamp.valueOf((String) param);
+                    long timeInMicroSecs = sqlTS.getTime() * 1000;
+                    timeInMicroSecs += sqlTS.getNanos() / 1000;
+                    return new TimestampType(timeInMicroSecs);
+                }
+                // ignore errors if it's not the right format
+                catch (IllegalArgumentException e) {}
+            }
         }
         if (slot == BigDecimal.class) {
             if (pclass == Long.class) {

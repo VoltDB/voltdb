@@ -238,6 +238,20 @@ public class TestJSONInterface extends TestCase {
         long value = row.getLong(0);
         assertEquals(1, value);
 
+        // try to pass a string as a date
+        java.sql.Timestamp ts = new java.sql.Timestamp(System.currentTimeMillis());
+        pset.setParameters(1,
+                5,
+                new double[] { 1.5, 6.0, 4 },
+                new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT)),
+                new BigDecimal[] {},
+                ts.toString());
+
+        responseJSON = callProcOverJSON("CrazyBlahProc", pset);
+        System.out.println(responseJSON);
+        response = responseFromJSON(responseJSON);
+        assertTrue(response.status == ClientResponse.SUCCESS);
+
         // now try a null short value sent as a int  (param expects short)
         pset.setParameters(1,
                 VoltType.NULL_SMALLINT,
