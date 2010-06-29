@@ -22,6 +22,7 @@ import java.util.Properties;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.SyncCallback;
 
 public class HTTPClientInterface {
 
@@ -41,23 +42,31 @@ public class HTTPClientInterface {
             String procName = parms.getProperty("Procedure");
             String params = parms.getProperty("Parameters");
 
-            ClientResponse response = null;
+            SyncCallback scb = new SyncCallback();
+            boolean success;
 
             if (params != null) {
                 ParameterSet paramSet = ParameterSet.fromJSONString(params);
-                response = m_client.callProcedure(procName, paramSet.toArray());
+                success =  m_client.callProcedure(scb, procName, paramSet.toArray());
             }
             else {
-                response = m_client.callProcedure(procName);
+                success = m_client.callProcedure(scb, procName);
+            }
+            if (!success) {
+                throw new Exception("Server is not accepting work at this time.");
             }
 
-            ClientResponseImpl rimpl = (ClientResponseImpl) response;
+            scb.waitForResponse();
+
+            ClientResponseImpl rimpl = (ClientResponseImpl) scb.getResponse();
             msg = rimpl.toJSONString();
         }
         catch (Exception e) {
             msg = e.getMessage();
+            ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
             e.printStackTrace();
             m_client = null;
+            msg = rimpl.toJSONString();
         }
 
         return msg;
