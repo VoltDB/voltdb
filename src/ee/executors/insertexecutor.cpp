@@ -45,9 +45,11 @@
 
 #include "insertexecutor.h"
 #include "common/debuglog.h"
+#include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
+#include "common/types.h"
 #include "plannodes/insertnode.h"
 #include "execution/VoltDBEngine.h"
 #include "storage/persistenttable.h"
@@ -58,7 +60,10 @@
 #include "storage/tablefactory.h"
 #include "storage/temptable.h"
 
-namespace voltdb {
+#include <vector>
+
+using namespace std;
+using namespace voltdb;
 
 bool InsertExecutor::p_init(AbstractPlanNode *abstract_node, const catalog::Database* catalog_db, int* tempTableMemoryInBytes) {
     VOLT_TRACE("init Insert Executor");
@@ -68,12 +73,24 @@ bool InsertExecutor::p_init(AbstractPlanNode *abstract_node, const catalog::Data
     assert(m_node->getTargetTable());
     assert(m_node->getInputTables().size() == 1);
 
-    // create an output table that currently will contain copies of modified tuples
-    m_node->setOutputTable(TableFactory::getCopiedTempTable(
-            m_node->databaseId(),
-            m_node->getInputTables()[0]->name(),
-            m_node->getInputTables()[0],
-            tempTableMemoryInBytes));
+    // Create an output table for the modified tuple count
+    // XXX this should maybe move to coming in via JSON
+    const vector<ValueType> outputType(1, VALUE_TYPE_BIGINT);
+    const vector<int32_t> outputSize(1, sizeof(int64_t));
+    const vector<bool> outputAllowNull(1, false);
+    string outputNames[1];
+    outputNames[0] = "modified_tuples";
+
+    TupleSchema* schema = TupleSchema::createTupleSchema(outputType,
+                                                         outputSize,
+                                                         outputAllowNull,
+                                                         true);
+
+    m_node->setOutputTable(TableFactory::getTempTable(m_node->databaseId(),
+                                                      "temp",
+                                                      schema,
+                                                      outputNames,
+                                                      tempTableMemoryInBytes));
 
     m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTables()[0]); //input table should be temptable
     assert(m_inputTable);
@@ -92,7 +109,7 @@ bool InsertExecutor::p_init(AbstractPlanNode *abstract_node, const catalog::Data
     if (persistentTarget) {
         m_partitionColumn = persistentTarget->partitionColumn();
         if (m_partitionColumn != -1) {
-            if (m_inputTable->schema()->columnType(m_partitionColumn) == voltdb::VALUE_TYPE_VARCHAR) {
+            if (m_inputTable->schema()->columnType(m_partitionColumn) == VALUE_TYPE_VARCHAR) {
                 m_partitionColumnIsString = true;
             }
         }
@@ -173,23 +190,23 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
             return false;
         }
 
-        // try to put the tuple into the output table
-        if (!outputTable->insertTuple(m_tuple)) {
-            VOLT_ERROR("Failed to insert tuple from input table '%s' into"
-                       " output table '%s'",
-                       m_inputTable->name().c_str(),
-                       outputTable->name().c_str());
-            return false;
-        }
-
         // successfully inserted
         modifiedTuples++;
+    }
+
+    TableTuple& count_tuple = outputTable->tempTuple();
+    count_tuple.setNValue(0, ValueFactory::getBigIntValue(modifiedTuples));
+    // try to put the tuple into the output table
+    if (!outputTable->insertTuple(count_tuple)) {
+        VOLT_ERROR("Failed to insert tuple count (%d) into"
+                   " output table '%s'",
+                   modifiedTuples,
+                   outputTable->name().c_str());
+        return false;
     }
 
     // add to the planfragments count of modified tuples
     m_engine->m_tuplesModified += modifiedTuples;
     VOLT_INFO("Finished inserting tuple");
     return true;
-}
-
 }

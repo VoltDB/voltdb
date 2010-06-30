@@ -17,9 +17,21 @@
 
 package org.voltdb.plannodes;
 
+import java.util.ArrayList;
+
 import org.json.JSONException;
 import org.json.JSONStringer;
+
+import org.voltdb.VoltType;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.Database;
+import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.PlanColumn;
 import org.voltdb.planner.PlannerContext;
+import org.voltdb.planner.PlanColumn.SortOrder;
+import org.voltdb.planner.PlanColumn.Storage;
+import org.voltdb.utils.CatalogUtil;
 
 public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
 
@@ -60,6 +72,28 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
      */
     public final void setTargetTableName(final String target_table_name) {
         m_targetTableName = target_table_name;
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    protected ArrayList<Integer> createOutputColumns(Database db, ArrayList<Integer> input) {
+        if (m_outputColumns.isEmpty())
+        {
+            // must produce a tuple value expression for this column.
+            TupleValueExpression tve = new TupleValueExpression();
+            tve.setValueType(VoltType.BIGINT);
+            tve.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
+            tve.setColumnIndex(0);
+            tve.setTableName("VOLT_TEMP_TABLE");
+            tve.setColumnAlias("modified_tuples");
+            tve.setColumnName("modified_tuples");
+
+            m_outputColumns.add(m_context.getPlanColumn(tve,
+                                                        "modified_tuples",
+                                                        SortOrder.kUnsorted,
+                                                        Storage.kTemporary).guid());
+        }
+        return (ArrayList<Integer>)m_outputColumns.clone();
     }
 
     @Override

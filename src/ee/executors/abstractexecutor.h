@@ -114,25 +114,6 @@ class AbstractExecutor {
     bool needs_outputtable_clear_cached;
 };
 
-/**
- * An Executor that modifies existing data, i.e. UPDATE/INSERT.  As
- * such kind of executor has to preserve the existing data,
- * needsOutputTableClear() always returns false. (RTB: this is a
- * confusing explanation - the targettable is modified, not the output
- * table. In reality, update and insert set outputtable to the
- * inputtable. Obviously clearing the input table before executing
- * would be non-sensical, so this setting of needsOutputClear() is
- * valid. But why set output <- input in the first place?)
- */
-class OperationExecutor : public AbstractExecutor {
-  public:
-    virtual ~OperationExecutor() {}
-
-  protected:
-    OperationExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) : AbstractExecutor(engine, abstract_node) {}
-    virtual bool needsOutputTableClear() { return false; };
-};
-
 inline bool AbstractExecutor::execute(const NValueArray &params) {
     assert (abstract_node);
     VOLT_TRACE("Starting execution of plannode(id=%d)...", abstract_node->getPlanNodeId());

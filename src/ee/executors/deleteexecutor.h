@@ -61,30 +61,35 @@ class DeletePlanNode;
 class TempTable;
 class PersistentTable;
 
-/**
- *
- */
-class DeleteExecutor : public OperationExecutor {
-    public:
-        DeleteExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) : OperationExecutor(engine, abstract_node) {
-            m_inputTable = NULL;
-            m_targetTable = NULL;
-            m_engine = engine;
-        }
-        ~DeleteExecutor();
-    protected:
-        bool p_init(AbstractPlanNode*, const catalog::Database* catalog_db, int* tempTableMemoryInBytes);
-        bool p_execute(const NValueArray &params);
+class DeleteExecutor : public AbstractExecutor
+{
+public:
+    DeleteExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
+        : AbstractExecutor(engine, abstract_node)
+    {
+        m_inputTable = NULL;
+        m_targetTable = NULL;
+        m_engine = engine;
+    }
 
-        /** true if all tuples are deleted, truncate is the only case we don't need PK to delete tuples. */
-        bool m_truncate;
-        TempTable* m_inputTable;
-        PersistentTable* m_targetTable;
-        TableTuple m_inputTuple;
-        TableTuple m_targetTuple;
+protected:
+    bool p_init(AbstractPlanNode*, const catalog::Database* catalog_db,
+                int* tempTableMemoryInBytes);
+    bool p_execute(const NValueArray &params);
 
-        /** reference to the engine/context to store the number of modified tuples */
-        VoltDBEngine* m_engine;
+    DeletePlanNode* m_node;
+
+    /** true if all tuples are deleted, truncate is the only case we
+        don't need PK to delete tuples. */
+    bool m_truncate;
+    TempTable* m_inputTable;
+    PersistentTable* m_targetTable;
+    TableTuple m_inputTuple;
+    TableTuple m_targetTuple;
+
+    /** reference to the engine/context to store the number of
+        modified tuples */
+    VoltDBEngine* m_engine;
 };
 
 }

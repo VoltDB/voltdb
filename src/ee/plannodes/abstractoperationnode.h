@@ -58,6 +58,7 @@ class Table;
  */
 class AbstractOperationPlanNode : public AbstractPlanNode {
     public:
+        virtual ~AbstractOperationPlanNode();
         Table* getTargetTable() const;
         void setTargetTable(Table* val);
 
@@ -77,7 +78,6 @@ class AbstractOperationPlanNode : public AbstractPlanNode {
             target_table = NULL;
             target_table_name = "NOT SPECIFIED";
         }
-        virtual ~AbstractOperationPlanNode() {}
 
         //
         // Target Table

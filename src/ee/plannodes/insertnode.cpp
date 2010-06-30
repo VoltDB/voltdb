@@ -63,9 +63,4 @@ void InsertPlanNode::loadFromJSONObject(json_spirit::Object &obj, const catalog:
     m_multiPartition = multiPartitionValue.get_bool();
 }
 
-InsertPlanNode::~InsertPlanNode() {
-    delete getOutputTable();
-    setOutputTable(NULL);
-}
-
 }

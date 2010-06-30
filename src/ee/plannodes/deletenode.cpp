@@ -55,13 +55,6 @@ using namespace std;
 
 namespace voltdb {
 
-DeletePlanNode::~DeletePlanNode() {
-    if (getTruncate()) {
-        delete getOutputTable();
-        setOutputTable(NULL);
-    }
-}
-
 void DeletePlanNode::loadFromJSONObject(json_spirit::Object &obj, const catalog::Database *catalog_db) {
     AbstractOperationPlanNode::loadFromJSONObject(obj, catalog_db);
     json_spirit::Value truncateValue = json_spirit::find_value( obj, "TRUNCATE");

@@ -60,38 +60,39 @@ class UpdatePlanNode;
 class TempTable;
 class PersistentTable;
 
-/**
- *
- */
-class UpdateExecutor : public OperationExecutor {
-    public:
-        UpdateExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) : OperationExecutor(engine, abstract_node) {
-            m_inputTargetMapSize = -1;
-            m_inputTable = NULL;
-            m_targetTable = NULL;
-            m_engine = engine;
-            m_partitionColumn = -1;
-        }
-        ~UpdateExecutor();
-    protected:
-        bool p_init(AbstractPlanNode*, const catalog::Database* catalog_db, int* tempTableMemoryInBytes);
-        bool p_execute(const NValueArray &params);
+class UpdateExecutor : public AbstractExecutor
+{
+public:
+    UpdateExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
+        : AbstractExecutor(engine, abstract_node)
+    {
+        m_inputTargetMapSize = -1;
+        m_inputTable = NULL;
+        m_targetTable = NULL;
+        m_engine = engine;
+        m_partitionColumn = -1;
+    }
 
+protected:
+    bool p_init(AbstractPlanNode*, const catalog::Database* catalog_db, int* tempTableMemoryInBytes);
+    bool p_execute(const NValueArray &params);
 
-        std::vector<std::pair<int, int> > m_inputTargetMap;
-        int m_inputTargetMapSize;
+    UpdatePlanNode* m_node;
 
-        TempTable* m_inputTable;
-        PersistentTable* m_targetTable;
+    std::vector<std::pair<int, int> > m_inputTargetMap;
+    int m_inputTargetMapSize;
 
-        TableTuple m_inputTuple;
-        TableTuple m_targetTuple;
-        int m_partitionColumn;
-        bool m_partitionColumnIsString;
-        bool m_updatesIndexes;
+    TempTable* m_inputTable;
+    PersistentTable* m_targetTable;
 
-        /** reference to the engine/context to store the number of modified tuples */
-        VoltDBEngine* m_engine;
+    TableTuple m_inputTuple;
+    TableTuple m_targetTuple;
+    int m_partitionColumn;
+    bool m_partitionColumnIsString;
+    bool m_updatesIndexes;
+
+    /** reference to the engine/context to store the number of modified tuples */
+    VoltDBEngine* m_engine;
 };
 
 }

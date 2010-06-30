@@ -62,7 +62,7 @@ class DeletePlanNode : public AbstractOperationPlanNode {
         DeletePlanNode() : AbstractOperationPlanNode() {
             truncate = false;
         }
-        ~DeletePlanNode();
+
         virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_DELETE); }
         bool getTruncate() const { return truncate; }
         void setTruncate(bool truncate) { this->truncate = truncate; }

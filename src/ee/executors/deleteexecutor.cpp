@@ -45,6 +45,7 @@
 
 #include "deleteexecutor.h"
 
+#include "common/ValueFactory.hpp"
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
 #include "storage/table.h"
@@ -55,33 +56,49 @@
 #include "storage/temptable.h"
 #include "storage/persistenttable.h"
 
+#include <vector>
 #include <cassert>
 
-namespace voltdb {
+using namespace std;
+using namespace voltdb;
 
 bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node, const catalog::Database* catalog_db, int* tempTableMemoryInBytes) {
     VOLT_TRACE("init Delete Executor");
 
-    DeletePlanNode* node = dynamic_cast<DeletePlanNode*>(abstract_node);
-    assert(node);
-    assert(node->getTargetTable());
-    m_targetTable = dynamic_cast<PersistentTable*>(node->getTargetTable()); //target table should be persistenttable
+    m_node = dynamic_cast<DeletePlanNode*>(abstract_node);
+    assert(m_node);
+    assert(m_node->getTargetTable());
+    m_targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable()); //target table should be persistenttable
     assert(m_targetTable);
-    m_truncate = node->getTruncate();
+
+    // Create an output table for the modified tuple count
+    // XXX this should maybe move to coming in via JSON
+    const vector<ValueType> outputType(1, VALUE_TYPE_BIGINT);
+    const vector<int32_t> outputSize(1, sizeof(int64_t));
+    const vector<bool> outputAllowNull(1, false);
+    string outputNames[1];
+    outputNames[0] = "modified_tuples";
+
+    TupleSchema* schema = TupleSchema::createTupleSchema(outputType,
+                                                         outputSize,
+                                                         outputAllowNull,
+                                                         true);
+
+    m_node->setOutputTable(TableFactory::getTempTable(m_node->databaseId(),
+                                                      "temp",
+                                                      schema,
+                                                      outputNames,
+                                                      tempTableMemoryInBytes));
+
+    m_truncate = m_node->getTruncate();
     if (m_truncate) {
-        assert(node->getInputTables().size() == 0);
-        // TODO : we can't use target table here because
-        // it will report that "0 tuples deleted" as it's already truncated as of Result node..
-        node->setOutputTable(TableFactory::getCopiedTempTable(m_targetTable->databaseId(), "result_table", m_targetTable, tempTableMemoryInBytes));
+        assert(m_node->getInputTables().size() == 0);
         return true;
     }
 
-    assert(node->getInputTables().size() == 1);
-    m_inputTable = dynamic_cast<TempTable*>(node->getInputTables()[0]); //input table should be temptable
+    assert(m_node->getInputTables().size() == 1);
+    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTables()[0]); //input table should be temptable
     assert(m_inputTable);
-
-    // Our output is just our input table (regardless if plan is single-sited or not)
-    node->setOutputTable(node->getInputTables()[0]);
 
     m_inputTuple = TableTuple(m_inputTable->schema());
     m_targetTuple = TableTuple(m_targetTable->schema());
@@ -91,46 +108,54 @@ bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node, const catalog::Data
 
 bool DeleteExecutor::p_execute(const NValueArray &params) {
     assert(m_targetTable);
+    int64_t modified_tuples = 0;
+
     if (m_truncate) {
         VOLT_TRACE("truncating table %s...", m_targetTable->name().c_str());
         // count the truncated tuples as deleted
-        m_engine->m_tuplesModified += m_inputTable->activeTupleCount();
-        //m_engine->context().incrementTuples(m_targetTable->activeTupleCount());
+        modified_tuples = m_targetTable->activeTupleCount();
+
         // actually delete all the tuples
         m_targetTable->deleteAllTuples(true);
-        return true;
     }
-    assert(m_inputTable);
+    else
+    {
+        assert(m_inputTable);
+        assert(m_inputTuple.sizeInValues() == m_inputTable->columnCount());
+        assert(m_targetTuple.sizeInValues() == m_targetTable->columnCount());
+        TableIterator inputIterator(m_inputTable);
+        while (inputIterator.next(m_inputTuple)) {
+            //
+            // OPTIMIZATION: Single-Sited Query Plans
+            // If our beloved DeletePlanNode is apart of a single-site query plan,
+            // then the first column in the input table will be the address of a
+            // tuple on the target table that we will want to blow away. This saves
+            // us the trouble of having to do an index lookup
+            //
+            void *targetAddress = m_inputTuple.getNValue(0).castAsAddress();
+            m_targetTuple.move(targetAddress);
 
-    assert(m_inputTuple.sizeInValues() == m_inputTable->columnCount());
-    assert(m_targetTuple.sizeInValues() == m_targetTable->columnCount());
-    TableIterator inputIterator(m_inputTable);
-    while (inputIterator.next(m_inputTuple)) {
-        //
-        // OPTIMIZATION: Single-Sited Query Plans
-        // If our beloved DeletePlanNode is apart of a single-site query plan,
-        // then the first column in the input table will be the address of a
-        // tuple on the target table that we will want to blow away. This saves
-        // us the trouble of having to do an index lookup
-        //
-        void *targetAddress = m_inputTuple.getNValue(0).castAsAddress();
-        m_targetTuple.move(targetAddress);
-
-        // Delete from target table
-        if (!m_targetTable->deleteTuple(m_targetTuple, true)) {
-            VOLT_ERROR("Failed to delete tuple from table '%s'",
-                       m_targetTable->name().c_str());
-            return false;
+            // Delete from target table
+            if (!m_targetTable->deleteTuple(m_targetTuple, true)) {
+                VOLT_ERROR("Failed to delete tuple from table '%s'",
+                           m_targetTable->name().c_str());
+                return false;
+            }
         }
+        modified_tuples = m_inputTable->activeTupleCount();
     }
 
-    // add to the planfragments count of modified tuples
-    m_engine->m_tuplesModified += m_inputTable->activeTupleCount();
-    //m_engine->context().incrementTuples(m_inputTable->activeTupleCount());
+    TableTuple& count_tuple = m_node->getOutputTable()->tempTuple();
+    count_tuple.setNValue(0, ValueFactory::getBigIntValue(modified_tuples));
+    // try to put the tuple into the output table
+    if (!m_node->getOutputTable()->insertTuple(count_tuple)) {
+        VOLT_ERROR("Failed to insert tuple count (%ld) into"
+                   " output table '%s'",
+                   static_cast<long int>(modified_tuples),
+                   m_node->getOutputTable()->name().c_str());
+        return false;
+    }
+    m_engine->m_tuplesModified += modified_tuples;
 
     return true;
-}
-
-DeleteExecutor::~DeleteExecutor() {
-}
 }

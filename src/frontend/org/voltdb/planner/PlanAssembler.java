@@ -458,10 +458,7 @@ public class PlanAssembler {
             assert (scanNode instanceof AbstractScanPlanNode);
             scanNode.addInlinePlanNode(projectionNode);
             deleteNode.addAndLinkChild(scanNode);
-
-            AbstractPlanNode countNode = insertCountInDMLPlan(deleteNode);
-
-            sendNode.addAndLinkChild(countNode);
+            sendNode.addAndLinkChild(deleteNode);
 
             // fix the receive node's output columns
             recvNode.updateOutputColumns(m_catalogDb);
@@ -551,10 +548,7 @@ public class PlanAssembler {
             assert (scanNode instanceof AbstractScanPlanNode);
             scanNode.addInlinePlanNode(projectionNode);
             updateNode.addAndLinkChild(scanNode);
-
-            AbstractPlanNode countNode = insertCountInDMLPlan(updateNode);
-
-            sendNode.addAndLinkChild(countNode);
+            sendNode.addAndLinkChild(updateNode);
 
             // fix the receive node's output columns
             recvNode.updateOutputColumns(m_catalogDb);
@@ -655,9 +649,6 @@ public class PlanAssembler {
             // all sites to a scan -> send
             // root site has many recvs feeding into a union
 
-            rootNode = insertCountInDMLPlan(rootNode);
-
-
             SendPlanNode sendNode = new SendPlanNode(m_context);
             // this will make the child planfragment be sent to all partitions
             sendNode.isMultiPartition = true;
@@ -675,47 +666,6 @@ public class PlanAssembler {
         }
 
         return rootNode;
-    }
-
-    // Add the result row count above the DML node in the plan fragment
-    // that executes on all the sites in a multi-partition plan.  This
-    // is the result that will be summed at the coordinator by the node
-    // added by addSumAndSendToDMLNode()
-    AbstractPlanNode insertCountInDMLPlan(AbstractPlanNode dmlRoot)
-    {
-        // update the output columns in case our caller hasn't
-        dmlRoot.updateOutputColumns(m_catalogDb);
-        // Add an aggregate count.
-        AggregatePlanNode countNode = new AggregatePlanNode(m_context);
-        List<String> countColumnNames = new ArrayList<String>();
-        List<Integer> countColumnGuids = new ArrayList<Integer>();
-        List<ExpressionType> countColumnTypes = new ArrayList<ExpressionType>();
-        List<Integer> countOutputColumns = countNode.getAggregateOutputColumns();
-
-        // aggregate column name same as original dmlRoot name.
-        int colGuid = dmlRoot.m_outputColumns.get(0); // offset 0.
-        countColumnNames.add(m_context.get(colGuid).displayName());
-        countColumnGuids.add(colGuid);
-        countOutputColumns.add(0);
-        countColumnTypes.add(ExpressionType.AGGREGATE_COUNT_STAR);
-        countNode.setAggregateColumnNames(countColumnNames);
-        countNode.setAggregateColumnGuids(countColumnGuids);
-        countNode.setAggregateTypes(countColumnTypes);
-
-        // The output column. Not really based on a TVE (it is really the
-        // count expression represented by the count configured above). But
-        // this is sufficient for now.
-        TupleValueExpression tve = new TupleValueExpression();
-        tve.setValueType(VoltType.BIGINT);
-        tve.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
-        tve.setColumnIndex(0);
-        tve.setColumnName(m_context.get(colGuid).displayName());
-        tve.setColumnAlias(m_context.get(colGuid).displayName());
-        tve.setTableName("");
-        PlanColumn countColInfo = m_context.getPlanColumn(tve, "modified_tuples");
-        countNode.appendOutputColumn(countColInfo);
-        countNode.addAndLinkChild(dmlRoot);
-        return countNode;
     }
 
     AbstractPlanNode addSumAndSendToDMLNode(AbstractPlanNode dmlRoot) {

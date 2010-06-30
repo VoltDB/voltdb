@@ -59,16 +59,20 @@ class TempTable;
 /**
  *
  */
-class InsertExecutor : public OperationExecutor {
-    public:
-        InsertExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) : OperationExecutor(engine, abstract_node) {
-            m_inputTable = NULL;
-            m_targetTable = NULL;
-            m_node = NULL;
-            m_engine = engine;
-            m_partitionColumn = -1;
-            m_multiPartition = false;
-        }
+class InsertExecutor : public AbstractExecutor
+{
+public:
+    InsertExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
+        : AbstractExecutor(engine, abstract_node)
+    {
+        m_inputTable = NULL;
+        m_targetTable = NULL;
+        m_node = NULL;
+        m_engine = engine;
+        m_partitionColumn = -1;
+        m_multiPartition = false;
+    }
+
     protected:
         bool p_init(AbstractPlanNode*, const catalog::Database* catalog_db, int* tempTableMemoryInBytes);
         bool p_execute(const NValueArray &params);

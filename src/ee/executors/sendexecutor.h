@@ -55,22 +55,27 @@ namespace voltdb {
 
 class SendPlanNode;
 
-/**
- *
- */
-class SendExecutor : public OperationExecutor {
-    public:
-        SendExecutor(VoltDBEngine *engine, AbstractPlanNode* abstractNode) : OperationExecutor(engine, abstractNode) {
-            m_inputTable = NULL;
-            m_engine = engine;
-        }
-    protected:
-        bool p_init(AbstractPlanNode*, const catalog::Database* catalog_db, int* tempTableMemoryInBytes);
-        bool p_execute(const NValueArray &params);
+class SendExecutor : public AbstractExecutor
+{
+public:
+    SendExecutor(VoltDBEngine *engine, AbstractPlanNode* abstractNode)
+        : AbstractExecutor(engine, abstractNode)
+    {
+        m_inputTable = NULL;
+        m_engine = engine;
+    }
 
-    private:
-        Table* m_inputTable;
-        VoltDBEngine *m_engine;
+protected:
+    bool p_init(AbstractPlanNode*, const catalog::Database* catalog_db, int* tempTableMemoryInBytes);
+    bool p_execute(const NValueArray &params);
+
+    // SendExecutors don't actually have output tables, so they
+    // don't require them to be cleared before executing
+    virtual bool needsOutputTableClear() { return false; };
+
+private:
+    Table* m_inputTable;
+    VoltDBEngine *m_engine;
 };
 
 }

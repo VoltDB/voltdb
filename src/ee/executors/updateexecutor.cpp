@@ -48,6 +48,7 @@
 #include "updateexecutor.h"
 #include "common/debuglog.h"
 #include "common/common.h"
+#include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
 #include "common/types.h"
 #include "common/tabletuple.h"
@@ -65,28 +66,45 @@
 #include "catalog/table.h"
 #include "catalog/column.h"
 
-namespace voltdb {
+using namespace std;
+using namespace voltdb;
 
 bool UpdateExecutor::p_init(AbstractPlanNode *abstract_node, const catalog::Database* catalog_db, int* tempTableMemoryInBytes) {
     VOLT_TRACE("init Update Executor");
 
-    UpdatePlanNode* node = dynamic_cast<UpdatePlanNode*>(abstract_node);
-    assert(node);
-    assert(node->getTargetTable());
-    assert(node->getInputTables().size() == 1);
-    m_inputTable = dynamic_cast<TempTable*>(node->getInputTables()[0]); //input table should be temptable
+    m_node = dynamic_cast<UpdatePlanNode*>(abstract_node);
+    assert(m_node);
+    assert(m_node->getTargetTable());
+    assert(m_node->getInputTables().size() == 1);
+    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTables()[0]); //input table should be temptable
     assert(m_inputTable);
-    m_targetTable = dynamic_cast<PersistentTable*>(node->getTargetTable()); //target table should be persistenttable
+    m_targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable()); //target table should be persistenttable
     assert(m_targetTable);
-    assert(node->getTargetTable());
+    assert(m_node->getTargetTable());
 
-    // Our output is just our input table (regardless if plan is single-sited or not)
-    node->setOutputTable(node->getInputTables()[0]);
+    // Create an output table for the modified tuple count
+    // XXX this should maybe move to coming in via JSON
+    const vector<ValueType> outputType(1, VALUE_TYPE_BIGINT);
+    const vector<int32_t> outputSize(1, sizeof(int64_t));
+    const vector<bool> outputAllowNull(1, false);
+    string outputNames[1];
+    outputNames[0] = "modified_tuples";
+
+    TupleSchema* schema = TupleSchema::createTupleSchema(outputType,
+                                                         outputSize,
+                                                         outputAllowNull,
+                                                         true);
+
+    m_node->setOutputTable(TableFactory::getTempTable(m_node->databaseId(),
+                                                      "temp",
+                                                      schema,
+                                                      outputNames,
+                                                      tempTableMemoryInBytes));
 
     // record if a full index update is needed, or if these checks can be skipped
-    m_updatesIndexes = node->doesUpdateIndexes();
+    m_updatesIndexes = m_node->doesUpdateIndexes();
 
-    AbstractPlanNode *child = node->getChildren()[0];
+    AbstractPlanNode *child = m_node->getChildren()[0];
     ProjectionPlanNode *proj_node = NULL;
     if (NULL == child) {
         VOLT_ERROR("Attempted to initialize update executor with NULL child");
@@ -102,9 +120,9 @@ bool UpdateExecutor::p_init(AbstractPlanNode *abstract_node, const catalog::Data
         assert(NULL != proj_node);
     }
 
-    std::vector<std::string> output_column_names = proj_node->getOutputColumnNames();
+    vector<string> output_column_names = proj_node->getOutputColumnNames();
 
-    std::string targetTableName = node->getTargetTableName();
+    string targetTableName = m_node->getTargetTableName();
     catalog::Table *targetTable = NULL;
     catalog::CatalogMap<catalog::Table> tables = catalog_db->tables();
     for ( catalog::CatalogMap<catalog::Table>::field_map_iter i = tables.begin(); i != tables.end(); i++) {
@@ -123,10 +141,10 @@ bool UpdateExecutor::p_init(AbstractPlanNode *abstract_node, const catalog::Data
      * it when generating the map from input columns to the target table columns.
      */
     for (int ii = 1; ii < output_column_names.size(); ii++) {
-        std::string outputColumnName = output_column_names[ii];
+        string outputColumnName = output_column_names[ii];
         catalog::Column *column = columns.get(outputColumnName);
         assert (column != NULL);
-        m_inputTargetMap.push_back(std::pair<int, int>( ii, column->index()));
+        m_inputTargetMap.push_back(pair<int, int>( ii, column->index()));
     }
     m_inputTargetMapSize = (int)m_inputTargetMap.size();
 
@@ -136,7 +154,7 @@ bool UpdateExecutor::p_init(AbstractPlanNode *abstract_node, const catalog::Data
     m_partitionColumn = m_targetTable->partitionColumn();
     m_partitionColumnIsString = false;
     if (m_partitionColumn != -1) {
-        if (m_targetTable->schema()->columnType(m_partitionColumn) == voltdb::VALUE_TYPE_VARCHAR) {
+        if (m_targetTable->schema()->columnType(m_partitionColumn) == VALUE_TYPE_VARCHAR) {
             m_partitionColumnIsString = true;
         }
     }
@@ -209,6 +227,17 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
         }
     }
 
+    TableTuple& count_tuple = m_node->getOutputTable()->tempTuple();
+    count_tuple.setNValue(0, ValueFactory::getBigIntValue(m_inputTable->activeTupleCount()));
+    // try to put the tuple into the output table
+    if (!m_node->getOutputTable()->insertTuple(count_tuple)) {
+        VOLT_ERROR("Failed to insert tuple count (%ld) into"
+                   " output table '%s'",
+                   static_cast<long int>(m_inputTable->activeTupleCount()),
+                   m_node->getOutputTable()->name().c_str());
+        return false;
+    }
+
     VOLT_TRACE("TARGET TABLE - AFTER: %s\n", m_targetTable->debug().c_str());
     // TODO lets output result table here, not in result executor. same thing in
     // delete/insert
@@ -217,8 +246,4 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
     m_engine->m_tuplesModified += m_inputTable->activeTupleCount();
 
     return true;
-}
-
-UpdateExecutor::~UpdateExecutor() {}
-
 }

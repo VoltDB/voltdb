@@ -53,8 +53,13 @@
 #include "json_spirit/json_spirit.h"
 
 using namespace std;
+using namespace voltdb;
 
-namespace voltdb {
+AbstractOperationPlanNode::~AbstractOperationPlanNode()
+{
+    delete getOutputTable();
+    setOutputTable(NULL);
+}
 
 string AbstractOperationPlanNode::getTargetTableName() const {
     return target_table_name;
@@ -85,6 +90,4 @@ void AbstractOperationPlanNode::loadFromJSONObject(json_spirit::Object &obj, con
                                       "Couldn't find TARGET_TABLE_NAME value");
     }
     target_table_name = targetTableNameValue.get_str();
-}
-
 }

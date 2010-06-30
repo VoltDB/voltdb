@@ -62,7 +62,6 @@ class InsertPlanNode : public AbstractOperationPlanNode {
         InsertPlanNode() : AbstractOperationPlanNode() {
             // Do nothing
         }
-       ~InsertPlanNode();
 
         virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_INSERT); }
 
@@ -78,4 +77,3 @@ class InsertPlanNode : public AbstractOperationPlanNode {
 }
 
 #endif
-

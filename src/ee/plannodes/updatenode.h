@@ -64,9 +64,7 @@ class UpdatePlanNode : public AbstractOperationPlanNode {
         UpdatePlanNode() : AbstractOperationPlanNode(), m_updatesIndexes(false) {
             // Do nothing
         }
-        ~UpdatePlanNode() {
-            setOutputTable(NULL);
-        }
+
         virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_UPDATE); }
 
         std::string debugInfo(const std::string &spacer) const;
