@@ -539,7 +539,8 @@ public abstract class VoltProcedure {
             }
         }
         if (slot == BigDecimal.class) {
-            if (pclass == Long.class) {
+            if ((pclass == Long.class) || (pclass == Integer.class) ||
+                (pclass == Short.class) || (pclass == Byte.class)) {
                 BigInteger bi = new BigInteger(param.toString());
                 BigDecimal bd = new BigDecimal(bi);
                 bd.setScale(4, BigDecimal.ROUND_HALF_EVEN);

@@ -218,6 +218,7 @@ public class TestJSONInterface extends TestCase {
                            5,
                            new double[] { 1.5, 6.0, 4 },
                            new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT)),
+                           new BigDecimal(5),
                            new BigDecimal[] {},
                            new TimestampType(System.currentTimeMillis()));
 
@@ -244,6 +245,7 @@ public class TestJSONInterface extends TestCase {
                 5,
                 new double[] { 1.5, 6.0, 4 },
                 new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT)),
+                new BigDecimal(5),
                 new BigDecimal[] {},
                 ts.toString());
 
@@ -257,6 +259,7 @@ public class TestJSONInterface extends TestCase {
                 VoltType.NULL_SMALLINT,
                 new double[] { 1.5, 6.0, 4 },
                 new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT)),
+                new BigDecimal(5),
                 new BigDecimal[] {},
                 new TimestampType(System.currentTimeMillis()));
 
@@ -270,6 +273,7 @@ public class TestJSONInterface extends TestCase {
                 Long.MAX_VALUE - 100,
                 new double[] { 1.5, 6.0, 4 },
                 new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT)),
+                new BigDecimal(5),
                 new BigDecimal[] {},
                 new TimestampType(System.currentTimeMillis()));
 
@@ -277,6 +281,21 @@ public class TestJSONInterface extends TestCase {
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
         assertFalse(response.status == ClientResponse.SUCCESS);
+
+        // now try bigdecimal with small value
+        pset.setParameters(1,
+                4,
+                new double[] { 1.5, 6.0, 4 },
+                new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT)),
+                5,
+                new BigDecimal[] {},
+                new TimestampType(System.currentTimeMillis()));
+
+        responseJSON = callProcOverJSON("CrazyBlahProc", pset);
+        System.out.println(responseJSON);
+        response = responseFromJSON(responseJSON);
+        System.out.println(response.statusString);
+        assertEquals(ClientResponse.SUCCESS, response.status);
 
         server.shutdown();
         server.join();
