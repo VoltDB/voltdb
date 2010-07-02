@@ -68,7 +68,6 @@ class AbstractExpression;
 //
 class IndexScanPlanNode;
 class ProjectionPlanNode;
-class DistinctPlanNode;
 class LimitPlanNode;
 
 class IndexScanExecutor : public AbstractExecutor
@@ -96,15 +95,6 @@ protected:
     ProjectionPlanNode* m_projectionNode;
     int* m_projectionAllTupleArray; // projection_all_tuple_array_ptr[]
     AbstractExpression** m_projectionExpressions;
-
-    // Inline Distinct
-    DistinctPlanNode* m_distinctNode;
-    boost::unordered_set<NValue,
-        NValue::hash,
-        NValue::equal_to,
-        boost::pool_allocator<NValue> > m_distinctValueSet; // HACK
-    int m_distinctColumn;
-    ValueType m_distinctColumnType;
 
     // Search key
     TableTuple m_searchKey;

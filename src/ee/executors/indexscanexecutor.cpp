@@ -56,7 +56,6 @@
 // Inline PlanNodes
 #include "plannodes/indexscannode.h"
 #include "plannodes/projectionnode.h"
-#include "plannodes/distinctnode.h"
 #include "plannodes/limitnode.h"
 
 #include "storage/table.h"
@@ -73,7 +72,6 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     VOLT_TRACE("init IndexScan Executor");
 
     m_projectionNode = NULL;
-    m_distinctNode = NULL;
     m_limitNode = NULL;
 
     m_node = dynamic_cast<IndexScanPlanNode*>(abstractNode);
@@ -145,51 +143,6 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
                                               "temp",
                                               m_node->getTargetTable(),
                                               tempTableMemoryInBytes));
-    }
-
-    //
-    // INLINE DISTINCT
-    //
-    if (m_node->getInlinePlanNode(PLAN_NODE_TYPE_DISTINCT) != NULL)
-    {
-        m_distinctNode =
-            static_cast<DistinctPlanNode*>
-            (m_node->getInlinePlanNode(PLAN_NODE_TYPE_DISTINCT));
-        // XXX again, this assert is pointless if static_cast is
-        // what's actually intended above
-        assert(m_distinctNode);
-
-        // Retrieve the distinct column index from the target table
-        // using the distinct column name stored in the inline
-        // distinct node.
-        //
-        // Should this be done elsewhere?
-        voltdb::Table *targetTable = m_node->getTargetTable();
-        assert (targetTable);
-        std::string distinctColumnName = m_distinctNode->getDistinctColumnName();        assert(!distinctColumnName.empty());
-
-        int distinctColumn = targetTable->columnIndex(distinctColumnName);
-        assert(distinctColumn != -1);
-        m_distinctNode->setDistinctColumn(distinctColumn);
-
-        // Use the information we just cached in the inline plan node.
-        assert(m_distinctNode->getDistinctColumn() >= 0);
-        m_distinctColumn = m_distinctNode->getDistinctColumn();
-        m_distinctColumnType =
-            m_node->getTargetTable()->schema()->columnType(m_distinctColumn);
-
-        //
-        // HACK: For now use integer types only
-        //
-        if ((m_distinctColumnType != VALUE_TYPE_TINYINT) &&
-            (m_distinctColumnType != VALUE_TYPE_SMALLINT) &&
-            (m_distinctColumnType != VALUE_TYPE_INTEGER) &&
-            (m_distinctColumnType != VALUE_TYPE_BIGINT)) {
-            VOLT_ERROR("The Distinct operation is not supported for '%s'"
-                       " columns", getTypeName(m_distinctColumnType).c_str());
-            delete [] m_projectionExpressions;
-            return false;
-        }
     }
 
     //
@@ -312,14 +265,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             }
             assert(m_projectionExpressions[ctr]);
         }
-    }
-
-    //
-    // INLINE DISTINCT
-    //
-    if (m_distinctNode != NULL)
-    {
-        m_distinctValueSet.clear();
     }
 
     //
@@ -463,20 +408,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         if (post_expression == NULL ||
             post_expression->eval(&m_tuple, NULL).isTrue())
         {
-            //
-            // Inline Distinct
-            //
-            if (m_distinctNode != NULL)
-            {
-                NValue value = m_tuple.getNValue(m_distinctColumn);
-                // insert returns a pair<iterator, bool_succeeded>.
-                // Don't want to continue if insert failed (value
-                // was already present).
-                if (m_distinctValueSet.insert(value).second == false)
-                {
-                    continue;
-                }
-            }
             if (m_projectionNode != NULL)
             {
                 TableTuple &temp_tuple = m_outputTable->tempTuple();
