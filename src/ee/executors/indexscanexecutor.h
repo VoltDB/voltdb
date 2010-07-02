@@ -68,7 +68,6 @@ class AbstractExpression;
 //
 class IndexScanPlanNode;
 class ProjectionPlanNode;
-class AggregatePlanNode;
 class DistinctPlanNode;
 class LimitPlanNode;
 
@@ -117,11 +116,6 @@ protected:
     bool m_needsSubstitutePostExpression;
     bool m_needsSubstituteEndExpression;
 
-    // Inline Aggregate
-    AggregatePlanNode* m_aggregateNode;
-    int m_aggregateColumnIdx;
-    int m_aggregateCompareValue;
-    ValueType m_aggregateColumnType;
     IndexLookupType m_lookupType;
     SortDirectionType m_sortDirection;
 

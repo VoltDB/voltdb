@@ -56,7 +56,6 @@
 // Inline PlanNodes
 #include "plannodes/indexscannode.h"
 #include "plannodes/projectionnode.h"
-#include "plannodes/aggregatenode.h"
 #include "plannodes/distinctnode.h"
 #include "plannodes/limitnode.h"
 
@@ -74,7 +73,6 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     VOLT_TRACE("init IndexScan Executor");
 
     m_projectionNode = NULL;
-    m_aggregateNode = NULL;
     m_distinctNode = NULL;
     m_limitNode = NULL;
 
@@ -281,48 +279,6 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     }
 
     //
-    // INLINE AGGREGATE
-    //
-    m_aggregateColumnIdx = -1;
-    m_aggregateCompareValue = VALUE_COMPARE_EQUAL;
-    m_aggregateColumnType = VALUE_TYPE_INVALID;
-    if (m_node->getInlinePlanNode(PLAN_NODE_TYPE_AGGREGATE) != NULL)
-    {
-        m_aggregateNode =
-            static_cast<AggregatePlanNode*>
-            (m_node->getInlinePlanNode(PLAN_NODE_TYPE_AGGREGATE));
-        ExpressionType aggregateType = m_aggregateNode->getAggregates()[0];
-        if ((aggregateType != EXPRESSION_TYPE_AGGREGATE_MIN) &&
-            (aggregateType != EXPRESSION_TYPE_AGGREGATE_MAX))
-        {
-            VOLT_ERROR("Unsupported inline Aggregate type '%s' in PlanNode '%s'",
-                       expressionutil::getTypeName(aggregateType).c_str(),
-                       m_node->debug().c_str());
-            delete [] m_searchKeyBackingStore;
-            delete [] m_projectionExpressions;
-            return false;
-        }
-
-        //
-        // HACKISH
-        // For now it's hard-coded so that it only
-        // process single-column-aggregate
-        //
-        std::vector<int> agg_column_idxes(1);
-        agg_column_idxes[0] =
-            m_targetTable->
-            columnIndex(m_aggregateNode->getAggregateColumnNames()[0]);
-        m_aggregateNode->setAggregateColumns(agg_column_idxes);
-        m_aggregateColumnIdx = m_aggregateNode->getAggregateColumns()[0];
-        m_aggregateCompareValue =
-            (aggregateType == EXPRESSION_TYPE_AGGREGATE_MIN ?
-             VALUE_COMPARE_LESSTHAN
-             : VALUE_COMPARE_GREATERTHAN);
-        m_aggregateColumnType =
-            m_targetTable->schema()->columnType(m_aggregateColumnIdx);
-    }
-
-    //
     // Miscellanous Information
     //
     m_lookupType = m_node->getLookupType();
@@ -357,15 +313,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             assert(m_projectionExpressions[ctr]);
         }
     }
-
-    //
-    // INLINE AGGREGATE
-    // We can also perform a really simple inline aggregate to get a
-    // single min or max value of the input table.
-    //
-    bool aggregate_isset = false;
-    NValue aggregate_value;
-    void* aggregate_tuple_address = NULL;
 
     //
     // INLINE DISTINCT
@@ -530,30 +477,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                     continue;
                 }
             }
-            //
-            // Inline Aggregate
-            //
-            if (m_aggregateNode != NULL)
-            {
-                // search for a min or max value.
-                // m_aggregateCompareValue is either "greater-than" or
-                // "less-than".
-                if (aggregate_isset == false ||
-                    m_aggregateCompareValue == VALUE_COMPARE_LESSTHAN ?
-                    m_tuple.getNValue(m_aggregateColumnIdx).op_lessThan(aggregate_value).isTrue() :
-                    m_tuple.getNValue(m_aggregateColumnIdx).op_greaterThan(aggregate_value).isTrue())
-                {
-                    aggregate_value =
-                        m_tuple.getNValue(m_aggregateColumnIdx);
-                    aggregate_tuple_address = m_tuple.address();
-                    aggregate_isset = true;
-                }
-                //
-                // Inline Projection
-                // Project (or replace) values from input tuple
-                //
-            }
-            else if (m_projectionNode != NULL)
+            if (m_projectionNode != NULL)
             {
                 TableTuple &temp_tuple = m_outputTable->tempTuple();
                 if (m_projectionAllTupleArray != NULL)
@@ -598,44 +522,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         }
     }
 
-    //
-    // Inline Aggregate
-    //
-    if (m_aggregateNode != NULL && aggregate_isset)
-    {
-        m_tuple.move(aggregate_tuple_address);
-        //
-        // Inline Projection
-        //
-        if (m_projectionNode != NULL)
-        {
-            TableTuple &temp_tuple = m_outputTable->tempTuple();
-            if (m_projectionAllTupleArray != NULL)
-            {
-                for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr)
-                {
-                    temp_tuple.setNValue(ctr,
-                                         m_tuple.getNValue(m_projectionAllTupleArray[ctr]));
-                }
-            }
-            else
-            {
-                for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr)
-                {
-                    temp_tuple.setNValue(ctr,
-                                         m_projectionExpressions[ctr]->eval(&m_tuple, NULL));
-                }
-            }
-            m_outputTable->insertTupleNonVirtual(temp_tuple);
-        }
-        else
-        //
-        // Straight Insert
-        //
-        {
-            m_outputTable->insertTupleNonVirtual(m_tuple);
-        }
-    }
     VOLT_DEBUG ("Index Scanned :\n %s", m_outputTable->debug().c_str());
     return true;
 }
