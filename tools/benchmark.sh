@@ -10,6 +10,7 @@
 #                    snapshot setup or rate limiting.
 
 echo "cd ~/trunk && BMCLIENT=$BMCLIENT BMDURATION=$BMDURATION BMCLIENTCOUNT=1 FIRSTCLIENT=$HOSTNAME BMKFACTOR=$BMKFACTOR $EXTRAENV BMSITESPERHOST=12 BMTPCCWAREHOUSES=`dc -e "$BMHOSTCOUNT 12 * p q"` VOLTBIN=/home/test/workspace/build-centos/trunk/obj/release/voltbin BMHOSTCOUNT=$BMHOSTCOUNT ant benchmarkenv" > ~/trunk/tools/benchmark-$HOSTNAME.sh
+echo "date" >> ~/trunk/tools/benchmark-$HOSTNAME.sh
 chmod a+x ~/trunk/tools/benchmark-$HOSTNAME.sh
 
 rm -f /home/test/output/benchmark-$HOSTNAME.log
