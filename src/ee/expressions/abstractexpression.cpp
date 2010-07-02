@@ -210,14 +210,6 @@ AbstractExpression::buildExpressionTree_recurse(json_spirit::Object &obj)
     std::string valueTypeString = valueTypeValue.get_str();
     value_type = stringToValue(valueTypeString);
 
-    // this should be relatively safe, though it ignores overflow.
-    if ((value_type == VALUE_TYPE_TINYINT)  ||
-        (value_type == VALUE_TYPE_SMALLINT) ||
-        (value_type == VALUE_TYPE_INTEGER))
-    {
-        value_type = VALUE_TYPE_BIGINT;
-    }
-
     assert(value_type != VALUE_TYPE_INVALID);
 
     // add the value size

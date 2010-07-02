@@ -299,24 +299,6 @@ AbstractExpression *
 constantValueFactory(const NValue &newvalue)
 {
     return new ConstantValueExpression(newvalue);
- /*   switch (vt) {
-        case (VALUE_TYPE_TINYINT):
-        case (VALUE_TYPE_SMALLINT):
-        case (VALUE_TYPE_INTEGER):
-        case (VALUE_TYPE_TIMESTAMP):
-        case (VALUE_TYPE_BIGINT):
-            return new ConstantValueExpression<int64_t>(newvalue);
-        case (VALUE_TYPE_DOUBLE):
-            return new OptimizedConstantValueExpression<double>(newvalue);
-        case (VALUE_TYPE_VARCHAR):
-            return new OptimizedConstantValueExpression<VoltString>(newvalue);
-        case (VALUE_TYPE_DECIMAL):
-            return new OptimizedConstantValueExpression<VoltDecimal>(newvalue);
-        default:
-            VOLT_ERROR("unknown type '%d'", vt);
-            assert (!"unknown type in constantValueFactory");
-            return NULL;
-    }*/
 }
 
 /** convert the enumerated value type into a concrete c type for
@@ -476,6 +458,8 @@ expressionFactory(json_spirit::Object &obj,
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
     }
 
+    ret->setValueType(vt);
+    ret->setValueSize(vs);
     // written thusly to ease testing/inspecting return content.
     VOLT_TRACE("Created expression %p", ret);
     return ret;

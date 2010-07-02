@@ -63,7 +63,6 @@ class TableTuple;
 
 /**
  * Predicate objects for filtering tuples during query execution.
- * These objects are stored in query plans and passed to Storage Access Manager.
  */
 
 // ------------------------------------------------------------------
@@ -102,6 +101,29 @@ class AbstractExpression {
         return m_type;
     }
 
+    ValueType getValueType() const
+    {
+        return m_valueType;
+    }
+
+    int getValueSize() const
+    {
+        return m_valueSize;
+    }
+
+    // These should really be part of the constructor, but plumbing
+    // the type and size args through the whole of the expression world is
+    // not something I'm doing right now.
+    void setValueType(ValueType type)
+    {
+        m_valueType = type;
+    }
+
+    void setValueSize(int size)
+    {
+        m_valueSize = size;
+    }
+
     const AbstractExpression *getLeft() const {
         return m_left;
     }
@@ -125,6 +147,8 @@ class AbstractExpression {
     AbstractExpression *m_left, *m_right;
     ExpressionType m_type;
     bool m_hasParameter;
+    ValueType m_valueType;
+    int m_valueSize;
 };
 
 }
