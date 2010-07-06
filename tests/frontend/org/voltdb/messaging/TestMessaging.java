@@ -587,6 +587,7 @@ public class TestMessaging extends TestCase {
         // rejoin the network in a new thread
         MockNewNode newnode = new MockNewNode(internalPort);
         newnode.start();
+        Thread.sleep(100);
 
         msg1.rejoinForeignHostPrepare(1, new InetSocketAddress(internalPort));
         msg1.rejoinForeignHostCommit();
