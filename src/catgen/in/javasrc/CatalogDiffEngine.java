@@ -141,10 +141,26 @@ public class CatalogDiffEngine {
             //              both not null => check Object.equals()
             Object prevValue = prevType.getField(field);
             Object newValue = newType.getField(field);
-            if (((prevValue == null) != (newValue == null)) ||
-                ((prevValue != null) && (prevValue.equals(newValue) == false)))
-            {
+            if ((prevValue == null) != (newValue == null)) {
                 writeModification(newType, field);
+            }
+            // if they're both not null (above/below ifs implies this)
+            else if (prevValue != null) {
+                // if comparing CatalogTypes (both must be same)
+                if (prevValue instanceof CatalogType) {
+                    assert(newValue instanceof CatalogType);
+                    String prevPath = ((CatalogType) prevValue).getPath();
+                    String newPath = ((CatalogType) newValue).getPath();
+                    if (prevPath.compareTo(newPath) != 0) {
+                        writeModification(newType, field);
+                    }
+                }
+                // if scalar types
+                else {
+                    if (prevValue.equals(newValue) == false) {
+                        writeModification(newType, field);
+                    }
+                }
             }
         }
 
