@@ -25,6 +25,7 @@ import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -222,6 +223,20 @@ public class VoltProjectBuilder {
     public void addSchema(final URL schemaURL) {
         assert(schemaURL != null);
         addSchema(schemaURL.getPath());
+    }
+
+    /**
+     * This is test code written by Ryan, even though it was
+     * committed by John.
+     */
+    @Deprecated
+    public void addLiteralSchema(String ddlText) throws IOException {
+        File temp = File.createTempFile("difftest", "sql");
+        temp.deleteOnExit();
+        FileWriter out = new FileWriter(temp);
+        out.write(ddlText);
+        out.close();
+        addSchema(URLEncoder.encode(temp.getAbsolutePath(), "UTF-8"));
     }
 
     public void addSchema(String schemaPath) {

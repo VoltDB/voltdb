@@ -23,9 +23,12 @@
 
 package org.voltdb.catalog;
 
+import java.io.IOException;
+
 import junit.framework.TestCase;
 
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
+import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.utils.CatalogUtil;
@@ -282,4 +285,28 @@ public class TestCatalogDiffs extends TestCase {
         assertEquals("", diff.commands());
     }
 
+    @SuppressWarnings("deprecation")
+    public void testDiffOfIdenticalCatalogs() throws IOException {
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.addPartitionInfo("A", "C1");
+        builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
+        builder.compile("identical3.jar");
+        Catalog c3 = catalogForJar("identical3.jar");
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.addPartitionInfo("A", "C1");
+        builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
+        builder.compile("identical4.jar");
+        Catalog c4 = catalogForJar("identical4.jar");
+
+        CatalogDiffEngine diff = new CatalogDiffEngine(c3, c4);
+        // don't reach this point.
+        c3.execute(diff.commands());
+        assertTrue(diff.supported());
+        String updatedOriginalSerialized = c3.serialize();
+        assertEquals(updatedOriginalSerialized, c4.serialize());
+    }
 }
