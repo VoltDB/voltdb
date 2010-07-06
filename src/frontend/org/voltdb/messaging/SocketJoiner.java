@@ -29,6 +29,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Hashtable;
+import java.util.Map.Entry;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -59,7 +60,7 @@ public class SocketJoiner extends Thread {
     static final int RESPONSE_CONNECTED = 1;
     static final int MAX_ACCEPTABLE_TIME_DIFF_IN_MS = 100;
     static final int PING = 333;
-    InetAddress m_coordIp;
+    InetAddress m_coordIp = null;
     int m_localHostId;
     Hashtable<Integer, SocketChannel> m_sockets = new Hashtable<Integer, SocketChannel>();
     Hashtable<Integer, DataInputStream> m_inputs = new Hashtable<Integer, DataInputStream>();
@@ -110,6 +111,13 @@ public class SocketJoiner extends Thread {
         m_catalogCRC = catalogCRC;
     }
 
+    public SocketJoiner(ServerSocketChannel acceptor, int expectedHosts, Logger hostLog) {
+        m_listenerSocket = acceptor;
+        m_expectedHosts = expectedHosts;
+        m_hostLog = hostLog;
+        m_addr = ByteBuffer.wrap(acceptor.socket().getInetAddress().getAddress()).getInt();
+    }
+
     @Override
     public void run() {
         // set defaults
@@ -122,39 +130,49 @@ public class SocketJoiner extends Thread {
         if (vdbinst != null) {
             VoltDB.Configuration config = vdbinst.getConfig();
             if (config != null) {
-                m_internalPort = unsetConfig.m_internalPort;
-                m_internalInterface = unsetConfig.m_internalInterface;
+                m_internalPort = config.m_internalPort;
+                m_internalInterface = config.m_internalInterface;
             }
         }
 
-        // Try to become primary regardless of configuration.
-        try {
-            m_listenerSocket = ServerSocketChannel.open();
-            InetSocketAddress inetsockaddr = new InetSocketAddress(m_coordIp, m_internalPort);
-            m_listenerSocket.socket().bind(inetsockaddr);
-            m_listenerSocket.socket().setPerformancePreferences(0, 2, 1);
-        }
-        catch (IOException e) {
-            if (m_listenerSocket != null) {
-                try {
-                    m_listenerSocket.close();
-                    m_listenerSocket = null;
-                }
-                catch (IOException ex) {
-                    Logger.getLogger(SocketJoiner.class.getName()).l7dlog(Level.FATAL, null, ex);
-                }
-            }
-        }
-
+        // if the cluster has already started and this is a rejoin
         if (m_listenerSocket != null) {
             if (m_hostLog != null)
-                m_hostLog.info("Connecting to VoltDB cluster as the leader...");
-            runPrimary();
+                m_hostLog.info("Connecting to existing VoltDB cluster as a replacement...");
+            runJoinExisting();
         }
+        // join a new cluster as primary or existing
         else {
-            if (m_hostLog != null)
-                m_hostLog.info("Connecting to the VoltDB cluster leader...");
-            runNonPrimary();
+
+            // Try to become primary regardless of configuration.
+            try {
+                m_listenerSocket = ServerSocketChannel.open();
+                InetSocketAddress inetsockaddr = new InetSocketAddress(m_coordIp, m_internalPort);
+                m_listenerSocket.socket().bind(inetsockaddr);
+                m_listenerSocket.socket().setPerformancePreferences(0, 2, 1);
+            }
+            catch (IOException e) {
+                if (m_listenerSocket != null) {
+                    try {
+                        m_listenerSocket.close();
+                        m_listenerSocket = null;
+                    }
+                    catch (IOException ex) {
+                        Logger.getLogger(SocketJoiner.class.getName()).l7dlog(Level.FATAL, null, ex);
+                    }
+                }
+            }
+
+            if (m_listenerSocket != null) {
+                if (m_hostLog != null)
+                    m_hostLog.info("Connecting to VoltDB cluster as the leader...");
+                runPrimary();
+            }
+            else {
+                if (m_hostLog != null)
+                    m_hostLog.info("Connecting to the VoltDB cluster leader...");
+                runNonPrimary();
+            }
         }
 
         // check that we're well connected
@@ -464,6 +482,132 @@ public class SocketJoiner extends Thread {
             }
             LOG.debug("Non-Primary Done");
         }
+    }
+
+    private void runJoinExisting() {
+        m_timestamp = System.currentTimeMillis();
+        SocketChannel socket = null;
+        DataInputStream in = null;
+        DataOutputStream out = null;
+
+        LOG.debug("Starting Coordinator");
+
+        try {
+            while (m_sockets.size() < (m_expectedHosts - 1)) {
+                socket = m_listenerSocket.accept();
+                socket.socket().setTcpNoDelay(true);
+                socket.socket().setPerformancePreferences(0, 2, 1);
+
+                InputStream s = socket.socket().getInputStream();
+                in = new DataInputStream(new BufferedInputStream(s));
+                int hostId = in.readInt();
+
+                m_sockets.put(hostId, socket);
+            }
+
+            // read the timestamps from all
+            int difftimei = 0;
+            long difftimes[] = new long[m_expectedHosts - 1];
+            for (Entry<Integer, SocketChannel> e : m_sockets.entrySet()) {
+                out = getOutputForHost(e.getKey());
+                in = getInputForHost(e.getKey());
+
+                out.writeInt(COMMAND_SENDTIME_AND_CRC);
+                out.flush();
+                long timestamp = in.readLong();
+                difftimes[difftimei++] = System.currentTimeMillis() - timestamp;
+            }
+
+            // figure out how bad the skew is and if it's acceptable
+            int command = COMMAND_COMPLETE;
+            long minimumDiff = 0;
+            long maximumDiff = 0;
+            for (long diff : difftimes) {
+                if (diff > maximumDiff)
+                    maximumDiff = diff;
+                if (diff < minimumDiff)
+                    minimumDiff = diff;
+            }
+            long maxDiffMS = maximumDiff - minimumDiff;
+            if (maxDiffMS > MAX_ACCEPTABLE_TIME_DIFF_IN_MS)
+                command = COMMAND_NTPFAIL;
+
+            for (Entry<Integer, SocketChannel> e : m_sockets.entrySet()) {
+                out = getOutputForHost(e.getKey());
+                out.writeLong(maxDiffMS);
+                out.writeInt(command);
+                out.flush();
+            }
+
+            if (m_hostLog != null)
+                m_hostLog.info("Maximum clock/network skew is " + maxDiffMS + " milliseconds (according to rejoined node)");
+            if (command == COMMAND_NTPFAIL) {
+                if (m_hostLog != null)
+                    m_hostLog.info("Maximum clock/network is " + (maxDiffMS*100)/MAX_ACCEPTABLE_TIME_DIFF_IN_MS +
+                                   "% higher than allowable limit");
+                VoltDB.crashVoltDB();
+            }
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+        finally {
+            try {
+                m_listenerSocket.close();
+            }
+            catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    /**
+     * Helper method for the rejoin process. This is called by nodes inside the cluster
+     * to initiate a connection to nodes re-joining the cluster.
+     *
+     * @param hostId The calling node's host id.
+     * @param address The address the re-joining node is listening on.
+     * @return A connected SocketChannel to the re-joining node, or null on failure.
+     */
+    static SocketChannel connect(int hostId, InetSocketAddress address) {
+        SocketChannel remoteConnection = null;
+        try {
+            // open a connection to the re-joining node
+            remoteConnection = SocketChannel.open(address);
+
+            // create helper streams for IO
+            DataOutputStream out = new DataOutputStream(new BufferedOutputStream(remoteConnection.socket().getOutputStream()));
+            DataInputStream in = new DataInputStream(new BufferedInputStream(remoteConnection.socket().getInputStream()));
+
+            // write the id of this host
+            out.writeInt(hostId);
+            out.flush();
+
+            // read in the command to acknowledge connection and to request the time
+            int command = in.readInt();
+            if (command != COMMAND_SENDTIME_AND_CRC)
+                throw new Exception(String.format("Unexpected command (%d) from joining node.", command));
+
+            // write the current time so the re-join node can measure skew
+            out.writeLong(System.currentTimeMillis());
+            out.flush();
+
+            // read the confirmation command
+            long maxDiffMS = in.readLong();
+            System.out.printf("Re-joining node reports %d ms skew.\n", maxDiffMS);
+            command = in.readInt();
+            if (command == COMMAND_COMPLETE)
+                return remoteConnection;
+            else {
+                String msg = String.format("Unable to re-join node. Error No. %d.", command);
+                throw new Exception(msg);
+            }
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            remoteConnection = null;
+        }
+        return remoteConnection;
     }
 
     int getLocalHostId() {

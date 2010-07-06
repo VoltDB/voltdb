@@ -44,7 +44,7 @@ public class ForeignHost {
     static final int DEAD_HOST_TIMEOUT_THRESHOLD = 10000;
 
     private final Connection m_connection;
-    private final FHInputHandler m_handler;
+    final FHInputHandler m_handler;
     private final HostMessenger m_hostMessenger;
     private final InetAddress m_ipAddress;
     private final int m_tcpPort;
@@ -52,7 +52,7 @@ public class ForeignHost {
 
     private String m_remoteHostname;
     private boolean m_closing;
-    private boolean m_isUp;
+    boolean m_isUp;
 
     private long m_lastMessageMillis;
 
@@ -122,10 +122,19 @@ public class ForeignHost {
         m_lastMessageMillis = Long.MAX_VALUE;
     }
 
-    void close()
+    synchronized void close()
     {
+        if (m_closing) return;
         m_closing = true;
-        m_connection.unregister();
+        if (m_connection != null)
+            m_connection.unregister();
+    }
+
+    @Override
+    protected void finalize() throws Throwable
+    {
+        close();
+        super.finalize();
     }
 
     boolean isUp()

@@ -19,13 +19,15 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.HashMap;
 import java.util.Hashtable;
-import java.util.Map.Entry;
 import java.util.Queue;
+import java.util.Map.Entry;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
@@ -65,7 +67,7 @@ public class HostMessenger implements Messenger {
 
     private final SocketJoiner m_joiner;
     private final VoltNetwork m_network;
-    private final InetAddress m_coordinatorAddr;
+    //private final InetAddress m_coordinatorAddr;
     private final int m_expectedHosts;
 
     final ForeignHost[] m_foreignHosts;
@@ -73,15 +75,41 @@ public class HostMessenger implements Messenger {
     int m_largestHostId = 0;
     int m_largestSiteId = 0;
 
+    ForeignHost m_tempNewFH = null;
+    int m_tempNewHostId = -1;
+
+    long m_joinerTimestamp;
+    int m_joinerAddress;
+
     final AtomicInteger m_hostsToWaitFor = new AtomicInteger();
 
+    /**
+     *
+     * @param network
+     * @param coordinatorIp
+     * @param expectedHosts
+     * @param catalogCRC
+     * @param hostLog
+     */
     public HostMessenger(VoltNetwork network, InetAddress coordinatorIp, int expectedHosts, long catalogCRC, Logger hostLog)
     {
-        m_coordinatorAddr = coordinatorIp;
         m_expectedHosts = expectedHosts;
         m_hostsToWaitFor.set(expectedHosts);
         m_network = network;
-        m_joiner = new SocketJoiner(m_coordinatorAddr, m_expectedHosts, catalogCRC, hostLog);
+        m_joiner = new SocketJoiner(coordinatorIp, m_expectedHosts, catalogCRC, hostLog);
+        m_joiner.start();
+
+        m_foreignHosts = new ForeignHost[expectedHosts + 1];
+        m_messengerSites = new MessengerSite[VoltDB.MAX_SITES_PER_HOST + 1];
+        m_largestHostId = expectedHosts;
+    }
+
+    public HostMessenger(VoltNetwork network, ServerSocketChannel acceptor, int expectedHosts, long catalogCRC, Logger hostLog)
+    {
+        m_expectedHosts = expectedHosts;
+        m_hostsToWaitFor.set(expectedHosts);
+        m_network = network;
+        m_joiner = new SocketJoiner(acceptor, expectedHosts, hostLog);
         m_joiner.start();
 
         m_foreignHosts = new ForeignHost[expectedHosts + 1];
@@ -99,36 +127,38 @@ public class HostMessenger implements Messenger {
 
     public synchronized Object[] waitForGroupJoin() {
         // no-op if called from another thread after the first init
-        if (m_initialized) return new Object[] { m_joiner.m_timestamp, m_joiner.m_addr };
+        if (!m_initialized) {
 
-        try {
-            m_joiner.join();
-            if (!m_joiner.getSuccess()) {
-                throw new RuntimeException("The joiner thread was not successful");
-            }
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-
-        m_localHostId = m_joiner.getLocalHostId();
-        Hashtable<Integer, SocketChannel> sockets = m_joiner.getHostsAndSockets();
-        for (Integer hostId : sockets.keySet()) {
-            SocketChannel socket = sockets.get(hostId);
             try {
-                socket.socket().setSendBufferSize(1024*1024*2);
-                socket.socket().setReceiveBufferSize(1024*1024*2);
-            } catch (SocketException e) {
+                m_joiner.join();
+                if (!m_joiner.getSuccess()) {
+                    throw new RuntimeException("The joiner thread was not successful");
+                }
+            } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            ForeignHost fhost = null;
-            try {
-                fhost = new ForeignHost(this, hostId, socket);
-            } catch (java.io.IOException e) {
-                e.printStackTrace();
+
+            m_localHostId = m_joiner.getLocalHostId();
+            Hashtable<Integer, SocketChannel> sockets = m_joiner.getHostsAndSockets();
+            for (Integer hostId : sockets.keySet()) {
+                SocketChannel socket = sockets.get(hostId);
+                try {
+                    socket.socket().setSendBufferSize(1024*1024*2);
+                    socket.socket().setReceiveBufferSize(1024*1024*2);
+                } catch (SocketException e) {
+                    e.printStackTrace();
+                }
+                ForeignHost fhost = null;
+                try {
+                    fhost = new ForeignHost(this, hostId, socket);
+                } catch (java.io.IOException e) {
+                    e.printStackTrace();
+                }
+                m_foreignHosts[hostId] = fhost;
             }
-            m_foreignHosts[hostId] = fhost;
+
+            m_initialized = true;
         }
-        m_initialized = true;
 
         return new Object[] { m_joiner.m_timestamp, m_joiner.m_addr };
     }
@@ -351,6 +381,59 @@ public class HostMessenger implements Messenger {
                 return false;
             }
         return true;
+    }
+
+    /**
+     * Find the host id of any failed node and return it.
+     * @return The host id of a failed node or -1 if all nodes running.
+     */
+    public int findDownHostId() {
+        for (int hostId = 0; hostId < m_foreignHosts.length; hostId++) {
+            if (m_foreignHosts[hostId].isUp() == false)
+                return hostId;
+        }
+        return -1;
+    }
+
+    /**
+     * Initiate the addition of a replacement foreign host.
+     *
+     * @param hostId The id of the failed host to replace.
+     * @param sock A network connection to that host.
+     * @throws Exception Throws exceptions on failure.
+     */
+    public void rejoinForeignHostPrepare(int hostId, InetSocketAddress addr) throws Exception {
+        if (hostId < 0)
+            throw new Exception("Rejoin HostId can be negative.");
+        if (m_foreignHosts.length <= hostId)
+            throw new Exception("Rejoin HostId out of expexted range.");
+        if (m_foreignHosts[hostId].isUp())
+            throw new Exception("Rejoin HostId is not a failed host.");
+
+        SocketChannel sock = SocketJoiner.connect(1, addr);
+
+        m_tempNewFH = new ForeignHost(this, hostId, sock);
+        m_tempNewHostId = hostId;
+    }
+
+    /**
+     * Finish joining the network.
+     */
+    public void rejoinForeignHostCommit() {
+        m_foreignHosts[m_tempNewHostId] = m_tempNewFH;
+        m_tempNewFH = null;
+        m_tempNewHostId = -1;
+    }
+
+    /**
+     * Reverse any changes made while adding a foreign host.
+     * This probably isn't strictly necessary, but if more
+     * functionality is added, this will be nice to have.
+     */
+    public void rejoinForeginHostRollback() {
+        m_tempNewFH.close();
+        m_tempNewFH = null;
+        m_tempNewHostId = -1;
     }
 
     public void shutdown()

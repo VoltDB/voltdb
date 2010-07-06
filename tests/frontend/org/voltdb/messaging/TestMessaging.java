@@ -25,8 +25,9 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.net.InetAddress;
-import java.net.UnknownHostException;
+import java.net.InetSocketAddress;
 import java.nio.channels.Selector;
+import java.nio.channels.ServerSocketChannel;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
@@ -269,7 +270,7 @@ public class TestMessaging extends TestCase {
 
     }*/
 
-    public void testJoiner() {
+    /*public void testJoiner() {
         try {
             SocketJoiner joiner1 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 0, null);
             SocketJoiner joiner2 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 0, null);
@@ -325,6 +326,7 @@ public class TestMessaging extends TestCase {
         VoltNetwork network = new VoltNetwork();
         network.start();
         HostMessenger msg1 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 2, 0, null);
+        Thread.sleep(20);
         HostMessenger msg2 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 2, 0, null);
 
         System.out.println("Waiting for socketjoiners...");
@@ -391,7 +393,9 @@ public class TestMessaging extends TestCase {
         VoltNetwork network = new VoltNetwork();
         network.start();
         HostMessenger msg1 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 3, 0, null);
+        Thread.sleep(20);
         HostMessenger msg2 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 3, 0, null);
+        Thread.sleep(20);
         HostMessenger msg3 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 3, 0, null);
 
         System.out.println("Waiting for socketjoiners...");
@@ -492,7 +496,7 @@ public class TestMessaging extends TestCase {
         msg2.shutdown();
         msg3.shutdown();
         network.shutdown();
-    }
+    }*/
 
     /*public void testForStress1() {
         final int siteCount = 3;
@@ -514,4 +518,84 @@ public class TestMessaging extends TestCase {
                 e.printStackTrace();
             }
     }*/
+
+    class MockNewNode extends Thread {
+        final int m_port;
+
+        MockNewNode(int port) {
+            m_port = port;
+        }
+
+        @Override
+        public void run() {
+            try {
+
+
+                ServerSocketChannel listener = ServerSocketChannel.open();
+                listener.socket().bind(new InetSocketAddress(m_port));
+
+                VoltNetwork network = new VoltNetwork();
+                network.start();
+                HostMessenger msg = new HostMessenger(network, listener, 2, 0, null);
+                msg.waitForGroupJoin();
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    public void testFailAndRejoin() throws Exception {
+        MockVoltDB mockvolt = new MockVoltDB();
+        VoltDB.replaceVoltDBInstanceForTest(mockvolt);
+
+        // get config info (mostly the port)
+        int internalPort = new VoltDB.Configuration().m_internalPort;
+
+        try {
+            Selector.open();
+        } catch (IOException ex) {
+            throw new RuntimeException(ex);
+        }
+        VoltNetwork network = new VoltNetwork();
+        network.start();
+        HostMessenger msg1 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 2, 0, null);
+        Thread.sleep(20);
+        HostMessenger msg2 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 2, 0, null);
+
+        System.out.println("Waiting for socketjoiners...");
+        msg1.waitForGroupJoin();
+        System.out.println("Finished socket joiner for msg1");
+        msg2.waitForGroupJoin();
+        System.out.println("Finished socket joiner for msg2");
+
+        assertEquals(0, msg1.getHostId());
+        assertEquals(1, msg2.getHostId());
+
+        int siteId1 = msg1.getHostId() * VoltDB.SITES_TO_HOST_DIVISOR + 1;
+        int siteId2 = msg2.getHostId() * VoltDB.SITES_TO_HOST_DIVISOR + 2;
+
+        msg1.createLocalSite(siteId1);
+        msg2.createLocalSite(siteId2);
+
+        // kill host #2
+        // triggers the fault manager
+        msg2.shutdown();
+        Thread.sleep(20);
+
+        // rejoin the network in a new thread
+        MockNewNode newnode = new MockNewNode(internalPort);
+        newnode.start();
+
+        msg1.rejoinForeignHostPrepare(1, new InetSocketAddress(internalPort));
+        msg1.rejoinForeignHostCommit();
+
+        // this timeout is rather lousy, but neither is it exception safe!
+        newnode.join(1000);
+        if (newnode.isAlive()) fail();
+
+        msg1.shutdown();
+        network.shutdown();
+    }
 }
