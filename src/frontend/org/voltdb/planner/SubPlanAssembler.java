@@ -432,7 +432,11 @@ public abstract class SubPlanAssembler {
 
         if (expr.getExpressionType() == ExpressionType.VALUE_TUPLE) {
             TupleValueExpression tve = (TupleValueExpression)expr;
-            return getTableColumn(table, tve.getColumnName());
+            if (table.getTypeName().equals(tve.getTableName()))
+            {
+                return getTableColumn(table, tve.getColumnName());
+            }
+            return null;
         }
 
         // recursive step
