@@ -45,7 +45,6 @@
 
 #include "receivenode.h"
 
-#include "PlanColumn.h"
 #include "storage/table.h"
 
 #include <sstream>
@@ -74,74 +73,19 @@ ReceivePlanNode::getPlanNodeType() const
 {
     return PLAN_NODE_TYPE_RECEIVE;
 }
-
-void
-ReceivePlanNode::setOutputColumnNames(vector<string>& names)
-{
-    m_outputColumnNames = names;
-}
-
-vector<string>&
-ReceivePlanNode::getOutputColumnNames()
-{
-    return m_outputColumnNames;
-}
-
-const vector<string>&
-ReceivePlanNode::getOutputColumnNames() const
-{
-    return m_outputColumnNames;
-}
-
-void
-ReceivePlanNode::setOutputColumnTypes(vector<ValueType>& types)
-{
-    m_outputColumnTypes = types;
-}
-
-vector<ValueType>&
-ReceivePlanNode::getOutputColumnTypes()
-{
-    return m_outputColumnTypes;
-}
-
-const vector<ValueType>&
-ReceivePlanNode::getOutputColumnTypes() const
-{
-    return m_outputColumnTypes;
-}
-
-void
-ReceivePlanNode::setOutputColumnSizes(vector<int32_t>& sizes)
-{
-    m_outputColumnSizes = sizes;
-}
-
-vector<int32_t>&
-ReceivePlanNode::getOutputColumnSizes()
-{
-    return m_outputColumnSizes;
-}
-
-const vector<int32_t>&
-ReceivePlanNode::getOutputColumnSizes() const
-{
-    return m_outputColumnSizes;
-}
-
 string
 ReceivePlanNode::debugInfo(const string& spacer) const
 {
     ostringstream buffer;
     buffer << spacer << "Incoming Table Columns["
-           << m_outputColumnGuids.size() << "]:\n";
-    for (int ctr = 0, cnt = (int)m_outputColumnGuids.size(); ctr < cnt; ctr++)
+           << getOutputSchema().size() << "]:\n";
+    for (int ctr = 0, cnt = (int)getOutputSchema().size(); ctr < cnt; ctr++)
     {
-        buffer << spacer << "  [" << ctr << "] "
-               << m_outputColumnGuids[ctr] << " : ";
-        buffer << "name=" << m_outputColumnNames[ctr] << " : ";
-        buffer << "size=" << m_outputColumnSizes[ctr] << " : ";
-        buffer << "type=" << getTypeName(m_outputColumnTypes[ctr]) << "\n";
+        SchemaColumn* col = getOutputSchema()[ctr];
+        buffer << spacer << "  [" << ctr << "] ";
+        buffer << "name=" << col->getColumnName() << " : ";
+        buffer << "size=" << col->getSize() << " : ";
+        buffer << "type=" << col->getType() << "\n";
     }
     return (buffer.str());
 }
@@ -150,37 +94,5 @@ void
 ReceivePlanNode::loadFromJSONObject(json_spirit::Object& obj,
                                     const catalog::Database *catalog_db)
 {
-    json_spirit::Value outputColumnsValue =
-        json_spirit::find_value( obj, "OUTPUT_COLUMNS");
-    if (outputColumnsValue == json_spirit::Value::null)
-    {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AggregatePlanNode::loadFromJSONObject:"
-                                      " Can't find OUTPUT_COLUMNS value");
-    }
-    json_spirit::Array outputColumnsArray = outputColumnsValue.get_array();
-
-    for (int ii = 0; ii < outputColumnsArray.size(); ii++)
-    {
-        json_spirit::Value outputColumnValue = outputColumnsArray[ii];
-        PlanColumn outputColumn = PlanColumn(outputColumnValue.get_obj());
-        m_outputColumnGuids.push_back(outputColumn.getGuid());
-        m_outputColumnNames.push_back(outputColumn.getName());
-        m_outputColumnTypes.push_back(outputColumn.getType());
-        m_outputColumnSizes.push_back(outputColumn.getSize());
-    }
-}
-
-int
-ReceivePlanNode::getColumnIndexFromGuid(int guid,
-                                        const catalog::Database *db) const
-{
-    for (int i = 0; i < m_outputColumnGuids.size(); i++)
-    {
-        if (guid == m_outputColumnGuids[i])
-        {
-            return i;
-        }
-    }
-    return -1;
+    // This space intentionally left blank.
 }

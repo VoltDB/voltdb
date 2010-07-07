@@ -62,10 +62,8 @@ IndexScanPlanNode::~IndexScanPlanNode() {
         delete searchkey_expressions[ii];
     }
     delete end_expression;
-    if (getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION) == NULL) {
-        delete getOutputTable();
-        setOutputTable(NULL);
-    }
+    delete getOutputTable();
+    setOutputTable(NULL);
 }
 
 void IndexScanPlanNode::setKeyIterate(bool val) {

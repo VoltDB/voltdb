@@ -19,7 +19,6 @@ package org.voltdb.plannodes;
 
 import org.json.JSONException;
 import org.json.JSONStringer;
-import org.voltdb.planner.PlannerContext;
 import org.voltdb.types.*;
 
 public class UpdatePlanNode extends AbstractOperationPlanNode {
@@ -30,8 +29,8 @@ public class UpdatePlanNode extends AbstractOperationPlanNode {
 
     boolean m_updatesIndexes = false;
 
-    public UpdatePlanNode(PlannerContext context) {
-        super(context);
+    public UpdatePlanNode() {
+        super();
     }
 
     public boolean doesUpdateIndexes() {

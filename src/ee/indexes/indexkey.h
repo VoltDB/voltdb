@@ -384,7 +384,6 @@ public:
         TableTuple keyTuple(keySchema);
         keyTuple.moveNoHeader(reinterpret_cast<void*>(data));
         for (int i = 0; i < keySchema->columnCount(); i++) {
-            assert(indices[i] < 20);
             keyTuple.setNValue(i, tuple->getNValue(indices[i]));
         }
     }

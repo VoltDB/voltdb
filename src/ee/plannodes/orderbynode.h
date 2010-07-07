@@ -61,17 +61,9 @@ public:
 
     virtual PlanNodeType getPlanNodeType() const;
 
-    void setSortColumns(std::vector<int> &cols);
-    std::vector<int>& getSortColumns();
-    const std::vector<int>& getSortColumns() const;
+    std::vector<AbstractExpression*>& getSortExpressions();
 
-    std::vector<int>& getSortColumnGuids();
-
-    void setSortColumnNames(std::vector<std::string> &column_names);
-    std::vector<std::string>& getSortColumnNames();
-    const std::vector<std::string>& getSortColumnNames() const;
-
-    void setSortDirections(std::vector<SortDirectionType> &dirs);
+    void setSortDirections(std::vector<SortDirectionType>& dirs);
     std::vector<SortDirectionType>& getSortDirections();
     const std::vector<SortDirectionType>& getDirections() const;
 
@@ -83,13 +75,8 @@ protected:
                                          const catalog::Database* catalog_db);
     virtual void loadFromJSONObject(json_spirit::Object& obj,
                                     const catalog::Database* catalog_db);
-    /**
-     * Sort Columns Indexes
-     * The column index in the table that we should sort on
-     */
-    std::vector<int> m_sortColumns;
-    std::vector<int> m_sortColumnGuids;
-    std::vector<std::string> m_sortColumnNames;
+
+    std::vector<AbstractExpression*> m_sortExpressions;
     /**
      * Sort Directions
      * If true, sort in ASC order

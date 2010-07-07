@@ -17,21 +17,11 @@
 
 package org.voltdb.plannodes;
 
-import java.util.ArrayList;
-
 import org.json.JSONException;
 import org.json.JSONStringer;
-
 import org.voltdb.VoltType;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.PlanColumn;
-import org.voltdb.planner.PlannerContext;
-import org.voltdb.planner.PlanColumn.SortOrder;
-import org.voltdb.planner.PlanColumn.Storage;
-import org.voltdb.utils.CatalogUtil;
 
 public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
 
@@ -42,8 +32,8 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
     // The target table is the table that the plannode wants to perform some operation on.
     protected String m_targetTableName = "";
 
-    protected AbstractOperationPlanNode(PlannerContext context) {
-        super(context);
+    protected AbstractOperationPlanNode() {
+        super();
     }
 
     protected String debugInfo(String spacer) {
@@ -74,26 +64,57 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
         m_targetTableName = target_table_name;
     }
 
-    @SuppressWarnings("unchecked")
     @Override
-    protected ArrayList<Integer> createOutputColumns(Database db, ArrayList<Integer> input) {
-        if (m_outputColumns.isEmpty())
+    public void generateOutputSchema(Database db)
+    {
+        // Operation nodes (Insert/update/delete) have an output schema
+        // of one column, which is the number of modified tuples
+        // Delete nodes have a special case with no child node when they
+        // are truncating the entire table
+        assert(m_children.size() == 1 ||
+               ((this instanceof DeletePlanNode) &&
+                (((DeletePlanNode)this).m_truncate)));
+        if (m_children.size() == 1)
         {
-            // must produce a tuple value expression for this column.
+            m_children.get(0).generateOutputSchema(db);
+        }
+        // Our output schema isn't ever going to change, only generate this once
+        if (m_outputSchema == null)
+        {
+            m_outputSchema = new NodeSchema();
+            // This TVE is magic and repeats unfortunately like this
+            // throughout the planner.  Consolidate at some point --izzy
             TupleValueExpression tve = new TupleValueExpression();
             tve.setValueType(VoltType.BIGINT);
             tve.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
             tve.setColumnIndex(0);
             tve.setTableName("VOLT_TEMP_TABLE");
-            tve.setColumnAlias("modified_tuples");
             tve.setColumnName("modified_tuples");
-
-            m_outputColumns.add(m_context.getPlanColumn(tve,
-                                                        "modified_tuples",
-                                                        SortOrder.kUnsorted,
-                                                        Storage.kTemporary).guid());
+            tve.setColumnAlias("modified_tuples");
+            SchemaColumn col = new SchemaColumn("VOLT_TEMP_TABLE",
+                                                "modified_tuples",
+                                                "modified_tuples",
+                                                tve);
+            m_outputSchema.addColumn(col);
         }
-        return (ArrayList<Integer>)m_outputColumns.clone();
+        return;
+    }
+
+    @Override
+    public void resolveColumnIndexes()
+    {
+        assert(m_children.size() == 1 ||
+               ((this instanceof DeletePlanNode) &&
+                (((DeletePlanNode)this).m_truncate)));
+        if (m_children.size() == 1)
+        {
+            m_children.get(0).resolveColumnIndexes();
+        }
+        // No operation plan node (INSERT/UPDATE/DELETE) currently
+        // has any care about column indexes.  I think that updates may
+        // (should) eventually care about a mapping of input schema
+        // to columns in the target table that doesn't rely on matching
+        // column names in the EE. --izzy
     }
 
     @Override

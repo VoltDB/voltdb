@@ -45,7 +45,6 @@
 
 #include "projectionnode.h"
 
-#include "PlanColumn.h"
 #include "storage/table.h"
 
 using namespace std;
@@ -65,10 +64,6 @@ ProjectionPlanNode::~ProjectionPlanNode()
 {
     delete getOutputTable();
     setOutputTable(NULL);
-    for (int ii = 0; ii < m_outputColumnExpressions.size(); ii++)
-    {
-        delete m_outputColumnExpressions[ii];
-    }
 }
 
 PlanNodeType
@@ -150,30 +145,15 @@ ProjectionPlanNode::getOutputColumnExpressions() const
     return m_outputColumnExpressions;
 }
 
-int
-ProjectionPlanNode::
-getColumnIndexFromGuid(int guid, const catalog::Database* catalog_db) const
-{
-    for (int ii = 0; ii < m_outputColumnGuids.size(); ii++)
-    {
-        if (m_outputColumnGuids[ii] == guid)
-        {
-            return ii;
-        }
-    }
-    return -1;
-}
-
 string
 ProjectionPlanNode::debugInfo(const string& spacer) const
 {
     ostringstream buffer;
     buffer << spacer << "Projection Output["
-           << m_outputColumnGuids.size() << "]:\n";
-    for (int ctr = 0, cnt = (int)m_outputColumnGuids.size(); ctr < cnt; ctr++)
+           << m_outputColumnNames.size() << "]:\n";
+    for (int ctr = 0, cnt = (int)m_outputColumnNames.size(); ctr < cnt; ctr++)
     {
-        buffer << spacer << "  [" << ctr << "] "
-               << m_outputColumnGuids[ctr] << " : ";
+        buffer << spacer << "  [" << ctr << "] ";
         buffer << "name=" << m_outputColumnNames[ctr] << " : ";
         buffer << "size=" << m_outputColumnSizes[ctr] << " : ";
         buffer << "type=" << getTypeName(m_outputColumnTypes[ctr]) << "\n";
@@ -194,24 +174,13 @@ void
 ProjectionPlanNode::loadFromJSONObject(json_spirit::Object& obj,
                                        const catalog::Database *catalog_db)
 {
-    json_spirit::Value outputColumnsValue =
-        json_spirit::find_value( obj, "OUTPUT_COLUMNS");
-    if (outputColumnsValue == json_spirit::Value::null)
+    // XXX-IZZY move this to init at some point
+    for (int ii = 0; ii < getOutputSchema().size(); ii++)
     {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AggregatePlanNode::loadFromJSONObject:"
-                                      " Can't find OUTPUT_COLUMNS value");
-    }
-    json_spirit::Array outputColumnsArray = outputColumnsValue.get_array();
-
-    for (int ii = 0; ii < outputColumnsArray.size(); ii++)
-    {
-        json_spirit::Value outputColumnValue = outputColumnsArray[ii];
-        PlanColumn outputColumn = PlanColumn(outputColumnValue.get_obj());
-        m_outputColumnGuids.push_back(outputColumn.getGuid());
-        m_outputColumnNames.push_back(outputColumn.getName());
-        m_outputColumnTypes.push_back(outputColumn.getType());
-        m_outputColumnSizes.push_back(outputColumn.getSize());
-        m_outputColumnExpressions.push_back(outputColumn.getExpression());
+        SchemaColumn* outputColumn = getOutputSchema()[ii];
+        m_outputColumnNames.push_back(outputColumn->getColumnName());
+        m_outputColumnTypes.push_back(outputColumn->getType());
+        m_outputColumnSizes.push_back(outputColumn->getSize());
+        m_outputColumnExpressions.push_back(outputColumn->getExpression());
     }
 }

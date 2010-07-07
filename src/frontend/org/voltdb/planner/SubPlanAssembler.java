@@ -35,6 +35,7 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt.TablePair;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SendPlanNode;
@@ -50,18 +51,16 @@ public abstract class SubPlanAssembler {
 
     /** The parsed statement structure that has the table and predicate info we need. */
     final AbstractParsedStmt m_parsedStmt;
-    /** Context object with planner-local information. */
-    final PlannerContext m_context;
+
     /** The catalog's database object which contains tables and access path info */
     final Database m_db;
 
     /** Do the plan need to scan all partitions or just one? */
     final boolean m_singlePartition;
 
-    SubPlanAssembler(PlannerContext context, Database db, AbstractParsedStmt parsedStmt,
-                     boolean singlePartition, int partitionCount)
+    SubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, boolean singlePartition,
+                     int partitionCount)
     {
-        m_context = context;
         m_db = db;
         m_parsedStmt = parsedStmt;
         m_singlePartition = singlePartition;
@@ -470,16 +469,16 @@ public abstract class SubPlanAssembler {
      */
     protected AbstractPlanNode addSendReceivePair(AbstractPlanNode scanNode) {
 
-        SendPlanNode sendNode = new SendPlanNode(m_context);
+        SendPlanNode sendNode = new SendPlanNode();
         // this will make the child planfragment be sent to all partitions
         sendNode.isMultiPartition = true;
         sendNode.addAndLinkChild(scanNode);
 
-        ReceivePlanNode recvNode = new ReceivePlanNode(m_context);
+        ReceivePlanNode recvNode = new ReceivePlanNode();
         recvNode.addAndLinkChild(sendNode);
 
         // receive node requires the schema of its output table
-        recvNode.updateOutputColumns(m_db);
+        recvNode.generateOutputSchema(m_db);
         return recvNode;
     }
 
@@ -495,31 +494,23 @@ public abstract class SubPlanAssembler {
         assert(table != null);
         assert(path != null);
 
+        AbstractScanPlanNode scanNode = null;
         // if no path is a sequential scan, call a subroutine for that
         if (path.index == null)
-            return getScanAccessPlanForTable(table, path.otherExprs);
-
-        // now assume this will be an index scan and get the relevant index
-        Index index = path.index;
-
-        // build the list of search-keys for the index in question
-        IndexScanPlanNode scanNode = new IndexScanPlanNode(m_context);
-        List<AbstractExpression> searchKeys = scanNode.getSearchKeyExpressions();
-        for (AbstractExpression expr : path.indexExprs) {
-            AbstractExpression expr2 = ExpressionUtil.getOtherTableExpression(expr, table.getTypeName());
-            assert(expr2 != null);
-            searchKeys.add(expr2);
+        {
+            scanNode = getScanAccessPlanForTable(table, path.otherExprs);
         }
-
-        // create the IndexScanNode with all its metadata
-        scanNode.setKeyIterate(path.keyIterate);
-        scanNode.setLookupType(path.lookupType);
-        scanNode.setSortDirection(path.sortDirection);
-        scanNode.setTargetTableName(table.getTypeName());
-        scanNode.setTargetTableAlias(table.getTypeName());
-        scanNode.setTargetIndexName(index.getTypeName());
-        scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
-        scanNode.setPredicate(ExpressionUtil.combine(path.otherExprs));
+        else
+        {
+            scanNode = getIndexAccessPlanForTable(table, path);
+        }
+        // set the scan columns for this scan node based on the parsed SQL,
+        // if any
+        if (m_parsedStmt.scanColumns != null)
+        {
+            scanNode.setScanColumns(m_parsedStmt.scanColumns.get(table.getTypeName()));
+        }
+        scanNode.generateOutputSchema(m_db);
 
         AbstractPlanNode rootNode = scanNode;
 
@@ -539,27 +530,55 @@ public abstract class SubPlanAssembler {
      *
      * @param table The table to scan.
      * @param exprs The predicate components.
-     * @return A scan plan node or multi-site graph to get the distributed version of a scan.
+     * @return A scan plan node
      */
-    protected AbstractPlanNode getScanAccessPlanForTable(Table table, ArrayList<AbstractExpression> exprs) {
+    protected AbstractScanPlanNode
+    getScanAccessPlanForTable(Table table, ArrayList<AbstractExpression> exprs)
+    {
+        // build the scan node
+        SeqScanPlanNode scanNode = new SeqScanPlanNode();
+        scanNode.setTargetTableName(table.getTypeName());
+
         // build the predicate
         AbstractExpression localWhere = null;
         if ((exprs != null) && (exprs.isEmpty() == false))
+        {
             localWhere = ExpressionUtil.combine(exprs);
-
-        // build the scan node
-        SeqScanPlanNode scanNode = new SeqScanPlanNode(m_context);
-        scanNode.setTargetTableName(table.getTypeName());
-        scanNode.setPredicate(localWhere);
-        AbstractPlanNode rootNode = scanNode;
-
-        // if we need to scan everywhere...
-        if (tableRequiresDistributedScan(table)) {
-            // all sites to a scan -> send
-            // root site has many recvs feeding into a union
-            rootNode = addSendReceivePair(scanNode);
+            scanNode.setPredicate(localWhere);
         }
 
-        return rootNode;
+        return scanNode;
+    }
+
+    /**
+     * Get a index scan access plan for a table. For multi-site plans/tables,
+     * scans at all partitions and sends to one partition.
+     *
+     * @param table The table to get data from.
+     * @param path The access path to access the data in the table (index/scan/etc).
+     * @return An index scan plan node
+     */
+    protected AbstractScanPlanNode getIndexAccessPlanForTable(Table table,
+                                                              AccessPath path)
+    {
+        // now assume this will be an index scan and get the relevant index
+        Index index = path.index;
+        // build the list of search-keys for the index in question
+        IndexScanPlanNode scanNode = new IndexScanPlanNode();
+        for (AbstractExpression expr : path.indexExprs) {
+            AbstractExpression expr2 = ExpressionUtil.getOtherTableExpression(expr, table.getTypeName());
+            assert(expr2 != null);
+            scanNode.addSearchKeyExpression(expr2);
+        }
+        // create the IndexScanNode with all its metadata
+        scanNode.setKeyIterate(path.keyIterate);
+        scanNode.setLookupType(path.lookupType);
+        scanNode.setSortDirection(path.sortDirection);
+        scanNode.setTargetTableName(table.getTypeName());
+        scanNode.setTargetTableAlias(table.getTypeName());
+        scanNode.setTargetIndexName(index.getTypeName());
+        scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
+        scanNode.setPredicate(ExpressionUtil.combine(path.otherExprs));
+        return scanNode;
     }
 }

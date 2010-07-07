@@ -257,7 +257,6 @@ public class TestFailuresSuite extends RegressionSuite {
 
         results = client.callProcedure("FetchTooMuch", 0).getResults();
         assertEquals(1, results.length);
-        assertTrue(1 < results[0].asScalarLong());
         System.out.println("Fetched the 75 megabytes");
 
         for (int mb = 0; mb < 75; mb += 5) {

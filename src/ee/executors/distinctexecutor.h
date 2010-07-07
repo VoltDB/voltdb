@@ -56,22 +56,23 @@ namespace voltdb {
 class UndoLog;
 class ReadWriteSet;
 
-/**
- *
- */
-class DistinctExecutor : public AbstractExecutor {
-    public:
-        DistinctExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) : AbstractExecutor(engine, abstract_node) {
-            this->distinct_column = -1;
-            this->distinct_column_type = VALUE_TYPE_INVALID;
-        }
-        ~DistinctExecutor();
-    protected:
-        bool p_init(AbstractPlanNode*, const catalog::Database* catalog_db, int* tempTableMemoryInBytes);
-        bool p_execute(const NValueArray &params);
+class DistinctExecutor : public AbstractExecutor
+{
+public:
+    DistinctExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
+        : AbstractExecutor(engine, abstract_node)
+    {
+        this->distinct_column_type = VALUE_TYPE_INVALID;
+    }
 
-        int distinct_column;
-        ValueType distinct_column_type;
+    ~DistinctExecutor();
+
+protected:
+    bool p_init(AbstractPlanNode*, const catalog::Database* catalog_db,
+                int* tempTableMemoryInBytes);
+    bool p_execute(const NValueArray &params);
+
+    ValueType distinct_column_type;
 };
 
 }

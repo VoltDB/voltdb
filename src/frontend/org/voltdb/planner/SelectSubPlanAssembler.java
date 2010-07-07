@@ -46,10 +46,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * @param parsedStmt The parsed and dissected statement object describing the sql to execute.
      * @param singlePartition Does this statement access one or multiple partitions?
      */
-    SelectSubPlanAssembler(PlannerContext context, Database db, AbstractParsedStmt parsedStmt,
+    SelectSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt,
                            boolean singlePartition, int partitionCount)
     {
-        super(context, db, parsedStmt, singlePartition, partitionCount);
+        super(db, parsedStmt, singlePartition, partitionCount);
         queueAllJoinOrders();
     }
 
@@ -58,6 +58,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      */
     private void queueAllJoinOrders() {
         // inserts can't have predicates
+        // XXX these asserts seem useless here in SelectSubPlanAssembler? --izzy
         assert(((m_parsedStmt instanceof ParsedInsertStmt) && (m_parsedStmt.where != null)) == false);
         // only selects can have more than one table
         if (m_parsedStmt.tableList.size() > 1)
@@ -217,62 +218,23 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
         AbstractPlanNode retval = null;
         if (nljAccessPlan instanceof IndexScanPlanNode) {
-            NestLoopIndexPlanNode nlijNode = new NestLoopIndexPlanNode(m_context);
+            NestLoopIndexPlanNode nlijNode = new NestLoopIndexPlanNode();
 
             nlijNode.setJoinType(JoinType.INNER);
 
             IndexScanPlanNode innerNode = (IndexScanPlanNode) nljAccessPlan;
 
-            //
-            // Now we have to update the column references used by the inner node
-            //
-            subPlan.updateOutputColumns(m_db);
-            final List<Integer> outputColumns = subPlan.m_outputColumns;
-            if (innerNode.getPredicate() != null) {
-                try {
-                    innerNode.setPredicate(ExpressionUtil.clone(innerNode.getPredicate()));
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-                ExpressionUtil.setColumnIndexes(
-                        m_context,
-                        innerNode.getPredicate(),
-                        outputColumns);
-            }
-
-            if (innerNode.getEndExpression() != null) {
-                try {
-                    innerNode.setEndExpression(ExpressionUtil.clone(innerNode.getEndExpression()));
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-                ExpressionUtil.setColumnIndexes(
-                        m_context, innerNode.getEndExpression(), outputColumns);
-            }
-
-            ArrayList<AbstractExpression> searchKeyExpressions = new ArrayList<AbstractExpression>(innerNode.getSearchKeyExpressions());
-            innerNode.getSearchKeyExpressions().clear();
-            for (int ctr = 0, cnt = searchKeyExpressions.size(); ctr < cnt; ctr++) {
-                AbstractExpression expr = null;
-                try {
-                    expr = ExpressionUtil.clone(searchKeyExpressions.get(ctr));
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    System.exit(-1);
-                }
-                ExpressionUtil.setColumnIndexes(m_context, expr, outputColumns);
-                innerNode.getSearchKeyExpressions().add(expr);
-            }
-
             nlijNode.addInlinePlanNode(nljAccessPlan);
 
             // combine the tails plan graph with the new head node
             nlijNode.addAndLinkChild(subPlan);
+            // now generate the output schema for this join
+            nlijNode.generateOutputSchema(m_db);
 
             retval = nlijNode;
         }
         else {
-            NestLoopPlanNode nljNode = new NestLoopPlanNode(m_context);
+            NestLoopPlanNode nljNode = new NestLoopPlanNode();
             if ((joinClauses != null) && (joinClauses.size() > 0))
                 nljNode.setPredicate(ExpressionUtil.combine(joinClauses));
             nljNode.setJoinType(JoinType.LEFT);
@@ -281,6 +243,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             nljNode.addAndLinkChild(nljAccessPlan);
 
             nljNode.addAndLinkChild(subPlan);
+            // now generate the output schema for this join
+            nljNode.generateOutputSchema(m_db);
 
             retval = nljNode;
         }

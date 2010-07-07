@@ -14,8 +14,8 @@
  * You should have received a copy of the GNU General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef VOLTDBPLANCOLUMN_H
-#define VOLTDBPLANCOLUMN_H
+#ifndef VOLTDBSCHEMACOLUMN_H
+#define VOLTDBSCHEMACOLUMN_H
 
 #include "common/types.h"
 #include "expressions/abstractexpression.h"
@@ -29,37 +29,37 @@ namespace voltdb
 {
 
 /**
- * Convenience class to deserialize a PlanColumn object from the JSON
+ * Convenience class to deserialize a SchemaColumn object from the JSON
  * and provide common accessors to the contents.  Currently relies on
- * colObject to remain valid; PlanColumns should not be passed around,
+ * colObject to remain valid; SchemaColumns should not be passed around,
  * stored, or expected to be valid outside the scope of the initial
  * JSON deserialization.
  */
-class PlanColumn
+class SchemaColumn
 {
 public:
-    PlanColumn(json_spirit::Object& colObject);
+    SchemaColumn(json_spirit::Object& colObject);
+    ~SchemaColumn();
 
-    int getGuid() const;
-    std::string getName() const;
+    std::string getTableName() const;
+    std::string getColumnName() const;
+    std::string getColumnAlias() const;
     ValueType getType() const;
     int32_t getSize() const;
-    std::string getInputColumnName() const;
 
-    // getExpression lazily evaluates the expression in the JSON
-    // object because some expressions (namely aggregates) are currently
-    // unhappy, so we only actually do this from places where we know it will
-    // succeed.
+    // SchemaColumn retains responsibility for the deletion of
+    // the expression
     AbstractExpression* getExpression();
 
 private:
     const json_spirit::Object& m_colObject;
 
-    int m_guid;
-    std::string m_name;
+    std::string m_tableName;
+    std::string m_columnName;
+    std::string m_columnAlias;
+    AbstractExpression* m_expression;
     ValueType m_type;
     int32_t m_size;
-    std::string m_inputColumnName;
 };
 
 }

@@ -19,7 +19,7 @@ package org.voltdb.plannodes;
 
 import org.json.JSONException;
 import org.json.JSONStringer;
-import org.voltdb.planner.PlannerContext;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.*;
 
 public class SendPlanNode extends AbstractPlanNode {
@@ -27,13 +27,31 @@ public class SendPlanNode extends AbstractPlanNode {
     // used for planning
     public boolean isMultiPartition = false;
 
-    public SendPlanNode(PlannerContext context) {
-        super(context);
+    public SendPlanNode() {
+        super();
     }
 
     @Override
     public PlanNodeType getPlanNodeType() {
         return PlanNodeType.SEND;
+    }
+
+    @Override
+    public void resolveColumnIndexes()
+    {
+        // Need to order and resolve indexes of output columns
+        assert(m_children.size() == 1);
+        m_children.get(0).resolveColumnIndexes();
+        NodeSchema input_schema = m_children.get(0).getOutputSchema();
+        for (SchemaColumn col : m_outputSchema.getColumns())
+        {
+            // At this point, they'd better all be TVEs.
+            assert(col.getExpression() instanceof TupleValueExpression);
+            TupleValueExpression tve = (TupleValueExpression)col.getExpression();
+            int index = input_schema.getIndexOfTve(tve);
+            tve.setColumnIndex(index);
+        }
+        m_outputSchema.sortByTveIndex();
     }
 
     @Override

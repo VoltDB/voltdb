@@ -43,6 +43,7 @@ import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
+import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.Pair;
@@ -92,16 +93,21 @@ public class PlannerTestAideDeCamp {
         return catalog;
     }
 
+    public AbstractPlanNode compile(String sql, int paramCount)
+    {
+        return compile(sql, paramCount, false);
+    }
 
     /**
      * Compile a statement and return the final plan graph.
      * @param sql
      * @param paramCount
      */
-    public AbstractPlanNode compile(String sql, int paramCount) {
+    public AbstractPlanNode compile(String sql, int paramCount, boolean singlePartition)
+    {
         Statement catalogStmt = proc.getStatements().add("stmt-" + String.valueOf(compileCounter++));
         catalogStmt.setSqltext(sql);
-        catalogStmt.setSinglepartition(false);
+        catalogStmt.setSinglepartition(singlePartition);
         catalogStmt.setBatched(false);
         catalogStmt.setParamnum(paramCount);
 
@@ -156,14 +162,14 @@ public class PlannerTestAideDeCamp {
 
         // Output Columns
         int index = 0;
-        for (Integer plancol : plan.columns) {
-            PlanColumn planColumn = planner.getPlannerContext().get(plancol);
-            Column column = catalogStmt.getOutput_columns().add(String.valueOf(index));
-            column.setNullable(false);
-            column.setIndex(index);
-            column.setName(planColumn.displayName());
-            column.setType(planColumn.type().getValue());
-            column.setSize(planColumn.width());
+        for (SchemaColumn col : plan.columns.getColumns())
+        {
+            Column catColumn = catalogStmt.getOutput_columns().add(String.valueOf(index));
+            catColumn.setNullable(false);
+            catColumn.setIndex(index);
+            catColumn.setName(col.getColumnName());
+            catColumn.setType(col.getType().getValue());
+            catColumn.setSize(col.getSize());
             index++;
         }
 

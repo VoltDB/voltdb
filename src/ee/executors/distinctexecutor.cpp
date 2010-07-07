@@ -57,12 +57,12 @@
 #include <set>
 #include <cassert>
 
-namespace voltdb {
+using namespace voltdb;
 
 bool DistinctExecutor::p_init(AbstractPlanNode*, const catalog::Database* catalog_db, int* tempTableMemoryInBytes) {
     VOLT_DEBUG("init Distinct Executor");
 
-    DistinctPlanNode* node = dynamic_cast<DistinctPlanNode*>(abstract_node);
+    DistinctPlanNode* node = dynamic_cast<DistinctPlanNode*>(m_abstractNode);
     assert(node);
     //
     // Create a duplicate of input table
@@ -72,30 +72,18 @@ bool DistinctExecutor::p_init(AbstractPlanNode*, const catalog::Database* catalo
         assert(node->getInputTables()[0]->columnCount() > 0);
         assert(node->getChildren()[0] != NULL);
 
-        AbstractPlanNode *child_node = node->getChildren()[0];
-        /*
-         * Has to be a cleaner way to enforce this so the planner doesn't generate plans that will fail this assertion.
-         */
-        int index =
-            child_node->getColumnIndexFromGuid(node->getDistinctColumnGuid(),
-                                               catalog_db);
-        assert(index != -1);
-        if (index == -1) {
-            return false;
-        }
-        node->setDistinctColumn(index);
-
-        node->setOutputTable(TableFactory::getCopiedTempTable(node->databaseId(), node->getInputTables()[0]->name(), node->getInputTables()[0], tempTableMemoryInBytes));
-
-        assert(node->getDistinctColumn() >= 0);
-        this->distinct_column = node->getDistinctColumn();
-        this->distinct_column_type = node->getInputTables()[0]->schema()->columnType(this->distinct_column);
+        node->
+            setOutputTable(TableFactory::
+                           getCopiedTempTable(node->databaseId(),
+                                              node->getInputTables()[0]->name(),
+                                              node->getInputTables()[0],
+                                              tempTableMemoryInBytes));
     }
     return (true);
 }
 
 bool DistinctExecutor::p_execute(const NValueArray &params) {
-    DistinctPlanNode* node = dynamic_cast<DistinctPlanNode*>(abstract_node);
+    DistinctPlanNode* node = dynamic_cast<DistinctPlanNode*>(m_abstractNode);
     assert(node);
     Table* output_table = node->getOutputTable();
     assert(output_table);
@@ -104,15 +92,13 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
 
     TableIterator iterator = input_table->tableIterator();
     TableTuple tuple(input_table->schema());
-    //
-    // HACK: Use BIGINT for now...
-    //
+
     std::set<NValue, NValue::ltNValue> found_values;
     while (iterator.next(tuple)) {
         //
         // Check whether this value already exists in our list
         //
-        NValue tuple_value = tuple.getNValue(this->distinct_column);
+        NValue tuple_value = node->getDistinctExpression()->eval(&tuple, NULL);
         if (found_values.find(tuple_value) == found_values.end()) {
             found_values.insert(tuple_value);
             if (!output_table->insertTuple(tuple)) {
@@ -122,13 +108,11 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
                            output_table->name().c_str());
                 return false;
             }
-        } // IF unique
+        }
     }
 
     return true;
 }
 
 DistinctExecutor::~DistinctExecutor() {
-}
-
 }

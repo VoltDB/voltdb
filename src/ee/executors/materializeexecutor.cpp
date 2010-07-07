@@ -57,32 +57,30 @@
 
 namespace voltdb {
 
-bool MaterializeExecutor::p_init(AbstractPlanNode* abstract_node, const catalog::Database* catalog_db, int* tempTableMemoryInBytes) {
+bool MaterializeExecutor::p_init(AbstractPlanNode* abstractNode, const catalog::Database* catalog_db, int* tempTableMemoryInBytes) {
     VOLT_TRACE("init Materialize Executor");
     assert(tempTableMemoryInBytes);
 
-    node = dynamic_cast<MaterializePlanNode*>(abstract_node);
+    node = dynamic_cast<MaterializePlanNode*>(abstractNode);
     assert(node);
     batched = node->isBatched();
 
     // Construct the output table
-    m_columnCount = (int)node->getOutputColumnNames().size();
+    m_columnCount = static_cast<int>(node->getOutputSchema().size());
     assert(m_columnCount >= 0);
-    assert(m_columnCount == node->getOutputColumnTypes().size());
-    assert(m_columnCount == node->getOutputColumnSizes().size());
 
-    const std::vector<std::string> outputColumnNames = node->getOutputColumnNames();
-    const std::vector<voltdb::ValueType> outputColumnTypes = node->getOutputColumnTypes();
-    const std::vector<int32_t> outputColumnSizes = node->getOutputColumnSizes();
-    const std::vector<bool> outputColumnAllowNull(m_columnCount, true);
-    TupleSchema *schema = TupleSchema::createTupleSchema(outputColumnTypes, outputColumnSizes, outputColumnAllowNull, true);
-    std::string *columnNames = new std::string[m_columnCount];
-    for (int ctr = 0; ctr < m_columnCount; ctr++) {
-        columnNames[ctr] = node->getOutputColumnNames()[ctr];
+    TupleSchema* schema = node->generateTupleSchema(true);
+    std::string* column_names = new std::string[m_columnCount];
+    for (int ctr = 0; ctr < m_columnCount; ctr++)
+    {
+        column_names[ctr] = node->getOutputSchema()[ctr]->getColumnName();
     }
-    node->setOutputTable(TableFactory::getTempTable(node->databaseId(), "temp", schema, columnNames, tempTableMemoryInBytes));
-
-    delete[] columnNames;
+    node->setOutputTable(TableFactory::getTempTable(node->databaseId(),
+                                                      "temp",
+                                                      schema,
+                                                      column_names,
+                                                      tempTableMemoryInBytes));
+    delete[] column_names;
 
     // initialize local variables
     all_param_array_ptr = expressionutil::convertIfAllParameterValues(node->getOutputColumnExpressions());
@@ -108,7 +106,7 @@ bool MaterializeExecutor::p_init(AbstractPlanNode* abstract_node, const catalog:
 }
 
 bool MaterializeExecutor::p_execute(const NValueArray &params) {
-    assert (node == dynamic_cast<MaterializePlanNode*>(abstract_node));
+    assert (node == dynamic_cast<MaterializePlanNode*>(m_abstractNode));
     assert(node);
     assert (!node->isInline()); // inline projection's execute() should not be called
     assert (output_table == dynamic_cast<TempTable*>(node->getOutputTable()));

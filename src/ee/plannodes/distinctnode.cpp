@@ -55,12 +55,10 @@ using namespace std;
 
 DistinctPlanNode::DistinctPlanNode(CatalogId id) : AbstractPlanNode(id)
 {
-    m_distinctColumnIdx = -1;
 }
 
 DistinctPlanNode::DistinctPlanNode() : AbstractPlanNode()
 {
-    m_distinctColumnIdx = -1;
 }
 
 DistinctPlanNode::~DistinctPlanNode()
@@ -69,6 +67,7 @@ DistinctPlanNode::~DistinctPlanNode()
         delete getOutputTable();
         setOutputTable(NULL);
     }
+    delete m_distinctExpression;
 }
 
 PlanNodeType
@@ -77,42 +76,18 @@ DistinctPlanNode::getPlanNodeType() const
     return PLAN_NODE_TYPE_DISTINCT;
 }
 
-void
-DistinctPlanNode::setDistinctColumn(int column)
+AbstractExpression*
+DistinctPlanNode::getDistinctExpression() const
 {
-    m_distinctColumnIdx = column;
-}
-
-int
-DistinctPlanNode::getDistinctColumn() const
-{
-    assert(m_distinctColumnIdx >= 0);
-    return m_distinctColumnIdx;
-}
-
-void
-DistinctPlanNode::setDistinctColumnName(string columnName)
-{
-    m_distinctColumnName = columnName;
-}
-
-string
-DistinctPlanNode::getDistinctColumnName() const
-{
-    return m_distinctColumnName;
-}
-
-int
-DistinctPlanNode::getDistinctColumnGuid() const
-{
-    return m_distinctColumnGuid;
+    return m_distinctExpression;
 }
 
 string
 DistinctPlanNode::debugInfo(const string &spacer) const
 {
     ostringstream buffer;
-    buffer << spacer << "DistinctColumn[" << this->m_distinctColumnIdx << "]\n";
+    buffer << spacer << "DistinctExpression["
+           << this->m_distinctExpression->debug() << "]\n";
     return buffer.str();
 }
 
@@ -120,23 +95,17 @@ void
 DistinctPlanNode::loadFromJSONObject(json_spirit::Object& obj,
                                      const catalog::Database* catalog_db)
 {
-    json_spirit::Value distinctColumnGuidValue =
-        json_spirit::find_value( obj, "DISTINCT_COLUMN_GUID");
-    if (distinctColumnGuidValue == json_spirit::Value::null)
+    json_spirit::Value distinctExpressionValue =
+        find_value(obj, "DISTINCT_EXPRESSION");
+    if (distinctExpressionValue == json_spirit::Value::null)
     {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       "DistinctPlanNode::loadFromJSONObject: "
-                                      "Can't find DISTINCT_COLUMN_GUID value");
+                                      "Can't find DISTINCT_EXPRESSION value");
     }
-    m_distinctColumnGuid = distinctColumnGuidValue.get_int();
 
-    json_spirit::Value distinctColumnNameValue =
-        json_spirit::find_value( obj, "DISTINCT_COLUMN_NAME");
-    if (distinctColumnNameValue == json_spirit::Value::null)
-    {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "DistinctPlanNode::loadFromJSONObject: "
-                                      "Can't find DISTINCT_COLUMN_NAME value");
-    }
-    m_distinctColumnName = distinctColumnNameValue.get_str();
+    json_spirit::Object distinctExpressionObject =
+        distinctExpressionValue.get_obj();
+    m_distinctExpression =
+        AbstractExpression::buildExpressionTree(distinctExpressionObject);
 }

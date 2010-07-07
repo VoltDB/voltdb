@@ -19,8 +19,7 @@ package org.voltdb.plannodes;
 
 import org.json.JSONException;
 import org.json.JSONStringer;
-import org.voltdb.planner.PlannerContext;
-import org.voltdb.types.*;
+import org.voltdb.types.PlanNodeType;
 
 public class DeletePlanNode extends AbstractOperationPlanNode {
 
@@ -31,8 +30,8 @@ public class DeletePlanNode extends AbstractOperationPlanNode {
     /** true if all tuples are deleted. */
     boolean m_truncate = false;
 
-    public DeletePlanNode(PlannerContext context) {
-        super(context);
+    public DeletePlanNode() {
+        super();
     }
 
     @Override

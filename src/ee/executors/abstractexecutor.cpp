@@ -44,53 +44,56 @@
  */
 
 #include "abstractexecutor.h"
-#include "catalog/database.h"
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/FatalException.hpp"
+
 #include "execution/VoltDBEngine.h"
-#include "plannodes/abstractplannode.h"
-#include "plannodes/abstractscannode.h"
 #include "plannodes/abstractoperationnode.h"
-#include "plannodes/nestloopindexnode.h"
-#include "storage/table.h"
-#include "storage/temptable.h"
-#include "storage/persistenttable.h"
-#include "storage/tableutil.h"
+#include "plannodes/abstractscannode.h"
+#include <vector>
 
-namespace voltdb {
+using namespace std;
+using namespace voltdb;
 
-bool AbstractExecutor::init(VoltDBEngine *engine, const catalog::Database* catalog_db, int* tempTableMemoryInBytes) {
-    assert (abstract_node);
+bool AbstractExecutor::init(VoltDBEngine* engine,
+                            const catalog::Database* catalog_db,
+                            int* tempTableMemoryInBytes)
+{
+    assert (m_abstractNode);
     //
     // Grab the input tables directly from this node's children
     //
-    std::vector<Table*> input_tables;
-    for (int ctr = 0, cnt = (int)abstract_node->getChildren().size(); ctr < cnt; ctr++) {
-        Table* table = abstract_node->getChildren()[ctr]->getOutputTable();
+    vector<Table*> input_tables;
+    for (int ctr = 0,
+             cnt = static_cast<int>(m_abstractNode->getChildren().size());
+         ctr < cnt;
+         ctr++)
+    {
+        Table* table = m_abstractNode->getChildren()[ctr]->getOutputTable();
         if (table == NULL) {
             VOLT_ERROR("Output table from PlanNode '%s' is NULL",
-                       abstract_node->getChildren()[ctr]->debug().c_str());
+                       m_abstractNode->getChildren()[ctr]->debug().c_str());
             return false;
         }
         input_tables.push_back(table);
     }
-    abstract_node->setInputTables(input_tables);
+    m_abstractNode->setInputTables(input_tables);
 
     // Some tables have target tables (scans + operations) that are
     // based on tables under the control of the local storage manager
     // (as opposed to an intermediate result table). We'll grab them
-    // from the HStoreEgine This is kind of a hack job here... is
+    // from the VoltDBEngine. This is kind of a hack job here... is
     // there a better way?
 
-    AbstractScanPlanNode *scan_node = dynamic_cast<AbstractScanPlanNode*>(abstract_node);
-    AbstractOperationPlanNode *oper_node = dynamic_cast<AbstractOperationPlanNode*>(abstract_node);
+    AbstractScanPlanNode* scan_node =
+        dynamic_cast<AbstractScanPlanNode*>(m_abstractNode);
+    AbstractOperationPlanNode* oper_node =
+        dynamic_cast<AbstractOperationPlanNode*>(m_abstractNode);
     bool requires_target_table = false;
-    if (scan_node || oper_node) {
+    if (scan_node || oper_node)
+    {
         requires_target_table = true;
         Table* target_table = NULL;
 
-        std::string targetTableName;
+        string targetTableName;
         if (scan_node) {
             targetTableName = scan_node->getTargetTableName();
             target_table = scan_node->getTargetTable();
@@ -101,13 +104,14 @@ bool AbstractExecutor::init(VoltDBEngine *engine, const catalog::Database* catal
 
         // If the target_table is NULL, then we need to ask the engine
         // for a reference to what we need
+        // Really, we can't enforce this when we load the plan? --izzy 7/3/2010
         if (target_table == NULL) {
             target_table = engine->getTable(targetTableName);
             if (target_table == NULL) {
                 VOLT_ERROR("Failed to retrieve target table '%s' "
                            "from execution engine for PlanNode '%s'",
                            targetTableName.c_str(),
-                           abstract_node->debug().c_str());
+                           m_abstractNode->debug().c_str());
                 return false;
             }
             if (scan_node) {
@@ -117,32 +121,30 @@ bool AbstractExecutor::init(VoltDBEngine *engine, const catalog::Database* catal
             }
         }
     }
-    this->needs_outputtable_clear_cached = needsOutputTableClear();
+    needs_outputtable_clear_cached = needsOutputTableClear();
 
     // Call the p_init() method on our derived class
     try {
-        if (!this->p_init(abstract_node, catalog_db, tempTableMemoryInBytes))
+        if (!p_init(m_abstractNode, catalog_db, tempTableMemoryInBytes))
             return false;
-    } catch (std::exception& err) {
+    } catch (exception& err) {
         char message[128];
         sprintf(message, "The Executor failed to initialize PlanNode '%s'",
-                abstract_node->debug().c_str());
+                m_abstractNode->debug().c_str());
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       message);
     }
-    Table *tmp_output_table_base = abstract_node->getOutputTable();
-    this->tmp_output_table = dynamic_cast<TempTable*>(tmp_output_table_base);
+    Table* tmp_output_table_base = m_abstractNode->getOutputTable();
+    m_tmpOutputTable = dynamic_cast<TempTable*>(tmp_output_table_base);
 
     // determines whether the output table should be cleared or not.
     // specific executor might not need (and must not do) clearing.
-    if (!this->needs_outputtable_clear_cached) {
+    if (!needs_outputtable_clear_cached) {
         VOLT_TRACE("Did not clear output table because the derived class"
                    " answered so");
-        this->tmp_output_table = NULL;
+        m_tmpOutputTable = NULL;
     }
     return true;
 }
 
 AbstractExecutor::~AbstractExecutor() {}
-
-}

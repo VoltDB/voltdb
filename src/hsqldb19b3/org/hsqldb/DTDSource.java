@@ -143,7 +143,7 @@ public abstract class DTDSource {
 
         sb.append("  <!ELEMENT statement (select|update|insert|delete)>\n");
 
-        sb.append("  <!ELEMENT select (columns,parameters,tablescans,querycondition?,havingcondition?,ordercolumns?)>\n");
+        sb.append("  <!ELEMENT select (scan_columns,columns,parameters,tablescans,querycondition?,havingcondition?,ordercolumns?)>\n");
         sb.append("  <!ATTLIST select\n");
         sb.append("    limit CDATA #IMPLIED\n");
         sb.append("    limit_paramid CDATA #IMPLIED\n");
@@ -154,6 +154,7 @@ public abstract class DTDSource {
         sb.append("    aggregated CDATA #IMPLIED>\n");
 
         sb.append("  <!ELEMENT values (columnref*|").append(getExpressionElementList()).append(")>\n");
+        sb.append("  <!ELEMENT scan_columns (columnref*|column*|").append(getExpressionElementList()).append(")>\n");
         sb.append("  <!ELEMENT columns (columnref*|column*|").append(getExpressionElementList()).append(")>\n");
 
         // columnref is declared in the included expression section

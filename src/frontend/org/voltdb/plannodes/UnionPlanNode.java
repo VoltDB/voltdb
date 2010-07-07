@@ -17,17 +17,22 @@
 
 package org.voltdb.plannodes;
 
-import org.voltdb.planner.PlannerContext;
 import org.voltdb.types.*;
 
 public class UnionPlanNode extends AbstractPlanNode {
 
-    public UnionPlanNode(PlannerContext context) {
-        super(context);
+    public UnionPlanNode() {
+        super();
     }
 
     @Override
     public PlanNodeType getPlanNodeType() {
         return PlanNodeType.UNION;
+    }
+
+    public void resolveColumnIndexes()
+    {
+        // This node doesn't actually exist
+        assert(false);
     }
 }

@@ -45,7 +45,6 @@
 
 #include "aggregatenode.h"
 
-#include "PlanColumn.h"
 #include "expressions/expressionutil.h"
 #include "storage/table.h"
 
@@ -75,60 +74,20 @@ AggregatePlanNode::~AggregatePlanNode()
         delete getOutputTable();
         setOutputTable(NULL);
     }
+    for (int i = 0; i < m_aggregateInputExpressions.size(); i++)
+    {
+        delete m_aggregateInputExpressions[i];
+    }
+    for (int i = 0; i < m_groupByExpressions.size(); i++)
+    {
+        delete m_groupByExpressions[i];
+    }
 }
 
 PlanNodeType
 AggregatePlanNode::getPlanNodeType() const
 {
     return m_type;
-}
-
-vector<string>&
-AggregatePlanNode::getOutputColumnNames()
-{
-    return m_outputColumnNames;
-}
-
-const vector<string>&
-AggregatePlanNode::getOutputColumnNames() const
-{
-    return m_outputColumnNames;
-}
-
-vector<ValueType>&
-AggregatePlanNode::getOutputColumnTypes()
-{
-    return m_outputColumnTypes;
-}
-
-const vector<ValueType>&
-AggregatePlanNode::getOutputColumnTypes() const
-{
-    return m_outputColumnTypes;
-}
-
-vector<int32_t>&
-AggregatePlanNode::getOutputColumnSizes()
-{
-    return m_outputColumnSizes;
-}
-
-const vector<int32_t>&
-AggregatePlanNode::getOutputColumnSizes() const
-{
-    return m_outputColumnSizes;
-}
-
-vector<int>&
-AggregatePlanNode::getOutputColumnInputGuids()
-{
-    return m_outputColumnGuids;
-}
-
-const vector<int>&
-AggregatePlanNode::getOutputColumnInputGuids() const
-{
-    return m_outputColumnGuids;
 }
 
 vector<ExpressionType>
@@ -143,138 +102,38 @@ AggregatePlanNode::getAggregates() const
     return m_aggregates;
 }
 
-void
-AggregatePlanNode::setAggregateColumns(vector<int> columns)
+const vector<AbstractExpression*>&
+AggregatePlanNode::getGroupByExpressions() const
 {
-    m_aggregateColumns = columns;
+    return m_groupByExpressions;
 }
-
-vector<int>
-AggregatePlanNode::getAggregateColumns() const
-{
-    return m_aggregateColumns;
-}
-
-vector<string>
-AggregatePlanNode::getAggregateColumnNames() const
-{
-    return m_aggregateColumnNames;
-}
-
-vector<int>
-AggregatePlanNode::getAggregateColumnGuids() const
-{
-    return m_aggregateColumnGuids;
-}
-
-void
-AggregatePlanNode::setGroupByColumns(vector<int> &columns)
-{
-    m_groupByColumns = columns;
-}
-
-vector<int>&
-AggregatePlanNode::getGroupByColumns()
-{
-    return m_groupByColumns;
-}
-
-const vector<int>&
-AggregatePlanNode::getGroupByColumns() const
-{
-    return m_groupByColumns;
-}
-
-vector<int>&
-AggregatePlanNode::getGroupByColumnGuids()
-{
-    return m_groupByColumnGuids;
-}
-
-const vector<int>&
-AggregatePlanNode::getGroupByColumnGuids() const
-{
-    return m_groupByColumnGuids;
-}
-
-vector<string>&
-AggregatePlanNode::getGroupByColumnNames()
-{
-    return m_groupByColumnNames;
-}
-
-const vector<string>&
-AggregatePlanNode::getGroupByColumnNames() const
-{
-    return m_groupByColumnNames;
-}
-
-int
-AggregatePlanNode::getColumnIndexFromGuid(
-    int guid, const catalog::Database *db) const
-{
-    for (int i = 0; i < m_outputColumnGuids.size(); i++)
-    {
-        if (guid == m_outputColumnGuids[i])
-        {
-            return i;
-        }
-    }
-    return -1;
-}
-
-
 
 string AggregatePlanNode::debugInfo(const string &spacer) const {
     ostringstream buffer;
-    buffer << spacer << "\nAggregateColumns["
-           << (int) m_aggregateColumns.size() << "]: {";
-    for (int ctr = 0, cnt = (int) m_aggregateColumns.size();
+    buffer << spacer << "\nAggregates["
+           << (int) m_aggregates.size() << "]: {";
+    for (int ctr = 0, cnt = (int) m_aggregates.size();
          ctr < cnt; ctr++)
     {
-        buffer << spacer << m_aggregateColumns[ctr];
-    }
-    buffer << spacer << "}";
-    buffer << spacer << "\nAggregateTypes["
-           << (int) m_aggregateColumns.size() << "]: {";
-    for (int ctr = 0, cnt = (int) m_aggregateColumns.size();
-         ctr < cnt; ctr++)
-    {
-        buffer << spacer << expressionutil::getTypeName(m_aggregates[ctr]);
+        buffer << spacer << "type="
+               << expressionutil::getTypeName(m_aggregates[ctr]) << "\n";
+        buffer << spacer << "outcol="
+               << m_aggregateOutputColumns[ctr] << "\n";
+        buffer << spacer << "expr="
+               << m_aggregateInputExpressions[ctr]->debug(spacer) << "\n";
     }
     buffer << spacer << "}";
 
-    buffer << spacer << "}";
-    buffer << spacer << "\nAggregateColumnNames["
-           << (int) m_aggregateColumnNames.size() << "]: {";
-    for (int ctr = 0, cnt = (int) m_aggregateColumnNames.size();
-         ctr < cnt; ctr++)
-    {
-        buffer << spacer << m_aggregateColumnNames[ctr];
-    }
-    buffer << spacer << "}";
-
-    buffer << spacer << "\nGroupByColumns[";
+    buffer << spacer << "\nGroupByExpressions[";
     string add = "";
-    for (int ctr = 0, cnt = (int) m_groupByColumns.size();
+    for (int ctr = 0, cnt = (int) m_groupByExpressions.size();
          ctr < cnt; ctr++)
     {
-        buffer << add << m_groupByColumns[ctr];
+        buffer << spacer << m_groupByExpressions[ctr]->debug(spacer);
         add = ", ";
     }
     buffer << "]\n";
 
-    buffer << spacer << "OutputColumns[" << m_outputColumnGuids.size()
-           << "]:\n";
-    for (int ctr = 0, cnt = (int) m_outputColumnGuids.size();
-         ctr < cnt; ctr++)
-    {
-        buffer << spacer << "   [" << ctr << "] "
-               << m_outputColumnGuids[ctr] << " : ";
-        buffer << "name=" << m_outputColumnNames[ctr] << " : ";
-        buffer << "size=" << m_outputColumnSizes[ctr] << " : ";
-        buffer << "type=" << m_outputColumnTypes[ctr] << "\n";
-    }
     return buffer.str();
 }
 
@@ -282,25 +141,6 @@ void
 AggregatePlanNode::loadFromJSONObject(Object &obj,
                                       const catalog::Database *catalog_db)
 {
-    Value outputColumnsValue = find_value(obj, "OUTPUT_COLUMNS");
-    if (outputColumnsValue == Value::null)
-    {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AggregatePlanNode::loadFromJSONObject:"
-                                      " Can't find OUTPUT_COLUMNS value");
-    }
-    Array outputColumnsArray = outputColumnsValue.get_array();
-
-    for (int ii = 0; ii < outputColumnsArray.size(); ii++)
-    {
-        Value outputColumnValue = outputColumnsArray[ii];
-        PlanColumn outputColumn = PlanColumn(outputColumnValue.get_obj());
-        m_outputColumnGuids.push_back(outputColumn.getGuid());
-        m_outputColumnNames.push_back(outputColumn.getName());
-        m_outputColumnTypes.push_back(outputColumn.getType());
-        m_outputColumnSizes.push_back(outputColumn.getSize());
-    }
-
     Value aggregateColumnsValue = find_value(obj, "AGGREGATE_COLUMNS");
     if (aggregateColumnsValue == Value::null)
     {
@@ -314,9 +154,8 @@ AggregatePlanNode::loadFromJSONObject(Object &obj,
         Value aggregateColumnValue = aggregateColumnsArray[ii];
         Object aggregateColumn = aggregateColumnValue.get_obj();
         bool containsType = false;
-        bool containsName = false;
-        bool containsGuid = false;
         bool containsOutputColumn = false;
+        bool containsExpression = false;
         for (int zz = 0; zz < aggregateColumn.size(); zz++)
         {
             if (aggregateColumn[zz].name_ == "AGGREGATE_TYPE")
@@ -327,61 +166,35 @@ AggregatePlanNode::loadFromJSONObject(Object &obj,
                 m_aggregates.
                     push_back(stringToExpression(aggregateColumnTypeString));
             }
-            else if (aggregateColumn[zz].name_ == "AGGREGATE_NAME")
-            {
-                containsName = true;
-                m_aggregateColumnNames.
-                    push_back(aggregateColumn[zz].value_.get_str());
-            }
-            else if (aggregateColumn[zz].name_ == "AGGREGATE_GUID")
-            {
-                containsGuid = true;
-                m_aggregateColumnGuids.
-                    push_back(aggregateColumn[zz].value_.get_int());
-            }
             else if (aggregateColumn[zz].name_ == "AGGREGATE_OUTPUT_COLUMN")
             {
                 containsOutputColumn = true;
                 m_aggregateOutputColumns.
                     push_back(aggregateColumn[zz].value_.get_int());
             }
+            else if (aggregateColumn[zz].name_ == "AGGREGATE_EXPRESSION")
+            {
+                containsExpression = true;
+                m_aggregateInputExpressions.
+                    push_back(AbstractExpression::buildExpressionTree(aggregateColumn[zz].value_.get_obj()));
+            }
         }
-        assert(containsName && containsType && containsOutputColumn);
+        assert(containsType && containsOutputColumn && containsExpression);
     }
 
-    Value groupByColumnsValue = find_value(obj, "GROUPBY_COLUMNS");
-    if (!(groupByColumnsValue == Value::null))
+    Value groupByExpressionsValue = find_value(obj, "GROUPBY_EXPRESSIONS");
+    if (!(groupByExpressionsValue == Value::null))
     {
-        Array groupByColumnsArray = groupByColumnsValue.get_array();
-        for (int ii = 0; ii < groupByColumnsArray.size(); ii++)
+        Array groupByExpressionsArray = groupByExpressionsValue.get_array();
+        for (int ii = 0; ii < groupByExpressionsArray.size(); ii++)
         {
-            Value groupByColumnValue = groupByColumnsArray[ii];
-            PlanColumn groupByColumn = PlanColumn(groupByColumnValue.get_obj());
-            m_groupByColumnGuids.push_back(groupByColumn.getGuid());
-            m_groupByColumnNames.push_back(groupByColumn.getName());
+            Value groupByExpressionValue = groupByExpressionsArray[ii];
+            m_groupByExpressions.push_back(AbstractExpression::buildExpressionTree(groupByExpressionValue.get_obj()));
         }
     }
 }
 
 // definitions of public test methods
-
-void
-AggregatePlanNode::setOutputColumnNames(vector<string> &names)
-{
-     m_outputColumnNames = names;
-}
-
-void
-AggregatePlanNode::setOutputColumnTypes(vector<ValueType> &types)
-{
-    m_outputColumnTypes = types;
-}
-
-void
-AggregatePlanNode::setOutputColumnSizes(vector<int32_t> &sizes)
-{
-    m_outputColumnSizes = sizes;
-}
 
 void
 AggregatePlanNode::setAggregates(vector<ExpressionType> &aggregates)
@@ -393,10 +206,4 @@ void
 AggregatePlanNode::setAggregateOutputColumns(vector<int> outputColumns)
 {
     m_aggregateOutputColumns = outputColumns;
-}
-
-void
-AggregatePlanNode::setAggregateColumnNames(vector<string> column_names)
-{
-    m_aggregateColumnNames = column_names;
 }

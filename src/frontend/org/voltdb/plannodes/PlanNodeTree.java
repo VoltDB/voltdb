@@ -51,14 +51,6 @@ public class PlanNodeTree implements JSONString {
         }
     }
 
-    public void freePlan()
-    {
-        for (AbstractPlanNode n : m_planNodes)
-        {
-            n.freeColumns();
-        }
-    }
-
     public Integer getRootPlanNodeId() {
         return m_planNodes.get(0).getPlanNodeId();
     }

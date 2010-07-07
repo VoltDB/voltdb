@@ -47,10 +47,10 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
      * @param parsedStmt The parsed and dissected statement object describing the sql to execute.
      * @param singlePartition Does this statement access one or multiple partitions?
      */
-    WriterSubPlanAssembler(PlannerContext context, Database db, AbstractParsedStmt parsedStmt,
-                           boolean singlePartition, int partitionCount)
+    WriterSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, boolean singlePartition,
+                           int partitionCount)
     {
-        super(context, db, parsedStmt, singlePartition, partitionCount);
+        super(db, parsedStmt, singlePartition, partitionCount);
 
         assert(m_parsedStmt.tableList.size() == 1);
         m_targetTable = m_parsedStmt.tableList.get(0);
@@ -61,7 +61,7 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
      * for that join order, then append them to the computed plans deque.
      */
     @Override
-    protected AbstractPlanNode nextPlan() {
+    AbstractPlanNode nextPlan() {
         if (!m_generatedPlans) {
             m_generatedPlans = true;
             // for each table, just add the empty access path (the full table scan)

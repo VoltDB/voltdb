@@ -49,7 +49,6 @@ public class QueryPlanner {
     String m_recentErrorMsg;
     boolean m_useGlobalIds;
     boolean m_quietPlanner;
-    final PlannerContext m_context;
 
     /**
      * Initialize planner with physical schema info and a reference to HSQLDB parser.
@@ -67,8 +66,7 @@ public class QueryPlanner {
         assert(catalogDb != null);
 
         m_HSQL = HSQL;
-        m_context = new PlannerContext();
-        m_assembler = new PlanAssembler(m_context, catalogCluster, catalogDb);
+        m_assembler = new PlanAssembler(catalogCluster, catalogDb);
         m_db = catalogDb;
         m_cluster = catalogCluster;
         m_estimates = estimates;
@@ -185,6 +183,9 @@ public class QueryPlanner {
                 // iterate through the subset of plans
                 for (CompiledPlan plan : optimizedPlans) {
 
+                    // this plan is final, resolve all the column index references
+                    plan.fragments.get(0).planGraph.resolveColumnIndexes();
+
                     // compute resource usage using the single stats collector
                     stats = new PlanStatistics();
                     AbstractPlanNode planGraph = plan.fragments.get(0).planGraph;
@@ -223,15 +224,7 @@ public class QueryPlanner {
                     if (cost < minCost) {
                         minCost = cost;
                         // free the PlanColumns held by the previous best plan
-                        if (bestPlan != null)
-                        {
-                            bestPlan.freePlan(m_context);
-                        }
                         bestPlan = plan;
-                    }
-                    else
-                    {
-                        plan.freePlan(m_context);
                     }
 
                     // output a description of the parsed stmt
@@ -303,10 +296,6 @@ public class QueryPlanner {
         }
 
         return bestPlan;
-    }
-
-    public PlannerContext getPlannerContext() {
-        return m_context;
     }
 
     public String getErrorMessage() {

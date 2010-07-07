@@ -160,13 +160,14 @@ namespace
     }
 }
 
-bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstract_node,
-                                   const catalog::Database* catalog_db, int* tempTableMemoryInBytes)
+bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
+                                   const catalog::Database* catalog_db,
+                                   int* tempTableMemoryInBytes)
 {
     VOLT_TRACE("init NLIJ Executor");
     assert(tempTableMemoryInBytes);
 
-    node = dynamic_cast<NestLoopIndexPlanNode*>(abstract_node);
+    node = dynamic_cast<NestLoopIndexPlanNode*>(abstractNode);
     assert(node);
     inline_node = dynamic_cast<IndexScanPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_INDEXSCAN));
     assert(inline_node);
@@ -177,58 +178,27 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstract_node,
     // We need exactly one input table and a target table
     //
     assert(node->getInputTables().size() == 1);
-    Table* input_table = node->getInputTables()[0];
-    assert(input_table);
 
-    Table* target_table = inline_node->getTargetTable();
-    assert(target_table);
-
-    //
-    // Our output table will have all the columns from outer and inner table
-    //
-    std::vector<boost::shared_ptr<const TableColumn> > columns;
-
-    // For passing to plan node counterpart
-    const TupleSchema *first = input_table->schema();
-    const TupleSchema *second = target_table->schema();
-    TupleSchema *schema = TupleSchema::createTupleSchema(first, second);
-
-    int combinedColumnCount =
-      input_table->columnCount() + target_table->columnCount();
-    std::string *columnNames = new std::string[combinedColumnCount];
-
-    std::vector<int> outputColumnGuids;
-    int cur_index = 0;
-    // copy from outer table (input table)
-    for (int col_ctr = 0, col_cnt = input_table->columnCount();
-         col_ctr < col_cnt;
-         col_ctr++, cur_index++)
+    int schema_size = static_cast<int>(node->getOutputSchema().size());
+    string* columnNames = new string[schema_size];
+    for (int i = 0; i < schema_size; i++)
     {
-        columnNames[cur_index] = input_table->columnName(col_ctr);
-        outputColumnGuids.
-            push_back(node->getChildren()[0]->getOutputColumnGuids()[col_ctr]);
+        columnNames[i] = node->getOutputSchema()[i]->getColumnName();
+        m_outputExpressions.
+            push_back(node->getOutputSchema()[i]->getExpression());
     }
 
-    // copy from inner table (target table)
-    for (int col_ctr = 0, col_cnt = target_table->columnCount();
-         col_ctr < col_cnt;
-         col_ctr++, cur_index++)
-    {
-        columnNames[cur_index] = target_table->columnName(col_ctr);
-        outputColumnGuids.push_back(inline_node->getOutputColumnGuids()[col_ctr]);
-    }
+    TupleSchema* schema = node->generateTupleSchema(true);
 
     // create the output table
-    node->setOutputTable(TableFactory::getTempTable(node->getInputTables()[0]->databaseId(),
-                                                    "temp", schema, columnNames, tempTableMemoryInBytes));
-
-    // Set the mapping of column names to column indexes in output tables
-    node->setOutputColumnGuids(outputColumnGuids);
-    // clean up
+    node->setOutputTable(
+        TableFactory::getTempTable(node->getInputTables()[0]->databaseId(),
+                                   "temp", schema, columnNames,
+                                   tempTableMemoryInBytes));
     delete[] columnNames;
 
     //
-    // Make sure that we actually search keys
+    // Make sure that we actually have search keys
     //
     int num_of_searchkeys = (int)inline_node->getSearchKeyExpressions().size();
     if (num_of_searchkeys == 0) {
@@ -281,6 +251,12 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstract_node,
     // eval() tuple parameter. By convention, eval's first parameter
     // will always be the outer table and its second parameter the inner
 
+    // NOTE: the output expressions are not currently scanned to
+    // determine how to take tuples from the outer and inner tables,
+    // since the way the execute loop is currently written prevents
+    // the contribution to the schema from the outer table from being
+    // used with a valid tuple from the inner table.
+
     bool retval =
         assignTupleValueIndexes(inline_node->getPredicate(),
                                 node->getInputTables()[0]->name(),
@@ -296,8 +272,7 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstract_node,
 
 bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
 {
-    VOLT_TRACE ("executing NestLoopIndex...");
-    assert (node == dynamic_cast<NestLoopIndexPlanNode*>(abstract_node));
+    assert (node == dynamic_cast<NestLoopIndexPlanNode*>(m_abstractNode));
     assert(node);
     assert (inline_node == dynamic_cast<IndexScanPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_INDEXSCAN)));
     assert(inline_node);
@@ -313,8 +288,8 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     assert(node->getInputTables().size() == 1);
     assert (outer_table == node->getInputTables()[0]);
     assert (outer_table);
-    VOLT_TRACE ("outer table:\n %s", outer_table->debug().c_str());
-    VOLT_TRACE ("inner table:\n %s", inner_table->debug().c_str());
+    VOLT_TRACE("executing NestLoopIndex with outer table: %s, inner table: %s",
+               outer_table->debug().c_str(), inner_table->debug().c_str());
 
     //
     // Substitute parameter to SEARCH KEY Note that the expressions
@@ -373,9 +348,6 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
         }
         VOLT_TRACE("Searching %s", index_values.debug("").c_str());
 
-        for (int col_ctr = 0; col_ctr < num_of_outer_cols; ++col_ctr) {
-            join_tuple.setNValue(col_ctr, outer_tuple.getNValue(col_ctr));
-        }
 
         //
         // Our index scan on the inner table is going to have three parts:
@@ -408,7 +380,6 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                 !(inner_tuple = index->nextValue()).isNullTuple()))
         {
             match = true;
-
             VOLT_TRACE("inner_tuple:%s",
                        inner_tuple.debug(inner_table->name()).c_str());
 
@@ -430,13 +401,29 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                 //
                 // Try to put the tuple into our output table
                 //
+                // This is a bit hacky.  It duplicates the non-eval
+                // world that was here before.  Could fold these two
+                // loops together if we assign table indexes in p_init
+                for (int col_ctr = 0; col_ctr < num_of_outer_cols;
+                     ++col_ctr)
+                {
+                    join_tuple.setNValue(col_ctr,
+                                         m_outputExpressions[col_ctr]->
+                                         eval(&outer_tuple, NULL));
+                }
                 //
                 // Append the inner values to the end of our join tuple
                 //
-                for (int col_ctr = 0; col_ctr < num_of_inner_cols; ++col_ctr)
+                for (int col_ctr = num_of_outer_cols;
+                     col_ctr < join_tuple.sizeInValues();
+                     ++col_ctr)
                 {
-                    join_tuple.setNValue(col_ctr + num_of_outer_cols,
-                                         inner_tuple.getNValue(col_ctr));
+                    // For the sake of consistency, we don't try to do
+                    // output expressions here with columns from both tables.
+                    join_tuple.
+                        setNValue(col_ctr,
+                                  m_outputExpressions[col_ctr]->
+                                  eval(&inner_tuple, NULL));
                 }
                 VOLT_TRACE("join_tuple tuple: %s",
                            join_tuple.debug(output_table->name()).c_str());
@@ -466,6 +453,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     }
 
     VOLT_TRACE ("result table:\n %s", output_table->debug().c_str());
+    VOLT_TRACE("Finished NestLoopIndex");
     return (true);
 }
 

@@ -20,21 +20,31 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+package org.voltdb.plannodes;
 
-package org.voltdb.regressionsuites.failureprocs;
+import junit.framework.TestCase;
 
-import org.voltdb.*;
+public class TestNestLoopPlanNode extends TestCase
+{
+    static final String TABLE1 = "table1";
+    static final String[] T1COLS = { "t1col0", "t1col1", "t1col2", "t1col3",
+                                     "t1col4" };
 
-@ProcInfo (
-    partitionInfo = "FIVEK_STRING.P: 0",
-    singlePartition = true
-)
-public class FetchTooMuch extends VoltProcedure {
+    static final String TABLE2 = "table2";
+    static final String[] T2COLS = { "t2col0", "t2col1", "t2col2", "t2col3" };
 
-    public final SQLStmt fetchTooMuch = new SQLStmt("SELECT * FROM WIDE WHERE P > -1;");
+    public void testStuff()
+    {
+        NestLoopPlanNode dut = new NestLoopPlanNode();
 
-    public VoltTable[] run(int p) {
-        voltQueueSQL(fetchTooMuch);
-        return voltExecuteSQL();
+        MockPlanNode outer_child = new MockPlanNode(TABLE1, T1COLS);
+        MockPlanNode inner_child = new MockPlanNode(TABLE2, T2COLS);
+
+        dut.addAndLinkChild(inner_child);
+        dut.addAndLinkChild(outer_child);
+
+        dut.generateOutputSchema(null);
+        dut.resolveColumnIndexes();
+        System.out.println(dut.getOutputSchema().toString());
     }
 }

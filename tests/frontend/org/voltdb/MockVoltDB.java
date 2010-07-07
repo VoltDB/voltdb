@@ -152,7 +152,7 @@ public class MockVoltDB implements VoltDBInterface
         return m_howManyCrashes;
     }
 
-    Database getDatabase()
+    public Database getDatabase()
     {
         return getCluster().getDatabases().get(m_databaseName);
     }

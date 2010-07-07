@@ -23,7 +23,6 @@ import org.json.JSONStringer;
 import org.json.JSONString;
 import org.voltdb.expressions.*;
 import org.voltdb.planner.PlanStatistics;
-import org.voltdb.planner.PlannerContext;
 import org.voltdb.planner.StatsField;
 import org.voltdb.types.*;
 import org.voltdb.catalog.Cluster;
@@ -71,8 +70,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // The sorting direction
     protected SortDirectionType m_sortDirection = SortDirectionType.INVALID;
 
-    public IndexScanPlanNode(PlannerContext context) {
-        super(context);
+    public IndexScanPlanNode() {
+        super();
     }
 
     @Override
@@ -169,15 +168,78 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     /**
      * @param endExpression the end expression to set
      */
-    public void setEndExpression(AbstractExpression endExpression) {
-        m_endExpression = endExpression;
+    public void setEndExpression(AbstractExpression endExpression)
+    {
+        if (endExpression != null)
+        {
+            // PlanNodes all need private deep copies of expressions
+            // so that the resolveColumnIndexes results
+            // don't get bashed by other nodes or subsequent planner runs
+            try
+            {
+                m_endExpression = (AbstractExpression) endExpression.clone();
+            }
+            catch (CloneNotSupportedException e)
+            {
+                // This shouldn't ever happen
+                e.printStackTrace();
+                throw new RuntimeException(e.getMessage());
+            }
+        }
+    }
+
+    public void addSearchKeyExpression(AbstractExpression expr)
+    {
+        if (expr != null)
+        {
+            // PlanNodes all need private deep copies of expressions
+            // so that the resolveColumnIndexes results
+            // don't get bashed by other nodes or subsequent planner runs
+            try
+            {
+                m_searchkeyExpressions.add((AbstractExpression) expr.clone());
+            }
+            catch (CloneNotSupportedException e)
+            {
+                // This shouldn't ever happen
+                e.printStackTrace();
+                throw new RuntimeException(e.getMessage());
+            }
+        }
     }
 
     /**
      * @return the searchkey_expressions
      */
-    public List<AbstractExpression> getSearchKeyExpressions() {
+    // Please don't use me to add search key expressions.  Use
+    // addSearchKeyExpression() so that the expression gets cloned
+    List<AbstractExpression> getSearchKeyExpressions() {
         return m_searchkeyExpressions;
+    }
+
+    @Override
+    public void resolveColumnIndexes()
+    {
+        // IndexScanPlanNode has TVEs that need index resolution in:
+        // m_searchkeyExpressions
+        // m_endExpression
+
+        // Collect all the TVEs in the end expression and search key expressions
+        List<TupleValueExpression> index_tves =
+            new ArrayList<TupleValueExpression>();
+        index_tves.addAll(ExpressionUtil.getTupleValueExpressions(m_endExpression));
+        for (AbstractExpression search_exp : m_searchkeyExpressions)
+        {
+            index_tves.addAll(ExpressionUtil.getTupleValueExpressions(search_exp));
+        }
+        // and update their indexes against the table schema
+        for (TupleValueExpression tve : index_tves)
+        {
+            int index = m_tableSchema.getIndexOfTve(tve);
+            tve.setColumnIndex(index);
+        }
+        // now do the common scan node work
+        super.resolveColumnIndexes();
     }
 
     @Override

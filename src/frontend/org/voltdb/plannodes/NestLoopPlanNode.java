@@ -17,18 +17,16 @@
 
 package org.voltdb.plannodes;
 
-import org.voltdb.planner.PlannerContext;
 import org.voltdb.types.*;
 
 public class NestLoopPlanNode extends AbstractJoinPlanNode {
 
-    public NestLoopPlanNode(PlannerContext context) {
-        super(context);
+    public NestLoopPlanNode() {
+        super();
     }
 
     @Override
     public PlanNodeType getPlanNodeType() {
         return PlanNodeType.NESTLOOP;
     }
-
 }

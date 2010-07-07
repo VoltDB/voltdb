@@ -69,6 +69,10 @@ OrderByPlanNode::~OrderByPlanNode()
 {
     delete getOutputTable();
     setOutputTable(NULL);
+    for (int i = 0; i < m_sortExpressions.size(); i++)
+    {
+        delete m_sortExpressions[i];
+    }
 }
 
 PlanNodeType
@@ -77,47 +81,10 @@ OrderByPlanNode::getPlanNodeType() const
     return PLAN_NODE_TYPE_ORDERBY;
 }
 
-void
-OrderByPlanNode::setSortColumns(vector<int>& cols)
+vector<AbstractExpression*>&
+OrderByPlanNode::getSortExpressions()
 {
-    m_sortColumns = cols;
-}
-
-
-vector<int>&
-OrderByPlanNode::getSortColumns()
-{
-    return m_sortColumns;
-}
-
-const vector<int>&
-OrderByPlanNode::getSortColumns() const
-{
-    return m_sortColumns;
-}
-
-vector<int>&
-OrderByPlanNode::getSortColumnGuids()
-{
-    return m_sortColumnGuids;
-}
-
-void
-OrderByPlanNode::setSortColumnNames(vector<string>& column_names)
-{
-    m_sortColumnNames = column_names;
-}
-
-vector<string>&
-OrderByPlanNode::getSortColumnNames()
-{
-    return m_sortColumnNames;
-}
-
-const vector<string>&
-OrderByPlanNode::getSortColumnNames() const
-{
-    return m_sortColumnNames;
+    return m_sortExpressions;
 }
 
 void
@@ -142,10 +109,11 @@ string
 OrderByPlanNode::debugInfo(const string& spacer) const
 {
     ostringstream buffer;
-    buffer << spacer << "SortColumns[" << m_sortColumns.size() << "]\n";
-    for (int ctr = 0, cnt = (int)m_sortColumns.size(); ctr < cnt; ctr++)
+    buffer << spacer << "SortColumns[" << m_sortExpressions.size() << "]\n";
+    for (int ctr = 0, cnt = (int)m_sortExpressions.size(); ctr < cnt; ctr++)
     {
-        buffer << spacer << "  [" << ctr << "] " << m_sortColumns[ctr]
+        buffer << spacer << "  [" << ctr << "] "
+               << m_sortExpressions[ctr]->debug()
                << "::" << m_sortDirections[ctr] << "\n";
     }
     return buffer.str();
@@ -169,27 +137,23 @@ OrderByPlanNode::loadFromJSONObject(json_spirit::Object& obj,
     for (int ii = 0; ii < sortColumnsArray.size(); ii++)
     {
         json_spirit::Object sortColumn = sortColumnsArray[ii].get_obj();
-        bool hasName = false, hasDirection = false;
+        bool hasDirection = false, hasExpression = false;
         for (int zz = 0; zz < sortColumn.size(); zz++)
         {
-            if (sortColumn[zz].name_ == "COLUMN_NAME")
-            {
-                hasName = true;
-                m_sortColumnNames.push_back(sortColumn[zz].value_.get_str());
-            }
-            else if (sortColumn[zz].name_ == "COLUMN_GUID")
-            {
-                hasName = true;
-                m_sortColumnGuids.push_back(sortColumn[zz].value_.get_int());
-            }
-            else if (sortColumn[zz].name_ == "SORT_DIRECTION")
+            if (sortColumn[zz].name_ == "SORT_DIRECTION")
             {
                 hasDirection = true;
                 string sortDirectionTypeString = sortColumn[zz].value_.get_str();
                 m_sortDirections.
                     push_back(stringToSortDirection(sortDirectionTypeString));
             }
+            else if (sortColumn[zz].name_ == "SORT_EXPRESSION")
+            {
+                hasExpression = true;
+                m_sortExpressions.
+                    push_back(AbstractExpression::buildExpressionTree(sortColumn[zz].value_.get_obj()));
+            }
         }
-        assert (hasName && hasDirection);
+        assert (hasExpression && hasDirection);
     }
 }

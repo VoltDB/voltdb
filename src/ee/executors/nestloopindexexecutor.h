@@ -101,6 +101,7 @@ protected:
     TableTuple index_values;
     Table* outer_table;
     JoinType join_type;
+    std::vector<AbstractExpression*> m_outputExpressions;
 
     //So valgrind doesn't report the data as lost.
     char *index_values_backing_store;

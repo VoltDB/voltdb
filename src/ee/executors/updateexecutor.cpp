@@ -82,24 +82,19 @@ bool UpdateExecutor::p_init(AbstractPlanNode *abstract_node, const catalog::Data
     assert(m_targetTable);
     assert(m_node->getTargetTable());
 
-    // Create an output table for the modified tuple count
-    // XXX this should maybe move to coming in via JSON
-    const vector<ValueType> outputType(1, VALUE_TYPE_BIGINT);
-    const vector<int32_t> outputSize(1, sizeof(int64_t));
-    const vector<bool> outputAllowNull(1, false);
-    string outputNames[1];
-    outputNames[0] = "modified_tuples";
-
-    TupleSchema* schema = TupleSchema::createTupleSchema(outputType,
-                                                         outputSize,
-                                                         outputAllowNull,
-                                                         true);
-
+    TupleSchema* schema = m_node->generateTupleSchema(false);
+    int column_count = static_cast<int>(m_node->getOutputSchema().size());
+    std::string* column_names = new std::string[column_count];
+    for (int ctr = 0; ctr < column_count; ctr++)
+    {
+        column_names[ctr] = m_node->getOutputSchema()[ctr]->getColumnName();
+    }
     m_node->setOutputTable(TableFactory::getTempTable(m_node->databaseId(),
                                                       "temp",
                                                       schema,
-                                                      outputNames,
+                                                      column_names,
                                                       tempTableMemoryInBytes));
+    delete[] column_names;
 
     // record if a full index update is needed, or if these checks can be skipped
     m_updatesIndexes = m_node->doesUpdateIndexes();

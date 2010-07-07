@@ -75,7 +75,7 @@ class ProjectionExecutor : public AbstractExecutor {
     private:
         TempTable* output_table;
         Table* input_table;
-        int num_of_columns;
+        int m_columnCount;
         boost::shared_array<int> all_tuple_array_ptr;
         int* all_tuple_array;
         boost::shared_array<int> all_param_array_ptr;

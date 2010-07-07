@@ -17,11 +17,9 @@
 
 package org.voltdb.planner;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.Stack;
 import java.util.Map.Entry;
 
 import org.voltdb.VoltType;
@@ -39,6 +37,7 @@ import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
@@ -49,9 +48,11 @@ import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.MaterializePlanNode;
+import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
+import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
@@ -74,9 +75,6 @@ public class PlanAssembler {
     final Cluster m_catalogCluster;
     /** convenience pointer to the database object in the catalog */
     final Database m_catalogDb;
-
-    /** Context object with planner-local information. */
-    final PlannerContext m_context;
 
     /** parsed statement for an insert */
     ParsedInsertStmt m_parsedInsert = null;
@@ -111,8 +109,7 @@ public class PlanAssembler {
      * @param catalogDb
      *            Catalog info about schema, metadata and procedures.
      */
-    PlanAssembler(PlannerContext context, Cluster catalogCluster, Database catalogDb) {
-        m_context = context;
+    PlanAssembler(Cluster catalogCluster, Database catalogDb) {
         m_catalogCluster = catalogCluster;
         m_catalogDb = catalogDb;
         m_partitionCount = m_catalogCluster.getPartitions().size();
@@ -199,7 +196,7 @@ public class PlanAssembler {
             }
             m_parsedSelect = (ParsedSelectStmt) parsedStmt;
             subAssembler =
-                new SelectSubPlanAssembler(m_context, m_catalogDb,
+                new SelectSubPlanAssembler(m_catalogDb,
                                            parsedStmt, singlePartition,
                                            m_partitionCount);
         } else {
@@ -218,7 +215,7 @@ public class PlanAssembler {
                 }
                 m_parsedUpdate = (ParsedUpdateStmt) parsedStmt;
                 subAssembler =
-                    new WriterSubPlanAssembler(m_context, m_catalogDb, parsedStmt, singlePartition, m_partitionCount);
+                    new WriterSubPlanAssembler(m_catalogDb, parsedStmt, singlePartition, m_partitionCount);
             } else if (parsedStmt instanceof ParsedDeleteStmt) {
                 if (tableListIncludesExportOnly(parsedStmt.tableList)) {
                     throw new RuntimeException(
@@ -226,7 +223,7 @@ public class PlanAssembler {
                 }
                 m_parsedDelete = (ParsedDeleteStmt) parsedStmt;
                 subAssembler =
-                    new WriterSubPlanAssembler(m_context, m_catalogDb, parsedStmt, singlePartition, m_partitionCount);
+                    new WriterSubPlanAssembler(m_catalogDb, parsedStmt, singlePartition, m_partitionCount);
             } else
                 throw new RuntimeException(
                         "Unknown subclass of AbstractParsedStmt.");
@@ -296,17 +293,35 @@ public class PlanAssembler {
         {
             return null;
         }
+        else
+        {
+            // Do a final generateOutputSchema pass.
+            fragment.planGraph.generateOutputSchema(m_catalogDb);
+        }
 
         return retval;
     }
 
     private void addColumns(CompiledPlan plan, ParsedSelectStmt stmt) {
-        int index = 0;
-        for (ParsedSelectStmt.ParsedColInfo col : stmt.displayColumns) {
-            PlanColumn outcol = m_context.getPlanColumn(col.expression, col.alias);
-            plan.columns.add(outcol.guid());
-            index++;
+        NodeSchema output_schema = plan.fragments.get(0).planGraph.getOutputSchema();
+        // Sanity-check the output NodeSchema columns against the display columns
+        if (stmt.displayColumns.size() != output_schema.size())
+        {
+            throw new PlanningErrorException("Mismatched plan output cols " +
+            "to parsed display columns");
         }
+        for (ParsedColInfo display_col : stmt.displayColumns)
+        {
+            SchemaColumn col = output_schema.find(display_col.tableName,
+                                                  display_col.columnName,
+                                                  display_col.alias);
+            if (col == null)
+            {
+                throw new PlanningErrorException("Mismatched plan output cols " +
+                                                 "to parsed display columns");
+            }
+        }
+        plan.columns = output_schema;
     }
 
     private void addParameters(CompiledPlan plan, AbstractParsedStmt stmt) {
@@ -330,16 +345,9 @@ public class PlanAssembler {
 
         /*
          * Establish the output columns for the sub select plan.
-         * The order, aggregation and expression operations placed
-         * "on top" of this work should calculate correct output
-         * column state as nodes are added. (That is,
-         * the recursive updateOutputColumns() ideally wouldn't
-         * have other callers.)
          */
-        root.updateOutputColumns(m_catalogDb);
-
+        root.generateOutputSchema(m_catalogDb);
         root = handleAggregationOperators(root);
-        root.updateOutputColumns(m_catalogDb);
 
         if ((subSelectRoot.getPlanNodeType() != PlanNodeType.INDEXSCAN ||
             ((IndexScanPlanNode) subSelectRoot).getSortDirection() == SortDirectionType.INVALID) &&
@@ -357,7 +365,7 @@ public class PlanAssembler {
         if ((m_parsedSelect.limit != -1) || (m_parsedSelect.limitParameterId != -1) ||
             (m_parsedSelect.offset > 0) || (m_parsedSelect.offsetParameterId != -1))
         {
-            LimitPlanNode limit = new LimitPlanNode(m_context);
+            LimitPlanNode limit = new LimitPlanNode();
             limit.setLimit((int) m_parsedSelect.limit);
             limit.setOffset((int) m_parsedSelect.offset);
 
@@ -372,13 +380,15 @@ public class PlanAssembler {
                 limit.setLimitParameterIndex(parameterInfo.index);
             }
             limit.addAndLinkChild(root);
+            limit.generateOutputSchema(m_catalogDb);
             root = limit;
         }
 
-        SendPlanNode sendNode = new SendPlanNode(m_context);
+        SendPlanNode sendNode = new SendPlanNode();
 
         // connect the nodes to build the graph
         sendNode.addAndLinkChild(root);
+        sendNode.generateOutputSchema(m_catalogDb);
 
         return sendNode;
     }
@@ -404,13 +414,18 @@ public class PlanAssembler {
             return null;
 
         // generate the delete node with the right target table
-        DeletePlanNode deleteNode = new DeletePlanNode(m_context);
+        DeletePlanNode deleteNode = new DeletePlanNode();
         deleteNode.setTargetTableName(targetTable.getTypeName());
 
-        ProjectionPlanNode projectionNode = new ProjectionPlanNode(m_context);
+        ProjectionPlanNode projectionNode = new ProjectionPlanNode();
         AbstractExpression addressExpr = new TupleAddressExpression();
-        PlanColumn colInfo = m_context.getPlanColumn(addressExpr, "tuple_address");
-        projectionNode.appendOutputColumn(colInfo);
+        NodeSchema proj_schema = new NodeSchema();
+        // This planner-created column is magic.
+        proj_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
+                                               "tuple_address",
+                                               "tuple_address",
+                                               addressExpr));
+        projectionNode.setOutputSchema(proj_schema);
 
         if (m_singlePartition == true) {
 
@@ -428,10 +443,15 @@ public class PlanAssembler {
             // If the root node we got back from createSelectTree() is an
             // AbstractScanNode, then
             // we put the Projection node we just created inside of it
+            // When we inline this projection into the scan, we're going
+            // to overwrite any original projection that we might have inlined
+            // in order to simply cull the columns from the persistent table.
+            // The call here to generateOutputSchema() will recurse down to
+            // the scan node and cause it to update appropriately.
             subSelectRoot.addInlinePlanNode(projectionNode);
             // connect the nodes to build the graph
             deleteNode.addAndLinkChild(subSelectRoot);
-
+            deleteNode.generateOutputSchema(m_catalogDb);
             return deleteNode;
 
         } else {
@@ -439,10 +459,7 @@ public class PlanAssembler {
             // indicates it's a multi-site plan
             assert (subSelectRoot instanceof ReceivePlanNode);
 
-            //
             // put the delete node in the right place
-            //
-
             // get the recv node
             ReceivePlanNode recvNode = (ReceivePlanNode) subSelectRoot;
             // get the send node
@@ -458,11 +475,11 @@ public class PlanAssembler {
             assert (scanNode instanceof AbstractScanPlanNode);
             scanNode.addInlinePlanNode(projectionNode);
             deleteNode.addAndLinkChild(scanNode);
+            deleteNode.generateOutputSchema(m_catalogDb);
             sendNode.addAndLinkChild(deleteNode);
-
+            sendNode.generateOutputSchema(m_catalogDb);
             // fix the receive node's output columns
-            recvNode.updateOutputColumns(m_catalogDb);
-
+            recvNode.generateOutputSchema(m_catalogDb);
             // add a sum and send on top of the union
             return addSumAndSendToDMLNode(subSelectRoot);
         }
@@ -488,40 +505,60 @@ public class PlanAssembler {
         if (subSelectRoot == null)
             return null;
 
-        UpdatePlanNode updateNode = new UpdatePlanNode(m_context);
+        UpdatePlanNode updateNode = new UpdatePlanNode();
         updateNode.setTargetTableName(targetTable.getTypeName());
         // set this to false until proven otherwise
         updateNode.setUpdateIndexes(false);
 
-        ProjectionPlanNode projectionNode = new ProjectionPlanNode(m_context);
+        ProjectionPlanNode projectionNode = new ProjectionPlanNode();
         TupleAddressExpression tae = new TupleAddressExpression();
-        PlanColumn colInfo = m_context.getPlanColumn(tae, "tuple_address");
-        projectionNode.appendOutputColumn(colInfo);
+        NodeSchema proj_schema = new NodeSchema();
+        // This planner-generated column is magic.
+        proj_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
+                                               "tuple_address",
+                                               "tuple_address",
+                                               tae));
 
         // get the set of columns affected by indexes
         Set<String> affectedColumns = getIndexedColumnSetForTable(targetTable);
 
-        // add the output columns we need
-        int index = 1;
+        // add the output columns we need to the projection
+        //
+        // Right now, the EE is going to use the original column names
+        // and compare these to the persistent table column names in the
+        // update executor in order to figure out which table columns get
+        // updated.  We'll associate the actual values with VOLT_TEMP_TABLE
+        // to avoid any false schema/column matches with the actual table.
         for (Entry<Column, AbstractExpression> col : m_parsedUpdate.columns.entrySet()) {
-            colInfo = m_context.getPlanColumn(col.getValue(), col.getKey().getTypeName());
-            projectionNode.appendOutputColumn(colInfo);
-            index++;
+            proj_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
+                                                   col.getKey().getTypeName(),
+                                                   col.getKey().getTypeName(),
+                                                   col.getValue()));
 
             // check if this column is an indexed column
-            if (affectedColumns.contains(colInfo.displayName()))
+            if (affectedColumns.contains(col.getKey().getTypeName()))
+            {
                 updateNode.setUpdateIndexes(true);
+            }
         }
+        projectionNode.setOutputSchema(proj_schema);
 
         if (m_singlePartition == true) {
 
             // add the projection inline (TODO: this will break if more than one
             // layer is below this)
+            //
+            // When we inline this projection into the scan, we're going
+            // to overwrite any original projection that we might have inlined
+            // in order to simply cull the columns from the persistent table.
+            // The call here to generateOutputSchema() will recurse down to
+            // the scan node and cause it to update appropriately.
             assert(subSelectRoot instanceof AbstractScanPlanNode);
             subSelectRoot.addInlinePlanNode(projectionNode);
 
             // connect the nodes to build the graph
             updateNode.addAndLinkChild(subSelectRoot);
+            updateNode.generateOutputSchema(m_catalogDb);
 
             return updateNode;
         } else {
@@ -529,10 +566,7 @@ public class PlanAssembler {
             // indicates it's a multi-site plan
             assert (subSelectRoot instanceof ReceivePlanNode);
 
-            //
             // put the update node in the right place
-            //
-
             // get the recv node
             ReceivePlanNode recvNode = (ReceivePlanNode) subSelectRoot;
             // get the send node
@@ -548,11 +582,11 @@ public class PlanAssembler {
             assert (scanNode instanceof AbstractScanPlanNode);
             scanNode.addInlinePlanNode(projectionNode);
             updateNode.addAndLinkChild(scanNode);
+            updateNode.generateOutputSchema(m_catalogDb);
             sendNode.addAndLinkChild(updateNode);
-
+            sendNode.generateOutputSchema(m_catalogDb);
             // fix the receive node's output columns
-            recvNode.updateOutputColumns(m_catalogDb);
-
+            recvNode.generateOutputSchema(m_catalogDb);
             // add a count and send on top of the union
             return addSumAndSendToDMLNode(subSelectRoot);
         }
@@ -584,14 +618,14 @@ public class PlanAssembler {
         }
 
         // the root of the insert plan is always an InsertPlanNode
-        InsertPlanNode insertNode = new InsertPlanNode(m_context);
+        InsertPlanNode insertNode = new InsertPlanNode();
         insertNode.setTargetTableName(targetTable.getTypeName());
         insertNode.setMultiPartition(m_singlePartition == false);
 
         // the materialize node creates a tuple to insert (which is frankly not
         // always optimal)
-        MaterializePlanNode materializeNode =
-            new MaterializePlanNode(m_context);
+        MaterializePlanNode materializeNode = new MaterializePlanNode();
+        NodeSchema mat_schema = new NodeSchema();
 
         // get the ordered list of columns for the targettable using a helper
         // function they're not guaranteed to be in order in the catalog
@@ -637,29 +671,33 @@ public class PlanAssembler {
             expr.setValueType(VoltType.get((byte)column.getType()));
 
             // add column to the materialize node.
-            PlanColumn colInfo = m_context.getPlanColumn(expr, column.getTypeName());
-            materializeNode.appendOutputColumn(colInfo);
+            // This table name is magic.
+            mat_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
+                                                  column.getTypeName(),
+                                                  column.getTypeName(),
+                                                  expr));
         }
 
+        materializeNode.setOutputSchema(mat_schema);
         // connect the insert and the materialize nodes together
         insertNode.addAndLinkChild(materializeNode);
+        insertNode.generateOutputSchema(m_catalogDb);
         AbstractPlanNode rootNode = insertNode;
 
         if (m_singlePartition == false) {
             // all sites to a scan -> send
             // root site has many recvs feeding into a union
 
-            SendPlanNode sendNode = new SendPlanNode(m_context);
+            SendPlanNode sendNode = new SendPlanNode();
             // this will make the child planfragment be sent to all partitions
             sendNode.isMultiPartition = true;
             sendNode.addAndLinkChild(rootNode);
+            sendNode.generateOutputSchema(m_catalogDb);
 
-            ReceivePlanNode recvNode = new ReceivePlanNode(m_context);
+            ReceivePlanNode recvNode = new ReceivePlanNode();
             recvNode.addAndLinkChild(sendNode);
+            recvNode.generateOutputSchema(m_catalogDb);
             rootNode = recvNode;
-
-            // receive node requires the schema of its output table
-            recvNode.updateOutputColumns(m_catalogDb);
 
             // add a count and send on top of the union
             rootNode = addSumAndSendToDMLNode(rootNode);
@@ -668,48 +706,51 @@ public class PlanAssembler {
         return rootNode;
     }
 
-    AbstractPlanNode addSumAndSendToDMLNode(AbstractPlanNode dmlRoot) {
-        // do some output column organizing...
-        dmlRoot.updateOutputColumns(m_catalogDb);
-
+    AbstractPlanNode addSumAndSendToDMLNode(AbstractPlanNode dmlRoot)
+    {
         // create the nodes being pushed on top of dmlRoot.
-        AggregatePlanNode countNode = new AggregatePlanNode(m_context);
-        SendPlanNode sendNode = new SendPlanNode(m_context);
+        AggregatePlanNode countNode = new AggregatePlanNode();
+        SendPlanNode sendNode = new SendPlanNode();
 
         // configure the count aggregate (sum) node to produce a single
         // output column containing the result of the sum.
-
-        List<String> countColumnNames = new ArrayList<String>();
-        List<Integer> countColumnGuids = new ArrayList<Integer>();
-        List<ExpressionType> countColumnTypes = new ArrayList<ExpressionType>();
-        List<Integer> countOutputColumns = countNode.getAggregateOutputColumns();
-
-        // aggregate column name same as original dmlRoot name.
-        int colGuid = dmlRoot.m_outputColumns.get(0); // offset 0.
-        countColumnNames.add(m_context.get(colGuid).displayName());
-        countColumnGuids.add(colGuid);
-        countOutputColumns.add(0);
-        countColumnTypes.add(ExpressionType.AGGREGATE_SUM);
-        countNode.setAggregateColumnNames(countColumnNames);
-        countNode.setAggregateColumnGuids(countColumnGuids);
-        countNode.setAggregateTypes(countColumnTypes);
+        // Create a TVE that should match the tuple count input column
+        // This TVE is magic.
+        // really really need to make this less hard-wired
+        TupleValueExpression count_tve = new TupleValueExpression();
+        count_tve.setValueType(VoltType.BIGINT);
+        count_tve.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
+        count_tve.setColumnIndex(0);
+        count_tve.setColumnName("modified_tuples");
+        count_tve.setColumnAlias("modified_tuples");
+        count_tve.setTableName("VOLT_TEMP_TABLE");
+        countNode.addAggregate(ExpressionType.AGGREGATE_SUM, 0, count_tve);
 
         // The output column. Not really based on a TVE (it is really the
         // count expression represented by the count configured above). But
-        // this is sufficient for now.
+        // this is sufficient for now.  This looks identical to the above
+        // TVE but it's logically different so we'll create a fresh one.
+        // And yes, oh, oh, it's magic</elo>
         TupleValueExpression tve = new TupleValueExpression();
         tve.setValueType(VoltType.BIGINT);
         tve.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
         tve.setColumnIndex(0);
-        tve.setColumnName(m_context.get(colGuid).displayName());
-        tve.setColumnAlias(m_context.get(colGuid).displayName());
-        tve.setTableName("");
-        PlanColumn colInfo = m_context.getPlanColumn(tve, "modified_tuples");
-        countNode.appendOutputColumn(colInfo);
+        tve.setColumnName("modified_tuples");
+        tve.setColumnAlias("modified_tuples");
+        tve.setTableName("VOLT_TEMP_TABLE");
+        NodeSchema count_schema = new NodeSchema();
+        SchemaColumn col = new SchemaColumn("VOLT_TEMP_TABLE",
+                                            "modified_tuples",
+                                            "modified_tuples",
+                                            tve);
+        count_schema.addColumn(col);
+        countNode.setOutputSchema(count_schema);
 
         // connect the nodes to build the graph
         countNode.addAndLinkChild(dmlRoot);
+        countNode.generateOutputSchema(m_catalogDb);
         sendNode.addAndLinkChild(countNode);
+        sendNode.generateOutputSchema(m_catalogDb);
 
         return sendNode;
     }
@@ -727,33 +768,22 @@ public class PlanAssembler {
     AbstractPlanNode addProjection(AbstractPlanNode rootNode) {
         assert (m_parsedSelect != null);
         assert (m_parsedSelect.displayColumns != null);
-        PlanColumn colInfo = null;
-
-        // The rootNode must have a correct output column set.
-        rootNode.updateOutputColumns(m_catalogDb);
 
         ProjectionPlanNode projectionNode =
-            new ProjectionPlanNode(m_context);
+            new ProjectionPlanNode();
+        NodeSchema proj_schema = new NodeSchema();
 
-        // The input to this projection MUST include all the columns needed
-        // to satisfy any TupleValueExpression in the parsed select statement's
-        // output expressions.
-        //
-        // For each parsed select statement output column, create a new PlanColumn
-        // cloning the expression. Walk the clone and configure each TVE with
-        // the offset into the input column array.
-        for (ParsedSelectStmt.ParsedColInfo outputCol : m_parsedSelect.displayColumns) {
+        // Build the output schema for the projection based on the display columns
+        for (ParsedSelectStmt.ParsedColInfo outputCol : m_parsedSelect.displayColumns)
+        {
             assert(outputCol.expression != null);
-            try {
-                AbstractExpression expressionWithRealOffsets =
-                    generateProjectionColumnExpression(outputCol,
-                                                     rootNode.m_outputColumns);
-                colInfo = m_context.getPlanColumn(expressionWithRealOffsets, outputCol.alias);
-                projectionNode.appendOutputColumn(colInfo);
-            } catch (CloneNotSupportedException ex) {
-                throw new PlanningErrorException(ex.getMessage());
-            }
+            SchemaColumn col = new SchemaColumn(outputCol.tableName,
+                                                outputCol.columnName,
+                                                outputCol.alias,
+                                                outputCol.expression);
+            proj_schema.addColumn(col);
         }
+        projectionNode.setOutputSchema(proj_schema);
 
         // if the projection can be done inline...
         if (rootNode instanceof AbstractScanPlanNode) {
@@ -761,123 +791,23 @@ public class PlanAssembler {
             return rootNode;
         } else {
             projectionNode.addAndLinkChild(rootNode);
+            projectionNode.generateOutputSchema(m_catalogDb);
             return projectionNode;
         }
-    }
-
-    /**
-     * Generate the AbstractExpression that should be used to produce
-     * this output column for the projection.  In general, it
-     * walk expression and calculate the right columnIndex (offset)
-     * into sourceColumns for each tupleValueExpression, but there
-     * are currently ugly special-cases for projection columns that are
-     * aggregates
-     * @param outputCol the ParsedColInfo from the parsed select statement
-     * @param sourceColumns
-     * @return The AbstractExpression that should be used for this projection
-     * @throws CloneNotSupportedException
-     */
-    private AbstractExpression generateProjectionColumnExpression(
-            ParsedSelectStmt.ParsedColInfo outputCol,
-            ArrayList<Integer> sourceColumns) throws CloneNotSupportedException
-    {
-        Stack<AbstractExpression> stack = new Stack<AbstractExpression>();
-        AbstractExpression expression = (AbstractExpression) outputCol.expression.clone();
-        AbstractExpression currExp = expression;
-        while (currExp != null) {
-
-            // Found an aggregate expression.  This is already computed by
-            // an earlier plannode and the column should be directly in
-            // the output columns.  Look it up by the column alias.
-            // We don't actually need to do the work in this if but this
-            // allows the planner to barf if the aggregate column doesn't
-            // exist.
-            if (currExp instanceof AggregateExpression)
-            {
-                boolean found = false;
-                int offset = 0;
-                for (Integer colguid : sourceColumns) {
-                    PlanColumn plancol = m_context.get(colguid);
-                    /* System.out.printf("Expression: %s/%s. Candidate column: %s/%s\n",
-                            tve.getColumnAlias(), tve.getTableName(),
-                            plancol.originColumnName(), plancol.originTableName()); */
-                    if (outputCol.alias.equals(plancol.displayName()))
-                    {
-                        found = true;
-                        expression = (AbstractExpression) plancol.m_expression.clone();
-                        assert(expression instanceof TupleValueExpression);
-                        TupleValueExpression tve = (TupleValueExpression) expression;
-                        tve.setColumnIndex(offset);
-                        break;
-                    }
-                    ++offset;
-                }
-                if (!found) {
-                    System.out.println("PLANNER ERROR: could not match aggregate column alias");
-                    System.out.println(getSQLText());
-                    throw new RuntimeException("Could not match aggregate column alias.");
-                }
-                break;
-            }
-
-            // found a TVE - calculate its offset into the sourceColumns
-            else if (currExp instanceof TupleValueExpression) {
-                TupleValueExpression tve = (TupleValueExpression)currExp;
-                boolean found = false;
-                int offset = 0;
-                for (Integer colguid : sourceColumns) {
-                    PlanColumn plancol = m_context.get(colguid);
-                    /* System.out.printf("Expression: %s/%s. Candidate column: %s/%s\n",
-                            tve.getColumnAlias(), tve.getTableName(),
-                            plancol.originColumnName(), plancol.originTableName()); */
-                    if (tve.getColumnName().equals(plancol.originColumnName()) &&
-                        tve.getTableName().equals(plancol.originTableName()))
-                    {
-                        tve.setColumnIndex(offset);
-                        found = true;
-                        break;
-                    }
-                    ++offset;
-                }
-                if (!found) {
-                    System.out.println("PLANNER ERROR: could not match tve column alias");
-                    System.out.println(getSQLText());
-                    throw new RuntimeException("Could not match TVE column alias.");
-                }
-            }
-
-            // save rhs. process lhs. when lhs is leaf, process a rhs.
-            if (currExp.getRight() != null) {
-                stack.push(currExp.getRight());
-            }
-            currExp = currExp.getLeft();
-            if (currExp == null) {
-                if (!stack.empty())
-                    currExp = stack.pop();
-            }
-        }
-        return expression;
     }
 
     AbstractPlanNode addOrderBy(AbstractPlanNode root) {
         assert (m_parsedSelect != null);
 
-        OrderByPlanNode orderByNode = new OrderByPlanNode(m_context);
+        OrderByPlanNode orderByNode = new OrderByPlanNode();
         for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.orderColumns) {
-            orderByNode.getSortColumnNames().add(col.alias);
-            orderByNode.getSortColumns().add(col.index);
-            orderByNode.getSortDirections()
-                    .add(
-                         col.ascending ? SortDirectionType.ASC
-                                      : SortDirectionType.DESC);
-            PlanColumn orderByCol =
-                root.findMatchingOutputColumn(col.tableName, col.columnName,
-                                              col.alias);
-            orderByNode.getSortColumnGuids().add(orderByCol.guid());
+            orderByNode.addSort(col.expression,
+                                col.ascending ? SortDirectionType.ASC
+                                              : SortDirectionType.DESC);
         }
         // connect the nodes to build the graph
         orderByNode.addAndLinkChild(root);
-        orderByNode.updateOutputColumns(m_catalogDb);
+        orderByNode.generateOutputSchema(m_catalogDb);
         return orderByNode;
     }
 
@@ -902,28 +832,26 @@ public class PlanAssembler {
         }
 
         // "Select A from T group by A" is grouped but has no aggregate operator expressions
-        // Catch that case by checking the grouped flag. Probably the OutputColumn iteration
-        // above is unnecessary?
-
+        // Catch that case by checking the grouped flag.
         if (m_parsedSelect.grouped)
+        {
             containsAggregateExpression = true;
+        }
 
         if (containsAggregateExpression) {
-            aggNode = new HashAggregatePlanNode(m_context);
+            aggNode = new HashAggregatePlanNode();
 
             for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.groupByColumns) {
-                aggNode.getGroupByColumns().add(col.index);
-                aggNode.getGroupByColumnNames().add(col.alias);
-                PlanColumn groupByColumn =
-                    root.findMatchingOutputColumn(col.tableName, col.columnName,
-                                                  col.alias);
-                aggNode.appendGroupByColumn(groupByColumn);
+                aggNode.addGroupByExpression(col.expression);
             }
 
             int outputColumnIndex = 0;
-            for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns) {
-
+            NodeSchema agg_schema = new NodeSchema();
+            for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns)
+            {
                 AbstractExpression rootExpr = col.expression;
+                AbstractExpression agg_input_expr = null;
+                SchemaColumn schema_col = null;
                 ExpressionType agg_expression_type = rootExpr.getExpressionType();
                 if (rootExpr.getExpressionType() == ExpressionType.AGGREGATE_SUM ||
                     rootExpr.getExpressionType() == ExpressionType.AGGREGATE_MIN ||
@@ -932,20 +860,15 @@ public class PlanAssembler {
                     rootExpr.getExpressionType() == ExpressionType.AGGREGATE_COUNT ||
                     rootExpr.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR)
                 {
-                    PlanColumn aggregateColumn = null;
+                    agg_input_expr = rootExpr.getLeft();
+                    // Distinct can, in theory, handle any expression now,
+                    // but it's untested so we'll balk on anything other than
+                    // a TVE here for now --izzy
                     if (rootExpr.getLeft() instanceof TupleValueExpression)
                     {
-                        TupleValueExpression nested =
-                            (TupleValueExpression) rootExpr.getLeft();
-
                         if (((AggregateExpression)rootExpr).m_distinct) {
-                            root = addDistinctNode(root, nested);
+                            root = addDistinctNode(root, rootExpr.getLeft());
                         }
-
-                        aggregateColumn =
-                            root.findMatchingOutputColumn(nested.getTableName(),
-                                                          nested.getColumnName(),
-                                                          nested.getColumnAlias());
                     }
                     // count(*) hack.  we're not getting AGGREGATE_COUNT_STAR
                     // expression types from the parsing, so we have
@@ -954,36 +877,49 @@ public class PlanAssembler {
                     else if (rootExpr.getExpressionType() == ExpressionType.AGGREGATE_COUNT &&
                              rootExpr.getLeft() == null)
                     {
-                        aggregateColumn =
-                            m_context.get(root.m_outputColumns.get(0));
                         agg_expression_type = ExpressionType.AGGREGATE_COUNT_STAR;
+
+                        // Just need a random input column for now.
+                        // The EE won't actually evaluate this, so we
+                        // just pick something innocuous
+                        // At some point we should special-case count-star so
+                        // we don't go digging for TVEs
+                        SchemaColumn first_col = root.getOutputSchema().getColumns().get(0);
+                        TupleValueExpression tve = new TupleValueExpression();
+                        tve.setValueType(first_col.getType());
+                        tve.setValueSize(first_col.getSize());
+                        tve.setColumnIndex(0);
+                        tve.setColumnName(first_col.getColumnName());
+                        tve.setColumnAlias(first_col.getColumnName());
+                        tve.setTableName(first_col.getTableName());
+                        agg_input_expr = tve;
                     }
                     else
                     {
                         throw new PlanningErrorException("Expressions in aggregates currently unsupported");
                     }
 
-                    aggNode.getAggregateColumnGuids().add(aggregateColumn.guid());
-                    aggNode.getAggregateColumnNames().add(aggregateColumn.displayName());
-                    aggNode.getAggregateTypes().add(agg_expression_type);
-
-                    // A bit of a hack: ProjectionNodes using PlanColumns after the
+                    // A bit of a hack: ProjectionNodes after the
                     // aggregate node need the output columns here to
                     // contain TupleValueExpressions (effectively on a temp table).
                     // So we construct one based on the output of the
                     // aggregate expression, the column alias provided by HSQL,
                     // and the offset into the output table schema for the
                     // aggregate node that we're computing.
+                    // Oh, oh, it's magic, you know..
                     TupleValueExpression tve = new TupleValueExpression();
                     tve.setValueType(rootExpr.getValueType());
                     tve.setValueSize(rootExpr.getValueSize());
                     tve.setColumnIndex(outputColumnIndex);
                     tve.setColumnName("");
                     tve.setColumnAlias(col.alias);
-                    tve.setTableName("VOLT_AGGREGATE_NODE_TEMP_TABLE");
-                    PlanColumn colInfo = m_context.getPlanColumn(tve, col.alias);
-                    aggNode.appendOutputColumn(colInfo);
-                    aggNode.getAggregateOutputColumns().add(outputColumnIndex);
+                    tve.setTableName("VOLT_TEMP_TABLE");
+                    aggNode.addAggregate(agg_expression_type, outputColumnIndex,
+                                         agg_input_expr);
+                    schema_col = new SchemaColumn("VOLT_TEMP_TABLE",
+                                                  "",
+                                                  col.alias,
+                                                  tve);
                 }
                 else
                 {
@@ -993,17 +929,17 @@ public class PlanAssembler {
                      * MUST already exist in the child node's output. Find them and
                      * add them to the aggregate's output.
                      */
-                    PlanColumn passThruColumn =
-                        root.findMatchingOutputColumn(col.tableName,
-                                                      col.columnName,
-                                                      col.alias);
-                    aggNode.appendOutputColumn(passThruColumn);
+                    schema_col = new SchemaColumn(col.tableName,
+                                                  col.columnName,
+                                                  col.alias,
+                                                  col.expression);
                 }
-
+                agg_schema.addColumn(schema_col);
                 outputColumnIndex++;
             }
-
+            aggNode.setOutputSchema(agg_schema);
             aggNode.addAndLinkChild(root);
+            aggNode.generateOutputSchema(m_catalogDb);
             root = aggNode;
         }
 
@@ -1018,11 +954,12 @@ public class PlanAssembler {
                 throw new PlanningErrorException("Multiple DISTINCT columns currently unsupported");
             }
             for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns) {
+                // Distinct can in theory handle any expression now, but it's
+                // untested so we'll balk on anything other than a TVE here
+                // --izzy
                 if (col.expression instanceof TupleValueExpression)
                 {
-                    TupleValueExpression colexpr = (TupleValueExpression)(col.expression);
-                    root = addDistinctNode(root, colexpr);
-
+                    root = addDistinctNode(root, col.expression);
                     // aggregate handlers are expected to produce the required projection.
                     // the other aggregates do this inherently but distinct may need a
                     // projection node.
@@ -1039,19 +976,13 @@ public class PlanAssembler {
     }
 
     AbstractPlanNode addDistinctNode(AbstractPlanNode root,
-                                     TupleValueExpression expr)
+                                     AbstractExpression expr)
     {
-        DistinctPlanNode distinctNode = new DistinctPlanNode(m_context);
-        distinctNode.setDistinctColumnName(expr.getColumnAlias());
-
-        PlanColumn distinctColumn =
-            root.findMatchingOutputColumn(expr.getTableName(),
-                                          expr.getColumnName(),
-                                          expr.getColumnAlias());
-        distinctNode.setDistinctColumnGuid(distinctColumn.guid());
+        DistinctPlanNode distinctNode = new DistinctPlanNode();
+        distinctNode.setDistinctExpression(expr);
 
         distinctNode.addAndLinkChild(root);
-        distinctNode.updateOutputColumns(m_catalogDb);
+        distinctNode.generateOutputSchema(m_catalogDb);
         return distinctNode;
     }
 

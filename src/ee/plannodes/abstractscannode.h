@@ -68,9 +68,6 @@ public:
 
     virtual std::string debugInfo(const std::string& spacer) const;
 
-    virtual int getColumnIndexFromGuid(int guid,
-                                       const catalog::Database *db) const;
-
 protected:
     friend AbstractPlanNode*
         AbstractPlanNode::fromJSONObject(json_spirit::Object &obj,
@@ -78,17 +75,9 @@ protected:
     virtual void loadFromJSONObject(json_spirit::Object &obj,
                                     const catalog::Database *catalog_db);
 
-    int getColumnIndexFromName(std::string name,
-                               const catalog::Database *db) const;
-
     AbstractScanPlanNode(int32_t id);
     AbstractScanPlanNode();
 
-    std::vector<int> m_outputColumnGuids;
-    std::vector<std::string> m_outputColumnNames;
-    std::vector<ValueType> m_outputColumnTypes;
-    std::vector<int32_t> m_outputColumnSizes;
-    //
     // Target Table
     // These tables are different from the input and the output tables
     // The plannode can read in tuples from the input table(s) and

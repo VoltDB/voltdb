@@ -79,9 +79,6 @@ class ProjectionPlanNode : public AbstractPlanNode
 
     std::string debugInfo(const std::string& spacer) const;
 
-    virtual int getColumnIndexFromGuid(int guid,
-                                       const catalog::Database* catalog_db) const;
-
  protected:
     friend AbstractPlanNode*
         AbstractPlanNode::fromJSONObject(json_spirit::Object& obj,
@@ -93,7 +90,6 @@ class ProjectionPlanNode : public AbstractPlanNode
     // The node must define what the columns in the output table are
     // going to look like
     //
-    std::vector<int> m_outputColumnGuids;
     std::vector<std::string> m_outputColumnNames;
     std::vector<ValueType> m_outputColumnTypes;
     std::vector<int32_t> m_outputColumnSizes;

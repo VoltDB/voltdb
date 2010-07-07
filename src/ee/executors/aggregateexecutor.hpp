@@ -67,7 +67,6 @@
 #include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
 
-
 #include "boost/unordered_map.hpp"
 
 #include <algorithm>
@@ -81,7 +80,7 @@
 namespace voltdb {
 
 
-typedef std::vector<std::pair<int, int> > PassThroughColType;
+typedef std::vector<int> PassThroughColType;
 
 /*
  * Base class for an individual aggregate that aggregates a specific
@@ -355,9 +354,9 @@ protected:
     bool p_execute(const NValueArray &params);
 
     /*
-     * List of mappings of columns from the output table that are
-     * passing through the value from a column in the input table and
-     * not doing any aggregation.
+     * List of columns in the output schema that are passing through
+     * the value from a column in the input table and not doing any
+     * aggregation.
      */
     PassThroughColType m_passThroughColumns;
     Pool m_memoryPool;
@@ -379,7 +378,7 @@ public:
                Table* input_table,
                Table* output_table,
                std::vector<ExpressionType>* agg_types,
-               std::vector<int>* groupByCols,
+               const std::vector<AbstractExpression*>& groupByExpressions,
                std::vector<ValueType>* col_types);
     bool nextTuple(TableTuple nextTuple, TableTuple prevTuple);
     bool finalize(TableTuple prevTuple);
@@ -436,11 +435,12 @@ helper(AggregatePlanNode* node, Agg** aggs,
      * intentional optimization to allow values that are not in the
      * GROUP BY to be passed through.
      */
-    for (PassThroughColType::const_iterator cit = passThroughColumns->begin();
-         cit < passThroughColumns->end();
-         cit++)
+    for (int i = 0; i < passThroughColumns->size(); i++)
     {
-        tmptup.setNValue((*cit).first, prev.getNValue((*cit).second));
+        int output_col_index = (*passThroughColumns)[i];
+        tmptup.setNValue(output_col_index,
+                         node->getOutputSchema()[output_col_index]->
+                         getExpression()->eval(&prev, NULL));
     }
 
     if (!output_table->insertTuple(tmptup)) {
@@ -488,7 +488,7 @@ public:
                       Table* input_table,
                       Table* output_table,
                       std::vector<ExpressionType> *agg_types,
-                      std::vector<int> *groupByCols,
+                      const std::vector<AbstractExpression*>& groupByExpressions,
                       std::vector<ValueType> *col_types)
         : m_memoryPool(memoryPool),
           m_groupByKeySchema(groupByKeySchema),
@@ -497,7 +497,7 @@ public:
           m_inputTable(input_table),
           m_outputTable(output_table),
           m_aggTypes(agg_types),
-          m_groupByCols(groupByCols),
+          m_groupByExpressions(groupByExpressions),
           m_colTypes(col_types),
           groupByKeyTuple(groupByKeySchema)
     {
@@ -512,10 +512,11 @@ public:
         AggregateList *aggregateList;
 
         // configure a tuple and search for the required group.
-        for (int i = 0; i < m_groupByCols->size(); i++)
+        for (int i = 0; i < m_groupByExpressions.size(); i++)
         {
             groupByKeyTuple.setNValue(i,
-                                      nextTuple.getNValue((*m_groupByCols)[i]));
+                                      m_groupByExpressions[i]->eval(&nextTuple,
+                                                                    NULL));
         }
         HashAggregateMapType::const_iterator keyIter =
             m_aggregates.find(groupByKeyTuple);
@@ -552,7 +553,8 @@ public:
         for (int i = 0; i < m_colTypes->size(); i++)
         {
             aggregateList->m_aggregates[i]->
-                advance(nextTuple.getNValue(m_node->getAggregateColumns()[i]));
+                advance(m_node->getAggregateInputExpressions()[i]->
+                        eval(&nextTuple, NULL));
         }
 
         return true;
@@ -576,7 +578,7 @@ public:
         // only when it doesn't have GROUP BY. See difference of these cases:
         //   SELECT SUM(A) FROM BBB ,   when BBB has no tuple
         //   SELECT SUM(A) FROM BBB GROUP BY C,   when BBB has no tuple
-        if (m_groupByCols->size() == 0 &&
+        if (m_groupByExpressions.size() == 0 &&
             m_outputTable->activeTupleCount() == 0)
         {
             VOLT_TRACE("no record. outputting a NULL row..");
@@ -607,7 +609,7 @@ private:
     Table* m_inputTable;
     Table* m_outputTable;
     std::vector<ExpressionType>* m_aggTypes;
-    std::vector<int>* m_groupByCols;
+    const std::vector<AbstractExpression*>& m_groupByExpressions;
     std::vector<ValueType>* m_colTypes;
     HashAggregateMapType m_aggregates;
     TableTuple groupByKeyTuple;
@@ -628,7 +630,7 @@ public:
                       Table* input_table,
                       Table* output_table,
                       std::vector<ExpressionType>* agg_types,
-                      std::vector<int>* groupByCols,
+                      const std::vector<AbstractExpression*>& groupByExpressions,
                       std::vector<ValueType>* col_types) :
         m_memoryPool(memoryPool),
         m_groupByKeySchema(groupByKeySchema),
@@ -637,7 +639,7 @@ public:
         m_inputTable(input_table),
         m_outputTable(output_table),
         m_aggTypes(agg_types),
-        m_groupByCols(groupByCols),
+        m_groupByExpressions(groupByExpressions),
         m_colTypes(col_types),
         m_aggs(static_cast<Agg**>(memoryPool->allocate(sizeof(void*) *
                                                        agg_types->size())))
@@ -654,11 +656,12 @@ public:
         }
         else
         {
-            for (int i = 0; i < m_groupByCols->size(); i++)
+            for (int i = 0; i < m_groupByExpressions.size(); i++)
             {
                 bool cmp =
-                    nextTuple.getNValue((*m_groupByCols)[i]).
-                    op_notEquals(prevTuple.getNValue((*m_groupByCols)[i])).
+                    m_groupByExpressions[i]->eval(&nextTuple, NULL).
+                    op_notEquals(m_groupByExpressions[i]->eval(&prevTuple,
+                                                               NULL)).
                     isTrue();
                 if (cmp)
                 {
@@ -692,10 +695,9 @@ public:
         }
         for (int i = 0; i < m_colTypes->size(); i++)
         {
-            const int column = m_node->getAggregateColumns()[i];
-            NValue value = nextTuple.getNValue(column);
-            value.debug();
-            m_aggs[i]->advance(value);
+            m_aggs[i]->
+                advance(m_node->getAggregateInputExpressions()[i]->
+                        eval(&nextTuple, NULL));
         }
         return true;
     }
@@ -712,7 +714,7 @@ public:
         // only when it doesn't have GROUP BY. See difference of these cases:
         //   SELECT SUM(A) FROM BBB ,   when BBB has no tuple
         //   SELECT SUM(A) FROM BBB GROUP BY C,   when BBB has no tuple
-        if (m_groupByCols->size() == 0 &&
+        if (m_groupByExpressions.size() == 0 &&
             m_outputTable->activeTupleCount() == 0)
         {
             VOLT_TRACE("no record. outputting a NULL row..");
@@ -743,7 +745,7 @@ private:
     Table* m_inputTable;
     Table* m_outputTable;
     std::vector<ExpressionType>* m_aggTypes;
-    std::vector<int>* m_groupByCols;
+    const std::vector<AbstractExpression*>& m_groupByExpressions;
     std::vector<ValueType>* m_colTypes;
     Agg** m_aggs;
 };
@@ -758,175 +760,78 @@ AggregateExecutor<aggregateType>::p_init(AbstractPlanNode *abstract_node,
     assert(node);
     assert(tempTableMemoryInBytes);
 
-    //
-    // Construct the output table
-    // Note that we do not need to do this if we're an inline node
-    //
-    if (!node->isInline())
+    assert(node->getInputTables().size() == 1);
+    int columnCount = (int)node->getOutputSchema().size();
+    assert(columnCount >= 1);
+
+    assert(node->getChildren()[0] != NULL);
+    for (int i = 0; i < node->getAggregateInputExpressions().size(); i++)
     {
-        assert(node->getInputTables().size() == 1);
-        int columnCount = (int)node->getOutputColumnNames().size();
-        assert(columnCount >= 1);
-        assert(columnCount == node->getOutputColumnTypes().size());
-        assert(columnCount == node->getOutputColumnSizes().size());
-
-        assert(node->getChildren()[0] != NULL);
-        AbstractPlanNode *child_node = node->getChildren()[0];
-        for (int i = 0; i < node->getAggregateColumnNames().size(); i++) {
-            VOLT_DEBUG("\nAGG COLUMN NAME: %s\n",
-                       node->getAggregateColumnNames()[i].c_str());
-        }
-
-        int aggregateCount = (int) node->getAggregateColumnNames().size();
-        assert(aggregateCount == node->getAggregates().size());
-
-        std::vector<int> aggregateColumns;
-        for (int ctr = 0; ctr < aggregateCount; ctr++)
-        {
-            int index =
-                child_node->
-                getColumnIndexFromGuid(node->getAggregateColumnGuids()[ctr],
-                                       catalog_db);
-            assert(index != -1);
-            if (index == -1)
-            {
-                return false;
-            }
-            aggregateColumns.push_back(index);
-        }
-        node->setAggregateColumns(aggregateColumns);
-
-        /*
-         * Find the difference between the set of aggregate output columns
-         * (output columns resulting from an aggregate) and output columns.
-         * Columns that are not the result of aggregates are being passed
-         * through from the input table. Do this extra work here rather then
-         * serialize yet more data.
-         */
-        const std::vector<ValueType> outputColumnTypes =
-            node->getOutputColumnTypes();
-
-        std::vector<bool>
-            outputColumnsResultingFromAggregates(outputColumnTypes.size(),
-                                                 false);
-        std::vector<int> aggregateOutputColumns =
-            node->getAggregateOutputColumns();
-
-        for (int ii = 0; ii < aggregateOutputColumns.size(); ii++)
-        {
-            outputColumnsResultingFromAggregates[aggregateOutputColumns[ii]] =
-                true;
-        }
-
-        /*
-         * Now collect the indices in the output table of the pass
-         * through columns.
-         */
-        std::vector<int> passThroughColumnIndices;
-        for (int ii = 0; ii < outputColumnsResultingFromAggregates.size();
-             ii++)
-        {
-            if (outputColumnsResultingFromAggregates[ii] == false)
-            {
-                passThroughColumnIndices.push_back(ii);
-            }
-        }
-
-        /*
-         * Now go use the name of the input column associated with the output
-         * column (this info is serialized into the plan node by the planner) to
-         * ask the input table what index of the column is. This allows the
-         * generation of the mapping between the two. Since some of the output
-         * columns are the results of aggregates they will not be associated
-         * with an input column (although the aggregate is).  and the empty
-         * string will be substituted as the name of the output column input
-         * column. The empty string should not appear here because all the
-         * columns in the passThroughColumnIndices vector should not be
-         * aggregate columns and the planner should have provided the name. Also
-         * retrieve the output column size for pass through columns. This ends
-         * up being important for inlined strings.
-         */
-        const TupleSchema* childSchema = child_node->getOutputTable()->schema();
-        std::vector<int32_t> outputColumnSizes = node->getOutputColumnSizes();
-        for (int ii = 0; ii < passThroughColumnIndices.size(); ii++)
-        {
-            int outputColumnIndex = passThroughColumnIndices[ii];
-            int outputColumnInputColumnGuid =
-                node->getOutputColumnInputGuids()[outputColumnIndex];
-            //Planner must provide the GUID of the input column for the mapping.
-            int inputColumnIndex =
-                child_node->getColumnIndexFromGuid(outputColumnInputColumnGuid,
-                                                   catalog_db);
-            outputColumnSizes[outputColumnIndex] =
-                childSchema->columnLength(inputColumnIndex);
-            m_passThroughColumns.
-                push_back(std::pair<int, int>(outputColumnIndex,
-                                              inputColumnIndex));
-        }
-
-        const std::vector<std::string> outputColumnNames =
-            node->getOutputColumnNames();
-
-        const std::vector<bool> outputColumnAllowNull(columnCount, true);
-        TupleSchema* schema =
-            TupleSchema::createTupleSchema(outputColumnTypes,
-                                           outputColumnSizes,
-                                           outputColumnAllowNull,
-                                           true);
-        std::string* columnNames = new std::string[columnCount];
-        for (int ctr = 0; ctr < columnCount; ctr++)
-        {
-            columnNames[ctr] = node->getOutputColumnNames()[ctr];
-        }
-        node->setOutputTable(TableFactory::getTempTable(node->databaseId(),
-                                                        "temp",
-                                                        schema,
-                                                        columnNames,
-                                                        tempTableMemoryInBytes));
-
-        /*
-         * set the group by columns only if the test code didn't
-         * specify them manually.
-         */
-        if (node->getGroupByColumns().size() == 0)
-        {
-            std::vector<std::string> groupByColumnNames =
-                node->getGroupByColumnNames();
-            std::vector<int> groupByColumns;
-            for (int ii = 0; ii < groupByColumnNames.size(); ii++)
-            {
-                int index = child_node->
-                    getColumnIndexFromGuid(node->getGroupByColumnGuids()[ii],
-                                           catalog_db);
-                assert(index != -1);
-                if (index == -1)
-                {
-                    return false;
-                }
-                groupByColumns.push_back(index);
-            }
-            node->setGroupByColumns(groupByColumns);
-        }
-
-        const std::vector<int> groupByColumns = node->getGroupByColumns();
-        std::vector<ValueType> groupByColumnTypes;
-        std::vector<int32_t> groupByColumnSizes;
-        std::vector<bool> groupByColumnAllowNull;
-        for (int ii = 0; ii < groupByColumns.size(); ii++)
-        {
-            const int column = groupByColumns[ii];
-            groupByColumnTypes.push_back(childSchema->columnType(column));
-            groupByColumnSizes.push_back(childSchema->columnLength(column));
-            groupByColumnAllowNull.
-                push_back(childSchema->columnAllowNull(column));
-        }
-        m_groupByKeySchema =
-            TupleSchema::createTupleSchema(groupByColumnTypes,
-                                                   groupByColumnSizes,
-                                                   groupByColumnAllowNull,
-                                                   true);
-        delete[] columnNames;
+        VOLT_DEBUG("\nAGG INPUT EXPRESSIONS: %s\n",
+                   node->getAggregateInputExpressions()[i]->debug().c_str());
     }
+
+    /*
+     * Find the difference between the set of aggregate output columns
+     * (output columns resulting from an aggregate) and output columns.
+     * Columns that are not the result of aggregates are being passed
+     * through from the input table. Do this extra work here rather then
+     * serialize yet more data.
+     */
+    std::vector<bool>
+        outputColumnsResultingFromAggregates(node->getOutputSchema().size(),
+                                             false);
+    std::vector<int> aggregateOutputColumns =
+        node->getAggregateOutputColumns();
+
+    for (int ii = 0; ii < aggregateOutputColumns.size(); ii++)
+    {
+        outputColumnsResultingFromAggregates[aggregateOutputColumns[ii]] =
+            true;
+    }
+
+    /*
+     * Now collect the indices in the output table of the pass
+     * through columns.
+     */
+    for (int ii = 0; ii < outputColumnsResultingFromAggregates.size();
+         ii++)
+    {
+        if (outputColumnsResultingFromAggregates[ii] == false)
+        {
+            m_passThroughColumns.push_back(ii);
+        }
+    }
+
+    TupleSchema* schema = node->generateTupleSchema(true);
+    std::string* columnNames = new std::string[columnCount];
+    for (int ctr = 0; ctr < columnCount; ctr++)
+    {
+        columnNames[ctr] = node->getOutputSchema()[ctr]->getColumnName();
+    }
+    node->setOutputTable(TableFactory::getTempTable(node->databaseId(),
+                                                    "temp",
+                                                    schema,
+                                                    columnNames,
+                                                    tempTableMemoryInBytes));
+    delete[] columnNames;
+
+    std::vector<ValueType> groupByColumnTypes;
+    std::vector<int32_t> groupByColumnSizes;
+    std::vector<bool> groupByColumnAllowNull;
+    for (int ii = 0; ii < node->getGroupByExpressions().size(); ii++)
+    {
+        AbstractExpression* expr = node->getGroupByExpressions()[ii];
+        groupByColumnTypes.push_back(expr->getValueType());
+        groupByColumnSizes.push_back(expr->getValueSize());
+        groupByColumnAllowNull.push_back(true);
+    }
+    m_groupByKeySchema =
+        TupleSchema::createTupleSchema(groupByColumnTypes,
+                                       groupByColumnSizes,
+                                       groupByColumnAllowNull,
+                                       true);
+
     return true;
 }
 
@@ -938,7 +843,7 @@ bool AggregateExecutor<aggregateType>::p_execute(const NValueArray &params)
 {
     m_memoryPool.purge();
     VOLT_DEBUG("started AGGREGATE");
-    AggregatePlanNode* node = dynamic_cast<AggregatePlanNode*>(abstract_node);
+    AggregatePlanNode* node = dynamic_cast<AggregatePlanNode*>(m_abstractNode);
     assert(node);
     Table* output_table = node->getOutputTable();
     assert(output_table);
@@ -947,23 +852,24 @@ bool AggregateExecutor<aggregateType>::p_execute(const NValueArray &params)
     VOLT_TRACE("input table\n%s", input_table->debug().c_str());
 
     std::vector<ExpressionType> agg_types = node->getAggregates();
-    std::vector<ValueType> col_types(node->getAggregateColumns().size());
+    std::vector<ValueType> col_types(node->getAggregateInputExpressions().size());
     for (int i = 0; i < col_types.size(); i++)
     {
         col_types[i] =
-            input_table->schema()->columnType(node->getAggregateColumns()[i]);
+            node->getAggregateInputExpressions()[i]->getValueType();
     }
 
     TableIterator it(input_table);
 
-    std::vector<int> groupByColumns = node->getGroupByColumns();
+    std::vector<AbstractExpression*> groupByExpressions =
+        node->getGroupByExpressions();
     TableTuple prev(input_table->schema());
 
     Aggregator<aggregateType> aggregator(&m_memoryPool, m_groupByKeySchema,
                                          node, &m_passThroughColumns,
                                          input_table, output_table,
                                          &agg_types,
-                                         &groupByColumns, &col_types);
+                                         groupByExpressions, &col_types);
 
     VOLT_TRACE("looping..");
     for (TableTuple cur(input_table->schema()); it.next(cur);

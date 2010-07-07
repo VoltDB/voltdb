@@ -43,16 +43,11 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORENODEABSTRACTEXECUTOR_H
-#define HSTORENODEABSTRACTEXECUTOR_H
+#ifndef VOLTDBNODEABSTRACTEXECUTOR_H
+#define VOLTDBNODEABSTRACTEXECUTOR_H
 
-#include <vector>
-#include "common/common.h"
-#include "common/valuevector.h"
-#include "storage/table.h"
-#include "storage/temptable.h"
 #include "plannodes/abstractplannode.h"
-#include "catalog/database.h"
+#include "storage/temptable.h"
 
 namespace voltdb {
 
@@ -65,12 +60,12 @@ class AbstractExecutor {
   public:
     virtual ~AbstractExecutor();
 
-
     /** Executors are initialized once when the catalog is loaded */
-    bool init(VoltDBEngine*, const catalog::Database *catalog_db, int* tempTableMemoryInBytes);
+    bool init(VoltDBEngine*, const catalog::Database* catalog_db,
+              int* tempTableMemoryInBytes);
 
     /** Invoke a plannode's associated executor */
-    bool execute(const NValueArray &params);
+    bool execute(const NValueArray& params);
 
     /**
      * Returns true if the output table for the plannode must be cleaned up
@@ -83,48 +78,52 @@ class AbstractExecutor {
     /**
      * Returns the plannode that generated this executor.
      */
-    inline AbstractPlanNode* getPlanNode() { return abstract_node; }
+    inline AbstractPlanNode* getPlanNode() { return m_abstractNode; }
+
   protected:
-    AbstractExecutor(VoltDBEngine *engine, AbstractPlanNode *abstract_node) {
-        this->abstract_node = abstract_node;
-        tmp_output_table = NULL;
+    AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode) {
+        m_abstractNode = abstractNode;
+        m_tmpOutputTable = NULL;
     }
 
     /** Concrete executor classes implement initialization in p_init() */
-    virtual bool p_init(AbstractPlanNode*, const catalog::Database *catalog_db, int* tempTableMemoryInBytes) = 0;
+    virtual bool p_init(AbstractPlanNode*, const catalog::Database* catalog_db,
+                        int* tempTableMemoryInBytes) = 0;
 
     /** Concrete executor classes impelmenet execution in p_execute() */
-    virtual bool p_execute(const NValueArray &params) = 0;
+    virtual bool p_execute(const NValueArray& params) = 0;
 
     /**
      * Returns true if the output table for the plannode must be
      * cleared before p_execute().  <b>Default is true (clear each
      * time)</b>. Override this method if the executor receives a
      * plannode instance that must not be cleared.
-     * @param abstract_node the plannode about to be executed in p_execute()
      * @return true if output table must be cleared; false otherwise.
      */
     virtual bool needsOutputTableClear() { return true; };
 
     // execution engine owns the plannode allocation.
-    AbstractPlanNode* abstract_node;
-    TempTable *tmp_output_table;
+    AbstractPlanNode* m_abstractNode;
+    TempTable* m_tmpOutputTable;
 
     // cache to avoid runtime virtual function call
     bool needs_outputtable_clear_cached;
 };
 
-inline bool AbstractExecutor::execute(const NValueArray &params) {
-    assert (abstract_node);
-    VOLT_TRACE("Starting execution of plannode(id=%d)...", abstract_node->getPlanNodeId());
+inline bool AbstractExecutor::execute(const NValueArray& params)
+{
+    assert(m_abstractNode);
+    VOLT_TRACE("Starting execution of plannode(id=%d)...",
+               m_abstractNode->getPlanNodeId());
 
-    if (tmp_output_table) {
+    if (m_tmpOutputTable)
+    {
         VOLT_TRACE("Clearing output table...");
-        tmp_output_table->deleteAllTuplesNonVirtual(false);
+        m_tmpOutputTable->deleteAllTuplesNonVirtual(false);
     }
 
     // run the executor
-    return this->p_execute(params);
+    return p_execute(params);
 }
 
 }

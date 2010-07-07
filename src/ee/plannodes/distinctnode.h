@@ -66,13 +66,7 @@ public:
 
     virtual PlanNodeType getPlanNodeType() const;
 
-    void setDistinctColumn(int column);
-    int getDistinctColumn() const;
-
-    void setDistinctColumnName(std::string columnName);
-    std::string getDistinctColumnName() const;
-
-    int getDistinctColumnGuid() const;
+    AbstractExpression* getDistinctExpression() const;
 
     std::string debugInfo(const std::string& spacer) const;
 
@@ -84,9 +78,7 @@ protected:
     virtual void loadFromJSONObject(json_spirit::Object& obj,
                                     const catalog::Database* catalog_db);
 
-    int m_distinctColumnIdx;
-    int m_distinctColumnGuid;
-    std::string m_distinctColumnName;
+    AbstractExpression* m_distinctExpression;
 };
 
 }

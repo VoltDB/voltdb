@@ -45,7 +45,6 @@
 
 #include "abstractscannode.h"
 
-#include "PlanColumn.h"
 #include "storage/table.h"
 #include "catalog/table.h"
 #include "catalog/column.h"
@@ -120,76 +119,10 @@ AbstractScanPlanNode::debugInfo(const string &spacer) const
     return buffer.str();
 }
 
-int
-AbstractScanPlanNode::getColumnIndexFromName(string name,
-                                             const catalog::Database* db) const
-{
-    catalog::Table* table = db->tables().get(m_targetTableName);
-    assert (table != NULL);
-    if (NULL == table)
-    {
-        return -1;
-    }
-
-    catalog::CatalogMap<catalog::Column> columns = table->columns();
-    catalog::Column* column = columns.get(name);
-    assert (NULL != column);
-    if (NULL == column)
-    {
-        return -1;
-    }
-    return column->index();
-}
-
-int
-AbstractScanPlanNode::getColumnIndexFromGuid(int guid,
-                                             const catalog::Database* db) const
-{
-    // if the scan node has an inlined projection, then we
-    // want to look up the column index in the projection
-    AbstractPlanNode* projection =
-        getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION);
-    if (projection != NULL)
-    {
-        return projection->getColumnIndexFromGuid(guid, db);
-    }
-    else
-    {
-        string name = "";
-        for (int i = 0; i < m_outputColumnGuids.size(); i++)
-        {
-            if (guid == m_outputColumnGuids[i])
-            {
-                return getColumnIndexFromName(m_outputColumnNames[i], db);
-            }
-        }
-    }
-    return -1;
-}
-
 void
 AbstractScanPlanNode::loadFromJSONObject(json_spirit::Object& obj,
                                          const catalog::Database* catalog_db)
 {
-    Value outputColumnsValue = find_value(obj, "OUTPUT_COLUMNS");
-    if (outputColumnsValue == Value::null)
-    {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AbstractScanPlanNode::loadFromJSONObject:"
-                                      " Can't find OUTPUT_COLUMNS value");
-    }
-    Array outputColumnsArray = outputColumnsValue.get_array();
-
-    for (int ii = 0; ii < outputColumnsArray.size(); ii++)
-    {
-        Value outputColumnValue = outputColumnsArray[ii];
-        PlanColumn outputColumn = PlanColumn(outputColumnValue.get_obj());
-        m_outputColumnGuids.push_back(outputColumn.getGuid());
-        m_outputColumnNames.push_back(outputColumn.getName());
-        m_outputColumnTypes.push_back(outputColumn.getType());
-        m_outputColumnSizes.push_back(outputColumn.getSize());
-    }
-
     json_spirit::Value targetTableNameValue =
         json_spirit::find_value(obj, "TARGET_TABLE_NAME");
     if (targetTableNameValue == json_spirit::Value::null)

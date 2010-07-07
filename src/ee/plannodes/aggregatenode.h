@@ -60,32 +60,8 @@ public:
 
     virtual PlanNodeType getPlanNodeType() const;
 
-    std::vector<std::string>& getOutputColumnNames();
-    const std::vector<std::string>& getOutputColumnNames() const;
-
-    std::vector<ValueType>& getOutputColumnTypes();
-    const std::vector<ValueType>& getOutputColumnTypes() const;
-
-    std::vector<int32_t>& getOutputColumnSizes();
-    const std::vector<int32_t>& getOutputColumnSizes() const;
-
-    std::vector<int>& getOutputColumnInputGuids();
-    const std::vector<int>& getOutputColumnInputGuids() const;
-
-    // abstractplannode virtual method
-    virtual int getColumnIndexFromGuid(int guid, const catalog::Database*) const;
-
     std::vector<ExpressionType> getAggregates();
     const std::vector<ExpressionType> getAggregates() const;
-
-    void setAggregateColumns(std::vector<int> columns);
-
-    /*
-     * Value returned by getAggregateColumn is uninitialized after
-     * deserialization. Use getAggregateColumnName to determine the
-     * proper value for the context the node is being used in.
-     */
-    std::vector<int> getAggregateColumns() const;
 
     /*
      * Returns a list of output column indices that map from each
@@ -98,31 +74,20 @@ public:
         return m_aggregateOutputColumns;
     }
 
-    std::vector<std::string> getAggregateColumnNames() const;
-    std::vector<int> getAggregateColumnGuids() const;
+    std::vector<AbstractExpression*>& getAggregateInputExpressions()
+    {
+        return m_aggregateInputExpressions;
+    }
 
-    void setGroupByColumns(std::vector<int> &columns);
-
-    std::vector<int>& getGroupByColumns();
-    const std::vector<int>& getGroupByColumns() const;
-
-    std::vector<int>& getGroupByColumnGuids();
-    const std::vector<int>& getGroupByColumnGuids() const;
-
-    std::vector<std::string>& getGroupByColumnNames();
-    const std::vector<std::string>& getGroupByColumnNames() const;
+    const std::vector<AbstractExpression*>& getGroupByExpressions() const;
 
     std::string debugInfo(const std::string &spacer) const;
 
     //
     // Public methods used only for tests
     //
-    void setOutputColumnNames(std::vector<std::string>& names);
-    void setOutputColumnTypes(std::vector<ValueType>& types);
-    void setOutputColumnSizes(std::vector<int32_t>& sizes);
     void setAggregates(std::vector<ExpressionType> &aggregates);
     void setAggregateOutputColumns(std::vector<int> outputColumns);
-    void setAggregateColumnNames(std::vector<std::string> column_names);
 
 protected:
     friend AbstractPlanNode*
@@ -133,31 +98,18 @@ protected:
                                     const catalog::Database* catalog_db);
 
     //
-    // The node must define what the columns in the output table are
-    // going to look like
-    //
-    std::vector<int> m_outputColumnGuids;
-    std::vector<std::string> m_outputColumnNames;
-    std::vector<ValueType> m_outputColumnTypes;
-    std::vector<int32_t> m_outputColumnSizes;
-
-    //
     // HACK: We use a simple type to keep track of function we are
     // going to execute.  For TPC-C, there will only be output column
     // produced...
     //
     std::vector<ExpressionType> m_aggregates;
-    std::vector<int> m_aggregateColumns;
-    std::vector<std::string> m_aggregateColumnNames;
-    std::vector<int> m_aggregateColumnGuids;
     std::vector<int> m_aggregateOutputColumns;
+    std::vector<AbstractExpression*> m_aggregateInputExpressions;
 
     //
     // What columns to group by on
     //
-    std::vector<int> m_groupByColumns;
-    std::vector<int> m_groupByColumnGuids;
-    std::vector<std::string> m_groupByColumnNames;
+    std::vector<AbstractExpression*> m_groupByExpressions;
 
     PlanNodeType m_type; //AGGREGATE OR HASHAGGREGATE
 };

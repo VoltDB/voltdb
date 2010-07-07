@@ -65,32 +65,27 @@
 using namespace std;
 using namespace voltdb;
 
-bool InsertExecutor::p_init(AbstractPlanNode *abstract_node, const catalog::Database* catalog_db, int* tempTableMemoryInBytes) {
+bool InsertExecutor::p_init(AbstractPlanNode* abstractNode, const catalog::Database* catalog_db, int* tempTableMemoryInBytes) {
     VOLT_TRACE("init Insert Executor");
 
-    m_node = dynamic_cast<InsertPlanNode*>(abstract_node);
+    m_node = dynamic_cast<InsertPlanNode*>(abstractNode);
     assert(m_node);
     assert(m_node->getTargetTable());
     assert(m_node->getInputTables().size() == 1);
 
-    // Create an output table for the modified tuple count
-    // XXX this should maybe move to coming in via JSON
-    const vector<ValueType> outputType(1, VALUE_TYPE_BIGINT);
-    const vector<int32_t> outputSize(1, sizeof(int64_t));
-    const vector<bool> outputAllowNull(1, false);
-    string outputNames[1];
-    outputNames[0] = "modified_tuples";
-
-    TupleSchema* schema = TupleSchema::createTupleSchema(outputType,
-                                                         outputSize,
-                                                         outputAllowNull,
-                                                         true);
-
+    TupleSchema* schema = m_node->generateTupleSchema(false);
+    int column_count = static_cast<int>(m_node->getOutputSchema().size());
+    std::string* column_names = new std::string[column_count];
+    for (int ctr = 0; ctr < column_count; ctr++)
+    {
+        column_names[ctr] = m_node->getOutputSchema()[ctr]->getColumnName();
+    }
     m_node->setOutputTable(TableFactory::getTempTable(m_node->databaseId(),
                                                       "temp",
                                                       schema,
-                                                      outputNames,
+                                                      column_names,
                                                       tempTableMemoryInBytes));
+    delete[] column_names;
 
     m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTables()[0]); //input table should be temptable
     assert(m_inputTable);
@@ -119,7 +114,7 @@ bool InsertExecutor::p_init(AbstractPlanNode *abstract_node, const catalog::Data
 }
 
 bool InsertExecutor::p_execute(const NValueArray &params) {
-    assert(m_node == dynamic_cast<InsertPlanNode*>(abstract_node));
+    assert(m_node == dynamic_cast<InsertPlanNode*>(m_abstractNode));
     assert(m_node);
     assert(m_inputTable == dynamic_cast<TempTable*>(m_node->getInputTables()[0]));
     assert(m_inputTable);

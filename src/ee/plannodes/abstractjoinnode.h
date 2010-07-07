@@ -68,11 +68,6 @@ public:
 
     virtual std::string debugInfo(const std::string& spacer) const;
 
-    virtual int getColumnIndexFromGuid(int guid,
-                                       const catalog::Database* db) const;
-
-    void setOutputColumnGuids(std::vector<int> output_column_guids);
-
 protected:
     friend AbstractPlanNode*
         AbstractPlanNode::fromJSONObject(json_spirit::Object& obj,
@@ -90,14 +85,6 @@ protected:
     // We currently don't do anything with this...
     //
     JoinType m_joinType;
-
-    /*
-     * Initialized by the executors p_init. It has to generate the
-     * schema for the output table anyways so we use that opportunity
-     * to cache the output column names and indexes in this vector so
-     * it can be retrieved by other plan nodes/executors
-     */
-    std::vector<int> m_outputColumnGuids;
 };
 
 }

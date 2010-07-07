@@ -19,7 +19,6 @@ package org.voltdb.plannodes;
 
 import org.json.JSONException;
 import org.json.JSONStringer;
-import org.voltdb.planner.PlannerContext;
 import org.voltdb.types.*;
 
 public class InsertPlanNode extends AbstractOperationPlanNode {
@@ -30,8 +29,8 @@ public class InsertPlanNode extends AbstractOperationPlanNode {
 
     protected boolean m_multiPartition = false;
 
-    public InsertPlanNode(PlannerContext context) {
-        super(context);
+    public InsertPlanNode() {
+        super();
     }
 
     public boolean getMultiPartition() {

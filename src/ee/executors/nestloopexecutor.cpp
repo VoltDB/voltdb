@@ -77,8 +77,8 @@ namespace
     // soon.
     bool
     assignTupleValueIndex(AbstractExpression *ae,
-                          const std::string &oname,
-                          const std::string &iname)
+                          const string &oname,
+                          const string &iname)
     {
         // if an exact table name match is found, do the obvious
         // thing. Otherwise, assign to the table named "temp".
@@ -88,10 +88,10 @@ namespace
         // tuple index 0 is always the outer table.
         // tuple index 1 is always the inner table.
         TupleValueExpression *tve = dynamic_cast<TupleValueExpression*>(ae);
-        std::string tname = tve->getTableName();
+        string tname = tve->getTableName();
 
         if (oname == "temp" && iname == "temp") {
-            VOLT_ERROR("Unsuported join on two temp tables.");
+            VOLT_ERROR("Unsupported join on two temp tables.");
             return false;
         }
 
@@ -122,7 +122,7 @@ namespace
         // eval() tuple parameter. By convention, eval's first parameter
         // will always be the outer table and its second parameter the inner
         const AbstractExpression* predicate = expression;
-        std::stack<const AbstractExpression*> stack;
+        stack<const AbstractExpression*> stack;
         while (predicate != NULL) {
             const AbstractExpression *left = predicate->getLeft();
             const AbstractExpression *right = predicate->getRight();
@@ -160,44 +160,30 @@ namespace
     }
 }
 
-bool NestLoopExecutor::p_init(AbstractPlanNode* abstract_node, const catalog::Database* catalog_db, int* tempTableMemoryInBytes) {
+bool NestLoopExecutor::p_init(AbstractPlanNode* abstract_node,
+                              const catalog::Database* catalog_db,
+                              int* tempTableMemoryInBytes)
+{
     VOLT_TRACE("init NestLoop Executor");
     assert(tempTableMemoryInBytes);
 
     NestLoopPlanNode* node = dynamic_cast<NestLoopPlanNode*>(abstract_node);
     assert(node);
 
-    // produce the fully joined schema relying on a later projection
-    // to narrow the output later as required.
-    assert(node->getInputTables().size() == 2);
-    const TupleSchema *first = node->getInputTables()[0]->schema();
-    const TupleSchema *second = node->getInputTables()[1]->schema();
-    TupleSchema *schema = TupleSchema::createTupleSchema(first, second);
-
-    int combinedColumnCount = first->columnCount() + second->columnCount();
-    std::string *columnNames = new std::string[combinedColumnCount];
-    std::vector<int> outputColumnGuids;
-    int index = 0;
-
-    for (int ctr = 0; ctr < 2; ctr++) {
-        assert(node->getInputTables()[ctr]);
-        for (int col_ctr = 0, col_cnt = node->getInputTables()[ctr]->columnCount();
-             col_ctr < col_cnt;
-             col_ctr++, index++)
-        {
-            outputColumnGuids.
-                push_back(node->getChildren()[ctr]->getOutputColumnGuids()[col_ctr]);
-            columnNames[index] = node->getInputTables()[ctr]->columnName(col_ctr);
-        }
+    int schema_size = static_cast<int>(node->getOutputSchema().size());
+    string* columnNames = new string[schema_size];
+    for (int i = 0; i < schema_size; i++)
+    {
+        columnNames[i] = node->getOutputSchema()[i]->getColumnName();
     }
 
-    // Set the mapping of column names to column indexes in output tables
-    node->setOutputColumnGuids(outputColumnGuids);
+    TupleSchema* schema = node->generateTupleSchema(true);
 
     // create the output table
     node->setOutputTable(
-        TableFactory::getTempTable(
-            node->getInputTables()[0]->databaseId(), "temp", schema, columnNames, tempTableMemoryInBytes));
+        TableFactory::getTempTable(node->getInputTables()[0]->databaseId(),
+                                   "temp", schema, columnNames,
+                                   tempTableMemoryInBytes));
 
     // for each tuple value expression in the predicate, determine
     // which tuple is being represented. Tuple could come from outer
@@ -216,7 +202,7 @@ bool NestLoopExecutor::p_init(AbstractPlanNode* abstract_node, const catalog::Da
 bool NestLoopExecutor::p_execute(const NValueArray &params) {
     VOLT_DEBUG("executing NestLoop...");
 
-    NestLoopPlanNode* node = dynamic_cast<NestLoopPlanNode*>(abstract_node);
+    NestLoopPlanNode* node = dynamic_cast<NestLoopPlanNode*>(m_abstractNode);
     assert(node);
     assert(node->getInputTables().size() == 2);
 

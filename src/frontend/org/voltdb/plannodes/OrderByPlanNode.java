@@ -20,32 +20,28 @@ package org.voltdb.plannodes;
 import java.util.*;
 import org.json.JSONException;
 import org.json.JSONStringer;
-import org.voltdb.planner.PlannerContext;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.*;
 
 public class OrderByPlanNode extends AbstractPlanNode {
 
     public enum Members {
         SORT_COLUMNS,
-        COLUMN_NAME,
-        COLUMN_GUID,
+        SORT_EXPRESSION,
         SORT_DIRECTION;
     }
 
-    /**
-     * Sort Columns Indexes
-     * The column index in the table that we should sort on
-     */
-    protected List<Integer> m_sortColumns = new Vector<Integer>();
-    protected List<Integer> m_sortColumnGuids = new Vector<Integer>();
-    protected List<String> m_sortColumnNames = new Vector<String>();
+    protected List<AbstractExpression> m_sortExpressions =
+        new Vector<AbstractExpression>();
     /**
      * Sort Directions
      */
     protected List<SortDirectionType> m_sortDirections = new Vector<SortDirectionType>();
 
-    public OrderByPlanNode(PlannerContext context) {
-        super(context);
+    public OrderByPlanNode() {
+        super();
     }
 
     @Override
@@ -58,17 +54,17 @@ public class OrderByPlanNode extends AbstractPlanNode {
         super.validate();
 
         // Make sure that they have the same # of columns and directions
-        if (m_sortColumns.size() != m_sortDirections.size()) {
+        if (m_sortExpressions.size() != m_sortDirections.size()) {
             throw new Exception("ERROR: PlanNode '" + toString() + "' has " +
-                                "'" + m_sortColumns.size() + "' sort columns but " +
+                                "'" + m_sortExpressions.size() + "' sort expressions but " +
                                 "'" + m_sortDirections.size() + "' sort directions");
         }
 
         // Make sure that none of the items are null
-        for (int ctr = 0, cnt = m_sortColumns.size(); ctr < cnt; ctr++) {
-            if (m_sortColumns.get(ctr) == null) {
+        for (int ctr = 0, cnt = m_sortExpressions.size(); ctr < cnt; ctr++) {
+            if (m_sortExpressions.get(ctr) == null) {
                 throw new Exception("ERROR: PlanNode '" + toString() + "' has a null " +
-                                    "sort column index at position " + ctr);
+                                    "sort expression at position " + ctr);
             } else if (m_sortDirections.get(ctr) == null) {
                 throw new Exception("ERROR: PlanNode '" + toString() + "' has a null " +
                                     "sort direction at position " + ctr);
@@ -77,60 +73,73 @@ public class OrderByPlanNode extends AbstractPlanNode {
     }
 
     /**
-     * @return the sort_columns
+     * Add a sort to the order-by
+     * @param sortExpr  The input expression on which to order the rows
+     * @param sortDir
      */
-    public List<Integer> getSortColumns() {
-        return m_sortColumns;
-    }
-    /**
-     * @param sort_columns the sort_columns to set
-     */
-    public void setSortColumns(List<Integer> sort_columns) {
-        m_sortColumns = sort_columns;
-    }
-
-    /**
-     * @return the sort_column_guids
-     */
-    public List<Integer> getSortColumnGuids() {
-        return m_sortColumnGuids;
-    }
-
-    /**
-     * @return the sort_column_names
-     */
-    public List<String> getSortColumnNames() {
-        return m_sortColumnNames;
-    }
-    /**
-     * @param sort_column_names the sort_column_names to set
-     */
-    public void setSortColumnNames(List<String> sort_column_names) {
-        m_sortColumnNames = sort_column_names;
+    public void addSort(AbstractExpression sortExpr, SortDirectionType sortDir)
+    {
+        assert(sortExpr != null);
+        // PlanNodes all need private deep copies of expressions
+        // so that the resolveColumnIndexes results
+        // don't get bashed by other nodes or subsequent planner runs
+        try
+        {
+            m_sortExpressions.add((AbstractExpression) sortExpr.clone());
+        }
+        catch (CloneNotSupportedException e)
+        {
+            // This shouldn't ever happen
+            e.printStackTrace();
+            throw new RuntimeException(e.getMessage());
+        }
+        m_sortDirections.add(sortDir);
     }
 
-    /**
-     * @return the sort_directions
-     */
-    public List<SortDirectionType> getSortDirections() {
-        return m_sortDirections;
-    }
-    /**
-     * @param sort_direction the sort_direction to set
-     */
-    public void setSortDirections(List<SortDirectionType> sort_direction) {
-        m_sortDirections = sort_direction;
+    @Override
+    public void resolveColumnIndexes()
+    {
+        // Need to order and resolve indexes of output columns AND
+        // the sort columns
+        assert(m_children.size() == 1);
+        m_children.get(0).resolveColumnIndexes();
+        NodeSchema input_schema = m_children.get(0).getOutputSchema();
+        for (SchemaColumn col : m_outputSchema.getColumns())
+        {
+            // At this point, they'd better all be TVEs.
+            assert(col.getExpression() instanceof TupleValueExpression);
+            TupleValueExpression tve = (TupleValueExpression)col.getExpression();
+            int index = input_schema.getIndexOfTve(tve);
+            tve.setColumnIndex(index);
+        }
+        m_outputSchema.sortByTveIndex();
+
+        // Find the proper index for the sort columns.  Not quite
+        // sure these should be TVEs in the long term.
+        List<TupleValueExpression> sort_tves =
+            new ArrayList<TupleValueExpression>();
+        for (AbstractExpression sort_exps : m_sortExpressions)
+        {
+            sort_tves.addAll(ExpressionUtil.getTupleValueExpressions(sort_exps));
+        }
+        for (TupleValueExpression tve : sort_tves)
+        {
+            int index = input_schema.getIndexOfTve(tve);
+            tve.setColumnIndex(index);
+        }
     }
 
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        assert (m_sortColumnNames.size() == m_sortDirections.size());
+        assert (m_sortExpressions.size() == m_sortDirections.size());
         stringer.key(Members.SORT_COLUMNS.name()).array();
-        for (int ii = 0; ii < m_sortColumnNames.size(); ii++) {
+        for (int ii = 0; ii < m_sortExpressions.size(); ii++) {
             stringer.object();
-            stringer.key(Members.COLUMN_NAME.name()).value(m_sortColumnNames.get(ii));
-            stringer.key(Members.COLUMN_GUID.name()).value(m_sortColumnGuids.get(ii));
+            stringer.key(Members.SORT_EXPRESSION.name());
+            stringer.object();
+            m_sortExpressions.get(ii).toJSONString(stringer);
+            stringer.endObject();
             stringer.key(Members.SORT_DIRECTION.name()).value(m_sortDirections.get(ii).toString());
             stringer.endObject();
         }

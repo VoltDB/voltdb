@@ -19,7 +19,7 @@ package org.voltdb.plannodes;
 
 import org.json.JSONException;
 import org.json.JSONStringer;
-import org.voltdb.planner.PlannerContext;
+import org.voltdb.catalog.Database;
 import org.voltdb.types.*;
 
 public class MaterializePlanNode extends ProjectionPlanNode {
@@ -30,8 +30,8 @@ public class MaterializePlanNode extends ProjectionPlanNode {
 
     protected boolean m_batched = false;
 
-    public MaterializePlanNode(PlannerContext context) {
-        super(context);
+    public MaterializePlanNode() {
+        super();
     }
 
     @Override
@@ -45,6 +45,22 @@ public class MaterializePlanNode extends ProjectionPlanNode {
 
     public boolean isBatched() {
         return m_batched;
+    }
+
+    @Override
+    public void generateOutputSchema(Database db)
+    {
+        // MaterializePlanNodes have no children
+        assert(m_children.size() == 0);
+        // MaterializePlanNode's output schema is pre-determined, don't touch
+        return;
+    }
+
+    @Override
+    public void resolveColumnIndexes()
+    {
+        // MaterializePlanNodes have no children
+        assert(m_children.size() == 0);
     }
 
     @Override

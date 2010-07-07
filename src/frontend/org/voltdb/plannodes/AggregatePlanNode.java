@@ -21,8 +21,9 @@ import java.util.*;
 import org.json.JSONException;
 import org.json.JSONStringer;
 import org.voltdb.catalog.Database;
-import org.voltdb.planner.PlanColumn;
-import org.voltdb.planner.PlannerContext;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.*;
 
 public class AggregatePlanNode extends AbstractPlanNode {
@@ -30,10 +31,9 @@ public class AggregatePlanNode extends AbstractPlanNode {
     public enum Members {
         AGGREGATE_COLUMNS,
         AGGREGATE_TYPE,
-        AGGREGATE_NAME,
-        AGGREGATE_GUID,
         AGGREGATE_OUTPUT_COLUMN,
-        GROUPBY_COLUMNS;
+        AGGREGATE_EXPRESSION,
+        GROUPBY_EXPRESSIONS;
     }
 
     //
@@ -41,20 +41,19 @@ public class AggregatePlanNode extends AbstractPlanNode {
     //     good enough for what we need in TPC-C for now...
     //
     protected List<ExpressionType> m_aggregateTypes = new ArrayList<ExpressionType>();
-
     // a list of column offsets/indexes not plan column guids.
     protected List<Integer> m_aggregateOutputColumns = new ArrayList<Integer>();
-    // a list of the names of the columns that are being aggregated
-    protected List<String> m_aggregateColumnNames = new ArrayList<String>();
-    // a list of the GUIDs for the columns that are being aggregated
-    protected List<Integer> m_aggregateColumnGuids = new ArrayList<Integer>();
+    // List of the input TVEs into the aggregates.  Maybe should become
+    // a list of SchemaColumns someday
+    protected List<AbstractExpression> m_aggregateExpressions =
+        new ArrayList<AbstractExpression>();
 
-    protected List<Integer> m_groupByColumns = new ArrayList<Integer>();
-    protected List<Integer> m_groupByColumnGuids = new ArrayList<Integer>();
-    protected List<String> m_groupByColumnNames = new ArrayList<String>();
+    // At the moment these are guaranteed to be TVES.  This might always be true
+    protected List<AbstractExpression> m_groupByExpressions
+        = new ArrayList<AbstractExpression>();
 
-    public AggregatePlanNode(PlannerContext context) {
-        super(context);
+    public AggregatePlanNode() {
+        super();
     }
 
     @Override
@@ -69,110 +68,132 @@ public class AggregatePlanNode extends AbstractPlanNode {
         // We need to have an aggregate type and column
         // We're not checking that it's a valid ExpressionType because this plannode is a temporary hack
         //
-        if (m_aggregateTypes.size() != m_aggregateColumnNames.size() ||
-            m_aggregateColumnNames.size() != m_aggregateOutputColumns.size())
+        if (m_aggregateTypes.size() != m_aggregateExpressions.size() ||
+            m_aggregateExpressions.size() != m_aggregateOutputColumns.size())
         {
             throw new Exception("ERROR: Mismatched number of aggregate expression column attributes for PlanNode '" + this + "'");
         } else if (m_aggregateTypes.isEmpty()|| m_aggregateTypes.contains(ExpressionType.INVALID)) {
             throw new Exception("ERROR: Invalid Aggregate ExpressionType or No Aggregate Expression types for PlanNode '" + this + "'");
-        } else if (m_aggregateColumnNames.isEmpty()) {
-            throw new Exception("ERROR: No Aggregate Columns for PlanNode '" + this + "'");
+        } else if (m_aggregateExpressions.isEmpty()) {
+            throw new Exception("ERROR: No Aggregate Expressions for PlanNode '" + this + "'");
         }
     }
 
-    @SuppressWarnings("unchecked")
+    public void setOutputSchema(NodeSchema schema)
+    {
+        // aggregates currently have their output schema specified
+        m_outputSchema = schema.clone();
+    }
+
     @Override
-    protected ArrayList<Integer> createOutputColumns(Database db, ArrayList<Integer> input) {
-        // columns are created during plan node construction
-        assert(m_outputColumns.size() > 0);
-        return (ArrayList<Integer>)m_outputColumns.clone();
+    public void generateOutputSchema(Database db)
+    {
+        assert(m_children.size() == 1);
+        m_children.get(0).generateOutputSchema(db);
+        // aggregate's output schema is pre-determined, don't touch
+        return;
     }
 
-    public void appendOutputColumn(PlanColumn colInfo) {
-        m_outputColumns.add(colInfo.guid());
-    }
-    /**
-     * @return The list of output column indexes that each aggregate outputs to
-     */
-    public List<Integer> getAggregateOutputColumns() {
-        return m_aggregateOutputColumns;
-    }
+    public void resolveColumnIndexes()
+    {
+        // Aggregates need to resolve indexes for the output schema but don't need
+        // to reorder it.  Some of the outputs may be local aggregate columns and
+        // won't have a TVE to resolve.
+        assert(m_children.size() == 1);
+        m_children.get(0).resolveColumnIndexes();
+        NodeSchema input_schema = m_children.get(0).getOutputSchema();
+        for (SchemaColumn col : m_outputSchema.getColumns())
+        {
+            // At this point, they'd better all be TVEs.
+            assert(col.getExpression() instanceof TupleValueExpression);
+            TupleValueExpression tve = (TupleValueExpression)col.getExpression();
+            int index = input_schema.getIndexOfTve(tve);
+            if (index == -1)
+            {
+                // check to see if this TVE is the aggregate output
+                // XXX SHOULD MODE THIS STRING TO A STATIC DEF SOMEWHERE
+                if (!tve.getTableName().equals("VOLT_TEMP_TABLE"))
+                {
+                    throw new RuntimeException("Unable to find index for column: " +
+                                               col.toString());
+                }
+            }
+            else
+            {
+                tve.setColumnIndex(index);
+            }
+        }
 
-    /**
-     * @return The type of aggregation for each aggregate column
-     */
-    public List<ExpressionType> getAggregateTypes() {
-        return m_aggregateTypes;
-    }
-    /**
-     * @param aggregate_types
-     */
-    public void setAggregateTypes(List<ExpressionType> aggregate_types) {
-        m_aggregateTypes = aggregate_types;
-    }
+        // Aggregates also need to resolve indexes for aggregate inputs
+        // Find the proper index for the sort columns.  Not quite
+        // sure these should be TVEs in the long term.
+        List<TupleValueExpression> agg_tves =
+            new ArrayList<TupleValueExpression>();
+        for (AbstractExpression agg_exp : m_aggregateExpressions)
+        {
+            agg_tves.addAll(ExpressionUtil.getTupleValueExpressions(agg_exp));
+        }
+        for (TupleValueExpression tve : agg_tves)
+        {
+            int index = input_schema.getIndexOfTve(tve);
+            tve.setColumnIndex(index);
+        }
 
-    /**
-     * @return the aggregate column GUIDs (aggregated input col GUID)
-     */
-    public List<Integer> getAggregateColumnGuids() {
-        return m_aggregateColumnGuids;
-    }
-    /**
-     * @param aggregate_column_guids
-     */
-    public void setAggregateColumnGuids(List<Integer> aggregate_column_guids) {
-        m_aggregateColumnGuids = aggregate_column_guids;
-    }
-
-    /**
-     * @return the aggregate_column_name
-     */
-    public List<String> getAggregateColumnNames() {
-        return m_aggregateColumnNames;
-    }
-    /**
-     * @param aggregate_column_names
-     */
-    public void setAggregateColumnNames(List<String> aggregate_column_names) {
-        m_aggregateColumnNames = aggregate_column_names;
-    }
-
-    /**
-     * @return Names of the input column that maps to the output column.
-     */
-    public List<String> getoutputColumnInputAliasNames() {
-        return m_aggregateColumnNames;
-    }
-
-    /**
-     * @return the groupby_columns
-     */
-    public List<Integer> getGroupByColumns() {
-        return m_groupByColumns;
-    }
-
-    public void appendGroupByColumn(PlanColumn colInfo) {
-        m_groupByColumnGuids.add(colInfo.guid());
+        // Aggregates also need to resolve indexes for group_by inputs
+        List<TupleValueExpression> group_tves =
+            new ArrayList<TupleValueExpression>();
+        for (AbstractExpression group_exp : m_groupByExpressions)
+        {
+            group_tves.addAll(ExpressionUtil.getTupleValueExpressions(group_exp));
+        }
+        for (TupleValueExpression tve : group_tves)
+        {
+            int index = input_schema.getIndexOfTve(tve);
+            tve.setColumnIndex(index);
+        }
     }
 
     /**
-     * @param groupby_columns
+     * Add an aggregate to this plan node.
+     * @param aggType
+     * @param aggOutputColumn  Which output column in the output schema this
+     *        aggregate should occupy
+     * @param aggInputExpr  The input expression which should get aggregated
      */
-    public void setGroupByColumn(List<Integer> groupby_columns) {
-        m_groupByColumns = groupby_columns;
+    public void addAggregate(ExpressionType aggType,
+                             Integer aggOutputColumn,
+                             AbstractExpression aggInputExpr)
+    {
+        assert(aggInputExpr != null);
+        m_aggregateTypes.add(aggType);
+        m_aggregateOutputColumns.add(aggOutputColumn);
+        try
+        {
+            m_aggregateExpressions.add((AbstractExpression) aggInputExpr.clone());
+        }
+        catch (CloneNotSupportedException e)
+        {
+            // This shouldn't ever happen
+            e.printStackTrace();
+            throw new RuntimeException(e.getMessage());
+        }
     }
 
-    /**
-     * @return the groupby_column_names
-     */
-    public List<String> getGroupByColumnNames() {
-        return m_groupByColumnNames;
-    }
-    /**
-     * @param groupby_column_names
-     */
-    public void setGroupByColumnNames(List<String> groupby_column_names) {
-        m_groupByColumnNames = groupby_column_names;
+    public void addGroupByExpression(AbstractExpression expr)
+    {
+        if (expr != null)
+        {
+            try
+            {
+                m_groupByExpressions.add((AbstractExpression) expr.clone());
+            }
+            catch (CloneNotSupportedException e)
+            {
+                // This shouldn't ever happen
+                e.printStackTrace();
+                throw new RuntimeException(e.getMessage());
+            }
+        }
     }
 
     @Override
@@ -184,19 +205,22 @@ public class AggregatePlanNode extends AbstractPlanNode {
         for (int ii = 0; ii < m_aggregateTypes.size(); ii++) {
             stringer.object();
             stringer.key(Members.AGGREGATE_TYPE.name()).value(m_aggregateTypes.get(ii).name());
-            stringer.key(Members.AGGREGATE_NAME.name()).value(m_aggregateColumnNames.get(ii));
-            stringer.key(Members.AGGREGATE_GUID.name()).value(m_aggregateColumnGuids.get(ii));
             stringer.key(Members.AGGREGATE_OUTPUT_COLUMN.name()).value(m_aggregateOutputColumns.get(ii));
+            stringer.key(Members.AGGREGATE_EXPRESSION.name());
+            stringer.object();
+            m_aggregateExpressions.get(ii).toJSONString(stringer);
+            stringer.endObject();
             stringer.endObject();
         }
         stringer.endArray();
 
-        if (!m_groupByColumnGuids.isEmpty())
+        if (!m_groupByExpressions.isEmpty())
         {
-            stringer.key(Members.GROUPBY_COLUMNS.name()).array();
-            for (int i = 0; i < m_groupByColumnGuids.size(); i++) {
-                PlanColumn column = m_context.get(m_groupByColumnGuids.get(i));
-                column.toJSONString(stringer);
+            stringer.key(Members.GROUPBY_EXPRESSIONS.name()).array();
+            for (int i = 0; i < m_groupByExpressions.size(); i++) {
+                stringer.object();
+                m_groupByExpressions.get(i).toJSONString(stringer);
+                stringer.endObject();
             }
             stringer.endArray();
         }

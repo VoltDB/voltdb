@@ -20,8 +20,6 @@ package org.voltdb.expressions;
 import java.util.*;
 
 import org.voltdb.VoltType;
-import org.voltdb.planner.PlanColumn;
-import org.voltdb.planner.PlannerContext;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.utils.VoltTypeUtil;
 import org.voltdb.utils.NotImplementedException;
@@ -356,43 +354,6 @@ public abstract class ExpressionUtil {
         return ret;
     }
 
-    /**
-     * An AbstractExpression may be applied to a tuple that is a result of several joins and projections. Until the
-     * order of joins and projections is known it is not possible to determine the column index of the value a TupleValueExpression
-     * should return. Once that information is known the expression can be updated to have the correct index. It does this
-     * by searching the list of output columns for the column that originated from the correct table and column name.
-     * @param input The expression to update
-     * @param outputColumns The description of the output columns of the tuple that this expression will be applied to.
-     */
-    public static void setColumnIndexes(PlannerContext context, AbstractExpression input, List<Integer> outputColumns) {
-        if (input == null) {
-            return;
-        }
-
-        // recursive call
-        setColumnIndexes(context, input.m_left, outputColumns);
-        setColumnIndexes(context, input.m_right, outputColumns);
-
-        // actual work
-        if (input instanceof TupleValueExpression) {
-            final TupleValueExpression expr = (TupleValueExpression) input;
-            final String tableName = expr.getTableName();
-            final String columnName = expr.getColumnName();
-            int ii = 0;
-            for (Integer colGuid : outputColumns) {
-                PlanColumn info = context.get(colGuid);
-                if (info.originTableName().equals(tableName)) {
-                    if (info.displayName().equals(columnName)) {
-                        expr.setColumnIndex(ii);
-                        return;
-                    }
-                }
-                ii++;
-            }
-        }
-
-    }
-
     public static AbstractExpression getOtherTableExpression(AbstractExpression expr, String tableName) {
         assert(expr != null);
         AbstractExpression retval = expr.getLeft();
@@ -415,5 +376,31 @@ public abstract class ExpressionUtil {
         }
 
         return retval;
+    }
+
+    /**
+     * Recursively walk an expression and return a list of all the tuple
+     * value expressions it contains.
+     */
+    public static List<TupleValueExpression>
+    getTupleValueExpressions(AbstractExpression input)
+    {
+        ArrayList<TupleValueExpression> tves =
+            new ArrayList<TupleValueExpression>();
+        // recursive stopping steps
+        if (input == null)
+        {
+            return tves;
+        }
+        if (input instanceof TupleValueExpression)
+        {
+            tves.add((TupleValueExpression) input);
+            return tves;
+        }
+
+        // recursive calls
+        tves.addAll(getTupleValueExpressions(input.m_left));
+        tves.addAll(getTupleValueExpressions(input.m_right));
+        return tves;
     }
 }

@@ -68,28 +68,25 @@ bool ReceiveExecutor::p_init(AbstractPlanNode *abstract_node,
     //
     // Construct the output table
     //
-    int num_of_columns = (int)node->getOutputColumnNames().size();
-    assert(num_of_columns >= 0);
-    assert(num_of_columns == node->getOutputColumnTypes().size());
-    assert(num_of_columns == node->getOutputColumnSizes().size());
-    const std::vector<std::string> outputColumnNames = node->getOutputColumnNames();
-    const std::vector<voltdb::ValueType> outputColumnTypes = node->getOutputColumnTypes();
-    const std::vector<int32_t> outputColumnSizes = node->getOutputColumnSizes();
-    const std::vector<bool> outputColumnAllowNull(num_of_columns, true);
-    TupleSchema *schema = TupleSchema::createTupleSchema(outputColumnTypes, outputColumnSizes, outputColumnAllowNull, true);
-    std::string *columnNames = new std::string[num_of_columns];
-    for (int ctr = 0; ctr < num_of_columns; ctr++) {
-        columnNames[ctr] = node->getOutputColumnNames()[ctr];
+    TupleSchema* schema = node->generateTupleSchema(true);
+    int num_of_columns = static_cast<int>(node->getOutputSchema().size());
+    std::string* column_names = new std::string[num_of_columns];
+    for (int ctr = 0; ctr < num_of_columns; ctr++)
+    {
+        column_names[ctr] = node->getOutputSchema()[ctr]->getColumnName();
     }
-    node->setOutputTable(TableFactory::getTempTable(node->databaseId(), "temp", schema, columnNames, tempTableMemoryInBytes));
-
-    delete[] columnNames;
+    node->setOutputTable(TableFactory::getTempTable(node->databaseId(),
+                                                    "temp",
+                                                    schema,
+                                                    column_names,
+                                                    tempTableMemoryInBytes));
+    delete[] column_names;
     return true;
 }
 
 bool ReceiveExecutor::p_execute(const NValueArray &params) {
     int loadedDeps = 0;
-    ReceivePlanNode* node = dynamic_cast<ReceivePlanNode*>(abstract_node);
+    ReceivePlanNode* node = dynamic_cast<ReceivePlanNode*>(m_abstractNode);
     Table* output_table = dynamic_cast<Table*>(node->getOutputTable());
 
     // iterate dependencies stored in the frontend and union them

@@ -76,12 +76,22 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
 
     m_node = dynamic_cast<IndexScanPlanNode*>(abstractNode);
     assert(m_node);
-    //
-    // Now create our temp table where we can store our results
-    // For now we are always use all of the columns, but in the future we may
-    // want to have a projection work right inside of the SeqScan
-    //
     assert(m_node->getTargetTable());
+
+    // Create output table based on output schema from the plan
+    TupleSchema* schema = m_node->generateTupleSchema(true);
+    int column_count = static_cast<int>(m_node->getOutputSchema().size());
+    std::string* column_names = new std::string[column_count];
+    for (int ctr = 0; ctr < column_count; ctr++)
+    {
+        column_names[ctr] = m_node->getOutputSchema()[ctr]->getColumnName();
+    }
+    m_node->setOutputTable(TableFactory::getTempTable(m_node->databaseId(),
+                                                      m_node->getTargetTable()->name(),
+                                                      schema,
+                                                      column_names,
+                                                      tempTableMemoryInBytes));
+    delete[] column_names;
 
     //
     // INLINE PROJECTION
@@ -91,15 +101,6 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
         m_projectionNode =
             static_cast<ProjectionPlanNode*>
             (m_node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
-        // XXX this assertion is useless if the above is a static_cast
-        // assert(m_projectionNode);
-        //
-        // The internal node will already be initialized for us We
-        // just need to use the internal node's output table which has
-        // been formatted correctly based on the projection
-        // information as our own output table
-        assert(m_projectionNode->getOutputTable());
-        m_node->setOutputTable(m_projectionNode->getOutputTable());
 
         m_projectionExpressions =
             new AbstractExpression*[m_node->getOutputTable()->columnCount()];
@@ -131,18 +132,6 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
             m_projectionExpressions[ctr] =
               m_projectionNode->getOutputColumnExpressions()[ctr];
         }
-    //
-    // FULL TABLE SCHEMA
-    //
-    }
-    else
-    {
-        m_node->
-            setOutputTable(TableFactory::
-                           getCopiedTempTable(m_node->databaseId(),
-                                              "temp",
-                                              m_node->getTargetTable(),
-                                              tempTableMemoryInBytes));
     }
 
     //
@@ -243,7 +232,7 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
 bool IndexScanExecutor::p_execute(const NValueArray &params)
 {
     assert(m_node);
-    assert(m_node == dynamic_cast<IndexScanPlanNode*>(abstract_node));
+    assert(m_node == dynamic_cast<IndexScanPlanNode*>(m_abstractNode));
     assert(m_outputTable);
     assert(m_outputTable == static_cast<TempTable*>(m_node->getOutputTable()));
     assert(m_targetTable);

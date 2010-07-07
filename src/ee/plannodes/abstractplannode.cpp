@@ -45,7 +45,7 @@
 
 #include "abstractplannode.h"
 
-#include "PlanColumn.h"
+#include "common/TupleSchema.h"
 #include "executors/abstractexecutor.h"
 #include "plannodeutil.h"
 
@@ -76,6 +76,10 @@ AbstractPlanNode::~AbstractPlanNode()
     for (iter = m_inlineNodes.begin(); iter != m_inlineNodes.end(); iter++)
     {
         delete (*iter).second;
+    }
+    for (int i = 0; i < m_outputSchema.size(); i++)
+    {
+        delete m_outputSchema[i];
     }
 }
 
@@ -222,10 +226,31 @@ AbstractPlanNode::getOutputTable() const
     return m_outputTable;
 }
 
-vector<int>
-AbstractPlanNode::getOutputColumnGuids() const
+const vector<SchemaColumn*>&
+AbstractPlanNode::getOutputSchema() const
 {
-    return m_outputColumnGuids;
+    return m_outputSchema;
+}
+
+TupleSchema*
+AbstractPlanNode::generateTupleSchema(bool allowNulls)
+{
+    int schema_size = static_cast<int>(m_outputSchema.size());
+    vector<voltdb::ValueType> columnTypes;
+    vector<int32_t> columnSizes;
+    vector<bool> columnAllowNull(schema_size, allowNulls);
+
+    for (int i = 0; i < schema_size; i++)
+    {
+        SchemaColumn* col = m_outputSchema[i];
+        columnTypes.push_back(col->getExpression()->getValueType());
+        columnSizes.push_back(col->getExpression()->getValueSize());
+    }
+
+    TupleSchema* schema =
+        TupleSchema::createTupleSchema(columnTypes, columnSizes,
+                                       columnAllowNull, true);
+    return schema;
 }
 
 // ----------------------------------------------------
@@ -315,21 +340,22 @@ AbstractPlanNode::fromJSONObject(Object &obj, const catalog::Database *catalog_d
         node->m_childIds.push_back(childNodeId);
     }
 
-    Value outputColumnsValue = find_value(obj, "OUTPUT_COLUMNS");
-    if (outputColumnsValue == Value::null)
+    Value outputSchemaValue = find_value(obj, "OUTPUT_SCHEMA");
+    if (outputSchemaValue == Value::null)
     {
         delete node;
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       "AbstractPlanNode::loadFromJSONObject:"
-                                      " Can't find OUTPUT_COLUMNS value");
+                                      " Can't find OUTPUT_SCHEMA value");
     }
-    Array outputColumnsArray = outputColumnsValue.get_array();
+    Array outputSchemaArray = outputSchemaValue.get_array();
 
-    for (int ii = 0; ii < outputColumnsArray.size(); ii++)
+    for (int ii = 0; ii < outputSchemaArray.size(); ii++)
     {
-        Value outputColumnValue = outputColumnsArray[ii];
-        PlanColumn outputColumn = PlanColumn(outputColumnValue.get_obj());
-        node->m_outputColumnGuids.push_back(outputColumn.getGuid());
+        Value outputColumnValue = outputSchemaArray[ii];
+        SchemaColumn* outputColumn =
+            new SchemaColumn(outputColumnValue.get_obj());
+        node->m_outputSchema.push_back(outputColumn);
     }
 
     try {
@@ -395,20 +421,4 @@ AbstractPlanNode::debug(const string& spacer) const
         buffer << m_children[ctr]->debug(child_spacer);
     }
     return (buffer.str());
-}
-
-int
-AbstractPlanNode::getColumnIndexFromGuid(int guid,
-                                         const catalog::Database* db) const
-{
-    if (m_children.size() != 1)
-    {
-        return -1;
-    }
-    AbstractPlanNode* child = m_children[0];
-    if (child == NULL)
-    {
-        return -1;
-    }
-    return child->getColumnIndexFromGuid(guid, db);
 }

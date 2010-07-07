@@ -23,14 +23,13 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.planner.PlanStatistics;
-import org.voltdb.planner.PlannerContext;
 import org.voltdb.planner.StatsField;
 import org.voltdb.types.*;
 
 public class SeqScanPlanNode extends AbstractScanPlanNode {
 
-    public SeqScanPlanNode(PlannerContext context) {
-        super(context);
+    public SeqScanPlanNode() {
+        super();
     }
 
     @Override

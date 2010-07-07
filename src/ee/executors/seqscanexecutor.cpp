@@ -70,48 +70,37 @@ bool SeqScanExecutor::p_init(AbstractPlanNode *abstract_node,
     assert(node->getTargetTable());
 
     //
-    // NESTED PROJECTION
+    // OPTIMIZATION: If there is no predicate for this SeqScan,
+    // then we want to just set our OutputTable pointer to be the
+    // pointer of our TargetTable. This prevents us from just
+    // reading through the entire TargetTable and copying all of
+    // the tuples. We are guarenteed that no Executor will ever
+    // modify an input table, so this operation is safe
     //
-    if (node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION) != NULL) {
-        //std::cout << "Inline node:" << node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION)->debug() << std::endl;
-        ProjectionPlanNode* projection_node = static_cast<ProjectionPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
-        assert(projection_node);
-        //
-        // The internal node will already be initialized for us
-        //
-        // We just need to use the internal node's output table which
-        // has been formatted correctly based on the projection
-        // information as our own output table
-        //
-        assert(projection_node->getOutputTable());
-        node->setOutputTable(projection_node->getOutputTable());
+    if (!this->needsOutputTableClear())
+    {
+        node->setOutputTable(node->getTargetTable());
+    }
     //
-    // FULL TABLE SCHEMA
+    // Otherwise create a new temp table that mirrors the
+    // output schema specified in the plan (which should mirror
+    // the output schema for any inlined projection)
     //
-    } else {
-        //
-        // OPTIMIZATION: If there is no predicate for this SeqScan,
-        // then we want to just set our OutputTable pointer to be the
-        // pointer of our TargetTable. This prevents us from just
-        // reading through the entire TargetTable and copying all of
-        // the tuples. We are guarenteed that no Executor will ever
-        // modify an input table, so this operation is safe
-        //
-        if (!this->needsOutputTableClear()) {
-            node->setOutputTable(node->getTargetTable());
-        //
-        // Otherwise create a new temp table that mirrors the
-        // TargetTable so that we can just copy the tuples right into
-        // it. For now we are always use all of the columns, but in
-        // the future we may want to have a projection work right
-        // inside of the SeqScan
-        //
-        } else {
-            node->setOutputTable(TableFactory::getCopiedTempTable(node->databaseId(),
-                    node->getTargetTable()->name(),
-                    node->getTargetTable(),
-                    tempTableMemoryInBytes));
+    else
+    {
+        TupleSchema* schema = node->generateTupleSchema(true);
+        int column_count = static_cast<int>(node->getOutputSchema().size());
+        std::string* column_names = new std::string[column_count];
+        for (int ctr = 0; ctr < column_count; ctr++)
+        {
+            column_names[ctr] = node->getOutputSchema()[ctr]->getColumnName();
         }
+        node->setOutputTable(TableFactory::getTempTable(node->databaseId(),
+                                                        node->getTargetTable()->name(),
+                                                        schema,
+                                                        column_names,
+                                                        tempTableMemoryInBytes));
+        delete[] column_names;
     }
     return true;
 }
@@ -120,13 +109,13 @@ bool SeqScanExecutor::needsOutputTableClear() {
     // clear the temporary output table only when it has a predicate.
     // if it doesn't have a predicate, it's the original persistent table
     // and we don't have to (and must not) clear it.
-    SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(abstract_node);
+    SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(m_abstractNode);
     assert(node);
     return node->needsOutputTableClear();
 }
 
 bool SeqScanExecutor::p_execute(const NValueArray &params) {
-    SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(abstract_node);
+    SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(m_abstractNode);
     assert(node);
     Table* output_table = node->getOutputTable();
     assert(output_table);
@@ -259,7 +248,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         }
     }
     VOLT_TRACE("\n%s\n", output_table->debug().c_str());
-    VOLT_TRACE("Finished Seq scanning");
+    VOLT_DEBUG("Finished Seq scanning");
 
     return true;
 }

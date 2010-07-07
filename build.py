@@ -239,11 +239,11 @@ CTX.INPUT['plannodes'] = """
  nestloopindexnode.cpp
  nestloopnode.cpp
  orderbynode.cpp
- PlanColumn.cpp
  plannodefragment.cpp
  plannodeutil.cpp
  projectionnode.cpp
  receivenode.cpp
+ SchemaColumn.cpp
  sendnode.cpp
  seqscannode.cpp
  unionnode.cpp
@@ -322,7 +322,6 @@ CTX.TESTS['common'] = """
 
 CTX.TESTS['execution'] = """
  engine_test
- executors_test
 """
 
 CTX.TESTS['expressions'] = """

@@ -26,9 +26,7 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
-import org.voltdb.planner.PlanColumn;
 import org.voltdb.planner.PlanStatistics;
-import org.voltdb.planner.PlannerContext;
 import org.voltdb.planner.StatsField;
 import org.voltdb.types.*;
 
@@ -67,7 +65,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         INLINE_NODES,
         CHILDREN_IDS,
         PARENT_IDS,
-        OUTPUT_COLUMNS;
+        OUTPUT_SCHEMA;
     }
 
     protected int m_id = -1;
@@ -76,26 +74,25 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     protected HashSet<AbstractPlanNode> m_dominators = new HashSet<AbstractPlanNode>();
 
     // TODO: planner accesses this data directly. Should be protected.
-    public ArrayList<Integer> m_outputColumns = new ArrayList<Integer>();
     protected List<ScalarValueHints> m_outputColumnHints = new ArrayList<ScalarValueHints>();
     protected long m_estimatedOutputTupleCount = 0;
+
+    // The output schema for this node
+    protected NodeSchema m_outputSchema;
 
     /**
      * Some PlanNodes can take advantage of inline PlanNodes to perform
      * certain additional tasks while performing their main operation, rather than
      * having to re-read tuples from intermediate results
      */
-    protected Map<PlanNodeType, AbstractPlanNode> m_inlineNodes = new HashMap<PlanNodeType, AbstractPlanNode>();
+    protected Map<PlanNodeType, AbstractPlanNode> m_inlineNodes =
+        new HashMap<PlanNodeType, AbstractPlanNode>();
     protected boolean m_isInline = false;
-
-    protected final PlannerContext m_context;
 
     /**
      * Instantiates a new plan node.
      */
-    protected AbstractPlanNode(PlannerContext context) {
-        assert(context != null);
-        m_context = context;
+    protected AbstractPlanNode() {
         m_id = getNextPlanNodeId();
     }
 
@@ -108,11 +105,10 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * is not inserted in the plan graph and has a unique plan node id.
      */
     protected void produceCopyForTransformation(AbstractPlanNode copy) {
-        for (Integer colGuid : m_outputColumns) {
-            copy.m_outputColumns.add(colGuid);
-        }
+        copy.m_outputSchema = m_outputSchema;
         copy.m_outputColumnHints = m_outputColumnHints;
         copy.m_estimatedOutputTupleCount = m_estimatedOutputTupleCount;
+        copy.m_outputSchema = m_outputSchema;
 
         // clone is not yet implemented for every node.
         assert(m_inlineNodes.size() == 0);
@@ -123,69 +119,48 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         assert (copy.m_children.size() == 0);
     }
 
-
     public abstract PlanNodeType getPlanNodeType();
 
-    public boolean updateOutputColumns(Database db) {
-        ArrayList<Integer> childCols = new ArrayList<Integer>();
-        for (AbstractPlanNode child : m_children) {
-            boolean result = child.updateOutputColumns(db);
-            assert(result);
-            childCols.addAll(child.m_outputColumns);
-        }
-
-        ArrayList<Integer> new_output_cols = new ArrayList<Integer>();
-        new_output_cols = createOutputColumns(db, childCols);
-        for (AbstractPlanNode child : m_inlineNodes.values()) {
-            if (child instanceof IndexScanPlanNode)
-                continue;
-            new_output_cols = child.createOutputColumns(db, new_output_cols);
-        }
-
-        // Before we wipe out the old column list, free any PlanColumns that
-        // aren't getting reused
-        for (Integer col : m_outputColumns)
-        {
-            if (!new_output_cols.contains(col))
-            {
-                m_context.freeColumn(col);
-            }
-        }
-
-        m_outputColumns = new_output_cols;
-
-        return true;
-    }
-
-    /** By default, a plan node does not alter its input schema */
-    @SuppressWarnings("unchecked")
-    protected ArrayList<Integer> createOutputColumns(Database db, ArrayList<Integer> input) {
-        return (ArrayList<Integer>)input.clone();
-    }
-
-    public PlanColumn findMatchingOutputColumn(String tableName,
-                                               String columnName,
-                                               String columnAlias)
+    /**
+     * Generate the output schema for this node based on the
+     * output schemas of its children.  The generated schema consists of
+     * the complete set of columns but is not yet ordered.
+     *
+     * Right now it's best to call this on every node after it gets added
+     * and linked to the top of the current plan graph.
+     *
+     * Many nodes will need to override this method in order to take whatever
+     * action is appropriate (so, joins will combine two schemas, projections
+     * will already have schemas defined and do nothing, etc)
+     * @param db  A reference to the Database object from the catalog.
+     */
+    public void generateOutputSchema(Database db)
     {
-        boolean found = false;
-        PlanColumn retval = null;
-        for (Integer colguid : m_outputColumns) {
-            PlanColumn plancol = m_context.get(colguid);
-            if ((plancol.originTableName().equals(tableName)) &&
-                ((plancol.originColumnName().equals(columnName)) ||
-                 (plancol.originColumnName().equals(columnAlias))))
-            {
-                found = true;
-                retval = plancol;
-                break;
-            }
-        }
-        if (!found) {
-            assert(found) : "Found no candidate output column.";
-            throw new RuntimeException("Found no candidate output column.");
-        }
-        return retval;
+        // default behavior: just copy the input schema
+        // to the output schema
+        assert(m_children.size() == 1);
+        m_children.get(0).generateOutputSchema(db);
+        // Replace the expressions in our children's columns with TVEs.  When
+        // we resolve the indexes in these TVEs they will point back at the
+        // correct input column, which we are assuming that the child node
+        // has filled in with whatever expression was here before the replacement.
+        m_outputSchema =
+            m_children.get(0).getOutputSchema().copyAndReplaceWithTVE();
     }
+
+    /**
+     * Recursively iterate through the plan and resolve the column_idx value for
+     * every TupleValueExpression in every AbstractExpression in every PlanNode.
+     * Few enough common cases so we force every AbstractPlanNode subclass to
+     * implement this.  After index resolution, this method also sorts
+     * the columns in the output schema appropriately, depending upon what
+     * sort of node it is, so that its parent will be able to resolve
+     * its indexes successfully.
+     *
+     * Should get called on the plan graph after any optimizations but before
+     * the plan gets fragmented.
+     */
+    public abstract void resolveColumnIndexes();
 
     public void validate() throws Exception {
         //
@@ -251,6 +226,15 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      */
     public Integer getPlanNodeId() {
         return m_id;
+    }
+
+    /**
+     * Get this PlanNode's output schema
+     * @return the NodeSchema which represents this node's output schema
+     */
+    public NodeSchema getOutputSchema()
+    {
+        return m_outputSchema;
     }
 
     /**
@@ -457,22 +441,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             n.findAllNodesOfType_recurse(type, collected, visited);
     }
 
-    public void freeColumns()
-    {
-        for (Integer guid : m_outputColumns)
-        {
-            m_context.freeColumn(guid);
-        }
-        for (AbstractPlanNode n : m_children)
-        {
-            n.freeColumns();
-        }
-        for (PlanNodeType t : m_inlineNodes.keySet())
-        {
-            m_inlineNodes.get(t).freeColumns();
-        }
-    }
-
     @Override
     public int compareTo(AbstractPlanNode other) {
         int diff = 0;
@@ -573,25 +541,23 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             assert(node instanceof JSONString);
             stringer.value(node);
         }
-        /*for (Map.Entry<PlanNodeType, AbstractPlanNode> entry : m_inlineNodes.entrySet()) {
-            assert (entry.getValue() instanceof JSONString);
-            stringer.value(entry.getValue());
-        }*/
         stringer.endArray();
+
         stringer.key(Members.CHILDREN_IDS.name()).array();
         for (AbstractPlanNode node : m_children) {
             stringer.value(node.getPlanNodeId().intValue());
         }
         stringer.endArray().key(Members.PARENT_IDS.name()).array();
+
         for (AbstractPlanNode node : m_parents) {
             stringer.value(node.getPlanNodeId().intValue());
         }
         stringer.endArray(); //end inlineNodes
 
-        stringer.key(Members.OUTPUT_COLUMNS.name());
+        stringer.key(Members.OUTPUT_SCHEMA.name());
         stringer.array();
-        for (int col = 0; col < m_outputColumns.size(); col++) {
-            PlanColumn column = m_context.get(m_outputColumns.get(col));
+        for (int col = 0; col < m_outputSchema.getColumns().size(); col++) {
+            SchemaColumn column = m_outputSchema.getColumns().get(col);
             column.toJSONString(stringer);
         }
         stringer.endArray();

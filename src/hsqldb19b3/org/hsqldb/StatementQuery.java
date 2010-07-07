@@ -32,10 +32,13 @@
 package org.hsqldb;
 
 import java.util.ArrayList;
+
 import org.hsqldb.HSQLInterface.HSQLParseException;
 import org.hsqldb.HsqlNameManager.HsqlName;
 import org.hsqldb.HsqlNameManager.SimpleName;
 import org.hsqldb.ParserDQL.CompileContext;
+import org.hsqldb.lib.HsqlArrayList;
+import org.hsqldb.lib.HsqlList;
 import org.hsqldb.lib.OrderedHashSet;
 import org.hsqldb.result.Result;
 import org.hsqldb.result.ResultMetaData;
@@ -242,6 +245,62 @@ public class StatementQuery extends StatementDMQL {
         }
 
         sb.append(">\n");
+
+        // columns that need to be output by the scans
+        sb.append(indent + "<scan_columns>\n");
+        // Just gather a mish-mash of every possible relevant expression
+        // and uniq them later
+        HsqlList col_list = new HsqlArrayList();
+        select.collectAllExpressions(col_list, Expression.columnExpressionSet, Expression.emptyExpressionSet);
+        if (select.queryCondition != null)
+        {
+            Expression.collectAllExpressions(col_list, select.queryCondition,
+                                             Expression.columnExpressionSet,
+                                             Expression.emptyExpressionSet);
+        }
+        for (int i = 0; i < select.exprColumns.length; i++) {
+            Expression.collectAllExpressions(col_list, select.exprColumns[i],
+                                             Expression.columnExpressionSet,
+                                             Expression.emptyExpressionSet);
+        }
+        for (RangeVariable rv : select.rangeVariables)
+        {
+            if (rv.indexCondition != null)
+            {
+                Expression.collectAllExpressions(col_list, rv.indexCondition,
+                                                 Expression.columnExpressionSet,
+                                                 Expression.emptyExpressionSet);
+
+            }
+            if (rv.indexEndCondition != null)
+            {
+                Expression.collectAllExpressions(col_list, rv.indexEndCondition,
+                                                 Expression.columnExpressionSet,
+                                                 Expression.emptyExpressionSet);
+
+            }
+            if (rv.nonIndexJoinCondition != null)
+            {
+                Expression.collectAllExpressions(col_list, rv.nonIndexJoinCondition,
+                                                 Expression.columnExpressionSet,
+                                                 Expression.emptyExpressionSet);
+
+            }
+        }
+        HsqlList uniq_col_list = new HsqlArrayList();
+        for (int i = 0; i < col_list.size(); i++)
+        {
+            Expression orig = (Expression)col_list.get(i);
+            if (!uniq_col_list.contains(orig))
+            {
+                uniq_col_list.add(orig);
+            }
+        }
+        for (int i = 0; i < uniq_col_list.size(); i++)
+        {
+            sb.append(((Expression)uniq_col_list.get(i)).voltGetXML(session, indent + HSQLInterface.XML_INDENT)).append("\n");
+        }
+        sb.append(indent + "</scan_columns>\n");
 
         // columns
         sb.append(indent + "<columns>\n");

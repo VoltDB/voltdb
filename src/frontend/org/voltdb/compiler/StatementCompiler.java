@@ -32,7 +32,6 @@ import org.voltdb.catalog.StmtParameter;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.ParameterInfo;
-import org.voltdb.planner.PlanColumn;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.TrivialCostModel;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -40,6 +39,7 @@ import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
+import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
@@ -174,14 +174,14 @@ public abstract class StatementCompiler {
 
         // Output Columns
         int index = 0;
-        for (Integer colguid : plan.columns) {
-            PlanColumn planColumn = planner.getPlannerContext().get(colguid);
+        for (SchemaColumn col : plan.columns.getColumns())
+        {
             Column catColumn = catalogStmt.getOutput_columns().add(String.valueOf(index));
             catColumn.setNullable(false);
             catColumn.setIndex(index);
-            catColumn.setName(planColumn.displayName());
-            catColumn.setType(planColumn.type().getValue());
-            catColumn.setSize(planColumn.width());
+            catColumn.setName(col.getColumnName());
+            catColumn.setType(col.getType().getValue());
+            catColumn.setSize(col.getSize());
             index++;
         }
 

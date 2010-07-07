@@ -62,7 +62,8 @@ namespace voltdb {
  * enclosing plannode to NULL so the delete can be safely repeated.
  */
 SeqScanPlanNode::~SeqScanPlanNode() {
-    if (needsOutputTableClear() && getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION) == NULL) {
+    if (needsOutputTableClear())
+    {
         delete getOutputTable();
         setOutputTable(NULL);
     }

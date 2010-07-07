@@ -39,6 +39,7 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.utils.StringInputStream;
 import org.w3c.dom.Document;
@@ -49,16 +50,8 @@ import org.xml.sax.ErrorHandler;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 
-/**
- *
- *
- */
 public abstract class AbstractParsedStmt {
 
-    /**
-     *
-     *
-     */
     static class HSQLXMLErrorHandler implements ErrorHandler {
         public void error(SAXParseException exception) throws SAXException {
             throw exception;
@@ -73,10 +66,6 @@ public abstract class AbstractParsedStmt {
         }
     }
 
-    /**
-     *
-     *
-     */
     public static class TablePair {
         public Table t1;
         public Table t2;
@@ -99,26 +88,31 @@ public abstract class AbstractParsedStmt {
         }
     }
 
-    /** The */
+
     public String sql;
-    /** The */
+
     public ArrayList<ParameterInfo> paramList = new ArrayList<ParameterInfo>();
-    /** The */
+
     public HashMap<Long, ParameterInfo> paramsById = new HashMap<Long, ParameterInfo>();
-    /** The */
+
     public ArrayList<Table> tableList = new ArrayList<Table>();
-    /** The */
+
     public AbstractExpression where = null;
-    /** The */
+
     public ArrayList<AbstractExpression> whereSelectionList = new ArrayList<AbstractExpression>();
-    /** The */
+
     public ArrayList<AbstractExpression> noTableSelectionList = new ArrayList<AbstractExpression>();
-    /** The */
+
     public ArrayList<AbstractExpression> multiTableSelectionList = new ArrayList<AbstractExpression>();
-    /** The */
+
     public HashMap<Table, ArrayList<AbstractExpression>> tableFilterList = new HashMap<Table, ArrayList<AbstractExpression>>();
-    /** The */
+
     public HashMap<TablePair, ArrayList<AbstractExpression>> joinSelectionList = new HashMap<TablePair, ArrayList<AbstractExpression>>();
+
+    // Store a table-hashed list of the columns actually used by this statement.
+    // XXX An unfortunately counter-intuitive (but hopefully temporary) meaning here:
+    // if this is null, that means ALL the columns get used.
+    public HashMap<String, ArrayList<SchemaColumn>> scanColumns = null;
 
     /**
      *
@@ -194,6 +188,10 @@ public abstract class AbstractParsedStmt {
             }
             if (node.getNodeName().equalsIgnoreCase("tablescans")) {
                 retval.parseTables(node, db);
+            }
+            if (node.getNodeName().equalsIgnoreCase("scan_columns"))
+            {
+                retval.parseScanColumns(node, db);
             }
         }
 
@@ -401,6 +399,43 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
+     * Parse the scan_columns element out of the HSQL-generated XML.
+     * Fills scanColumns with a list of the columns used in the plan, hashed by
+     * table name.
+     *
+     * @param columnsNode
+     * @param db
+     */
+    void parseScanColumns(Node columnsNode, Database db)
+    {
+        scanColumns = new HashMap<String, ArrayList<SchemaColumn>>();
+        for (Node child = columnsNode.getFirstChild(); child != null; child = child.getNextSibling()) {
+            if (child.getNodeType() != Node.ELEMENT_NODE)
+                continue;
+            final String nodeName = child.getNodeName();
+            assert(nodeName.equals("columnref"));
+            AbstractExpression col_exp = parseExpressionTree(child, db);
+            ExpressionUtil.assignLiteralConstantTypesRecursively(col_exp);
+            ExpressionUtil.assignOutputValueTypesRecursively(col_exp);
+            assert(col_exp != null);
+            assert(col_exp instanceof TupleValueExpression);
+            TupleValueExpression tve = (TupleValueExpression)col_exp;
+            SchemaColumn col = new SchemaColumn(tve.getTableName(),
+                                                tve.getColumnName(),
+                                                tve.getColumnAlias(),
+                                                col_exp);
+            ArrayList<SchemaColumn> table_cols = null;
+            if (!scanColumns.containsKey(col.getTableName()))
+            {
+                table_cols = new ArrayList<SchemaColumn>();
+                scanColumns.put(col.getTableName(), table_cols);
+            }
+            table_cols = scanColumns.get(col.getTableName());
+            table_cols.add(col);
+        }
+    }
+
+    /**
      *
      * @param tablesNode
      * @param db
@@ -551,6 +586,24 @@ public abstract class AbstractParsedStmt {
         retval += "\nTABLE SOURCES:\n\t";
         for (Table table : tableList) {
             retval += table.getTypeName() + " ";
+        }
+
+        retval += "\nSCAN COLUMNS:\n";
+        if (scanColumns != null)
+        {
+            for (String table : scanColumns.keySet())
+            {
+                retval += "\tTable: " + table + ":\n";
+                for (SchemaColumn col : scanColumns.get(table))
+                {
+                    retval += "\t\tColumn: " + col.getColumnName() + ": ";
+                    retval += col.getExpression().toString() + "\n";
+                }
+            }
+        }
+        else
+        {
+            retval += "\tALL\n";
         }
 
         if (where != null) {

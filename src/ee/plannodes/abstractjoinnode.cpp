@@ -104,26 +104,6 @@ string AbstractJoinPlanNode::debugInfo(const string& spacer) const
     return (buffer.str());
 }
 
-int
-AbstractJoinPlanNode::getColumnIndexFromGuid(int guid,
-                                             const catalog::Database* db) const
-{
-    for (int ii = 0; ii < m_outputColumnGuids.size(); ii++)
-    {
-        if (m_outputColumnGuids[ii] == guid)
-        {
-            return ii;
-        }
-    }
-    return -1;
-}
-
-void
-AbstractJoinPlanNode::setOutputColumnGuids(vector<int> output_column_guids)
-{
-    m_outputColumnGuids = output_column_guids;
-}
-
 void
 AbstractJoinPlanNode::loadFromJSONObject(Object& obj,
                                          const catalog::Database* catalog_db)

@@ -60,22 +60,7 @@ class ReceivePlanNode : public AbstractPlanNode
 
     virtual PlanNodeType getPlanNodeType() const;
 
-    void setOutputColumnNames(std::vector<std::string>& names);
-    std::vector<std::string>& getOutputColumnNames();
-    const std::vector<std::string>& getOutputColumnNames() const;
-
-    void setOutputColumnTypes(std::vector<ValueType>& types);
-    std::vector<ValueType>& getOutputColumnTypes();
-    const std::vector<ValueType>& getOutputColumnTypes() const;
-
-    void setOutputColumnSizes(std::vector<int32_t>& sizes);
-    std::vector<int32_t>& getOutputColumnSizes();
-    const std::vector<int32_t>& getOutputColumnSizes() const;
-
     std::string debugInfo(const std::string& spacer) const;
-
-    virtual int getColumnIndexFromGuid(int guid,
-                                       const catalog::Database* db) const;
 
 protected:
     friend AbstractPlanNode*
@@ -84,15 +69,6 @@ protected:
 
     virtual void loadFromJSONObject(json_spirit::Object& obj,
                                     const catalog::Database* catalog_db);
-
-    //
-    // The following information is used so that we can instantiate
-    // the output table ahead of time
-    //
-    std::vector<int> m_outputColumnGuids;
-    std::vector<std::string> m_outputColumnNames;
-    std::vector<ValueType> m_outputColumnTypes;
-    std::vector<int32_t> m_outputColumnSizes;
 };
 
 }

@@ -72,36 +72,6 @@ OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
     assert(node->getInputTables().size() == 1);
 
     assert(node->getChildren()[0] != NULL);
-    AbstractPlanNode *child_node = node->getChildren()[0];
-    /*
-     * Has to be a cleaner way to enforce this so the planner doesn't
-     * generate plans that will fail this assertion.
-     */
-    const std::vector<std::string> sortColumnNames = node->getSortColumnNames();
-    std::vector<int> sortColumns;
-    int input_column_count = node->getInputTables()[0]->columnCount();
-    for (int ii = 0; ii < sortColumnNames.size(); ii++)
-    {
-        int index =
-            child_node->getColumnIndexFromGuid(node->getSortColumnGuids()[ii],
-                                               catalog_db);
-        assert(index != -1);
-        if (index == -1)
-        {
-            VOLT_ERROR("Can not find index for sort col guid %d",
-                       node->getSortColumnGuids()[ii]);
-            return false;
-        }
-        else if (!(index < input_column_count)) {
-            VOLT_ERROR("Sorting column guid %d calculated index %d for input "
-                       " with %d columns", node->getSortColumnGuids()[ii],
-                       index, input_column_count);
-            return false;
-        }
-
-        sortColumns.push_back(index);
-    }
-    node->setSortColumns(sortColumns);
 
     //
     // Our output table should look exactly like out input table
@@ -124,7 +94,7 @@ OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
 class TupleComparer
 {
 public:
-    TupleComparer(const vector<int>& keys,
+    TupleComparer(const vector<AbstractExpression*>& keys,
                   const vector<SortDirectionType>& dirs)
         : m_keys(keys), m_dirs(dirs), m_keyCount(keys.size())
     {
@@ -135,9 +105,9 @@ public:
     {
         for (size_t i = 0; i < m_keyCount; ++i)
         {
-            int k = m_keys[i];
+            AbstractExpression* k = m_keys[i];
             SortDirectionType dir = m_dirs[i];
-            int cmp = ta.getNValue(k).compare(tb.getNValue(k));
+            int cmp = k->eval(&ta, NULL).compare(k->eval(&tb, NULL));
             if (dir == SORT_DIRECTION_TYPE_ASC)
             {
                 if (cmp < 0) return true;
@@ -159,7 +129,7 @@ public:
     }
 
 private:
-    const vector<int>& m_keys;
+    const vector<AbstractExpression*>& m_keys;
     const vector<SortDirectionType>& m_dirs;
     size_t m_keyCount;
 };
@@ -167,7 +137,7 @@ private:
 bool
 OrderByExecutor::p_execute(const NValueArray &params)
 {
-    OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(abstract_node);
+    OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(m_abstractNode);
     assert(node);
     Table* output_table = node->getOutputTable();
     assert(output_table);
@@ -191,7 +161,7 @@ OrderByExecutor::p_execute(const NValueArray &params)
         }
     }
 
-    VOLT_TRACE("Running OrderBy '%s'", abstract_node->debug().c_str());
+    VOLT_TRACE("Running OrderBy '%s'", m_abstractNode->debug().c_str());
     VOLT_TRACE("Input Table:\n '%s'", input_table->debug().c_str());
     TableIterator iterator(input_table);
     TableTuple tuple(input_table->schema());
@@ -203,7 +173,7 @@ OrderByExecutor::p_execute(const NValueArray &params)
     }
     VOLT_TRACE("\n***** Input Table PreSort:\n '%s'",
                input_table->debug().c_str());
-    sort(xs.begin(), xs.end(), TupleComparer(node->getSortColumns(),
+    sort(xs.begin(), xs.end(), TupleComparer(node->getSortExpressions(),
                                              node->getSortDirections()));
 
     int tuple_ctr = 0;

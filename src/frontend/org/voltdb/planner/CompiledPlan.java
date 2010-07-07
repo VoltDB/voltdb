@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.NodeSchema;
 
 /**
  * A triple-tuple to hold a complete plan graph along with its
@@ -61,7 +62,7 @@ public class CompiledPlan {
     public List<ParameterInfo> parameters = new ArrayList<ParameterInfo>();
 
     /** A list of output column ids, indexes and types */
-    public List<Integer> columns = new ArrayList<Integer>();
+    public NodeSchema columns = new NodeSchema();
 
     /**
      * If true, divide the number of tuples changed
@@ -89,18 +90,6 @@ public class CompiledPlan {
      * instance is serialized (only used for ad hoc sql).
      */
     public AbstractPlanNode fullWinnerPlan = null;
-
-    public void freePlan(PlannerContext context)
-    {
-        for (Integer guid : columns)
-        {
-            context.freeColumn(guid);
-        }
-        for (Fragment frag : fragments)
-        {
-            frag.planGraph.freeColumns();
-        }
-    }
 
     void resetPlanNodeIds() {
         int nextId = 1;

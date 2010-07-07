@@ -17,27 +17,28 @@
 
 package org.voltdb.plannodes;
 
+import java.util.List;
+
 import org.json.JSONException;
 import org.json.JSONStringer;
-import org.voltdb.planner.PlannerContext;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
 
 public class DistinctPlanNode extends AbstractPlanNode {
 
     public enum Members {
-        DISTINCT_COLUMN_GUID,
-        DISTINCT_COLUMN_NAME;
+        DISTINCT_EXPRESSION;
     }
 
     //
-    // TODO: This should really be an Expression that outputs some value?
-    //       But how would that work for multi-column Distincts?
+    // TODO: How will this work for multi-column Distincts?
     //
-    protected int m_distinctColumnGuid;
-    protected String m_distinctColumnName;
+    protected AbstractExpression m_distinctExpression;
 
-    public DistinctPlanNode(PlannerContext context) {
-        super(context);
+    public DistinctPlanNode() {
+        super();
     }
 
     /**
@@ -46,10 +47,9 @@ public class DistinctPlanNode extends AbstractPlanNode {
      * @return copy
      */
     public DistinctPlanNode produceCopyForTransformation() {
-        DistinctPlanNode copy = new DistinctPlanNode(m_context);
+        DistinctPlanNode copy = new DistinctPlanNode();
         super.produceCopyForTransformation(copy);
-        copy.m_distinctColumnGuid = m_distinctColumnGuid;
-        copy.m_distinctColumnName = m_distinctColumnName;
+        copy.m_distinctExpression = m_distinctExpression;
         return copy;
     }
 
@@ -59,31 +59,55 @@ public class DistinctPlanNode extends AbstractPlanNode {
     }
 
     /**
-     * @return the distinct_column GUID
+     * Set the expression to be distinct'd (verbing nouns weirds language)
+     * @param expr
      */
-    public Integer getDistinctColumnGuid() {
-        return m_distinctColumnGuid;
+    public void setDistinctExpression(AbstractExpression expr)
+    {
+        if (expr != null)
+        {
+            // PlanNodes all need private deep copies of expressions
+            // so that the resolveColumnIndexes results
+            // don't get bashed by other nodes or subsequent planner runs
+            try
+            {
+                m_distinctExpression = (AbstractExpression) expr.clone();
+            }
+            catch (CloneNotSupportedException e)
+            {
+                // This shouldn't ever happen
+                e.printStackTrace();
+                throw new RuntimeException(e.getMessage());
+            }
+        }
     }
 
-    /**
-     * @param distinctColumnGuid the distinct_column_guid to set
-     */
-    public void setDistinctColumnGuid(int distinctColumnGuid) {
-        m_distinctColumnGuid = distinctColumnGuid;
-    }
+    @Override
+    public void resolveColumnIndexes()
+    {
+        // Need to order and resolve indexes of output columns AND
+        // the distinct column
+        assert(m_children.size() == 1);
+        m_children.get(0).resolveColumnIndexes();
+        NodeSchema input_schema = m_children.get(0).getOutputSchema();
+        for (SchemaColumn col : m_outputSchema.getColumns())
+        {
+            // At this point, they'd better all be TVEs.
+            assert(col.getExpression() instanceof TupleValueExpression);
+            TupleValueExpression tve = (TupleValueExpression)col.getExpression();
+            int index = input_schema.getIndexOfTve(tve);
+            tve.setColumnIndex(index);
+        }
+        m_outputSchema.sortByTveIndex();
 
-    /**
-     * @return the distinct_column_name
-     */
-    public String getDistinctColumnName() {
-        return m_distinctColumnName;
-    }
-
-    /**
-     * @param distinct_column_name the distinct_column name to set
-     */
-    public void setDistinctColumnName(String distinct_column_name) {
-        m_distinctColumnName = distinct_column_name;
+        // Now resolve the indexes in the distinct expression
+        List<TupleValueExpression> distinct_tves =
+            ExpressionUtil.getTupleValueExpressions(m_distinctExpression);
+        for (TupleValueExpression tve : distinct_tves)
+        {
+            int index = input_schema.getIndexOfTve(tve);
+            tve.setColumnIndex(index);
+        }
     }
 
     @Override
@@ -94,7 +118,9 @@ public class DistinctPlanNode extends AbstractPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.DISTINCT_COLUMN_GUID.name()).value(m_distinctColumnGuid);
-        stringer.key(Members.DISTINCT_COLUMN_NAME.name()).value(m_distinctColumnName);
+        stringer.key(Members.DISTINCT_EXPRESSION.name());
+        stringer.object();
+        m_distinctExpression.toJSONString(stringer);
+        stringer.endObject();
     }
 }

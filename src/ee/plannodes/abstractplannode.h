@@ -46,6 +46,8 @@
 #ifndef HSTOREPLANNODE_H
 #define HSTOREPLANNODE_H
 
+#include "SchemaColumn.h"
+
 #include "catalog/database.h"
 #include "common/ids.h"
 #include "common/types.h"
@@ -59,8 +61,8 @@
 namespace voltdb
 {
 class AbstractExecutor;
-class PlanColumn;
 class Table;
+class TupleSchema;
 
 class AbstractPlanNode
 {
@@ -112,7 +114,22 @@ public:
     //
     virtual PlanNodeType getPlanNodeType() const = 0;
 
-    std::vector<int> getOutputColumnGuids() const;
+    /**
+     * Get the output columns that make up the output schema for
+     * this plan node.  The column order is implicit in their
+     * order in this vector.
+     */
+    const std::vector<SchemaColumn*>& getOutputSchema() const;
+
+    /**
+     * Convenience method:
+     * Generate a TupleSchema based on the contents of the output schema
+     * from the plan
+     *
+     * @param allowNulls whether or not the generated schema should
+     * permit null values in the output columns
+     */
+    TupleSchema* generateTupleSchema(bool allowNulls);
 
     // ------------------------------------------------------------------
     // UTILITY METHODS
@@ -120,9 +137,6 @@ public:
     static AbstractPlanNode*
     fromJSONObject(json_spirit::Object& obj,
                    const catalog::Database* catalog_db);
-
-    virtual int getColumnIndexFromGuid(int guid,
-                                       const catalog::Database* db) const;
 
     // Debugging convenience methods
     std::string debug() const;
@@ -183,7 +197,7 @@ protected:
     std::map<PlanNodeType, AbstractPlanNode*> m_inlineNodes;
     bool m_isInline;
 
-    std::vector<int32_t> m_outputColumnGuids;
+    std::vector<SchemaColumn*> m_outputSchema;
 };
 
 }

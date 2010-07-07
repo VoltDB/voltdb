@@ -49,8 +49,6 @@ public class Fragmentizer {
         // there should be only one fragment in the plan at this point
         CompiledPlan.Fragment rootFragment = plan.fragments.get(0);
 
-        rootFragment.planGraph.updateOutputColumns(db);
-
         // chop up the plan and set all the proper dependencies recursively
         recursiveFindFragment(rootFragment, rootFragment.planGraph, plan.fragments);
 
@@ -94,17 +92,6 @@ public class Fragmentizer {
             subFrag.planGraph = sendNode;
             currentFragment.hasDependencies = true;
             fragments.add(subFrag);
-
-            // THIS NEXT CHUNK OF CODE IS BROKEN BY THE 2-FRAGS
-            // PER PLAN ASSUMPTION
-            // make sure the parent fragment depends on the child
-            // sorry this is ugly append to an array code
-            /*int[] parentDepList = currentFragment.dependencyIds;
-            int[] newDepList = new int[parentDepList.length + 1];
-            for (int i = 0; i < parentDepList.length; i++)
-                newDepList[i] = parentDepList[i];
-            newDepList[newDepList.length - 1] = sendNode.getDependencyId();
-            currentFragment.dependencyIds = newDepList;*/
 
             // recursive call on the new fragment
             recursiveFindFragment(subFrag, sendNode, fragments);

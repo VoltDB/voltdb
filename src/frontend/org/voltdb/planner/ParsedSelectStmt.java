@@ -27,10 +27,6 @@ import org.voltdb.expressions.ExpressionUtil;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 
-/**
- *
- *
- */
 public class ParsedSelectStmt extends AbstractParsedStmt {
 
     public static class ParsedColInfo {
@@ -117,6 +113,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                     child.getAttributes().getNamedItem("column").getNodeValue();
                 col.tableName =
                     child.getAttributes().getNamedItem("table").getNodeValue();
+            }
+            else
+            {
+                // XXX hacky, assume all non-column refs come from a temp table
+                col.tableName = "VOLT_TEMP_TABLE";
+                col.columnName = "";
             }
             col.index = allColumns.size();
             displayColumns.add(col);

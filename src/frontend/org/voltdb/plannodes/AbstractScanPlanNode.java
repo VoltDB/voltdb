@@ -18,15 +18,14 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import org.voltdb.VoltType;
 import org.voltdb.catalog.*;
 import org.json.JSONException;
 import org.json.JSONStringer;
 import org.voltdb.expressions.*;
-import org.voltdb.planner.PlanColumn;
-import org.voltdb.planner.PlannerContext;
-import org.voltdb.planner.PlanColumn.SortOrder;
+import org.voltdb.types.PlanNodeType;
 import org.voltdb.utils.CatalogUtil;
 
 public abstract class AbstractScanPlanNode extends AbstractPlanNode {
@@ -36,14 +35,19 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         TARGET_TABLE_NAME;
     }
 
+    // Store the columns from the table as an internal NodeSchema
+    // for consistency of interface
+    protected NodeSchema m_tableSchema = null;
+    // Store the columns we use from this table as an internal schema
+    protected NodeSchema m_tableScanSchema = new NodeSchema();
     protected AbstractExpression m_predicate;
 
     // The target table is the table that the plannode wants to perform some operation on.
     protected String m_targetTableName = "";
     protected String m_targetTableAlias = null;
 
-    protected AbstractScanPlanNode(PlannerContext context) {
-        super(context);
+    protected AbstractScanPlanNode() {
+        super();
     }
 
     @Override
@@ -61,6 +65,16 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         //
         if (m_predicate != null) {
             m_predicate.validate();
+        }
+        // All the schema columns better reference this table
+        for (SchemaColumn col : m_tableScanSchema.getColumns())
+        {
+            if (!m_targetTableName.equals(col.getTableName()))
+            {
+                throw new Exception("ERROR: The scan column: " + col.getColumnName() +
+                                    " in table: " + m_targetTableName + " refers to " +
+                                    " table: " + col.getTableName());
+            }
         }
     }
 
@@ -101,37 +115,55 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
     /**
      * @param predicate the predicate to set
+     *
      */
     public void setPredicate(AbstractExpression predicate) {
-        m_predicate = predicate;
+        if (predicate != null)
+        {
+            // PlanNodes all need private deep copies of expressions
+            // so that the resolveColumnIndexes results
+            // don't get bashed by other nodes or subsequent planner runs
+            try
+            {
+                m_predicate = (AbstractExpression) predicate.clone();
+            }
+            catch (CloneNotSupportedException e)
+            {
+                // This shouldn't ever happen
+                e.printStackTrace();
+                throw new RuntimeException(e.getMessage());
+            }
+        }
     }
 
-    /**
-     * Initialize output columns
-     * @param db
-     */
-    @SuppressWarnings("unchecked")
+    public void setScanColumns(ArrayList<SchemaColumn> scanColumns)
+    {
+        if (scanColumns != null)
+        {
+            for (SchemaColumn col : scanColumns)
+            {
+                m_tableScanSchema.addColumn(col.clone());
+            }
+        }
+    }
+
+    NodeSchema getTableSchema()
+    {
+        return m_tableSchema;
+    }
 
     @Override
-    protected ArrayList<Integer> createOutputColumns(Database db, ArrayList<Integer> input) {
-        assert(m_children.isEmpty());
-
-        // the planner gleefully re-calculates output columns multiple times
-        // but this state should be idempotent w.r.t. to subsequent calls.
-        if (m_outputColumns.isEmpty()) {
-
+    public void generateOutputSchema(Database db)
+    {
+        // fill in the table schema if we haven't already
+        if (m_tableSchema == null)
+        {
+            m_tableSchema = new NodeSchema();
             CatalogMap<Column> cols =
                 db.getTables().getIgnoreCase(m_targetTableName).getColumns();
-
-            PlanColumn.Storage storage = PlanColumn.Storage.kPartitioned;
-            if (db.getTables().getIgnoreCase(m_targetTableName).getIsreplicated())
-                storage = PlanColumn.Storage.kReplicated;
-
-            // construct the columns and store them in index-ordering
-            PlanColumn orderedCols[] = new PlanColumn[cols.size()];
-
             // you don't strictly need to sort this, but it makes diff-ing easier
-            for (Column col : CatalogUtil.getSortedCatalogItems(cols, "index")) {
+            for (Column col : CatalogUtil.getSortedCatalogItems(cols, "index"))
+            {
                 // must produce a tuple value expression for this column.
                 TupleValueExpression tve = new TupleValueExpression();
                 tve.setValueType(VoltType.get((byte)col.getType()));
@@ -140,17 +172,112 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 tve.setTableName(m_targetTableName);
                 tve.setColumnAlias(col.getTypeName());
                 tve.setColumnName(col.getTypeName());
-
-                orderedCols[col.getIndex()] =
-                    m_context.getPlanColumn(tve, col.getTypeName(), SortOrder.kUnsorted, storage);
+                m_tableSchema.addColumn(new SchemaColumn(m_targetTableName,
+                                                         col.getTypeName(),
+                                                         col.getTypeName(),
+                                                         tve));
             }
-
-            // populate column collection in index (output) order
-            for (int i=0; i < orderedCols.length; ++i)
-                m_outputColumns.add(orderedCols[i].guid());
         }
 
-        return (ArrayList<Integer>)m_outputColumns.clone();
+        // Until the scan has an implicit projection rather than an explicitly
+        // inlined one, the output schema generation is going to be a bit odd.
+        // It will depend on two bits of state: whether any scan columns were
+        // specified for this table and whether or not there is an inlined
+        // projection.
+        //
+        // If there is an inlined projection, then we'll just steal that
+        // output schema as our own.
+        // If there is no inlined projection, then, if there are no scan columns
+        // specified, use the entire table's schema as the output schema.
+        // Otherwise add an inline projection that projects the scan columns
+        // and then take that output schema as our own.
+        // These have the effect of repeatably generating the correct output
+        // schema if called again and again, but also allowing the planner
+        // to overwrite the inline projection and still have the right thing
+        // happen
+        ProjectionPlanNode proj =
+            (ProjectionPlanNode)getInlinePlanNode(PlanNodeType.PROJECTION);
+        if (proj != null)
+        {
+            // Does this operation needs to change complex expressions
+            // into tuple value expressions with an column alias?
+            // Is this always true for clone?  Or do we need a new method?
+            m_outputSchema = proj.getOutputSchema().copyAndReplaceWithTVE();
+        }
+        else
+        {
+            if (m_tableScanSchema.size() != 0)
+            {
+                // Order the scan columns according to the table schema
+                // before we stick them in the projection output
+                List<TupleValueExpression> scan_tves =
+                    new ArrayList<TupleValueExpression>();
+                for (SchemaColumn col : m_tableScanSchema.getColumns())
+                {
+                    assert(col.getExpression() instanceof TupleValueExpression);
+                    scan_tves.addAll(ExpressionUtil.getTupleValueExpressions(col.getExpression()));
+                }
+                // and update their indexes against the table schema
+                for (TupleValueExpression tve : scan_tves)
+                {
+                    int index = m_tableSchema.getIndexOfTve(tve);
+                    tve.setColumnIndex(index);
+                }
+                m_tableScanSchema.sortByTveIndex();
+                // Create inline projection to map table outputs to scan outputs
+                ProjectionPlanNode map = new ProjectionPlanNode();
+                map.setOutputSchema(m_tableScanSchema);
+                addInlinePlanNode(map);
+                // a bit redundant but logically consistent
+                m_outputSchema = map.getOutputSchema().copyAndReplaceWithTVE();
+            }
+            else
+            {
+                // just fill m_outputSchema with the table's columns
+                m_outputSchema = m_tableSchema.clone();
+            }
+        }
+    }
+
+    public void resolveColumnIndexes()
+    {
+        // The following applies to both seq and index scan.  Index scan has
+        // some additional expressions that need to be handled as well
+
+        // predicate expression
+        List<TupleValueExpression> predicate_tves =
+            ExpressionUtil.getTupleValueExpressions(m_predicate);
+        for (TupleValueExpression tve : predicate_tves)
+        {
+            int index = m_tableSchema.getIndexOfTve(tve);
+            tve.setColumnIndex(index);
+        }
+
+        // inline projection
+        ProjectionPlanNode proj =
+            (ProjectionPlanNode)getInlinePlanNode(PlanNodeType.PROJECTION);
+        if (proj != null)
+        {
+            proj.resolveColumnIndexesUsingSchema(m_tableSchema);
+            m_outputSchema = proj.getOutputSchema().clone();
+        }
+        else
+        {
+            // output columns
+            // if there was an inline projection we will have copied these already
+            // otherwise we need to iterate through the output schema TVEs
+            // and sort them by table schema index order.
+
+            for (SchemaColumn col : m_outputSchema.getColumns())
+            {
+                // At this point, they'd better all be TVEs.
+                assert(col.getExpression() instanceof TupleValueExpression);
+                TupleValueExpression tve = (TupleValueExpression)col.getExpression();
+                int index = m_tableSchema.getIndexOfTve(tve);
+                tve.setColumnIndex(index);
+            }
+            m_outputSchema.sortByTveIndex();
+        }
     }
 
     @Override
