@@ -22,9 +22,12 @@
  */
 package org.voltdb.fault;
 
+import org.voltdb.VoltDB;
 import org.voltdb.fault.VoltFault.FaultType;
 
 import junit.framework.TestCase;
+import java.util.Set;
+import java.util.concurrent.Semaphore;
 
 public class TestFaultDistributor extends TestCase
 {
@@ -34,6 +37,7 @@ public class TestFaultDistributor extends TestCase
         boolean m_gotFault;
         int m_order;
         OrderTracker m_orderTracker;
+        Semaphore m_handledFaults = new Semaphore(0);
 
         public MockFaultHandler(FaultType type)
         {
@@ -51,16 +55,19 @@ public class TestFaultDistributor extends TestCase
         }
 
         @Override
-        public void faultOccured(VoltFault fault)
+        public void faultOccured(Set<VoltFault> faults)
         {
-            if (fault.getFaultType() == m_faultType)
-            {
-                m_gotFault = true;
+            for (VoltFault fault : faults) {
+                if (fault.getFaultType() == m_faultType)
+                {
+                    m_gotFault = true;
+                }
+                if (m_orderTracker != null)
+                {
+                    m_orderTracker.updateOrder(m_order);
+                }
             }
-            if (m_orderTracker != null)
-            {
-                m_orderTracker.updateOrder(m_order);
-            }
+            m_handledFaults.release();
         }
     }
 
@@ -85,7 +92,7 @@ public class TestFaultDistributor extends TestCase
         }
     }
 
-    public void testBasicDispatch()
+    public void testBasicDispatch() throws Exception
     {
         FaultDistributor dut = new FaultDistributor();
         MockFaultHandler unk_handler = new MockFaultHandler(FaultType.UNKNOWN);
@@ -93,14 +100,16 @@ public class TestFaultDistributor extends TestCase
         dut.registerFaultHandler(FaultType.UNKNOWN, unk_handler, 1);
         dut.registerFaultHandler(FaultType.NODE_FAILURE, node_handler, 1);
         dut.reportFault(new VoltFault(FaultType.UNKNOWN));
+        unk_handler.m_handledFaults.acquire();
         assertTrue(unk_handler.m_gotFault);
         assertFalse(node_handler.m_gotFault);
         dut.reportFault(new VoltFault(FaultType.NODE_FAILURE));
+        node_handler.m_handledFaults.acquire();
         assertTrue(node_handler.m_gotFault);
     }
 
     // multiple handlers for same type
-    public void testMultiHandler()
+    public void testMultiHandler() throws Exception
     {
         FaultDistributor dut = new FaultDistributor();
         MockFaultHandler node_handler1 = new MockFaultHandler(FaultType.NODE_FAILURE);
@@ -108,12 +117,14 @@ public class TestFaultDistributor extends TestCase
         MockFaultHandler node_handler2 = new MockFaultHandler(FaultType.NODE_FAILURE);
         dut.registerFaultHandler(FaultType.NODE_FAILURE, node_handler2, 1);
         dut.reportFault(new VoltFault(FaultType.NODE_FAILURE));
+        node_handler1.m_handledFaults.acquire();
+        node_handler2.m_handledFaults.acquire();
         assertTrue(node_handler1.m_gotFault);
         assertTrue(node_handler2.m_gotFault);
     }
 
     // no handler installed for type
-    public void testNoHandler()
+    public void testNoHandler() throws Exception
     {
         FaultDistributor dut = new FaultDistributor();
         // We lie a little bit here to get the NODE_FAILURE routed to UNKNOWN
@@ -121,10 +132,11 @@ public class TestFaultDistributor extends TestCase
         MockFaultHandler unk_handler = new MockFaultHandler(FaultType.NODE_FAILURE);
         dut.registerDefaultHandler(unk_handler);
         dut.reportFault(new VoltFault(FaultType.NODE_FAILURE));
+        unk_handler.m_handledFaults.acquire();
         assertTrue(unk_handler.m_gotFault);
     }
 
-    public void testSingleTypeOrder()
+    public void testSingleTypeOrder() throws Exception
     {
         FaultDistributor dut = new FaultDistributor();
         OrderTracker order_tracker = new OrderTracker(-1);
@@ -149,6 +161,7 @@ public class TestFaultDistributor extends TestCase
         dut.registerFaultHandler(FaultType.NODE_FAILURE, node_handler5a, 5);
         dut.registerFaultHandler(FaultType.NODE_FAILURE, node_handler2, 2);
         dut.reportFault(new VoltFault(FaultType.NODE_FAILURE));
+        node_handler7.m_handledFaults.acquire();
         assertTrue(node_handler1.m_gotFault);
         assertTrue(node_handler2.m_gotFault);
         assertTrue(node_handler2a.m_gotFault);

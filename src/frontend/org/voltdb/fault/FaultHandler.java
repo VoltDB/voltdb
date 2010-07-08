@@ -16,19 +16,25 @@
  */
 package org.voltdb.fault;
 
+import java.util.Set;
+
 /**
  * The FaultHandler interface should be implemented by any object wishing to
  * receive callback notification when a fault occurs.
  */
 public interface FaultHandler
 {
+
     /**
      * This method will be called by the FaultDistributor when this object
      * is a registered handler for a fault.
      *
-     * @param fault The fault which occured.  Objects implementing this interface
+     * @param faults The faults which have occured but not handled by this handler.  Objects implementing this interface
      *              and registering interest in particular FaultTypes will
-     *              need to downcast this VoltFault to the appropriate subclass
+     *              need to downcast this VoltFault to the appropriate subclass. The set of faults
+     *              includes all faults that have not been reported as handled by this fault handler since it was
+     *              registered. Unhandled faults are reported once when they are first detected and repeatedly along
+     *              with any new faults that are detected until the unhandled fault is reported as handled.
      */
-    public void faultOccured(VoltFault fault);
+    public void faultOccured(Set<VoltFault> faults);
 }

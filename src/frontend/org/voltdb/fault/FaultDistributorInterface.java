@@ -51,8 +51,16 @@ public interface FaultDistributorInterface
     public abstract void reportFault(VoltFault fault);
 
     /**
+     * Report that the fault has been handled by the specified handler and that
+     * it should no longer be included in the list of outstanding faults. The report
+     * is asynchronous so it is still possible for the fault to be delivered to the handler
+     * if reportFaultHandled is invoked outside the handler.
+     */
+    public abstract void reportFaultHandled(FaultHandler handler, VoltFault fault);
+
+    /**
      * Tell the fault distributor that the server is being shut down.
      * Prevents many false positives that prevent an orderly shutdown.
      */
-    public abstract void shutDown();
+    public abstract void shutDown() throws InterruptedException;
 }

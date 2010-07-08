@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.PrivateVoltTableFactory;
@@ -55,19 +56,22 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
     private class InitiatorNodeFailureFaultHandler implements FaultHandler
     {
         @Override
-        public void faultOccured(VoltFault fault)
+        public void faultOccured(Set<VoltFault> faults)
         {
-            if (fault instanceof NodeFailureFault)
-            {
-                NodeFailureFault node_fault = (NodeFailureFault) fault;
-                ArrayList<Integer> dead_sites =
-                    VoltDB.instance().getCatalogContext().siteTracker.
-                    getAllSitesForHost(node_fault.getHostId());
-                for (Integer site_id : dead_sites)
+            for (VoltFault fault : faults) {
+                if (fault instanceof NodeFailureFault)
                 {
-                    removeSite(site_id);
-                    m_safetyState.removeState(site_id);
+                    NodeFailureFault node_fault = (NodeFailureFault) fault;
+                    ArrayList<Integer> dead_sites =
+                        VoltDB.instance().getCatalogContext().siteTracker.
+                        getAllSitesForHost(node_fault.getHostId());
+                    for (Integer site_id : dead_sites)
+                    {
+                        removeSite(site_id);
+                        m_safetyState.removeState(site_id);
+                    }
                 }
+                VoltDB.instance().getFaultDistributor().reportFaultHandled(this, fault);
             }
         }
     }

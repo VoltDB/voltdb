@@ -62,10 +62,9 @@ public class SiteMailbox implements Mailbox {
     public void deliver(VoltMessage message) {
         assert(message != null);
         final Queue<VoltMessage> dq = m_messages.get(message.getSubject());
-        assert(dq != null);
-        synchronized (dq) {
+        synchronized (this) {
             dq.offer(message);
-            dq.notify();
+            this.notify();
         }
 
         // tag some extra transient data for debugging
@@ -106,17 +105,18 @@ public class SiteMailbox implements Mailbox {
 
     @Override
     public VoltMessage recv() {
-        return recv(Subject.DEFAULT);
+        return recv(m_defaultSubjects);
     }
 
     @Override
     public VoltMessage recvBlocking() {
-        return recvBlocking(Subject.DEFAULT);
+        return recvBlocking(m_defaultSubjects);
     }
 
+    private static final Subject m_defaultSubjects[] = new Subject[] { Subject.FAILURE, Subject.DEFAULT };
     @Override
     public VoltMessage recvBlocking(long timeout) {
-        return recvBlocking(Subject.DEFAULT, timeout);
+        return recvBlocking(m_defaultSubjects, timeout);
     }
 
     @Override
@@ -195,44 +195,59 @@ public class SiteMailbox implements Mailbox {
     }
 
     @Override
-    public VoltMessage recv(Subject s) {
-        final Queue<VoltMessage> dq = m_messages.get(s.getId());
-        assert(dq != null);
-        synchronized (dq) {
-            return dq.poll();
-        }
-    }
-
-    @Override
-    public VoltMessage recvBlocking(Subject s) {
-        try {
+    public synchronized VoltMessage recv(Subject subjects[]) {
+        for (Subject s : subjects) {
             final Queue<VoltMessage> dq = m_messages.get(s.getId());
             assert(dq != null);
-            synchronized (dq) {
-                while (dq.isEmpty()) {
-                    dq.wait();
-                }
-                final VoltMessage message = dq.poll();
-                assert(message != null);
-                return message;
+            VoltMessage m = dq.poll();
+            if (m != null) {
+                return m;
             }
-        } catch (InterruptedException e) {
         }
         return null;
     }
 
     @Override
-    public VoltMessage recvBlocking(Subject s, long timeout) {
-        try {
-            final Queue<VoltMessage> dq = m_messages.get(s.getId());
-            assert(dq != null);
-            synchronized (dq) {
-                if (dq.isEmpty()) {
-                    dq.wait(timeout);
+    public synchronized VoltMessage recvBlocking(Subject subjects[]) {
+        VoltMessage message = null;
+        while (message == null) {
+            for (Subject s : subjects) {
+                final Queue<VoltMessage> dq = m_messages.get(s.getId());
+                message = dq.poll();
+                if (message != null) {
+                    return message;
                 }
-                return dq.poll();
             }
+            try {
+                this.wait();
+            } catch (InterruptedException e) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public synchronized VoltMessage recvBlocking(Subject subjects[], long timeout) {
+        VoltMessage message = null;
+        for (Subject s : subjects) {
+            final Queue<VoltMessage> dq = m_messages.get(s.getId());
+            message = dq.poll();
+            if (message != null) {
+                return message;
+            }
+        }
+        try {
+            this.wait(timeout);
         } catch (InterruptedException e) {
+            return null;
+        }
+        for (Subject s : subjects) {
+            final Queue<VoltMessage> dq = m_messages.get(s.getId());
+            message = dq.poll();
+            if (message != null) {
+                return message;
+            }
         }
         return null;
     }

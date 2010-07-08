@@ -51,7 +51,6 @@
 package org.voltdb.messaging;
 
 import java.util.*;
-import java.util.concurrent.LinkedBlockingQueue;
 
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
@@ -65,9 +64,18 @@ public class MockMailbox implements Mailbox {
         postoffice.put(siteId, mbox);
     }
 
-    public MockMailbox(LinkedBlockingQueue<VoltMessage> queue) {
-        incomingMessages = queue;
-        m_failureNoticeMessages = new LinkedBlockingQueue<VoltMessage>();
+    public MockMailbox(Queue<VoltMessage> queue) {
+        for (Subject s : Subject.values()) {
+            if (s.equals(Subject.DEFAULT)) {
+                if (queue == null) {
+                    m_messages.add( s.getId(), new ArrayDeque<VoltMessage>());
+                } else {
+                    m_messages.add( s.getId(), queue);
+                }
+            } else {
+                m_messages.add( s.getId(), new ArrayDeque<VoltMessage>());
+            }
+        }
     }
 
     public void send(int siteId, int mailboxId, VoltMessage message) throws MessagingException {
@@ -92,55 +100,77 @@ public class MockMailbox implements Mailbox {
         throw new UnsupportedOperationException();
     }
 
+    private static final Subject m_defaultSubjects[] = new Subject[] { Subject.FAILURE_SITE_UPDATE, Subject.DEFAULT };
+
     public VoltMessage recv() {
-        return recv(Subject.DEFAULT);
+        return recv(m_defaultSubjects);
     }
 
     public VoltMessage recvBlocking() {
-        return recvBlocking(Subject.DEFAULT);
+        return recvBlocking(m_defaultSubjects);
     }
 
     @Override
     public VoltMessage recvBlocking(long timeout) {
-        return recvBlocking(Subject.DEFAULT, timeout);
+        return recvBlocking(m_defaultSubjects, timeout);
     }
 
     @Override
-    public VoltMessage recv(Subject s) {
-        if (s == Subject.DEFAULT)
-            return incomingMessages.poll();
-        else
-            return m_failureNoticeMessages.poll();
-    }
-
-    @Override
-    public VoltMessage recvBlocking(Subject s) {
-        try {
-            if (s == Subject.DEFAULT)
-                return incomingMessages.take();
-
-            else
-                return m_failureNoticeMessages.take();
+    public synchronized VoltMessage recv(Subject subjects[]) {
+        for (Subject s : subjects) {
+            final Queue<VoltMessage> dq = m_messages.get(s.getId());
+            assert(dq != null);
+            VoltMessage m = dq.poll();
+            if (m != null) {
+                return m;
+            }
         }
-        catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-
+        return null;
     }
 
     @Override
-    public VoltMessage recvBlocking(Subject s, long timeout) {
-        do {
+    public synchronized VoltMessage recvBlocking(Subject subjects[]) {
+        VoltMessage message = null;
+        while (message == null) {
+            for (Subject s : subjects) {
+                final Queue<VoltMessage> dq = m_messages.get(s.getId());
+                message = dq.poll();
+                if (message != null) {
+                    return message;
+                }
+            }
             try {
-                if (s == Subject.DEFAULT)
-                    return incomingMessages.take();
-                else
-                    return m_failureNoticeMessages.take();
+                this.wait();
+            } catch (InterruptedException e) {
+                return null;
             }
-            catch (InterruptedException e) {
-                e.printStackTrace();
+        }
+        return null;
+    }
+
+    @Override
+    public synchronized VoltMessage recvBlocking(Subject subjects[], long timeout) {
+        VoltMessage message = null;
+        for (Subject s : subjects) {
+            final Queue<VoltMessage> dq = m_messages.get(s.getId());
+            message = dq.poll();
+            if (message != null) {
+                return message;
             }
-        } while (true);
+        }
+        try {
+            this.wait(timeout);
+        } catch (InterruptedException e) {
+            return null;
+        }
+        for (Subject s : subjects) {
+            final Queue<VoltMessage> dq = m_messages.get(s.getId());
+            message = dq.poll();
+            if (message != null) {
+                return message;
+            }
+        }
+        return null;
     }
 
     public VoltMessage popLastMessage() {
@@ -161,10 +191,11 @@ public class MockMailbox implements Mailbox {
 
     @Override
     public void deliver(VoltMessage message) {
-        if (message.getSubject() == Subject.DEFAULT.getId())
-            incomingMessages.offer(message);
-        else
-            m_failureNoticeMessages.offer(message);
+        final Queue<VoltMessage> dq = m_messages.get(message.getSubject());
+        synchronized (this) {
+            dq.offer(message);
+            this.notify();
+        }
     }
 
     public VoltMessage next;
@@ -181,11 +212,7 @@ public class MockMailbox implements Mailbox {
         public final VoltMessage contents;
     }
 
-    // Queue for DEFAULT Messages
-    private final LinkedBlockingQueue<VoltMessage> incomingMessages;
-
-    // Queue for FAILURE_SITE_UPDATE Messages
-    private final LinkedBlockingQueue<VoltMessage> m_failureNoticeMessages;
+    final ArrayList<Queue<VoltMessage>> m_messages = new ArrayList<Queue<VoltMessage>>();
 
     private final ArrayDeque<Message> outgoingMessages = new ArrayDeque<Message>();
 }

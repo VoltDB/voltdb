@@ -216,11 +216,10 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
      * Used to figure out what to do after an initiator fails.
      * @param initiatorId The id of the initiator that has failed.
      */
-    public long getNewestSafeTransactionForInitiator(int initiatorId) {
+    public Long getNewestSafeTransactionForInitiator(int initiatorId) {
         LastInitiatorData lid = m_initiatorData.get(initiatorId);
         if (lid == null) {
-            assert(false) : "No initiator data during failure processing.";
-            return Long.MIN_VALUE;
+            return null;
         }
         return lid.m_lastSafeTxnId;
     }

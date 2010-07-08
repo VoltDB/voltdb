@@ -30,6 +30,7 @@ import java.util.Collections;
 import java.util.Hashtable;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.Set;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
@@ -67,35 +68,38 @@ public class RealVoltDB implements VoltDBInterface
     private class VoltDBNodeFailureFaultHandler implements FaultHandler
     {
         @Override
-        public void faultOccured(VoltFault fault)
+        public void faultOccured(Set<VoltFault> faults)
         {
-            if (fault instanceof NodeFailureFault)
-            {
-                NodeFailureFault node_fault = (NodeFailureFault) fault;
-                ArrayList<Integer> dead_sites =
-                    VoltDB.instance().getCatalogContext().
-                    siteTracker.getAllSitesForHost(node_fault.getHostId());
-                Collections.sort(dead_sites);
-                hostLog.error("Host failed, hostname: " + node_fault.getHostname());
-                hostLog.error("  Host ID: " + node_fault.getHostId());
-                hostLog.error("  Removing sites from cluster: " + dead_sites);
-                StringBuilder sb = new StringBuilder();
-                for (int site_id : dead_sites)
+            for (VoltFault fault : faults) {
+                if (fault instanceof NodeFailureFault)
                 {
-                    sb.append("set ");
-                    String site_path = VoltDB.instance().getCatalogContext().catalog.
-                                       getClusters().get("cluster").getSites().
-                                       get(Integer.toString(site_id)).getPath();
-                    sb.append(site_path).append(" ").append("isUp false");
-                    sb.append("\n");
+                    NodeFailureFault node_fault = (NodeFailureFault) fault;
+                    ArrayList<Integer> dead_sites =
+                        VoltDB.instance().getCatalogContext().
+                        siteTracker.getAllSitesForHost(node_fault.getHostId());
+                    Collections.sort(dead_sites);
+                    hostLog.error("Host failed, hostname: " + node_fault.getHostname());
+                    hostLog.error("  Host ID: " + node_fault.getHostId());
+                    hostLog.error("  Removing sites from cluster: " + dead_sites);
+                    StringBuilder sb = new StringBuilder();
+                    for (int site_id : dead_sites)
+                    {
+                        sb.append("set ");
+                        String site_path = VoltDB.instance().getCatalogContext().catalog.
+                                           getClusters().get("cluster").getSites().
+                                           get(Integer.toString(site_id)).getPath();
+                        sb.append(site_path).append(" ").append("isUp false");
+                        sb.append("\n");
+                    }
+                    VoltDB.instance().clusterUpdate(sb.toString());
+                    if (m_catalogContext.siteTracker.getFailedPartitions().size() != 0)
+                    {
+                        hostLog.fatal("Failure of host " + node_fault.getHostId() +
+                                      " has rendered the cluster unviable.  Shutting down...");
+                        VoltDB.crashVoltDB();
+                    }
                 }
-                VoltDB.instance().clusterUpdate(sb.toString());
-                if (m_catalogContext.siteTracker.getFailedPartitions().size() != 0)
-                {
-                    hostLog.fatal("Failure of host " + node_fault.getHostId() +
-                                  " has rendered the cluster unviable.  Shutting down...");
-                    VoltDB.crashVoltDB();
-                }
+                VoltDB.instance().getFaultDistributor().reportFaultHandled(this, fault);
             }
         }
     }

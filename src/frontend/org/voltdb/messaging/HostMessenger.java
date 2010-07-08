@@ -182,6 +182,10 @@ public class HostMessenger implements Messenger {
         return m_messengerSites[localSiteId];
     }
 
+    public String getHostnameForHostID(int hostId) {
+        return m_foreignHosts[hostId].hostname();
+    }
+
     public void createLocalSite(int siteId) {
         assert m_initialized;
         int hostId = siteId / VoltDB.SITES_TO_HOST_DIVISOR;

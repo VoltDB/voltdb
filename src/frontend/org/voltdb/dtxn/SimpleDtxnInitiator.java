@@ -332,7 +332,6 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                 txn.isSinglePartition,
                 txn.invocation,
                 newestSafeTxnId); // this will allow all transactions to run for now
-        workRequest.setNonCoordinatorSites(txn.otherSiteIds);
 
         try {
             m_mailbox.send(txn.coordinatorId, 0, workRequest);

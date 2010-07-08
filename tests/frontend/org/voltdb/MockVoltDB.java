@@ -42,7 +42,7 @@ import org.voltdb.network.VoltNetwork;
 
 public class MockVoltDB implements VoltDBInterface
 {
-    private final Catalog m_catalog;
+    private Catalog m_catalog;
     private CatalogContext m_context;
     final String m_clusterName = "cluster";
     final String m_databaseName = "database";
@@ -111,7 +111,8 @@ public class MockVoltDB implements VoltDBInterface
         getSite(siteId).setIsup(true);
     }
 
-    public void killSite(int siteId) {
+    public synchronized void killSite(int siteId) {
+        m_catalog = m_catalog.deepCopy();
         getSite(siteId).setIsup(false);
     }
 

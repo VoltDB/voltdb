@@ -20,6 +20,7 @@ package org.voltdb.dtxn;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.HashSet;
 
 import org.voltdb.ExecutionSite;
 import org.voltdb.VoltTable;
@@ -168,6 +169,6 @@ public abstract class TransactionState implements Comparable<TransactionState> {
      * @param globalCommitPoint greatest committed transaction id in the cluster
      * @param failedSites list of execution and initiator sites that have failed
      */
-    public abstract void handleSiteFaults(ArrayList<Integer> failedSites);
+    public abstract void handleSiteFaults(HashSet<Integer> failedSites);
 
 }

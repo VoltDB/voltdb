@@ -66,6 +66,9 @@ public class SiteTracker {
     // note: this makes
     int[] m_tempOldSitesScratch = null;
 
+    private final HashMap<Integer, int[]> m_upExecutionSitesExcludingSite =
+        new HashMap<Integer, int[]>();
+
     /**
      * Given topology info, initialize all of this class's data structures.
      *
@@ -374,6 +377,25 @@ public class SiteTracker {
             retval[i] = tmplist.poll();
         }
         return retval;
+    }
+
+    public int[] getUpExecutionSitesExcludingSite(int excludedSite) {
+        int sites[] = m_upExecutionSitesExcludingSite.get(excludedSite);
+        if (sites == null) {
+            ArrayList<Integer> list = new ArrayList<Integer>();
+            for (Integer site : getUpExecutionSites()) {
+                if (site.intValue() != excludedSite) {
+                    list.add(site);
+                }
+            }
+            sites = new int[list.size()];
+            int ii = 0;
+            for (int site : list) {
+                sites[ii++] = site;
+            }
+            m_upExecutionSitesExcludingSite.put( excludedSite, sites);
+        }
+        return sites;
     }
 
     /**

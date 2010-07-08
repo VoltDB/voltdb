@@ -21,11 +21,14 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ConnectionUtil;
+import org.voltdb.fault.FaultHandler;
 import org.voltdb.fault.NodeFailureFault;
+import org.voltdb.fault.VoltFault;
 import org.voltdb.network.Connection;
 import org.voltdb.network.QueueMonitor;
 import org.voltdb.network.VoltProtocolHandler;
@@ -55,6 +58,24 @@ public class ForeignHost {
     boolean m_isUp;
 
     private long m_lastMessageMillis;
+
+    private class FHFaultHandler implements FaultHandler
+    {
+        @Override
+        public void faultOccured(Set<VoltFault> faults)
+        {
+            for (VoltFault fault : faults) {
+                if (fault instanceof NodeFailureFault)
+                {
+                    NodeFailureFault node_fault = (NodeFailureFault)fault;
+                    if (node_fault.getHostId() == m_hostId) {
+                        close();
+                    }
+                }
+                VoltDB.instance().getFaultDistributor().reportFaultHandled(this, fault);
+            }
+        }
+    }
 
     /** ForeignHost's implementation of InputHandler */
     public class FHInputHandler extends VoltProtocolHandler {
@@ -120,6 +141,15 @@ public class ForeignHost {
         m_closing = false;
         m_isUp = true;
         m_lastMessageMillis = Long.MAX_VALUE;
+        //TestMessaging doesn't have the real deal
+        if (VoltDB.instance() != null) {
+            if (VoltDB.instance().getFaultDistributor() != null) {
+                VoltDB.instance().getFaultDistributor().
+                    registerFaultHandler(
+                            org.voltdb.fault.VoltFault.FaultType.NODE_FAILURE,
+                            new FHFaultHandler(), NodeFailureFault.NODE_FAILURE_FOREIGN_HOST);
+            }
+        }
     }
 
     synchronized void close()
@@ -130,9 +160,14 @@ public class ForeignHost {
             m_connection.unregister();
     }
 
+    /*
+     * Huh!? The constructor registers the ForeignHost with VoltNetwork so finalizer
+     * will never get called unless the ForeignHost is unregistered with the VN.
+     */
     @Override
     protected void finalize() throws Throwable
     {
+        if (m_closing) return;
         close();
         super.finalize();
     }
@@ -198,7 +233,6 @@ public class ForeignHost {
             hostLog.info("\tcurrent time: " + current_time);
             hostLog.info("\tlast message: " + m_lastMessageMillis);
             hostLog.info("\tdelta: " + current_delta);
-            close();
             VoltDB.instance().getFaultDistributor().
             reportFault(new NodeFailureFault(m_hostId, m_remoteHostname));
         }
@@ -240,6 +274,10 @@ public class ForeignHost {
         out.put(hostnameBytes);
         out.rewind();
         m_connection.writeStream().enqueue(out);
+    }
+
+    String hostname() {
+        return m_remoteHostname;
     }
 
     /** Deliver a deserialized message from the network to a local mailbox */

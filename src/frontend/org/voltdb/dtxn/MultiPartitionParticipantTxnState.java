@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.HashSet;
 
 import org.voltdb.*;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
@@ -70,8 +71,9 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         {
             m_isCoordinator = true;
             InitiateTaskMessage task = (InitiateTaskMessage) notice;
-            m_nonCoordinatingSites = task.getNonCoordinatorSites();
-            m_readyWorkUnits.add(new WorkUnit(site.getSiteTracker(), task,
+            SiteTracker tracker = site.getSiteTracker();
+            m_nonCoordinatingSites = tracker.getUpExecutionSitesExcludingSite(m_siteId);
+            m_readyWorkUnits.add(new WorkUnit( tracker, task,
                                               null, m_siteId,
                                               null, false));
         }
@@ -523,7 +525,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
      * here is to make internal book keeping right.
      */
     @Override
-    public void handleSiteFaults(ArrayList<Integer> failedSites)
+    public void handleSiteFaults(HashSet<Integer> failedSites)
     {
         // remove failed sites from the non-coordinating lists
         // and decrement expected dependency response count

@@ -85,9 +85,10 @@ public class TestDtxnInitiatorQueue extends TestCase
         }
 
         @Override
-        public boolean enqueue(FastSerializable f)
+        public synchronized boolean enqueue(FastSerializable f)
         {
             m_gotResponse = true;
+            notify();
             return false;
         }
 
@@ -465,7 +466,7 @@ public class TestDtxnInitiatorQueue extends TestCase
 //        dut.removeSite(1);
 //    }
 
-    public void testFaultNotification()
+    public void testFaultNotification() throws Exception
     {
         MockInitiator initiator = new MockInitiator();
         ExecutorTxnIdSafetyState safetyState =
@@ -478,8 +479,11 @@ public class TestDtxnInitiatorQueue extends TestCase
         dut.addPendingTxn(createTxnState(0, 1, false, true));
         dut.offer(createInitiateResponse(0, 1, true, true, createResultSet("dude")));
 
-        NodeFailureFault node_failure = new NodeFailureFault(HOST_ID, "localhost");
-        VoltDB.instance().getFaultDistributor().reportFault(node_failure);
+        synchronized (m_testStream) {
+            NodeFailureFault node_failure = new NodeFailureFault(HOST_ID, "localhost");
+            VoltDB.instance().getFaultDistributor().reportFault(node_failure);
+            m_testStream.wait(10000);
+        }
 
         assertTrue(m_testStream.gotResponse());
         assertEquals(1, initiator.m_reduceCount);

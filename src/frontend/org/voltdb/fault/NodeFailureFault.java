@@ -18,6 +18,7 @@ package org.voltdb.fault;
 
 public class NodeFailureFault extends VoltFault
 {
+    public static int NODE_FAILURE_FOREIGN_HOST = 0;
     public static int NODE_FAILURE_CATALOG = 1;
     public static int NODE_FAILURE_INITIATOR = 2;
     public static int NODE_FAILURE_EXECUTION_SITE = 3;
@@ -39,6 +40,7 @@ public class NodeFailureFault extends VoltFault
         return m_hostname;
     }
 
+    @Override
     public String toString()
     {
         StringBuilder sb = new StringBuilder();
@@ -49,6 +51,22 @@ public class NodeFailureFault extends VoltFault
         sb.append(super.toString());
 
         return sb.toString();
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        if (other instanceof NodeFailureFault) {
+            NodeFailureFault ofault = (NodeFailureFault)other;
+            if (ofault.getHostId() == m_hostId && ofault.getHostname().equals(m_hostname)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public int hashCode() {
+        return m_hostId + m_hostname.hashCode();
     }
 
     private int m_hostId;

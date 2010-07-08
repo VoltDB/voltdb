@@ -18,6 +18,7 @@
 package org.voltdb.dtxn;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 
 import org.voltdb.ExecutionSite;
 import org.voltdb.TransactionIdManager;
@@ -91,7 +92,7 @@ public class SinglePartitionTxnState extends TransactionState {
     }
 
     @Override
-    public void handleSiteFaults(ArrayList<Integer> failedSites) {
+    public void handleSiteFaults(HashSet<Integer> failedSites) {
         // nothing to be done here.
     }
 }

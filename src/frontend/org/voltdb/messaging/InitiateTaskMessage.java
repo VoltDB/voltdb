@@ -34,7 +34,6 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
     boolean m_isSinglePartition;
     StoredProcedureInvocation m_invocation;
     long m_lastSafeTxnID; // this is the largest txn acked by all partitions running the java for it
-    int[] m_nonCoordinatorSites = null;
 
     /** Empty constructor for de-serialization */
     InitiateTaskMessage() {
@@ -53,10 +52,6 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
         m_invocation = invocation;
         m_invocation.buildParameterSet();
         m_lastSafeTxnID = lastSafeTxnID;
-    }
-
-    public void setNonCoordinatorSites(int[] siteIds) {
-        m_nonCoordinatorSites = siteIds;
     }
 
     @Override
@@ -90,10 +85,6 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
         return m_invocation.getParams().toArray();
     }
 
-    public int[] getNonCoordinatorSites() {
-        return m_nonCoordinatorSites;
-    }
-
     public long getLastSafeTxnId() {
         return m_lastSafeTxnID;
     }
@@ -112,8 +103,7 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
 
         // size of MembershipNotice
         int msgsize = super.getMessageByteCount();
-        msgsize += 1 + 2 + 8 + invocationBytes.remaining();
-        if (m_nonCoordinatorSites != null) msgsize += m_nonCoordinatorSites.length * 4;
+        msgsize += 1 + 8 + invocationBytes.remaining();
 
         if (m_buffer == null) {
             m_container = pool.acquire(msgsize + 1 + HEADER_SIZE);
@@ -129,13 +119,6 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
         m_buffer.putLong(m_lastSafeTxnID);
 
         m_buffer.put(m_isSinglePartition ? (byte) 1 : (byte) 0);
-        if (m_nonCoordinatorSites == null)
-            m_buffer.putShort((short) 0);
-        else {
-            m_buffer.putShort((short) m_nonCoordinatorSites.length);
-            for (int i = 0; i < m_nonCoordinatorSites.length; i++)
-                m_buffer.putInt(m_nonCoordinatorSites[i]);
-        }
         m_buffer.put(invocationBytes);
         m_buffer.limit(m_buffer.position());
     }
@@ -148,12 +131,6 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
         m_lastSafeTxnID = m_buffer.getLong();
 
         m_isSinglePartition = m_buffer.get() == 1;
-        int siteCount = m_buffer.getShort();
-        if (siteCount > 0) {
-            m_nonCoordinatorSites = new int[siteCount];
-            for (int i = 0; i < siteCount; i++)
-                m_nonCoordinatorSites[i] = m_buffer.getInt();
-        }
         FastDeserializer fds = new FastDeserializer(m_buffer);
         try {
             m_invocation = fds.readObject(StoredProcedureInvocation.class);
@@ -186,13 +163,6 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
             sb.append("MULTI PARTITION, ");
         sb.append("COORD ");
         sb.append(m_coordinatorSiteId);
-
-        if ((m_nonCoordinatorSites != null) && (m_nonCoordinatorSites.length > 0)) {
-            sb.append("\n  NON-COORD SITES: ");
-            for (int i : m_nonCoordinatorSites)
-                sb.append(i).append(", ");
-            sb.setLength(sb.lastIndexOf(", "));
-        }
 
         sb.append("\n  PROCEDURE: ");
         sb.append(m_invocation.getProcName());

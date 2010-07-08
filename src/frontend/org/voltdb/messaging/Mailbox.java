@@ -68,14 +68,14 @@ public interface Mailbox {
     public int getWaitingCount();
 
     /**
-     * Get the next Object from this messaging queue from the default subject.
+     * Get the next Object from this messaging queue from the default subjects.
      *
      * @return A message object on success or null if no object is waiting.
      */
     public VoltMessage recv();
 
     /**
-     * Get the next Object from this messaging queue from the default subject. Blocks if no messages
+     * Get the next Object from this messaging queue from the default subjects. Blocks if no messages
      * are available.
      *
      * @return A message object on success or null if interrupted
@@ -83,7 +83,7 @@ public interface Mailbox {
     public VoltMessage recvBlocking();
 
     /**
-     * Get the next Object from this messaging queue from the default subject.. Blocks if no messages
+     * Get the next Object from this messaging queue from the default subjects. Blocks if no messages
      * are available.
      * @param  timeout Number of milliseconds to wait for work
      * @return A message object on success or null if interrupted
@@ -91,25 +91,29 @@ public interface Mailbox {
     public VoltMessage recvBlocking(long timeout);
 
     /**
-     * Get the next Object from this messaging queue from the default subject.
+     * Get the next Object from this messaging queue from the provided subject. The order
+     * of the subjects determines the order that subjects are checked for waiting messages.
      *
      * @return A message object on success or null if no object is waiting.
      */
-    public VoltMessage recv(Subject s);
+    public VoltMessage recv(Subject s[]);
 
     /**
      * Get the next Object from this messaging queue from the default subject. Blocks if no messages
-     * are available.
+     * are available. The order of the subjects determines the order that subjects are checked
+     * for waiting messages.
      *
      * @return A message object on success or null if interrupted
      */
-    public VoltMessage recvBlocking(Subject s);
+    public VoltMessage recvBlocking(Subject s[]);
 
     /**
      * Get the next Object from this messaging queue from the default subject.. Blocks if no messages
-     * are available.
+     * are available.The order of the subjects determines the order that subjects are checked
+     * for waiting messages.
+     * @param s Subjects to check for messages
      * @param  timeout Number of milliseconds to wait for work
      * @return A message object on success or null if interrupted
      */
-    public VoltMessage recvBlocking(Subject s, long timeout);
+    public VoltMessage recvBlocking(Subject s[], long timeout);
 }
