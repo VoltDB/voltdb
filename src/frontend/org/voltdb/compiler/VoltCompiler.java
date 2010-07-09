@@ -950,6 +950,7 @@ public class VoltCompiler {
          {"org.voltdb.sysprocs.AdHoc",                        "false",    "false"},
          {"org.voltdb.sysprocs.LoadMultipartitionTable",      "false",    "false"},
          {"org.voltdb.sysprocs.Quiesce",                      "false",    "false"},
+         {"org.voltdb.sysprocs.Rejoin",                       "false",    "false"},
          {"org.voltdb.sysprocs.SnapshotSave",                 "false",    "false"},
          {"org.voltdb.sysprocs.SnapshotRestore",              "false",    "false"},
          {"org.voltdb.sysprocs.SnapshotStatus",               "false",    "false"},

@@ -68,6 +68,27 @@ public interface VoltDBInterface
     public BackendTarget getBackendTargetType();
 
     /**
+     * Open a connection to a rejoining node and create a foreign host for it.
+     *
+     * @param currentTxnId The current transaction doing the rejoin.
+     * @param rejoinHostId The host id of the node joining the cluster.
+     * @param rejoiningHostname The IP hostname of the joining node.
+     * @param portToConnect The port to connect to the joining node on.
+     * @return Null on success and an error string on failure.
+     */
+    public String doRejoinPrepare(long currentTxnId, int rejoinHostId, String rejoiningHostname, int portToConnect);
+
+    /**
+     * Either integrate the created forign host for the rejoining node into
+     * the set of active ones, or throw it out and clean up.
+     *
+     * @param currentTxnId The current transaction doing the rejoin.
+     * @param commit Add the new node in, or throw it out.
+     * @return Null on success and an error string on failure.
+     */
+    public String doRejoinCommitOrRollback(long currentTxnId, boolean commit);
+
+    /**
      * Update the global logging context in the server.
      *
      * @param xmlConfig The xml string containing the new logging configuration

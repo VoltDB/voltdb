@@ -354,4 +354,17 @@ public class MockVoltDB implements VoltDBInterface
 
     }
 
+    @Override
+    public String doRejoinCommitOrRollback(long currentTxnId, boolean commit) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public String doRejoinPrepare(long currentTxnId, int rejoinHostId,
+            String rejoiningHostname, int portToConnect) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
 }

@@ -24,13 +24,14 @@ import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.StringReader;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Hashtable;
 import java.util.Random;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
@@ -581,6 +582,64 @@ public class RealVoltDB implements VoltDBInterface
         }
     }
 
+    /** Last transaction ID at which the rejoin commit took place.
+     * Also, use the intrinsic lock to safeguard access from multiple
+     * execution site threads */
+    private static Long lastNodeRejoinPrepare_txnId = 0L;
+    @Override
+    public synchronized String doRejoinPrepare(long currentTxnId, int rejoinHostId, String rejoiningHostname, int portToConnect)
+    {
+        // another site already did this work.
+        if (currentTxnId == lastNodeRejoinPrepare_txnId) {
+            return null;
+        }
+        else if (currentTxnId < lastNodeRejoinPrepare_txnId) {
+            throw new RuntimeException("Trying to rejoin (prepare) with an old transaction.");
+        }
+        System.out.printf("Rejoining node with host id: %s at txnid: %d\n", 0, currentTxnId);
+        lastNodeRejoinPrepare_txnId = currentTxnId;
+
+        HostMessenger messenger = getHostMessenger();
+
+        // connect to the joining node, build a foreign host
+        InetSocketAddress addr = new InetSocketAddress(rejoiningHostname, portToConnect);
+        try {
+            messenger.rejoinForeignHostPrepare(rejoinHostId, addr);
+            return null;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return e.getMessage();
+        }
+    }
+
+    /** Last transaction ID at which the rejoin commit took place.
+     * Also, use the intrinsic lock to safeguard access from multiple
+     * execution site threads */
+    private static Long lastNodeRejoinFinish_txnId = 0L;
+    @Override
+    public synchronized String doRejoinCommitOrRollback(long currentTxnId, boolean commit)
+    {
+        // another site already did this work.
+        if (currentTxnId == lastNodeRejoinFinish_txnId) {
+            return null;
+        }
+        else if (currentTxnId < lastNodeRejoinFinish_txnId) {
+            throw new RuntimeException("Trying to rejoin (commit/rollback) with an old transaction.");
+        }
+
+        HostMessenger messenger = getHostMessenger();
+        if (commit) {
+            // put the foreign host into the set of active ones
+            messenger.rejoinForeignHostCommit();
+        }
+        else {
+            // clean up any connections made
+            messenger.rejoinForeginHostRollback();
+        }
+
+        return null;
+    }
+
     /** Last transaction ID at which the logging config updated.
      * Also, use the intrinsic lock to safeguard access from multiple
      * execution site threads */
@@ -605,6 +664,8 @@ public class RealVoltDB implements VoltDBInterface
             configurator.doConfigure(sr, LogManager.getLoggerRepository());
         }
     }
+
+
 
     /** Last transaction ID at which the catalog updated. */
     private static long lastCatalogUpdate_txnId = 0;
