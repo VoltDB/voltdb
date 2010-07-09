@@ -928,7 +928,7 @@ public class VoltCompiler {
                     throw new VoltCompilerException("View configured as an export-only table");
                 }
 
-                org.voltdb.catalog.ConnectorTableInfo connTableInfo = catconn.getTableinfo().add(i.toString());
+                org.voltdb.catalog.ConnectorTableInfo connTableInfo = catconn.getTableinfo().add(tablename);
                 connTableInfo.setAppendonly(xmltable.isExportonly());
                 connTableInfo.setTable(tableref);
                 ++i;

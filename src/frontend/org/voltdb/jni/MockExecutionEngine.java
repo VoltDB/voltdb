@@ -110,7 +110,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void updateCatalog(final String catalogDiffs) throws EEException {
+    public void updateCatalog(final String catalogDiffs, int catalogVersion) throws EEException {
         // TODO Auto-generated method stub
     }
 
@@ -182,7 +182,7 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     public ELTProtoMessage eltAction(boolean ackAction, boolean pollAction,
-            boolean resetAction, long ackOffset, int partitionId, int mTableId) {
+            boolean resetAction, long ackOffset, int partitionId, long mTableId) {
         // TODO Auto-generated method stub
         return null;
     }

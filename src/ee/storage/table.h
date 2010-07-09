@@ -120,6 +120,26 @@ class Table {
 public:
     virtual ~Table();
 
+    /*
+     * Table lifespan can be managed bya reference count. The
+     * reference is trivial to maintain since it is only accessed by
+     * the execution engine thread. Snapshot, ELT and the
+     * corresponding CatalogDelegate may be reference count
+     * holders. The table is deleted when the refcount falls to
+     * zero. This allows longer running processes to complete
+     * gracefully after a table has been removed from the catalog.
+     */
+    void incrementRefcount() {
+        m_refcount += 1;
+    }
+
+    void decrementRefcount() {
+        m_refcount -= 1;
+        if (m_refcount == 0) {
+            delete this;
+        }
+    }
+
     // ------------------------------------------------------------------
     // ACCESS METHODS
     // ------------------------------------------------------------------
@@ -168,7 +188,6 @@ public:
     // UTILITY
     // ------------------------------------------------------------------
     CatalogId databaseId() const;
-    virtual CatalogId tableId() const { assert(false); return -1; }
     const std::string& name() const;
 
     virtual std::string tableType() const = 0;
@@ -314,6 +333,9 @@ protected:
     // ptr to global integer tracking temp table memory allocated per frag
     // should be null for persistent tables
     int* m_tempTableMemoryInBytes;
+
+  private:
+    int32_t m_refcount;
 };
 
 /**

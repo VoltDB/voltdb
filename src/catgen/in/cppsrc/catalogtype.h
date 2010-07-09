@@ -48,7 +48,24 @@ struct CatalogValue {
  */
 class CatalogType {
     friend class Catalog;
-protected:
+
+  private:
+    void clearUpdateStatus() {
+        m_wasAdded = false;
+        m_wasUpdated = false;
+    }
+    void added() {
+        m_wasAdded = true;
+    }
+
+    void updated() {
+        m_wasUpdated = true;
+    }
+
+    bool m_wasAdded;     // victim of 'add' command in catalog update
+    bool m_wasUpdated;   // target of 'set' command in catalog update
+
+  protected:
     std::map<std::string, CatalogValue> m_fields;
     // the void* is a giant hack, solutions welcome
     std::map<std::string, void*> m_childCollections;
@@ -61,14 +78,16 @@ protected:
 
     CatalogType(Catalog * catalog, CatalogType * parent, const std::string &path, const std::string &name);
     virtual ~CatalogType() {}
-    void set(const std::string &field, const std::string &value);
 
+    void set(const std::string &field, const std::string &value);
     virtual void update() = 0;
     virtual CatalogType * addChild(const std::string &collectionName, const std::string &name) = 0;
     virtual CatalogType * getChild(const std::string &collectionName, const std::string &childName) const = 0;
-    virtual void removeChild(const std::string &collectionName, const std::string &childName) = 0;
+    // returns true if a child was deleted
+    virtual bool removeChild(const std::string &collectionName, const std::string &childName) = 0;
 
 public:
+
     /**
      * Get the parent of this CatalogType instance
      * @return The name of this CatalogType instance
@@ -99,6 +118,14 @@ public:
      * @return The index of this node amongst its sibling nodes
      */
     int32_t relativeIndex() const;
+
+    bool wasAdded() const {
+        return m_wasAdded;
+    }
+
+    bool wasUpdated() const {
+        return m_wasUpdated;
+    }
 };
 
 }

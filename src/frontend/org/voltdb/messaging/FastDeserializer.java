@@ -152,6 +152,41 @@ public class FastDeserializer implements DataInput {
     }
 
     /**
+     * Read a string in the standard VoltDB way without
+     * wrapping the byte buffer[
+     */
+    public static String readString(ByteBuffer buffer) throws IOException {
+        final int NULL_STRING_INDICATOR = -1;
+
+        final int len = buffer.getInt();
+
+        // check for null string
+        if (len == NULL_STRING_INDICATOR)
+            return null;
+        assert len >= 0;
+
+        if (len > VoltType.MAX_VALUE_LENGTH) {
+            throw new IOException("Serializable strings cannot be longer then "
+                    + VoltType.MAX_VALUE_LENGTH + " bytes");
+        }
+        if (len < NULL_STRING_INDICATOR) {
+            throw new IOException("String length is negative " + len);
+        }
+
+        // now assume not null
+        final byte[] strbytes = new byte[len];
+        buffer.get(strbytes);
+        String retval = null;
+        try {
+            retval = new String(strbytes, "UTF-8");
+        } catch (final UnsupportedEncodingException e) {
+            e.printStackTrace();
+        }
+        return retval;
+    }
+
+
+    /**
      * Read a string in the standard VoltDB way. That is, two
      * bytes of length info followed by the bytes of characters
      * encoded in UTF-8.

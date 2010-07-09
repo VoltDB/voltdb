@@ -89,7 +89,6 @@ PersistentTable::PersistentTable(ExecutorContext *ctx, bool exportEnabled) :
     {
         m_wrapper = new TupleStreamWrapper(m_executorContext->m_partitionId,
                                            m_executorContext->m_siteId,
-                                           m_id,
                                            m_executorContext->m_lastTickTime);
     }
 }
@@ -152,7 +151,7 @@ bool PersistentTable::insertTuple(TableTuple &source) {
 
     // not null checks at first
     FAIL_IF(!checkNulls(source)) {
-        throw ConstraintFailureException(this, m_id, source, TableTuple(),
+        throw ConstraintFailureException(this, source, TableTuple(),
                                          voltdb::CONSTRAINT_TYPE_NOT_NULL);
     }
 
@@ -188,7 +187,7 @@ bool PersistentTable::insertTuple(TableTuple &source) {
         // Careful to delete allocated objects
         m_tmpTarget1.freeObjectColumns();
         deleteTupleStorage(m_tmpTarget1);
-        throw ConstraintFailureException(this, m_id, source, TableTuple(),
+        throw ConstraintFailureException(this, source, TableTuple(),
                                          voltdb::CONSTRAINT_TYPE_UNIQUE);
     }
 
@@ -228,8 +227,8 @@ void PersistentTable::insertTupleForUndo(TableTuple &source, size_t wrapperOffse
 
     // not null checks at first
     if (!checkNulls(source)) {
-        throwFatalException("Failed to insert tuple into table %d for undo:"
-                            " null constraint violation\n%s\n", m_id,
+        throwFatalException("Failed to insert tuple into table %s for undo:"
+                            " null constraint violation\n%s\n", m_name.c_str(),
                             source.debugNoHeader().c_str());
     }
 
@@ -265,8 +264,8 @@ void PersistentTable::insertTupleForUndo(TableTuple &source, size_t wrapperOffse
 
     if (!tryInsertOnAllIndexes(&m_tmpTarget1)) {
         deleteTupleStorage(m_tmpTarget1);
-        throwFatalException("Failed to insert tuple into table %d for undo:"
-                            " unique constraint violation\n%s\n", m_id,
+        throwFatalException("Failed to insert tuple into table %s for undo:"
+                            " unique constraint violation\n%s\n", m_name.c_str(),
                             m_tmpTarget1.debugNoHeader().c_str());
     }
 
@@ -318,7 +317,7 @@ bool PersistentTable::updateTuple(TableTuple &source, TableTuple &target, bool u
     // if so, update the indexes here
     if (updatesIndexes) {
         if (!tryUpdateOnAllIndexes(ptuua->getOldTuple(), target)) {
-            throw ConstraintFailureException(this, m_id, ptuua->getOldTuple(),
+            throw ConstraintFailureException(this, ptuua->getOldTuple(),
                                              target,
                                              voltdb::CONSTRAINT_TYPE_UNIQUE);
         }
@@ -348,7 +347,7 @@ bool PersistentTable::updateTuple(TableTuple &source, TableTuple &target, bool u
      * some columns
      */
     FAIL_IF(!checkNulls(target)) {
-        throw ConstraintFailureException(this, m_id, ptuua->getOldTuple(),
+        throw ConstraintFailureException(this, ptuua->getOldTuple(),
                                          target,
                                          voltdb::CONSTRAINT_TYPE_NOT_NULL);
     }
@@ -398,8 +397,8 @@ void PersistentTable::updateTupleForUndo(TableTuple &source, TableTuple &target,
     if (revertIndexes) {
         if (!tryUpdateOnAllIndexes(targetBackup, target)) {
             // TODO: this might be too strict. see insertTuple()
-            throwFatalException("Failed to update tuple in table %d for undo:"
-                                " unique constraint violation\n%s\n%s\n", m_id,
+            throwFatalException("Failed to update tuple in table %s for undo:"
+                                " unique constraint violation\n%s\n%s\n", m_name.c_str(),
                                 targetBackup.debugNoHeader().c_str(),
                                 target.debugNoHeader().c_str());
         }
@@ -466,8 +465,8 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
 void PersistentTable::deleteTupleForUndo(voltdb::TableTuple &tupleCopy, size_t wrapperOffset) {
     TableTuple target = lookupTuple(tupleCopy);
     if (target.isNullTuple()) {
-        throwFatalException("Failed to delete tuple from table %d:"
-                            " tuple does not exist\n%s\n", m_id,
+        throwFatalException("Failed to delete tuple from table %s:"
+                            " tuple does not exist\n%s\n", m_name.c_str(),
                             tupleCopy.debugNoHeader().c_str());
     }
     else {
@@ -774,9 +773,9 @@ bool PersistentTable::activateCopyOnWrite(TupleSerializer *serializer, int32_t p
  * Returns true if there are more tuples and false if there are no more tuples waiting to be
  * serialized.
  */
-void PersistentTable::serializeMore(ReferenceSerializeOutput *out) {
+bool PersistentTable::serializeMore(ReferenceSerializeOutput *out) {
     if (m_COWContext == NULL) {
-        return;
+        return false;
     }
 
     const bool hasMore = m_COWContext->serializeMore(out);
@@ -785,7 +784,7 @@ void PersistentTable::serializeMore(ReferenceSerializeOutput *out) {
         fflush(stdout);
     }
 
-    return;
+    return hasMore;
 }
 
 }

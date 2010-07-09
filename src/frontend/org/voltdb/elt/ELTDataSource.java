@@ -17,6 +17,7 @@
 
 package org.voltdb.elt;
 
+import java.io.IOException;
 import java.util.ArrayList;
 
 import org.voltdb.VoltDB;
@@ -24,18 +25,19 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.elt.processors.RawProcessor;
+import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.MessagingException;
 import org.voltdb.utils.CatalogUtil;
 
 /**
  *  Allows an ELTDataProcessor to access underlying table queues
  */
-public class ELTDataSource {
+public class ELTDataSource implements Comparable<ELTDataSource> {
 
     private final String m_database;
     private final String m_tableName;
     private final byte m_isReplicated;
-    private final int m_tableId;
+    private final long m_tableId;
     private final int m_siteId;
     private final int m_partitionId;
     public final ArrayList<String> m_columnNames = new ArrayList<String>();
@@ -53,34 +55,43 @@ public class ELTDataSource {
      */
     public ELTDataSource(String db, String tableName,
                          boolean isReplicated,
-                         int partitionId, int siteId, int tableId,
+                         int partitionId, int siteId, long tableId,
                          CatalogMap<Column> catalogMap)
     {
         m_database = db;
         m_tableName = tableName;
-        // coerce true == 1, false == 0 for wire format
+
+        /*
+         * coerce true == 1, false == 0 for wire format
+         */
         m_isReplicated = (byte)(isReplicated ? 1 : 0);
+
+        /*
+         * This is not the catalog relativeIndex(). This ID incorporates
+         * a catalog version and a table id so that it is constant across
+         * catalog updates that add or drop tables.
+         */
         m_tableId = tableId;
         m_partitionId = partitionId;
         m_siteId = siteId;
 
-        // Add the ELT meta-data columns to the schema first
-        // Transaction ID
+        // Add the ELT meta-data columns to the schema followed by the
+        // catalog columns for this table.
         m_columnNames.add("VOLT_TRANSACTION_ID");
         m_columnTypes.add((Integer)((int)VoltType.BIGINT.getValue()));
-        // timestamp
+
         m_columnNames.add("VOLT_ELT_TIMESTAMP");
         m_columnTypes.add((Integer)((int)VoltType.BIGINT.getValue()));
-        // sequence #
+
         m_columnNames.add("VOLT_ELT_SEQUENCE_NUMBER");
         m_columnTypes.add((Integer)((int)VoltType.BIGINT.getValue()));
-        // partition ID
+
         m_columnNames.add("VOLT_PARTITION_ID");
         m_columnTypes.add((Integer)((int)VoltType.BIGINT.getValue()));
-        // site ID
+
         m_columnNames.add("VOLT_SITE_ID");
         m_columnTypes.add((Integer)((int)VoltType.BIGINT.getValue()));
-        // INSERT or DELETE (ELT OPERATION TYPE?)
+
         m_columnNames.add("VOLT_ELT_OPERATION");
         m_columnTypes.add((Integer)((int)VoltType.TINYINT.getValue()));
 
@@ -110,7 +121,7 @@ public class ELTDataSource {
         return m_isReplicated;
     }
 
-    public int getTableId() {
+    public long getTableId() {
         return m_tableId;
     }
 
@@ -121,4 +132,63 @@ public class ELTDataSource {
     public int getPartitionId() {
         return m_partitionId;
     }
+
+    public void writeAdvertisementTo(FastSerializer fs) throws IOException {
+        fs.writeByte(getIsReplicated());
+        fs.writeInt(getPartitionId());
+        fs.writeLong(getTableId());
+        fs.writeString(getTableName());
+        fs.writeInt(m_columnNames.size());
+        for (int ii=0; ii < m_columnNames.size(); ++ii) {
+            fs.writeString(m_columnNames.get(ii));
+            fs.writeInt(m_columnTypes.get(ii));
+        }
+    }
+
+    /**
+     * Compare two ELTDataSources for equivalence. This currently does not
+     * compare column names, but it should once column add/drop is allowed.
+     * This comparison is performed to decide if a datasource in a new catalog
+     * needs to be passed to a proccessor.
+     */
+    @Override
+    public int compareTo(ELTDataSource o) {
+        int result;
+
+        result = m_database.compareTo(o.m_database);
+        if (result != 0) {
+            return result;
+        }
+
+        result = m_tableName.compareTo(o.m_tableName);
+        if (result != 0) {
+            return result;
+        }
+
+        result = (m_siteId - o.m_siteId);
+        if (result != 0) {
+            return result;
+        }
+
+       result = (m_partitionId - o.m_partitionId);
+       if (result != 0) {
+           return result;
+       }
+
+       // does not verify replicated / unreplicated.
+       // does not verify column names / schema
+       return 0;
+    }
+
+    /**
+     * Make sure equal objects compareTo as 0.
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof ELTDataSource))
+            return false;
+
+        return compareTo((ELTDataSource)o) == 0;
+    }
+
 }

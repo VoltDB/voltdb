@@ -205,7 +205,7 @@ public class TestELTProtoMessage extends TestCase {
             }.serialize(p);
 
         ByteBuffer b = bb.b;
-        assertEquals(28, b.getInt());
+        assertEquals(32, b.getInt());
         FastDeserializer fds = new FastDeserializer(b);
         ELTProtoMessage m = ELTProtoMessage.readExternal(fds);
         assertEquals(1, m.m_partitionId);

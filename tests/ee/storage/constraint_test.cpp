@@ -117,12 +117,12 @@ protected:
         }
         if (pkey) {
             printf("creating table with pkey\n");
-            table = TableFactory::getPersistentTable(this->database_id, 1, m_engine.getExecutorContext(),
+            table = TableFactory::getPersistentTable(this->database_id, m_engine.getExecutorContext(),
                                                      "test_table", schema, names, *pkey, -1, false, false);
         }
         else {
             printf("creating table with no pkey\n");
-            table = TableFactory::getPersistentTable(this->database_id, 1, m_engine.getExecutorContext(),
+            table = TableFactory::getPersistentTable(this->database_id, m_engine.getExecutorContext(),
                                                      "test_table", schema, names, -1, false, false);
         }
 

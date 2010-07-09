@@ -28,7 +28,6 @@ namespace voltdb {
  */
 ConstraintFailureException::ConstraintFailureException(
         PersistentTable *table,
-        CatalogId tableId,
         TableTuple tuple,
         TableTuple otherTuple,
         ConstraintType type) :
@@ -36,7 +35,7 @@ ConstraintFailureException::ConstraintFailureException(
                     SQLException::integrity_constraint_violation,
                     "Attempted violation of constraint",
                     voltdb::VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION),
-            m_table(table), m_tableId(tableId), m_tuple(tuple), m_otherTuple(otherTuple), m_type(type) {
+            m_table(table), m_tuple(tuple), m_otherTuple(otherTuple), m_type(type) {
         assert(table);
         assert(!tuple.isNullTuple());
 }
@@ -44,7 +43,7 @@ ConstraintFailureException::ConstraintFailureException(
 void ConstraintFailureException::p_serialize(ReferenceSerializeOutput *output) {
     SQLException::p_serialize(output);
     output->writeInt(m_type);
-    output->writeInt(m_tableId);
+    output->writeTextString(m_table->name());
     std::size_t tableSizePosition = output->reserveBytes(4);
     TableTuple tuples[] = { m_tuple, m_otherTuple };
     if (m_otherTuple.isNullTuple()) {

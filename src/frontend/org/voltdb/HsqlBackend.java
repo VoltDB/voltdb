@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -33,6 +34,7 @@ import org.apache.log4j.Logger;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.exceptions.ConstraintFailureException;
+import org.voltdb.messaging.FastSerializer;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.LogKeys;
@@ -183,11 +185,17 @@ public class HsqlBackend {
                 if (e.getMessage().contains("constraint")) {
                     sqlLog.l7dlog( Level.TRACE, LogKeys.sql_Backend_ConvertingHSQLExtoCFEx.name(), e);
                     final byte messageBytes[] = e.getMessage().getBytes();
-                    ByteBuffer b = ByteBuffer.allocate(21 + messageBytes.length);
+                    ByteBuffer b = ByteBuffer.allocate(25 + messageBytes.length);
                     b.putInt(messageBytes.length);
                     b.put(messageBytes);
                     b.put(e.getSQLState().getBytes());
-                    b.putLong(0);//Move forward 8 bytes to provide header info for CFE, ConstraintType, TableId
+                    b.putInt(0); // ConstraintFailure.type
+                    try {
+                        FastSerializer.writeString("HSQL", b);
+                    }
+                    catch (IOException e1) {
+                        e1.printStackTrace();
+                    }
                     b.putInt(0);//Table size is 0
                     b.rewind();
                     throw new ConstraintFailureException(b);

@@ -52,7 +52,7 @@ protected:
 public:
     CatalogMap(Catalog *globalCatalog, CatalogType *parent, const std::string &path);
     T * add(const std::string &name);
-    void remove(const std::string &name);
+    bool remove(const std::string &name);
 
 public:
     /**
@@ -111,17 +111,22 @@ T * CatalogMap<T>::add(const std::string &name) {
 }
 
 template <class T>
-void CatalogMap<T>::remove(const std::string &name) {
+bool CatalogMap<T>::remove(const std::string &name) {
     typename std::map<std::string, T*>::iterator iter;
     iter = m_items.find(name);
-    assert (iter != m_items.end());
+    if (iter == m_items.end()) {
+        return false;
+    }
     m_items.erase(iter);
 
     // assign all the children of this map a relative index
     int index = 1;
     typename std::map<std::string, T*>::const_iterator iter2;
-    for (iter2 = m_items.begin(); iter2 != m_items.end(); iter2++)
+    for (iter2 = m_items.begin(); iter2 != m_items.end(); iter2++) {
         iter2->second->m_relativeIndex = index++;
+    }
+
+    return true;
 }
 
 template <class T>

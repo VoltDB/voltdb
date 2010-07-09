@@ -54,7 +54,7 @@ public class ELTProtoMessage
     static public class AdvertisedDataSource {
         final private byte m_isReplicated;
         final private int m_partitionId;
-        final private int m_tableId;
+        final private long m_tableId;
         final private String m_tableName;
 
         private ArrayList<String> m_columnNames = new ArrayList<String>();
@@ -62,7 +62,7 @@ public class ELTProtoMessage
         private ArrayList<VoltType> m_columnTypes = new ArrayList<VoltType>();
 
         public AdvertisedDataSource(byte isReplicated,
-                                    int p_id, int t_id, String t_name,
+                                    int p_id, long t_id, String t_name,
                                     ArrayList<String> names,
                                     ArrayList<VoltType> types)
         {
@@ -83,7 +83,7 @@ public class ELTProtoMessage
             return m_partitionId;
         }
 
-        public int tableId() {
+        public long tableId() {
             return m_tableId;
         }
 
@@ -125,14 +125,14 @@ public class ELTProtoMessage
         m.m_version = fds.readShort();
         m.m_type = fds.readShort();
         m.m_partitionId = fds.readInt();
-        m.m_tableId = fds.readInt();
+        m.m_tableId = fds.readLong();
         m.m_offset = fds.readLong();
         // if no data is remaining, m_data will have 0 capacity.
         m.m_data = fds.remainder();
         return m;
     }
 
-    public ELTProtoMessage(int partitionId, int tableId) {
+    public ELTProtoMessage(int partitionId, long tableId) {
         m_partitionId = partitionId;
         m_tableId = tableId;
     }
@@ -159,7 +159,7 @@ public class ELTProtoMessage
         fs.writeShort(m_version);
         fs.writeShort(m_type);
         fs.writeInt(m_partitionId);
-        fs.writeInt(m_tableId);
+        fs.writeLong(m_tableId);
         fs.writeLong(m_offset);
         if (m_data != null) {
             fs.write(m_data);
@@ -219,7 +219,7 @@ public class ELTProtoMessage
         return m_partitionId;
     }
 
-    public int getTableId() {
+    public long getTableId() {
         return m_tableId;
     }
 
@@ -252,7 +252,7 @@ public class ELTProtoMessage
 
             byte is_replicated = fds.readByte();
             int p_id = fds.readInt();
-            int t_id = fds.readInt();
+            long t_id = fds.readLong();
             String t_name = fds.readString();
             int colcnt = fds.readInt();
             for (int jj = 0; jj < colcnt; jj++) {
@@ -282,7 +282,7 @@ public class ELTProtoMessage
 
     // calculate bytes of fixed payload
     private static int FIXED_PAYLOAD_LENGTH =
-        (Integer.SIZE/8 * 3) + (Long.SIZE/8 * 1);
+        (Short.SIZE/8 * 2) + Integer.SIZE/8 + (Long.SIZE/8 * 2);
 
     // message version. Currently all messages are version 1.
     short m_version = 1;
@@ -293,8 +293,8 @@ public class ELTProtoMessage
     // partition id for this ack or poll
     int m_partitionId = -1;
 
-    // the table name for this ack or poll
-    int m_tableId = -1;
+    // the table id for this ack or poll
+    long m_tableId = -1;
 
     // if kAck, the offset being acked.
     // if kPollResponse, the offset of the last byte returned.

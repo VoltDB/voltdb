@@ -55,13 +55,13 @@ public class ExportConnection implements Runnable {
     private final String m_password;
 
     // cached reference to ELClientBase's collection of ELDataSinks
-    private final HashMap<Integer, HashMap<Integer, ExportDataSink>> m_sinks;
+    private final HashMap<Long, HashMap<Integer, ExportDataSink>> m_sinks;
     private ArrayList<AdvertisedDataSource> m_dataSources;
 
     public ExportConnection(
             String username, String password,
             InetSocketAddress serverAddr,
-            HashMap<Integer, HashMap<Integer, ExportDataSink>> dataSinks)
+            HashMap<Long, HashMap<Integer, ExportDataSink>> dataSinks)
     {
         m_username = username != null ? username : "";
         m_password = password != null ? password : "";

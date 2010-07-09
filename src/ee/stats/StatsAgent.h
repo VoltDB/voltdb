@@ -48,6 +48,11 @@ public:
     void registerStatsSource(voltdb::StatisticsSelectorType sst, voltdb::CatalogId catalogId, voltdb::StatsSource* statsSource);
 
     /**
+     * Unassociate all instances of this selector type
+     */
+    void unregisterStatsSource(voltdb::StatisticsSelectorType sst);
+
+    /**
      * Get statistics for the specified resources
      * @param sst StatisticsSelectorType of the resources
      * @param catalogIds CatalogIds of the resources statistics should be retrieved for

@@ -44,12 +44,13 @@ public class CatalogContext {
     public final int numberOfExecSites;
     public final int numberOfNodes;
     public final SiteTracker siteTracker;
+    public final int catalogVersion;
 
     // PRIVATE
     private final String m_path;
     private final JarClassLoader m_catalogClassLoader;
 
-    public CatalogContext(Catalog catalog, String pathToCatalogJar) {
+    public CatalogContext(Catalog catalog, String pathToCatalogJar, int version) {
         // check the heck out of the given params in this immutable class
         assert(catalog != null);
         assert(pathToCatalogJar != null);
@@ -86,16 +87,17 @@ public class CatalogContext {
 
         // count partitions
         numberOfPartitions = cluster.getPartitions().size();
+        catalogVersion = version;
     }
 
     public CatalogContext deepCopy() {
-        return new CatalogContext(catalog.deepCopy(), m_path);
+        return new CatalogContext(catalog.deepCopy(), m_path, catalogVersion + 1);
     }
 
     public CatalogContext update(String pathToNewJar, String diffCommands) {
         Catalog newCatalog = catalog.deepCopy();
         newCatalog.execute(diffCommands);
-        CatalogContext retval = new CatalogContext(newCatalog, pathToNewJar);
+        CatalogContext retval = new CatalogContext(newCatalog, pathToNewJar, catalogVersion + 1);
         return retval;
     }
 

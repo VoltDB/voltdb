@@ -168,7 +168,7 @@ typedef struct {
     int32_t isPoll;
     int32_t isReset;
     int64_t offset;
-    int32_t tableId;
+    int64_t tableId;
 }__attribute__((packed)) elt_action;
 
 
@@ -186,7 +186,8 @@ static void writeOrDie(int fd, unsigned char *data, ssize_t sz) {
     do {
         last = write(fd, data + written, sz - written);
         if (last < 0) {
-            printf("write to JNI returned -1. Exiting");
+            printf("\n\nIPC write to JNI returned -1. Exiting\n\n");
+            fflush(stdout);
             exit(-1);
         }
         written += last;
@@ -241,6 +242,7 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
         break;
       case 5:
         getStats(cmd);
+        result = kErrorCode_None;
         break;
       case 6:
         // also writes results directly
@@ -329,11 +331,18 @@ int8_t VoltDBIPC::loadCatalog(struct ipc_command *cmd) {
 int8_t VoltDBIPC::updateCatalog(struct ipc_command *cmd) {
     printf("updateCatalog\n");
     assert(m_engine);
-    if (!m_engine)
+    if (!m_engine) {
         return kErrorCode_Error;
+    }
 
+    struct updatecatalog {
+        struct ipc_command cmd;
+        int catalogVersion;
+        char data[];
+    };
+    struct updatecatalog *uc = (struct updatecatalog*)cmd;
     try {
-        if (m_engine->updateCatalog(std::string(cmd->data)) == true) {
+        if (m_engine->updateCatalog(std::string(uc->data), uc->catalogVersion) == true) {
             return kErrorCode_Success;
         }
     } catch (FatalException e) {
@@ -870,24 +879,6 @@ void VoltDBIPC::getStats(struct ipc_command *cmd) {
     }
 }
 
-void
-VoltDBIPC::handoffReadyELBuffer(char* bufferPtr, int32_t bytesUsed, int32_t tableId) {
-
-    // serialized in network order.
-    // serialize as {int8_t indicator,
-    //              int32_t tableId,
-    //              int32_t bytes,
-    //              buffer}
-
-    char message[1 + 4 + 4];
-    message[0] = static_cast<int8_t>(kErrorCode_HandoffReadELBuffer);
-    *reinterpret_cast<int32_t*>(&message[1]) = htonl(tableId);
-    *reinterpret_cast<int32_t*>(&message[5]) = htonl(bytesUsed);
-
-    writeOrDie(m_fd, (unsigned char*)message, 9);
-    writeOrDie(m_fd, (unsigned char*)bufferPtr, bytesUsed);
-}
-
 int8_t VoltDBIPC::activateCopyOnWrite(struct ipc_command *cmd) {
     activate_copy_on_write *activateCopyOnWriteCommand = (activate_copy_on_write*) cmd;
     const voltdb::CatalogId tableId = ntohl(activateCopyOnWriteCommand->tableId);
@@ -943,8 +934,8 @@ void VoltDBIPC::eltAction(struct ipc_command *cmd) {
     long result = m_engine->eltAction(action->isAck,
                                       action->isPoll,
                                       action->isReset,
-                                      ntohll(action->offset),
-                                      ntohl(action->tableId));
+                                      static_cast<int64_t>(ntohll(action->offset)),
+                                      static_cast<int64_t>(ntohll(action->tableId)));
     int buflength = m_engine->getResultsSize();
 
     // write offset across bigendian.
@@ -1196,7 +1187,8 @@ int main(int argc, char **argv) {
         }
     }
 
-    done: close(sock);
+  done:
+    close(sock);
     close(fd);
     delete voltipc;
     free(data);

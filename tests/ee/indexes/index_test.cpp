@@ -134,7 +134,7 @@ public:
         m_engine->initialize(0, 0, 0, 0, "");
         table =
             dynamic_cast<PersistentTable*>
-          (TableFactory::getPersistentTable(database_id, 1, m_engine->getExecutorContext(),
+          (TableFactory::getPersistentTable(database_id, m_engine->getExecutorContext(),
                                             "test_table", schema,
                                             columnNames, pkey, indexes, -1, false, false));
 

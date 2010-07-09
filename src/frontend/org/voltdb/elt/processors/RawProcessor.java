@@ -61,8 +61,8 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
      * are configured by the ELT manager at initialization time.
      * partitionid : <tableid : datasource>.
      */
-    HashMap<Integer, HashMap<Integer,ELTDataSource>> m_sources =
-        new HashMap<Integer, HashMap<Integer, ELTDataSource>>();
+    HashMap<Integer, HashMap<Long, ELTDataSource>> m_sources =
+        new HashMap<Integer, HashMap<Long, ELTDataSource>>();
 
     ArrayList<ELTDataSource> m_sourcesArray =
         new ArrayList<ELTDataSource>();
@@ -174,15 +174,7 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
                     // serialize an array of DataSources
                     fs.writeInt(m_sourcesArray.size());
                     for (ELTDataSource src : m_sourcesArray) {
-                        fs.writeByte(src.getIsReplicated());
-                        fs.writeInt(src.getPartitionId());
-                        fs.writeInt(src.getTableId());
-                        fs.writeString(src.getTableName());
-                        fs.writeInt(src.m_columnNames.size());
-                        for (int ii=0; ii < src.m_columnNames.size(); ++ii) {
-                            fs.writeString(src.m_columnNames.get(ii));
-                            fs.writeInt(src.m_columnTypes.get(ii));
-                        }
+                        src.writeAdvertisementTo(fs);
                     }
                 }
                 catch (IOException e) {
@@ -369,8 +361,8 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
         m_logger = null;
     }
 
-    ELTDataSource getDataSourceFor(int partitionId, int tableId) {
-        HashMap<Integer, ELTDataSource> partmap = m_sources.get(partitionId);
+    ELTDataSource getDataSourceFor(int partitionId, long tableId) {
+        HashMap<Long, ELTDataSource> partmap = m_sources.get(partitionId);
         if (partmap == null) {
             return null;
         }
@@ -382,12 +374,12 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
     @Override
     public void addDataSource(ELTDataSource dataSource) {
         int partid = dataSource.getPartitionId();
-        int tableid = dataSource.getTableId();
+        long tableid = dataSource.getTableId();
 
         m_sourcesArray.add(dataSource);
-        HashMap<Integer, ELTDataSource> partmap = m_sources.get(partid);
+        HashMap<Long, ELTDataSource> partmap = m_sources.get(partid);
         if (partmap == null) {
-            partmap = new HashMap<Integer, ELTDataSource>();
+            partmap = new HashMap<Long, ELTDataSource>();
             m_sources.put(partid, partmap);
         }
         assert(partmap.get(tableid) == null);

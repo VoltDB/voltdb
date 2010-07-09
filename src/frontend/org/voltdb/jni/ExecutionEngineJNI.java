@@ -78,7 +78,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     /**
      * initialize the native Engine object.
-     * @see #nativeCreate()
      */
     public ExecutionEngineJNI(
             final ExecutionSite site,
@@ -150,7 +149,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * This method is automatically called from #finalize(), but
      * it's recommended to call this method just after you finish
      * using the object.
-     * @see #nativeDestroy(long)
      */
     @Override
     public void release() throws EEException {
@@ -168,7 +166,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     /**
-     * Wrapper for {@link #nativeLoadCatalog(long, String)}.
+     *  Provide a serialized catalog and initialize version 0 of the engine's
+     *  catalog.
      */
     @Override
     public void loadCatalog(final String serializedCatalog) throws EEException {
@@ -183,23 +182,22 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     /**
-     * Wrapper for {@link #nativeUpdateCatalog(long, String)}.
+     * Provide a catalog diff and a new catalog version and update the
+     * engine's catalog.
      */
     @Override
-    public void updateCatalog(final String catalogDiffs) throws EEException {
+    public void updateCatalog(final String catalogDiffs, int catalogVersion) throws EEException {
         //C++ JSON deserializer is not thread safe, must synchronize
         LOG.trace("Loading Application Catalog...");
         int errorCode = 0;
         synchronized (ExecutionEngineJNI.class) {
-            errorCode = nativeUpdateCatalog(pointer, catalogDiffs);
+            errorCode = nativeUpdateCatalog(pointer, catalogDiffs, catalogVersion);
         }
         checkErrorCode(errorCode);
-        //LOG.info("Loaded Catalog.");
     }
 
     /**
      * @param undoToken Token identifying undo quantum for generated undo info
-     * Wrapper for {@link #nativeExecutePlanFragment(long, long, int, int, long, long, long)}.
      */
     @Override
     public DependencyPair executePlanFragment(final long planFragmentId,
@@ -290,7 +288,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     /**
      * @param undoToken Token identifying undo quantum for generated undo info
-     * Wrapper for {@link #nativeExecuteQueryPlanFragmentsAndGetResults(long, long[], int, long, long, long)}.
      */
     @Override
     public VoltTable[] executeQueryPlanFragmentsAndGetResults(
@@ -359,9 +356,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         }
     }
 
-    /**
-     * Wrapper for {@link #nativeSerializeTable(long, int, ByteBuffer, int)}.
-     */
     @Override
     public VoltTable serializeTable(final int tableId) throws EEException {
         if (LOG.isTraceEnabled()) {
@@ -380,9 +374,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         }
     }
 
-    /**
-     * Wrapper for {@link #nativeLoadTable(long, int, byte[], long, long, long, boolean)}.
-     */
     @Override
     public void loadTable(final int tableId, final VoltTable table,
         final long txnId, final long lastCommittedTxnId,
@@ -454,9 +445,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         }
     }
 
-    /**
-     * Wrapper for {@link #nativeToggleProfiler(long, int)}.
-     */
     @Override
     public int toggleProfiler(final int toggle) {
         return nativeToggleProfiler(pointer, toggle);
@@ -499,7 +487,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      */
     @Override
     public ELTProtoMessage eltAction(boolean ackAction, boolean pollAction,
-            boolean resetAction, long ackTxnId, int partitionId, int tableId)
+            boolean resetAction, long ackTxnId, int partitionId, long tableId)
     {
         deserializer.clear();
         ELTProtoMessage result = null;

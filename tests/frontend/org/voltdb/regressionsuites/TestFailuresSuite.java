@@ -147,6 +147,9 @@ public class TestFailuresSuite extends RegressionSuite {
                 table.resetRowPosition();
                 assertTrue(table.advanceRow());
                 assertTrue(java.util.Arrays.equals(stringData, table.getStringAsBytes(2)));
+                ConstraintFailureException cfe = (ConstraintFailureException)e.getCause();
+                assertTrue(cfe.getTableName().equalsIgnoreCase("FIVEK_STRING"));
+
             }
         }
         assertTrue(threwException);

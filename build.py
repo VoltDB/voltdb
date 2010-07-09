@@ -271,6 +271,7 @@ CTX.INPUT['storage'] = """
  StreamedTableStats.cpp
  streamedtable.cpp
  table.cpp
+ TableCatalogDelegate.cpp
  tablefactory.cpp
  TableStats.cpp
  tableutil.cpp
@@ -321,6 +322,7 @@ CTX.TESTS['common'] = """
 """
 
 CTX.TESTS['execution'] = """
+ add_drop_table
  engine_test
 """
 

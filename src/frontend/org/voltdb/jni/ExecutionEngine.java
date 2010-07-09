@@ -269,7 +269,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     abstract public void loadCatalog(final String serializedCatalog) throws EEException;
 
     /** Pass diffs to apply to the EE's catalog to update it */
-    abstract public void updateCatalog(final String diffCommands) throws EEException;
+    abstract public void updateCatalog(final String diffCommands, int catalogVersion) throws EEException;
 
     /** Run a plan fragment */
     abstract public DependencyPair executePlanFragment(
@@ -335,7 +335,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             Long now);
 
     /**
-     * Wrapper for {@link #nativeToggleProfiler(long, int)}.
+     * Instruct the EE to start/stop its profiler.
      */
     public abstract int toggleProfiler(int toggle);
 
@@ -361,7 +361,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     public abstract ELTProtoMessage eltAction(
             boolean ackAction, boolean pollAction, boolean resetAction,
-            long ackTxnId, int partitionId, int tableId);
+            long ackTxnId, int partitionId, long tableId);
 
 
     /*
@@ -436,9 +436,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Update the EE's catalog.
      * @param pointer the VoltDBEngine pointer
      * @param diff_commands Commands to apply to the existing EE catalog to update it
+     * @param catalogVersion
      * @return error code
      */
-    protected native int nativeUpdateCatalog(long pointer, String diff_commands);
+    protected native int nativeUpdateCatalog(long pointer, String diff_commands, int catalogVersion);
 
     /**
      * This method is called to initially load table data.
@@ -606,5 +607,5 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             boolean pollAction,
             boolean resetAction,
             long mAckOffset,
-            int mTableId);
+            long mTableId);
 }

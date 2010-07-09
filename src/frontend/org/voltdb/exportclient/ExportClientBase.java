@@ -39,11 +39,11 @@ public abstract class ExportClientBase implements Runnable {
     protected HashMap<String, ExportConnection> m_elConnections;
 
     // First hash by table, second by partition
-    private final HashMap<Integer, HashMap<Integer, ExportDataSink>> m_sinks;
+    private final HashMap<Long, HashMap<Integer, ExportDataSink>> m_sinks;
 
     public ExportClientBase()
     {
-        m_sinks = new HashMap<Integer, HashMap<Integer, ExportDataSink>>();
+        m_sinks = new HashMap<Long, HashMap<Integer, ExportDataSink>>();
         m_elConnections = new HashMap<String, ExportConnection>();
         m_servers = null;
     }
@@ -74,7 +74,7 @@ public abstract class ExportClientBase implements Runnable {
                           ", part ID: " + source.partitionId());
             // Put the ELDataSink in our hashed collection if it doesn't exist
             ExportDataSink sink = null;
-            int table_id = source.tableId();
+            long table_id = source.tableId();
             int part_id = source.partitionId();
             HashMap<Integer, ExportDataSink> part_map =
                 m_sinks.get(table_id);

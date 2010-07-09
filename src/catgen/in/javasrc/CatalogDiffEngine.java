@@ -25,6 +25,9 @@ public class CatalogDiffEngine {
     // true if the difference is allowed in a running system
     private boolean m_supported;
 
+    // collection of reasons why a diff is not supported
+    private final StringBuilder m_errors;
+
     /**
      * Instantiate a new diff. The resulting object can return the text
      * of the difference and report whether the difference is allowed in a
@@ -32,8 +35,9 @@ public class CatalogDiffEngine {
      * @param prev Tip of the old catalog.
      * @param next Tip of the new catalog.
      */
-    public CatalogDiffEngine(CatalogType prev, CatalogType next) {
+    public CatalogDiffEngine(final CatalogType prev, final CatalogType next) {
         m_sb = new StringBuilder();
+        m_errors = new StringBuilder();
         m_supported = true;
         diffRecursively(prev, next);
     }
@@ -52,8 +56,13 @@ public class CatalogDiffEngine {
      */
     boolean checkAddDropWhitelist(CatalogType suspect) {
         // should generate this from spec.txt
+        CatalogType orig = suspect;
 
-        // Support add/drop of these entire sub-trees
+        // Support add/drop of only the top level object.
+        if (suspect instanceof Table)
+            return true;
+
+        // Support add/drop anywhere in these sub-trees
         do {
             if (suspect instanceof User)
                 return true;
@@ -61,8 +70,11 @@ public class CatalogDiffEngine {
                 return true;
             if (suspect instanceof Procedure)
                 return true;
+            if (suspect instanceof Connector)
+                return true;
         } while ((suspect = suspect.m_parent) != null);
 
+        m_errors.append("May not dynamically add/drop: " + orig + "\n");
         m_supported = false;
         return false;
     }
@@ -71,8 +83,13 @@ public class CatalogDiffEngine {
      * @return true if CatalogType can be dynamically modified
      * in a running system.
      */
-    boolean checkModifyWhitelist(CatalogType suspect) {
+    boolean checkModifyWhitelist(CatalogType suspect, String field) {
         // should generate this from spec.txt
+        CatalogType orig = suspect;
+
+        // Support modification of these specific fields
+        if (suspect instanceof Database && field.equals("schema"))
+            return true;
 
         // Support modification of these entire sub-trees
         do {
@@ -84,6 +101,7 @@ public class CatalogDiffEngine {
                 return true;
         } while ((suspect = suspect.m_parent) != null);
 
+        m_errors.append("May not dynamically modify field " + field + " of " + orig + "\n");
         m_supported = false;
         return false;
     }
@@ -93,7 +111,7 @@ public class CatalogDiffEngine {
      */
     private void writeModification(CatalogType newType, String field)
     {
-        checkModifyWhitelist(newType);
+        checkModifyWhitelist(newType, field);
         newType.writeCommandForField(m_sb, field);
     }
 

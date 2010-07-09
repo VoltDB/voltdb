@@ -23,6 +23,7 @@
 
 package org.voltdb.messaging;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import junit.framework.TestCase;
@@ -36,7 +37,7 @@ import org.voltdb.utils.DBBPool;
 
 public class TestVoltMessageSerialization extends TestCase {
 
-    VoltMessage checkVoltMessage(VoltMessage msg, final DBBPool pool) {
+    VoltMessage checkVoltMessage(VoltMessage msg, final DBBPool pool) throws IOException {
         msg.flattenToBuffer( pool );
         ByteBuffer buf1 = msg.m_buffer;
 
@@ -49,7 +50,7 @@ public class TestVoltMessageSerialization extends TestCase {
         return msg2;
     }
 
-    public void testInitiateTask() {
+    public void testInitiateTask() throws IOException {
         DBBPool pool = new DBBPool();
         StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.setClientHandle(25);
@@ -73,7 +74,7 @@ public class TestVoltMessageSerialization extends TestCase {
         pool.clear();
     }
 
-    public void testInitiateResponse() {
+    public void testInitiateResponse() throws IOException {
         DBBPool pool = new DBBPool();
         StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.setClientHandle(25);
@@ -101,7 +102,7 @@ public class TestVoltMessageSerialization extends TestCase {
         pool.clear();
     }
 
-    public void testFragmentTask() {
+    public void testFragmentTask() throws IOException {
         DBBPool pool = new DBBPool();
         FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, true,
             new long[] { 5 }, new int[] { 12 }, new ByteBuffer[] { ByteBuffer.allocate(0) }, true);
@@ -123,7 +124,7 @@ public class TestVoltMessageSerialization extends TestCase {
         pool.clear();
     }
 
-    public void testFragmentResponse() {
+    public void testFragmentResponse() throws IOException {
         DBBPool pool = new DBBPool();
         FragmentTaskMessage ft = new FragmentTaskMessage(
                 15, 12, 37,
@@ -156,7 +157,7 @@ public class TestVoltMessageSerialization extends TestCase {
         pool.clear();
     }
 
-    public void testMembershipNotice() {
+    public void testMembershipNotice() throws IOException {
         DBBPool pool = new DBBPool();
         MultiPartitionParticipantMessage mn = new MultiPartitionParticipantMessage(100222, -75, 555555555555L, false);
 
@@ -171,7 +172,7 @@ public class TestVoltMessageSerialization extends TestCase {
         pool.clear();
     }
 
-    public void testHeartbeat() {
+    public void testHeartbeat() throws IOException {
         DBBPool pool = new DBBPool();
         HeartbeatMessage mn = new HeartbeatMessage(100222, 555555555555L, 97L);
 
@@ -187,7 +188,7 @@ public class TestVoltMessageSerialization extends TestCase {
         pool.clear();
     }
 
-    public void testHeartbeatResponse() {
+    public void testHeartbeatResponse() throws IOException {
         DBBPool pool = new DBBPool();
         HeartbeatResponseMessage mn = new HeartbeatResponseMessage(55, 100222, true);
 

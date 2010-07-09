@@ -36,8 +36,7 @@ class TupleStreamWrapper {
 public:
     enum Type { INSERT, DELETE };
 
-    TupleStreamWrapper(CatalogId partitionId, CatalogId siteId,
-                       CatalogId tableId, int64_t createTime);
+    TupleStreamWrapper(CatalogId partitionId, CatalogId siteId, int64_t createTime);
 
     ~TupleStreamWrapper() {
         cleanupManagedBuffers();
@@ -105,7 +104,6 @@ public:
     // cached catalog values
     const CatalogId m_partitionId;
     const CatalogId m_siteId;
-    const CatalogId m_tableId;
 
     /** timestamp of most recent flush() */
     int64_t m_lastFlush;

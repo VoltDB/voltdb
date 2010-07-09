@@ -21,10 +21,12 @@
 
 #include <cstdlib>
 #include <cassert>
+#include <functional>
 #include <iostream>
 #include <stdio.h>
 #include <string.h>
 #include "catalog.h"
+#include "catalogtype.h"
 #include "cluster.h"
 #include "common/SerializableEEException.h"
 
@@ -49,7 +51,22 @@ Catalog::~Catalog() {
     }
 }
 
+/*
+ * Clear the wasAdded/wasUpdated and deletion path lists.
+ */
+void Catalog::cleanupExecutionBookkeeping() {
+    // sad there isn't clean syntax to for_each a map's pair->second
+    boost::unordered_map<std::string, CatalogType*>::iterator iter;
+    for (iter = m_allCatalogObjects.begin(); iter != m_allCatalogObjects.end(); iter++) {
+        CatalogType *ct = iter->second;
+        ct->clearUpdateStatus();
+    }
+    m_deletions.clear();
+}
+
 void Catalog::execute(const string &stmts) {
+    cleanupExecutionBookkeeping();
+
     vector<string> lines = splitString(stmts, '\n');
     for (int32_t i = 0; i < lines.size(); ++i) {
         executeOne(lines[i]);
@@ -106,8 +123,7 @@ void Catalog::executeOne(const string &stmt) {
     CatalogType *item = itemForRef(ref);
     if (item == NULL) {
         std::string errmsg = "Catalog reference for " + ref + " not found.";
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      errmsg);
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, errmsg);
     }
 
     // execute
@@ -117,13 +133,23 @@ void Catalog::executeOne(const string &stmt) {
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                            "Catalog failed to add child.");
         }
+        type->added();
         resolveUnresolvedInfo(type->path());
     }
     else if (command.compare("set") == 0) {
         item->set(coll, child);
+        item->updated();
     }
     else if (command.compare("delete") == 0) {
-        item->removeChild(coll, child);
+        // remove from collection and hash path to the deletion tracker
+        // throw if nothing was removed.
+        if(item->removeChild(coll, child)) {
+            m_deletions.push_back(ref + "/" + coll + "[" + child + "]");
+        }
+        else {
+            std::string errmsg = "Catalog reference for " + ref + " not found.";
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, errmsg);
+        }
     }
     else {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
@@ -243,7 +269,8 @@ void Catalog::resolveUnresolvedInfo(string path) {
     }
 }
 
-CatalogType *Catalog::addChild(const string &collectionName, const string &childName) {
+CatalogType *
+Catalog::addChild(const string &collectionName, const string &childName) {
     if (collectionName.compare("clusters") == 0) {
         CatalogType *exists = m_clusters.get(childName);
         if (exists)
@@ -255,16 +282,20 @@ CatalogType *Catalog::addChild(const string &collectionName, const string &child
     return NULL;
 }
 
-CatalogType *Catalog::getChild(const string &collectionName, const string &childName) const {
+CatalogType *
+Catalog::getChild(const string &collectionName, const string &childName) const {
     if (collectionName.compare("clusters") == 0)
         return m_clusters.get(childName);
     return NULL;
 }
 
-void Catalog::removeChild(const std::string &collectionName, const std::string &childName) {
+bool
+Catalog::removeChild(const std::string &collectionName, const std::string &childName) {
     assert (m_childCollections.find(collectionName) != m_childCollections.end());
-    if (collectionName.compare("clusters") == 0)
+    if (collectionName.compare("clusters") == 0) {
         return m_clusters.remove(childName);
+    }
+    return false;
 }
 
 /** takes in 0-F, returns 0-15 */
@@ -307,4 +338,8 @@ void Catalog::hexEncodeString(const char *string, char *buffer) {
         buffer[(i * 2) + 1] = ch[0];
     }
     buffer[i*2] = '\0';
+}
+
+void Catalog::getDeletedPaths(vector<std::string> &deletions) {
+    copy(m_deletions.begin(), m_deletions.end(), back_inserter(deletions));
 }

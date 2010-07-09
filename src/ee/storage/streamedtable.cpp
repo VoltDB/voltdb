@@ -24,20 +24,19 @@ using namespace voltdb;
 
 StreamedTable::StreamedTable(ExecutorContext *ctx, bool exportEnabled)
     : Table(100), stats_(this), m_executorContext(ctx), m_wrapper(NULL),
-      m_id(0), m_sequenceNo(0)
+      m_sequenceNo(0)
 {
     // In StreamedTable, a non-null m_wrapper implies elt enabled.
     if (exportEnabled) {
         m_wrapper = new TupleStreamWrapper(m_executorContext->m_partitionId,
                                            m_executorContext->m_siteId,
-                                           m_id,
                                            m_executorContext->m_lastTickTime);
     }
 }
 
 StreamedTable::StreamedTable(int tableAllocationTargetSize)
     : Table(tableAllocationTargetSize), stats_(this),
-      m_executorContext(NULL), m_wrapper(NULL), m_id(0), m_sequenceNo(0)
+      m_executorContext(NULL), m_wrapper(NULL), m_sequenceNo(0)
 {
     throwFatalException("Must provide executor context to streamed table constructor.");
 }

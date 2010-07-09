@@ -272,7 +272,7 @@ def gencpp( classes, prepath, postpath ):
         write("    virtual CatalogType * getChild(const std::string &collectionName, const std::string &childName) const;")
 
         # removeChild method
-        write("    virtual void removeChild(const std::string &collectionName, const std::string &childName);")
+        write("    virtual bool removeChild(const std::string &collectionName, const std::string &childName);")
 
         # public section
         write("\npublic:")
@@ -385,14 +385,16 @@ def gencpp( classes, prepath, postpath ):
         write ( '    return NULL;\n}\n' )
 
         # write removeChild(...)
-        write ( interp( 'void $clsname::removeChild(const std::string &collectionName, const std::string &childName) {', locals() ) )
+        write ( interp( 'bool $clsname::removeChild(const std::string &collectionName, const std::string &childName) {', locals() ) )
         write ( interp( '    assert (m_childCollections.find(collectionName) != m_childCollections.end());', locals() ) )
         for field in cls.fields:
             if field.type[-1] == "*":
                 privname = 'm_' + field.name
                 pubname = field.name
-                write ( interp( '    if (collectionName.compare("$pubname") == 0)', locals() ) )
+                write ( interp( '    if (collectionName.compare("$pubname") == 0) {', locals() ) )
                 write ( interp( '        return $privname.remove(childName);', locals() ) )
+                write ( interp( '    }', locals() ) )
+        write ( interp( '    return false;', locals() ) )
         write ( '}\n' )
 
         # write field getters

@@ -74,9 +74,6 @@ class StreamedTable : public Table {
   private:
     ExecutorContext *m_executorContext;
     TupleStreamWrapper *m_wrapper;
-
-    // configured by factory
-    CatalogId m_id;
     int64_t m_sequenceNo;
 };
 

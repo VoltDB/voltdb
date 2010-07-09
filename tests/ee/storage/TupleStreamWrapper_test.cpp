@@ -71,7 +71,7 @@ public:
                                          true);
 
         // allocate a new buffer and wrap it
-        m_wrapper = new TupleStreamWrapper(1, 1, 1, 1);
+        m_wrapper = new TupleStreamWrapper(1, 1, 1);
 
         // excercise a smaller buffer capacity
         m_wrapper->setDefaultCapacity(BUFFER_SIZE);

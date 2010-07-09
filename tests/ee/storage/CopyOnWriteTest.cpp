@@ -113,7 +113,7 @@ public:
         std::vector<voltdb::TableIndexScheme> indexes;
 
         m_table = dynamic_cast<voltdb::PersistentTable*>(voltdb::TableFactory::getPersistentTable
-                                                         (0, 1, m_engine->getExecutorContext(), "Foo",
+                                                         (0, m_engine->getExecutorContext(), "Foo",
                                                           m_tableSchema, &m_columnNames[0], indexScheme, indexes, 0,
                                                           false, false));
     }

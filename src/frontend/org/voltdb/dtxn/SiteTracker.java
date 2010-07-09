@@ -261,7 +261,6 @@ public class SiteTracker {
      * Get the ids of all sites that contain a copy of ANY of
      * the given partitions.
      * @param partitions as ArrayList
-     * @return
      */
     public ArrayList<Integer> getLiveSitesForEachPartitionAsList(int[]  partitions) {
         ArrayList<Integer> all_sites = new ArrayList<Integer>();
@@ -314,7 +313,6 @@ public class SiteTracker {
     /**
      * Get the list of live execution site IDs on a specific host ID
      * @param hostId
-     * @return
      */
     public ArrayList<Integer> getLiveExecutionSitesForHost(int hostId)
     {

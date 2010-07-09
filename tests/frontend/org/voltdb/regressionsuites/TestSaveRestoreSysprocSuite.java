@@ -367,6 +367,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
     public void testSaveRestoreJumboRows()
     throws IOException, InterruptedException, ProcCallException
     {
+        System.out.println("Starting testSaveRestoreJumboRows.");
         Client client = getClient();
         byte firstStringBytes[] = new byte[1048576];
         java.util.Arrays.fill(firstStringBytes, (byte)'c');
@@ -412,6 +413,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
     public void testTSVConversion() throws Exception
     {
+        System.out.println("Staring testTSVConversion.");
         Client client = getClient();
 
         int num_replicated_items_per_chunk = 100;
@@ -438,6 +440,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
     public void testCSVConversion() throws Exception
     {
+        System.out.println("Starting testCSVConversion");
         Client client = getClient();
 
         int num_replicated_items_per_chunk = 100;
@@ -468,6 +471,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
      */
     public void testSnapshotSave() throws Exception
     {
+        System.out.println("Starting testSnapshotSave");
         Client client = getClient();
 
         int num_replicated_items_per_chunk = 100;
@@ -663,6 +667,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
     public void testIdleOnlineSnapshot() throws Exception
     {
+        System.out.println("Starting testIdleOnlineSnapshot");
         Client client = getClient();
 
         int num_replicated_items_per_chunk = 100;
@@ -702,6 +707,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
     public void testSaveAndRestoreReplicatedTable()
     throws IOException, InterruptedException, ProcCallException
     {
+        System.out.println("Starting testSaveAndRestoreReplicatedTable");
         int num_replicated_items_per_chunk = 100;
         int num_replicated_chunks = 10;
 
@@ -741,6 +747,9 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
         results = client.callProcedure("@Statistics", "table", 0).getResults();
 
+        System.out.println("@Statistics after restore:");
+        System.out.println(results[0]);
+
         int foundItem = 0;
         while (results[0].advanceRow())
         {
@@ -760,6 +769,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
     public void testSaveAndRestorePartitionedTable()
     throws IOException, InterruptedException, ProcCallException
     {
+        System.out.println("Starting testSaveAndRestorePartitionedTable");
         int num_partitioned_items_per_chunk = 120; // divisible by 3
         int num_partitioned_chunks = 10;
         Client client = getClient();
@@ -922,6 +932,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
     public void testRestoreMissingFiles()
     throws IOException, InterruptedException
     {
+        System.out.println("Starting testRestoreMissingFile");
         int num_replicated_items = 1000;
         int num_partitioned_items = 126;
 
@@ -959,6 +970,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
     public void testCorruptedFiles()
     throws Exception
     {
+        System.out.println("Starting testCorruptedFiles");
         int num_replicated_items = 1000;
         int num_partitioned_items = 126;
         java.util.Random r = new java.util.Random(0);
@@ -1003,6 +1015,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
     public void testCorruptedFilesRandom()
     throws Exception
     {
+        System.out.println("Starting testCorruptedFilesRandom");
         int num_replicated_items = 1000;
         int num_partitioned_items = 126;
         java.util.Random r = new java.util.Random();
@@ -1078,6 +1091,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
     public void testRepartition()
     throws IOException, InterruptedException, ProcCallException
     {
+        System.out.println("Starting testRepartition");
         int num_replicated_items_per_chunk = 100;
         int num_replicated_chunks = 10;
         int num_partitioned_items_per_chunk = 120; // divisible by 3 and 4
@@ -1142,6 +1156,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
     public void testChangeDDL()
     throws IOException, InterruptedException, ProcCallException
     {
+        System.out.println("Starting testChangeDDL");
         int num_partitioned_items_per_chunk = 120;
         int num_partitioned_chunks = 10;
         Client client = getClient();
@@ -1234,6 +1249,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
     public void testGoodChangeAttributeTypes()
     throws IOException, InterruptedException, ProcCallException
     {
+        System.out.println("Starting testGoodChangeAttributeTypes");
         Client client = getClient();
 
         // Store something in the table which will change columns
@@ -1304,6 +1320,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
     public void testBadChangeAttributeTypes()
     throws IOException, InterruptedException, ProcCallException
     {
+        System.out.println("Starting testBadChangeAttributeTypes");
         Client client = getClient();
 
         // Store something in the table which will change columns

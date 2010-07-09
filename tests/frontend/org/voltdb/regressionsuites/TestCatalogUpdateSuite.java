@@ -31,8 +31,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.Test;
 
-import org.voltdb.BackendTarget;
-import org.voltdb.VoltTable;
+import org.voltdb.*;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.benchmark.tpcc.procedures.InsertNewOrder;
@@ -53,16 +52,25 @@ import org.voltdb.types.TimestampType;
 public class TestCatalogUpdateSuite extends RegressionSuite {
 
     // procedures used by these tests
-    static Class<?>[] BASEPROCS =     { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
-                                        org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
-                                        org.voltdb.benchmark.tpcc.procedures.delivery.class };
+    static Class<?>[] BASEPROCS = { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
+                                    org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
+                                    org.voltdb.benchmark.tpcc.procedures.delivery.class };
+
+    static Class<?>[] BASEPROCS_OPROCS =  { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
+                                            org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
+                                            org.voltdb.benchmark.tpcc.procedures.delivery.class,
+                                            org.voltdb.regressionsuites.orderbyprocs.InsertO1.class};
+
+
     static Class<?>[] EXPANDEDPROCS = { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
                                         org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
                                         org.voltdb.benchmark.tpcc.procedures.delivery.class,
                                         org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class };
+
     static Class<?>[] CONFLICTPROCS = { org.voltdb.catalog.InsertNewOrder.class,
                                         org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
                                         org.voltdb.benchmark.tpcc.procedures.delivery.class };
+
     static Class<?>[] SOMANYPROCS =   { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
                                         org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
                                         org.voltdb.benchmark.tpcc.procedures.neworder.class,
@@ -233,20 +241,9 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
     }
 
     public void negativeTests(Client client) throws UnsupportedEncodingException {
-        // this fails because it tries to change schema
-        String newCatalogURL;
-        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtables.jar");
-        try {
-            client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
-            fail();
-        }
-        catch (Exception e) {
-            assertTrue(e.getMessage().startsWith("The requested catalog change is not"));
-        }
-
         // this fails because the catalog URL isn't a real thing
         URL url = LoadCatalogToString.class.getResource("catalog.txt");
-        newCatalogURL = URLDecoder.decode(url.getPath(), "UTF-8");
+        String newCatalogURL = URLDecoder.decode(url.getPath(), "UTF-8");
         try {
             client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
             fail();
@@ -255,6 +252,85 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
             assertTrue(e.getMessage().startsWith("Unable to read from catalog"));
         }
     }
+
+    public void testAddDropTable() throws IOException, ProcCallException, InterruptedException
+    {
+        Client client = getClient();
+        loadSomeData(client, 0, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
+
+        // verify that an insert w/o a table fails.
+        try {
+            client.callProcedure("@AdHoc", "insert into O1 values (1, 1, 'foo', 'foobar');");
+            fail();
+        }
+        catch (ProcCallException e) {
+        }
+
+        // Also can't call this not-yet-existing stored procedure
+        try {
+            client.callProcedure("InsertO1", new Integer(100), new Integer(200), "foo", "bar");
+            fail();
+        }
+        catch (ProcCallException e) {
+        }
+
+        // add tables O1, O2, O3
+        String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtables.jar");
+        VoltTable[] results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL).getResults();
+        assertTrue(results.length == 1);
+
+        // verify that the new table(s) support an insert
+        ClientResponse callProcedure = client.callProcedure("@AdHoc", "insert into O1 values (1, 1, 'foo', 'foobar');");
+        assertTrue(callProcedure.getResults().length == 1);
+        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
+
+        callProcedure = client.callProcedure("@AdHoc", "insert into O2 values (1, 1, 'foo', 'foobar');");
+        assertTrue(callProcedure.getResults().length == 1);
+        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
+
+        callProcedure = client.callProcedure("@AdHoc", "select * from O1");
+        VoltTable result = callProcedure.getResults()[0];
+        result.advanceRow();
+        assertTrue(result.get(2, VoltType.STRING).equals("foo"));
+
+        // old tables can still be accessed
+        loadSomeData(client, 20, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
+
+        // and this new procedure is happy like clams
+        callProcedure = client.callProcedure("InsertO1", new Integer(100), new Integer(200), "foo", "bar");
+        assertTrue(callProcedure.getResults().length == 1);
+        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
+
+        // revert to the original schema
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
+        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL).getResults();
+        assertTrue(results.length == 1);
+
+        // requests to the dropped table should fail
+        try {
+            client.callProcedure("@AdHoc", "insert into O1 values (1, 1, 'foo', 'foobar');");
+            fail();
+        }
+        catch (ProcCallException e) {
+        }
+
+        try {
+            client.callProcedure("InsertO1", new Integer(100), new Integer(200), "foo", "bar");
+            fail();
+        }
+        catch (ProcCallException e) {
+        }
+
+        // and other requests still succeed
+        loadSomeData(client, 30, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
+    }
+
 
 
     /**
@@ -283,7 +359,8 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project.addDefaultPartitioning();
         project.addProcedures(BASEPROCS);
         // build the jarfile
-        config.compile(project);
+        boolean basecompile = config.compile(project);
+        assertTrue(basecompile);
 
         // add this config to the set of tests to run
         builder.addServerConfig(config);
@@ -299,8 +376,10 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project.addDefaultSchema();
         project.addSchema(TestCatalogUpdateSuite.class.getResource("testorderby-ddl.sql").getPath());
         project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
-        config.compile(project);
+        project.addPartitionInfo("O1", "PKEY");
+        project.addProcedures(BASEPROCS_OPROCS);
+        boolean compile = config.compile(project);
+        assertTrue(compile);
 
         // Build a new catalog
         //config = new LocalSingleProcessServer("catalogupdate-local-expanded.jar", 2, BackendTarget.NATIVE_EE_JNI);
@@ -309,7 +388,8 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project.addDefaultSchema();
         project.addDefaultPartitioning();
         project.addProcedures(EXPANDEDPROCS);
-        config.compile(project);
+        compile = config.compile(project);
+        assertTrue(compile);
 
         // Build a new catalog
         //config = new LocalSingleProcessServer("catalogupdate-local-conflict.jar", 2, BackendTarget.NATIVE_EE_JNI);
@@ -318,7 +398,8 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project.addDefaultSchema();
         project.addDefaultPartitioning();
         project.addProcedures(CONFLICTPROCS);
-        config.compile(project);
+        compile = config.compile(project);
+        assertTrue(compile);
 
         // Build a new catalog
         //config = new LocalSingleProcessServer("catalogupdate-local-many.jar", 2, BackendTarget.NATIVE_EE_JNI);
@@ -327,7 +408,8 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project.addDefaultSchema();
         project.addDefaultPartitioning();
         project.addProcedures(SOMANYPROCS);
-        config.compile(project);
+        compile = config.compile(project);
+        assertTrue(compile);
 
         return builder;
     }

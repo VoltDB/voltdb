@@ -421,7 +421,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadC
 SHAREDLIB_JNIEXPORT jint JNICALL
 Java_org_voltdb_jni_ExecutionEngine_nativeUpdateCatalog(
     JNIEnv *env, jobject obj,
-    jlong engine_ptr, jstring catalog_diffs) {
+    jlong engine_ptr, jstring catalog_diffs, jint catalog_version) {
     VOLT_DEBUG("nativeUpdateCatalog() start");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
@@ -440,7 +440,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeUpdateCatalog(
     VOLT_DEBUG("calling loadCatalog...");
 
     try {
-        bool success = engine->updateCatalog(str);
+        bool success = engine->updateCatalog(str, catalog_version);
 
         if (success) {
             VOLT_DEBUG("updateCatalog succeeded");
@@ -1129,14 +1129,16 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeELTA
    jboolean pollAction,
    jboolean resetAction,
    jlong ackOffset,
-   jint tableId) {
+   jlong tableId) {
     VOLT_DEBUG("nativeELTAction in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     try {
         try {
             engine->resetReusedResultOutputBuffer();
-            return engine->eltAction(ackAction, pollAction, resetAction, ackOffset, tableId);
+            return engine->eltAction(ackAction, pollAction, resetAction,
+                                     static_cast<int64_t>(ackOffset),
+                                     static_cast<int64_t>(tableId));
         } catch (SQLException e) {
             throwFatalException("%s", e.message().c_str());
         }

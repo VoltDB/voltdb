@@ -17,6 +17,7 @@
 
 package org.voltdb.messaging;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 
@@ -168,7 +169,7 @@ public abstract class VoltMessage {
     }
 
     protected abstract void initFromBuffer();
-    protected abstract void flattenToBuffer(final DBBPool pool);
+    protected abstract void flattenToBuffer(final DBBPool pool) throws IOException;
     protected void initNew() {
         m_buffer = ByteBuffer.allocate(HEADER_SIZE + 1024);
         m_container = DBBPool.wrapBB(m_buffer);
@@ -176,7 +177,7 @@ public abstract class VoltMessage {
         m_buffer.limit(HEADER_SIZE);
     }
 
-    public BBContainer getBufferForMessaging(final DBBPool pool) {
+    public BBContainer getBufferForMessaging(final DBBPool pool) throws IOException {
         flattenToBuffer(pool);
         return m_container;
     }

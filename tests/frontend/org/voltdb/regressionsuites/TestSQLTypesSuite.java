@@ -1069,6 +1069,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
 
         final VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-ddl.sql"));
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-nonulls-ddl.sql"));
         project.addPartitionInfo("NO_NULLS", "PKEY");
         project.addPartitionInfo("ALLOW_NULLS", "PKEY");
         project.addPartitionInfo("WITH_DEFAULTS", "PKEY");

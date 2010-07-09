@@ -59,11 +59,6 @@ public:
      */
     char *retrieveDependency(int32_t dependencyId, size_t *dependencySz);
 
-    /**
-     * Push an EL buffer over the socket
-     */
-    void handoffReadyELBuffer(char* bufferPtr, int32_t bytesUsed, int32_t tableId);
-
     bool execute(struct ipc_command *cmd);
 
     /**

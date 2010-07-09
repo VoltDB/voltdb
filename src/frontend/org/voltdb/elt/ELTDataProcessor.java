@@ -40,7 +40,8 @@ public interface ELTDataProcessor  {
     void addLogger(Logger logger);
 
     /** Pass the loader each table in each database.
-     * Called once for each table in the catalog.
+     * This is called for each unique datasource. It may be recalled with
+     * new datasources if the catalog changes at runtime.
      * @param database these tables belong to.
      * @param tableName for the database
      * @param tableId corresponding to tableName.

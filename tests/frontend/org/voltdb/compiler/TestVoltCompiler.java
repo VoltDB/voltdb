@@ -209,6 +209,7 @@ public class TestVoltCompiler extends TestCase {
     public void testELTSetting() throws IOException {
         final VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestExportSuite.class.getResource("sqltypessuite-ddl.sql"));
+        project.addSchema(TestExportSuite.class.getResource("sqltypessuite-nonulls-ddl.sql"));
         project.addProcedures(org.voltdb.regressionsuites.sqltypesprocs.Insert.class);
         project.addPartitionInfo("NO_NULLS", "PKEY");
         project.addPartitionInfo("ALLOW_NULLS", "PKEY");
@@ -263,10 +264,10 @@ public class TestVoltCompiler extends TestCase {
                 get("database").getConnectors().get("0");
             assertTrue(connector.getEnabled());
             // Assert that all tables exist in the connector section of catalog
-            assertNotNull(connector.getTableinfo().get("0"));
-            assertNotNull(connector.getTableinfo().get("1"));
-            assertNotNull(connector.getTableinfo().get("2"));
-            assertNotNull(connector.getTableinfo().get("3"));
+            assertNotNull(connector.getTableinfo().getIgnoreCase("a"));
+            assertNotNull(connector.getTableinfo().getIgnoreCase("b"));
+            assertNotNull(connector.getTableinfo().getIgnoreCase("e"));
+            assertNotNull(connector.getTableinfo().getIgnoreCase("f"));
         } finally {
             final File jar = new File("/tmp/eltsettingstest.jar");
             jar.delete();

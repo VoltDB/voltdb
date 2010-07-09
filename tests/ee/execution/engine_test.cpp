@@ -214,7 +214,6 @@ void ExecutionEngineTest::compareTables(voltdb::Table *first, voltdb::Table *sec
     ASSERT_TRUE(first->indexCount() == second->indexCount());
     ASSERT_TRUE(first->activeTupleCount() == second->activeTupleCount());
     ASSERT_TRUE(first->databaseId() == second->databaseId());
-    ASSERT_TRUE(first->tableId() == second->tableId());
     ASSERT_TRUE(first->name() == second->name());
     ASSERT_TRUE(first->tableType() == second->tableType());
     vector<voltdb::TableIndex*> firstAllIndexes = first->allIndexes();

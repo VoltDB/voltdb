@@ -15,6 +15,9 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef CATALOGUTIL_H
+#define CATALOGUTIL_H
+
 #include "catalog/connector.h"
 #include "catalog/connectortableinfo.h"
 #include "catalog/database.h"
@@ -30,15 +33,15 @@
  * A table is export only if any connector's table list marks it as
  * such. Search through the connector's table lists accordingly.
  */
-bool isTableExportOnly(catalog::Database* database, int32_t tableIndex) {
+bool isTableExportOnly(catalog::Database& database, int32_t tableIndex) {
 
     // no export, no export only tables
-    if (database->connectors().size() == 0) {
+    if (database.connectors().size() == 0) {
         return false;
     }
 
     // there is one well-known-named connector
-    catalog::Connector *connector = database->connectors().get("0");
+    catalog::Connector *connector = database.connectors().get("0");
 
     // iterate the connector tableinfo list looking for tableindex
     std::map<std::string, catalog::ConnectorTableInfo*>::const_iterator it;
@@ -60,15 +63,15 @@ bool isTableExportOnly(catalog::Database* database, int32_t tableIndex) {
  * a connector's table list and if export is enabled for the
  * database as a whole
  */
-bool isExportEnabledForTable(catalog::Database* database, int32_t tableIndex) {
+bool isExportEnabledForTable(catalog::Database& database, int32_t tableIndex) {
 
     // export is disabled unless a connector exists
-    if (database->connectors().size() == 0) {
+    if (database.connectors().size() == 0) {
         return false;
     }
 
     // there is one well-known-named connector
-    catalog::Connector *connector = database->connectors().get("0");
+    catalog::Connector *connector = database.connectors().get("0");
 
     // export is disabled if the connector is disabled
     if (!(connector->enabled())) {
@@ -89,4 +92,6 @@ bool isExportEnabledForTable(catalog::Database* database, int32_t tableIndex) {
     return false;
 }
 
+
+#endif
 

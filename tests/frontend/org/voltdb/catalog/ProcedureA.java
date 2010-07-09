@@ -28,9 +28,9 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
 /*
-* A meaningless procedure that reads table 'A' for testing catalog
-* table add/drop.
-*/
+ * A meaningless procedure that reads table 'A' for testing catalog
+ * table add/drop.
+ */
 @ProcInfo (
    partitionInfo = "A.C1: 0",
    singlePartition = true

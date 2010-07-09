@@ -850,14 +850,14 @@ class VoltException:
                 print "Exception was a Volt SQL Exception ", self.sql_state_bytes
             else:
                 self.constraint_type = fser.readInt32()
-                self.table_id = fser.readInt32()
+                self.table_name = fser.readString()
                 self.buffer_size = fser.readInt32()
                 self.buffer = []
                 for i in xrange(0, self.buffer_size):
                     self.buffer.append(fser.readByte())
                 print "Exception was a Volt Constraint Failure Exception" \
                     " of type %d on table ID %d" % (self.constraint_type,
-                                                    self.table_id)
+                                                    self.table_name)
         else:
             for i in xrange(0, self.length - 3 - 2 - self.message_len):
                 fser.readByte()

@@ -244,9 +244,11 @@ public class RealVoltDB implements VoltDBInterface
                 VoltDB.crashVoltDB();
             }
 
+            /* N.B. node recovery requires discovering the current catalog version. */
+            final int catalogVersion = 0;
             Catalog catalog = new Catalog();
             catalog.execute(serializedCatalog);
-            m_catalogContext = new CatalogContext(catalog, m_config.m_pathToCatalog);
+            m_catalogContext = new CatalogContext(catalog, m_config.m_pathToCatalog, catalogVersion);
             final SnapshotSchedule schedule =
                 m_catalogContext.database.getSnapshotschedule().get("default");
 
@@ -286,8 +288,7 @@ public class RealVoltDB implements VoltDBInterface
 
             // Let the ELT system read its configuration from the catalog.
             try {
-                ELTManager.initialize(myHostId, catalog,
-                                      m_catalogContext.siteTracker);
+                ELTManager.initialize(myHostId, m_catalogContext);
             } catch (ELTManager.SetupException e) {
                 hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ELTInitFailure.name(), e);
                 System.exit(-1);
@@ -530,7 +531,8 @@ public class RealVoltDB implements VoltDBInterface
             if (m_siteThreads != null) {
                 for (Thread siteThread : m_siteThreads.values()) {
                     if (Thread.currentThread().equals(siteThread) == false) {
-                        siteThread.interrupt();
+                        // don't interrupt here. the site will start shutdown when
+                        // it sees the shutdown flag set.
                         siteThread.join();
                     }
                 }
@@ -539,7 +541,8 @@ public class RealVoltDB implements VoltDBInterface
             // try to join the main thread (possibly this one)
             if (mainSiteThread != null) {
                 if (Thread.currentThread().equals(mainSiteThread) == false) {
-                    mainSiteThread.interrupt();
+                    // don't interrupt here. the site will start shutdown when
+                    // it sees the shutdown flag set.
                     mainSiteThread.join();
                 }
             }
@@ -627,6 +630,11 @@ public class RealVoltDB implements VoltDBInterface
             System.out.println("Updating RealVoltDB catalog context from txnid: " + lastCatalogUpdate_txnId + " to " + currentTxnId);
             lastCatalogUpdate_txnId = currentTxnId;
             m_catalogContext = m_catalogContext.update(newCatalogURL, diffCommands);
+
+            // 1. update the elt manager.
+            ELTManager.instance().updateCatalog(m_catalogContext);
+
+            // 2. update client interface (asynchronously)
             for (ClientInterface ci : m_clientInterfaces)
                 ci.notifyOfCatalogUpdate();
         }

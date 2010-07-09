@@ -75,18 +75,36 @@ public class TestCatalogDiffs extends TestCase {
         return c;
     }
 
+    private void verifyDiff(
+            Catalog catOriginal,
+            Catalog catUpdated)
+    {
+        CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
+        catOriginal.execute(diff.commands());
+        assertTrue(diff.supported());
+        String updatedOriginalSerialized = catOriginal.serialize();
+        assertEquals(updatedOriginalSerialized, catUpdated.serialize());
+    }
+
+    private void verifyDiffRejected(
+            Catalog catOriginal,
+            Catalog catUpdated)
+    {
+        CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
+        catOriginal.execute(diff.commands());
+        assertFalse(diff.supported());
+        String updatedOriginalSerialized = catOriginal.serialize();
+        assertEquals(updatedOriginalSerialized, catUpdated.serialize());
+    }
+
+
     public void testAddProcedure() {
         String original = compile("base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
         String updated = compile("expanded", EXPANDEDPROCS);
         Catalog catUpdated = catalogForJar(updated);
-        String updatedSerialized = catUpdated.serialize();
 
-        CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
-        assertTrue(diff.supported());
-        catOriginal.execute(diff.commands());
-        String updatedOriginalSerialized = catOriginal.serialize();
-        assertEquals(updatedOriginalSerialized, updatedSerialized);
+        verifyDiff(catOriginal, catUpdated);
     }
 
     public void testModifyProcedureCode() {
@@ -94,13 +112,8 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catOriginal = catalogForJar(original);
         String updated = compile("conflict", CONFLICTPROCS);
         Catalog catUpdated = catalogForJar(updated);
-        String updatedSerialized = catUpdated.serialize();
 
-        CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
-        catOriginal.execute(diff.commands());
-        assertTrue(diff.supported());
-        String updatedOriginalSerialized = catOriginal.serialize();
-        assertEquals(updatedOriginalSerialized, updatedSerialized);
+        verifyDiff(catOriginal, catUpdated);
     }
 
     public void testDeleteProcedure() {
@@ -108,13 +121,8 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catOriginal = catalogForJar(original);
         String updated = compile("fewer", FEWERPROCS);
         Catalog catUpdated = catalogForJar(updated);
-        String updatedSerialized = catUpdated.serialize();
 
-        CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
-        catOriginal.execute(diff.commands());
-        assertTrue(diff.supported());
-        String updatedOriginalSerialized = catOriginal.serialize();
-        assertEquals(updatedOriginalSerialized, updatedSerialized);
+        verifyDiff(catOriginal, catUpdated);
     }
 
     public void testAddGroup() {
@@ -125,13 +133,8 @@ public class TestCatalogDiffs extends TestCase {
         gi[0] = new GroupInfo("group1", true, true);
         String updated = compileWithGroups(gi, null, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
-        String updatedSerialized = catUpdated.serialize();
 
-        CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
-        catOriginal.execute(diff.commands());
-        assertTrue(diff.supported());
-        String updatedOriginalSerialized = catOriginal.serialize();
-        assertEquals(updatedOriginalSerialized, updatedSerialized);
+        verifyDiff(catOriginal, catUpdated);
     }
 
     public void testAddGroupAndUser() {
@@ -146,13 +149,8 @@ public class TestCatalogDiffs extends TestCase {
 
         String updated = compileWithGroups(gi, ui, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
-        String updatedSerialized = catUpdated.serialize();
 
-        CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
-        catOriginal.execute(diff.commands());
-        assertTrue(diff.supported());
-        String updatedOriginalSerialized = catOriginal.serialize();
-        assertEquals(updatedOriginalSerialized, updatedSerialized);
+        verifyDiff(catOriginal, catUpdated);
     }
 
     public void testModifyUser() {
@@ -169,13 +167,8 @@ public class TestCatalogDiffs extends TestCase {
         ui[0] = new UserInfo("user1", false, false, "drowssap", new String[] {"group1"});
         String updated = compileWithGroups(gi, ui, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
-        String updatedSerialized = catUpdated.serialize();
 
-        CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
-        catOriginal.execute(diff.commands());
-        assertTrue(diff.supported());
-        String updatedOriginalSerialized = catOriginal.serialize();
-        assertEquals(updatedOriginalSerialized, updatedSerialized);
+        verifyDiff(catOriginal, catUpdated);
     }
 
     public void testDeleteUser() {
@@ -191,13 +184,8 @@ public class TestCatalogDiffs extends TestCase {
         // no users this time
         String updated = compileWithGroups(gi, null, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
-        String updatedSerialized = catUpdated.serialize();
 
-        CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
-        catOriginal.execute(diff.commands());
-        assertTrue(diff.supported());
-        String updatedOriginalSerialized = catOriginal.serialize();
-        assertEquals(updatedOriginalSerialized, updatedSerialized);
+        verifyDiff(catOriginal, catUpdated);
     }
 
     public void testDeleteGroupAndUser() {
@@ -213,13 +201,8 @@ public class TestCatalogDiffs extends TestCase {
         // no groups or users this time
         String updated = compileWithGroups(null, null, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
-        String updatedSerialized = catUpdated.serialize();
 
-        CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
-        catOriginal.execute(diff.commands());
-        assertTrue(diff.supported());
-        String updatedOriginalSerialized = catOriginal.serialize();
-        assertEquals(updatedOriginalSerialized, updatedSerialized);
+        verifyDiff(catOriginal, catUpdated);
     }
 
     public void testChangeUsersAssignedGroups() {
@@ -239,24 +222,19 @@ public class TestCatalogDiffs extends TestCase {
         ui[1] = new UserInfo("user2", true, true, "password", new String[] {"group1"});
         String updated = compileWithGroups(gi, ui, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
-        String updatedSerialized = catUpdated.serialize();
 
-        CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
-        catOriginal.execute(diff.commands());
-        assertTrue(diff.supported());
-        String updatedOriginalSerialized = catOriginal.serialize();
-        assertEquals(updatedOriginalSerialized, updatedSerialized);
+        verifyDiff(catOriginal, catUpdated);
     }
 
-    public void testUnallowedChange() {
+    public void testUnallowedChange() throws IOException {
         String original = compile("base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
 
-        // compile an invalid change (add ELT, in this case)
+        // compile an invalid change (add an index, in this case)
         TPCCProjectBuilder builder = new TPCCProjectBuilder();
         builder.addDefaultSchema();
         builder.addDefaultPartitioning();
-        builder.addDefaultELT();
+        builder.addLiteralSchema("CREATE INDEX IDX_CUSTOMER_NAME2 ON CUSTOMER_NAME (C_W_ID,C_D_ID,C_LAST);");
         builder.addProcedures(BASEPROCS);
         String updated = "tpcc-catalogcheck-invalid.jar";
         builder.compile(updated);
@@ -285,7 +263,6 @@ public class TestCatalogDiffs extends TestCase {
         assertEquals("", diff.commands());
     }
 
-    @SuppressWarnings("deprecation")
     public void testDiffOfIdenticalCatalogs() throws IOException {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
@@ -308,5 +285,219 @@ public class TestCatalogDiffs extends TestCase {
         assertTrue(diff.supported());
         String updatedOriginalSerialized = c3.serialize();
         assertEquals(updatedOriginalSerialized, c4.serialize());
+    }
+
+    public void testDeepCopyPreservesIsDown()
+    {
+        String original = compile("base", BASEPROCS);
+        Catalog catOriginal = catalogForJar(original);
+        catOriginal.getClusters().get("cluster").getSites().add("999");
+        catOriginal.getClusters().get("cluster").getSites().get("999").set("isUp", "false");
+        Catalog cat_copy = catOriginal.deepCopy();
+        assertFalse(cat_copy.getClusters().get("cluster").getSites().get("999").m_isUp);
+    }
+
+    public void testDeepCopyPreservesIsUp()
+    {
+        String original = compile("base", BASEPROCS);
+        Catalog catOriginal = catalogForJar(original);
+        catOriginal.getClusters().get("cluster").getSites().add("999");
+        catOriginal.getClusters().get("cluster").getSites().get("999").set("isUp", "true");
+        Catalog cat_copy = catOriginal.deepCopy();
+        assertTrue(cat_copy.getClusters().get("cluster").getSites().get("999").m_isUp);
+    }
+
+    // N.B. Some of the testcases assume this exact table structure... if you change it,
+    // check the callers.
+    Catalog getCatalogForTable(String tableName, String catname) throws IOException {
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("CREATE TABLE " + tableName + " (C1 BIGINT NOT NULL, PRIMARY KEY(C1));");
+        builder.addPartitionInfo(tableName, "C1");
+
+        if (tableName.equals("A"))
+            builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
+        else
+            builder.addProcedures(org.voltdb.catalog.ProcedureB.class);
+
+        builder.compile("test-" + catname + ".jar");
+        Catalog cat = catalogForJar("test-" + catname + ".jar");
+        return cat;
+    }
+
+
+    // N.B. Some of the testcases assume this exact table structure .. if you change it,
+    // check the callers...
+    Catalog get2ColumnCatalogForTable(String tableName, String catname) throws IOException {
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("CREATE TABLE " + tableName + " (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, PRIMARY KEY(C1));");
+        builder.addPartitionInfo(tableName, "C1");
+        if (tableName.equals("A"))
+            builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
+        else
+            builder.addProcedures(org.voltdb.catalog.ProcedureB.class);
+        builder.compile("test-" + catname + ".jar");
+        Catalog cat = catalogForJar("test-" + catname + ".jar");
+        return cat;
+    }
+
+
+    public void testAddTable() throws IOException {
+        // Start with table A.
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("CREATE TABLE A (C1 BIGINT NOT NULL, PRIMARY KEY(C1));");
+        builder.addPartitionInfo("A", "C1");
+        builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
+        builder.compile("testaddtable1.jar");
+        Catalog catOriginal = catalogForJar("testaddtable1.jar");
+
+        // Add table B and recompile
+        builder.addLiteralSchema("CREATE TABLE B (C1 BIGINT NOT NULL, PRIMARY KEY(C1));");
+        builder.addPartitionInfo("B", "C1");
+        builder.addProcedures(org.voltdb.catalog.ProcedureB.class);
+        builder.compile("testaddtable2.jar");
+        Catalog catUpdated = catalogForJar("testaddtable2.jar");
+
+        verifyDiff(catOriginal, catUpdated);
+    }
+
+    public void testDropTable() throws IOException {
+        // Start with table A and B.
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, PRIMARY KEY(C1));" +
+                                 "\nCREATE TABLE B (C1 BIGINT NOT NULL, PRIMARY KEY(C1));");
+        builder.addPartitionInfo("A", "C1");
+        builder.addPartitionInfo("B", "C1");
+        builder.addProcedures(org.voltdb.catalog.ProcedureA.class,
+                              org.voltdb.catalog.ProcedureB.class);
+        builder.compile("testdroptable1.jar");
+        Catalog catOriginal = catalogForJar("testdroptable1.jar");
+
+        // Create a catalog with just table A
+        Catalog catUpdated = getCatalogForTable("A", "droptable2");
+
+        verifyDiff(catOriginal, catUpdated);
+    }
+
+
+    public void testAddTableColumnRejected() throws IOException {
+        Catalog catOriginal = getCatalogForTable("A", "addtablecolumnrejected1");
+        Catalog catUpdated = get2ColumnCatalogForTable("A", "addtablecolumnrejected2");
+        verifyDiffRejected(catOriginal, catUpdated);
+    }
+
+    public void testRemoveTableColumnRejected() throws IOException {
+        Catalog catOriginal = get2ColumnCatalogForTable("A", "removetablecolumnrejected2");
+        Catalog catUpdated = getCatalogForTable("A", "removetablecolumnrejected1");
+        verifyDiffRejected(catOriginal, catUpdated);
+    }
+
+    public void testAddTableIndexRejected() throws IOException {
+        // start with a table
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, PRIMARY KEY(C1));");
+        builder.addPartitionInfo("A", "C1");
+        builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
+        builder.compile("addindexrejected1.jar");
+        Catalog catOriginal = catalogForJar("addindexrejected1.jar");
+
+        // add an index
+        builder.addLiteralSchema("\nCREATE INDEX IDX ON A(C1,C2);");
+        builder.compile("addindexrejected2.jar");
+        Catalog catUpdated = catalogForJar("addindexrejected2.jar");
+
+        verifyDiffRejected(catOriginal, catUpdated);
+    }
+
+    public void testRemoveTableIndexRejected() throws IOException {
+        // start with a table with an index
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, PRIMARY KEY(C1));");
+        builder.addLiteralSchema("\nCREATE INDEX IDX ON A(C1,C2);");
+        builder.addPartitionInfo("A", "C1");
+        builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
+        builder.compile("removeindexrejected1.jar");
+        Catalog catOriginal = catalogForJar("removeindexrejected1.jar");
+
+        // remove the index
+        Catalog catUpdated = get2ColumnCatalogForTable("A", "removeindexrejected2");
+        verifyDiffRejected(catOriginal, catUpdated);
+    }
+
+    public void testAddTableConstraintRejected() throws IOException {
+        // start with a table without a PKEY
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("A", "C1");
+        builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
+        builder.compile("addconstraint1.jar");
+        Catalog catOriginal = catalogForJar("addconstraint1.jar");
+
+        // add a constraint (this function creates a primary key)
+        Catalog catUpdated = getCatalogForTable("A", "addconstraint2");
+        verifyDiffRejected(catOriginal, catUpdated);
+    }
+
+    public void testRemoveTableConstraintRejected() throws IOException {
+        // with the primary key
+        Catalog catOriginal = getCatalogForTable("A", "dropconstraint1");
+
+        // without the primary key
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("A", "C1");
+        builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
+        builder.compile("dropconstraint2.jar");
+        Catalog catUpdated = catalogForJar("dropconstraint2.jar");
+
+        verifyDiffRejected(catOriginal, catUpdated);
+    }
+
+    public void testAddMaterializedViewRejected() throws IOException {
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("A", "C1");
+        builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
+        builder.compile("addmatview1.jar");
+        Catalog catOriginal = catalogForJar("addmatview1.jar");
+
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.compile("addmatview2.jar");
+        Catalog catUpdated = catalogForJar("addmatview2.jar");
+
+        verifyDiffRejected(catOriginal, catUpdated);
+    }
+
+    public void testRemoveMaterializedViewRejected() throws IOException {
+        // with a view
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.addPartitionInfo("A", "C1");
+        builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
+        builder.compile("remmatview1.jar");
+        Catalog catOriginal = catalogForJar("remmatview1.jar");
+
+        // without a view
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("A", "C1");
+        builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
+        builder.compile("remmatview2.jar");
+        Catalog catUpdated = catalogForJar("remmatview2.jar");
+
+        verifyDiffRejected(catOriginal, catUpdated);
+    }
+
+    public void testChangeTableReplicationSettingRejected() throws IOException {
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
+        builder.compile("addpart1.jar");
+        Catalog catOriginal = catalogForJar("addpart1.jar");
+
+        builder.addPartitionInfo("A", "C1");
+        builder.compile("addpart2.jar");
+        Catalog catUpdated = catalogForJar("addpart2.jar");
+        verifyDiffRejected(catOriginal, catUpdated);
     }
 }

@@ -17,10 +17,7 @@
 
 package org.voltdb.exceptions;
 
-import java.io.PrintStream;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.io.UnsupportedEncodingException;
+import java.io.*;
 import java.nio.ByteBuffer;
 
 import org.json.JSONString;
@@ -139,8 +136,9 @@ public class SerializableException extends VoltProcedure.VoltAbortException impl
     /**
      * Serialize this exception to the supplied byte buffer
      * @param b ByteBuffer to serialize this exception to
+     * @throws IOException
      */
-    public void serializeToBuffer(ByteBuffer b) {
+    public void serializeToBuffer(ByteBuffer b) throws IOException {
         assert(getSerializedSize() <= b.remaining());
         b.putInt(getSerializedSize() - 4);
         b.put((byte)getExceptionType().ordinal());
@@ -158,8 +156,9 @@ public class SerializableException extends VoltProcedure.VoltAbortException impl
      * Method for subclasses to implement that serializes the subclass's contents to
      * the ByteBuffer
      * @param b ByteBuffer to serialize the subclass contents to
+     * @throws IOException
      */
-    protected void p_serializeToBuffer(ByteBuffer b) {}
+    protected void p_serializeToBuffer(ByteBuffer b) throws IOException {}
 
     /**
      * Method for subclasses to specify what constant from the SerializableExceptions enum

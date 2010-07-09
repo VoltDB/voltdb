@@ -269,6 +269,34 @@ public class FastSerializer implements DataOutput {
     }
 
     /**
+     * Write a string in the standard VoltDB way without
+     * wrapping the byte buffer.
+     */
+    public static void writeString(String string, ByteBuffer buffer) throws IOException {
+        final int MAX_LENGTH = VoltType.MAX_VALUE_LENGTH;
+        final int NULL_STRING_INDICATOR = -1;
+        if (string == null) {
+            buffer.putInt(NULL_STRING_INDICATOR);
+            return;
+        }
+
+        int len = 0;
+        byte[] strbytes = {};
+        try {
+            strbytes = string.getBytes("UTF-8");
+            len = strbytes.length;
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
+        }
+        if (len > MAX_LENGTH) {
+            throw new IOException("String exceeds maximum length of "
+                                  + MAX_LENGTH + " bytes.");
+        }
+        buffer.putInt(len);
+        buffer.put(strbytes);
+    }
+
+    /**
      * Write a string in the standard VoltDB way. That is, two
      * bytes of length info followed by the bytes of characters
      * encoded in UTF-8.

@@ -22,9 +22,9 @@ import java.nio.ByteBuffer;
 import java.util.logging.Logger;
 
 import org.voltdb.types.ConstraintType;
-import org.voltdb.PrivateVoltTableFactory;
-import org.voltdb.VoltTable;
+import org.voltdb.*;
 import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.messaging.FastSerializer;
 
 /**
  * Exception generated when a constraint is violated. Contains more information then a SQLException.
@@ -41,12 +41,19 @@ public class ConstraintFailureException extends SQLException {
     public ConstraintFailureException(ByteBuffer exceptionBuffer) {
         super(exceptionBuffer);
         type = ConstraintType.get(exceptionBuffer.getInt());
-        tableId = exceptionBuffer.getInt();
+        try {
+            tableName = FastDeserializer.readString(exceptionBuffer);
+        }
+        catch (IOException e) {
+            // implies that the EE created an invalid constraint
+            // failure, which would be a corruption/defect.
+            VoltDB.crashVoltDB();
+        }
         if (exceptionBuffer.hasRemaining()) {
             int tableSize = exceptionBuffer.getInt();
-            buffer = ByteBuffer.allocate(tableSize);//Don't bother to copy the bytes for type and table id
-            //buffer.order(exceptionBuffer.order());
-            exceptionBuffer.get(buffer.array());//Copy the exception details.
+            buffer = ByteBuffer.allocate(tableSize);
+            //Copy the exception details.
+            exceptionBuffer.get(buffer.array());
         } else {
             buffer = ByteBuffer.allocate(0);
         }
@@ -60,11 +67,8 @@ public class ConstraintFailureException extends SQLException {
         return type;
     }
 
-    /**
-     * Retrieve the CatalogId of the table that the constraint violation occurred in
-     */
-    public int getTableId() {
-        return tableId;
+    public String getTableName() {
+        return tableName;
     }
 
     /**
@@ -98,9 +102,9 @@ public class ConstraintFailureException extends SQLException {
     private final ConstraintType type;
 
     /**
-     * CatalogId of the table that the contraint violation occured in.
+     * Name of the table that the constraint violation occurred in.
      */
-    private final int tableId;
+    private String tableName = null;
 
     /**
      * Lazy deserialized copy of a table with the tuples involved in the constraint violation
@@ -117,7 +121,7 @@ public class ConstraintFailureException extends SQLException {
             sb.append("Constraint Type ");
             sb.append(type);
             sb.append(", Table CatalogId ");
-            sb.append(tableId);
+            sb.append(tableName);
             sb.append('\n');
             sb.append(getTuples().toString());
             return sb.toString();
@@ -139,14 +143,15 @@ public class ConstraintFailureException extends SQLException {
 
     @Override
     protected int p_getSerializedSize() {
-        return super.p_getSerializedSize() + 12 + buffer.capacity();
+        // ... + 8 + string prefix + string length + ...
+        return super.p_getSerializedSize() + 8 + 4 + tableName.length() + buffer.capacity();
     }
 
     @Override
-    protected void p_serializeToBuffer(ByteBuffer b) {
+    protected void p_serializeToBuffer(ByteBuffer b) throws IOException {
         super.p_serializeToBuffer(b);
         b.putInt(type.getValue());
-        b.putInt(tableId);
+        FastSerializer.writeString(tableName, b);
         b.putInt(buffer.capacity());
         buffer.rewind();
         b.put(buffer);

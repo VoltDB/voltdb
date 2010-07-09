@@ -78,7 +78,6 @@ public:
     */
     static Table* getPersistentTable(
         voltdb::CatalogId databaseId,
-        CatalogId tableId,
         ExecutorContext *ctx,
         const std::string &name,
         TupleSchema* schema,
@@ -92,7 +91,6 @@ public:
     */
     static Table* getPersistentTable(
         voltdb::CatalogId databaseId,
-        CatalogId tableId,
         ExecutorContext *ctx,
         const std::string &name,
         TupleSchema* schema,
@@ -108,7 +106,6 @@ public:
     */
     static Table* getPersistentTable(
         voltdb::CatalogId databaseId,
-        CatalogId tableId,
         ExecutorContext *ctx,
         const std::string &name,
         TupleSchema* schema,
@@ -124,7 +121,6 @@ public:
     */
     static Table* getPersistentTable(
         voltdb::CatalogId databaseId,
-        CatalogId tableId,
         ExecutorContext *ctx,
         const std::string &name,
         TupleSchema* schema,

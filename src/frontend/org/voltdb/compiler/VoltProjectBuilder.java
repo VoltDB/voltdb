@@ -229,7 +229,6 @@ public class VoltProjectBuilder {
      * This is test code written by Ryan, even though it was
      * committed by John.
      */
-    @Deprecated
     public void addLiteralSchema(String ddlText) throws IOException {
         File temp = File.createTempFile("difftest", "sql");
         temp.deleteOnExit();

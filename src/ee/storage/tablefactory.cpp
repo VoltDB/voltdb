@@ -59,7 +59,6 @@ namespace voltdb {
 
 Table* TableFactory::getPersistentTable(
             voltdb::CatalogId databaseId,
-            CatalogId tableId,
             ExecutorContext *ctx,
             const std::string &name,
             TupleSchema* schema,
@@ -69,14 +68,13 @@ Table* TableFactory::getPersistentTable(
             bool exportOnly)
 {
     std::vector<TableIndexScheme> dummy;
-    return getPersistentTable(databaseId, tableId, ctx, name,
+    return getPersistentTable(databaseId, ctx, name,
                               schema, columnNames, dummy, partitionColumn,
                               exportEnabled, exportOnly);
 }
 
 Table* TableFactory::getPersistentTable(
             voltdb::CatalogId databaseId,
-            CatalogId tableId,
             ExecutorContext *ctx,
             const std::string &name,
             TupleSchema* schema,
@@ -87,14 +85,13 @@ Table* TableFactory::getPersistentTable(
             bool exportOnly)
 {
     std::vector<TableIndexScheme> dummy;
-    return getPersistentTable(databaseId, tableId, ctx, name, schema, columnNames,
+    return getPersistentTable(databaseId, ctx, name, schema, columnNames,
                               pkey_index, dummy, partitionColumn,
                               exportEnabled, exportOnly);
 }
 
 Table* TableFactory::getPersistentTable(
             voltdb::CatalogId databaseId,
-            CatalogId tableId,
             ExecutorContext *ctx,
             const std::string &name,
             TupleSchema* schema,
@@ -118,8 +115,6 @@ Table* TableFactory::getPersistentTable(
         pTable->m_indexes = new TableIndex*[indexes.size()];
         pTable->m_partitionColumn = partitionColumn;
 
-        pTable->m_id = tableId;
-
         for (int i = 0; i < indexes.size(); ++i) {
             pTable->m_indexes[i] = TableIndexFactory::getInstance(indexes[i]);
         }
@@ -137,7 +132,6 @@ Table* TableFactory::getPersistentTable(
 
 Table* TableFactory::getPersistentTable(
             voltdb::CatalogId databaseId,
-            CatalogId tableId,
             ExecutorContext *ctx,
             const std::string &name,
             TupleSchema* schema,
@@ -165,8 +159,6 @@ Table* TableFactory::getPersistentTable(
         pTable->m_indexCount = 1 + (int)indexes.size();
         pTable->m_indexes = new TableIndex*[1 + indexes.size()];
         pTable->m_indexes[0] = pTable->m_pkeyIndex;
-
-        pTable->m_id = tableId;
 
         for (int i = 0; i < indexes.size(); ++i) {
             pTable->m_indexes[i + 1] = TableIndexFactory::getInstance(indexes[i]);

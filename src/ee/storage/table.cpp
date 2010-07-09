@@ -76,11 +76,15 @@ Table::Table(int tableAllocationTargetSize) :
     m_name(""),
     m_ownsTupleSchema(true),
     m_tableAllocationTargetSize(tableAllocationTargetSize),
-    m_tempTableMemoryInBytes(NULL)
+    m_tempTableMemoryInBytes(NULL),
+    m_refcount(0)
 {
 }
 
 Table::~Table() {
+    // not all tables are reference counted but this should be invariant
+    assert(m_refcount == 0);
+
     // clear the schema
     if (m_ownsTupleSchema) {
         TupleSchema::freeTupleSchema(m_schema);
@@ -413,7 +417,6 @@ bool Table::equals(const voltdb::Table *other) const {
     if (!(indexCount() == other->indexCount())) return false;
     if (!(activeTupleCount() == other->activeTupleCount())) return false;
     if (!(databaseId() == other->databaseId())) return false;
-    if (!(tableId() == other->tableId())) return false;
     if (!(name() == other->name())) return false;
     if (!(tableType() == other->tableType())) return false;
 

@@ -34,7 +34,7 @@ public class ExportDataSink implements Runnable
         Logger.getLogger("ExportClient",
                          VoltLoggerFactory.instance());
 
-    private int m_tableId = -1;
+    private long m_tableId = -1;
     private int m_partitionId = -1;
     private final String m_tableName;
     private final ExportDecoderBase m_decoder;
@@ -45,7 +45,7 @@ public class ExportDataSink implements Runnable
 
     boolean m_started = false;
 
-    public ExportDataSink(int partitionId, int tableId,
+    public ExportDataSink(int partitionId, long tableId,
                       String tableName, ExportDecoderBase decoder)
     {
         m_tableId = tableId;
@@ -56,7 +56,7 @@ public class ExportDataSink implements Runnable
         m_txQueues = new HashMap<String, LinkedList<ELTProtoMessage>>();
     }
 
-    public int getTableId()
+    public long getTableId()
     {
         return m_tableId;
     }

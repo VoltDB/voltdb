@@ -117,12 +117,12 @@ public class ExportTestClient extends ExportClientBase
     {
         boolean retval = true;
 
-        HashMap<Integer, Long> table_offsets = new HashMap<Integer, Long>();
+        HashMap<Long, Long> table_offsets = new HashMap<Long, Long>();
 
         // Generate polls for every connection/table/partition
         for (ExportConnection connection : m_elConnections.values())
         {
-            HashMap<Integer, Long> seen_responses = new HashMap<Integer, Long>();
+            HashMap<Long, Long> seen_responses = new HashMap<Long, Long>();
             for (AdvertisedDataSource source : connection.getDataSources())
             {
                 try
@@ -146,7 +146,7 @@ public class ExportTestClient extends ExportClientBase
                     long offset = m.getAckOffset();
                     // Now, see if we've seen this offset for this table.  If so,
                     // check to see that it's equal.  Otherwise, stash it.
-                    Integer table_hash = m.getTableId() * 137 + m.getPartitionId();
+                    Long table_hash = m.getTableId() * 137 + m.getPartitionId();
                     if (!table_offsets.containsKey(table_hash))
                     {
                         table_offsets.put(table_hash, offset);

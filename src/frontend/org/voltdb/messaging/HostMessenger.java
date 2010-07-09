@@ -264,7 +264,7 @@ public class HostMessenger implements Messenger {
             host.send(mailboxId, dests, 1,
                     new DeferredSerialization() {
                 @Override
-                public final BBContainer serialize(final DBBPool pool) {
+                public final BBContainer serialize(final DBBPool pool) throws IOException {
                     return message.getBufferForMessaging(pool);
                 }
 
@@ -309,7 +309,7 @@ public class HostMessenger implements Messenger {
          */
         final FutureTask<ByteBuffer> buildMessageTask = new FutureTask<ByteBuffer>(
                 new Callable<ByteBuffer>() {
-                    public final ByteBuffer call() {
+                    public final ByteBuffer call() throws IOException {
                         return message.getBufferForMessaging(heapPool).b;
                     }
                 });

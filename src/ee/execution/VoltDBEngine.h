@@ -96,6 +96,7 @@ class AbstractPlanNode;
 class SerializeInput;
 class SerializeOutput;
 class Table;
+class CatalogDelegate;
 class ReferenceSerializeInput;
 class ReferenceSerializeOutput;
 class PlanNodeFragment;
@@ -170,7 +171,13 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // Catalog Functions
         // -------------------------------------------------
         bool loadCatalog(const std::string &catalogPayload);
-        bool updateCatalog(const std::string &catalogPayload);
+        bool updateCatalog(const std::string &catalogPayload, int catalogVersion);
+        bool processCatalogAdditions(bool addAll);
+        bool processCatalogDeletes();
+        bool rebuildPlanFragmentCollections();
+        bool rebuildTableCollections();
+
+
         /**
         * Load table data into a persistent table specified by the tableId parameter.
         * This must be called at most only once before any data is loaded in to the table.
@@ -352,12 +359,12 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * @param pollAction whether or not this action requests the
          * next buffer of unpolled octets
          * @param if ackAction is true, the stream offset being released
-         * @param the ID of the table to which this action applies
+         * @param the catalog version qualified id of the table to which this action applies
          * @return the universal offset for any poll results (results
          * returned separatedly via QueryResults buffer)
          */
         long eltAction(bool ackAction, bool pollAction, bool resetAction,
-                       long ackOffset, int tableId);
+                       int64_t ackOffset, int64_t tableId);
 
     protected:
         /*
@@ -370,12 +377,11 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         // Initialization Functions
         // -------------------------------------------------
-        bool clearAndLoadAllPlanFragments();
-        bool initTable(const int32_t databaseId, const catalog::Table *catalogTable);
         bool initPlanFragment(const int64_t fragId, const std::string planNodeTree);
         bool initPlanNode(const int64_t fragId, AbstractPlanNode* node, int* tempTableMemoryInBytes);
-        bool initCluster(const catalog::Cluster *catalogCluster);
+        bool initCluster();
         bool initMaterializedViews();
+        bool updateCatalogDatabaseReference();
 
         void printReport();
 
@@ -399,21 +405,41 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         int32_t m_partitionId;
         int32_t m_clusterIndex;
         int m_totalPartitions;
-
         size_t m_startOfResultBuffer;
 
-        /**
-         * Tables.
-         * We maintain a map of table id's to table objects
-         * This contains both intermediate result tables and persistent tables
-        */
+        /*
+         * Catalog delegates hashed by path.
+         */
+        std::map<std::string, CatalogDelegate*> m_catalogDelegates;
+
+        // map catalog table id to table pointers
         std::map<int32_t, Table*> m_tables;
+
+        // map catalog table name to table pointers
         std::map<std::string, Table*> m_tablesByName;
+
+        /*
+         * Map of catalog table ids to snapshotting tables.
+         * Note that these tableIds are the ids when the snapshot
+         * was initiated. The snapshot processor in Java does not
+         * update tableIds when the catalog changes. The point of
+         * reference, therefore, is consistently the catalog at
+         * the point of snapshot initiation. It is always invalid
+         * to try to map this tableId back to catalog::Table via
+         * the catalog, at least w/o comparing table names.
+         */
+        std::map<int32_t, Table*> m_snapshottingTables;
+
+        /*
+         * Map of catalog ids to exporting tables.
+         */
+        std::map<int64_t, Table*> m_exportingTables;
 
         /**
          * System Catalog.
         */
         boost::shared_ptr<catalog::Catalog> m_catalog;
+        int m_catalogVersion;
         catalog::Database *m_database;
 
         /** reused parameter container. */

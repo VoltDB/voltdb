@@ -318,7 +318,8 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 }
                 finished = true;
             } catch (final InterruptedException e) {
-                //Ignore interruptions and finish shutting down.
+                System.out.println("Interrupted while shutting down. Trying again.");
+                e.printStackTrace();
             }
         }
 
@@ -352,14 +353,14 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             CatalogMap<Table> tables = m_context.database.getTables();
             int[] tableIds = new int[tables.size()];
             int i = 0;
-            for (Table table : tables)
+            for (Table table : tables) {
                 tableIds[i++] = table.getRelativeIndex();
-            final VoltTable[] s = ee.getStats(SysProcSelector.TABLE,
-                                              tableIds,
-                                              false,
-                                              System.currentTimeMillis());
-            if (s != null)
+            }
+            final VoltTable[] s =
+                ee.getStats(SysProcSelector.TABLE, tableIds, false, time);
+            if (s != null) {
                 m_tableStats.setStatsTable(s[0]);
+            }
         }
     }
 
@@ -566,7 +567,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     public boolean updateCatalog(String catalogDiffCommands) {
         m_context = VoltDB.instance().getCatalogContext();
         loadProceduresFromCatalog(VoltDB.getEEBackendType());
-        ee.updateCatalog(catalogDiffCommands);
+        ee.updateCatalog(catalogDiffCommands, m_context.catalogVersion);
         return true;
     }
 

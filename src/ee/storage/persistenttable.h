@@ -112,7 +112,6 @@ class PersistentTable : public Table {
 
   public:
     virtual ~PersistentTable();
-    virtual CatalogId tableId() const { return m_id; }
 
     // ------------------------------------------------------------------
     // OPERATIONS
@@ -193,11 +192,11 @@ class PersistentTable : public Table {
     bool activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId);
 
     /**
-     * Attempt to serialize more tuples from the table to the provided output stream.
-     * Returns true if there are more tuples and false if there are no more tuples waiting to be
-     * serialized.
+     * Attempt to serialize more tuples from the table to the provided
+     * output stream.  Returns true if there are more tuples and false
+     * if there are no more tuples waiting to be serialized.
      */
-    void serializeMore(ReferenceSerializeOutput *out);
+    bool serializeMore(ReferenceSerializeOutput *out);
 
 protected:
     // ------------------------------------------------------------------
@@ -228,8 +227,6 @@ protected:
      * to do add tuples to indexes
      */
     virtual void populateIndexes(int tupleCount);
-
-    CatalogId m_id;
 
     // pointer to current transaction id and other "global" state.
     // abstract this out of VoltDBEngine to avoid creating dependendencies

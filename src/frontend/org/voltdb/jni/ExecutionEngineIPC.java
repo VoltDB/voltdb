@@ -337,7 +337,15 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 m_socket = null;
             }
             if (m_eeProcess != null) {
-                m_eeProcess.waitFor();
+                boolean done = false;
+                while (!done){
+                    try {
+                        m_eeProcess.waitFor();
+                        done = true;
+                    } catch (InterruptedException e) {
+                        System.out.println("Interrupted waiting for EE IPC process to die. Wait again.");
+                    }
+                }
             }
             if (m_stdoutParser != null) {
                 m_stdoutParser.join();
@@ -661,7 +669,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     @Override
     public void release() throws EEException, InterruptedException {
+        System.out.println("Shutdown IPC connection in progress.");
         m_connection.close();
+        System.out.println("Shutdown IPC connection in done.");
         m_dataNetworkOrigin.discard();
     }
 
@@ -675,7 +685,11 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int partitionId,
             final int hostId,
             final String hostname
-            ) {
+            )
+    {
+        synchronized(m_valgrindErrors) {
+            System.out.println("Initializing an IPC EE " + this + " for hostId " + hostId + " siteId " + siteId + " from thread " + Thread.currentThread().getId());
+        }
         int result = ExecutionEngine.ERRORCODE_ERROR;
         m_data.clear();
         m_data.putInt(Commands.Initialize.m_id);
@@ -733,7 +747,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     /** write the diffs as a UTF-8 byte string via connection */
     @Override
-    public void updateCatalog(final String catalogDiffs) throws EEException {
+    public void updateCatalog(final String catalogDiffs, int catalogVersion) throws EEException {
         int result = ExecutionEngine.ERRORCODE_ERROR;
         m_data.clear();
 
@@ -743,6 +757,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 m_data = ByteBuffer.allocate(catalogBytes.length + 100);
             }
             m_data.putInt(Commands.UpdateCatalog.m_id);
+            m_data.putInt(catalogVersion);
             m_data.put(catalogBytes);
             m_data.put((byte)'\0');
         } catch (final UnsupportedEncodingException ex) {
@@ -1061,8 +1076,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         try {
             result = m_connection.readStatusByte();
         } catch (final IOException e) {
-            System.out.println("Exception: " + e.getMessage());
-            throw new RuntimeException(e);
+            System.out.println("IPC exception reading statistics status: " + e.getMessage());
         }
 
         try {
@@ -1071,7 +1085,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 while (messageLengthBuffer.hasRemaining()) {
                     int read = m_connection.m_socketChannel.read(messageLengthBuffer);
                     if (read == -1) {
-                        throw new EOFException();
+                        throw new EOFException("End of file reading statistics(1)");
                     }
                 }
                 messageLengthBuffer.rewind();
@@ -1079,7 +1093,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 while (messageBuffer.hasRemaining()) {
                     int read = m_connection.m_socketChannel.read(messageBuffer);
                     if (read == -1) {
-                        throw new EOFException();
+                        throw new EOFException("End of file reading statistics(2)");
                     }
                 }
                 messageBuffer.rewind();
@@ -1091,8 +1105,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 return results;
             }
         } catch (final IOException e) {
-            System.out.println("Exception: " + e.getMessage());
-            throw new RuntimeException(e);
+            System.out.println("IPC exception reading statistics table: " + e.getMessage());
+
         }
         return null;
     }
@@ -1286,7 +1300,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     @Override
     public ELTProtoMessage eltAction(boolean ackAction, boolean pollAction,
-            boolean resetAction, long ackOffset, int partitionId, int mTableId) {
+            boolean resetAction, long ackOffset, int partitionId, long mTableId) {
         try {
             m_data.clear();
             m_data.putInt(Commands.ELTAction.m_id);
@@ -1294,7 +1308,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             m_data.putInt(pollAction ? 1 : 0);
             m_data.putInt(resetAction ? 1 : 0);
             m_data.putLong(ackOffset);
-            m_data.putInt(mTableId);
+            m_data.putLong(mTableId);
             m_data.flip();
             m_connection.write();
 

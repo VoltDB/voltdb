@@ -193,7 +193,7 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public CatalogContext getCatalogContext()
     {
-        m_context = new CatalogContext(m_catalog, CatalogContext.NO_PATH);
+        m_context = new CatalogContext(m_catalog, CatalogContext.NO_PATH, 0);
         return m_context;
     }
 

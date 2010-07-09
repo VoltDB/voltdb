@@ -117,7 +117,7 @@ public class FragmentResponseMessage extends VoltMessage {
     }
 
     @Override
-    protected void flattenToBuffer(final DBBPool pool) {
+    protected void flattenToBuffer(final DBBPool pool) throws IOException {
         int msgsize = 4 + 4 + 8 + 1 + 1 + 2;
         assert(m_exception == null || m_status != SUCCESS);
 

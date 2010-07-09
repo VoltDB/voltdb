@@ -139,12 +139,6 @@ comparisonFactory(ExpressionType c,
                typeid(*(lc)).name(), lc,
                typeid(*(rc)).name(), rc);
 
-    /*if (!l) {
-        printf("no left\n");
-        fflush(stdout);
-        exit(0);
-    }*/
-
     // more specialization available?
     ConstantValueExpression *l_const =
       dynamic_cast<ConstantValueExpression*>(lc);

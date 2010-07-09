@@ -23,11 +23,15 @@
 
 package org.voltdb.regressionsuites;
 
-import java.io.*;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
@@ -36,10 +40,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.elt.ExportTestClient;
-import org.voltdb.regressionsuites.sqltypesprocs.Delete;
-import org.voltdb.regressionsuites.sqltypesprocs.Insert;
-import org.voltdb.regressionsuites.sqltypesprocs.RollbackInsert;
-import org.voltdb.regressionsuites.sqltypesprocs.Update_ELT;
+import org.voltdb.regressionsuites.sqltypesprocs.*;
 import org.voltdb.utils.SnapshotVerifier;
 
 /**
@@ -119,7 +120,7 @@ public class TestExportSuite extends RegressionSuite {
         try {
             m_tester.connectToELServers(null, null);
         }
-        catch (IOException e){
+        catch (final IOException e){
             throw new RuntimeException(e);
         }
     }
@@ -128,6 +129,56 @@ public class TestExportSuite extends RegressionSuite {
     public void tearDown() throws Exception {
         super.tearDown();
         assertTrue(callbackSucceded);
+    }
+
+    /*
+     * Test ELT of an ADDED table.
+     */
+    public void testELTAndAddedTable() throws Exception {
+        final Client client = getClient();
+
+        // add a new table
+        final String newCatalogURL = Configuration.getPathToCatalogForTest("elt-ddl-addedtable.jar");
+        final ClientResponse callProcedure = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
+        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
+
+        // make a new tester and see if it gets the new advertisement!
+        m_tester.disconnectFromELServers();
+        m_tester = new ExportTestClient(getServerConfig().getNodeCount());
+        m_tester.connectToELServers(null, null);
+
+        // verify that it exports
+        for (int i=0; i < 10; i++) {
+            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            m_tester.addRow("ADDED_TABLE", i, convertValsToRow(i, 'I', rowdata));
+            final Object[]  params = convertValsToParams("ADDED_TABLE", i, rowdata);
+            client.callProcedure("InsertAddedTable", params);
+        }
+
+        quiesceAndVerify(client, m_tester);
+    }
+
+    /*
+     *  Test ELT of a DROPPED table.  Queues some data to a table.
+     *  Then drops the table and verifies that ELT can successfully
+     *  drain the dropped table. IE, drop table doesn't lose elt data.
+     */
+    public void testELTAndDroppedTable() throws Exception {
+        final Client client = getClient();
+        for (int i=0; i < 10; i++) {
+            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            m_tester.addRow("NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
+            client.callProcedure("Insert", params);
+        }
+
+        // now drop the no-nulls table
+        final String newCatalogURL = Configuration.getPathToCatalogForTest("elt-ddl-sans-nonulls.jar");
+        final ClientResponse callProcedure = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
+        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
+
+        // must still be able to verify the elt data.
+        quiesceAndVerify(client, m_tester);
     }
 
     /**
@@ -233,12 +284,13 @@ public class TestExportSuite extends RegressionSuite {
         quiesceAndVerify(client, m_tester);
     }
 
+
     /** Test that a table w/o ELT enabled does not produce ELT content */
     public void testThatTablesOptIn() throws Exception
     {
         final Client client = getClient();
 
-        Object params[] = new Object[TestSQLTypesSuite.COLS + 2];
+        final Object params[] = new Object[TestSQLTypesSuite.COLS + 2];
         params[0] = "WITH_DEFAULTS";  // this table should not produce ELT output
 
         // populate the row data
@@ -273,7 +325,7 @@ public class TestExportSuite extends RegressionSuite {
     public void testELTRollback() throws Exception {
         final Client client = getClient();
 
-        double rollbackPerc = 0.15;
+        final double rollbackPerc = 0.15;
         double random = Math.random(); // initializes the generator
 
         // eltxxx: should pick more random data
@@ -314,7 +366,7 @@ public class TestExportSuite extends RegressionSuite {
 
     private VoltTable createLoadTableTable(boolean addToVerifier, ExportTestClient tester) {
 
-        VoltTable loadTable = new VoltTable(new ColumnInfo("PKEY", VoltType.INTEGER),
+        final VoltTable loadTable = new VoltTable(new ColumnInfo("PKEY", VoltType.INTEGER),
           new ColumnInfo(TestSQLTypesSuite.m_columnNames[0], TestSQLTypesSuite.m_types[0]),
           new ColumnInfo(TestSQLTypesSuite.m_columnNames[1], TestSQLTypesSuite.m_types[1]),
           new ColumnInfo(TestSQLTypesSuite.m_columnNames[2], TestSQLTypesSuite.m_types[2]),
@@ -342,8 +394,8 @@ public class TestExportSuite extends RegressionSuite {
     public void testLoadMultiPartitionTableELTOff() throws Exception
     {
         // allow ELT is off. no rows added to the verifier
-        VoltTable loadTable = createLoadTableTable(false, m_tester);
-        Client client = getClient();
+        final VoltTable loadTable = createLoadTableTable(false, m_tester);
+        final Client client = getClient();
         client.callProcedure("@LoadMultipartitionTable", "ALLOW_NULLS", loadTable, 0);
         quiesceAndVerify(client, m_tester);
     }
@@ -354,8 +406,8 @@ public class TestExportSuite extends RegressionSuite {
     public void testLoadMultiPartitionTableELTOn() throws Exception
     {
         // allow ELT is on. rows added to the verifier
-        VoltTable loadTable = createLoadTableTable(true, m_tester);
-        Client client = getClient();
+        final VoltTable loadTable = createLoadTableTable(true, m_tester);
+        final Client client = getClient();
         client.callProcedure("@LoadMultipartitionTable", "ALLOW_NULLS", loadTable, 1);
         quiesceAndVerify(client, m_tester);
     }
@@ -366,8 +418,8 @@ public class TestExportSuite extends RegressionSuite {
     public void testLoadMultiPartitionTableELTOn2() throws Exception
     {
         // allow ELT is on but table is not opted in to ELT.
-        VoltTable loadTable = createLoadTableTable(false, m_tester);
-        Client client = getClient();
+        final VoltTable loadTable = createLoadTableTable(false, m_tester);
+        final Client client = getClient();
         client.callProcedure("@LoadMultipartitionTable", "WITH_DEFAULTS", loadTable, 1);
         quiesceAndVerify(client, m_tester);
     }
@@ -381,7 +433,7 @@ public class TestExportSuite extends RegressionSuite {
         try {
             client.callProcedure("@AdHoc", "Update NO_NULLS SET A_TINYINT=0 WHERE PKEY=0;");
         }
-        catch (ProcCallException e) {
+        catch (final ProcCallException e) {
             if (e.getMessage().contains("Illegal to update an export-only table.")) {
                 passed = true;
             }
@@ -398,7 +450,7 @@ public class TestExportSuite extends RegressionSuite {
         try {
             client.callProcedure("@AdHoc", "Select PKEY from NO_NULLS WHERE PKEY=0;");
         }
-        catch (ProcCallException e) {
+        catch (final ProcCallException e) {
             if (e.getMessage().contains("Illegal to read an export-only table.")) {
                 passed = true;
             }
@@ -415,7 +467,7 @@ public class TestExportSuite extends RegressionSuite {
         try {
             client.callProcedure("@AdHoc", "DELETE from NO_NULLS WHERE PKEY=0;");
         }
-        catch (ProcCallException e) {
+        catch (final ProcCallException e) {
             if (e.getMessage().contains("Illegal to delete from an export-only table.")) {
                 passed = true;
             }
@@ -440,7 +492,7 @@ public class TestExportSuite extends RegressionSuite {
 
         for (int i=0; i < 10; i++) {
             // add the full 'D' row
-            Object[] rowdata_d = TestSQLTypesSuite.m_midValues;
+            final Object[] rowdata_d = TestSQLTypesSuite.m_midValues;
             m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, 'D', rowdata_d));
 
             // perform the delete
@@ -467,11 +519,11 @@ public class TestExportSuite extends RegressionSuite {
         // update
         for (int i=0; i < 10; i++) {
             // add the 'D' row
-            Object[] rowdata_d = TestSQLTypesSuite.m_midValues;
+            final Object[] rowdata_d = TestSQLTypesSuite.m_midValues;
             m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, 'D', rowdata_d));
 
             // calculate the update and add that to the m_tester
-            Object[] rowdata_i = TestSQLTypesSuite.m_defaultValues;
+            final Object[] rowdata_i = TestSQLTypesSuite.m_defaultValues;
             m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, 'I', rowdata_i));
 
             // perform the update
@@ -482,7 +534,7 @@ public class TestExportSuite extends RegressionSuite {
         // delete
         for (int i=0; i < 10; i++) {
             // add the full 'D' row
-            Object[] rowdata_d = TestSQLTypesSuite.m_defaultValues;
+            final Object[] rowdata_d = TestSQLTypesSuite.m_defaultValues;
             m_tester.addRow("ALLOW_NULLS", i, convertValsToRow(i, 'D', rowdata_d));
 
             // perform the delete
@@ -537,31 +589,28 @@ public class TestExportSuite extends RegressionSuite {
         client.callProcedure("@SnapshotSave", "/tmp", "testELTPlusSnapshot", (byte)1).getResults();
 
         // verify. copped from TestSaveRestoreSysprocSuite
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        PrintStream ps = new PrintStream(baos);
-        PrintStream original = System.out;
+        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        final PrintStream ps = new PrintStream(baos);
+        final PrintStream original = System.out;
         try {
             System.setOut(ps);
-            String args[] = new String[] {
+            final String args[] = new String[] {
                     "testELTPlusSnapshot",
                     "--dir",
                     "/tmp"
             };
             SnapshotVerifier.main(args);
             ps.flush();
-            String reportString = baos.toString("UTF-8");
+            final String reportString = baos.toString("UTF-8");
             assertTrue(reportString.startsWith("Snapshot valid\n"));
-        } catch (UnsupportedEncodingException e) {}
+        } catch (final UnsupportedEncodingException e) {}
         finally {
             System.setOut(original);
         }
 
         // verify the el data
         quiesceAndVerify(client, m_tester);
-
-
     }
-
 
 
     /*
@@ -574,6 +623,14 @@ public class TestExportSuite extends RegressionSuite {
         Delete.class
     };
 
+    static final Class<?>[] PROCEDURES2 = {
+        Update_ELT.class
+    };
+
+    static final Class<?>[] PROCEDURES3 = {
+        InsertAddedTable.class
+    };
+
     public TestExportSuite(final String name) {
         super(name);
     }
@@ -584,13 +641,14 @@ public class TestExportSuite extends RegressionSuite {
 
     static public junit.framework.Test suite()
     {
+        VoltServerConfig config;
+
         final MultiConfigSuiteBuilder builder =
             new MultiConfigSuiteBuilder(TestExportSuite.class);
 
-        final VoltProjectBuilder project = new VoltProjectBuilder();
+        VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestExportSuite.class.getResource("sqltypessuite-ddl.sql"));
-        // add the connector/processor (name, host, port)
-        // and the exportable tables (name, export-only)
+        project.addSchema(TestExportSuite.class.getResource("sqltypessuite-nonulls-ddl.sql"));
         project.addELT("org.voltdb.elt.processors.RawProcessor",
                        true  /*enabled*/,
                        null, /* authUsers (off) */
@@ -598,7 +656,6 @@ public class TestExportSuite extends RegressionSuite {
         // "WITH_DEFAULTS" is a non-elt'd persistent table
         project.addELTTable("ALLOW_NULLS", false);   // persistent table
         project.addELTTable("NO_NULLS", true);       // streamed table
-        // and then project builder as normal
         project.addPartitionInfo("NO_NULLS", "PKEY");
         project.addPartitionInfo("ALLOW_NULLS", "PKEY");
         project.addPartitionInfo("WITH_DEFAULTS", "PKEY");
@@ -608,19 +665,83 @@ public class TestExportSuite extends RegressionSuite {
         project.addPartitionInfo("JUMBO_ROW", "PKEY");
         project.addProcedures(PROCEDURES);
 
-        VoltServerConfig config;
-        // JNI, single server
-        config = new LocalSingleProcessServer("elt-ddl.jar", 2,
-                                              BackendTarget.NATIVE_EE_JNI);
+// JNI, single server
+// Use the cluster only config. Multiple topologies with the extra catalog for the
+// Add drop tests is harder. Restrict to the single (complex) topology.
+//
+//        config = new LocalSingleProcessServer("elt-ddl.jar", 2,
+//                                              BackendTarget.NATIVE_EE_JNI);
+//        config.compile(project);
+//        builder.addServerConfig(config);
 
-        config.compile(project);
-        builder.addServerConfig(config);
 
-        // three host, two site-per-host, k=1 replication config
+        /*
+         * compile the catalog all tests start with
+         */
         config = new LocalCluster("elt-ddl-cluster-rep.jar", 2, 3, 1,
                                   BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
+        boolean compile = config.compile(project);
+        assertTrue(compile);
         builder.addServerConfig(config);
+
+
+        /*
+         * compile a catalog without the NO_NULLS table for add/drop tests
+         */
+        config = new LocalCluster("elt-ddl-sans-nonulls.jar", 2, 3, 1,
+                                              BackendTarget.NATIVE_EE_JNI);
+        project = new VoltProjectBuilder();
+        project.addSchema(TestExportSuite.class.getResource("sqltypessuite-ddl.sql"));
+        project.addELT("org.voltdb.elt.processors.RawProcessor",
+                       true  /*enabled*/,
+                       null, /* authUsers (off) */
+                       null  /* authGroups (off) */);
+        // "WITH_DEFAULTS" is a non-elt'd persistent table
+        project.addELTTable("ALLOW_NULLS", false);   // persistent table
+
+        // and then project builder as normal
+        project.addPartitionInfo("ALLOW_NULLS", "PKEY");
+        project.addPartitionInfo("WITH_DEFAULTS", "PKEY");
+        project.addPartitionInfo("WITH_NULL_DEFAULTS", "PKEY");
+        project.addPartitionInfo("EXPRESSIONS_WITH_NULLS", "PKEY");
+        project.addPartitionInfo("EXPRESSIONS_NO_NULLS", "PKEY");
+        project.addPartitionInfo("JUMBO_ROW", "PKEY");
+        project.addProcedures(PROCEDURES2);
+        compile = config.compile(project);
+        assertTrue(compile);
+
+        /*
+         * compile a catalog with an added table for add/drop tests
+         */
+        config = new LocalCluster("elt-ddl-addedtable.jar", 2, 3, 1,
+                                  BackendTarget.NATIVE_EE_JNI);
+        project = new VoltProjectBuilder();
+        project.addSchema(TestExportSuite.class.getResource("sqltypessuite-ddl.sql"));
+        project.addSchema(TestExportSuite.class.getResource("sqltypessuite-nonulls-ddl.sql"));
+        project.addSchema(TestExportSuite.class.getResource("sqltypessuite-addedtable-ddl.sql"));
+        project.addELT("org.voltdb.elt.processors.RawProcessor",
+                       true  /*enabled*/,
+                       null, /* authUsers (off) */
+                       null  /* authGroups (off) */);
+        // "WITH_DEFAULTS" is a non-elt'd persistent table
+        project.addELTTable("ALLOW_NULLS", false);   // persistent table
+        project.addELTTable("ADDED_TABLE", false);   // persistent table
+        project.addELTTable("NO_NULLS", true);       // streamed table
+
+        // and then project builder as normal
+        project.addPartitionInfo("ALLOW_NULLS", "PKEY");
+        project.addPartitionInfo("ADDED_TABLE", "PKEY");
+        project.addPartitionInfo("WITH_DEFAULTS", "PKEY");
+        project.addPartitionInfo("WITH_NULL_DEFAULTS", "PKEY");
+        project.addPartitionInfo("EXPRESSIONS_WITH_NULLS", "PKEY");
+        project.addPartitionInfo("EXPRESSIONS_NO_NULLS", "PKEY");
+        project.addPartitionInfo("JUMBO_ROW", "PKEY");
+        project.addPartitionInfo("NO_NULLS", "PKEY");
+        project.addProcedures(PROCEDURES);
+        project.addProcedures(PROCEDURES3);
+        compile = config.compile(project);
+        assertTrue(compile);
+
 
         return builder;
     }

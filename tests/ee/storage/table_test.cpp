@@ -115,7 +115,7 @@ class TableTest : public Test {
             }
             voltdb::TupleSchema *schema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
             if (xact) {
-                persistent_table = voltdb::TableFactory::getPersistentTable(database_id, 1, NULL, "test_table", schema, columnNames, -1, false, false);
+                persistent_table = voltdb::TableFactory::getPersistentTable(database_id, NULL, "test_table", schema, columnNames, -1, false, false);
                 table = persistent_table;
             } else {
                 temp_table = voltdb::TableFactory::getTempTable(database_id, "test_table", schema, columnNames, NULL);

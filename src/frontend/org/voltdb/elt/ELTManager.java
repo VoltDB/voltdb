@@ -21,6 +21,7 @@ import java.util.*;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.voltdb.CatalogContext;
 import org.voltdb.catalog.*;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.elt.processors.RawProcessor.ELTInternalMessage;
@@ -69,23 +70,25 @@ public class ELTManager
      */
     ArrayDeque<ELTDataProcessor> m_processors = new ArrayDeque<ELTDataProcessor>();
 
+    /**
+     * Existing datasources that have been advertised to processors
+     */
+    TreeSet<ELTDataSource> m_dataSources = new TreeSet<ELTDataSource>();
 
     /** Obtain the global ELTManager via its instance() method */
     private static ELTManager m_self;
+    private final int m_hostId;
 
     /**
      * Construct ELTManager using catalog.
      * @param myHostId
-     * @param catalog
-     * @param siteTracker
+     * @param catalogContext
      * @throws ELTManager.SetupException
      */
-    public static synchronized void initialize(int myHostId,
-                                               final Catalog catalog,
-                                               SiteTracker siteTracker)
-    throws ELTManager.SetupException
+    public static synchronized void initialize(int myHostId, CatalogContext catalogContext)
+        throws ELTManager.SetupException
     {
-        ELTManager tmp = new ELTManager(myHostId, catalog, siteTracker);
+        ELTManager tmp = new ELTManager(myHostId, catalogContext);
         m_self = tmp;
     }
 
@@ -98,14 +101,16 @@ public class ELTManager
         return m_self;
     }
 
-    /** Read the catalog to setup manager and loader(s)
-     * @param myHostId
-     * @param siteTracker */
-    private ELTManager(int myHostId, final Catalog catalog,
-                       SiteTracker siteTracker)
+    /**
+     * Read the catalog to setup manager and loader(s)
+     * @param siteTracker
+     */
+    private ELTManager(int myHostId, CatalogContext catalogContext)
     throws ELTManager.SetupException
     {
-        final Cluster cluster = catalog.getClusters().get("cluster");
+        m_hostId = myHostId;
+
+        final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
         final Database db = cluster.getDatabases().get("database");
         final Connector conn= db.getConnectors().get("0");
 
@@ -125,13 +130,7 @@ public class ELTManager
             final Class<?> loaderClass = Class.forName(elloader);
             newProcessor = (ELTDataProcessor)loaderClass.newInstance();
             newProcessor.addLogger(eltLog);
-
-            Iterator<ConnectorTableInfo> tableInfoIt = conn.getTableinfo().iterator();
-            while (tableInfoIt.hasNext()) {
-                ConnectorTableInfo next = tableInfoIt.next();
-                Table table = next.getTable();
-                addDataSources(newProcessor, table, myHostId, siteTracker);
-            }
+            addTableInfos(catalogContext, conn, newProcessor);
             newProcessor.readyForData();
             m_processors.add(newProcessor);
         }
@@ -144,21 +143,55 @@ public class ELTManager
         }
     }
 
+    public void updateCatalog(CatalogContext catalogContext)
+    {
+        final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
+        final Database db = cluster.getDatabases().get("database");
+        final Connector conn= db.getConnectors().get("0");
+
+        for (ELTDataProcessor processor : m_processors) {
+            addTableInfos(catalogContext, conn, processor);
+        }
+    }
+
+    private void addTableInfos(CatalogContext catalogContext,
+            final Connector conn, ELTDataProcessor processor)
+    {
+        Iterator<ConnectorTableInfo> tableInfoIt = conn.getTableinfo().iterator();
+        while (tableInfoIt.hasNext()) {
+            ConnectorTableInfo next = tableInfoIt.next();
+            Table table = next.getTable();
+            addDataSources(processor, table, m_hostId, catalogContext);
+        }
+    }
+
+
     // silly helper to add datasources for a table catalog object
     private void addDataSources(ELTDataProcessor newProcessor,
-            Table table, int hostId, SiteTracker siteTracker)
+            Table table, int hostId, CatalogContext catalogContext)
     {
+        SiteTracker siteTracker = catalogContext.siteTracker;
         ArrayList<Integer> sites = siteTracker.getLiveExecutionSitesForHost(hostId);
+
+        // make the catalog versioned table id. there is coordinated logic
+        // common/CatalogDelegate.cpp
+        long tmp = (long)(catalogContext.catalogVersion) << 32L;
+        long delegateId = tmp + table.getRelativeIndex();
+
         for (Integer site : sites) {
-            newProcessor.addDataSource(
-                 new ELTDataSource("database",
-                                   table.getTypeName(),
-                                   table.getIsreplicated(),
-                                   siteTracker.getPartitionForSite(site),
-                                   site,
-                                   table.getRelativeIndex(),
-                                   table.getColumns())
-            );
+
+            ELTDataSource eltDataSource = new ELTDataSource("database",
+                              table.getTypeName(),
+                              table.getIsreplicated(),
+                              siteTracker.getPartitionForSite(site),
+                              site,
+                              delegateId,
+                              table.getColumns());
+
+            if (!m_dataSources.contains(eltDataSource)) {
+                m_dataSources.add(eltDataSource);
+                newProcessor.addDataSource(eltDataSource);
+            }
         }
     }
 
