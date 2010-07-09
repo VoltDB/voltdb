@@ -816,6 +816,13 @@ class VoltException:
     VOLTEXCEPTION_GENERIC = 4
 
     def __init__(self, fser):
+        self.type = self.VOLTEXCEPTION_NONE
+        self.message = ""
+
+        if fser != None:
+            self.deserialize(fser)
+
+    def deserialize(self, fser):
         self.length = fser.readInt32()
         if self.length == 0:
             self.type = self.VOLTEXCEPTION_NONE
@@ -867,33 +874,47 @@ class VoltResponse:
     "VoltDB called procedure response (ClientResponse.java)"
     def __init__(self, fser):
         self.fser = fser
+        self.version = -1
+        self.clientHandle = -1
+        self.status = -1
+        self.statusString = ""
+        self.appStatus = -1
+        self.appStatusString = ""
+        self.roundtripTime = -1
+        self.exception = None
+        self.tables = None
+
+        if fser != None:
+            self.deserialize(fser)
+
+    def deserialize(self, fser):
         # serialization order: response-length, status, roundtripTime, exception,
         # tables[], info, id.
-        self.fser.bufferForRead()
-        self.version = self.fser.readByte()
-        self.clientHandle = self.fser.readInt64()
+        fser.bufferForRead()
+        self.version = fser.readByte()
+        self.clientHandle = fser.readInt64()
         presentFields = fser.readByte();
-        self.status = self.fser.readByte()
+        self.status = fser.readByte()
         if presentFields & (1 << 5) != 0:
-            self.statusString = self.fser.readString()
+            self.statusString = fser.readString()
         else:
             self.statusString = None
-        self.appStatus = self.fser.readByte()
+        self.appStatus = fser.readByte()
         if presentFields & (1 << 7) != 0:
-            self.appStatusString = self.fser.readString()
+            self.appStatusString = fser.readString()
         else:
             self.appStatusString = None
-        self.roundtripTime = self.fser.readInt32()
+        self.roundtripTime = fser.readInt32()
         if presentFields & (1 << 6) != 0:
-            self.exception = VoltException(self.fser)
+            self.exception = VoltException(fser)
         else:
             self.exception = None
 
         # tables[]
-        tablecount = self.fser.readInt16()
+        tablecount = fser.readInt16()
         self.tables = []
         for i in xrange(tablecount):
-            table = VoltTable(self.fser)
+            table = VoltTable(fser)
             self.tables.append(table.readFromSerializer())
 
     def __str__(self):
@@ -927,5 +948,11 @@ class VoltProcedure:
                 self.fser.writeWireType(self.paramtypes[i], params[i])
         self.fser.prependLength() # prepend the total length of the invocation
         self.fser.flush()
-        self.fser.socket.settimeout(timeout) # timeout exception will be raised
-        return response and VoltResponse(self.fser) or None
+
+        try:
+            self.fser.socket.settimeout(timeout) # timeout exception will be raised
+            res = VoltResponse(self.fser)
+        except IOError, err:
+            res = VoltResponse(None)
+            res.statusString = str(err)
+        return response and res or None

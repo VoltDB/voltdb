@@ -44,7 +44,7 @@ def generate_table_str(res):
 
     for k in tablestr.iterkeys():
         tmp = []
-        if "Result" in res[k]:
+        if "Result" in res[k] and res[k]["Result"] != None:
             for i in xrange(len(res[k]["Result"])):
                 result = []
 
@@ -181,7 +181,8 @@ def is_different(x):
 
     if "Result" in x["jni"] and "Result" in x["hsqldb"]:
         x["highlight"] = []
-        if len(x["jni"]["Result"]) != len(x["hsqldb"]["Result"]):
+        if (x["jni"]["Result"] == None or x["hsqldb"]["Result"] == None
+            or len(x["jni"]["Result"]) != len(x["hsqldb"]["Result"])):
             return True
         for i in xrange(len(x["jni"]["Result"])):
             x["highlight"].append([])
