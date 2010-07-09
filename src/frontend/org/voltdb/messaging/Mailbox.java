@@ -61,6 +61,12 @@ public interface Mailbox {
     public void deliver(VoltMessage message);
 
     /**
+     * Deliver a message to the front of the mailbox queue so it will be processed first.
+     * @param message
+     */
+    void deliverFront(VoltMessage message);
+
+    /**
      * Get the number of messages waiting to be delivered for this mailbox.
      *
      * @return An integer representing the number of waiting messages.

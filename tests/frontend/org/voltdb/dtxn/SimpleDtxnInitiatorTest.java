@@ -51,7 +51,7 @@
 package org.voltdb.dtxn;
 
 import java.nio.ByteBuffer;
-import java.util.Queue;
+import java.util.Deque;
 
 import junit.framework.TestCase;
 
@@ -100,7 +100,7 @@ public class SimpleDtxnInitiatorTest extends TestCase {
     {
         @Override
         public Mailbox createMailbox(int siteId, int mailboxId,
-                                     Queue<VoltMessage> queue)
+                Deque<VoltMessage> queue)
         {
             if (queue == null) {
                 return new MockMailbox(null);

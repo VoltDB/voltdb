@@ -31,7 +31,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Queue;
+import java.util.Deque;
 import java.util.Random;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -83,22 +83,13 @@ public class TestExecutionSite extends TestCase {
         int m_totalSends;
         int m_heartBeatSends;
         private final Integer m_siteId;
-        final ArrayList<Queue<VoltMessage>> m_messages = new ArrayList<Queue<VoltMessage>>();
+        final ArrayList<Deque<VoltMessage>> m_messages = new ArrayList<Deque<VoltMessage>>();
         private int m_failureProb;
 
-        public RussianRouletteMailbox(LinkedBlockingQueue<VoltMessage> queue,
-                                      Integer siteId)
+        public RussianRouletteMailbox(Integer siteId)
         {
             for (Subject s : Subject.values()) {
-                if (s.equals(Subject.DEFAULT)) {
-                    if (queue == null) {
-                        m_messages.add( s.getId(), new ArrayDeque<VoltMessage>());
-                    } else {
-                        m_messages.add( s.getId(), queue);
-                    }
-                } else {
-                    m_messages.add( s.getId(), new ArrayDeque<VoltMessage>());
-                }
+                m_messages.add( s.getId(), new ArrayDeque<VoltMessage>());
             }
             m_failureProb = 0;
             m_siteId = siteId;
@@ -197,7 +188,7 @@ public class TestExecutionSite extends TestCase {
         @Override
         public synchronized VoltMessage recv(Subject subjects[]) {
             for (Subject s : subjects) {
-                final Queue<VoltMessage> dq = m_messages.get(s.getId());
+                final Deque<VoltMessage> dq = m_messages.get(s.getId());
                 assert(dq != null);
                 VoltMessage m = dq.poll();
                 if (m != null) {
@@ -212,7 +203,7 @@ public class TestExecutionSite extends TestCase {
             VoltMessage message = null;
             while (message == null) {
                 for (Subject s : subjects) {
-                    final Queue<VoltMessage> dq = m_messages.get(s.getId());
+                    final Deque<VoltMessage> dq = m_messages.get(s.getId());
                     message = dq.poll();
                     if (message != null) {
                         return message;
@@ -231,7 +222,7 @@ public class TestExecutionSite extends TestCase {
         public synchronized VoltMessage recvBlocking(Subject subjects[], long timeout) {
             VoltMessage message = null;
             for (Subject s : subjects) {
-                final Queue<VoltMessage> dq = m_messages.get(s.getId());
+                final Deque<VoltMessage> dq = m_messages.get(s.getId());
                 message = dq.poll();
                 if (message != null) {
                     return message;
@@ -243,7 +234,7 @@ public class TestExecutionSite extends TestCase {
                 return null;
             }
             for (Subject s : subjects) {
-                final Queue<VoltMessage> dq = m_messages.get(s.getId());
+                final Deque<VoltMessage> dq = m_messages.get(s.getId());
                 message = dq.poll();
                 if (message != null) {
                     return message;
@@ -254,9 +245,22 @@ public class TestExecutionSite extends TestCase {
 
         @Override
         public void deliver(VoltMessage message) {
-            final Queue<VoltMessage> dq = m_messages.get(message.getSubject());
+            deliver(message, false);
+        }
+
+        @Override
+        public void deliverFront(VoltMessage message) {
+            deliver(message, true);
+        }
+
+        public void deliver(VoltMessage message, final boolean toFront) {
+            final Deque<VoltMessage> dq = m_messages.get(message.getSubject());
             synchronized (this) {
-                dq.offer(message);
+                if (toFront){
+                    dq.push(message);
+                } else {
+                    dq.offer(message);
+                }
                 this.notify();
             }
         }
@@ -375,8 +379,7 @@ public class TestExecutionSite extends TestCase {
 
         // Create the real objects
         for (int ss=0; ss < siteCount; ++ss) {
-            m_mboxes[ss] = new RussianRouletteMailbox( null,
-                                                      ss);
+            m_mboxes[ss] = new RussianRouletteMailbox( ss );
             m_rpqs[ss] = new RestrictedPriorityARRR(getInitiatorIds(), ss, m_mboxes[ss]);
             m_sites[ss] = new ExecutionSite(m_voltdb, m_mboxes[ss], ss, null, m_rpqs[ss]);
             registerMailbox(ss, m_mboxes[ss]);

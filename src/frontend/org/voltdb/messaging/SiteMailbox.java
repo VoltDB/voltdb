@@ -19,7 +19,7 @@ package org.voltdb.messaging;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Queue;
+import java.util.Deque;
 
 import org.voltdb.debugstate.MailboxHistory;
 import org.voltdb.debugstate.MailboxHistory.MessageState;
@@ -31,7 +31,7 @@ import org.voltdb.debugstate.MailboxHistory.MessageState;
 public class SiteMailbox implements Mailbox {
 
     final HostMessenger m_hostMessenger;
-    final ArrayList<Queue<VoltMessage>> m_messages = new ArrayList<Queue<VoltMessage>>();
+    final ArrayList<Deque<VoltMessage>> m_messages = new ArrayList<Deque<VoltMessage>>();
     final int m_siteId;
 
     // deques to store recent inter-site messages
@@ -41,16 +41,16 @@ public class SiteMailbox implements Mailbox {
     ArrayDeque<VoltMessage> m_lastTenMembershipNotices = new ArrayDeque<VoltMessage>();
     ArrayDeque<VoltMessage> m_lastTenHeartbeats = new ArrayDeque<VoltMessage>();
 
-    SiteMailbox(HostMessenger hostMessenger, int siteId, int mailboxId, Queue<VoltMessage> queue) {
+    SiteMailbox(HostMessenger hostMessenger, int siteId, int mailboxId, Deque<VoltMessage> deque) {
         this.m_hostMessenger = hostMessenger;
         this.m_siteId = siteId;
         MESSAGE_HISTORY_SIZE = 0;
         for (Subject s : Subject.values()) {
             if (s.equals(Subject.DEFAULT)) {
-                if (queue == null) {
+                if (deque == null) {
                     m_messages.add( s.getId(), new ArrayDeque<VoltMessage>());
                 } else {
-                    m_messages.add( s.getId(), queue);
+                    m_messages.add( s.getId(), deque);
                 }
             } else {
                 m_messages.add( s.getId(), new ArrayDeque<VoltMessage>());
@@ -59,11 +59,24 @@ public class SiteMailbox implements Mailbox {
     }
 
     @Override
+    public void deliverFront(VoltMessage message) {
+        deliver(message, true);
+    }
+
+    @Override
     public void deliver(VoltMessage message) {
+        deliver(message, false);
+    }
+
+    public void deliver(VoltMessage message, final boolean toFront) {
         assert(message != null);
-        final Queue<VoltMessage> dq = m_messages.get(message.getSubject());
+        final Deque<VoltMessage> dq = m_messages.get(message.getSubject());
         synchronized (this) {
-            dq.offer(message);
+            if (toFront) {
+                dq.offerFirst(message);
+            } else {
+                dq.offer(message);
+            }
             this.notify();
         }
 
@@ -197,7 +210,7 @@ public class SiteMailbox implements Mailbox {
     @Override
     public synchronized VoltMessage recv(Subject subjects[]) {
         for (Subject s : subjects) {
-            final Queue<VoltMessage> dq = m_messages.get(s.getId());
+            final Deque<VoltMessage> dq = m_messages.get(s.getId());
             assert(dq != null);
             VoltMessage m = dq.poll();
             if (m != null) {
@@ -212,7 +225,7 @@ public class SiteMailbox implements Mailbox {
         VoltMessage message = null;
         while (message == null) {
             for (Subject s : subjects) {
-                final Queue<VoltMessage> dq = m_messages.get(s.getId());
+                final Deque<VoltMessage> dq = m_messages.get(s.getId());
                 message = dq.poll();
                 if (message != null) {
                     return message;
@@ -231,7 +244,7 @@ public class SiteMailbox implements Mailbox {
     public synchronized VoltMessage recvBlocking(Subject subjects[], long timeout) {
         VoltMessage message = null;
         for (Subject s : subjects) {
-            final Queue<VoltMessage> dq = m_messages.get(s.getId());
+            final Deque<VoltMessage> dq = m_messages.get(s.getId());
             message = dq.poll();
             if (message != null) {
                 return message;
@@ -243,7 +256,7 @@ public class SiteMailbox implements Mailbox {
             return null;
         }
         for (Subject s : subjects) {
-            final Queue<VoltMessage> dq = m_messages.get(s.getId());
+            final Deque<VoltMessage> dq = m_messages.get(s.getId());
             message = dq.poll();
             if (message != null) {
                 return message;

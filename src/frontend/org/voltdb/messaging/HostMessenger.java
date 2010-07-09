@@ -26,7 +26,7 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.HashMap;
 import java.util.Hashtable;
-import java.util.Queue;
+import java.util.Deque;
 import java.util.Map.Entry;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -243,7 +243,7 @@ public class HostMessenger implements Messenger {
     }
 
     @Override
-    public Mailbox createMailbox(int siteId, int mailboxId, Queue<VoltMessage> queue) {
+    public Mailbox createMailbox(int siteId, int mailboxId, Deque<VoltMessage> queue) {
         assert(m_initialized);
         int localSiteId = siteId % VoltDB.SITES_TO_HOST_DIVISOR;
         MessengerSite site = m_messengerSites[localSiteId];

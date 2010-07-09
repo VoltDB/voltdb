@@ -18,7 +18,7 @@
 package org.voltdb.messaging;
 
 import java.util.HashMap;
-import java.util.Queue;
+import java.util.Deque;
 
 class MessengerSite {
 
@@ -31,7 +31,7 @@ class MessengerSite {
         m_siteId = siteId;
     }
 
-    public synchronized Mailbox createMailbox(int mailboxId, Queue<VoltMessage> queue) {
+    public synchronized Mailbox createMailbox(int mailboxId, Deque<VoltMessage> queue) {
         SiteMailbox mbox = getMailbox(mailboxId);
         if (mbox != null) return null;
 

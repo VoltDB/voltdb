@@ -64,7 +64,7 @@ public class MockMailbox implements Mailbox {
         postoffice.put(siteId, mbox);
     }
 
-    public MockMailbox(Queue<VoltMessage> queue) {
+    public MockMailbox(Deque<VoltMessage> queue) {
         for (Subject s : Subject.values()) {
             if (s.equals(Subject.DEFAULT)) {
                 if (queue == null) {
@@ -191,9 +191,22 @@ public class MockMailbox implements Mailbox {
 
     @Override
     public void deliver(VoltMessage message) {
-        final Queue<VoltMessage> dq = m_messages.get(message.getSubject());
+        deliver(message, false);
+    }
+
+    @Override
+    public void deliverFront(VoltMessage message) {
+        deliver(message, true);
+    }
+
+    public void deliver(VoltMessage message, final boolean toFront) {
+        final Deque<VoltMessage> dq = m_messages.get(message.getSubject());
         synchronized (this) {
-            dq.offer(message);
+            if (toFront) {
+                dq.push(message);
+            } else {
+                dq.offer(message);
+            }
             this.notify();
         }
     }
@@ -212,7 +225,7 @@ public class MockMailbox implements Mailbox {
         public final VoltMessage contents;
     }
 
-    final ArrayList<Queue<VoltMessage>> m_messages = new ArrayList<Queue<VoltMessage>>();
+    final ArrayList<Deque<VoltMessage>> m_messages = new ArrayList<Deque<VoltMessage>>();
 
     private final ArrayDeque<Message> outgoingMessages = new ArrayDeque<Message>();
 }

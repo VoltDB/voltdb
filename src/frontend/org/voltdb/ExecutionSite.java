@@ -1207,7 +1207,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                             "the global multi-part commit point");
                     FragmentTaskMessage ft = mpts.createConcludingFragmentTask();
                     ft.setShouldUndo(false);
-                    m_mailbox.deliver(ft);
+                    m_mailbox.deliverFront(ft);
                 }
                 else if (ts.isInProgress() && ts.txnId > globalMultiPartCommitPoint) {
                     m_recoveryLog.info("Rolling back in progress multi-partition txn " + ts.txnId +
@@ -1215,7 +1215,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                             "the global multi-part commit point");
                     FragmentTaskMessage ft = mpts.createConcludingFragmentTask();
                     ft.setShouldUndo(true);
-                    m_mailbox.deliver(ft);
+                    m_mailbox.deliverFront(ft);
                 }
                 else
                 {
@@ -1236,7 +1236,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             {
                 if (ts.isInProgress())
                 {
-                    m_mailbox.deliver(new CheckTxnStateCompletionMessage(ts.txnId));
+                    m_mailbox.deliverFront(new CheckTxnStateCompletionMessage(ts.txnId));
                 }
             }
         }

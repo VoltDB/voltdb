@@ -23,7 +23,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Queue;
+import java.util.Deque;
 import java.util.Set;
 
 import org.voltdb.ClientResponseImpl;
@@ -51,7 +51,7 @@ import org.voltdb.utils.EstTime;
  * with the synchronization mechanism that existed before the extraction of
  * this class, so it should JustWork(tm).
  */
-public class DtxnInitiatorQueue implements Queue<VoltMessage>
+public class DtxnInitiatorQueue implements Deque<VoltMessage>
 {
     private class InitiatorNodeFailureFaultHandler implements FaultHandler
     {
@@ -387,5 +387,92 @@ public class DtxnInitiatorQueue implements Queue<VoltMessage>
     public List<InFlightTxnState> getInFlightTxns()
     {
         return m_pendingTxns.getInFlightTxns();
+    }
+
+    @Override
+    public void addFirst(VoltMessage e) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void addLast(VoltMessage e) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean offerFirst(VoltMessage e) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean offerLast(VoltMessage e) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public VoltMessage removeFirst() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public VoltMessage removeLast() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public VoltMessage pollFirst() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public VoltMessage pollLast() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public VoltMessage getFirst() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public VoltMessage getLast() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public VoltMessage peekFirst() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public VoltMessage peekLast() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean removeFirstOccurrence(Object o) {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    @Override
+    public boolean removeLastOccurrence(Object o) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void push(VoltMessage e) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public VoltMessage pop() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Iterator<VoltMessage> descendingIterator() {
+        throw new UnsupportedOperationException();
     }
 }

@@ -17,7 +17,7 @@
 
 package org.voltdb.messaging;
 
-import java.util.Queue;
+import java.util.Deque;
 
 /**
  * The interface to the global VoltDB messaging system.
@@ -32,9 +32,9 @@ public interface Messenger {
      * @param siteId The id of the site this new mailbox will be attached
      * to.
      * @param mailboxId The requested id of the new mailbox.
-     * @param queue A queue implementation. Can be null in which case the default will be used. Useful in situations where a dummy
+     * @param deque A Deque implementation. Can be null in which case the default will be used. Useful in situations where a dummy
      * queue can process the message inside the offer call.
      * @return A new Mailbox instance or null based on success.
      */
-    public abstract Mailbox createMailbox(int siteId, int mailboxId, Queue<VoltMessage> queue);
+    public abstract Mailbox createMailbox(int siteId, int mailboxId, Deque<VoltMessage> deque);
 }
