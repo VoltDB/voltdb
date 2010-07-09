@@ -201,7 +201,16 @@ public class SchemaColumn
             stringer.key(Members.TABLE_NAME.name()).value("");
         }
 
-        if (getColumnName() != null) {
+        // Tell the EE that the column name is either a valid column
+        // alias or the original column name if no alias exists.  This is a
+        // bit hacky, but it's the easiest way for the EE to generate
+        // a result set that has all the aliases that may have been specified
+        // by the user (thanks to chains of setOutputTable(getInputTable))
+        if (getColumnAlias() != null && !getColumnAlias().equals(""))
+        {
+            stringer.key(Members.COLUMN_NAME.name()).value(getColumnAlias());
+        }
+        else if (getColumnName() != null) {
             stringer.key(Members.COLUMN_NAME.name()).value(getColumnName());
         }
         else
