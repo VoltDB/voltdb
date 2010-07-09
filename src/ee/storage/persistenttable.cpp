@@ -82,7 +82,7 @@ TableTuple keyTuple;
 PersistentTable::PersistentTable(ExecutorContext *ctx, bool exportEnabled) :
     Table(TABLE_BLOCKSIZE), m_executorContext(ctx), m_uniqueIndexes(NULL), m_uniqueIndexCount(0), m_allowNulls(NULL),
     m_indexes(NULL), m_indexCount(0), m_pkeyIndex(NULL), m_wrapper(NULL),
-    tsSeqNo(0), m_viewCount(0), m_views(NULL), stats_(this), m_exportEnabled(exportEnabled),
+    tsSeqNo(0), stats_(this), m_exportEnabled(exportEnabled),
     m_COWContext(NULL)
 {
     if (exportEnabled)
@@ -114,12 +114,10 @@ PersistentTable::~PersistentTable() {
     if (m_allowNulls) delete[] m_allowNulls;
     if (m_indexes) delete[] m_indexes;
 
-    if (m_views) {
-        // note this class has ownership of the views, even if they
-        // were allocated by VoltDBEngine
-        for (int i = 0; i < m_viewCount; i++)
-            delete m_views[i];
-        delete[] m_views;
+    // note this class has ownership of the views, even if they
+    // were allocated by VoltDBEngine
+    for (int i = 0; i < m_views.size(); i++) {
+        delete m_views[i];
     }
 
     delete m_wrapper;
@@ -211,9 +209,8 @@ bool PersistentTable::insertTuple(TableTuple &source) {
     undoQuantum->registerUndoAction(ptuia);
 
     // handle any materialized views
-    if (m_views) {
-        for (int i = 0; i < m_viewCount; i++)
-            m_views[i]->processTupleInsert(source);
+    for (int i = 0; i < m_views.size(); i++) {
+        m_views[i]->processTupleInsert(source);
     }
 
     return true;
@@ -337,9 +334,8 @@ bool PersistentTable::updateTuple(TableTuple &source, TableTuple &target, bool u
     }
 
     // handle any materialized views
-    if (m_views) {
-        for (int i = 0; i < m_viewCount; i++)
-            m_views[i]->processTupleUpdate(ptuua->getOldTuple(), target);
+    for (int i = 0; i < m_views.size(); i++) {
+        m_views[i]->processTupleUpdate(ptuua->getOldTuple(), target);
     }
 
     /**
@@ -437,9 +433,8 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
     voltdb::PersistentTableUndoDeleteAction *ptuda = new (pool->allocate(sizeof(voltdb::PersistentTableUndoDeleteAction))) voltdb::PersistentTableUndoDeleteAction( target, this, pool);
 
     // handle any materialized views
-    if (m_views) {
-        for (int i = 0; i < m_viewCount; i++)
-            m_views[i]->processTupleDelete(target);
+    for (int i = 0; i < m_views.size(); i++) {
+        m_views[i]->processTupleDelete(target);
     }
 
     // if EL is enabled, append the tuple to the buffer
@@ -588,14 +583,11 @@ bool PersistentTable::checkNulls(TableTuple &tuple) const {
     return true;
 }
 
-void PersistentTable::setMaterializedViews(const std::vector<MaterializedViewMetadata*> &views) {
-    m_viewCount = static_cast<int32_t>(views.size());
-    m_views = new MaterializedViewMetadata*[m_viewCount];
-
-    // this actually transfers ownership of the view structures, they
-    // must be deleted by the table
-    for (int i = 0; i < m_viewCount; i++)
-        m_views[i] = views[i];
+/*
+ * claim ownership of a view. table is responsible for this view*
+ */
+void PersistentTable::addMaterializedView(MaterializedViewMetadata *view) {
+    m_views.push_back(view);
 }
 
 // ------------------------------------------------------------------
@@ -670,9 +662,8 @@ void PersistentTable::onSetColumns() {
  */
 void PersistentTable::processLoadedTuple(bool allowELT, TableTuple &tuple) {
     // handle any materialized views
-    if (m_views) {
-        for (int i = 0; i < m_viewCount; i++)
-            m_views[i]->processTupleInsert(m_tmpTarget1);
+    for (int i = 0; i < m_views.size(); i++) {
+        m_views[i]->processTupleInsert(m_tmpTarget1);
     }
 
     // if EL is enabled, append the tuple to the buffer

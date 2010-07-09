@@ -183,8 +183,8 @@ class PersistentTable : public Table {
     virtual bool releaseEltBytes(int64_t releaseOffset);
     virtual void resetPollMarker();
 
-    /** At EE setup time, add the list of views driven from this table */
-    void setMaterializedViews(const std::vector<MaterializedViewMetadata*> &views);
+    /** Add a view to this table */
+    void addMaterializedView(MaterializedViewMetadata *view);
 
     /**
      * Switch the table to copy on write mode. Returns true if the table was already in copy on write mode.
@@ -251,8 +251,7 @@ protected:
     int m_partitionColumn;
 
     // list of materialized views that are sourced from this table
-    int32_t m_viewCount;
-    MaterializedViewMetadata **m_views;
+    std::vector<MaterializedViewMetadata *> m_views;
 
     // STATS
     voltdb::PersistentTableStats stats_;

@@ -380,7 +380,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         bool initPlanFragment(const int64_t fragId, const std::string planNodeTree);
         bool initPlanNode(const int64_t fragId, AbstractPlanNode* node, int* tempTableMemoryInBytes);
         bool initCluster();
-        bool initMaterializedViews();
+        bool initMaterializedViews(bool addAll);
         bool updateCatalogDatabaseReference();
 
         void printReport();

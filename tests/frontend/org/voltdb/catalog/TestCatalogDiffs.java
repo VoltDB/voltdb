@@ -488,6 +488,27 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiffRejected(catOriginal, catUpdated);
     }
 
+    public void testRemoveTableAndMaterializedViewAccepted() throws IOException {
+        // with a view
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.addPartitionInfo("A", "C1");
+        builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
+        builder.compile("remtablematview1.jar");
+        Catalog catOriginal = catalogForJar("remtablematview1.jar");
+
+        // without a view
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("B", "C1");
+        builder.addProcedures(org.voltdb.catalog.ProcedureB.class);
+        builder.compile("remtablematview2.jar");
+        Catalog catUpdated = catalogForJar("remtablematview2.jar");
+
+        verifyDiff(catOriginal, catUpdated);
+    }
+
     public void testChangeTableReplicationSettingRejected() throws IOException {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");

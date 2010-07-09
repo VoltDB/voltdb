@@ -331,7 +331,36 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         assertTrue(callbackSuccess);
     }
 
+    public void testAddTableWithMatView() throws IOException, ProcCallException, InterruptedException {
+        Client client = getClient();
+        loadSomeData(client, 0, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
 
+        // add new tables and materialized view
+        String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtableswithmatview.jar");
+        VoltTable[] results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL).getResults();
+        assertTrue(results.length == 1);
+
+        // verify that the new table(s) support an insert
+        for (int i=0; i < 10; ++i) {
+            ClientResponse callProcedure = client.callProcedure("@AdHoc", "insert into O1 values (" + i + ", " + i % 2 + ", 'foo', 'foobar');");
+            assertTrue(callProcedure.getResults().length == 1);
+            assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
+        }
+
+        // read it - expect 10 rows
+        ClientResponse callProcedure = client.callProcedure("@AdHoc", "select * from O1");
+        VoltTable result = callProcedure.getResults()[0];
+        assertTrue(result.getRowCount() == 10);
+
+        // read the mat view. expect two rows (grouped on x % 2)
+        callProcedure = client.callProcedure("@AdHoc", "select C1,NUM from MATVIEW_O1 order by C1");
+        result = callProcedure.getResults()[0];
+
+        System.out.println("MATVIEW:"); System.out.println(result);
+        assertTrue(result.getRowCount() == 2);
+    }
 
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
@@ -380,6 +409,22 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project.addProcedures(BASEPROCS_OPROCS);
         boolean compile = config.compile(project);
         assertTrue(compile);
+
+        // as above but also with a materialized view added to O1
+        try {
+            config = new LocalCluster("catalogupdate-cluster-addtableswithmatview.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+            project = new TPCCProjectBuilder();
+            project.addDefaultSchema();
+            project.addSchema(TestCatalogUpdateSuite.class.getResource("testorderby-ddl.sql").getPath());
+            project.addLiteralSchema("CREATE VIEW MATVIEW_O1(C1,NUM) AS SELECT A_INT, COUNT(*) FROM O1 GROUP BY A_INT;");
+            project.addDefaultPartitioning();
+            project.addPartitionInfo("O1", "PKEY");
+            project.addProcedures(BASEPROCS_OPROCS);
+            compile = config.compile(project);
+            assertTrue(compile);
+        } catch (IOException e) {
+            fail();
+        }
 
         // Build a new catalog
         //config = new LocalSingleProcessServer("catalogupdate-local-expanded.jar", 2, BackendTarget.NATIVE_EE_JNI);

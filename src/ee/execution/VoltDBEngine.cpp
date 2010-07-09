@@ -529,7 +529,7 @@ bool VoltDBEngine::loadCatalog(const string &catalogPayload) {
     }
 
     // load up all the materialized views
-    initMaterializedViews();
+    initMaterializedViews(true);
 
     // load the plan fragments from the catalog
     if (!rebuildPlanFragmentCollections())
@@ -633,6 +633,11 @@ VoltDBEngine::updateCatalog(const string &catalogPayload, int catalogVersion)
 
     if (rebuildTableCollections() == false) {
         VOLT_ERROR("Error updating catalog id mappings for tables.");
+        return false;
+    }
+
+    if (initMaterializedViews(false) == false) {
+        VOLT_ERROR("Error update materialized view definitions.");
         return false;
     }
 
@@ -850,36 +855,33 @@ bool VoltDBEngine::initPlanNode(const int64_t fragId, AbstractPlanNode* node, in
     return true;
 }
 
-bool VoltDBEngine::initMaterializedViews() {
-
-    map<PersistentTable*, vector<MaterializedViewMetadata*> > allViews;
-
-    // build all the materialized view metadata structure
-    // start by iterating over all the tables in the catalog
+/*
+ * Iterate catalog tables looking for tables that are materialized
+ * view sources.  When found, construct a materialized view metadata
+ * object that connects the source and destination tables, and assign
+ * that object to the source table.
+ *
+ * Assumes all tables (sources and destinations) have been constructed.
+ * @param addAll Pass true to add all views. Pass false to only add new views.
+ */
+bool VoltDBEngine::initMaterializedViews(bool addAll) {
     map<string, catalog::Table*>::const_iterator tableIterator;
+    // walk tables
     for (tableIterator = m_database->tables().begin(); tableIterator != m_database->tables().end(); tableIterator++) {
         catalog::Table *srcCatalogTable = tableIterator->second;
         PersistentTable *srcTable = dynamic_cast<PersistentTable*>(m_tables[srcCatalogTable->relativeIndex()]);
-
-        // for each table look for any materialized views and iterate over them
+        // walk views
         map<string, catalog::MaterializedViewInfo*>::const_iterator matviewIterator;
         for (matviewIterator = srcCatalogTable->views().begin(); matviewIterator != srcCatalogTable->views().end(); matviewIterator++) {
             catalog::MaterializedViewInfo *catalogView = matviewIterator->second;
-
-            const catalog::Table *destCatalogTable = catalogView->dest();
-            PersistentTable *destTable = dynamic_cast<PersistentTable*>(m_tables[destCatalogTable->relativeIndex()]);
-
-            MaterializedViewMetadata *mvmd = new MaterializedViewMetadata(srcTable, destTable, catalogView);
-
-            allViews[srcTable].push_back(mvmd);
+            // connect source and destination tables
+            if (addAll || catalogView->wasAdded()) {
+                const catalog::Table *destCatalogTable = catalogView->dest();
+                PersistentTable *destTable = dynamic_cast<PersistentTable*>(m_tables[destCatalogTable->relativeIndex()]);
+                MaterializedViewMetadata *mvmd = new MaterializedViewMetadata(srcTable, destTable, catalogView);
+                srcTable->addMaterializedView(mvmd);
+            }
         }
-    }
-
-    // get the lists of views for each table and stick them in there
-    map<PersistentTable*, vector<MaterializedViewMetadata*> >::const_iterator viewListIterator;
-    for (viewListIterator = allViews.begin(); viewListIterator != allViews.end(); viewListIterator++) {
-        PersistentTable *srcTable = viewListIterator->first;
-        srcTable->setMaterializedViews(viewListIterator->second);
     }
 
     return true;
