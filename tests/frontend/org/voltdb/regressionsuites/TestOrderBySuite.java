@@ -37,6 +37,7 @@ import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.orderbyprocs.InsertO1;
 import org.voltdb.regressionsuites.orderbyprocs.InsertO3;
+import org.voltdb.regressionsuites.orderbyprocs.OrderByCountStarAlias;
 import org.voltdb.regressionsuites.orderbyprocs.OrderByNonIndex;
 import org.voltdb.regressionsuites.orderbyprocs.OrderByOneIndex;
 
@@ -49,6 +50,7 @@ public class TestOrderBySuite extends RegressionSuite {
 
     static final Class<?>[] PROCEDURES = { InsertO1.class,
                                           InsertO3.class,
+                                          OrderByCountStarAlias.class,
                                           OrderByNonIndex.class,
                                           OrderByOneIndex.class };
 
@@ -161,6 +163,22 @@ public class TestOrderBySuite extends RegressionSuite {
         client.callProcedure("InsertO1", 8, new Long(2), "Chris", "CrunchTubers");
         client.callProcedure("InsertO1", 9, new Long(3), "Chris", "AlphaBitters");
 
+        client.drain();
+    }
+
+    private void loadWithDifferingDupes(Client client)
+    throws NoConnectionsException, IOException, ProcCallException, InterruptedException
+    {
+        client.callProcedure("InsertO1", 1, new Long(1), "Alice", "AlphaBitters");
+        client.callProcedure("InsertO1", 2, new Long(2), "Alice", "CrunchTubers");
+        client.callProcedure("InsertO1", 3, new Long(3), "Alice", "BetaBuildingBlocks");
+        client.callProcedure("InsertO1", 4, new Long(4), "Betty", "CrunchTubers");
+        client.callProcedure("InsertO1", 5, new Long(1), "Betty", "AlphaBitters");
+        client.callProcedure("InsertO1", 6, new Long(2), "Betty", "BetaBuildingBlocks");
+        client.callProcedure("InsertO1", 7, new Long(3), "Chris", "BetaBuildingBlocks");
+        client.callProcedure("InsertO1", 8, new Long(1), "Chris", "CrunchTubers");
+        client.callProcedure("InsertO1", 9, new Long(2), "Chris", "AlphaBitters");
+        client.callProcedure("InsertO1", 10, new Long(1), "TheDude", "Caucasian");
         client.drain();
     }
 
@@ -441,16 +459,93 @@ public class TestOrderBySuite extends RegressionSuite {
         assertEquals(24, vt.get(2, VoltType.INTEGER));
     }
 
+    public void testOrderByCountStarAlias()
+    throws IOException, ProcCallException, InterruptedException
+    {
+        VoltTable vt;
+        Client client = getClient();
+        loadWithDifferingDupes(client);
+        vt = client.callProcedure("OrderByCountStarAlias").getResults()[0];
+        System.out.println(vt.toString());
+        assertEquals(4, vt.getRowCount());
+        vt.advanceRow();
+        assertEquals(4, vt.get("A_INT", VoltType.INTEGER));
+        assertEquals(1L, vt.get("FOO", VoltType.BIGINT));
+        vt.advanceRow();
+        assertEquals(3, vt.get("A_INT", VoltType.INTEGER));
+        assertEquals(2L, vt.get("FOO", VoltType.BIGINT));
+        vt.advanceRow();
+        assertEquals(2, vt.get("A_INT", VoltType.INTEGER));
+        assertEquals(3L, vt.get("FOO", VoltType.BIGINT));
+        vt.advanceRow();
+        assertEquals(1, vt.get("A_INT", VoltType.INTEGER));
+        assertEquals(4L, vt.get("FOO", VoltType.BIGINT));
+    }
+
+    public void testOrderByCountStarCardinal()
+    throws IOException, ProcCallException, InterruptedException
+    {
+        VoltTable vt;
+        Client client = getClient();
+        loadWithDifferingDupes(client);
+        vt = client.callProcedure("@AdHoc", "select A_INT, count(*) from O1 group by A_INT order by 2;").getResults()[0];
+        System.out.println(vt.toString());
+        assertEquals(4, vt.getRowCount());
+        vt.advanceRow();
+        assertEquals(4, vt.get(0, VoltType.INTEGER));
+        assertEquals(1L, vt.get(1, VoltType.BIGINT));
+        vt.advanceRow();
+        assertEquals(3, vt.get(0, VoltType.INTEGER));
+        assertEquals(2L, vt.get(1, VoltType.BIGINT));
+        vt.advanceRow();
+        assertEquals(2, vt.get(0, VoltType.INTEGER));
+        assertEquals(3L, vt.get(1, VoltType.BIGINT));
+        vt.advanceRow();
+        assertEquals(1, vt.get(0, VoltType.INTEGER));
+        assertEquals(4L, vt.get(1, VoltType.BIGINT));
+    }
+
+    public void testOrderByCountStarWithLimit()
+    throws IOException, ProcCallException, InterruptedException
+    {
+        VoltTable vt;
+        Client client = getClient();
+        loadWithDifferingDupes(client);
+        vt = client.callProcedure("@AdHoc", "select A_INT, count(*) as FOO from O1 group by A_INT order by FOO limit 1;").getResults()[0];
+        System.out.println(vt.toString());
+        assertEquals(1, vt.getRowCount());
+        vt.advanceRow();
+        assertEquals(4, vt.get("A_INT", VoltType.INTEGER));
+        assertEquals(1L, vt.get("FOO", VoltType.BIGINT));
+    }
+
+    public void testOrderByWithNewExpression() throws Exception
+    {
+        VoltTable vt;
+        Client client = getClient();
+        loadWithDupes(client);
+        vt = client.callProcedure("@AdHoc", "select PKEY + A_INT from O1 order by PKEY + A_INT;").getResults()[0];
+        System.out.println(vt.toString());
+        ArrayList<Long> expected = new ArrayList<Long>();
+        for (int i = 1; i < 10; i++)
+        {
+            expected.add((long) (i + ((i-1) % 3) + 1));
+        }
+        Collections.sort(expected);
+        assertEquals(9, expected.size());
+        for (int i = 0; i < expected.size(); i++)
+        {
+            vt.advanceRow();
+            assertEquals(expected.get(i), vt.get(0, VoltType.BIGINT));
+        }
+    }
+
     //
     // Suite builder boilerplate
     //
 
     public TestOrderBySuite(String name) {
         super(name);
-    }
-
-    public static void main(String args[]) {
-        org.junit.runner.JUnitCore.runClasses(TestOrderBySuite.class);
     }
 
     static public junit.framework.Test suite() {

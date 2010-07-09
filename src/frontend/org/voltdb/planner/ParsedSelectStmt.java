@@ -24,6 +24,8 @@ import java.util.Map.Entry;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.types.ExpressionType;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 
@@ -205,11 +207,16 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         while (child.getNodeType() != Node.ELEMENT_NODE)
             child = child.getNextSibling();
         assert(child != null);
+
+        NamedNodeMap childAttrs = child.getAttributes();
+        // Cases:
+        // inner child could be columnref, in which case it's just a normal
+        // column, so we try to look it up the the columns we've already
+        // parsed and if we don't find it, we create a new column.
+        //
         if (child.getNodeName().equals("columnref"))
         {
-            NamedNodeMap childAttrs = child.getAttributes();
             String alias = childAttrs.getNamedItem("alias").getNodeValue();
-
             // create the orderby column
             ParsedColInfo col = allColumns.get(alias);
             if (col == null) {
@@ -229,9 +236,61 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             col.ascending = !descending;
             orderColumns.add(col);
         }
+        // inner child could be an operation, which forks into two subcases:
+        else if (child.getNodeName().equals("operation"))
+        {
+            ParsedColInfo order_col = new ParsedColInfo();
+            order_col.columnName = "";
+            order_col.orderBy = true;
+            order_col.ascending = !descending;
+            // I'm not sure anyone actually cares about this table name
+            order_col.tableName = "VOLT_TEMP_TABLE";
+            AbstractExpression order_exp = parseExpressionTree(child, db);
+            // 2) It's a simplecolumn operation.  This means that the alias that
+            //    we have should refer to a column that we compute somewhere else.
+            //    Look up that column in the allColumns list, and then create a
+            //    new order by column with a magic TVE
+            if (order_exp instanceof TupleValueExpression)
+            {
+                String alias = childAttrs.getNamedItem("alias").getNodeValue();
+                ParsedColInfo orig_col = allColumns.get(alias);
+                // We need the original column expression so we can extract
+                // the value size and type for our TVE that refers back to it
+                if (orig_col == null)
+                {
+                    throw new PlanningErrorException("Unable to find source " +
+                                                     "column for simplecolumn: " +
+                                                     alias);
+                }
+                assert(orig_col.tableName.equals("VOLT_TEMP_TABLE"));
+                // Construct our fake TVE that will point back at the input
+                // column.
+                TupleValueExpression tve = (TupleValueExpression) order_exp;
+                tve.setColumnAlias(alias);
+                tve.setColumnName("");
+                tve.setColumnIndex(-1);
+                tve.setTableName("VOLT_TEMP_TABLE");
+                tve.setValueSize(orig_col.expression.getValueSize());
+                tve.setValueType(orig_col.expression.getValueType());
+                order_col.alias = alias;
+                order_col.expression = tve;
+            }
+            // 1) it's an actual complex expression, which we will (for now)
+            //    compute in the order by node.  Create a new column, hand it the
+            //    parsed expression, and stick it in the order by columns.
+            //    Disavow any knowledge of it for allColumns, since it's not
+            //    (yet) an output column
+            else
+            {
+                ExpressionUtil.assignLiteralConstantTypesRecursively(order_exp);
+                ExpressionUtil.assignOutputValueTypesRecursively(order_exp);
+                order_col.expression = order_exp;
+            }
+            orderColumns.add(order_col);
+        }
         else
         {
-            throw new RuntimeException("ORDER BY with complex expressions not yet supported");
+            throw new RuntimeException("ORDER BY parsed with strange child node type: " + child.getNodeName());
         }
     }
 

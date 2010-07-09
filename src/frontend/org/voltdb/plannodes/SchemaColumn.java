@@ -119,7 +119,7 @@ public class SchemaColumn
         return m_columnName;
     }
 
-    String getColumnAlias()
+    public String getColumnAlias()
     {
         return m_columnAlias;
     }
@@ -154,14 +154,14 @@ public class SchemaColumn
         boolean retval = false;
         if (tableName.equals(m_tableName))
         {
-            if (!columnName.equals("") && columnName != null)
+            if (columnName != null && !columnName.equals(""))
             {
                 if (columnName.equals(m_columnName))
                 {
                     retval = true;
                 }
             }
-            else if (!columnAlias.equals("") && columnAlias != null)
+            else if (columnAlias != null && !columnAlias.equals(""))
             {
                 if (columnAlias.equals(m_columnAlias))
                 {

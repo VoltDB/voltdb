@@ -179,7 +179,14 @@ public abstract class StatementCompiler {
             Column catColumn = catalogStmt.getOutput_columns().add(String.valueOf(index));
             catColumn.setNullable(false);
             catColumn.setIndex(index);
-            catColumn.setName(col.getColumnName());
+            if (col.getColumnAlias() != null && !col.getColumnAlias().equals(""))
+            {
+                catColumn.setName(col.getColumnAlias());
+            }
+            else
+            {
+                catColumn.setName(col.getColumnName());
+            }
             catColumn.setType(col.getType().getValue());
             catColumn.setSize(col.getSize());
             index++;

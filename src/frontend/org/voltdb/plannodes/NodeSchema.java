@@ -148,7 +148,7 @@ public class NodeSchema
         Collections.sort(m_columns, new TveColCompare());
     }
 
-    protected NodeSchema clone()
+    public NodeSchema clone()
     {
         NodeSchema copy = new NodeSchema();
         for (int i = 0; i < m_columns.size(); ++i)

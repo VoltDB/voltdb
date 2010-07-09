@@ -41,5 +41,7 @@ SELECT _variable FROM @from_tables GROUP BY _variable
 SELECT _variable[@order], _variable FROM @from_tables ORDER BY _variable[@order] _sortorder
 -- test LIMIT (with ORDER BY)
 SELECT * FROM @from_tables ORDER BY _variable LIMIT _value[int:1,10]
+-- test GROUP BY ORDER BY COUNT(*) with LIMIT
+SELECT _variable[@order], COUNT(*) AS FOO FROM @from_tables GROUP BY _variable[@order] ORDER BY FOO DESC, _variable[@order] LIMIT _value[int:1,3]
 -- test INNER JOIN (we'll do more two-table join fun separately, this just checks syntax)
 SELECT * FROM _table INNER JOIN _table ON _variable = _variable

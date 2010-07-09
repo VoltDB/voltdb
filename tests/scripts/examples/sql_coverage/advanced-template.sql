@@ -29,6 +29,9 @@ SELECT _variable FROM @from_tables WHERE (_variable _cmp _variable) _logic (_var
 SELECT _variable, ID FROM @from_tables ORDER BY ID _sortorder
 -- order by on two columns
 SELECT _variable[@order1], _variable[@order2], _variable FROM @from_tables ORDER BY _variable[@order1] _sortorder, _variable[@order2]
+-- order by with generic expression
+SELECT _variable[@order1] _math _variable[@order2] AS FOO FROM @from_tables ORDER BY FOO
+
 -- ticket 232
 SELECT NUM FROM @from_tables GROUP BY NUM ORDER BY NUM
 

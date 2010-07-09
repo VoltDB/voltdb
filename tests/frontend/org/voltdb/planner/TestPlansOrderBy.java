@@ -131,6 +131,16 @@ public class TestPlansOrderBy extends TestCase {
         }
     }
 
+    public void testOrderByCountStar() {
+        AbstractPlanNode pn = null;
+        pn = compile("SELECT T_PKEY, COUNT(*) AS FOO FROM T GROUP BY T_PKEY ORDER BY FOO", 0);
+        if (pn != null) {
+            assertFalse(pn.findAllNodesOfType(PlanNodeType.HASHAGGREGATE).isEmpty());
+            assertFalse(pn.findAllNodesOfType(PlanNodeType.SEQSCAN).isEmpty());
+            assertFalse(pn.findAllNodesOfType(PlanNodeType.ORDERBY).isEmpty());
+        }
+    }
+
     public void testEng450()
     {
         compile("select T.T_PKEY, " +

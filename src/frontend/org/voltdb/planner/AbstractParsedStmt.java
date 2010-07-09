@@ -352,6 +352,14 @@ public abstract class AbstractParsedStmt {
         }
         expr.setExpressionType(exprType);
 
+        // If the operation type was 'simplecolumn' then it's going to turn
+        // into a TVE and we need to bail out before we try parsing the
+        // left and right subtrees
+        if (expr instanceof TupleValueExpression)
+        {
+            return expr;
+        }
+
         // Allow expressions to read expression-specific data from exprNode.
         // Looks like the design fully abstracts other volt classes from
         // the XML serialization?  Putting this here instead of in derived
