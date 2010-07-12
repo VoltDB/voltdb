@@ -18,10 +18,18 @@ PATHS AND PROPERTIES
 <property name='procedures.dir'       location='procedures/' />
 <property name='src.dir'              location='src/' />
 
-<path id='project.classpath'>
+<path id='project.classpath.server'>
     <pathelement location='${build.dir}' />
     <fileset dir='../../voltdb' >
-        <include name='voltdb*.jar' />
+        <include name='voltdb-*.jar' />
+    </fileset>
+    <pathelement path="${java.class.path}"/>
+</path>
+
+<path id='project.classpath.client'>
+    <pathelement location='${build.dir}' />
+    <fileset dir='../../voltdb' >
+        <include name='voltdbclient-*.jar' />
     </fileset>
     <pathelement path="${java.class.path}"/>
 </path>
@@ -61,10 +69,10 @@ JAVA & CATALOG COMPILATION
     <!-- Build the Java code (procs and driver) for the Auction example -->
     <mkdir dir='${build.dir}' />
     <javac target="1.6" srcdir="${procedures.dir}" destdir='${build.dir}' debug='true'>
-        <classpath refid="project.classpath" />
+        <classpath refid="project.classpath.server" />
     </javac>
     <javac target="1.6" srcdir="${src.dir}" destdir='${build.dir}' debug='true'>
-        <classpath refid="project.classpath" />
+        <classpath refid="project.classpath.server" />
     </javac>
     <mkdir dir='${build.dir}/com/auctionexample/datafiles' />
     <copy todir="${build.dir}/com/auctionexample/datafiles" >
@@ -85,7 +93,7 @@ JAVA & CATALOG COMPILATION
         <arg value="1"/>           <!-- sites -->
         <arg value="localhost"/>   <!-- leader -->
         <arg value="${catalog_jar}"/> <!-- output -->
-        <classpath refid='project.classpath' />
+        <classpath refid='project.classpath.server' />
         <assertions><disable /></assertions>
     </java>
 </target>
@@ -103,7 +111,7 @@ SERVER, EXPORT, & CLIENT TARGETS
         <jvmarg value="-Xmx512m" />
         <arg value="catalog"/>
         <arg value="auction.jar"/>
-        <classpath refid='project.classpath' />
+        <classpath refid='project.classpath.server' />
         <assertions><disable /></assertions>
     </java>
 </target>
@@ -123,14 +131,14 @@ SERVER, EXPORT, & CLIENT TARGETS
         <arg value="voltdb"/>
         <arg value="--password"/>
         <arg value="demo"/>
-        <classpath refid='project.classpath' />
+        <classpath refid='project.classpath.server' />
         <assertions><disable /></assertions>
     </java>
 </target>
 
 <target name="client" description="Example: ant client    Run auction example client.">
     <java fork="yes" classname="com.auctionexample.Client" >
-        <classpath refid='project.classpath' />
+        <classpath refid='project.classpath.client' />
         <assertions><disable /></assertions>
     </java>
 </target>
