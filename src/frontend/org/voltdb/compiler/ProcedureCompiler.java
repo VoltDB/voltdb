@@ -20,7 +20,7 @@ package org.voltdb.compiler;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
-import org.hsqldb.HSQLInterface;
+import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltdb.ProcInfo;
 import org.voltdb.ProcInfoData;
 import org.voltdb.SQLStmt;

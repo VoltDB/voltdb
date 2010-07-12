@@ -27,8 +27,8 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.hsqldb.HSQLInterface;
-import org.hsqldb.HSQLInterface.HSQLParseException;
+import org.hsqldb_voltpatches.HSQLInterface;
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;

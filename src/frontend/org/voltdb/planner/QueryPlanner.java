@@ -22,8 +22,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map.Entry;
 
-import org.hsqldb.HSQLInterface;
-import org.hsqldb.HSQLInterface.HSQLParseException;
+import org.hsqldb_voltpatches.HSQLInterface;
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.voltdb.catalog.Cluster;

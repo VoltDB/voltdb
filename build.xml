@@ -418,7 +418,7 @@ JAR BUILDING
     <jar destfile="${build.prod.dir}/voltdb-${dist.version}.jar">
         <fileset dir="${build.prod.dir}" defaultexcludes="yes" >
             <include name="org/voltdb/**" />
-            <include name="org/hsqldb/**" />
+            <include name="org/hsqldb_voltpatches/**" />
             <include name="org/json/**" />
         </fileset>
         <fileset dir="${build.test.dir}" defaultexcludes="yes" >
@@ -461,7 +461,7 @@ JAR BUILDING
     <jar destfile="${build.prod.dir}/voltdbfat.jar">
         <fileset dir="${build.prod.dir}" defaultexcludes="yes" >
             <include name="org/voltdb/**" />
-            <include name="org/hsqldb/**" />
+            <include name="org/hsqldb_voltpatches/**" />
             <include name="org/json/**" />
         </fileset>
         <fileset dir="${build.test.dir}" defaultexcludes="no" >
@@ -522,8 +522,8 @@ JAVA COMPILATION
         <fileset dir="${src.gpl.dir}" includes="**/*.xml" />
     </copy>
 
-    <copy todir='${build.prod.dir}/org/hsqldb/resources'>
-        <fileset dir="${src.hsqldb.dir}/org/hsqldb/resources">
+    <copy todir='${build.prod.dir}/org/hsqldb_voltpatches/resources'>
+        <fileset dir="${src.hsqldb.dir}/org/hsqldb_voltpatches/resources">
             <include name="*"/>
         </fileset>
     </copy>
@@ -550,8 +550,8 @@ JAVA COMPILATION
         </fileset>
     </copy>
 
-    <copy todir='${build.test.dir}/org/hsqldb'>
-        <fileset dir="${src.hsqldb.test.dir}/org/hsqldb">
+    <copy todir='${build.test.dir}/org/hsqldb_voltpatches'>
+        <fileset dir="${src.hsqldb.test.dir}/org/hsqldb_voltpatches">
             <include name="*.sql"/>
         </fileset>
     </copy>
@@ -895,7 +895,7 @@ TEST CASES
         </formatters>
         <tests>
             <fileset dir='${build.test.dir}'>
-                <include name='org/hsqldb/**/Test*.class'/>
+                <include name='org/hsqldb_voltpatches/**/Test*.class'/>
                 <include name='org/voltdb/**/Test*.class'/>
                 <include name='org/voltdb/network/**/Test*.class'/>
                 <include name='org/voltdb/messaging/**/*Test.class'/>
@@ -964,7 +964,7 @@ TEST CASES
         </formatters>
         <tests>
             <fileset dir='${build.test.dir}'>
-                <include name='org/hsqldb/**/Test*.class'/>
+                <include name='org/hsqldb_voltpatches/**/Test*.class'/>
                 <include name='org/voltdb/**/Test*.class'/>
                 <include name='org/voltdb/network/**/Test*.class'/>
                 <include name='org/voltdb/messaging/**/*Test.class'/>

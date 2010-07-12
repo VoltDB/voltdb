@@ -43,7 +43,7 @@ import javax.xml.validation.SchemaFactory;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-import org.hsqldb.HSQLInterface;
+import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltdb.ProcInfo;
 import org.voltdb.ProcInfoData;
 import org.voltdb.TransactionIdManager;

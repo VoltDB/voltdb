@@ -29,8 +29,9 @@ import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Map.Entry;
-import org.hsqldb.HSQLInterface;
-import org.hsqldb.HSQLInterface.HSQLParseException;
+
+import org.hsqldb_voltpatches.HSQLInterface;
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.voltdb.AllTpccSQL;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.benchmark.tpcc.TPCCClient;

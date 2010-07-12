@@ -56,7 +56,7 @@ public class HsqlBackend {
 
     public HsqlBackend(int siteId) {
         try {
-            Class.forName("org.hsqldb.jdbcDriver" );
+            Class.forName("org.hsqldb_voltpatches.jdbcDriver" );
         } catch (Exception e) {
             throw new RuntimeException("Failed to load HSQLDB JDBC driver.", e);
         }

@@ -20,7 +20,7 @@ package org.voltdb.compiler;
 import java.io.PrintStream;
 import java.util.Collections;
 
-import org.hsqldb.HSQLInterface;
+import org.hsqldb_voltpatches.HSQLInterface;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.voltdb.catalog.Catalog;

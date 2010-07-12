@@ -29,8 +29,10 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.net.URL;
 import java.net.URLDecoder;
-import org.hsqldb.HSQLInterface;
-import org.hsqldb.HSQLInterface.HSQLParseException;
+
+import org.hsqldb_voltpatches.HSQLInterface;
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+
 import junit.framework.*;
 
 public class TestDDLCompiler extends TestCase {

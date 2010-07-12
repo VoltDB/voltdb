@@ -31,8 +31,8 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
-import org.hsqldb.HSQLInterface;
-import org.hsqldb.HSQLInterface.HSQLParseException;
+import org.hsqldb_voltpatches.HSQLInterface;
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Column;
