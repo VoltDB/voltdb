@@ -44,7 +44,7 @@ public class SnapshotVerifier {
         boolean specifiedSingle = false;
         HashSet<String> snapshotNames = new HashSet<String>();
         for (int ii = 0; ii < args.length; ii++) {
-            if (args[ii].equals("--dirs")) {
+            if (args[ii].equals("--dir")) {
                 ii++;
                 continue;
             }
