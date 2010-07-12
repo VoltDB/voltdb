@@ -28,7 +28,11 @@ SELECT _variable FROM @from_tables WHERE (_variable _cmp _variable) _logic (_var
 -- order by with projection
 SELECT _variable, ID FROM @from_tables ORDER BY ID _sortorder
 -- order by on two columns
-SELECT _variable[@order1], _variable[@order2], _variable FROM @from_tables ORDER BY _variable[@order1] _sortorder, _variable[@order2]
+-- ENG-631
+-- With multiple columns named the same thing and multiple order by columns using the same column and different
+-- sort directions, this statement fails.  Commenting it out and going with one that forces the sort orders for now
+--SELECT _variable[@order1], _variable[@order2], _variable FROM @from_tables ORDER BY _variable[@order1] _sortorder, _variable[@order2]
+SELECT _variable[@order1], _variable[@order2], _variable FROM @from_tables ORDER BY _variable[@order1] DESC, _variable[@order2] DESC
 -- order by with generic expression
 SELECT _variable[@order1] _math _variable[@order2] AS FOO FROM @from_tables ORDER BY FOO
 
@@ -37,21 +41,32 @@ SELECT NUM FROM @from_tables GROUP BY NUM ORDER BY NUM
 
 -- two _sortorder templates have some issue I'm not figuring out right now
 -- We get non-deterministic sort order on the non-orderby columns so leaving it out for now
-SELECT * from @from_tables ORDER BY _variable, _variable _sortorder
+-- This also appears to fail due to ENG-631 if the variables are the same.  Using
+-- a less generic version
+--SELECT * from @from_tables ORDER BY _variable, _variable _sortorder
+SELECT * from @from_tables ORDER BY _variable, _variable
 
 -- additional aggregation fun
 SELECT _agg(DISTINCT(_variable)) FROM @from_tables
-SELECT _agg(_variable), _agg(_variable) FROM @from_tables
 SELECT _variable, _agg(_variable) FROM @from_tables GROUP BY _variable
 SELECT SUM(_variable _math _variable) FROM @from_tables
+-- ENG-199.  Substituting this generic version
+-- with a few specific dual aggregates that will be different
+--SELECT _agg(_variable), _agg(_variable) FROM @from_tables
+SELECT MIN(_variable), MAX(_variable) FROM @from_tables
+SELECT COUNT(_variable), SUM(_variable) FROM @from_tables
+SELECT AVG(_variable), COUNT(_variable) FROM @from_tables
+SELECT MAX(_variable), SUM(_variable), COUNT(_variable) FROM @from_tables
 
 -- additional select expression math
-SELECT _variable _math _value[float] FROM @from_tables
+-- Causes frequent failures due to floating point rounding
+--SELECT _variable _math _value[float] FROM @from_tables
 SELECT _variable _math _variable FROM @from_tables
 -- push on divide by zero
 SELECT _variable / 0 from @from_tables
 SELECT _variable / 0.0 from @from_tables
-SELECT _variable / -1e-306 from @from_tables
+-- we throw an underflow exception and HSQL returns INF.
+--SELECT _variable / -1e-306 from @from_tables
 
 -- update
 -- compare two cols

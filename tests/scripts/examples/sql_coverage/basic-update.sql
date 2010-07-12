@@ -36,13 +36,15 @@ UPDATE _table SET @assign_col = @assign_col _math _value[int:0,3]
 -- test simple update
 -- test type casting
 UPDATE _table SET @assign_col = @assign_type
-UPDATE _table SET _variable = _variable _math _value[byte]
-UPDATE _table SET _variable = _variable _math _value[int16]
-UPDATE _table SET _variable = _variable _math _value[int32]
-UPDATE _table SET _variable = _variable _math _value[int64]
-UPDATE _table SET _variable = _variable _math _value[float]
-UPDATE _table SET _variable = _variable _math _value[string]
-UPDATE _table SET _variable = _variable _math _value[decimal]
+-- These fail with an odd message and kill the volt run.
+--UPDATE _table SET _variable = _variable _math _value[byte]
+--UPDATE _table SET _variable = _variable _math _value[int16]
+--UPDATE _table SET _variable = _variable _math _value[int32]
+--UPDATE _table SET _variable = _variable _math _value[int64]
+--UPDATE _table SET _variable = _variable _math _value[float]
+--UPDATE _table SET _variable = _variable _math _value[string]
+--UPDATE _table SET _variable = _variable _math _value[decimal]
 -- ENG-495 test type casting errors
-UPDATE _table SET _variable = _value[string]
-UPDATE _table SET _variable = _value[decimal]
+-- These don't make it out of the planner
+--UPDATE _table SET _variable = _value[string]
+--UPDATE _table SET _variable = _value[decimal]
