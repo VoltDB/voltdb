@@ -70,9 +70,9 @@ import java.util.Map.Entry;
 
 import junit.framework.TestCase;
 
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.CrazyBlahProc;
 import org.voltdb.compiler.VoltProjectBuilder;

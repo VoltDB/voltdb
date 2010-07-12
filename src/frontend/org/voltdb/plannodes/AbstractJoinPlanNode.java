@@ -20,8 +20,8 @@ package org.voltdb.plannodes;
 import java.util.List;
 import java.util.TreeMap;
 
-import org.json.JSONException;
-import org.json.JSONStringer;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.*;
 import org.voltdb.types.*;

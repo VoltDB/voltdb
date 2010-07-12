@@ -29,8 +29,8 @@ import java.net.URLDecoder;
 import java.util.List;
 
 import org.hsqldb_voltpatches.HSQLInterface;
-import org.json.JSONException;
-import org.json.JSONObject;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Column;

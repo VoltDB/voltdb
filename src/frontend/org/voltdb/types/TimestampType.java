@@ -20,7 +20,7 @@ package org.voltdb.types;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-import org.json.JSONString;
+import org.json_voltpatches.JSONString;
 
 public class TimestampType implements JSONString {
 

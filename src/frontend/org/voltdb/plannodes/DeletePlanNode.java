@@ -17,8 +17,8 @@
 
 package org.voltdb.plannodes;
 
-import org.json.JSONException;
-import org.json.JSONStringer;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONStringer;
 import org.voltdb.types.PlanNodeType;
 
 public class DeletePlanNode extends AbstractOperationPlanNode {

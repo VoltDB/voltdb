@@ -19,9 +19,9 @@ package org.voltdb;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import org.json.JSONException;
-import org.json.JSONString;
-import org.json.JSONStringer;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONString;
+import org.json_voltpatches.JSONStringer;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.messaging.FastDeserializer;

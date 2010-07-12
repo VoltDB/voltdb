@@ -22,8 +22,8 @@ import java.util.List;
 
 import org.voltdb.VoltType;
 import org.voltdb.catalog.*;
-import org.json.JSONException;
-import org.json.JSONStringer;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONStringer;
 import org.voltdb.expressions.*;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.utils.CatalogUtil;

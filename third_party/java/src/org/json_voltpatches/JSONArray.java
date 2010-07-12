@@ -1,4 +1,4 @@
-package org.json;
+package org.json_voltpatches;
 
 /*
 Copyright (c) 2002 JSON.org
@@ -53,7 +53,7 @@ import java.util.Map;
  * The generic <code>get()</code> and <code>opt()</code> methods return an
  * object which you can cast or query for type. There are also typed
  * <code>get</code> and <code>opt</code> methods that do type checking and type
- * coersion for you.
+ * coercion for you.
  * <p>
  * The texts produced by the <code>toString</code> methods strictly conform to
  * JSON syntax rules. The constructors are more forgiving in the texts they will
@@ -73,29 +73,28 @@ import java.util.Map;
  *     <code>false</code>, or <code>null</code>.</li>
  * <li>Values can be separated by <code>;</code> <small>(semicolon)</small> as
  *     well as by <code>,</code> <small>(comma)</small>.</li>
- * <li>Numbers may have the <code>0-</code> <small>(octal)</small> or
+ * <li>Numbers may have the
  *     <code>0x-</code> <small>(hex)</small> prefix.</li>
- * <li>Comments written in the slashshlash, slashstar, and hash conventions
- *     will be ignored.</li>
  * </ul>
 
  * @author JSON.org
- * @version 2008-09-18
+ * @version 2009-04-14
  */
+@SuppressWarnings("unchecked")
 public class JSONArray {
 
 
     /**
      * The arrayList where the JSONArray's properties are kept.
      */
-    private ArrayList<Object> myArrayList;
+    private ArrayList myArrayList;
 
 
     /**
      * Construct an empty JSONArray.
      */
     public JSONArray() {
-        this.myArrayList = new ArrayList<Object>();
+        this.myArrayList = new ArrayList();
     }
 
     /**
@@ -164,27 +163,18 @@ public class JSONArray {
      * Construct a JSONArray from a Collection.
      * @param collection     A Collection.
      */
-    public JSONArray(Collection<?> collection) {
-        this.myArrayList = (collection == null) ?
-            new ArrayList<Object>() :
-            new ArrayList<Object>(collection);
-    }
-
-    /**
-     * Construct a JSONArray from a collection of beans.
-     * The collection should have Java Beans.
-     */
-
-    public JSONArray(Collection<?> collection, boolean includeSuperClass) {
-        this.myArrayList = new ArrayList<Object>();
-        if(collection != null) {
-            for (Iterator<?> iter = collection.iterator(); iter.hasNext();) {
-                this.myArrayList.add(new JSONObject(iter.next(),includeSuperClass));    
+    public JSONArray(Collection collection) {
+        this.myArrayList = new ArrayList();
+        if (collection != null) {
+            Iterator iter = collection.iterator();
+            while (iter.hasNext()) {
+                Object o = iter.next();
+                this.myArrayList.add(JSONObject.wrap(o));
             }
         }
     }
 
-    
+
     /**
      * Construct a JSONArray from an array
      * @throws JSONException If not an array.
@@ -194,33 +184,15 @@ public class JSONArray {
         if (array.getClass().isArray()) {
             int length = Array.getLength(array);
             for (int i = 0; i < length; i += 1) {
-                this.put(Array.get(array, i));
+                this.put(JSONObject.wrap(Array.get(array, i)));
             }
         } else {
-            throw new JSONException("JSONArray initial value should be a string or collection or array.");
+            throw new JSONException(
+"JSONArray initial value should be a string or collection or array.");
         }
     }
 
-    /**
-     * Construct a JSONArray from an array with a bean.
-     * The array should have Java Beans.
-     * 
-     * @throws JSONException If not an array.
-     */
-    public JSONArray(Object array,boolean includeSuperClass) throws JSONException {
-        this();
-        if (array.getClass().isArray()) {
-            int length = Array.getLength(array);
-            for (int i = 0; i < length; i += 1) {
-                this.put(new JSONObject(Array.get(array, i),includeSuperClass));
-            }
-        } else {
-            throw new JSONException("JSONArray initial value should be a string or collection or array.");
-        }
-    }
 
-    
-    
     /**
      * Get the object value associated with an index.
      * @param index
@@ -605,7 +577,7 @@ public class JSONArray {
      * @param value A Collection value.
      * @return      this.
      */
-    public JSONArray put(Collection<?> value) {
+    public JSONArray put(Collection value) {
         put(new JSONArray(value));
         return this;
     }
@@ -656,7 +628,7 @@ public class JSONArray {
      * @param value A Map value.
      * @return      this.
      */
-    public JSONArray put(Map<?,?> value) {
+    public JSONArray put(Map value) {
         put(new JSONObject(value));
         return this;
     }
@@ -699,7 +671,7 @@ public class JSONArray {
      * @throws JSONException If the index is negative or if the value is
      * not finite.
      */
-    public JSONArray put(int index, Collection<?> value) throws JSONException {
+    public JSONArray put(int index, Collection value) throws JSONException {
         put(index, new JSONArray(value));
         return this;
     }
@@ -760,7 +732,7 @@ public class JSONArray {
      * @throws JSONException If the index is negative or if the the value is
      *  an invalid number.
      */
-    public JSONArray put(int index, Map<?,?> value) throws JSONException {
+    public JSONArray put(int index, Map value) throws JSONException {
         put(index, new JSONObject(value));
         return this;
     }
@@ -796,6 +768,19 @@ public class JSONArray {
 
 
     /**
+     * Remove an index and close the hole.
+     * @param index The index of the element to be removed.
+     * @return The value that was associated with the index,
+     * or null if there was no value.
+     */
+    public Object remove(int index) {
+        Object o = opt(index);
+        this.myArrayList.remove(index);
+        return o;
+    }
+
+
+    /**
      * Produce a JSONObject by combining a JSONArray of names with the values
      * of this JSONArray.
      * @param names A JSONArray containing a list of key strings. These will be
@@ -827,6 +812,7 @@ public class JSONArray {
      * @return a printable, displayable, transmittable
      *  representation of the array.
      */
+    @Override
     public String toString() {
         try {
             return '[' + join(",") + ']';
@@ -874,34 +860,20 @@ public class JSONArray {
                     indentFactor, indent));
         } else {
             int newindent = indent + indentFactor;
-            //sb.append('\n');
-            
-            boolean intType = false;
+            sb.append('\n');
             for (i = 0; i < len; i += 1) {
-                if (this.myArrayList.get(i).getClass() != Integer.class) {
-                    if (i == 0) {
-                        sb.append('\n');
-                    }
-                    if (i > 0) {
-                        sb.append(",\n");
-                    }
-                    for (int j = 0; j < newindent; j += 1) {
-                        sb.append(' ');
-                    }
+                if (i > 0) {
+                    sb.append(",\n");
                 }
-                else {
-                    intType = true;
-                    if (i > 0)
-                        sb.append(", ");
+                for (int j = 0; j < newindent; j += 1) {
+                    sb.append(' ');
                 }
                 sb.append(JSONObject.valueToString(this.myArrayList.get(i),
                         indentFactor, newindent));
             }
-            if (intType == false) {
-                sb.append('\n');
-                for (i = 0; i < indent; i += 1) {
-                    sb.append(' ');
-                }
+            sb.append('\n');
+            for (i = 0; i < indent; i += 1) {
+                sb.append(' ');
             }
         }
         sb.append(']');

@@ -17,8 +17,8 @@
 
 package org.voltdb.plannodes;
 
-import org.json.JSONException;
-import org.json.JSONStringer;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;

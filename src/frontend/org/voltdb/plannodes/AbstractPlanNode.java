@@ -19,9 +19,10 @@ package org.voltdb.plannodes;
 
 import java.util.*;
 import java.util.Map.Entry;
-import org.json.JSONString;
-import org.json.JSONStringer;
-import org.json.JSONException;
+
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONString;
+import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;

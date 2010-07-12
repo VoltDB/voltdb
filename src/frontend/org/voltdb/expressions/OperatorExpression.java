@@ -17,8 +17,8 @@
 
 package org.voltdb.expressions;
 
-import org.json.JSONException;
-import org.json.JSONObject;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.Database;
 import org.voltdb.types.*;
 

@@ -20,8 +20,8 @@ package org.voltdb.exceptions;
 import java.io.*;
 import java.nio.ByteBuffer;
 
-import org.json.JSONString;
-import org.json.JSONStringer;
+import org.json_voltpatches.JSONString;
+import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltProcedure;
 
 /**

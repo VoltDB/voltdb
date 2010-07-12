@@ -21,8 +21,8 @@ import java.io.PrintStream;
 import java.util.Collections;
 
 import org.hsqldb_voltpatches.HSQLInterface;
-import org.json.JSONException;
-import org.json.JSONObject;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;

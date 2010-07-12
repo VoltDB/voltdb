@@ -18,9 +18,10 @@
 package org.voltdb.plannodes;
 
 import java.util.*;
-import org.json.JSONException;
-import org.json.JSONStringer;
-import org.json.JSONString;
+
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONString;
+import org.json_voltpatches.JSONStringer;
 import org.voltdb.expressions.*;
 import org.voltdb.planner.PlanStatistics;
 import org.voltdb.planner.StatsField;

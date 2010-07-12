@@ -17,10 +17,10 @@
 
 package org.voltdb.expressions;
 
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.json.JSONStringer;
-import org.json.JSONString;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONString;
+import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
 import org.voltdb.types.*;
