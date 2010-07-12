@@ -630,39 +630,44 @@ public class TestExecutionSite extends TestCase {
         }
     }
 
-    public void testFuzzedTransactions()
+    public void testFuzzedTransactions() throws Exception
     {
-        final int totalTransactions = 20000;
-        final long firstTxnId = 10000;
-        for (int i=0; i < SITE_COUNT; ++i) {
-            m_mboxes[i].setFailureLikelihood(1);
-        }
-        queueTransactions(firstTxnId, totalTransactions, m_rand);
-        createAndRunSiteThreads();
+        for (int ii = 0; ii < 10; ii++) {
+            tearDown();
+            System.gc();
+            setUp();
+            final int totalTransactions = 20000;
+            final long firstTxnId = 10000;
+            for (int i=0; i < SITE_COUNT; ++i) {
+                m_mboxes[i].setFailureLikelihood(1);
+            }
+            queueTransactions(firstTxnId, totalTransactions, m_rand);
+            createAndRunSiteThreads();
 
-        // wait for all the sites to terminate runLoops
-        for (int i=0; i < SITE_COUNT; ++i) {
-            boolean stopped = false;
-            do {
-                try {
-                    m_siteThreads[i].join();
-                }
-                catch (InterruptedException e) {
-                }
-                if (m_siteThreads[i].isAlive() == false) {
-                    System.out.println("Joined site " + i);
-                    stopped = true;
-                }
-            } while (!stopped);
-        }
+            // wait for all the sites to terminate runLoops
+            for (int i=0; i < SITE_COUNT; ++i) {
+                boolean stopped = false;
+                do {
+                    try {
+                        m_siteThreads[i].join();
+                    }
+                    catch (InterruptedException e) {
+                    }
+                    if (m_siteThreads[i].isAlive() == false) {
+                        System.out.println("Joined site " + i);
+                        stopped = true;
+                    }
+                } while (!stopped);
+            }
 
-        for (int i = 0; i < SITE_COUNT; ++i)
-        {
-            System.out.println("sends for mailbox: " + i + ": " + m_mboxes[i].m_totalSends);
-        }
+            for (int i = 0; i < SITE_COUNT; ++i)
+            {
+                System.out.println("sends for mailbox: " + i + ": " + m_mboxes[i].m_totalSends);
+            }
 
-        m_checker.dumpLogs();
-        assertTrue(m_checker.validateLogs());
+            m_checker.dumpLogs();
+            assertTrue(m_checker.validateLogs());
+        }
     }
 
     /*
