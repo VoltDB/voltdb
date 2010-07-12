@@ -135,6 +135,16 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     // the final outcome for the txn.
     long lastCommittedMultiPartTxnId = 0;
 
+    /*
+     * Due to failures we may find out about commited multi-part txns
+     * before running the commit fragment. Handle node fault will generate
+     * the fragment, but it is possible for a new failure to be detected
+     * before the fragment can be run due to the order messages are pulled
+     * from subjects. Maintain and send this value when discovering/sending
+     * failure data.
+     */
+    long lastKnownGloballyCommitedMultiPartTxnId = 0;
+
     public final static long kInvalidUndoToken = -1L;
     private long latestUndoToken = 0L;
 
@@ -737,6 +747,8 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 if (!txnState.isSinglePartition())
                 {
                     lastCommittedMultiPartTxnId = txnState.txnId;
+                    lastKnownGloballyCommitedMultiPartTxnId =
+                        Math.max(txnState.txnId, lastKnownGloballyCommitedMultiPartTxnId);
                 }
             }
         }
@@ -978,7 +990,9 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         for (int survivor : survivors) {
             survivorSet.add(survivor);
         }
-        m_recoveryLog.info("Sending fault data " + m_knownFailedHosts.toString() + " to " + survivorSet.toString() + " survivors with lastCommitedMultiPartTxnId " + lastCommittedMultiPartTxnId);
+        m_recoveryLog.info("Sending fault data " + m_knownFailedHosts.toString() + " to "
+                + survivorSet.toString() + " survivors with lastKnownGloballyCommitedMultiPartTxnId "
+                + lastKnownGloballyCommitedMultiPartTxnId);
         try {
             for (Integer hostId : m_knownFailedHosts) {
                 HashMap<Integer, Long> siteMap = m_newestSafeTransactionForInitiatorLedger.get(hostId);
@@ -1006,7 +1020,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                                                          m_knownFailedHosts,
                                                          site,
                                                          txnId,
-                                                         lastCommittedMultiPartTxnId);
+                                                         lastKnownGloballyCommitedMultiPartTxnId);
 
                         m_mailbox.send(survivors, 0, srcmsg);
                         expectedResponses += (survivors.length);
@@ -1108,7 +1122,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             }
 
             ++responses;
-            m_recoveryLog.trace("Received failure message " + responses + " of " + expectedResponses
+            m_recoveryLog.info("Received failure message " + responses + " of " + expectedResponses
                     + " from " + fm.m_sourceSiteId + " for failed sites " + fm.m_failedHostIds +
                     " with commit point " + fm.m_committedTxnId + " safe txn id " + fm.m_safeTxnId +
                     " with failed host ids " + fm.m_failedHostIds);
@@ -1155,7 +1169,12 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             m_txnlog.trace("FUZZTEST handleNodeFault " + sb.toString() +
                     " with globalMultiPartCommitPoint " + globalMultiPartCommitPoint + " and globalInitiationPoint "
                     + globalInitiationPoint);
+        } else {
+            m_recoveryLog.info("Handling node faults " + sb.toString() +
+                    " with globalMultiPartCommitPoint " + globalMultiPartCommitPoint + " and globalInitiationPoint "
+                    + globalInitiationPoint);
         }
+        lastKnownGloballyCommitedMultiPartTxnId = globalMultiPartCommitPoint;
 
         // Fix safe transaction scoreboard in transaction queue
         HashSet<Integer> failedSites = new HashSet<Integer>();
