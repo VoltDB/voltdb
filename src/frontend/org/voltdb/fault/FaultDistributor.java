@@ -179,8 +179,13 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
      * the fault from the set of outstanding faults for that handler.
      */
     private void processHandledFaults() {
-        while (!m_handledFaults.isEmpty()) {
-            HandledFault hf = m_handledFaults.poll();
+        ArrayDeque<HandledFault> handledFaults;
+        synchronized (this) {
+            handledFaults = new ArrayDeque<HandledFault>(m_handledFaults);
+            m_handledFaults.clear();
+        }
+        while (!handledFaults.isEmpty()) {
+            HandledFault hf = handledFaults.poll();
             if (!m_faultHandlersData.containsKey(hf.m_handler)) {
                 hostLog.fatal("A handled fault was reported for a handler that is not registered");
                 VoltDB.crashVoltDB();
@@ -198,12 +203,17 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
      * to any interested fault handlers.
      */
     private void processPendingFaults() {
-        if (m_pendingFaults.isEmpty()) {
+        ArrayDeque<VoltFault> pendingFaults;
+        synchronized (this) {
+            pendingFaults = new ArrayDeque<VoltFault>(m_pendingFaults);
+            m_pendingFaults.clear();
+        }
+        if (pendingFaults.isEmpty()) {
             return;
         }
         HashMap<FaultType, HashSet<VoltFault>> faultsMap  = new HashMap<FaultType, HashSet<VoltFault>>();
-        while (!m_pendingFaults.isEmpty()) {
-            VoltFault fault = m_pendingFaults.poll();
+        while (!pendingFaults.isEmpty()) {
+            VoltFault fault = pendingFaults.poll();
             if (duplicateCheck(fault)) {
                 continue;
             }
@@ -248,14 +258,16 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
     public void run() {
         try {
             while (true) {
+                processHandledFaults();
+                processPendingFaults();
+                processHandledFaults();
                 synchronized (this) {
-                    processHandledFaults();
-                    processPendingFaults();
-                    processHandledFaults();
-                    try {
-                        this.wait();
-                    } catch (InterruptedException e) {
-                        return;
+                    if (m_pendingFaults.isEmpty() && m_handledFaults.isEmpty()) {
+                        try {
+                            this.wait();
+                        } catch (InterruptedException e) {
+                            return;
+                        }
                     }
                 }
             }
