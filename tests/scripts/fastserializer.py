@@ -863,7 +863,7 @@ class VoltException:
                 for i in xrange(0, self.buffer_size):
                     self.buffer.append(fser.readByte())
                 print "Exception was a Volt Constraint Failure Exception" \
-                    " of type %d on table ID %d" % (self.constraint_type,
+                    " of type %d on table ID %s" % (self.constraint_type,
                                                     self.table_name)
         else:
             for i in xrange(0, self.length - 3 - 2 - self.message_len):
