@@ -485,7 +485,7 @@ JAR BUILDING
         <fileset dir="${build.prod.dir}" defaultexcludes="yes" >
             <include name="org/voltdb/**" />
             <include name="org/hsqldb_voltpatches/**" />
-            <include name="org/json/**" />
+            <include name="org/json_voltpatches/**" />
         </fileset>
         <fileset dir="${build.test.dir}" defaultexcludes="no" >
             <include name="org/voltdb/**" />
