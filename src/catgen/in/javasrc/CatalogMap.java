@@ -122,7 +122,6 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
 
             // update versioning if needed
             updateVersioning();
-            m_catalog.m_changesMadePerUpdateCount++;
 
             // assign a relative index to every child item
             int index = 1;
@@ -149,7 +148,6 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
 
             // update versioning if needed
             updateVersioning();
-            m_catalog.m_changesMadePerUpdateCount++;
 
             // assign a relative index to every child item
             int index = 1;

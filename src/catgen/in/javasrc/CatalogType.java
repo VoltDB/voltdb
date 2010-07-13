@@ -236,7 +236,6 @@ public abstract class CatalogType implements Comparable<CatalogType> {
     }
 
     void updateVersioning() {
-        m_catalog.m_changesMadePerUpdateCount++;
         if (m_nodeVersion != m_catalog.m_currentCatalogVersion) {
             m_nodeVersion = m_catalog.m_currentCatalogVersion;
             updateSubTreeVersion();

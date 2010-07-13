@@ -90,10 +90,6 @@ public class CatalogContext {
         catalogVersion = version;
     }
 
-    public CatalogContext deepCopy() {
-        return new CatalogContext(catalog.deepCopy(), m_path, catalogVersion + 1);
-    }
-
     public CatalogContext update(String pathToNewJar, String diffCommands) {
         Catalog newCatalog = catalog.deepCopy();
         newCatalog.execute(diffCommands);
