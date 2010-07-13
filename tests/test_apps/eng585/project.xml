@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<project>
+  <database name='database'>
+    <schemas>
+      <schema path='ddl.sql' />
+    </schemas>
+    <procedures>
+      <procedure class='com.eng585.InsertT' />
+      <procedure class='com.eng585.InsertS' />
+      <procedure class='test' partitioninfo='t.t_pk1:0'><sql>select max(s.int2) max_s_int2 from s, t where s.s_pk = t.s_pk and t.t_pk1 = ?</sql></procedure>
+    </procedures>
+    <partitions>
+      <partition table='T' column='T_PK1' />
+    </partitions>
+  </database>
+</project>
