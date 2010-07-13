@@ -311,12 +311,17 @@ DISTRIBUTION
 
     <!-- save the symbols from the shared library -->
     <exec dir='${dist.dir}/voltdb' executable='/bin/sh'>
-        <arg line="-c '/usr/bin/nm  -n --demangle libvoltdb* > ${build.dir}/voltdb-${dist.version}.sym'"/>
+        <arg line="-c '/usr/bin/objcopy --only-keep-debug libvoltdb-${dist.version}.so ${build.dir}/voltdb-${dist.version}.sym'" />
     </exec>
 
     <!-- strip the voltbin shared library (~40x size reduction) -->
     <exec dir='${dist.dir}/voltdb' executable='/bin/sh'>
-        <arg line="-c '/usr/bin/strip -x libvoltdb*'"/>
+        <arg line="-c '/usr/bin/strip --strip-debug --strip-unneeded libvoltdb*'"/>
+    </exec>
+
+    <!-- embed the path to the symbol file into the ELF binary -->
+    <exec dir='${dist.dir}/voltdb' executable='/bin/sh'>
+        <arg line="-c '/usr/bin/objcopy --add-gnu-debuglink=voltdb-${dist.version}.sym libvoltdb-${dist.version}.so'" />
     </exec>
 
     <!-- populate top level README by copying and renaming user_guide -->
