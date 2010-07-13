@@ -632,7 +632,7 @@ public class TestExecutionSite extends TestCase {
 
     public void testFuzzedTransactions() throws Exception
     {
-        for (int ii = 0; ii < 10; ii++) {
+        for (int ii = 0; ii < 1; ii++) {
             tearDown();
             System.gc();
             setUp();
