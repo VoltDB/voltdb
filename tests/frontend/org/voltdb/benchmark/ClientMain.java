@@ -30,7 +30,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.lang.reflect.Constructor;
-import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -137,8 +136,10 @@ public abstract class ClientMain {
 
     /** The states important to the remote controller */
     public static enum ControlState {
-        PREPARING("PREPARING"), READY("READY"), RUNNING("RUNNING"), ERROR(
-            "ERROR");
+        PREPARING("PREPARING"),
+        READY("READY"),
+        RUNNING("RUNNING"),
+        ERROR("ERROR");
 
         ControlState(final String displayname) {
             display = displayname;
@@ -266,7 +267,8 @@ public abstract class ClientMain {
                     runLoop();
                 }
                 catch (final IOException e) {
-
+                }
+                catch (final InterruptedException e) {
                 }
             }
             else {
@@ -343,8 +345,9 @@ public abstract class ClientMain {
     /**
      * Implemented by derived classes. Loops indefinitely invoking stored
      * procedures. Method never returns and never receives any updates.
+     * @throws InterruptedException
      */
-    abstract protected void runLoop() throws IOException;
+    abstract protected void runLoop() throws IOException, InterruptedException;
 
     protected boolean useHeavyweightClient() {
         return false;
@@ -619,9 +622,7 @@ public abstract class ClientMain {
 
     /**
      * Performs constraint checking on the result set in clientResponse. It does
-     * simple sanity checks like if the response code is SUCCESS. If the check
-     * transaction flag is set to true by calling setCheckTransaction(), then it
-     * will check the result set against constraints.
+     * simple sanity checks like if the response code is SUCCESS.
      *
      * @param procName
      *            The name of the procedure
