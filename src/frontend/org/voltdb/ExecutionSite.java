@@ -98,7 +98,7 @@ public class ExecutionSite
 implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProcedureConnection
 {
     private Logger m_txnlog;
-    private Logger m_recoveryLog = Logger.getLogger("RECOVERY", VoltLoggerFactory.instance());
+    private final Logger m_recoveryLog = Logger.getLogger("RECOVERY", VoltLoggerFactory.instance());
     private static final Logger log = Logger.getLogger(ExecutionSite.class.getName(), VoltLoggerFactory.instance());
     private static final Logger hostLog = Logger.getLogger("HOST", VoltLoggerFactory.instance());
     private static AtomicInteger siteIndexCounter = new AtomicInteger(0);
@@ -962,17 +962,17 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
      * The list of failed hosts we know about. Included with all failure messages
      * to identify what the information was used to generate commit points
      */
-    private HashSet<Integer> m_knownFailedHosts = new HashSet<Integer>();
+    private final HashSet<Integer> m_knownFailedHosts = new HashSet<Integer>();
 
     /**
      * Failed hosts for which agreement has been reached.
      */
-    private HashSet<Integer> m_handledFailedHosts = new HashSet<Integer>();
+    private final HashSet<Integer> m_handledFailedHosts = new HashSet<Integer>();
 
     /**
      * Store values from older failed nodes. They are repeated with every failure message
      */
-    private HashMap<Integer, HashMap<Integer, Long>> m_newestSafeTransactionForInitiatorLedger =
+    private final HashMap<Integer, HashMap<Integer, Long>> m_newestSafeTransactionForInitiatorLedger =
         new HashMap<Integer, HashMap<Integer, Long>>();
 
     /**
@@ -1152,7 +1152,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
      * in different orders. UpdateCatalog changes MUST be commutative with
      * handleNodeFault.
      *
-     * @param HashSet<hostId> Host Ids of failed nodes
+     * @param hostIds Hashset<Integer> of host ids of failed nodes
      * @param globalCommitPoint the surviving cluster's greatest committed multi-partition transaction id
      * @param globalInitiationPoint the greatest transaction id acknowledged as globally
      * 2PC to any surviving cluster execution site by the failed initiator.
@@ -1604,43 +1604,47 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     {
         final InitiateTaskMessage itask = (InitiateTaskMessage)task;
         final VoltProcedure wrapper = procs.get(itask.getStoredProcedureName());
-        if (wrapper == null) {
-            System.err.printf("Missing procedure \"%s\" at execution site. %d\n", itask.getStoredProcedureName(), m_siteId);
-            VoltDB.crashVoltDB();
-        }
 
         final InitiateResponseMessage response = new InitiateResponseMessage(itask);
 
-        try {
-            if (wrapper instanceof VoltSystemProcedure) {
-                Object[] callerParams = itask.getParameters();
-                Object[] combinedParams = new Object[callerParams.length + 1];
-                combinedParams[0] = m_systemProcedureContext;
-                for (int i=0; i < callerParams.length; ++i) combinedParams[i+1] = callerParams[i];
-                final ClientResponseImpl cr = wrapper.call(txnState, combinedParams);
-                response.setResults(cr, itask);
-            }
-            else {
-                final ClientResponseImpl cr = wrapper.call(txnState, itask.getParameters());
-                response.setResults(cr, itask);
-            }
-        }
-        catch (final ExpectedProcedureException e) {
-            log.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_ExpectedProcedureException.name(), e);
+        // feasible to receive a transaction initiated with an earlier catalog.
+        if (wrapper == null) {
             response.setResults(
-                    new ClientResponseImpl(
-                            ClientResponse.GRACEFUL_FAILURE,
-                            new VoltTable[]{},
-                            e.toString()));
+                new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
+                                       new VoltTable[] {},
+                                       "Procedure does not exist: " + itask.getStoredProcedureName()));
         }
-        catch (final Exception e) {
-            // Should not be able to reach here. VoltProcedure.call caught all invocation target exceptions
-            // and converted them to error responses. Java errors are re-thrown, and not caught by this
-            // exception clause. A truly unexpected exception reached this point. Crash. It's a defect.
-            hostLog.l7dlog( Level.ERROR, LogKeys.host_ExecutionSite_UnexpectedProcedureException.name(), e);
-            VoltDB.crashVoltDB();
+        else {
+            try {
+                if (wrapper instanceof VoltSystemProcedure) {
+                    Object[] callerParams = itask.getParameters();
+                    Object[] combinedParams = new Object[callerParams.length + 1];
+                    combinedParams[0] = m_systemProcedureContext;
+                    for (int i=0; i < callerParams.length; ++i) combinedParams[i+1] = callerParams[i];
+                    final ClientResponseImpl cr = wrapper.call(txnState, combinedParams);
+                    response.setResults(cr, itask);
+                }
+                else {
+                    final ClientResponseImpl cr = wrapper.call(txnState, itask.getParameters());
+                    response.setResults(cr, itask);
+                }
+            }
+            catch (final ExpectedProcedureException e) {
+                log.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_ExpectedProcedureException.name(), e);
+                response.setResults(
+                                    new ClientResponseImpl(
+                                                           ClientResponse.GRACEFUL_FAILURE,
+                                                           new VoltTable[]{},
+                                                           e.toString()));
+            }
+            catch (final Exception e) {
+                // Should not be able to reach here. VoltProcedure.call caught all invocation target exceptions
+                // and converted them to error responses. Java errors are re-thrown, and not caught by this
+                // exception clause. A truly unexpected exception reached this point. Crash. It's a defect.
+                hostLog.l7dlog( Level.ERROR, LogKeys.host_ExecutionSite_UnexpectedProcedureException.name(), e);
+                VoltDB.crashVoltDB();
+            }
         }
-
         log.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
         return response;
     }
