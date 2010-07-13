@@ -201,7 +201,6 @@ public class BenchmarkController {
                     new Object[] { m_builderClass.getSimpleName() }, e);
             System.exit(-1);
         }
-        m_projectBuilder.addAllDefaults();
 
         if (config.snapshotFrequency != null
                 && config.snapshotPath != null

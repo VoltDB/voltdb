@@ -314,8 +314,10 @@ public class VoltCompiler {
 
         // do all the work to get the catalog
         final Catalog catalog = compileCatalog(projectFileURL, clusterConfig);
-        if (catalog == null)
+        if (catalog == null) {
+            compilerLog.error("Catalog compilation failed.");
             return false;
+        }
 
         // WRITE CATALOG TO JAR HERE
         final String catalogCommands = catalog.serialize();
@@ -354,6 +356,7 @@ public class VoltCompiler {
         if (!clusterConfig.validate())
         {
             addErr(clusterConfig.getErrorMsg());
+            compilerLog.error("Cluster configuration error: " + clusterConfig.getErrorMsg());
             return null;
         }
 
@@ -384,16 +387,21 @@ public class VoltCompiler {
             // Convert some linked exceptions to more friendly errors.
             if (e.getLinkedException() instanceof java.io.FileNotFoundException) {
                 addErr(e.getLinkedException().getMessage());
+                compilerLog.error(e.getLinkedException().getMessage());
                 return null;
             }
             if (e.getLinkedException() instanceof org.xml.sax.SAXParseException) {
                 addErr("Error schema validating project.xml file. " + e.getLinkedException().getMessage());
+                compilerLog.error("Error schema validating project.xml file: " + e.getLinkedException().getMessage());
+                compilerLog.error(e.getMessage());
+                compilerLog.error(projectFileURL);
                 return null;
             }
             throw new RuntimeException(e);
         }
         catch (SAXException e) {
             addErr("Error schema validating project.xml file. " + e.getMessage());
+            compilerLog.error("Error schema validating project.xml file. " + e.getMessage());
             return null;
         }
 
@@ -402,7 +410,7 @@ public class VoltCompiler {
         } catch (final VoltCompilerException e) {
             compilerLog.l7dlog( Level.ERROR, LogKeys.compiler_VoltCompiler_FailedToCompileXML.name(), null);
             compilerLog.error(e.getMessage());
-            //e.printStackTrace();
+            // e.printStackTrace();
             return null;
         }
         assert(m_catalog != null);
@@ -414,6 +422,7 @@ public class VoltCompiler {
         catch (RuntimeException e)
         {
             addErr(e.getMessage());
+            compilerLog.error(e.getMessage());
             return null;
         }
 
