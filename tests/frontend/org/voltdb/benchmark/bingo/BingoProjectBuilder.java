@@ -31,8 +31,22 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import java.net.URL;
 
 public class BingoProjectBuilder extends VoltProjectBuilder {
+
+    private static final String m_jarFileName = "bingo.jar";
     private static final URL ddlURL =
         BingoClient.class.getResource("bingo-ddl.sql");
+
+    @Override
+    public String[] compileAllCatalogs(
+            int sitesPerHost, int length, int kFactor, String leader)
+    {
+        addAllDefaults();
+        boolean compile = compile(m_jarFileName, sitesPerHost, length, kFactor, leader);
+        if (!compile) {
+            throw new RuntimeException("Bingo project builder failed app compilation.");
+        }
+        return new String[] {m_jarFileName};
+    }
 
     @Override
     public void addAllDefaults() {

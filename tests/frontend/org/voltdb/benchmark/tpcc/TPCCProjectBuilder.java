@@ -81,6 +81,8 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
 
     public static final URL ddlURL = TPCCProjectBuilder.class.getResource("tpcc-ddl.sql");
     public static final String jarFilename = "tpcc.jar";
+    private static final String m_jarFileName = "tpcc.jar";
+
 
     /**
      * Add the TPC-C procedures to the VoltProjectBuilder base class.
@@ -131,6 +133,18 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
         // addELTTable("ORDERS", false);      // 1 insert per new order (45%)
         // addELTTable("NEW_ORDER", false);   // 1 insert per new order; 10 deletes per delivery (4%)
         addELTTable("ORDER_LINE", false);     // 10 inserts per new order
+    }
+
+    @Override
+    public String[] compileAllCatalogs(
+            int sitesPerHost, int length, int kFactor, String leader)
+    {
+        addAllDefaults();
+        boolean compile = compile(m_jarFileName, sitesPerHost, length, kFactor, leader);
+        if (!compile) {
+            throw new RuntimeException("Bingo project builder failed app compilation.");
+        }
+        return new String[] {m_jarFileName};
     }
 
     @Override

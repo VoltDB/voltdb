@@ -619,7 +619,7 @@ implements TPCCSimulation.ProcCaller {
             m_counts[TPCCSimulation.Transaction.NEW_ORDER.ordinal()].incrementAndGet();
         }
 
-        private boolean cbRollback;
+        private final boolean cbRollback;
     }
 
     int randomIndex = 0;
@@ -907,10 +907,6 @@ implements TPCCSimulation.ProcCaller {
      */
     public static final Class<? extends ClientMain> m_loaderClass =
         org.voltdb.benchmark.tpcc.MultiLoader.class;
-    /**
-     * Retrieved via reflection by BenchmarkController
-     */
-    public static final String m_jarFileName = "tpcc.jar";
 
     @Override
     protected String getApplicationName() {

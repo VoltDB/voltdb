@@ -49,6 +49,7 @@ import javax.xml.transform.stream.StreamResult;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.ProcInfoData;
+import org.voltdb.utils.NotImplementedException;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Text;
@@ -196,6 +197,24 @@ public class VoltProjectBuilder {
     private String m_snapshotFrequency = null;
 
 
+    /**
+     * Produce all catalogs this project builder knows how to produce.
+     * Written to allow BenchmarkController to cause compilation of multiple
+     * catalogs for benchmarks that need to update running appplications and
+     * consequently need multiple benchmark controlled catalog jars.
+     * @param sitesPerHost
+     * @param length
+     * @param kFactor
+     * @param string
+     * @return a list of jar filenames that were compiled. The benchmark will
+     * be started using the filename at index 0.
+     */
+    public String[] compileAllCatalogs(
+            int sitesPerHost, int length,
+            int kFactor, String string)
+    {
+        throw new NotImplementedException("This project builder does not support compileAllCatalogs");
+    }
 
 
     public void addAllDefaults() {

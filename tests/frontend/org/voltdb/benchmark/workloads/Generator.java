@@ -31,19 +31,13 @@ import org.voltdb.benchmark.*;
 
 import java.io.*;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicLong;
 import java.lang.reflect.*;
 
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.net.URLDecoder;
-import java.net.UnknownHostException;
 import java.net.ConnectException;
 
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -83,8 +77,6 @@ public class Generator extends ClientMain
     //Retrieved via reflection by BenchmarkController
     //public static final Class<? extends ClientMain> m_loaderClass = anyLoader.class;
     public static final Class<? extends ClientMain> m_loaderClass = null;
-
-    public static final String m_jarFileName = "catalog.jar";
 
     private Microbenchmark mb;
     private LinkedList<Workload> workloads;

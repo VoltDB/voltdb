@@ -76,7 +76,7 @@ public class BlobTortureClient extends ClientMain {
     }
 
     private long m_partitionCount;
-    private java.util.Random m_random = new java.util.Random();
+    private final java.util.Random m_random = new java.util.Random();
 
 
     @Override
@@ -154,10 +154,6 @@ public class BlobTortureClient extends ClientMain {
      * Retrieved via reflection by BenchmarkController
      */
     public static final Class<? extends ClientMain> m_loaderClass = null;
-    /**
-     * Retrieved via reflection by BenchmarkController
-     */
-    public static final String m_jarFileName = "blobtorture.jar";
 
     @Override
     protected String getApplicationName() {

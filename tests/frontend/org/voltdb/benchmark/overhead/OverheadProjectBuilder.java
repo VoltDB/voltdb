@@ -34,6 +34,21 @@ public class OverheadProjectBuilder extends VoltProjectBuilder {
     private static final URL ddlURL =
         OverheadProjectBuilder.class.getResource("measureoverhead-ddl.sql");
 
+    private static final String m_jarFileName = "measureoverhead.jar";
+
+    @Override
+    public String[] compileAllCatalogs(
+            int sitesPerHost, int length, int kFactor, String leader)
+    {
+        addAllDefaults();
+        boolean compile = compile(m_jarFileName, sitesPerHost, length, kFactor, leader);
+        if (!compile) {
+            throw new RuntimeException("Bingo project builder failed app compilation.");
+        }
+        return new String[] {m_jarFileName};
+    }
+
+
     @Override
     public void addAllDefaults() {
         addProcedures(measureOverhead.class, measureOverhead42Longs.class,

@@ -59,10 +59,7 @@ public class BingoClient extends ClientMain {
      * Retrieved via reflection by BenchmarkController
      */
     public static final Class<? extends ClientMain> m_loaderClass = null;
-    /**
-     * Retrieved via reflection by BenchmarkController
-     */
-    public static final String m_jarFileName = "bingo.jar";
+
 
     private static int maxTournaments = 10000;
     private static int maxRounds = 100;

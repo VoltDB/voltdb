@@ -77,8 +77,11 @@ public class BenchmarkController {
     Class<? extends VoltProjectBuilder> m_builderClass = null;
     Class<? extends ClientMain> m_loaderClass = null;
 
+    // project builder discovered by reflection from client and instantiated.
     VoltProjectBuilder m_projectBuilder;
-    String m_jarFileName = null;
+    // the application jar to start the benchmark with - benchmark clients
+    // may change the jar during execution using @UpdateApplicatCatalog.
+    String m_jarFileName;
     ServerThread m_localserver = null;
     private ClusterMonitor m_clusterMonitor;
     @SuppressWarnings("unused")
@@ -178,13 +181,8 @@ public class BenchmarkController {
             //Hackish, client expected to have these field as a static member
             Field builderClassField = m_clientClass.getField("m_projectBuilderClass");
             Field loaderClassField = m_clientClass.getField("m_loaderClass");
-            Field jarFileNameField = m_clientClass.getField("m_jarFileName");
             m_builderClass = (Class<? extends VoltProjectBuilder>)builderClassField.get(null);
             m_loaderClass = (Class<? extends ClientMain>)loaderClassField.get(null);
-            m_jarFileName = (String)jarFileNameField.get(null);
-            if (m_config.localmode == false) {
-                m_jarFileName = config.hosts[0] + "." + m_jarFileName;
-            }
         } catch (Exception e) {
             LogKeys logkey = LogKeys.benchmark_BenchmarkController_ErrorDuringReflectionForClient;
             benchmarkLog.l7dlog( Level.FATAL, logkey.name(),
@@ -225,39 +223,44 @@ public class BenchmarkController {
 
     public void setupBenchmark() {
         // actually compile and write the catalog to disk
-        m_projectBuilder.compile(
-                m_jarFileName,
+        // the benchmark can produce multiple catalogs.
+        // the system will start with the catalog at index 0,
+        // the first catalog in the returned list of filenames.
+        String[] jarFileNames = m_projectBuilder.compileAllCatalogs(
                 m_config.sitesPerHost,
                 m_config.hosts.length,
                 m_config.k_factor,
                 m_config.hosts[0]);
+        m_jarFileName = jarFileNames[0];
 
         // copy the catalog to the servers, but don't bother in local mode
         boolean status;
         if (m_config.localmode == false) {
-            for (String host : m_config.hosts) {
-                status = SSHTools.copyFromLocal(
-                        new File(m_jarFileName),
-                        m_config.remoteUser,
-                        host,
-                        m_config.remotePath);
-                assert(status) :
-                    "SSH copyFromLocal failed to copy "
-                    + m_jarFileName + " to "
-                    + m_config.remoteUser + "@" + host + ":" + m_config.remotePath;
+            for (String fileName : jarFileNames) {
+                for (String host : m_config.hosts) {
+                    status = SSHTools.copyFromLocal(
+                                                    new File(fileName),
+                                                    m_config.remoteUser,
+                                                    host,
+                                                    m_config.remotePath);
+                    if(!status)
+                        System.out.println(
+                        "SSH copyFromLocal failed to copy "
+                        + fileName + " to "
+                        + m_config.remoteUser + "@" + host + ":" + m_config.remotePath);
+                }
+                for (String client : m_config.clients) {
+                    status = SSHTools.copyFromLocal(
+                                                    new File(fileName),
+                                                    m_config.remoteUser,
+                                                    client,
+                                                    m_config.remotePath);
+                    if(!status)
+                        System.out.println("SSH copyFromLocal failed to copy "
+                        + fileName + " to "
+                        + m_config.remoteUser + "@" + client + ":" + m_config.remotePath);
+                }
             }
-            for (String client : m_config.clients) {
-                status = SSHTools.copyFromLocal(
-                        new File(m_jarFileName),
-                        m_config.remoteUser,
-                        client,
-                        m_config.remotePath);
-                assert(status) :
-                    "SSH copyFromLocal failed to copy "
-                    + m_jarFileName + " to "
-                    + m_config.remoteUser + "@" + client + ":" + m_config.remotePath;
-            }
-
 
             // KILL ALL JAVA ORG.VOLTDB PROCESSES NOW
             Set<Thread> threads = new HashSet<Thread>();
@@ -323,7 +326,7 @@ public class BenchmarkController {
                         "-Xmn" + String.valueOf((m_config.serverHeapSize / 4) * 3) + "m",
                         "-Xmx" + String.valueOf(m_config.serverHeapSize) + "m",
                         "-server",
-                        "-cp", "\"voltdbfat.jar:vertica_4.0_jdk_5.jar:" + m_jarFileName + "\"",
+                        "-cp", "\"voltdbfat.jar:vertica_4.0_jdk_5.jar\"",
                         "org.voltdb.VoltDB",
                         "catalog",
                         m_jarFileName,
@@ -399,7 +402,7 @@ public class BenchmarkController {
 
             loaderCommand.append("java -XX:-ReduceInitialCardMarks -XX:+HeapDumpOnOutOfMemoryError " +
                     "-XX:HeapDumpPath=/tmp -Xmx" + loaderheap + "m " + debugString);
-            String classpath = "voltdbfat.jar" + ":" + m_jarFileName;
+            String classpath = "voltdbfat.jar";
             if (System.getProperty("java.class.path") != null) {
                 classpath = classpath + ":" + System.getProperty("java.class.path");
             }
@@ -466,7 +469,7 @@ public class BenchmarkController {
          */
         clArgs.add("-Djava.library.path=.");
 
-        String classpath = "voltdbfat.jar" + ":" + m_jarFileName;
+        String classpath = "voltdbfat.jar";
         if (System.getProperty("java.class.path") != null) {
             classpath = classpath + ":" + System.getProperty("java.class.path");
         }

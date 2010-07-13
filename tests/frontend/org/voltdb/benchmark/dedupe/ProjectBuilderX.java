@@ -45,11 +45,25 @@ public class ProjectBuilderX extends VoltProjectBuilder {
     };
 
     public static final URL m_ddlURL = ProjectBuilderX.class.getResource("ddl.sql");
+    private static final String m_jarFileName = "dedupe.jar";
+
 
     public static String m_partitioning[][] = new String[][] {
         {"archived", "column1"},
         {"unarchived", "column1"},
     };
+
+    @Override
+    public String[] compileAllCatalogs(
+            int sitesPerHost, int length, int kFactor, String leader)
+    {
+        addAllDefaults();
+        boolean compile = compile(m_jarFileName, sitesPerHost, length, kFactor, leader);
+        if (!compile) {
+            throw new RuntimeException("Bingo project builder failed app compilation.");
+        }
+        return new String[] {m_jarFileName};
+    }
 
     @Override
     public void addAllDefaults() {

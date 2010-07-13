@@ -190,10 +190,6 @@ public class OverheadClient extends ClientMain {
      * Retrieved via reflection by BenchmarkController
      */
     public static final Class<? extends ClientMain> m_loaderClass = null;
-    /**
-     * Retrieved via reflection by BenchmarkController
-     */
-    public static final String m_jarFileName = "measureoverhead.jar";
 
     @Override
     protected String getApplicationName() {

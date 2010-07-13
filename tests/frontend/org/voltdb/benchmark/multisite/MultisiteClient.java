@@ -25,7 +25,6 @@ package org.voltdb.benchmark.multisite;
 
 import java.io.IOException;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.VoltTable;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -105,9 +104,6 @@ public class MultisiteClient extends ClientMain {
     public static final Class<? extends ClientMain>
         m_loaderClass = org.voltdb.benchmark.multisite.Loader.class;
 
-    /** Retrieved via reflection by BenchmarkController */
-    public static final String m_jarFileName = "multisite.jar";
-
 
     /*
      * Application logic.
@@ -117,7 +113,7 @@ public class MultisiteClient extends ClientMain {
     private int m_scalefactor = 1;
 
     // used only for the random number helpers in this context
-    private Loader m_loader = new Loader(new String[] {});
+    private final Loader m_loader = new Loader(new String[] {});
 
     private boolean executeTransaction() throws IOException {
         int val = m_loader.number(1,100);

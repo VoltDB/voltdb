@@ -53,11 +53,24 @@ public class ProjectBuilderX extends VoltProjectBuilder
     };
 
     public static final URL m_ddlURL = ProjectBuilderX.class.getResource("MicroBenchmark-ddl.sql");
+    private static final String m_jarFileName = "catalog.jar";
 
     public static String m_partitioning[][] = new String[][]
     {
         {"ALL_TYPES", "SHORT_ITEM"}
     };
+
+    @Override
+    public String[] compileAllCatalogs(
+            int sitesPerHost, int length, int kFactor, String leader)
+    {
+        addAllDefaults();
+        boolean compile = compile(m_jarFileName, sitesPerHost, length, kFactor, leader);
+        if (!compile) {
+            throw new RuntimeException("Bingo project builder failed app compilation.");
+        }
+        return new String[] {m_jarFileName};
+    }
 
     @Override
     public void addAllDefaults()
