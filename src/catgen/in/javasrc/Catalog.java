@@ -30,7 +30,7 @@ import java.util.HashMap;
  */
 public class Catalog extends CatalogType {
 
-    private HashMap<String, CatalogType> m_pathCache = new HashMap<String, CatalogType>();
+    private final HashMap<String, CatalogType> m_pathCache = new HashMap<String, CatalogType>();
 
     CatalogMap<Cluster> m_clusters;
 
@@ -164,8 +164,14 @@ public class Catalog extends CatalogType {
 
     public Catalog deepCopy() {
         Catalog copy = new Catalog();
-        copy.m_clusters.copyFrom(m_clusters);
+        // Note that CatalogType.deepCopy isn't called on the catalog node.
+        // need to fully compensate for that here.
+        copy.m_currentCatalogVersion = m_currentCatalogVersion;
+        copy.m_nodeVersion = m_nodeVersion;
+        copy.m_subTreeVersion = m_subTreeVersion;
         copy.m_relativeIndex = 1;
+        copy.m_clusters.copyFrom(m_clusters);
+
 
         return copy;
     }
