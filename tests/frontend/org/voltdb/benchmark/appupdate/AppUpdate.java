@@ -130,6 +130,7 @@ public class AppUpdate extends ClientMain
         @Override
         public void clientCallback(ClientResponse clientResponse) {
             if (clientResponse.getStatus() == ClientResponse.CONNECTION_LOST) {
+                System.err.println("Connection lost to server.");
                 return;
             }
             if (!checkTransaction(t.name, clientResponse, false, false)) {
@@ -137,9 +138,9 @@ public class AppUpdate extends ClientMain
                     clientResponse.getException().printStackTrace();
                 }
                 if (clientResponse.getStatusString() != null) {
+                    // floods with "procedure not found" errors.
                     System.err.println(clientResponse.getStatusString());
                 }
-                System.exit(-1);
             }
             m_counts[t.ordinal()].incrementAndGet();
         }

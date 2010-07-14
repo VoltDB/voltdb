@@ -292,8 +292,11 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
 
             // get the current catalog
             CatalogContext context = VoltDB.instance().getCatalogContext();
-            // store the version of the catalog the diffs were created against
-            retval.expectedCatalogVersion = context.catalog.getSubTreeVersion();
+
+            // store the version of the catalog the diffs were created against.
+            // verified when / if the update procedure runs in order to verify
+            // catalogs only move forward
+            retval.expectedCatalogVersion = context.catalog.getCatalogVersion();
 
             // compute the diff in StringBuilder
             CatalogDiffEngine diff = new CatalogDiffEngine(context.catalog, newCatalog);

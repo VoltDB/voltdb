@@ -23,6 +23,8 @@
 
 package org.voltdb.catalog;
 
+import org.voltdb.CatalogContext;
+
 import junit.framework.TestCase;
 
 public class TestCatalogVersioning extends TestCase {
@@ -91,4 +93,44 @@ public class TestCatalogVersioning extends TestCase {
         assertTrue(procSTVersion > database.getNodeVersion());
         assertEquals(catalogVersion, procsVersion);
     }
+
+
+    // verify that a deepCopy preserves version data
+    public void testDeepCopyVersioning() {
+        Catalog catalog = new Catalog();
+        catalog.execute(LoadCatalogToString.THE_CATALOG);
+        Catalog copy = catalog.deepCopy();
+
+        assertTrue(catalog != copy);
+        assertTrue(catalog.m_currentCatalogVersion == copy.m_currentCatalogVersion);
+        assertTrue(catalog.getSubTreeVersion() == copy.getSubTreeVersion());
+    }
+
+    // a real catalog update happens on a deep copy.
+    // make sure that preserves version numbers (ENG-634)
+    public void testUpdateViaContextAPI() {
+        Catalog catalog = new Catalog();
+        catalog.execute(LoadCatalogToString.THE_CATALOG);
+
+        String addTableFoo = "add /clusters[cluster]/databases[database] tables FOO";
+        String addTableBar = "add /clusters[cluster]/databases[database] tables BAR";
+
+        CatalogContext context = new CatalogContext(catalog, CatalogContext.NO_PATH, 0);
+
+        CatalogContext foocontext = context.update(CatalogContext.NO_PATH, addTableFoo);
+        assertTrue(context != foocontext);
+        assertTrue(context.catalogVersion < foocontext.catalogVersion);
+        assertTrue(context.catalog.m_currentCatalogVersion < foocontext.catalog.m_currentCatalogVersion);
+
+        // (rtb) I think it's a defect that this requires <=. Should be strictly <.
+        assertTrue(context.catalog.getSubTreeVersion() <= foocontext.catalog.getSubTreeVersion());
+
+        // and advance it all one more time to show a copy of copy is a woodchuck
+        CatalogContext barcontext = foocontext.update(CatalogContext.NO_PATH, addTableBar);
+        assertTrue(foocontext != barcontext);
+        assertTrue(foocontext.catalogVersion < barcontext.catalogVersion);
+        assertTrue(foocontext.catalog.m_currentCatalogVersion < barcontext.catalog.m_currentCatalogVersion);
+        assertTrue(foocontext.catalog.getSubTreeVersion() <= barcontext.catalog.getSubTreeVersion());
+    }
+
 }

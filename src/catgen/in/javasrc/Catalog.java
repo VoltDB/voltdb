@@ -47,6 +47,10 @@ public class Catalog extends CatalogType {
         m_relativeIndex = 1;
     }
 
+    public int getCatalogVersion() {
+        return m_currentCatalogVersion;
+    }
+
     /**
      * Run one or more single-line catalog commands separated by newlines.
      * See the docs for more info on catalog statements.

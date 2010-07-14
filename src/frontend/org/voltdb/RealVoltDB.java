@@ -676,11 +676,13 @@ public class RealVoltDB implements VoltDBInterface
             else if (currentTxnId < lastCatalogUpdate_txnId) {
                 throw new RuntimeException("Trying to update main catalog context with an old transaction.");
             }
-            else if (m_catalogContext.catalog.getSubTreeVersion() != expectedCatalogVersion) {
+            else if (m_catalogContext.catalog.getCatalogVersion() != expectedCatalogVersion) {
                 throw new RuntimeException("Trying to update main catalog context with diff " +
-                "commands generated for an out-of date catalog.");
+                "commands generated for an out-of date catalog. Expected catalog version: " +
+                expectedCatalogVersion + " does not match actual version: " + m_catalogContext.catalog.getCatalogVersion());
             }
-            System.out.println("Updating RealVoltDB catalog context from txnid: " + lastCatalogUpdate_txnId + " to " + currentTxnId);
+
+            // 0. update the global context
             lastCatalogUpdate_txnId = currentTxnId;
             m_catalogContext = m_catalogContext.update(newCatalogURL, diffCommands);
 
@@ -688,6 +690,7 @@ public class RealVoltDB implements VoltDBInterface
             ELTManager.instance().updateCatalog(m_catalogContext);
 
             // 2. update client interface (asynchronously)
+            //    CI in turn updates the planner thread.
             for (ClientInterface ci : m_clientInterfaces)
                 ci.notifyOfCatalogUpdate();
         }

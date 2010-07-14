@@ -644,18 +644,7 @@ public abstract class ClientMain {
             if (abortExpected && status == ClientResponse.USER_ABORT)
                 return true;
 
-            if (status == ClientResponse.CONNECTION_LOST) {
-                return false;
-            }
-
-            if (clientResponse.getException() != null) {
-                clientResponse.getException().printStackTrace();
-            }
-            if (clientResponse.getStatusString() != null) {
-                System.err.println(clientResponse.getStatusString());
-            }
-
-            System.exit(-1);
+            return false;
         }
 
         if (m_checkGenerator.nextFloat() >= m_checkTransaction)
