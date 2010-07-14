@@ -548,7 +548,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         {
             public boolean accept(File dir, String file)
             {
-                return file.startsWith(TESTNONCE);
+                return file.startsWith(TESTNONCE) && file.endsWith("vpt");
             }
         };
 
