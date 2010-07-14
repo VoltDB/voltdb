@@ -521,7 +521,7 @@ public abstract class VoltProcedure {
         if ((slot == int.class) && (pclass == Integer.class || pclass == Short.class || pclass == Byte.class)) return param;
         if ((slot == short.class) && (pclass == Short.class || pclass == Byte.class)) return param;
         if ((slot == byte.class) && (pclass == Byte.class)) return param;
-        if ((slot == double.class) && (pclass == Double.class)) return param;
+        if ((slot == double.class) && (param instanceof Number)) return ((Number)param).doubleValue();
         if ((slot == String.class) && (pclass == String.class)) return param;
         if (slot == TimestampType.class) {
             if (pclass == Long.class) return new TimestampType((Long)param);

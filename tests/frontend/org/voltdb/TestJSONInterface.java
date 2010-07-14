@@ -205,13 +205,13 @@ public class TestJSONInterface extends TestCase {
         responseJSON = callProcOverJSON("Insert", pset);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
-        assertEquals(null, response.exception);
+        assertTrue(response.status == ClientResponse.SUCCESS);
 
         // Call insert again (with failure expected)
         responseJSON = callProcOverJSON("Insert", pset);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
-        assertNotNull(response.exception);
+        assertTrue(response.status != ClientResponse.SUCCESS);
 
         // Call proc with complex params
         pset.setParameters(1,
