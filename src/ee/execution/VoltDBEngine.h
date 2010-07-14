@@ -113,6 +113,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /** Constructor for test code: this does not enable JNI callbacks. */
         VoltDBEngine() :
           m_currentUndoQuantum(NULL),
+          m_catalogVersion(0),
           m_staticParams(MAX_PARAM_COUNT),
           m_currentOutputDepId(-1),
           m_currentInputDepId(-1),
