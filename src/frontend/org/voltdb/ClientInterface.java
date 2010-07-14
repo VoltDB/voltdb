@@ -33,8 +33,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
 import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
@@ -47,11 +45,19 @@ import org.voltdb.debugstate.InitiatorContext;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.elt.ELTManager;
+import org.voltdb.logging.Level;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.Messenger;
-import org.voltdb.network.*;
+import org.voltdb.network.Connection;
+import org.voltdb.network.InputHandler;
+import org.voltdb.network.NIOReadStream;
+import org.voltdb.network.QueueMonitor;
+import org.voltdb.network.VoltNetwork;
+import org.voltdb.network.VoltProtocolHandler;
+import org.voltdb.network.WriteStream;
 import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.EstTime;
@@ -66,10 +72,10 @@ import org.voltdb.utils.DBBPool.BBContainer;
  *
  */
 public class ClientInterface implements DumpManager.Dumpable {
-    private static final Logger log = Logger.getLogger(ClientInterface.class.getName(), org.voltdb.utils.VoltLoggerFactory.instance());
-    private static final Logger authLog = Logger.getLogger("AUTH", org.voltdb.utils.VoltLoggerFactory.instance());
-    private static final Logger hostLog = Logger.getLogger("HOST", org.voltdb.utils.VoltLoggerFactory.instance());
-    private static final Logger networkLog = Logger.getLogger("NETWORK", org.voltdb.utils.VoltLoggerFactory.instance());
+    private static final VoltLogger log = new VoltLogger(ClientInterface.class.getName());
+    private static final VoltLogger authLog = new VoltLogger("AUTH");
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger networkLog = new VoltLogger("NETWORK");
     private final ClientAcceptor m_acceptor;
     private final TransactionInitiator m_initiator;
     private final AsyncCompilerWorkThread m_asyncCompilerWorkThread;

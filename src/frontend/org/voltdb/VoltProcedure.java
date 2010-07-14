@@ -34,8 +34,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.ProcParameter;
@@ -46,12 +44,12 @@ import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.VoltLoggerFactory;
 
 /**
  * Wraps the stored procedure object created by the user
@@ -63,7 +61,7 @@ import org.voltdb.utils.VoltLoggerFactory;
  *
  */
 public abstract class VoltProcedure {
-    private static final Logger log = Logger.getLogger(VoltProcedure.class.getName(), VoltLoggerFactory.instance());
+    private static final VoltLogger log = new VoltLogger(VoltProcedure.class.getName());
 
     // Used to get around the "abstract" for StmtProcedures.
     // Path of least resistance?
@@ -348,7 +346,7 @@ public abstract class VoltProcedure {
         // run a regular java class
         if (catProc.getHasjava()) {
             try {
-                if (log.isEnabledFor(Level.TRACE)) {
+                if (log.isTraceEnabled()) {
                     log.trace("invoking... procMethod=" + procMethod.getName() + ", class=" + getClass().getName());
                 }
                 try {

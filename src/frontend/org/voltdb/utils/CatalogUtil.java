@@ -24,8 +24,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeMap;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
@@ -37,6 +35,8 @@ import org.voltdb.catalog.ConstraintRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.Table;
+import org.voltdb.logging.Level;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 
@@ -47,7 +47,7 @@ public abstract class CatalogUtil {
 
     public static final String CATALOG_FILENAME = "catalog.txt";
 
-    public static String loadCatalogFromJar(String pathToCatalog, Logger log) {
+    public static String loadCatalogFromJar(String pathToCatalog, VoltLogger log) {
         assert(pathToCatalog != null);
 
         String serializedCatalog = null;

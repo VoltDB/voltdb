@@ -18,13 +18,17 @@
 package org.voltdb;
 
 import java.io.IOException;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.HashSet;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.log4j.Logger;
 import org.voltdb.jni.ExecutionEngine;
-import org.voltdb.utils.VoltLoggerFactory;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.DBBPool.BBContainer;
 
 /*
@@ -36,7 +40,7 @@ import org.voltdb.utils.DBBPool.BBContainer;
  */
 public class SnapshotSiteProcessor {
 
-    private static final Logger hostLog = Logger.getLogger("HOST", VoltLoggerFactory.instance());
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     /** Global count of execution sites on this node performing snapshot */
     public static final AtomicInteger ExecutionSitesCurrentlySnapshotting = new AtomicInteger(-1);

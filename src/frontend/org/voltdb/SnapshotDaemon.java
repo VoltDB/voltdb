@@ -17,17 +17,16 @@
 
 package org.voltdb;
 
-import org.apache.log4j.Logger;
-import org.voltdb.catalog.SnapshotSchedule;
-import org.voltdb.utils.Pair;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.VoltTable;
 import java.io.File;
-
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.concurrent.TimeUnit;
+
+import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.logging.VoltLogger;
+import org.voltdb.utils.Pair;
 
 /**
  * A scheduler of automated snapshots and manager of archived and retained snapshots.
@@ -35,8 +34,7 @@ import java.util.concurrent.TimeUnit;
  */
 class SnapshotDaemon {
 
-    private static final Logger hostLog =
-        Logger.getLogger("HOST", org.voltdb.utils.VoltLoggerFactory.instance());
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     private final TimeUnit m_frequencyUnit;
     private final long m_frequencyInMillis;

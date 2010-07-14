@@ -18,11 +18,12 @@
 package org.voltdb;
 
 import java.io.UnsupportedEncodingException;
-import org.voltdb.catalog.*;
-import org.apache.log4j.Logger;
-import org.apache.log4j.Level;
+
+import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.Cluster;
+import org.voltdb.logging.Level;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.LogKeys;
-import org.voltdb.utils.VoltLoggerFactory;
 
 /**
  * Class that maps object values to partitions. It's rather simple
@@ -30,7 +31,7 @@ import org.voltdb.utils.VoltLoggerFactory;
  */
 public abstract class TheHashinator {
     static int partitionCount;
-    private static final Logger hostLogger = Logger.getLogger("HOST", VoltLoggerFactory.instance());
+    private static final VoltLogger hostLogger = new VoltLogger("HOST");
 
     /**
      * Initialize TheHashinator
@@ -107,13 +108,13 @@ public abstract class TheHashinator {
         } else if (obj instanceof String) {
             index = hashinate(obj, partitionCount);
         } else if (obj instanceof Integer) {
-            long value = (long)((Integer)obj).intValue();
+            long value = ((Integer)obj).intValue();
             index = hashinate(value, partitionCount);
         } else if (obj instanceof Short) {
-            long value = (long)((Short)obj).shortValue();
+            long value = ((Short)obj).shortValue();
             index = hashinate(value, partitionCount);
         } else if (obj instanceof Byte) {
-            long value = (long)((Byte)obj).byteValue();
+            long value = ((Byte)obj).byteValue();
             index = hashinate(value, partitionCount);
         }
         return index;

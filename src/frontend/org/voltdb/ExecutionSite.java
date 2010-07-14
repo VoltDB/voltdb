@@ -25,12 +25,9 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
-import org.apache.log4j.NDC;
 import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.CatalogMap;
@@ -65,6 +62,8 @@ import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.jni.MockExecutionEngine;
+import org.voltdb.logging.Level;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.DebugMessage;
 import org.voltdb.messaging.FailureSiteUpdateMessage;
 import org.voltdb.messaging.FastDeserializer;
@@ -86,7 +85,6 @@ import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.EstTime;
 import org.voltdb.utils.LogKeys;
-import org.voltdb.utils.VoltLoggerFactory;
 
 /**
  * The main executor of transactional work in the system. Controls running
@@ -97,10 +95,10 @@ import org.voltdb.utils.VoltLoggerFactory;
 public class ExecutionSite
 implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProcedureConnection
 {
-    private Logger m_txnlog;
-    private final Logger m_recoveryLog = Logger.getLogger("RECOVERY", VoltLoggerFactory.instance());
-    private static final Logger log = Logger.getLogger(ExecutionSite.class.getName(), VoltLoggerFactory.instance());
-    private static final Logger hostLog = Logger.getLogger("HOST", VoltLoggerFactory.instance());
+    private VoltLogger m_txnlog;
+    private VoltLogger m_recoveryLog = new VoltLogger("RECOVERY");
+    private static final VoltLogger log = new VoltLogger(ExecutionSite.class.getName());
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static AtomicInteger siteIndexCounter = new AtomicInteger(0);
     private final int siteIndex = siteIndexCounter.getAndIncrement();
     private final ExecutionSiteNodeFailureFaultHandler m_faultHandler =
@@ -430,8 +428,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     {
         m_siteId = siteId;
         String txnlog_name = ExecutionSite.class.getName() + "." + m_siteId;
-        m_txnlog =
-            Logger.getLogger(txnlog_name, VoltLoggerFactory.instance());
+        m_txnlog = new VoltLogger(txnlog_name);
 
         hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_Initializing.name(),
                         new Object[] { String.valueOf(siteId) }, null);
@@ -638,7 +635,8 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         name += String.valueOf(getSiteId());
         Thread.currentThread().setName(name);
 
-        NDC.push("ExecutionSite - " + getSiteId() + " index " + siteIndex);
+        // Commenting this out when making logging more abstrace (is that ok?)
+        //NDC.push("ExecutionSite - " + getSiteId() + " index " + siteIndex);
         if (VoltDB.getUseWatchdogs()) {
             m_watchdog.start(Thread.currentThread());
         }

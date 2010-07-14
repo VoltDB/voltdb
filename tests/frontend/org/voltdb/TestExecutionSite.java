@@ -28,21 +28,16 @@ import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Deque;
 import java.util.Random;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.HashSet;
 
 import junit.framework.TestCase;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
-import org.apache.log4j.SimpleLayout;
-import org.apache.log4j.WriterAppender;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
@@ -55,8 +50,19 @@ import org.voltdb.exceptions.SerializableException;
 import org.voltdb.executionsitefuzz.ExecutionSiteFuzzChecker;
 import org.voltdb.fault.FaultDistributor;
 import org.voltdb.fault.NodeFailureFault;
-import org.voltdb.messaging.*;
-import org.voltdb.utils.VoltLoggerFactory;
+import org.voltdb.logging.Level;
+import org.voltdb.logging.VoltLogger;
+import org.voltdb.messaging.FailureSiteUpdateMessage;
+import org.voltdb.messaging.FastSerializer;
+import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.HeartbeatMessage;
+import org.voltdb.messaging.HeartbeatResponseMessage;
+import org.voltdb.messaging.InitiateTaskMessage;
+import org.voltdb.messaging.Mailbox;
+import org.voltdb.messaging.MessagingException;
+import org.voltdb.messaging.MultiPartitionParticipantMessage;
+import org.voltdb.messaging.Subject;
+import org.voltdb.messaging.VoltMessage;
 
 public class TestExecutionSite extends TestCase {
 
@@ -312,7 +318,7 @@ public class TestExecutionSite extends TestCase {
     ExecutionSite m_sites[] = new ExecutionSite[SITE_COUNT];
     RussianRouletteMailbox m_mboxes[] = new RussianRouletteMailbox[SITE_COUNT];
     Thread m_siteThreads[] = new Thread[SITE_COUNT];
-    Logger[] m_siteLogger = new Logger[SITE_COUNT];
+    VoltLogger[] m_siteLogger = new VoltLogger[SITE_COUNT];
     StringWriter[] m_siteResults = new StringWriter[SITE_COUNT];
     Random m_rand;
 
@@ -334,11 +340,9 @@ public class TestExecutionSite extends TestCase {
                              false);
             // Configure log4j so that ExecutionSite generates FUZZTEST output
             String logname = ExecutionSite.class.getName() + "." + ss;
-            m_siteLogger[ss] = Logger.getLogger(logname,
-                                                VoltLoggerFactory.instance());
+            m_siteLogger[ss] = new VoltLogger(logname);
             m_siteResults[ss] = new StringWriter();
-            m_siteLogger[ss].addAppender(new WriterAppender(new SimpleLayout(),
-                                                            m_siteResults[ss]));
+            m_siteLogger[ss].addSimpleWriterAppender(m_siteResults[ss]);
             m_siteLogger[ss].setLevel(Level.TRACE);
         }
 

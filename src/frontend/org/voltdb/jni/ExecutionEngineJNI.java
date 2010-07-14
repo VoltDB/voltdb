@@ -20,7 +20,6 @@ package org.voltdb.jni;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import org.apache.log4j.Logger;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite;
 import org.voltdb.ParameterSet;
@@ -30,10 +29,10 @@ import org.voltdb.VoltTable;
 import org.voltdb.elt.ELTProtoMessage;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FastSerializer.BufferGrowCallback;
-import org.voltdb.utils.VoltLoggerFactory;
 import org.voltdb.utils.DBBPool.BBContainer;
 
 /**
@@ -50,7 +49,7 @@ import org.voltdb.utils.DBBPool.BBContainer;
 public class ExecutionEngineJNI extends ExecutionEngine {
 
     /** java.util.logging logger. */
-    private static final Logger LOG = Logger.getLogger(ExecutionEngine.class.getName(), VoltLoggerFactory.instance());
+    private static final VoltLogger LOG = new VoltLogger(ExecutionEngine.class.getName());
 
     /** The HStoreEngine pointer. */
     private long pointer;

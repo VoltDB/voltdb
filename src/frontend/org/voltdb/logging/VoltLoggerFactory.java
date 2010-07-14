@@ -15,7 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.utils;
+package org.voltdb.logging;
+
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ResourceBundle;

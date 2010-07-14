@@ -23,13 +23,12 @@ import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.SelectionKey;
 import java.util.ArrayDeque;
 
-import org.apache.log4j.Logger;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.EstTime;
-import org.voltdb.utils.VoltLoggerFactory;
 import org.voltdb.utils.DBBPool.BBContainer;
 
 /**
@@ -55,7 +54,7 @@ public class NIOWriteStream implements WriteStream {
      */
     private final VoltPort m_port;
 
-    private static final Logger networkLog = Logger.getLogger("NETWORK", VoltLoggerFactory.instance());
+    private static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
     private boolean m_isShutdown = false;
 

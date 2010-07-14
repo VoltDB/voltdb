@@ -34,8 +34,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.log4j.Logger;
-import org.voltdb.*;
+import org.voltdb.BackendTarget;
+import org.voltdb.DependencyPair;
+import org.voltdb.HsqlBackend;
+import org.voltdb.ParameterSet;
+import org.voltdb.PrivateVoltTableFactory;
+import org.voltdb.ProcInfo;
+import org.voltdb.SiteProcedureConnection;
+import org.voltdb.TheHashinator;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltSystemProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
+import org.voltdb.VoltTypeException;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Cluster;
@@ -45,12 +56,12 @@ import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.sysprocs.saverestore.ClusterSaveFileState;
 import org.voltdb.sysprocs.saverestore.SavedTableConverter;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
 import org.voltdb.sysprocs.saverestore.TableSaveFileState;
-import org.voltdb.sysprocs.saverestore.SnapshotUtil;
-import org.voltdb.utils.VoltLoggerFactory;
 import org.voltdb.utils.DBBPool.BBContainer;
 
 @ProcInfo (
@@ -58,12 +69,9 @@ import org.voltdb.utils.DBBPool.BBContainer;
 )
 public class SnapshotRestore extends VoltSystemProcedure
 {
-    private static final Logger TRACE_LOG =
-        Logger.getLogger(SnapshotRestore.class.getName(),
-                         VoltLoggerFactory.instance());
+    private static final VoltLogger TRACE_LOG = new VoltLogger(SnapshotRestore.class.getName());
 
-    private static final Logger HOST_LOG =
-        Logger.getLogger("HOST", VoltLoggerFactory.instance());
+    private static final VoltLogger HOST_LOG = new VoltLogger("HOST");
 
     private static final int DEP_restoreScan = (int)
         SysProcFragmentId.PF_restoreScan | DtxnConstants.MULTIPARTITION_DEPENDENCY;

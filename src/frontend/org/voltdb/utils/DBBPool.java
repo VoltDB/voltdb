@@ -17,14 +17,14 @@
 
 package org.voltdb.utils;
 
-import org.apache.log4j.Logger;
-import org.voltdb.VoltDB;
-import org.voltdb.utils.VoltLoggerFactory;
+import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicLong;
+
+import org.voltdb.VoltDB;
+import org.voltdb.logging.VoltLogger;
 
 /**
  * A pool of {@link java.nio.ByteBuffer ByteBuffers} that are
@@ -451,7 +451,7 @@ public final class DBBPool {
      */
     private final boolean foundNativeSupport;
 
-    private static final Logger m_logger = Logger.getLogger(DBBPool.class.getName(), VoltLoggerFactory.instance());
+    private static final VoltLogger m_logger = new VoltLogger(DBBPool.class.getName());
 
     /**
      * Boolean that determines whether code that traces and tracks allocations will be run

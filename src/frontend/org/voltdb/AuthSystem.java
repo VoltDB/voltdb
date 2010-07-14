@@ -17,18 +17,18 @@
 
 package org.voltdb;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.ArrayList;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 
-import org.voltdb.catalog.*;
+import org.voltdb.catalog.Connector;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Procedure;
+import org.voltdb.logging.Level;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.Encoder;
-
-import org.apache.log4j.Logger;
-import org.apache.log4j.Level;
-import org.voltdb.utils.VoltLoggerFactory;
 import org.voltdb.utils.LogKeys;
 
 
@@ -39,7 +39,7 @@ import org.voltdb.utils.LogKeys;
  */
 public class AuthSystem {
 
-    private static final Logger authLogger = Logger.getLogger("AUTH", VoltLoggerFactory.instance());
+    private static final VoltLogger authLogger = new VoltLogger("AUTH");
 
     /**
      * Representation of a permission group.

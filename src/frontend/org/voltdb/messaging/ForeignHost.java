@@ -23,24 +23,22 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.Set;
 
-import org.apache.log4j.Logger;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.fault.FaultHandler;
 import org.voltdb.fault.NodeFailureFault;
 import org.voltdb.fault.VoltFault;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.network.Connection;
 import org.voltdb.network.QueueMonitor;
 import org.voltdb.network.VoltProtocolHandler;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.EstTime;
-import org.voltdb.utils.VoltLoggerFactory;
 import org.voltdb.utils.DBBPool.BBContainer;
 
 public class ForeignHost {
-    private static final Logger hostLog =
-        Logger.getLogger("HOST", VoltLoggerFactory.instance());
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     // The amount of time we allow between messages from a host
     // before deciding that it must be dead.  In millis.

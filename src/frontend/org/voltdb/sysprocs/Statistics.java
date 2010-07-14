@@ -22,17 +22,27 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.log4j.Logger;
-import org.voltdb.*;
+import org.voltdb.BackendTarget;
+import org.voltdb.DependencyPair;
+import org.voltdb.ExecutionSite;
+import org.voltdb.HsqlBackend;
+import org.voltdb.ParameterSet;
+import org.voltdb.ProcInfo;
+import org.voltdb.SiteProcedureConnection;
+import org.voltdb.SysProcSelector;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltSystemProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
+import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
-import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.Pair;
-import org.voltdb.utils.VoltLoggerFactory;
 
 /**
  * Access the TABLE, PRCOEDURE, INITIATOR, IOSTATS, or PARTITIONCOUNT statistics.
@@ -44,8 +54,7 @@ import org.voltdb.utils.VoltLoggerFactory;
 
 public class Statistics extends VoltSystemProcedure {
 
-    private static final Logger HOST_LOG =
-        Logger.getLogger("HOST", VoltLoggerFactory.instance());
+    private static final VoltLogger HOST_LOG = new VoltLogger("HOST");
 
     static final int DEP_tableData = (int)
         SysProcFragmentId.PF_tableData | DtxnConstants.MULTIPARTITION_DEPENDENCY;

@@ -17,16 +17,23 @@
 
 package org.voltdb.elt;
 
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.TreeSet;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
 import org.voltdb.CatalogContext;
-import org.voltdb.catalog.*;
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Connector;
+import org.voltdb.catalog.ConnectorTableInfo;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.elt.processors.RawProcessor.ELTInternalMessage;
+import org.voltdb.logging.Level;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.network.InputHandler;
-import org.voltdb.utils.*;
+import org.voltdb.utils.LogKeys;
 
 /**
  * Bridges the connection to an OLAP system and the buffers passed
@@ -45,8 +52,7 @@ public class ELTManager
     /**
      * Processors also log using this facility.
      */
-    private static final Logger eltLog =
-        Logger.getLogger("ELT", VoltLoggerFactory.instance());
+    private static final VoltLogger eltLog = new VoltLogger("ELT");
 
     /**
      * Thrown if the initial setup of the loader fails

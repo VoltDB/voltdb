@@ -23,16 +23,13 @@ import java.util.LinkedList;
 import java.util.Queue;
 import java.util.Map.Entry;
 
-import org.apache.log4j.Logger;
 import org.voltdb.elt.ELTProtoMessage;
-import org.voltdb.utils.VoltLoggerFactory;
+import org.voltdb.logging.VoltLogger;
 
 
 public class ExportDataSink implements Runnable
 {
-    private static final Logger m_logger =
-        Logger.getLogger("ExportClient",
-                         VoltLoggerFactory.instance());
+    private static final VoltLogger m_logger = new VoltLogger("ExportClient");
 
     private long m_tableId = -1;
     private int m_partitionId = -1;

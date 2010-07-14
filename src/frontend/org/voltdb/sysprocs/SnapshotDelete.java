@@ -22,26 +22,30 @@ import java.io.FileFilter;
 import java.util.HashMap;
 import java.util.List;
 
-import org.apache.log4j.Logger;
-import org.voltdb.*;
+import org.voltdb.BackendTarget;
+import org.voltdb.DependencyPair;
+import org.voltdb.HsqlBackend;
+import org.voltdb.ParameterSet;
+import org.voltdb.ProcInfo;
+import org.voltdb.SiteProcedureConnection;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltSystemProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltdb.utils.VoltLoggerFactory;
+import org.voltdb.logging.VoltLogger;
 
 @ProcInfo(singlePartition = false)
 public class SnapshotDelete extends VoltSystemProcedure {
 
-    private static final Logger hostLog =
-        Logger.getLogger("HOST",
-                         VoltLoggerFactory.instance());
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    private static final Logger TRACE_LOG =
-        Logger.getLogger(SnapshotStatus.class.getName(),
-                         VoltLoggerFactory.instance());
+    private static final VoltLogger TRACE_LOG = new VoltLogger(SnapshotStatus.class.getName());
 
     private static final int DEP_snapshotDelete = (int)
         SysProcFragmentId.PF_snapshotDelete | DtxnConstants.MULTIPARTITION_DEPENDENCY;

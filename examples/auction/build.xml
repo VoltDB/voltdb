@@ -138,7 +138,7 @@ SERVER, EXPORT, & CLIENT TARGETS
 
 <target name="client" description="Example: ant client    Run auction example client.">
     <java fork="yes" classname="com.auctionexample.Client" >
-        <classpath refid='project.classpath.server' />
+        <classpath refid='project.classpath.client' />
         <assertions><disable /></assertions>
     </java>
 </target>

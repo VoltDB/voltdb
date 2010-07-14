@@ -46,8 +46,7 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.lang.Enum;
 
-import org.voltdb.utils.VoltLoggerFactory;
-import org.apache.log4j.Logger;
+import org.voltdb.logging.VoltLogger;
 
 public class ClientKV {
     public enum spName { GET, PUT };
@@ -66,7 +65,7 @@ public class ClientKV {
 
     public static boolean checkLatency = false;
 
-    public static final Logger m_logger = Logger.getLogger(ClientKV.class.getName(), VoltLoggerFactory.instance());
+    public static final VoltLogger m_logger = new VoltLogger(ClientKV.class.getName());
 
     private enum Behavior {
         NONE,
@@ -104,7 +103,7 @@ public class ClientKV {
                         } else {
                             byte[] baGetValue = clientResponse.getResults()[0].fetchRow(0).getStringAsBytes(0);
                             get_value_compressed_bytes += (long) baGetValue.length;
-                            
+
                             if (behavior == Behavior.NONE) {
                                 //if NOT bas64 encoding or compressing
                                 get_value_uncompressed_bytes += (long) baGetValue.length;
@@ -127,7 +126,7 @@ public class ClientKV {
                 }
             }
         }
-        
+
         protected void pClientCallback(VoltTable[] vtResults, int clientRoundtrip) {
             long execution_time = (long) clientRoundtrip;
 
@@ -195,11 +194,11 @@ public class ClientKV {
         long transactions_this_second = 0;
         long last_millisecond = System.currentTimeMillis();
         long this_millisecond = System.currentTimeMillis();
-  
+
         final org.voltdb.client.Client voltclient = ClientFactory.createClient();
-  
+
         String[] voltServers = serverList.split(",");
-  
+
         for (String thisServer : voltServers) {
             try {
                 thisServer = thisServer.trim();
@@ -210,7 +209,7 @@ public class ClientKV {
                 System.exit(-1);
             }
         }
-  
+
         // make random object totally random (set my milliseconds) so we can have multiple clients running simultaneously
         java.util.Random rand = new java.util.Random();
 
@@ -305,7 +304,7 @@ public class ClientKV {
                     m_logger.error(e.toString());
                     System.exit(-1);
                 }
-              
+
                 transactions_this_second++;
                 if (transactions_this_second >= transactions_per_milli) {
                     this_millisecond = System.currentTimeMillis();
@@ -433,7 +432,7 @@ public class ClientKV {
         transactions_this_second = 0;
         last_millisecond = System.currentTimeMillis();
         this_millisecond = System.currentTimeMillis();
-  
+
         startTime = System.currentTimeMillis();
         endTime = startTime + (1000l * test_duration_secs);
         currentTime = startTime;
@@ -497,7 +496,7 @@ public class ClientKV {
                     System.exit(-1);
                 }
             }
-          
+
             transactions_this_second++;
             if (transactions_this_second >= transactions_per_milli) {
                 this_millisecond = System.currentTimeMillis();

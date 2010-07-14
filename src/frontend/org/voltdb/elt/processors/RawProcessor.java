@@ -17,18 +17,30 @@
 
 package org.voltdb.elt.processors;
 
-import java.io.*;
+import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.log4j.Logger;
-import org.voltdb.elt.*;
-import org.voltdb.messaging.*;
-import org.voltdb.network.*;
-import org.voltdb.utils.*;
+import org.voltdb.elt.ELTDataProcessor;
+import org.voltdb.elt.ELTDataSource;
+import org.voltdb.elt.ELTProtoMessage;
+import org.voltdb.logging.VoltLogger;
+import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.messaging.FastSerializer;
+import org.voltdb.messaging.MessagingException;
+import org.voltdb.messaging.VoltMessage;
+import org.voltdb.network.Connection;
+import org.voltdb.network.InputHandler;
+import org.voltdb.network.QueueMonitor;
+import org.voltdb.network.VoltProtocolHandler;
+import org.voltdb.utils.DBBPool;
+import org.voltdb.utils.DeferredSerialization;
+import org.voltdb.utils.NotImplementedException;
 import org.voltdb.utils.DBBPool.BBContainer;
 
 
@@ -46,7 +58,7 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
      * This logger facility is set by the ELT manager and is configurable
      * via the standard VoltDB log configuration methods.
      */
-    Logger m_logger;
+    VoltLogger m_logger;
 
     /**
      * Work messages are queued and polled from this mailbox. All work
@@ -393,7 +405,7 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
     }
 
     @Override
-    public void addLogger(Logger logger) {
+    public void addLogger(VoltLogger logger) {
         m_logger = logger;
     }
 

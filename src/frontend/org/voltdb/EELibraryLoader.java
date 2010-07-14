@@ -17,15 +17,13 @@
 
 package org.voltdb;
 
-import org.apache.log4j.Logger;
-import org.voltdb.utils.VoltLoggerFactory;
+import org.voltdb.logging.VoltLogger;
 
 public class EELibraryLoader {
 
     private static boolean voltSharedLibraryLoaded = false;
 
-    private static final Logger hostLog = Logger.getLogger(
-            "HOST", VoltLoggerFactory.instance());
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
 
 
     static private boolean test64bit() {
@@ -49,7 +47,7 @@ public class EELibraryLoader {
                 test64bit();
 
                 try {
-                    final Logger hostLog = Logger.getLogger("HOST", VoltLoggerFactory.instance());
+                    final VoltLogger hostLog = new VoltLogger("HOST");
                     final String libname = "voltdb-" + VoltDB.instance().getVersionString();
                     hostLog.info("Attempting to load native VoltDB library " + libname +
                             ". Expect to see a confirmation following this upon success. " +

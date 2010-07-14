@@ -27,23 +27,20 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
-import org.apache.log4j.Logger;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
 import org.voltdb.catalog.Table;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.utils.Pair;
-import org.voltdb.utils.VoltLoggerFactory;
 
 
 
 public class PartitionedTableSaveFileState extends TableSaveFileState
 {
-    private static final Logger LOG =
-        Logger.getLogger(PartitionedTableSaveFileState.class.getName(),
-                         VoltLoggerFactory.instance());
+    private static final VoltLogger LOG = new VoltLogger(PartitionedTableSaveFileState.class.getName());
 
     public PartitionedTableSaveFileState(String tableName, int allowELT)
     {

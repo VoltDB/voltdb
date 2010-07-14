@@ -29,16 +29,15 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.List;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.exceptions.ConstraintFailureException;
+import org.voltdb.logging.Level;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.LogKeys;
-import org.voltdb.utils.VoltLoggerFactory;
 
 /**
  * A wrapper around the HSQLDB engine. This class can be used to execute SQL
@@ -48,9 +47,9 @@ import org.voltdb.utils.VoltLoggerFactory;
 public class HsqlBackend {
     /** java.util.logging logger. */
     @SuppressWarnings("unused")
-    private static final Logger log = Logger.getLogger(HsqlBackend.class.getName(), VoltLoggerFactory.instance());
-    private static final Logger hostLog = Logger.getLogger("HOST", VoltLoggerFactory.instance());
-    private static final Logger sqlLog = Logger.getLogger("SQL", VoltLoggerFactory.instance());
+    private static final VoltLogger log = new VoltLogger(HsqlBackend.class.getName());
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger sqlLog = new VoltLogger("SQL");
 
     Connection dbconn;
 

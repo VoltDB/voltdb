@@ -20,13 +20,22 @@ package org.voltdb.sysprocs;
 import java.util.HashMap;
 import java.util.List;
 
-import org.voltdb.*;
+import org.voltdb.BackendTarget;
+import org.voltdb.DependencyPair;
+import org.voltdb.ExecutionSite;
+import org.voltdb.HsqlBackend;
+import org.voltdb.ParameterSet;
+import org.voltdb.ProcInfo;
+import org.voltdb.ProcedureProfiler;
+import org.voltdb.SiteProcedureConnection;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltSystemProcedure;
+import org.voltdb.VoltTable;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltdb.utils.VoltLoggerFactory;
-import org.apache.log4j.Logger;
+import org.voltdb.logging.VoltLogger;
 
 /**
  * A wholly improper shutdown. No promise is given to return a result to a client,
@@ -77,7 +86,7 @@ public class Shutdown extends VoltSystemProcedure {
                     try {
                         VoltDB.instance().shutdown(this);
                     } catch (InterruptedException e) {
-                        Logger.getLogger("HOST", VoltLoggerFactory.instance()).error(
+                        new VoltLogger("HOST").error(
                                 "Exception while attempting to shutdown VoltDB from shutdown sysproc",
                                 e);
                     }

@@ -16,19 +16,17 @@
  */
 package org.voltdb.fault;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-import org.apache.log4j.Logger;
 import org.voltdb.VoltDB;
 import org.voltdb.fault.VoltFault.FaultType;
-import org.voltdb.utils.VoltLoggerFactory;
-
-import java.util.HashSet;
-import java.util.ArrayDeque;
+import org.voltdb.logging.VoltLogger;
 
 /**
  * FaultDistributor routes VoltFaults from reporters to entities that have
@@ -36,7 +34,7 @@ import java.util.ArrayDeque;
  */
 public class FaultDistributor implements FaultDistributorInterface, Runnable
 {
-    private static final Logger hostLog = Logger.getLogger("HOST", VoltLoggerFactory.instance());
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
     public FaultDistributor()
     {
         m_faultHandlers =

@@ -25,12 +25,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Queue;
 
-import org.apache.log4j.Logger;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.elt.ELTProtoMessage;
 import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.utils.VoltLoggerFactory;
 
 /**
  * Manage the connection to the server's EL port
@@ -38,9 +37,7 @@ import org.voltdb.utils.VoltLoggerFactory;
 
 public class ExportConnection implements Runnable {
 
-    private static final Logger m_logger =
-        Logger.getLogger("ExportClient",
-                         VoltLoggerFactory.instance());
+    private static final VoltLogger m_logger = new VoltLogger("ExportClient");
 
     static final private int CLOSED = 0;
     static final private int CONNECTING = 1;

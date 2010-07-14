@@ -21,32 +21,38 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.StringWriter;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.TreeMap;
-import java.util.ArrayList;
-import java.util.HashSet;
 
-import org.apache.log4j.Logger;
-import org.voltdb.*;
+import org.voltdb.BackendTarget;
+import org.voltdb.DependencyPair;
+import org.voltdb.HsqlBackend;
+import org.voltdb.ParameterSet;
+import org.voltdb.ProcInfo;
+import org.voltdb.SiteProcedureConnection;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltSystemProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltTableRow;
+import org.voltdb.VoltType;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltdb.sysprocs.saverestore.TableSaveFile;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
-import org.voltdb.utils.VoltLoggerFactory;
+import org.voltdb.sysprocs.saverestore.TableSaveFile;
 
 @ProcInfo(singlePartition = false)
 public class SnapshotScan extends VoltSystemProcedure {
-    private static final Logger TRACE_LOG =
-        Logger.getLogger(SnapshotStatus.class.getName(),
-                         VoltLoggerFactory.instance());
+    private static final VoltLogger TRACE_LOG = new VoltLogger(SnapshotStatus.class.getName());
 
-    private static final Logger HOST_LOG =
-        Logger.getLogger("HOST", VoltLoggerFactory.instance());
+    private static final VoltLogger HOST_LOG = new VoltLogger("HOST");
 
     private static final int DEP_snapshotDigestScan = (int)
         SysProcFragmentId.PF_snapshotDigestScan | DtxnConstants.MULTIPARTITION_DEPENDENCY;

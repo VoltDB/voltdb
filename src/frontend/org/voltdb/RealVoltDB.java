@@ -22,7 +22,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
-import java.io.StringReader;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
@@ -33,10 +32,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
-import org.apache.log4j.xml.DOMConfigurator;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Site;
 import org.voltdb.catalog.SnapshotSchedule;
@@ -47,6 +42,8 @@ import org.voltdb.fault.FaultHandler;
 import org.voltdb.fault.NodeFailureFault;
 import org.voltdb.fault.VoltFault;
 import org.voltdb.fault.VoltFault.FaultType;
+import org.voltdb.logging.Level;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.HostMessenger;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.Messenger;
@@ -56,15 +53,12 @@ import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.JarReader;
 import org.voltdb.utils.LogKeys;
-import org.voltdb.utils.VoltLoggerFactory;
 import org.voltdb.utils.VoltSampler;
 
 public class RealVoltDB implements VoltDBInterface
 {
-    private static final Logger log =
-        Logger.getLogger(VoltDB.class.getName(), VoltLoggerFactory.instance());
-    private static final Logger hostLog =
-        Logger.getLogger("HOST", VoltLoggerFactory.instance());
+    private static final VoltLogger log = new VoltLogger(VoltDB.class.getName());
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     private class VoltDBNodeFailureFaultHandler implements FaultHandler
     {
@@ -659,9 +653,7 @@ public class RealVoltDB implements VoltDBInterface
             System.out.println("Updating RealVoltDB logging config from txnid: " +
                                lastLogUpdate_txnId + " to " + currentTxnId);
             lastLogUpdate_txnId = currentTxnId;
-            DOMConfigurator configurator = new DOMConfigurator();
-            StringReader sr = new StringReader(xmlConfig);
-            configurator.doConfigure(sr, LogManager.getLoggerRepository());
+            VoltLogger.configure(xmlConfig);
         }
     }
 

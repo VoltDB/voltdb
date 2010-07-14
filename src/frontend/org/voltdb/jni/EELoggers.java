@@ -17,9 +17,7 @@
 
 package org.voltdb.jni;
 
-import org.apache.log4j.Logger;
-import org.apache.log4j.Level;
-import org.voltdb.utils.VoltLoggerFactory;
+import org.voltdb.logging.VoltLogger;
 
 /**
  * Only a subset of log4j loggers are made available for use with in the EE. A long is passed in to the EE
@@ -45,9 +43,9 @@ public class EELoggers {
      * log level is encoded into the long and the order they will be read
      * in the backend.
      */
-    public static final Logger loggers[] = new Logger[] {
-        Logger.getLogger("SQL", VoltLoggerFactory.instance()),
-        Logger.getLogger("HOST", VoltLoggerFactory.instance())
+    public static final VoltLogger loggers[] = new VoltLogger[] {
+        new VoltLogger("SQL"),
+        new VoltLogger("HOST")
     };
 
     /**
@@ -55,39 +53,8 @@ public class EELoggers {
      * @return A long containing log levels for all the loggers available in the EE
      */
     public final static long getLogLevels() {
-        long logLevels = 0;
-        for (int ii = 0; ii < loggers.length; ii++) {
-            final int level = loggers[ii].getEffectiveLevel().toInt();
-            switch (level) {
-            case Level.TRACE_INT:
-                logLevels |= trace << (ii * 3);
-                break;
-            case Level.ALL_INT:
-                logLevels |= all << (ii * 3);
-                break;
-            case Level.DEBUG_INT:
-                logLevels |= debug << (ii * 3);
-                break;
-            case Level.ERROR_INT:
-                logLevels |= error << (ii * 3);
-                break;
-            case Level.FATAL_INT:
-                logLevels |= fatal << (ii * 3);
-                break;
-            case Level.INFO_INT:
-                logLevels |= info << (ii * 3);
-                break;
-            case Level.OFF_INT:
-                logLevels |= off << (ii * 3);
-                break;
-            case Level.WARN_INT:
-                logLevels |= warn << (ii * 3);
-                break;
-                default:
-                    throw new RuntimeException("Unhandled log level " + level);
-            }
-        }
-        return logLevels;
+        assert(loggers.length > 0);
+        return loggers[0].getLogLevels(loggers);
     }
 
     /**

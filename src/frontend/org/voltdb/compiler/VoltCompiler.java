@@ -41,8 +41,6 @@ import javax.xml.bind.Unmarshaller;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltdb.ProcInfo;
 import org.voltdb.ProcInfoData;
@@ -70,12 +68,13 @@ import org.voltdb.compiler.projectfile.UsersType;
 import org.voltdb.compiler.projectfile.ClassdependenciesType.Classdependency;
 import org.voltdb.compiler.projectfile.ExportsType.Connector;
 import org.voltdb.compiler.projectfile.ExportsType.Connector.Tables;
+import org.voltdb.logging.Level;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.JarReader;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.StringInputStream;
-import org.voltdb.utils.VoltLoggerFactory;
 import org.xml.sax.ErrorHandler;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
@@ -112,9 +111,9 @@ public class VoltCompiler {
 
     DatabaseEstimates m_estimates = new DatabaseEstimates();
 
-    private static final Logger compilerLog = Logger.getLogger("COMPILER", VoltLoggerFactory.instance());
+    private static final VoltLogger compilerLog = new VoltLogger("COMPILER");
     @SuppressWarnings("unused")
-    private static final Logger Log = Logger.getLogger("org.voltdb.compiler.VoltCompiler", VoltLoggerFactory.instance());
+    private static final VoltLogger Log = new VoltLogger("org.voltdb.compiler.VoltCompiler");
 
     /**
      * Represents output from a compile. This works similarly to Log4j; there

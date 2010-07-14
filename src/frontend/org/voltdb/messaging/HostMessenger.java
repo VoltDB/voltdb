@@ -24,28 +24,26 @@ import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.Hashtable;
-import java.util.Deque;
 import java.util.Map.Entry;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.log4j.Logger;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ConnectionUtil;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DeferredSerialization;
-import org.voltdb.utils.VoltLoggerFactory;
 import org.voltdb.utils.DBBPool.BBContainer;
 
 public class HostMessenger implements Messenger {
 
-    private static final Logger m_logger =
-            Logger.getLogger("org.voltdb.messaging.impl.HostMessenger", VoltLoggerFactory.instance());
+    private static final VoltLogger m_logger = new VoltLogger("org.voltdb.messaging.impl.HostMessenger");
     static class SerializedMessage {
         public byte[] buf;
         public int off;
@@ -91,7 +89,7 @@ public class HostMessenger implements Messenger {
      * @param catalogCRC
      * @param hostLog
      */
-    public HostMessenger(VoltNetwork network, InetAddress coordinatorIp, int expectedHosts, long catalogCRC, Logger hostLog)
+    public HostMessenger(VoltNetwork network, InetAddress coordinatorIp, int expectedHosts, long catalogCRC, VoltLogger hostLog)
     {
         m_expectedHosts = expectedHosts;
         m_hostsToWaitFor.set(expectedHosts);
@@ -104,7 +102,7 @@ public class HostMessenger implements Messenger {
         m_largestHostId = expectedHosts;
     }
 
-    public HostMessenger(VoltNetwork network, ServerSocketChannel acceptor, int expectedHosts, long catalogCRC, Logger hostLog)
+    public HostMessenger(VoltNetwork network, ServerSocketChannel acceptor, int expectedHosts, long catalogCRC, VoltLogger hostLog)
     {
         m_expectedHosts = expectedHosts;
         m_hostsToWaitFor.set(expectedHosts);

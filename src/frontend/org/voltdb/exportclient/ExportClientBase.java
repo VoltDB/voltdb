@@ -19,21 +19,19 @@ package org.voltdb.exportclient;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.*;
-
-import org.apache.log4j.Logger;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Set;
 
 import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
-import org.voltdb.utils.VoltLoggerFactory;
+import org.voltdb.logging.VoltLogger;
 
 /**
  * Provides an extensible base class for writing ELT clients
  */
 
 public abstract class ExportClientBase implements Runnable {
-    private static final Logger m_logger =
-        Logger.getLogger("ExportClient",
-                         VoltLoggerFactory.instance());
+    private static final VoltLogger m_logger = new VoltLogger("ExportClient");
 
     private List<InetSocketAddress> m_servers = null;
     protected HashMap<String, ExportConnection> m_elConnections;

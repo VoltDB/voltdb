@@ -15,24 +15,13 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.utils;
+package org.voltdb.logging;
 
-import java.lang.Thread.UncaughtExceptionHandler;
-
-import org.voltdb.VoltDB;
-import org.voltdb.logging.VoltLogger;
-
-public class VoltUncaughtExceptionHandler implements UncaughtExceptionHandler {
-
-    private final VoltLogger log = new VoltLogger("HOST");
-
-    @Override
-    public void uncaughtException(Thread t, Throwable e) {
-        final String stringRep = e.toString();
-        log.fatal(stringRep);
-        log.fatal("VoltDB has encountered an unrecoverable error and is exiting.");
-        log.fatal("The log may contain additional information.");
-        VoltDB.crashVoltDB();
-    }
-
+public enum Level {
+    DEBUG,
+    ERROR,
+    FATAL,
+    INFO,
+    TRACE,
+    WARN
 }

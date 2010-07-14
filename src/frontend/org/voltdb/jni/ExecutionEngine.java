@@ -23,8 +23,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map.Entry;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite;
 import org.voltdb.ParameterSet;
@@ -33,9 +31,10 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.elt.ELTProtoMessage;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.logging.Level;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.utils.LogKeys;
-import org.voltdb.utils.VoltLoggerFactory;
 import org.voltdb.utils.DBBPool.BBContainer;
 
 /**
@@ -118,11 +117,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         private final HashMap<Integer, ArrayDeque<VoltTable>> m_depsById =
             new HashMap<Integer, ArrayDeque<VoltTable>>();
 
-        private final Logger hostLog =
-            Logger.getLogger("HOST", VoltLoggerFactory.instance());
+        private final VoltLogger hostLog = new VoltLogger("HOST");
 
-        private final Logger log =
-            Logger.getLogger(ExecutionSite.class.getName(), VoltLoggerFactory.instance());
+        private final VoltLogger log = new VoltLogger(ExecutionSite.class.getName());
 
 
         /**

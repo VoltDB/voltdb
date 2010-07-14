@@ -29,13 +29,18 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.UnknownHostException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
 import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
 import org.voltdb.ClusterMonitor;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
@@ -46,11 +51,12 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.logging.Level;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.processtools.ProcessSetManager;
 import org.voltdb.processtools.SSHTools;
 import org.voltdb.processtools.ShellTools;
 import org.voltdb.utils.LogKeys;
-import org.voltdb.utils.VoltLoggerFactory;
 
 public class BenchmarkController {
 
@@ -85,8 +91,8 @@ public class BenchmarkController {
     ServerThread m_localserver = null;
     private ClusterMonitor m_clusterMonitor;
     @SuppressWarnings("unused")
-    private static final Logger log = Logger.getLogger(BenchmarkController.class.getName(), VoltLoggerFactory.instance());
-    private static final Logger benchmarkLog = Logger.getLogger("BENCHMARK", VoltLoggerFactory.instance());
+    private static final VoltLogger log = new VoltLogger(BenchmarkController.class.getName());
+    private static final VoltLogger benchmarkLog = new VoltLogger("BENCHMARK");
 
     public static interface BenchmarkInterest {
         public void benchmarkHasUpdated(BenchmarkResults currentResults);

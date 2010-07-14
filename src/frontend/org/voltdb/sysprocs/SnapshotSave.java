@@ -19,47 +19,51 @@ package org.voltdb.sysprocs;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Deque;
-import java.util.LinkedList;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.Semaphore;
-import org.apache.log4j.Logger;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import org.voltdb.BackendTarget;
-import org.voltdb.DependencyPair;
-import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
-import org.voltdb.*;
-import org.voltdb.VoltTable.ColumnInfo;
-import org.voltdb.VoltType;
-import org.voltdb.SnapshotDataTarget;
 import org.voltdb.DefaultSnapshotDataTarget;
+import org.voltdb.DependencyPair;
+import org.voltdb.HsqlBackend;
+import org.voltdb.ParameterSet;
+import org.voltdb.ProcInfo;
+import org.voltdb.SiteProcedureConnection;
+import org.voltdb.SnapshotDataTarget;
+import org.voltdb.SnapshotSiteProcessor;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltSystemProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
+import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Host;
+import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
-import org.voltdb.catalog.Partition;
-import org.voltdb.catalog.Host;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.VoltLoggerFactory;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.utils.CatalogUtil;
 
 @ProcInfo(singlePartition = false)
 public class SnapshotSave extends VoltSystemProcedure
 {
-    private static final Logger TRACE_LOG =
-        Logger.getLogger(SnapshotSave.class.getName(),
-                         VoltLoggerFactory.instance());
+    private static final VoltLogger TRACE_LOG = new VoltLogger(SnapshotSave.class.getName());
 
-    private static final Logger HOST_LOG =
-        Logger.getLogger("HOST", VoltLoggerFactory.instance());
+    private static final VoltLogger HOST_LOG = new VoltLogger("HOST");
 
     private static final int DEP_saveTest = (int)
         SysProcFragmentId.PF_saveTest | DtxnConstants.MULTIPARTITION_DEPENDENCY;

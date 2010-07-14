@@ -31,11 +31,10 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.CRC32;
 
-import org.apache.log4j.Logger;
 import org.voltdb.client.ConnectionUtil;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.VoltLoggerFactory;
 import org.voltdb.utils.DBBPool.BBContainer;
 
 public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
@@ -45,7 +44,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
 
     private final FileChannel m_channel;
     private final FileOutputStream m_fos;
-    private static final Logger hostLog = Logger.getLogger("HOST", VoltLoggerFactory.instance());
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
     private final ExecutorService m_es;
     private Runnable m_onCloseHandler = null;
 

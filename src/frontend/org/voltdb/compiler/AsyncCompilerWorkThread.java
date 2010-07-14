@@ -22,16 +22,15 @@ import java.util.ArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.log4j.Logger;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.debugstate.PlannerThreadContext;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.Encoder;
-import org.voltdb.utils.VoltLoggerFactory;
 
 public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpable {
 
@@ -44,7 +43,7 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
     boolean m_isLoaded = false;
     CatalogContext m_context;
 
-    private static final Logger ahpLog = Logger.getLogger("ADHOCPLANNERTHREAD", VoltLoggerFactory.instance());
+    private static final VoltLogger ahpLog = new VoltLogger("ADHOCPLANNERTHREAD");
 
     /** If this is true, update the catalog */
     private final AtomicBoolean m_shouldUpdateCatalog = new AtomicBoolean(false);

@@ -17,8 +17,8 @@
 
 package org.voltdb.elt;
 
-import org.apache.log4j.Logger;
 import org.voltdb.elt.processors.RawProcessor.ELTInternalMessage;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.network.InputHandler;
 
 /**
@@ -37,7 +37,7 @@ public interface ELTDataProcessor  {
      * log to this logger to produce ELT category output.
      * @param logger log4j logger created from VoltDB logger factory.
      */
-    void addLogger(Logger logger);
+    void addLogger(VoltLogger logger);
 
     /** Pass the loader each table in each database.
      * This is called for each unique datasource. It may be recalled with

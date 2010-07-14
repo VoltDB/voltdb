@@ -47,12 +47,12 @@ package org.voltdb.dtxn;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.log4j.Logger;
 import org.voltdb.CatalogContext;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltDB;
 import org.voltdb.debugstate.InitiatorContext;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.HeartbeatMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.Mailbox;
@@ -60,7 +60,6 @@ import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.messaging.SiteMailbox;
-import org.voltdb.utils.VoltLoggerFactory;
 
 /** Supports correct execution of multiple partition transactions by executing them one at a time. */
 public class SimpleDtxnInitiator extends TransactionInitiator {
@@ -69,8 +68,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     private final DtxnInitiatorQueue m_queue;
     private final ExecutorTxnIdSafetyState m_safetyState;
 
-    private static final Logger transactionLog =
-        Logger.getLogger("TRANSACTION", VoltLoggerFactory.instance());
+    private static final VoltLogger transactionLog = new VoltLogger("TRANSACTION");
 
     /**
      * Task to run when a backpressure condition starts

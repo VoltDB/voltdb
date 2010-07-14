@@ -26,14 +26,13 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 
-import org.apache.log4j.Logger;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.types.TimestampType;
-import org.voltdb.utils.VoltLoggerFactory;
-import org.voltdb.utils.CSVEscaperUtil.Escaper;
 import org.voltdb.utils.CSVEscaperUtil.CSVEscaper;
+import org.voltdb.utils.CSVEscaperUtil.Escaper;
 import org.voltdb.utils.CSVEscaperUtil.TSVEscaper;
 
 /**
@@ -52,9 +51,7 @@ import org.voltdb.utils.CSVEscaperUtil.TSVEscaper;
 
 public class ExportToFileClient extends ExportClientBase
 {
-    private static final Logger m_logger =
-        Logger.getLogger("ExportToFileClient",
-                         VoltLoggerFactory.instance());
+    private static final VoltLogger m_logger = new VoltLogger("ExportToFileClient");
 
     private Escaper m_escaper;
     private String m_nonce;

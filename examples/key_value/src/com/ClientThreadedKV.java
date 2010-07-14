@@ -35,6 +35,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.NullCallback;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.utils.Encoder;
@@ -50,8 +51,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.Semaphore;
 
-import org.voltdb.utils.VoltLoggerFactory;
-import org.apache.log4j.Logger;
 
 public class ClientThreadedKV {
     public enum spName { GET, PUT };
@@ -71,7 +70,7 @@ public class ClientThreadedKV {
 
     public static boolean checkLatency = false;
 
-    public static final Logger m_logger = Logger.getLogger(ClientThreadedKV.class.getName(), VoltLoggerFactory.instance());
+    public static final VoltLogger m_logger = new VoltLogger(ClientThreadedKV.class.getName());
 
     private static final Client voltclient = ClientFactory.createClient();
 

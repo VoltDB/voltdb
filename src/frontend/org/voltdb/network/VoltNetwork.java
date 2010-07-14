@@ -62,24 +62,21 @@
 package org.voltdb.network;
 
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.nio.channels.CancelledKeyException;
-import java.nio.channels.SocketChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
+import java.nio.channels.SocketChannel;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.HashMap;
-import java.util.ArrayDeque;
-import java.lang.ref.WeakReference;
-
-import org.apache.log4j.Logger;
-
+import java.util.Set;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.Set;
 
-import org.voltdb.utils.VoltLoggerFactory;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.EstTimeUpdater;
 import org.voltdb.utils.Pair;
@@ -88,10 +85,8 @@ import org.voltdb.utils.Pair;
  public class VoltNetwork implements Runnable
 {
     private final Selector m_selector;
-    private static final Logger m_logger =
-        Logger.getLogger(VoltNetwork.class.getName(), VoltLoggerFactory.instance());
-    private static final Logger networkLog =
-        Logger.getLogger("NETWORK", VoltLoggerFactory.instance());
+    private static final VoltLogger m_logger = new VoltLogger(VoltNetwork.class.getName());
+    private static final VoltLogger networkLog = new VoltLogger("NETWORK");
     private final ArrayDeque<Runnable> m_tasks = new ArrayDeque<Runnable>();
     // keep two lists and swap them in and out to minimize contention
     private final ArrayDeque<VoltPort> m_selectorUpdates_1 = new ArrayDeque<VoltPort>();//Used as the lock for swapping lists
@@ -123,6 +118,8 @@ import org.voltdb.utils.Pair;
         m_selector = selector;
         m_useBlockingSelect = true;
         m_useExecutorService = false;
+
+
     }
 
     public VoltNetwork() {

@@ -19,9 +19,14 @@ package org.voltdb.jni;
 
 import java.util.Random;
 
-import org.voltdb.*;
+import org.voltdb.DependencyPair;
+import org.voltdb.ParameterSet;
+import org.voltdb.SysProcSelector;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.elt.ELTProtoMessage;
-import org.voltdb.exceptions.*;
+import org.voltdb.exceptions.EEException;
+import org.voltdb.exceptions.SQLException;
 import org.voltdb.utils.DBBPool.BBContainer;
 
 public class MockExecutionEngine extends ExecutionEngine {

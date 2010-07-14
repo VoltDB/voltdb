@@ -31,10 +31,10 @@ import java.nio.channels.SocketChannel;
 import java.util.Hashtable;
 import java.util.Map.Entry;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
+import org.voltdb.logging.Level;
+import org.voltdb.logging.VoltLogger;
 
 /** SocketJoiner runs at startup to create a fully meshed cluster.
  * The primary (aka: leader, coordinater) node listens on BASE_PORT.
@@ -46,7 +46,7 @@ import org.voltdb.VoltDBInterface;
  */
 public class SocketJoiner extends Thread {
 
-    private static final Logger LOG = Logger.getLogger(SocketJoiner.class.getName());
+    private static final VoltLogger LOG = new VoltLogger(SocketJoiner.class.getName());
     //static final int BASE_PORT = 3021;
     static final int COORD_HOSTID = 0;
     static final int COMMAND_NONE = 0;
@@ -67,7 +67,7 @@ public class SocketJoiner extends Thread {
     Hashtable<Integer, DataOutputStream> m_outputs = new Hashtable<Integer, DataOutputStream>();
     ServerSocketChannel m_listenerSocket = null;
     int m_expectedHosts;
-    Logger m_hostLog;
+    VoltLogger m_hostLog;
     long m_timestamp;//Part of instanceId
     Integer m_addr;
     long m_catalogCRC;
@@ -104,14 +104,14 @@ public class SocketJoiner extends Thread {
         return success;
     }
 
-    public SocketJoiner(InetAddress coordIp, int expectedHosts, long catalogCRC, Logger hostLog) {
+    public SocketJoiner(InetAddress coordIp, int expectedHosts, long catalogCRC, VoltLogger hostLog) {
         m_coordIp = coordIp;
         m_expectedHosts = expectedHosts;
         m_hostLog = hostLog;
         m_catalogCRC = catalogCRC;
     }
 
-    public SocketJoiner(ServerSocketChannel acceptor, int expectedHosts, Logger hostLog) {
+    public SocketJoiner(ServerSocketChannel acceptor, int expectedHosts, VoltLogger hostLog) {
         m_listenerSocket = acceptor;
         m_expectedHosts = expectedHosts;
         m_hostLog = hostLog;
@@ -158,7 +158,7 @@ public class SocketJoiner extends Thread {
                         m_listenerSocket = null;
                     }
                     catch (IOException ex) {
-                        Logger.getLogger(SocketJoiner.class.getName()).l7dlog(Level.FATAL, null, ex);
+                        new VoltLogger(SocketJoiner.class.getName()).l7dlog(Level.FATAL, null, ex);
                     }
                 }
             }
