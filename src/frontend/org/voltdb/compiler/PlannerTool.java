@@ -33,9 +33,9 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.planner.CompiledPlan;
+import org.voltdb.planner.CompiledPlan.Fragment;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.TrivialCostModel;
-import org.voltdb.planner.CompiledPlan.Fragment;
 import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.utils.Encoder;
 
@@ -44,6 +44,8 @@ import org.voltdb.utils.Encoder;
  * interactively accept SQL and outputs plans on standard out.
  */
 public class PlannerTool {
+
+    public static final String POISON_SQL = "*kill*";
 
     Process m_process;
     OutputStreamWriter m_in;
@@ -336,6 +338,12 @@ public class PlannerTool {
             inputLine = inputLine.trim();
 
             log("recieved sql stmt: " + inputLine);
+
+            // the poison sql causes the process to exit
+            if (inputLine.compareTo(POISON_SQL) == 0) {
+                log("Dying a horrible death (on purpose).");
+                System.exit(-1);
+            }
 
             //////////////////////
             // PLAN THE STMT

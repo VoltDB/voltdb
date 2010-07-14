@@ -28,7 +28,7 @@ import java.lang.reflect.Method;
  * avoid log4j wherever possible.
  */
 public class VoltLogger {
-    CoreVoltLogger m_logger;
+    final CoreVoltLogger m_logger;
 
     /**
      * Abstraction of core functionality shared between Log4j and
@@ -145,16 +145,28 @@ public class VoltLogger {
      * @param classname The id of the logger.
      */
     public VoltLogger(String classname) {
+        CoreVoltLogger tempLogger = null;
+
+        // try to load the Log4j logger without importing it
+        // any exception thrown will just keep going
         try {
             Class<?> loggerClz = Class.forName("org.voltdb.logging.VoltLog4jLogger");
             assert(loggerClz != null);
 
             Constructor<?> constructor = loggerClz.getConstructor(String.class);
-            m_logger = (CoreVoltLogger) constructor.newInstance(classname);
-
-        } catch (Exception e) {
-            m_logger = null;
-            throw new RuntimeException("VoltDB is missing Log4j", e);
+            tempLogger = (CoreVoltLogger) constructor.newInstance(classname);
         }
+        catch (Exception e) {}
+
+        // if unable to load Log4j, try to use java.util.logging
+        if (tempLogger == null)
+            tempLogger = new VoltUtilLoggingLogger(classname);
+
+        // set the final variable for the core logger
+        m_logger = tempLogger;
+
+        // Don't let the constructor exit without
+        if (m_logger == null)
+            throw new RuntimeException("Unable to get VoltLogger instance.");
     }
 }

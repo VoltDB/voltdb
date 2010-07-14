@@ -32,6 +32,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.exceptions.ConstraintFailureException;
 import org.voltdb.regressionsuites.failureprocs.CleanupFail;
@@ -39,10 +40,10 @@ import org.voltdb.regressionsuites.failureprocs.DivideByZero;
 import org.voltdb.regressionsuites.failureprocs.FetchTooMuch;
 import org.voltdb.regressionsuites.failureprocs.InsertBigString;
 import org.voltdb.regressionsuites.failureprocs.InsertLotsOfData;
+import org.voltdb.regressionsuites.failureprocs.ReturnAppStatus;
 import org.voltdb.regressionsuites.failureprocs.TooFewParams;
 import org.voltdb.regressionsuites.failureprocs.ViolateUniqueness;
 import org.voltdb.regressionsuites.failureprocs.ViolateUniquenessAndCatchException;
-import org.voltdb.regressionsuites.failureprocs.ReturnAppStatus;
 import org.voltdb.regressionsuites.sqlfeatureprocs.WorkWithBigString;
 
 public class TestFailuresSuite extends RegressionSuite {
@@ -331,19 +332,9 @@ public class TestFailuresSuite extends RegressionSuite {
         Client client = getClient();
 
         try {
-            client.callProcedure("@AdHoc",
-                    "select * from WAREHOUSE, DISTRICT, CUSTOMER, CUSTOMER_NAME, HISTORY, STOCK, ORDERS, NEW_ORDER, ORDER_LINE where " +
-                    "WAREHOUSE.W_ID = DISTRICT.D_W_ID and " +
-                    "WAREHOUSE.W_ID = CUSTOMER.C_W_ID and " +
-                    "WAREHOUSE.W_ID = CUSTOMER_NAME.C_W_ID and " +
-                    "WAREHOUSE.W_ID = HISTORY.H_W_ID and " +
-                    "WAREHOUSE.W_ID = STOCK.S_W_ID and " +
-                    "WAREHOUSE.W_ID = ORDERS.O_W_ID and " +
-                    "WAREHOUSE.W_ID = NEW_ORDER.NO_W_ID and " +
-                    "WAREHOUSE.W_ID = ORDER_LINE.OL_W_ID and " +
-                    "WAREHOUSE.W_ID = 0");
-            //fail()
-            // don't actually fail here... there's no guarantee this will fail...
+            // "*kill*" should kill the planner process
+            client.callProcedure("@AdHoc", PlannerTool.POISON_SQL);
+            fail();
         }
         catch (ProcCallException e) {}
 

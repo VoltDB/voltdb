@@ -52,6 +52,12 @@ public class VoltUtilLoggingLogger implements VoltLogger.CoreVoltLogger {
     /** Underlying java.ulil.logging logger */
     Logger m_logger;
 
+    VoltUtilLoggingLogger(String classname) {
+        m_logger = Logger.getLogger(classname);
+        if (m_logger == null)
+            throw new RuntimeException("Unable to get java.util.logging.Logger instance.");
+    }
+
     @Override
     public boolean isEnabledFor(Level level) {
         return m_logger.isLoggable(getPriorityForLevel(level));
@@ -59,21 +65,35 @@ public class VoltUtilLoggingLogger implements VoltLogger.CoreVoltLogger {
 
     @Override
     public void l7dlog(Level level, String key, Object[] params, Throwable t) {
-        String msg = key + " : Throwable: " + t.toString() + " : ";
-        for (Object o : params)
-            msg += o.toString() + ", ";
+        String msg = "NULL";
+        if (key != null)
+            msg = key;
+        if (t != null)
+            msg += " : Throwable: " + t.toString();
+        if ((params != null) && (params.length > 0)) {
+            msg += " : ";
+            for (Object o : params)
+                if (o != null)
+                    msg += o.toString() + ", ";
+                else
+                    msg += "NULL, ";
+        }
         m_logger.log(getPriorityForLevel(level), msg);
     }
 
     @Override
     public void log(Level level, Object message, Throwable t) {
-        String msg = message + " : Throwable: " + t.toString();
+        String msg = "NULL";
+        if (message != null)
+            msg = message.toString();
+        if (t != null)
+            msg += " : Throwable: " + t.toString();
         m_logger.log(getPriorityForLevel(level), msg);
     }
 
     @Override
     public void addSimpleWriterAppender(StringWriter writer) {
-        throw new RuntimeException("This logger doesn't support appenders. You need Log4j.");
+        m_logger.log(java.util.logging.Level.INFO, "This logger doesn't support appenders. You need Log4j.");
     }
 
     @Override
