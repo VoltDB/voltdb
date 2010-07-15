@@ -790,11 +790,19 @@ public abstract class ClientMain {
                 return false;
             }
             while (response[0].advanceRow()) {
-                if (!response[0].getString("key").equals("hostname"))
+                if (!response[0].getString("KEY").equals("HOSTNAME")) {
                     continue;
-                hostMappings.put((Integer) response[0].get("node_id", VoltType.INTEGER),
-                                 response[0].getString("value"));
+                }
+                hostMappings.put((Integer) response[0].get("HOST_ID", VoltType.INTEGER),
+                                 response[0].getString("VALUE"));
             }
+
+            /* DUMP THE HOST MAPPINGS:
+            System.err.println("\n\nhostMappings: ");
+            for (Integer i : hostMappings.keySet()) {
+                System.err.println("\tkey: " + i + " value: " + hostMappings.get(i));
+            }
+            */
 
             // Do a scan to get all the file names and table names
             response = client.callProcedure("@SnapshotScan", dir).getResults();
@@ -809,17 +817,28 @@ public abstract class ClientMain {
                     continue;
 
                 String[] tables = response[0].getString("TABLES_REQUIRED").split(",");
-                for (String t : tables)
+                for (String t : tables) {
                     snapshotMappings.put(t, null);
+                }
                 break;
             }
 
-            while (response[2].advanceRow()) {
-                long id = response[2].getLong("HOST_ID");
-                String tableName = response[2].getString("TABLE");
+            /* DUMP THE SNAPSHOT MAPPINGS:
+            System.err.println("\n\nsnapshotMappings: ");
+            for (String i : snapshotMappings.keySet()) {
+                System.err.println("\tkey: " + i + " value: " + snapshotMappings.get(i));
+            }
+            */
 
-                if (!snapshotMappings.containsKey(tableName) || !hostMappings.containsKey(id))
+            while (response[2].advanceRow()) {
+                int id = (Integer)response[2].get("HOST_ID", VoltType.INTEGER);
+                String tableName = response[2].getString("TABLE");
+                if (!snapshotMappings.containsKey(tableName) || !hostMappings.containsKey(id)) {
+                    System.err.println("FAILED configuring snapshotMappings for: ");
+                    System.err.println("snapshottingMapping[" + tableName + "] " + snapshotMappings.get(tableName));
+                    System.err.println("hostMappings[" + id + "] " + hostMappings.get(id));
                     continue;
+                }
 
                 snapshotMappings.put(tableName, Pair.of(hostMappings.get(id),
                                                         response[2].getString("NAME")));
@@ -839,10 +858,13 @@ public abstract class ClientMain {
         }
 
         // Iterate through all the tables
+        System.err.println("Checking " + m_tableCheckOrder.size() + " table contraints");
         for (String tableName : m_tableCheckOrder) {
             Pair<String, String> value = snapshotMappings.get(tableName);
-            if (value == null)
+            if (value == null) {
+                System.err.println("No snapshot mapping for table: " + tableName);
                 continue;
+            }
 
             String hostName = value.getFirst();
             File file = new File(dir, value.getSecond());
@@ -855,8 +877,6 @@ public abstract class ClientMain {
                 System.err.println("No constraint for : " + tableName);
                 continue;
             }
-
-            System.err.println("Checking table " + tableName);
 
             // Copy the file over
             String localhostName =  ConnectionUtil.getHostnameOrAddress();

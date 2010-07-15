@@ -299,6 +299,7 @@ public class AppUpdate extends ClientMain
 
         // change catalogs with a probability of 0.01%
         else if (m_rand.nextInt(100000) < 10) {
+            checkTables();
             queued = updateToCatalog(m_rand.nextInt(1000) % 3);
         }
 
@@ -359,16 +360,14 @@ public class AppUpdate extends ClientMain
 
                 Integer int_value = (Integer)row.get(int_index, VoltType.INTEGER);
                 String pay_value = (String)row.get(pay_index, VoltType.STRING);
-
                 return intLookup.get(int_value).equals(pay_value);
             }
             else if (m_table.equalsIgnoreCase("B")) {
                 final int str_index = row.getColumnIndex("S");
                 final int pay_index = row.getColumnIndex("PAYLOAD");
 
-                String str_value = (String)row.get(str_index, VoltType.INTEGER);
+                String str_value = (String)row.get(str_index, VoltType.STRING);
                 String pay_value = (String)row.get(pay_index, VoltType.STRING);
-
                 return strLookup.get(str_value).equals(pay_value);
             }
             return false;
