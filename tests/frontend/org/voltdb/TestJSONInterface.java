@@ -297,6 +297,21 @@ public class TestJSONInterface extends TestCase {
         System.out.println(response.statusString);
         assertEquals(ClientResponse.SUCCESS, response.status);
 
+        // now try null
+        pset.setParameters(1,
+                4,
+                new double[] { 1.5, 6.0, 4 },
+                new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT)),
+                5,
+                new BigDecimal[] {},
+                null);
+
+        responseJSON = callProcOverJSON("CrazyBlahProc", pset);
+        System.out.println(responseJSON);
+        response = responseFromJSON(responseJSON);
+        System.out.println(response.statusString);
+        assertEquals(ClientResponse.SUCCESS, response.status);
+
         server.shutdown();
         server.join();
     }

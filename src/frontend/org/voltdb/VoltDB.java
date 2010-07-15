@@ -171,7 +171,7 @@ public class VoltDB {
                 }
 
                 else if (arg.equals("httpadminport")) {
-                    m_port = Integer.parseInt(args[++i]);
+                    m_httpAdminPort = Integer.parseInt(args[++i]);
                 }
                 else if (arg.startsWith("httpadminport ")) {
                     m_httpAdminPort = Integer.parseInt(arg.substring("httpadminport ".length()));

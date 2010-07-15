@@ -100,7 +100,7 @@ import org.voltdb.types.VoltDecimalHelper;
         out.writeShort(m_params.length);
 
         for (Object obj : m_params) {
-            if (obj == null) {
+            if ((obj == null) || (obj == JSONObject.NULL)) {
                 VoltType type = VoltType.NULL;
                 out.writeByte(type.getValue());
                 continue;
