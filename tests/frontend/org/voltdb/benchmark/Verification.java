@@ -23,6 +23,8 @@
 
 package org.voltdb.benchmark;
 
+import java.util.*;
+
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.types.ExpressionType;
@@ -38,6 +40,48 @@ public class Verification {
     public interface Expression {
         public <T> Object evaluate(T tuple);
         public <T> String toString(T tuple);
+    }
+
+
+    /**
+     * Some shared code useful for validating foreign key contraints.
+     * Briefly, this works by scanning the FK table first and storing
+     * the relevant data, then scanning the constrained table to verify
+     * rows match the  corresponding FK.
+     */
+    public static abstract class ForeignKeyConstraintBase implements Expression {
+        protected final String m_table;
+
+        public ForeignKeyConstraintBase(String table) {
+            m_table = table;
+        }
+
+        @Override
+        abstract public <T> Object evaluate(T tuple);
+
+        @SuppressWarnings("unchecked")
+        protected static <T> void getKey(VoltTable tuple, String columnName,
+                                       Set<T> keySet) {
+            final int index = tuple.getColumnIndex(columnName);
+            final VoltType type = tuple.getColumnType(index);
+            keySet.add((T) tuple.get(index, type));
+        }
+
+        protected static <T> void getKeys(VoltTable tuple, String[] columnNames,
+                                        Set<List<Number>> keySet) {
+            final List<Number> key = new ArrayList<Number>(columnNames.length);
+            for (String name : columnNames) {
+                final int index = tuple.getColumnIndex(name);
+                final VoltType type = tuple.getColumnType(index);
+                key.add((Number) tuple.get(index, type));
+            }
+            keySet.add(key);
+        }
+
+        @Override
+        public <T> String toString(T tuple) {
+            return ("foreign key check on " + m_table);
+        }
     }
 
     /**

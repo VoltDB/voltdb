@@ -180,7 +180,8 @@ public class ProcessSetManager {
         pd.err.m_expectDeath.set(true);
 
         try {
-            pd.process.waitFor();
+            int waitFor = pd.process.waitFor();
+            System.err.println("Joined pd.process with exit status: " + waitFor);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }

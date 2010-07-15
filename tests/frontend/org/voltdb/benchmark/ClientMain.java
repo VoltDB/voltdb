@@ -815,7 +815,7 @@ public abstract class ClientMain {
             }
 
             while (response[2].advanceRow()) {
-                int id = Integer.parseInt(response[2].getString("HOST_ID"));
+                long id = response[2].getLong("HOST_ID");
                 String tableName = response[2].getString("TABLE");
 
                 if (!snapshotMappings.containsKey(tableName) || !hostMappings.containsKey(id))
@@ -851,8 +851,10 @@ public abstract class ClientMain {
             long rowCount = 0;
 
             Pair<String, Integer> key = Pair.of(tableName, 0);
-            if (!m_constraints.containsKey(key) || hostName == null)
+            if (!m_constraints.containsKey(key) || hostName == null) {
+                System.err.println("No constraint for : " + tableName);
                 continue;
+            }
 
             System.err.println("Checking table " + tableName);
 

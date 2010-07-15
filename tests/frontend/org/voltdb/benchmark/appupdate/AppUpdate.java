@@ -23,14 +23,44 @@
 package org.voltdb.benchmark.appupdate;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Random;
 
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.benchmark.ClientMain;
+import org.voltdb.benchmark.Verification.ForeignKeyConstraintBase;
 import org.voltdb.benchmark.appupdate.procs.InsertA;
 import org.voltdb.benchmark.appupdate.procs.InsertB;
 import org.voltdb.client.*;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.NotImplementedException;
+
+/**
+ * This benchmark uses three tables: A, B, FK.  Table FK is replicated and maps an int and a string
+ * to a payload. InsertA does a lookup on payload using the int and inserts the corresponding payload into A.
+ * InsertB does a lookup in FK of the payload using the string and inserts the corresponding payload into B.
+ * Concurrently with this workload, with some small probability, an UpdateApplicationCatalog procedure
+ * is run to change at random to a catalog defining A, B, or both A and B.
+ *
+ *  Consequently, lots of calls to InsertA and InsertB should fail. This failure is expected and is
+ *  counted. Likewise, some number of catalog updates will fail - they will diff v. an out of date
+ *  catalog and be caught by the  ExecutionSite as stale. These are also counted.
+ *
+ *  Note that this is an insert only workload. The system will run out of memory unless tables are
+ *  correctly dropped as a consequence of a catalog update.
+ *
+ *  Finally, the payload lookup scheme estalishes a foreign key constraint between A and FK and
+ *  B and FK. This is validated by the checkTransaction constraint benchmark feature, which uses
+ *  snapshots.
+ *
+ *  This test could/should be extended to include:
+ *      * export only tables
+ *      * export clients
+ *      * drops of replicated tables
+ *      * multi-partition workload (maybe UpdatePayload).
+ *      * AdHoc (see ENG-635)
+ */
 
 public class AppUpdate extends ClientMain
 {
@@ -40,11 +70,16 @@ public class AppUpdate extends ClientMain
 
     public static enum Transaction {
         InsertA("InsertA"),
+        InsertAFail("InsertA Failed"),
         InsertB("InsertB"),
+        InsertBFail("InsertB Failed"),
         Load("Load"),
         CatalogAB("appupdate_ab.jar"),
         CatalogA("appupdate_a.jar"),
-        CatalogB("appupdate_b.jar");
+        CatalogB("appupdate_b.jar"),
+        CatalogABFail("appupdate_ab.jar Failed"),
+        CatalogAFail("appupdate_a.jar Failed"),
+        CatalogBFail("appupdate_b.jar Failed");
         private Transaction(String name) {
             this.name = name;
         }
@@ -130,28 +165,45 @@ public class AppUpdate extends ClientMain
         @Override
         public void clientCallback(ClientResponse clientResponse) {
             if (clientResponse.getStatus() == ClientResponse.CONNECTION_LOST) {
-                System.err.println("Connection lost to server.");
                 return;
             }
             if (!checkTransaction(t.name, clientResponse, false, false)) {
+                if (clientResponse.getStatusString() != null) {
+                    if (clientResponse.getStatusString().contains("Procedure InsertA was not found"))
+                        m_counts[Transaction.InsertAFail.ordinal()].incrementAndGet();
+                    else if (clientResponse.getStatusString().contains("Procedure InsertB was not found"))
+                        m_counts[Transaction.InsertBFail.ordinal()].incrementAndGet();
+                    else if (clientResponse.getStatusString().contains("Trying to update main catalog context with diff commands generated for an out-of date catalog."))
+                        if (t == Transaction.CatalogA)
+                            m_counts[Transaction.CatalogAFail.ordinal()].incrementAndGet();
+                        else if (t == Transaction.CatalogB)
+                            m_counts[Transaction.CatalogBFail.ordinal()].incrementAndGet();
+                        else if (t == Transaction.CatalogAB)
+                            m_counts[Transaction.CatalogABFail.ordinal()].incrementAndGet();
+                    return;
+                }
                 if (clientResponse.getException() != null) {
                     clientResponse.getException().printStackTrace();
                 }
                 if (clientResponse.getStatusString() != null) {
-                    // floods with "procedure not found" errors.
                     System.err.println(clientResponse.getStatusString());
                 }
+                throw new RuntimeException("Error. Unexpected failure from harness.");
             }
-            m_counts[t.ordinal()].incrementAndGet();
+            else {
+                m_counts[t.ordinal()].incrementAndGet();
+            }
         }
     }
 
     public AppUpdate(Client client) {
         super(client);
+        setupVerificationConstraints();
     }
 
     public AppUpdate(String args[]) {
         super(args);
+        setupVerificationConstraints();
     }
 
     @Override
@@ -223,7 +275,7 @@ public class AppUpdate extends ClientMain
             default:
                 throw new UnsupportedOperationException("Invalid catalog update requested");
         }
-        System.err.println("Updating to catalog " + nextCatalog.name);
+        // System.err.println("Updating to catalog " + nextCatalog.name);
         return m_voltClient.callProcedure(
                   new AppUpdateCallback(nextCatalog),
                   "@UpdateApplicationCatalog", nextCatalog.name);
@@ -245,9 +297,9 @@ public class AppUpdate extends ClientMain
             }
         }
 
-        // change catalogs with a probability of 0.1%
-        else if (m_rand.nextInt(10000) < 10) {
-            queued = updateToCatalog(m_rand.nextInt(3));
+        // change catalogs with a probability of 0.01%
+        else if (m_rand.nextInt(100000) < 10) {
+            queued = updateToCatalog(m_rand.nextInt(1000) % 3);
         }
 
         // 50% inserts to A
@@ -273,6 +325,63 @@ public class AppUpdate extends ClientMain
 
     public static void main(String[] args) {
         ClientMain.main(AppUpdate.class, args, false);
+        System.err.println("Exiting AppUpdate.");
     }
+
+
+    private static class ForeignKeyConstraints extends ForeignKeyConstraintBase {
+
+        private static final HashMap<Integer, String> intLookup = new HashMap<Integer, String>();
+        private static final HashMap<String, String> strLookup = new HashMap<String, String>();
+
+        public ForeignKeyConstraints(String table) {
+            super(table);
+        }
+
+        @Override
+        public <T> Object evaluate(T tuple) {
+            VoltTable row = (VoltTable) tuple;
+
+            // build the FK table relationships in memory
+            if (m_table.equalsIgnoreCase("FK")) {
+                final int int_index = row.getColumnIndex("I");
+                final int str_index = row.getColumnIndex("S");
+                final int pay_index = row.getColumnIndex("PAYLOAD");
+                intLookup.put((Integer)row.get(int_index, VoltType.INTEGER),
+                              (String)row.get(pay_index, VoltType.STRING));
+                strLookup.put((String)row.get(str_index, VoltType.STRING),
+                              (String)row.get(pay_index, VoltType.STRING));
+                return true;
+            }
+            else if (m_table.equalsIgnoreCase("A")) {
+                final int int_index = row.getColumnIndex("I");
+                final int pay_index = row.getColumnIndex("PAYLOAD");
+
+                Integer int_value = (Integer)row.get(int_index, VoltType.INTEGER);
+                String pay_value = (String)row.get(pay_index, VoltType.STRING);
+
+                return intLookup.get(int_value).equals(pay_value);
+            }
+            else if (m_table.equalsIgnoreCase("B")) {
+                final int str_index = row.getColumnIndex("S");
+                final int pay_index = row.getColumnIndex("PAYLOAD");
+
+                String str_value = (String)row.get(str_index, VoltType.INTEGER);
+                String pay_value = (String)row.get(pay_index, VoltType.STRING);
+
+                return strLookup.get(str_value).equals(pay_value);
+            }
+            return false;
+        }
+    }
+
+    private void setupVerificationConstraints() {
+        // must process table f first to populate the constraint hashes
+        System.err.println("ADDING TABLE CONSTRAINTS");
+        addTableConstraint("FK", new ForeignKeyConstraints("FK"));
+        addTableConstraint("A", new ForeignKeyConstraints("A"));
+        addTableConstraint("B", new ForeignKeyConstraints("B"));
+    }
+
 
 }

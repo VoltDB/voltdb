@@ -24,13 +24,13 @@
 package org.voltdb.benchmark.tpcc;
 
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.benchmark.ClientMain;
 import org.voltdb.benchmark.Clock;
 import org.voltdb.benchmark.Verification;
 import org.voltdb.benchmark.Verification.Expression;
+import org.voltdb.benchmark.Verification.ForeignKeyConstraintBase;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.client.Client;
@@ -49,8 +49,7 @@ implements TPCCSimulation.ProcCaller {
     final TPCCSimulation m_tpccSim2;
     private final ScaleParameters m_scaleParams;
 
-    private static class ForeignKeyConstraints implements Expression {
-        private final String m_table;
+    private static class ForeignKeyConstraints extends ForeignKeyConstraintBase {
 
         private static final Set<Short> m_warehouse = new HashSet<Short>();
         private static final Set<List<Number>> m_district = new HashSet<List<Number>>();
@@ -60,7 +59,7 @@ implements TPCCSimulation.ProcCaller {
         private static final Set<Integer> m_item = new HashSet<Integer>();
 
         public ForeignKeyConstraints(String table) {
-            m_table = table;
+            super(table);
         }
 
         @Override
@@ -174,29 +173,6 @@ implements TPCCSimulation.ProcCaller {
             return true;
         }
 
-        @SuppressWarnings("unchecked")
-        private static <T> void getKey(VoltTable tuple, String columnName,
-                                       Set<T> keySet) {
-            final int index = tuple.getColumnIndex(columnName);
-            final VoltType type = tuple.getColumnType(index);
-            keySet.add((T) tuple.get(index, type));
-        }
-
-        private static <T> void getKeys(VoltTable tuple, String[] columnNames,
-                                        Set<List<Number>> keySet) {
-            final List<Number> key = new ArrayList<Number>(columnNames.length);
-            for (String name : columnNames) {
-                final int index = tuple.getColumnIndex(name);
-                final VoltType type = tuple.getColumnType(index);
-                key.add((Number) tuple.get(index, type));
-            }
-            keySet.add(key);
-        }
-
-        @Override
-        public <T> String toString(T tuple) {
-            return ("foreight key check on " + m_table);
-        }
     }
 
     /** Complies with our benchmark client remote controller scheme */
