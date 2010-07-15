@@ -118,7 +118,7 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
     }
 
     public void addDefaultELT() {
-        addELT("org.voltdb.elt.connectors.VerticaConnector", true, null, null);
+        addELT("org.voltdb.elt.connectors.VerticaConnector", true, null);
 
         /* Fixed after the loader completes. */
         // addELTTable("WAREHOUSE", false);

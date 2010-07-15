@@ -651,7 +651,6 @@ public class TestExportSuite extends RegressionSuite {
         project.addSchema(TestExportSuite.class.getResource("sqltypessuite-nonulls-ddl.sql"));
         project.addELT("org.voltdb.elt.processors.RawProcessor",
                        true  /*enabled*/,
-                       null, /* authUsers (off) */
                        null  /* authGroups (off) */);
         // "WITH_DEFAULTS" is a non-elt'd persistent table
         project.addELTTable("ALLOW_NULLS", false);   // persistent table
@@ -694,7 +693,6 @@ public class TestExportSuite extends RegressionSuite {
         project.addSchema(TestExportSuite.class.getResource("sqltypessuite-ddl.sql"));
         project.addELT("org.voltdb.elt.processors.RawProcessor",
                        true  /*enabled*/,
-                       null, /* authUsers (off) */
                        null  /* authGroups (off) */);
         // "WITH_DEFAULTS" is a non-elt'd persistent table
         project.addELTTable("ALLOW_NULLS", false);   // persistent table
@@ -721,7 +719,6 @@ public class TestExportSuite extends RegressionSuite {
         project.addSchema(TestExportSuite.class.getResource("sqltypessuite-addedtable-ddl.sql"));
         project.addELT("org.voltdb.elt.processors.RawProcessor",
                        true  /*enabled*/,
-                       null, /* authUsers (off) */
                        null  /* authGroups (off) */);
         // "WITH_DEFAULTS" is a non-elt'd persistent table
         project.addELTTable("ALLOW_NULLS", false);   // persistent table

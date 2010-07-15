@@ -2,20 +2,20 @@
 <project>
      <security enabled="true"/>
      <database name='database'>
-        <users>
-           <user name="tracker" password="vonbraun" />
-           <user name="signal" password="wernher" />
-           <user name="admin" password="nasa" adhoc="true" sysproc="true"/>
-        </users>
         <schemas>
             <schema path='satellite.ddl' />
         </schemas>
         <procedures>
-            <procedure class='procedures.AddSatellite' users="signal" />
-            <procedure class='procedures.UpdateLocation' users="signal" />
-            <procedure class='procedures.GetLocationData' users="tracker" />
-            <procedure class='procedures.GetSatelliteData' users="tracker"/>
+            <procedure class='procedures.AddSatellite' groups="signal-group" />
+            <procedure class='procedures.UpdateLocation' groups="signal-group" />
+            <procedure class='procedures.GetLocationData' groups="tracker-group" />
+            <procedure class='procedures.GetSatelliteData' groups="tracker-group" />
         </procedures>
+        <groups>
+            <group name="tracker-group" />
+            <group name="signal-group" />
+            <group name="admin-group" adhoc="true" sysproc="true" />
+        </groups>
         <partitions>
             <partition table='LOCATION' column='ID' />
             <partition table='SATELLITE' column='ID' />

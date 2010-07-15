@@ -29,7 +29,7 @@ public class ClusterCompiler
      * @param catalog  The catalog to be modified
      * @param clusterConfig  The desired cluster configuration
      */
-    static void compile(Catalog catalog, ClusterConfig clusterConfig)
+    public static void compile(Catalog catalog, ClusterConfig clusterConfig)
     {
         if (!clusterConfig.validate())
         {

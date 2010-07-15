@@ -10,11 +10,11 @@ Please note that there is no ant build file provided with these source files, be
 
         (compile application catalog)
 
-  $ java org.voltdb.compiler.VoltCompiler project.xml 1 1 localhost helloworld.jar
+  $ java org.voltdb.compiler.VoltCompiler project.xml helloworld.jar
 
         (create database)
 
-  $ java -Djava.library.path=../../voltdb/ org.voltdb.VoltDB catalog helloworld.jar
+  $ java -Djava.library.path=../../voltdb/ org.voltdb.VoltDB catalog helloworld.jar deployment deployment.xml
 
         (in separate window, run client application)
 

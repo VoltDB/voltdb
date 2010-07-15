@@ -28,7 +28,6 @@ import java.io.IOException;
 
 import junit.framework.TestCase;
 
-import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 
@@ -73,10 +72,8 @@ public class TestVerbotenPlans extends TestCase {
         final String projectPath = projectFile.getPath();
 
         final VoltCompiler compiler = new VoltCompiler();
-        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
 
-        final boolean success = compiler.compile(projectPath, cluster_config,
-                                                 "testout.jar", System.out, null);
+        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
 
         assertFalse(success);
     }

@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="1" sitesperhost="1" leader="localhost" />
+</deployment>

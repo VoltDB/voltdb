@@ -53,9 +53,6 @@ public class TestMilestoneOneCompile extends TestCase {
             "<?xml version=\"1.0\"?>\n" +
             "<project>" +
             "<database name='database'>" +
-            "<users>" +
-            "<user adhoc='true' groups='default' name='default' password='' sysproc='true'/>" +
-            "</users>" +
             "<groups>" +
             "<group adhoc='true' name='default' sysproc='true'/>" +
             "</groups>" +
@@ -78,10 +75,7 @@ public class TestMilestoneOneCompile extends TestCase {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         String catalogJar = testDir + File.separator + "milestoneOneCatalog.jar";
         VoltCompiler compiler = new VoltCompiler();
-        ClusterConfig cluster_config = new ClusterConfig(1, 2, 0, "localhost");
-        boolean success = compiler.compile(projectPath,
-                                           cluster_config,
-                                           catalogJar, System.out, null);
+        boolean success = compiler.compile(projectPath, catalogJar, System.out, null);
 
         assertTrue(success);
     }

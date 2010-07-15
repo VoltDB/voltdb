@@ -26,8 +26,6 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -55,8 +53,6 @@ import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
-import org.voltdb.catalog.User;
-import org.voltdb.catalog.UserRef;
 import org.voltdb.compiler.projectfile.DatabaseType;
 import org.voltdb.compiler.projectfile.GroupsType;
 import org.voltdb.compiler.projectfile.ProceduresType;
@@ -64,14 +60,12 @@ import org.voltdb.compiler.projectfile.ProjectType;
 import org.voltdb.compiler.projectfile.SchemasType;
 import org.voltdb.compiler.projectfile.SecurityType;
 import org.voltdb.compiler.projectfile.SnapshotType;
-import org.voltdb.compiler.projectfile.UsersType;
 import org.voltdb.compiler.projectfile.ClassdependenciesType.Classdependency;
 import org.voltdb.compiler.projectfile.ExportsType.Connector;
 import org.voltdb.compiler.projectfile.ExportsType.Connector.Tables;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.Encoder;
 import org.voltdb.utils.JarReader;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.StringInputStream;
@@ -213,28 +207,25 @@ public class VoltCompiler {
     }
 
     class ProcedureDescriptor {
-        final ArrayList<String> m_authUsers;
         final ArrayList<String> m_authGroups;
         final String m_className;
         // for single-stmt procs
         final String m_singleStmt;
         final String m_partitionString;
 
-        ProcedureDescriptor (final ArrayList<String> authUsers, final ArrayList<String> authGroups, final String className) {
+        ProcedureDescriptor (final ArrayList<String> authGroups, final String className) {
             assert(className != null);
 
-            m_authUsers = authUsers;
             m_authGroups = authGroups;
             m_className = className;
             m_singleStmt = null;
             m_partitionString = null;
         }
 
-        ProcedureDescriptor (final ArrayList<String> authUsers, final ArrayList<String> authGroups, final String className, final String singleStmt, final String partitionString) {
+        ProcedureDescriptor (final ArrayList<String> authGroups, final String className, final String singleStmt, final String partitionString) {
             assert(className != null);
             assert(singleStmt != null);
 
-            m_authUsers = authUsers;
             m_authGroups = authGroups;
             m_className = className;
             m_singleStmt = singleStmt;
@@ -287,17 +278,34 @@ public class VoltCompiler {
     }
 
     /**
+     * Compile with this method when you don't want the deployment.xml data to be applied to the catalog at this stage.
+     * This is the most common use case.
+     *
      * @param projectFileURL URL of the project file.
-     * @param clusterConfig Object containing desired physical cluster parameters
      * @param jarOutputPath The location to put the finished JAR to.
      * @param output Where to print status/errors to, usually stdout.
      * @param procInfoOverrides Optional overridden values for procedure annotations.
      */
-
     public boolean compile(final String projectFileURL,
-                           final ClusterConfig clusterConfig,
+            final String jarOutputPath, final PrintStream output,
+            final Map<String, ProcInfoData> procInfoOverrides) {
+        return compile(projectFileURL, jarOutputPath, output, procInfoOverrides, null);
+    }
+
+    /**
+     * Compile with this method when you do want the deployment.xml data to be applied to the catalog at this stage. The
+     * only time you will probably want to do this is when using VoltProjectBuilder.
+     *
+     * @param projectFileURL URL of the project file.
+     * @param jarOutputPath The location to put the finished JAR to.
+     * @param output Where to print status/errors to, usually stdout.
+     * @param procInfoOverrides Optional overridden values for procedure annotations.
+     * @param pathToDeployment Path to deployment.xml file.
+     */
+    public boolean compile(final String projectFileURL,
                            final String jarOutputPath, final PrintStream output,
-                           final Map<String, ProcInfoData> procInfoOverrides)
+                           final Map<String, ProcInfoData> procInfoOverrides,
+                           final String pathToDeployment)
     {
         m_hsql = null;
         m_projectFileURL = projectFileURL;
@@ -306,16 +314,17 @@ public class VoltCompiler {
         // use this map as default annotation values
         m_procInfoOverrides = procInfoOverrides;
 
-        compilerLog.l7dlog( Level.INFO, LogKeys.compiler_VoltCompiler_LeaderAndHostCountAndSitesPerHost.name(),
-                new Object[] { clusterConfig.getLeaderAddress(),
-                               clusterConfig.getHostCount(),
-                               clusterConfig.getSitesPerHost() }, null);
-
         // do all the work to get the catalog
-        final Catalog catalog = compileCatalog(projectFileURL, clusterConfig);
+        final Catalog catalog = compileCatalog(projectFileURL);
         if (catalog == null) {
             compilerLog.error("Catalog compilation failed.");
             return false;
+        }
+
+        // pathToDeployment will be null unless this is being called by VoltProjectBuilder which needs deployment info
+        // to be built into the catalog now
+        if (pathToDeployment != null) {
+            CatalogUtil.compileDeployment(catalog, pathToDeployment);
         }
 
         // WRITE CATALOG TO JAR HERE
@@ -349,16 +358,8 @@ public class VoltCompiler {
     }
 
     @SuppressWarnings("unchecked")
-    public Catalog compileCatalog(final String projectFileURL,
-                                  final ClusterConfig clusterConfig)
+    public Catalog compileCatalog(final String projectFileURL)
     {
-        if (!clusterConfig.validate())
-        {
-            addErr(clusterConfig.getErrorMsg());
-            compilerLog.error("Cluster configuration error: " + clusterConfig.getErrorMsg());
-            return null;
-        }
-
         // Compiler instance is reusable. Clear the cache.
         cachedAddedClasses.clear();
         m_currentFilename = new File(projectFileURL).getName();
@@ -413,17 +414,6 @@ public class VoltCompiler {
             return null;
         }
         assert(m_catalog != null);
-
-        try
-        {
-            ClusterCompiler.compile(m_catalog, clusterConfig);
-        }
-        catch (RuntimeException e)
-        {
-            addErr(e.getMessage());
-            compilerLog.error(e.getMessage());
-            return null;
-        }
 
         // add epoch info to catalog
         final int epoch = (int)(TransactionIdManager.getEpoch() / 1000);
@@ -564,29 +554,6 @@ public class VoltCompiler {
                 org.voltdb.catalog.Group catGroup = db.getGroups().add(group.getName());
                 catGroup.setAdhoc(group.isAdhoc());
                 catGroup.setSysproc(group.isSysproc());
-            }
-        }
-
-        // users/user
-        if (database.getUsers() != null) {
-            for (UsersType.User user : database.getUsers().getUser()) {
-                org.voltdb.catalog.User catUser = db.getUsers().add(user.getName());
-                catUser.setAdhoc(user.isAdhoc());
-                catUser.setSysproc(user.isSysproc());
-                byte passwordHash[] = extractPassword(user.getPassword());
-                catUser.setShadowpassword(Encoder.hexEncode(passwordHash));
-
-                // process the @groups comma separated list
-                if (user.getGroups() != null) {
-                    String grouplist[] = user.getGroups().split(",");
-                    for (final String group : grouplist) {
-                        final GroupRef groupRef = catUser.getGroups().add(group);
-                        final Group catalogGroup = db.getGroups().get(group);
-                        if (catalogGroup != null) {
-                            groupRef.setGroup(catalogGroup);
-                        }
-                    }
-                }
             }
         }
 
@@ -751,15 +718,7 @@ public class VoltCompiler {
         org.voltdb.compiler.projectfile.ProceduresType.Procedure xmlproc)
         throws VoltCompilerException
     {
-        final ArrayList<String> users = new ArrayList<String>();
         final ArrayList<String> groups = new ArrayList<String>();
-
-        // @users
-        if (xmlproc.getUsers() != null) {
-            for (String user : xmlproc.getUsers().split(",")) {
-                users.add(user);
-            }
-        }
 
         // @groups
         if (xmlproc.getGroups() != null) {
@@ -778,7 +737,7 @@ public class VoltCompiler {
             // set empty attributes to multi-partition
             if (partattr != null && partattr.length() == 0)
                 partattr = null;
-            return new ProcedureDescriptor(users, groups, classattr,
+            return new ProcedureDescriptor(groups, classattr,
                                            xmlproc.getSql(), partattr);
         }
         else {
@@ -789,7 +748,7 @@ public class VoltCompiler {
                 "and may not use the @partitioninfo project file procedure attribute.";
                 throw new VoltCompilerException(msg);
             }
-            return new ProcedureDescriptor(users, groups, classattr);
+            return new ProcedureDescriptor(groups, classattr);
         }
     }
 
@@ -839,19 +798,6 @@ public class VoltCompiler {
         return retval;
     }
 
-    /** Read a hashed password from password. */
-    private byte[] extractPassword(String password) {
-        MessageDigest md = null;
-        try {
-            md = MessageDigest.getInstance("SHA-1");
-        } catch (final NoSuchAlgorithmException e) {
-            compilerLog.l7dlog(Level.FATAL, LogKeys.compiler_VoltCompiler_NoSuchAlgorithm.name(), e);
-            System.exit(-1);
-        }
-        final byte passwordHash[] = md.digest(md.digest(password.getBytes()));
-        return passwordHash;
-    }
-
     void compileConnector(final Connector conn, final Database catdb)
         throws VoltCompilerException
     {
@@ -876,15 +822,7 @@ public class VoltCompiler {
         catconn.setLoaderclass(conn.getClazz());
 
         // add authorized users and groups
-        final ArrayList<String> userslist = new ArrayList<String>();
         final ArrayList<String> groupslist = new ArrayList<String>();
-
-        // @users
-        if (conn.getUsers() != null) {
-            for (String user : conn.getUsers().split(",")) {
-                userslist.add(user);
-            }
-        }
 
         // @groups
         if (conn.getGroups() != null) {
@@ -893,14 +831,6 @@ public class VoltCompiler {
             }
         }
 
-        for (String userName : userslist) {
-            final User user = catdb.getUsers().get(userName);
-            if (user == null) {
-                throw new VoltCompilerException("Export connector " + conn.getClazz() + " has a user " + userName + " that does not exist");
-            }
-            final UserRef userRef = catconn.getAuthusers().add(userName);
-            userRef.setUser(user);
-        }
         for (String groupName : groupslist) {
             final Group group = catdb.getGroups().get(groupName);
             if (group == null) {
@@ -1016,27 +946,16 @@ public class VoltCompiler {
 
     public static void main(final String[] args) {
         // Parse arguments
-        if (args.length < 5 || args.length > 6) {
-            System.err.println("VoltCompiler [project file] [hosts] [sites per host] [leader IP] [output JAR] [k-safety factor (optional/future)] ");
+        if (args.length != 2) {
+            System.err.println("VoltCompiler [project file] [output JAR]");
             System.exit(1);
         }
         final String projectPath = args[0];
-        final int hostCount = Integer.parseInt(args[1]);
-        final int siteCount = Integer.parseInt(args[2]);
-        final String leaderAddress = args[3];
-        final String outputJar = args[4];
-        int k_factor = 0;
-        if (args.length == 6)
-        {
-            k_factor = Integer.parseInt(args[5]);
-        }
+        final String outputJar = args[1];
 
         // Compile and exit with error code if we failed
-        final ClusterConfig cluster_config =
-            new ClusterConfig(hostCount, siteCount, k_factor, leaderAddress);
         final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compile(projectPath, cluster_config,
-                                                 outputJar, System.out, null);
+        final boolean success = compiler.compile(projectPath, outputJar, System.out, null);
         if (!success) {
             System.exit(-1);
         }

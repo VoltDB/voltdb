@@ -46,7 +46,6 @@
   <xsd:complexType name="databaseType">
     <xsd:all>
       <!-- elements of an all group may appear in any order at most once. -->
-      <xsd:element name="users" type="usersType" minOccurs="0"/>
       <xsd:element name="groups" type="groupsType" minOccurs="0"/>
       <xsd:element name="schemas" type="schemasType"/>
       <xsd:element name="procedures" type="proceduresType"/>
@@ -64,21 +63,6 @@
     <xsd:attribute name="retain" type="xsd:integer" use="required" />
     <xsd:attribute name="path" type="xsd:string" use="required" />
     <xsd:attribute name="prefix" type="xsd:string" use="required" />
-  </xsd:complexType>
-
-  <!-- <users> -->
-  <xsd:complexType name="usersType">
-    <xsd:sequence>
-      <xsd:element name="user" minOccurs="1" maxOccurs="unbounded">
-        <xsd:complexType>
-          <xsd:attribute name="name" type="xsd:string" use="required"/>
-          <xsd:attribute name="sysproc" type="xsd:boolean" default="false"/>
-          <xsd:attribute name="adhoc" type="xsd:boolean" default="false"/>
-          <xsd:attribute name="groups" type="xsd:string" />
-          <xsd:attribute name="password" type="xsd:string" use="required"/>
-        </xsd:complexType>
-      </xsd:element>
-    </xsd:sequence>
   </xsd:complexType>
 
   <!-- <groups> -->
@@ -116,7 +100,6 @@
           </xsd:sequence>
           <xsd:attribute name="class" type="xsd:string" use="required"/>
           <xsd:attribute name="partitioninfo" type="xsd:string"/>
-          <xsd:attribute name="users" type="xsd:string"/>
           <xsd:attribute name="groups" type="xsd:string"/>
         </xsd:complexType>
       </xsd:element>
@@ -171,7 +154,6 @@
 	  <!-- connector attributes -->
           <xsd:attribute name="class" type="xsd:string" use="required"/>
 	  <xsd:attribute name="enabled" type="xsd:boolean" default="false"/>
-          <xsd:attribute name="users" type="xsd:string"/>
           <xsd:attribute name="groups" type="xsd:string"/>
 	</xsd:complexType>
       </xsd:element>

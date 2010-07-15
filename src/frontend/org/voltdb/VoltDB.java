@@ -64,6 +64,9 @@ public class VoltDB {
         /** name of the m_catalog JAR file */
         public String m_pathToCatalog = "catalog.jar";
 
+        /** name of the deployment file */
+        public String m_pathToDeployment = null;
+
         /** level of internal transaction profiling (for testing) */
         public ProcedureProfiler.Level m_profilingLevel =
             ProcedureProfiler.Level.DISABLED;
@@ -180,6 +183,9 @@ public class VoltDB {
                 // and from ant as a single string "m_catalog filename"
                 else if (arg.startsWith("catalog ")) {
                     m_pathToCatalog = arg.substring("catalog ".length());
+                }
+                else if (arg.equals("deployment")) {
+                    m_pathToDeployment = args[++i];
                 }
                 else if (arg.equalsIgnoreCase("useThreadAffinity")) {
                     m_useThreadAffinity = true;

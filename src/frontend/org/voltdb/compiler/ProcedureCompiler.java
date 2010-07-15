@@ -38,8 +38,6 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.catalog.Table;
-import org.voltdb.catalog.User;
-import org.voltdb.catalog.UserRef;
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.utils.CatalogUtil;
@@ -88,14 +86,6 @@ public abstract class ProcedureCompiler {
 
         // add an entry to the catalog
         final Procedure procedure = db.getProcedures().add(shortName);
-        for (String userName : procedureDescriptor.m_authUsers) {
-            final User user = db.getUsers().get(userName);
-            if (user == null) {
-                throw compiler.new VoltCompilerException("Procedure " + className + " has a user " + userName + " that does not exist");
-            }
-            final UserRef userRef = procedure.getAuthusers().add(userName);
-            userRef.setUser(user);
-        }
         for (String groupName : procedureDescriptor.m_authGroups) {
             final Group group = db.getGroups().get(groupName);
             if (group == null) {
@@ -306,14 +296,6 @@ public abstract class ProcedureCompiler {
 
         // add an entry to the catalog
         final Procedure procedure = db.getProcedures().add(shortName);
-        for (String userName : procedureDescriptor.m_authUsers) {
-            final User user = db.getUsers().get(userName);
-            if (user == null) {
-                throw compiler.new VoltCompilerException("Procedure " + className + " has a user " + userName + " that does not exist");
-            }
-            final UserRef userRef = procedure.getAuthusers().add(userName);
-            userRef.setUser(user);
-        }
         for (String groupName : procedureDescriptor.m_authGroups) {
             final Group group = db.getGroups().get(groupName);
             if (group == null) {

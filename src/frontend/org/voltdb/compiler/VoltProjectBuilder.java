@@ -59,21 +59,20 @@ import org.w3c.dom.Text;
  * the information a user would put in a VoltDB project file and it will go
  * and build the project file and run the compiler on it.
  *
+ * It will also create a deployment.xml file and apply its changes to the catalog.
  */
 public class VoltProjectBuilder {
 
     final LinkedHashSet<String> m_schemas = new LinkedHashSet<String>();
 
     public static final class ProcedureInfo {
-        private final String users[];
         private final String groups[];
         private final Class<?> cls;
         private final String name;
         private final String sql;
         private final String partitionInfo;
 
-        public ProcedureInfo(final String users[], final String groups[], final Class<?> cls) {
-            this.users = users;
+        public ProcedureInfo(final String groups[], final Class<?> cls) {
             this.groups = groups;
             this.cls = cls;
             this.name = cls.getSimpleName();
@@ -82,9 +81,8 @@ public class VoltProjectBuilder {
             assert(this.name != null);
         }
 
-        public ProcedureInfo(final String users[], final String groups[], final String name, final String sql, final String partitionInfo) {
+        public ProcedureInfo(final String groups[], final String name, final String sql, final String partitionInfo) {
             assert(name != null);
-            this.users = users;
             this.groups = groups;
             this.cls = null;
             this.name = name;
@@ -110,15 +108,11 @@ public class VoltProjectBuilder {
 
     public static final class UserInfo {
         private final String name;
-        private final boolean adhoc;
-        private final boolean sysproc;
         private final String password;
         private final String groups[];
 
-        public UserInfo (final String name, final boolean adhoc, final boolean sysproc, final String password, final String groups[]){
+        public UserInfo (final String name, final String password, final String groups[]){
             this.name = name;
-            this.adhoc = adhoc;
-            this.sysproc = sysproc;
             this.password = password;
             this.groups = groups;
         }
@@ -183,7 +177,6 @@ public class VoltProjectBuilder {
 
     String m_elloader = null;         // loader package.Classname
     private boolean m_elenabled;      // true if enabled; false if disabled
-    List<String> m_elAuthUsers;       // authorized users
     List<String> m_elAuthGroups;      // authorized groups
 
     BackendTarget m_target = BackendTarget.NATIVE_EE_JNI;
@@ -280,18 +273,18 @@ public class VoltProjectBuilder {
     }
 
     public void addStmtProcedure(String name, String sql, String partitionInfo) {
-        addProcedures(new ProcedureInfo(new String[0], new String[0], name, sql, partitionInfo));
+        addProcedures(new ProcedureInfo(new String[0], name, sql, partitionInfo));
     }
 
     public void addProcedures(final Class<?>... procedures) {
         final ArrayList<ProcedureInfo> procArray = new ArrayList<ProcedureInfo>();
         for (final Class<?> procedure : procedures)
-            procArray.add(new ProcedureInfo(new String[0], new String[0], procedure));
+            procArray.add(new ProcedureInfo(new String[0], procedure));
         addProcedures(procArray);
     }
 
     /*
-     * List of users and groups permitted to invoke the procedure
+     * List of groups permitted to invoke the procedure
      */
     public void addProcedures(final ProcedureInfo... procedures) {
         final ArrayList<ProcedureInfo> procArray = new ArrayList<ProcedureInfo>();
@@ -360,11 +353,9 @@ public class VoltProjectBuilder {
     }
 
 
-    public void addELT(final String loader, boolean enabled,
-            List<String> users, List<String> groups) {
+    public void addELT(final String loader, boolean enabled, List<String> groups) {
         m_elloader = loader;
         m_elenabled = enabled;
-        m_elAuthUsers = users;
         m_elAuthGroups = groups;
     }
 
@@ -474,53 +465,18 @@ public class VoltProjectBuilder {
         final File projectFile =
             writeStringToTempFile(result.getWriter().toString());
         final String projectPath = projectFile.getPath();
-        final ClusterConfig cluster_config =
-            new ClusterConfig(hostCount, sitesPerHost, replication,
-                              leaderAddress);
+
+        String pathToDeployment = writeDeploymentFile(hostCount, sitesPerHost, leaderAddress, replication);
+
         final boolean success = compiler.compile(projectPath,
-                                           cluster_config,
                                            jarPath,
                                            m_compilerDebugPrintStream,
-                                           m_procInfoOverrides);
+                                           m_procInfoOverrides,
+                                           pathToDeployment);
         return success;
     }
 
     private void buildDatabaseElement(Document doc, final Element database) {
-
-        // /project/database/users
-        final Element users = doc.createElement("users");
-        database.appendChild(users);
-
-        // users/user
-        if (m_users.isEmpty()) {
-            final Element user = doc.createElement("user");
-            user.setAttribute("name", "default");
-            user.setAttribute("groups", "default");
-            user.setAttribute("password", "");
-            user.setAttribute("sysproc", "true");
-            user.setAttribute("adhoc", "true");
-            users.appendChild(user);
-        }
-        else {
-            for (final UserInfo info : m_users) {
-                final Element user = doc.createElement("user");
-                user.setAttribute("name", info.name);
-                user.setAttribute("password", info.password);
-                user.setAttribute("sysproc", info.sysproc ? "true" : "false");
-                user.setAttribute("adhoc", info.adhoc ? "true" : "false");
-                // build up user/@groups. This attribute must be redesigned
-                if (info.groups.length > 0) {
-                    final StringBuilder groups = new StringBuilder();
-                    for (final String group : info.groups) {
-                        if (groups.length() > 0)
-                            groups.append(",");
-                        groups.append(group);
-                    }
-                    user.setAttribute("groups", groups.toString());
-                }
-                users.appendChild(user);
-            }
-        }
 
         // /project/database/groups
         final Element groups = doc.createElement("groups");
@@ -567,16 +523,6 @@ public class VoltProjectBuilder {
 
             final Element proc = doc.createElement("procedure");
             proc.setAttribute("class", procedure.cls.getName());
-            // build up @users. This attribute should be redesigned
-            if (procedure.users.length > 0) {
-                final StringBuilder userattr = new StringBuilder();
-                for (final String user : procedure.users) {
-                    if (userattr.length() > 0)
-                        userattr.append(",");
-                    userattr.append(user);
-                }
-                proc.setAttribute("users", userattr.toString());
-            }
             // build up @groups. This attribute should be redesigned
             if (procedure.groups.length > 0) {
                 final StringBuilder groupattr = new StringBuilder();
@@ -600,16 +546,6 @@ public class VoltProjectBuilder {
             proc.setAttribute("class", procedure.name);
             if (procedure.partitionInfo != null);
                 proc.setAttribute("partitioninfo", procedure.partitionInfo);
-            // build up @users. This attribute should be redesigned
-            if (procedure.users.length > 0) {
-                final StringBuilder userattr = new StringBuilder();
-                for (final String user : procedure.users) {
-                    if (userattr.length() > 0)
-                        userattr.append(",");
-                    userattr.append(user);
-                }
-                proc.setAttribute("users", userattr.toString());
-            }
             // build up @groups. This attribute should be redesigned
             if (procedure.groups.length > 0) {
                 final StringBuilder groupattr = new StringBuilder();
@@ -663,20 +599,6 @@ public class VoltProjectBuilder {
             final Element conn = doc.createElement("connector");
             conn.setAttribute("class", m_elloader);
             conn.setAttribute("enabled", m_elenabled ? "true" : "false");
-
-            // turn list into stupid comma separated attribute list
-            String usersattr = "";
-            if (m_elAuthUsers != null) {
-                for (String s : m_elAuthUsers) {
-                    if (usersattr.isEmpty()) {
-                        usersattr += s;
-                    }
-                    else {
-                        usersattr += "," + s;
-                    }
-                }
-                conn.setAttribute("users", usersattr);
-            }
 
             // turn list into stupid comma separated attribute list
             String groupsattr = "";
@@ -743,4 +665,103 @@ public class VoltProjectBuilder {
             return null;
         }
     }
+
+    /**
+     * Writes deployment.xml file to a temporary file. It is constructed from the passed parameters and the m_users
+     * field.
+     * @param hostCount Number of hosts.
+     * @param sitesPerHost Sites per host.
+     * @param leader Leader address.
+     * @param kFactor Replication factor.
+     * @return Returns the path the temporary file was written to.
+     */
+    private String writeDeploymentFile(int hostCount, int sitesPerHost, String leader, int kFactor) {
+        DocumentBuilderFactory docFactory;
+        DocumentBuilder docBuilder;
+        Document doc;
+        try {
+            docFactory = DocumentBuilderFactory.newInstance();
+            docBuilder = docFactory.newDocumentBuilder();
+            doc = docBuilder.newDocument();
+        }
+        catch (final ParserConfigurationException e) {
+            e.printStackTrace();
+            return null;
+        }
+
+        // <deployment>
+        final Element deployment = doc.createElement("deployment");
+        doc.appendChild(deployment);
+
+        // <cluster>
+        final Element cluster = doc.createElement("cluster");
+        cluster.setAttribute("hostcount", new Integer(hostCount).toString());
+        cluster.setAttribute("sitesperhost", new Integer(sitesPerHost).toString());
+        cluster.setAttribute("leader", leader);
+        cluster.setAttribute("kfactor", new Integer(kFactor).toString());
+        deployment.appendChild(cluster);
+
+        // <users>
+        final Element users = doc.createElement("users");
+        deployment.appendChild(users);
+
+        // <user>
+        if (m_users.isEmpty()) {
+            final Element user = doc.createElement("user");
+            user.setAttribute("name", "default");
+            user.setAttribute("groups", "default");
+            user.setAttribute("password", "");
+            users.appendChild(user);
+        }
+        else {
+            for (final UserInfo info : m_users) {
+                final Element user = doc.createElement("user");
+                user.setAttribute("name", info.name);
+                user.setAttribute("password", info.password);
+                // build up user/@groups. This attribute must be redesigned
+                if (info.groups.length > 0) {
+                    final StringBuilder groups = new StringBuilder();
+                    for (final String group : info.groups) {
+                        if (groups.length() > 0)
+                            groups.append(",");
+                        groups.append(group);
+                    }
+                    user.setAttribute("groups", groups.toString());
+                }
+                users.appendChild(user);
+            }
+        }
+
+        // boilerplate to write this DOM object to file.
+        StreamResult result;
+        try {
+            final Transformer transformer = TransformerFactory.newInstance().newTransformer();
+            transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+            result = new StreamResult(new StringWriter());
+            final DOMSource domSource = new DOMSource(doc);
+            transformer.transform(domSource, result);
+        }
+        catch (final TransformerConfigurationException e) {
+            e.printStackTrace();
+            return null;
+        }
+        catch (final TransformerFactoryConfigurationError e) {
+            e.printStackTrace();
+            return null;
+        }
+        catch (final TransformerException e) {
+            e.printStackTrace();
+            return null;
+        }
+
+        String xml = result.getWriter().toString();
+        System.out.println(xml);
+
+        final File deploymentFile =
+            writeStringToTempFile(result.getWriter().toString());
+        final String deploymentPath = deploymentFile.getPath();
+
+        return deploymentPath;
+    }
+
 }

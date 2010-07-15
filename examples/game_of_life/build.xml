@@ -61,6 +61,8 @@ PRIMARY ENTRY POINTS
         <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError" />
         <jvmarg value="-XX:HeapDumpPath=/tmp" />
         <jvmarg value="-XX:-ReduceInitialCardMarks" />
+        <arg value="deployment" />
+        <arg value="deployment.xml" />
         <classpath refid='project.classpath' />
         <assertions><disable /></assertions>
     </java>
@@ -69,9 +71,6 @@ PRIMARY ENTRY POINTS
 <target name="compile" depends="srccompile" description="Compile the catalog using the schema and the DDL file" >
     <java fork="yes" failonerror="true" classname="org.voltdb.compiler.VoltCompiler" >
         <arg value="project.xml"/> <!-- project file -->
-        <arg value="1"/>           <!-- hosts -->
-        <arg value="3"/>           <!-- sites -->
-        <arg value="localhost"/>   <!-- leader -->
         <arg value="catalog.jar"/> <!-- output -->
         <classpath refid='project.classpath' />
         <assertions><disable /></assertions>

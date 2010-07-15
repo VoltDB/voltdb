@@ -78,10 +78,8 @@ public class TestVoltCompiler extends TestCase {
         final String projectPath = projectFile.getPath();
 
         final VoltCompiler compiler = new VoltCompiler();
-        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
 
-        final boolean success = compiler.compile(projectPath, cluster_config,
-                                                 "testout.jar", System.out, null);
+        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
         assertTrue(success);
     }
 
@@ -157,12 +155,10 @@ public class TestVoltCompiler extends TestCase {
         final String projectPath = projectFile.getPath();
 
         final VoltCompiler compiler = new VoltCompiler();
-        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         PrintStream ps = new PrintStream(baos);
-        final boolean success = compiler.compile(projectPath, cluster_config,
-                                                 "testout.jar", ps, null);
+        final boolean success = compiler.compile(projectPath, "testout.jar", ps, null);
         ps.flush();
         String str = baos.toString();
         System.out.println(str);
@@ -218,7 +214,7 @@ public class TestVoltCompiler extends TestCase {
         project.addPartitionInfo("EXPRESSIONS_WITH_NULLS", "PKEY");
         project.addPartitionInfo("EXPRESSIONS_NO_NULLS", "PKEY");
         project.addPartitionInfo("JUMBO_ROW", "PKEY");
-        project.addELT("org.voltdb.elt.processors.RawProcessor", false, null, null);
+        project.addELT("org.voltdb.elt.processors.RawProcessor", false, null);
         project.addELTTable("ALLOW_NULLS", false);   // persistent table
         project.addELTTable("WITH_DEFAULTS", true);  // streamed table
         try {
@@ -249,7 +245,7 @@ public class TestVoltCompiler extends TestCase {
         project.addPartitionInfo("B", "B_ID");
         project.addPartitionInfo("e", "e_id");
         project.addPartitionInfo("f", "f_id");
-        project.addELT("org.voltdb.elt.processors.RawProcessor", true, null, null);
+        project.addELT("org.voltdb.elt.processors.RawProcessor", true, null);
         project.addELTTable("A", true); // uppercase DDL, uppercase export
         project.addELTTable("b", true); // uppercase DDL, lowercase export
         project.addELTTable("E", true); // lowercase DDL, uppercase export
@@ -279,7 +275,7 @@ public class TestVoltCompiler extends TestCase {
         final VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestVoltCompiler.class.getResource("ELTTesterWithView-ddl.sql"));
         project.addStmtProcedure("Dummy", "select * from v_table1r_el_only");
-        project.addELT("org.voltdb.elt.processors.RawProcessor", true, null, null);
+        project.addELT("org.voltdb.elt.processors.RawProcessor", true, null);
         project.addELTTable("table1r_el_only", true);
         try {
             assertFalse(project.compile("/tmp/elttestview.jar"));
@@ -295,7 +291,7 @@ public class TestVoltCompiler extends TestCase {
         final VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestVoltCompiler.class.getResource("ELTTesterWithView-ddl.sql"));
         project.addStmtProcedure("Dummy", "select * from table1r_el_only");
-        project.addELT("org.voltdb.elt.processors.RawProcessor", true, null, null);
+        project.addELT("org.voltdb.elt.processors.RawProcessor", true, null);
         project.addELTTable("v_table1r_el_only", true);
         try {
             assertFalse(project.compile("/tmp/elttestview.jar"));
@@ -308,10 +304,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testBadPath() {
         final VoltCompiler compiler = new VoltCompiler();
-        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
-        final boolean success = compiler.compile("invalidnonsense",
-                                                 cluster_config,
-                                                 "nothing", System.out, null);
+        final boolean success = compiler.compile("invalidnonsense", "nothing", System.out, null);
 
         assertFalse(success);
     }
@@ -330,10 +323,8 @@ public class TestVoltCompiler extends TestCase {
         final String path = xmlFile.getPath();
 
         final VoltCompiler compiler = new VoltCompiler();
-        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
 
-        final boolean success = compiler.compile(path, cluster_config,
-                                           "nothing", System.out, null);
+        final boolean success = compiler.compile(path, "nothing", System.out, null);
 
         assertFalse(success);
     }
@@ -352,10 +343,8 @@ public class TestVoltCompiler extends TestCase {
         final String path = xmlFile.getPath();
 
         final VoltCompiler compiler = new VoltCompiler();
-        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
 
-        final boolean success = compiler.compile(path, cluster_config,
-                                           "nothing", System.out, null);
+        final boolean success = compiler.compile(path, "nothing", System.out, null);
 
         assertFalse(success);
     }
@@ -378,54 +367,20 @@ public class TestVoltCompiler extends TestCase {
         final String path = xmlFile.getPath();
 
         final VoltCompiler compiler = new VoltCompiler();
-        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
 
-        final boolean success = compiler.compile(path, cluster_config,
-                                                 "nothing", System.out, null);
+        final boolean success = compiler.compile(path, "nothing", System.out, null);
 
         assertFalse(success);
     }
 
     public void testBadClusterConfig() throws IOException {
-        String simpleSchema =
-            "create table books (cash integer default 23, title varchar default 'foo', PRIMARY KEY(cash));";
-
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
-        String schemaPath = schemaFile.getPath();
-
-        String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<!-- xml comment check -->" +
-            "<database name='database'>" +
-            "<!-- xml comment check -->" +
-            "<schema path='" + schemaPath + "' />" +
-            "<!-- xml comment check -->" +
-            "<procedure class='org.voltdb.compiler.procedures.AddBook' />" +
-            "<!-- xml comment check -->" +
-            "</database>" +
-            "<!-- xml comment check -->" +
-            "</project>";
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        String projectPath = projectFile.getPath();
-
-        VoltCompiler compiler = new VoltCompiler();
-
         // check no hosts
         ClusterConfig cluster_config = new ClusterConfig(0, 1, 0, "localhost");
-        boolean success = compiler.compile(projectPath, cluster_config,
-                                           "testout.jar", System.out, null);
-        assertFalse(success);
+        assertFalse(cluster_config.validate());
 
         // check no sites-per-hosts
         cluster_config = new ClusterConfig(1, 0, 0, "localhost");
-        success = compiler.compile(projectPath, cluster_config,
-                                   "testout.jar", System.out, null);
-        assertFalse(success);
-
-        File jar = new File("testout.jar");
-        jar.delete();
+        assertFalse(cluster_config.validate());
     }
 
     public void testXMLFileWithDDL() throws IOException {
@@ -469,10 +424,8 @@ public class TestVoltCompiler extends TestCase {
         final String projectPath = projectFile.getPath();
 
         final VoltCompiler compiler = new VoltCompiler();
-        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
 
-        final boolean success = compiler.compile(projectPath, cluster_config,
-                                                 "testout.jar", System.out, null);
+        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
 
         assertTrue(success);
 
@@ -513,10 +466,8 @@ public class TestVoltCompiler extends TestCase {
         final String projectPath = projectFile.getPath();
 
         final VoltCompiler compiler = new VoltCompiler();
-        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
 
-        final boolean success = compiler.compile(projectPath, cluster_config,
-                                                 "testout.jar", System.out, null);
+        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
 
         assertFalse(success);
     }
@@ -548,10 +499,8 @@ public class TestVoltCompiler extends TestCase {
         final String projectPath = projectFile.getPath();
 
         final VoltCompiler compiler = new VoltCompiler();
-        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
 
-        final boolean success = compiler.compile(projectPath, cluster_config,
-                                                 "testout.jar", System.out, null);
+        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
         assertFalse(success);
     }
 
@@ -576,10 +525,8 @@ public class TestVoltCompiler extends TestCase {
         final String projectPath = projectFile.getPath();
 
         final VoltCompiler compiler = new VoltCompiler();
-        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
 
-        final boolean success = compiler.compile(projectPath, cluster_config,
-                                                 "testout.jar", System.out, null);
+        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
 
         assertFalse(success);
 
@@ -611,10 +558,8 @@ public class TestVoltCompiler extends TestCase {
         final String projectPath = projectFile.getPath();
 
         final VoltCompiler compiler = new VoltCompiler();
-        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
 
-        final boolean success = compiler.compile(projectPath, cluster_config,
-                                                 "testout.jar", System.out, null);
+        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
 
         assertFalse(success);
     }
@@ -645,10 +590,8 @@ public class TestVoltCompiler extends TestCase {
         final String projectPath = projectFile.getPath();
 
         final VoltCompiler compiler = new VoltCompiler();
-        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
 
-        final boolean success = compiler.compile(projectPath, cluster_config,
-                                                 "testout.jar", System.out, null);
+        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
 
         assertTrue(success);
 
@@ -682,12 +625,12 @@ public class TestVoltCompiler extends TestCase {
 
         final VoltCompiler compiler1 = new VoltCompiler();
         final VoltCompiler compiler2 = new VoltCompiler();
-        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
 
-        final Catalog catalog = compiler1.compileCatalog(projectPath, cluster_config);
+        // TODO: temporary fix so this would compile was to remove second argument (cluster_config)
+        final Catalog catalog = compiler1.compileCatalog(projectPath);
+
         final String cat1 = catalog.serialize();
-        final boolean success = compiler2.compile(projectPath, cluster_config,
-                                                  "testout.jar", System.out, null);
+        final boolean success = compiler2.compile(projectPath, "testout.jar", System.out, null);
         final String cat2 = JarReader.readFileFromJarfile("testout.jar", "catalog.txt");
 
         assertTrue(success);
@@ -722,10 +665,8 @@ public class TestVoltCompiler extends TestCase {
         final String projectPath = projectFile.getPath();
 
         final VoltCompiler compiler = new VoltCompiler();
-        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
 
-        final boolean success = compiler.compile(projectPath, cluster_config,
-                                                 "testout.jar", System.out, null);
+        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
         assertFalse(success);
 
         boolean found = false;
@@ -761,10 +702,8 @@ public class TestVoltCompiler extends TestCase {
         final String projectPath = projectFile.getPath();
 
         final VoltCompiler compiler = new VoltCompiler();
-        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
 
-        final boolean success = compiler.compile(projectPath, cluster_config,
-                                                 "testout.jar", System.out, null);
+        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
         assertTrue(success);
 
         final String sql = JarReader.readFileFromJarfile("testout.jar", "tpcc-ddl.sql");
@@ -799,10 +738,7 @@ public class TestVoltCompiler extends TestCase {
 
         final VoltCompiler compiler = new VoltCompiler();
 
-        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
-
-        final boolean success = compiler.compile(projectPath, cluster_config,
-                                                "testout.jar", System.out, null);
+        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
 
         assertTrue(success);
 
@@ -848,11 +784,8 @@ public class TestVoltCompiler extends TestCase {
         overrideMap.put("AddBook", info);
 
         final VoltCompiler compiler = new VoltCompiler();
-        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
 
-        final boolean success = compiler.compile(projectPath, cluster_config,
-                                                 "testout.jar", System.out,
-                                                 overrideMap);
+        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, overrideMap);
 
         assertTrue(success);
 
@@ -890,11 +823,8 @@ public class TestVoltCompiler extends TestCase {
         final String projectPath = projectFile.getPath();
 
         final VoltCompiler compiler = new VoltCompiler();
-        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
 
-        final boolean success = compiler.compile(projectPath, cluster_config,
-                                                 "testout.jar", System.out,
-                                                 null);
+        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
 
         assertFalse(success);
     }
@@ -920,11 +850,8 @@ public class TestVoltCompiler extends TestCase {
         final String projectPath = projectFile.getPath();
 
         final VoltCompiler compiler = new VoltCompiler();
-        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
 
-        final boolean success = compiler.compile(projectPath, cluster_config,
-                                                 "testout.jar", System.out,
-                                                 null);
+        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
 
         assertTrue(success);
 

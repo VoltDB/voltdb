@@ -42,8 +42,7 @@ public class TestSecuritySuite extends RegressionSuite {
     static final Class<?>[] PROCEDURES = {
         DoNothing1.class,
         DoNothing2.class,
-        DoNothing3.class,
-        DoNothing4.class
+        DoNothing3.class
     };
 
     public TestSecuritySuite(String name) {
@@ -80,43 +79,13 @@ public class TestSecuritySuite extends RegressionSuite {
     }
 
     public void testSysprocAndAdhocPermissions() throws Exception {
-        //User1 should be able to do both
+        Client client;
+        boolean exceptionThrown;
+        VoltTable modCount;
+        VoltTable[] results;
+
+        // user1 can't run anything
         m_username = "user1";
-        Client client = getClient();
-        VoltTable modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (1, 1, 1);").getResults()[0];
-        assertTrue(modCount.getRowCount() == 1);
-        assertTrue(modCount.asScalarLong() == 1);
-        VoltTable results[] = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
-        // one aggregate table returned
-        assertTrue(results.length == 1);
-
-        //User2 can only do adhoc
-        m_username = "user2";
-        client = getClient();
-        modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (2, 2, 2);").getResults()[0];
-        assertTrue(modCount.getRowCount() == 1);
-        assertTrue(modCount.asScalarLong() == 1);
-        boolean exceptionThrown = false;
-        try {
-            results = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
-        } catch (ProcCallException e) {
-            e.printStackTrace();
-            exceptionThrown = true;
-        }
-        assertTrue(exceptionThrown);
-
-        //User3 can "only" run sysprocs which includes adhoc
-        m_username = "user3";
-        client = getClient();
-        modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (3, 3, 3);").getResults()[0];
-        assertTrue(modCount.getRowCount() == 1);
-        assertTrue(modCount.asScalarLong() == 1);
-        results = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
-        // one aggregate table returned
-        assertTrue(results.length == 1);
-
-        //User 4 can't run anything
-        m_username = "user4";
         client = getClient();
         exceptionThrown = false;
         try {
@@ -135,8 +104,8 @@ public class TestSecuritySuite extends RegressionSuite {
         }
         assertTrue(exceptionThrown);
 
-        //User 5 can run sysprocs due to his group
-        m_username = "user5";
+        // user2 can run sysprocs due to his group
+        m_username = "user2";
         client = getClient();
         modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (4, 4, 4);").getResults()[0];
         assertTrue(modCount.getRowCount() == 1);
@@ -145,8 +114,8 @@ public class TestSecuritySuite extends RegressionSuite {
         // one aggregate table returned
         assertTrue(results.length == 1);
 
-        //User 6 can only run adhoc due to his group
-        m_username = "user6";
+        // user3 can only run adhoc due to his group
+        m_username = "user3";
         client = getClient();
         modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (5, 5, 5);").getResults()[0];
         assertTrue(modCount.getRowCount() == 1);
@@ -160,8 +129,8 @@ public class TestSecuritySuite extends RegressionSuite {
         }
         assertTrue(exceptionThrown);
 
-        //User 7 can do anything due to his group
-        m_username = "user7";
+        // user4 can do anything due to his group
+        m_username = "user4";
         client = getClient();
         modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (6, 6, 6);").getResults()[0];
         assertTrue(modCount.getRowCount() == 1);
@@ -172,96 +141,25 @@ public class TestSecuritySuite extends RegressionSuite {
     }
 
     public void testProcedurePermissions() throws Exception {
-        //User1 should be able to invoke all procedures except the last one
+        Client client;
+        boolean exceptionThrown;
+
+        // user1 should be able to invoke 2 and 3
         m_username = "user1";
-        Client client = getClient();
-        client.callProcedure("DoNothing1", 1);
+        client = getClient();
+        exceptionThrown = false;
+        try {
+            client.callProcedure("DoNothing1", 1);
+        } catch (ProcCallException e) {
+            e.printStackTrace();
+            exceptionThrown = true;
+        }
+        assertTrue(exceptionThrown);
         client.callProcedure("DoNothing2", 1);
         client.callProcedure("DoNothing3", 1);
-        boolean exceptionThrown = false;
-        try {
-            client.callProcedure("DoNothing4", 1);
-        } catch (ProcCallException e) {
-            e.printStackTrace();
-            exceptionThrown = true;
-        }
-        assertTrue(exceptionThrown);
 
-        //User2 should be able to invoke 1 and 3
+        // user2 should be able to invoke 3
         m_username = "user2";
-        client = getClient();
-        client.callProcedure("DoNothing1", 1);
-        exceptionThrown = false;
-        try {
-            client.callProcedure("DoNothing2", 1);
-        } catch (ProcCallException e) {
-            e.printStackTrace();
-            exceptionThrown = true;
-        }
-        assertTrue(exceptionThrown);
-        client.callProcedure("DoNothing3", 1);
-        exceptionThrown = false;
-        try {
-            client.callProcedure("DoNothing4", 1);
-        } catch (ProcCallException e) {
-            e.printStackTrace();
-            exceptionThrown = true;
-        }
-        assertTrue(exceptionThrown);
-
-        //User 5 should be able to invoke #1
-        m_username = "user5";
-        client = getClient();
-        client.callProcedure("DoNothing1", 1);
-        exceptionThrown = false;
-        try {
-            client.callProcedure("DoNothing2", 1);
-        } catch (ProcCallException e) {
-            e.printStackTrace();
-            exceptionThrown = true;
-        }
-        assertTrue(exceptionThrown);
-        exceptionThrown = false;
-        try {
-            client.callProcedure("DoNothing3", 1);
-        } catch (ProcCallException e) {
-            e.printStackTrace();
-            exceptionThrown = true;
-        }
-        assertTrue(exceptionThrown);
-        exceptionThrown = false;
-        try {
-            client.callProcedure("DoNothing4", 1);
-        } catch (ProcCallException e) {
-            e.printStackTrace();
-            exceptionThrown = true;
-        }
-        assertTrue(exceptionThrown);
-
-        //User 6 should able to invoke 1 and 3
-        m_username = "user6";
-        client = getClient();
-        client.callProcedure("DoNothing1", 1);
-        exceptionThrown = false;
-        try {
-            client.callProcedure("DoNothing2", 1);
-        } catch (ProcCallException e) {
-            e.printStackTrace();
-            exceptionThrown = true;
-        }
-        assertTrue(exceptionThrown);
-        client.callProcedure("DoNothing3", 1);
-        exceptionThrown = false;
-        try {
-            client.callProcedure("DoNothing4", 1);
-        } catch (ProcCallException e) {
-            e.printStackTrace();
-            exceptionThrown = true;
-        }
-        assertTrue(exceptionThrown);
-
-        //User 7 should be able to invoke 3
-        m_username = "user7";
         client = getClient();
         exceptionThrown = false;
         try {
@@ -280,9 +178,29 @@ public class TestSecuritySuite extends RegressionSuite {
         }
         assertTrue(exceptionThrown);
         client.callProcedure("DoNothing3", 1);
+
+        // user3 shouldn't be able to invoke any
+        m_username = "user3";
+        client = getClient();
         exceptionThrown = false;
         try {
-            client.callProcedure("DoNothing4", 1);
+            client.callProcedure("DoNothing1", 1);
+        } catch (ProcCallException e) {
+            e.printStackTrace();
+            exceptionThrown = true;
+        }
+        assertTrue(exceptionThrown);
+        exceptionThrown = false;
+        try {
+            client.callProcedure("DoNothing2", 1);
+        } catch (ProcCallException e) {
+            e.printStackTrace();
+            exceptionThrown = true;
+        }
+        assertTrue(exceptionThrown);
+        exceptionThrown = false;
+        try {
+            client.callProcedure("DoNothing3", 1);
         } catch (ProcCallException e) {
             e.printStackTrace();
             exceptionThrown = true;
@@ -291,14 +209,9 @@ public class TestSecuritySuite extends RegressionSuite {
     }
 
     public void testAllowedExportConnectorPermissions() throws IOException {
-        // User1 can connect (in users list)
+        // user1 can connect (in groups list)
         ExportTestClient eclient = new ExportTestClient(1);
         eclient.connectToELServers("user1", "password");
-        eclient.disconnectFromELServers();
-
-        // User3 can connect (in groups list)
-        eclient = new ExportTestClient(1);
-        eclient.connectToELServers("user3", "password");
         eclient.disconnectFromELServers();
 
         // Expected to throw an exception on failure
@@ -309,8 +222,8 @@ public class TestSecuritySuite extends RegressionSuite {
         boolean caught = false;
         ExportTestClient eclient = new ExportTestClient(1);
         try {
-            // bad user & bad group
-            eclient.connectToELServers("user6", "password");
+            // bad group
+            eclient.connectToELServers("user2", "password");
         }
         catch (IOException e) {
             caught = true;
@@ -343,41 +256,32 @@ public class TestSecuritySuite extends RegressionSuite {
         project.addDefaultSchema();
         project.addDefaultPartitioning();
         ArrayList<ProcedureInfo> procedures = new ArrayList<ProcedureInfo>();
-        procedures.add(new ProcedureInfo(new String[] { "user1", "user5", "user6" }, new String[] { "group1" }, PROCEDURES[0]));
-        procedures.add(new ProcedureInfo(new String[] { "user1" }, new String[0], PROCEDURES[1]));
-        procedures.add(new ProcedureInfo(new String[0], new String[] { "group1", "group4", "group5" }, PROCEDURES[2]));
-        procedures.add(new ProcedureInfo(new String[0], new String[0], PROCEDURES[3]));
+        procedures.add(new ProcedureInfo(new String[0], PROCEDURES[0]));
+        procedures.add(new ProcedureInfo(new String[] {"group1"}, PROCEDURES[1]));
+        procedures.add(new ProcedureInfo(new String[] {"group1", "group2"}, PROCEDURES[2]));
         project.addProcedures(procedures);
 
         UserInfo users[] = new UserInfo[] {
-                new UserInfo("user1", true, true, "password", new String[] {"group1"}),
-                new UserInfo("user2", true, false, "password", new String[]{"group1"}),
-                new UserInfo("user3", false, true, "password", new String[]{"group2"}),
-                new UserInfo("user4", false, false, "password", new String[]{"group2"}),
-                new UserInfo("user5", false, false, "password", new String[] { "group3" }),
-                new UserInfo("user6", false, false, "password", new String[] { "group4" }),
-                new UserInfo("user7", false, false, "password", new String[] { "group5" })
+                new UserInfo("user1", "password", new String[] {"group1"}),
+                new UserInfo("user2", "password", new String[] {"group2"}),
+                new UserInfo("user3", "password", new String[] {"group3"}),
+                new UserInfo("user4", "password", new String[] {"group4"})
         };
         project.addUsers(users);
 
         GroupInfo groups[] = new GroupInfo[] {
                 new GroupInfo("group1", false, false),
-                new GroupInfo("group2", false, false),
-                new GroupInfo("group3", false, true),
-                new GroupInfo("group4", true, false),
-                new GroupInfo("group5", true, true)
+                new GroupInfo("group2", false, true),
+                new GroupInfo("group3", true, false),
+                new GroupInfo("group4", true, true)
         };
         project.addGroups(groups);
         project.setSecurityEnabled(true);
 
-        ArrayList<String> elusers = new ArrayList<String>();
-        elusers.add("user1");
         ArrayList<String> elgroups = new ArrayList<String>();
-        elgroups.add("group2");
+        elgroups.add("group1");
 
-        project.addELT("org.voltdb.elt.processors.RawProcessor",
-                       true /*enabled*/,
-                       elusers, elgroups);
+        project.addELT("org.voltdb.elt.processors.RawProcessor", true /*enabled*/, elgroups);
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 1 Local Site/Partitions running on JNI backend

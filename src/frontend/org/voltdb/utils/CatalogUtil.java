@@ -17,6 +17,9 @@
 
 package org.voltdb.utils;
 
+import java.io.File;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -24,26 +27,46 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeMap;
 
+import javax.xml.bind.JAXBContext;
+import javax.xml.bind.JAXBElement;
+import javax.xml.bind.JAXBException;
+import javax.xml.bind.Unmarshaller;
+import javax.xml.validation.Schema;
+import javax.xml.validation.SchemaFactory;
+
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.CatalogType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.ConstraintRef;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Group;
+import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.Table;
+import org.voltdb.compiler.ClusterCompiler;
+import org.voltdb.compiler.ClusterConfig;
+import org.voltdb.compiler.deploymentfile.ClusterType;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
+import org.xml.sax.SAXException;
 
 /**
  *
  */
 public abstract class CatalogUtil {
+
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     public static final String CATALOG_FILENAME = "catalog.txt";
 
@@ -371,4 +394,129 @@ public abstract class CatalogUtil {
         }
         return false;
     }
+
+    /**
+     * Parse the deployment.xml file and add its data into the catalog.
+     * @param catalog Catalog to be updated.
+     * @param pathToDeployment Path to the deployment.xml file.
+     */
+    public static void compileDeployment(Catalog catalog, String pathToDeployment) {
+        // get deployment info from xml file
+        DeploymentType deployment = getDeployment(pathToDeployment);
+
+        // set the cluster info
+        setClusterInfo(catalog, deployment.getCluster());
+
+        // set the users info
+        setUsersInfo(catalog, deployment.getUsers());
+    }
+
+    /**
+     * Get a reference to the root <deployment> element from the deployment.xml file.
+     * @param pathToDeployment Path to the deployment.xml file.
+     * @return Returns a reference to the root <deployment> element.
+     */
+    @SuppressWarnings("unchecked")
+    private static DeploymentType getDeployment(String pathToDeployment) {
+        try {
+            JAXBContext jc = JAXBContext.newInstance("org.voltdb.compiler.deploymentfile");
+            // This schema shot the sheriff.
+            SchemaFactory sf = SchemaFactory.newInstance(javax.xml.XMLConstants.W3C_XML_SCHEMA_NS_URI);
+
+            // This is ugly, but I couldn't get CatalogUtil.class.getResource("../compiler/DeploymentFileSchema.xsd")
+            // to work and gave up.
+            Schema schema = sf.newSchema(VoltDB.class.getResource("compiler/DeploymentFileSchema.xsd"));
+
+            Unmarshaller unmarshaller = jc.createUnmarshaller();
+            // But did not shoot unmarshaller!
+            unmarshaller.setSchema(schema);
+            JAXBElement<DeploymentType> result =
+                (JAXBElement<DeploymentType>) unmarshaller.unmarshal(new File(pathToDeployment));
+            DeploymentType deployment = result.getValue();
+            return deployment;
+        } catch (JAXBException e) {
+            // Convert some linked exceptions to more friendly errors.
+            if (e.getLinkedException() instanceof java.io.FileNotFoundException) {
+                hostLog.error(e.getLinkedException().getMessage());
+                return null;
+            } else if (e.getLinkedException() instanceof org.xml.sax.SAXParseException) {
+                hostLog.error("Error schema validating deployment.xml file. " + e.getLinkedException().getMessage());
+                return null;
+            } else {
+                throw new RuntimeException(e);
+            }
+        } catch (SAXException e) {
+            hostLog.error("Error schema validating deployment.xml file. " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Set cluster info in the catalog.
+     * @param catalog The catalog to be updated.
+     * @param cluster A reference to the <cluster> element of the deployment.xml file.
+     */
+    private static void setClusterInfo(Catalog catalog, ClusterType cluster) {
+        int hostCount = cluster.getHostcount();
+        int sitesPerHost = cluster.getSitesperhost();
+        String leader = cluster.getLeader();
+        int kFactor = cluster.getKfactor();
+
+        ClusterConfig config = new ClusterConfig(hostCount, sitesPerHost, kFactor, leader);
+        hostLog.l7dlog(Level.INFO, LogKeys.compiler_VoltCompiler_LeaderAndHostCountAndSitesPerHost.name(),
+                new Object[] {config.getLeaderAddress(), config.getHostCount(), config.getSitesPerHost()}, null);
+
+        if (!config.validate()) {
+            hostLog.error(config.getErrorMsg());
+        } else {
+            ClusterCompiler.compile(catalog, config);
+        }
+    }
+
+    /**
+     * Set user info in the catalog.
+     * @param catalog The catalog to be updated.
+     * @param users A reference to the <users> element of the deployment.xml file.
+     */
+    private static void setUsersInfo(Catalog catalog, UsersType users) {
+        if (users == null) {
+            return;
+        }
+
+        // TODO: The database name is not available in deployment.xml (it is defined in project.xml). However, it must
+        // always be named "database", so I've temporarily hardcoded it here until a more robust solution is available.
+        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+
+        for (UsersType.User user : users.getUser()) {
+            org.voltdb.catalog.User catUser = db.getUsers().add(user.getName());
+            byte passwordHash[] = extractPassword(user.getPassword());
+            catUser.setShadowpassword(Encoder.hexEncode(passwordHash));
+
+            // process the @groups comma separated list
+            if (user.getGroups() != null) {
+                String grouplist[] = user.getGroups().split(",");
+                for (final String group : grouplist) {
+                    final GroupRef groupRef = catUser.getGroups().add(group);
+                    final Group catalogGroup = db.getGroups().get(group);
+                    if (catalogGroup != null) {
+                        groupRef.setGroup(catalogGroup);
+                    }
+                }
+            }
+        }
+    }
+
+    /** Read a hashed password from password. */
+    private static byte[] extractPassword(String password) {
+        MessageDigest md = null;
+        try {
+            md = MessageDigest.getInstance("SHA-1");
+        } catch (final NoSuchAlgorithmException e) {
+            hostLog.l7dlog(Level.FATAL, LogKeys.compiler_VoltCompiler_NoSuchAlgorithm.name(), e);
+            System.exit(-1);
+        }
+        final byte passwordHash[] = md.digest(md.digest(password.getBytes()));
+        return passwordHash;
+    }
+
 }

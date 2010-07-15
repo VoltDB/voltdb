@@ -38,6 +38,8 @@ PRIMARY ENTRY POINTS
         <jvmarg value="-Dlog4j.configuration=file:log-server.xml" />
         <arg value="catalog"/>
         <arg value="key_value_catalog.jar"/>
+        <arg value="deployment"/>
+        <arg value="deployment.xml"/>
         <classpath refid='project.classpath'/>
         <assertions><disable/></assertions>
     </java>
@@ -93,11 +95,7 @@ PRIMARY ENTRY POINTS
     <java fork="yes" classname="org.voltdb.compiler.VoltCompiler" >
         <jvmarg value="-Djava.library.path=../../voltdb" />
         <arg value="project.xml"/>             <!-- project file -->
-        <arg value="1"/>                       <!-- hosts -->
-        <arg value="2"/>                       <!-- sites -->
-        <arg value="localhost"/>               <!-- leader -->
         <arg value="key_value_catalog.jar"/>   <!-- catalog -->
-        <arg value="0"/>                       <!-- k-safety --> 
         <classpath refid='project.classpath' />
         <assertions><disable /></assertions>
     </java>

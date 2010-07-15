@@ -145,7 +145,7 @@ public class TestCatalogDiffs extends TestCase {
         gi[0] = new GroupInfo("group1", true, true);
 
         UserInfo ui[] = new UserInfo[1];
-        ui[0] = new UserInfo("user1", true, true, "password", new String[] {"group1"});
+        ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
 
         String updated = compileWithGroups(gi, ui, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
@@ -158,13 +158,13 @@ public class TestCatalogDiffs extends TestCase {
         gi[0] = new GroupInfo("group1", true, true);
 
         UserInfo ui[] = new UserInfo[1];
-        ui[0] = new UserInfo("user1", true, true, "password", new String[] {"group1"});
+        ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
 
         String original = compileWithGroups(gi, ui, "base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
 
         // change a user.
-        ui[0] = new UserInfo("user1", false, false, "drowssap", new String[] {"group1"});
+        ui[0] = new UserInfo("user1", "drowssap", new String[] {"group1"});
         String updated = compileWithGroups(gi, ui, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
 
@@ -176,7 +176,7 @@ public class TestCatalogDiffs extends TestCase {
         gi[0] = new GroupInfo("group1", true, true);
 
         UserInfo ui[] = new UserInfo[1];
-        ui[0] = new UserInfo("user1", true, true, "password", new String[] {"group1"});
+        ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
 
         String original = compileWithGroups(gi, ui, "base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
@@ -193,7 +193,7 @@ public class TestCatalogDiffs extends TestCase {
         gi[0] = new GroupInfo("group1", true, true);
 
         UserInfo ui[] = new UserInfo[1];
-        ui[0] = new UserInfo("user1", true, true, "password", new String[] {"group1"});
+        ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
 
         String original = compileWithGroups(gi, ui, "base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
@@ -211,15 +211,15 @@ public class TestCatalogDiffs extends TestCase {
         gi[1] = new GroupInfo("group2", true, true);
 
         UserInfo ui[] = new UserInfo[2];
-        ui[0] = new UserInfo("user1", true, true, "password", new String[] {"group1"});
-        ui[1] = new UserInfo("user2", true, true, "password", new String[] {"group2"});
+        ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
+        ui[1] = new UserInfo("user2", "password", new String[] {"group2"});
 
         String original = compileWithGroups(gi, ui, "base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
 
         // swap the user's group assignments
-        ui[0] = new UserInfo("user1", true, true, "password", new String[] {"group2"});
-        ui[1] = new UserInfo("user2", true, true, "password", new String[] {"group1"});
+        ui[0] = new UserInfo("user1", "password", new String[] {"group2"});
+        ui[1] = new UserInfo("user2", "password", new String[] {"group1"});
         String updated = compileWithGroups(gi, ui, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
 

@@ -36,7 +36,6 @@ import junit.framework.TestCase;
 import org.voltdb.benchmark.tpcc.TPCCClient;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
-import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 
@@ -63,9 +62,6 @@ public class TestJarReader extends TestCase {
             "<?xml version=\"1.0\"?>\n" +
             "<project>" +
             "<database name='database'>" +
-            "<users>" +
-            "<user adhoc='true' groups='default' name='default' password='' sysproc='true'/>" +
-            "</users>" +
             "<groups>" +
             "<group adhoc='true' name='default' sysproc='true'/>" +
             "</groups>" +
@@ -81,9 +77,7 @@ public class TestJarReader extends TestCase {
         String projectPath = projectFile.getPath();
 
         VoltCompiler compiler = new VoltCompiler();
-        ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
-        assertTrue(compiler.compile(projectPath, cluster_config,
-                                    "testout.jar", System.out, null));
+        assertTrue(compiler.compile(projectPath, "testout.jar", System.out, null));
 
         // Now read the jar file back in and make sure that we can grab the
         // class file from it using JarClassLoader

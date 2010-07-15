@@ -75,9 +75,6 @@ JAVA & CATALOG COMPILATION
           classname="org.voltdb.compiler.VoltCompiler" >
         <jvmarg value="-Djava.library.path=../../voltdb" />
         <arg value="project.xml"/> <!-- project file -->
-        <arg value="1"/>           <!-- hosts -->
-        <arg value="1"/>           <!-- sites -->
-        <arg value="localhost"/>   <!-- leader -->
         <arg value="${catalog_jar}"/> <!-- output -->
         <classpath refid='project.classpath' />
         <assertions><disable /></assertions>
@@ -98,6 +95,8 @@ SERVER & CLIENT TARGETS
         <jvmarg value="-Xmx512m" />
         <arg value="catalog"/>
         <arg value="${catalog_jar}"/>
+        <arg value="deployment"/>
+        <arg value="deployment.xml"/>
         <classpath refid='project.classpath' />
         <assertions><disable /></assertions>
     </java>
