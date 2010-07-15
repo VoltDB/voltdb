@@ -48,6 +48,8 @@ PRIMARY ENTRY POINTS
         <jvmarg value="-server" />
         <jvmarg value="-Xmx512m" />
         <jvmarg value="-XX:-ReduceInitialCardMarks" />
+        <arg value="deployment" />
+        <arg value="deployment.xml" /> <!-- deployment file -->
         <classpath refid='project.classpath' />
         <assertions><disable /></assertions>
     </java>
@@ -59,9 +61,6 @@ PRIMARY ENTRY POINTS
           classname="org.voltdb.compiler.VoltCompiler" >
         <jvmarg value="-Djava.library.path=##voltdb_lib_path##" />
         <arg value="project.xml"/> <!-- project file -->
-        <arg value="1"/>           <!-- hosts -->
-        <arg value="2"/>           <!-- sites -->
-        <arg value="localhost"/>   <!-- leader -->
         <arg value="catalog.jar"/> <!-- output -->
         <classpath refid='project.classpath' />
         <assertions><disable /></assertions>

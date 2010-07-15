@@ -40,6 +40,7 @@ buildFileContent = readfile("build.xml")
 clientFileContent = readfile("Client.java")
 ddlFileContent = readfile("ddl.sql")
 deleteFileContent = readfile("Delete.java")
+deploymentFileContent = readfile("deployment.xml")
 insertFileContent = readfile("Insert.java")
 projectFileContent = readfile("project.xml")
 selectFileContent = readfile("Insert.java")
@@ -146,6 +147,10 @@ copyAndSubstituteTemplates(buildFileContent, dest_fn, package_prefix, project_na
 # project.xml
 dest_fn = "%s/project.xml"%(destination)
 copyAndSubstituteTemplates(projectFileContent, dest_fn, package_prefix, project_name, voltpath)
+
+# deployment.xml
+dest_fn = "%s/deployment.xml"%(destination)
+copyAndSubstituteTemplates(deploymentFileContent, dest_fn, package_prefix, project_name, voltpath)
 
 # ddl.sql
 dest_fn = "%s/%s-ddl.sql"%(destination, project_name)

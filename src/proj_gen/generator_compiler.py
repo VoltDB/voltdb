@@ -36,6 +36,7 @@ names = [("buildFileContent", "build.xml"),
          ("clientFileContent", "Client.java"),
          ("ddlFileContent", "ddl.sql"),
          ("deleteFileContent", "Delete.java"),
+         ("deploymentFileContent", "deployment.xml"),
          ("insertFileContent", "Insert.java"),
          ("projectFileContent", "project.xml"),
          ("selectFileContent", "Select.java")]
