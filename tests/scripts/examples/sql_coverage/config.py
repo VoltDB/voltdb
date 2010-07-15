@@ -36,6 +36,12 @@
                       "template": "basic-strings.sql",
                       "normalizer": "normalizer.py"},
 # BIGINT OVERFLOW CAUSES FAILURES IN THIS SUITE, DISABLING
+# also, the generator fails to generates statements for:
+# Template "SELECT * FROM _table WHERE (_variable _cmp _value[int64]) _logic (_variable _cmp _variable)" failed to yield SQL statements
+# Template "UPDATE _table SET BIG = _value[int64] WHERE (_variable _cmp _variable) _logic (_variable _cmp _value[int64])" failed to yield SQL statements
+# Template "DELETE FROM _table WHERE (_variable _cmp _variable) _logic (_variable _cmp _value[int64])" failed to yield SQL statements
+# because there are insufficient columns of the same type to satisfy all the _variables
+# given how the generator works.
 #    "basic-ints": {"schema": "int-schema.py",
 #                   "ddl": "int-DDL.sql",
 #                   "template": "basic-ints.sql",
@@ -51,6 +57,9 @@
 #                        "template": "basic-timestamp.sql",
 #                        "normalizer": "normalizer.py"},
 # BIGINT OVERFLOW CAUSES FAILURES IN THIS SUITE
+# also, the generator fails to generate statements for:
+# Template "UPDATE _table SET BIG = _value[int64] WHERE (_variable _cmp _variable) _logic (_variable _cmp _value[int64])" failed to yield SQL statements
+# Template "DELETE FROM _table WHERE (_variable _cmp _variable) _logic (_variable _cmp _value[int64])" failed to yield SQL statements
 #    "basic-matview": {"schema": "matview-schema.py",
 #                      "ddl": "matview-DDL.sql",
 #                      "template": "basic-matview.sql",
@@ -76,6 +85,13 @@
                          "template": "advanced-strings.sql",
                          "normalizer": "normalizer.py"},
 # BIGINT OVERFLOW CAUSES FAILURES IN THIS SUITE
+# also, the generator failed to create statements for:
+# Template "SELECT * FROM _table WHERE _variable _cmp (_variable _math _value[int:0,1000])" failed to yield SQL statements
+# Template "SELECT _variable, _variable FROM _table WHERE _variable _cmp _variable LIMIT _value[int:1,100]" failed to yield SQL statements
+# Template "SELECT _variable FROM _table WHERE (_variable _cmp _variable) _logic (_variable _cmp _variable)" failed to yield SQL statements
+# Template "SELECT _variable[@order1] _math _variable[@order2] AS FOO FROM _table ORDER BY FOO" failed to yield SQL statements
+# Template "SELECT SUM(_variable _math _variable) FROM _table" failed to yield SQL statements
+# Template "SELECT _variable _math _variable FROM _table" failed to yield SQL statements
 #    "advanced-ints": {"schema": "int-schema.py",
 #                      "ddl": "int-DDL.sql",
 #                      "template": "advanced-ints.sql",
