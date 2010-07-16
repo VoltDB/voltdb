@@ -103,7 +103,7 @@ public class ClientVoter {
         if (args.length != 7) {
             System.err.println("ClientVoter [number of contestants] [votes per phone number] " +
                     "[transactions per second] [client feedback interval (seconds)] " +
-                    "[test duration (seconds)] [server list (comma separated)] [lag record delay (seconds)] ");
+                    "[test duration (seconds)] [lag record delay (seconds)] [server list (comma separated)]");
             System.exit(1);
         }
 
@@ -281,7 +281,6 @@ public class ClientVoter {
         System.out.printf(" - Rejected votes (voter over limit) = %,d\n\n",vote_result_counter[2]);
 
         String winnerName = "<<UNKNOWN>>";
-        long winnerVotes = -1;
 
         try {
             VoltTable[] vtResults = voltclient.callProcedure("Results").getResults();
@@ -295,11 +294,7 @@ public class ClientVoter {
                     String resultName = row.getString(0);
                     long resultVotes = row.getLong(1);
                     System.out.printf(" - Contestant %s received %,d vote(s)\n",resultName,resultVotes);
-
-                    if (resultVotes > winnerVotes) {
-                        winnerVotes = resultVotes;
-                        winnerName = resultName;
-                    }
+                    winnerName = resultName;
                 }
             }
         } catch (ProcCallException e) {
@@ -310,7 +305,7 @@ public class ClientVoter {
             System.exit(-1);
         }
 
-        System.out.printf("\n - Contestant %s was the winner with %,d vote(s)\n",winnerName,winnerVotes);
+        System.out.printf("\n - Contestant %s was the winner.\n",winnerName);
 
 
         System.out.println("\n");

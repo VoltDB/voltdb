@@ -37,13 +37,13 @@ import org.voltdb.*;
 public class Results extends VoltProcedure {
     // get the results
 
-    public final SQLStmt getResults = new SQLStmt("select a.contestant_name c1, " +
-                                                  "       sum(b.num_votes) c2 " +
+    public final SQLStmt getResults = new SQLStmt("select a.contestant_name contestant_name, " +
+                                                  "       sum(b.num_votes) total_votes " +
                                                   "from v_votes_by_contestant_number b, " +
                                                   "     contestants a " +
                                                   "where a.contestant_number = b.contestant_number " +
                                                   "group by a.contestant_name " +
-                                                  "order by a.contestant_name;");
+                                                  "order by total_votes asc;");
 
     public VoltTable[] run() {
         voltQueueSQL(getResults);
