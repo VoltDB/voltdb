@@ -157,6 +157,7 @@ public class VoltLogger {
             tempLogger = (CoreVoltLogger) constructor.newInstance(classname);
         }
         catch (Exception e) {}
+        catch (LinkageError e) {}
 
         // if unable to load Log4j, try to use java.util.logging
         if (tempLogger == null)
