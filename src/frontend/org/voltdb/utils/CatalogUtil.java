@@ -401,8 +401,18 @@ public abstract class CatalogUtil {
      * @param pathToDeployment Path to the deployment.xml file.
      */
     public static void compileDeployment(Catalog catalog, String pathToDeployment) {
+        File deploymentFile = new File(pathToDeployment);
+
+        // make sure the file exists
+        if (!deploymentFile.exists()) {
+            hostLog.fatal("Could not locate deployment file: " + deploymentFile.getAbsolutePath());
+            System.exit(-1);
+        } else {
+            hostLog.info("Path to deployment " + deploymentFile.getAbsolutePath());
+        }
+
         // get deployment info from xml file
-        DeploymentType deployment = getDeployment(pathToDeployment);
+        DeploymentType deployment = getDeployment(deploymentFile);
 
         // set the cluster info
         setClusterInfo(catalog, deployment.getCluster());
@@ -417,7 +427,7 @@ public abstract class CatalogUtil {
      * @return Returns a reference to the root <deployment> element.
      */
     @SuppressWarnings("unchecked")
-    private static DeploymentType getDeployment(String pathToDeployment) {
+    private static DeploymentType getDeployment(File deploymentFile) {
         try {
             JAXBContext jc = JAXBContext.newInstance("org.voltdb.compiler.deploymentfile");
             // This schema shot the sheriff.
@@ -431,7 +441,7 @@ public abstract class CatalogUtil {
             // But did not shoot unmarshaller!
             unmarshaller.setSchema(schema);
             JAXBElement<DeploymentType> result =
-                (JAXBElement<DeploymentType>) unmarshaller.unmarshal(new File(pathToDeployment));
+                (JAXBElement<DeploymentType>) unmarshaller.unmarshal(deploymentFile);
             DeploymentType deployment = result.getValue();
             return deployment;
         } catch (JAXBException e) {

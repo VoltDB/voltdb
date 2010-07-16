@@ -192,6 +192,7 @@ public class TestJSONInterface extends TestCase {
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_httpAdminPort = 8095;
         config.m_pathToCatalog = "json.jar";
+        config.m_pathToDeployment = builder.getPathToDeployment();
         ServerThread server = new ServerThread(config);
         server.start();
         server.waitForInitialization();

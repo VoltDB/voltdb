@@ -142,8 +142,9 @@ public class TestHSQLBackend extends TestCase {
         String catalogJar = testDir + File.separator + "tpcchsql.jar";
 
         builder.compile(catalogJar, 1, 1, 0, "localhost");
+        String pathToDeployment = builder.getPathToDeployment();
 
-        ServerThread server = new ServerThread(catalogJar, BackendTarget.HSQLDB_BACKEND);
+        ServerThread server = new ServerThread(catalogJar, pathToDeployment, BackendTarget.HSQLDB_BACKEND);
         server.start();
         server.waitForInitialization();
 

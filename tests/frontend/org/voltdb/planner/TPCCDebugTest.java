@@ -74,7 +74,7 @@ public class TPCCDebugTest extends TestCase {
         pb.compile(catalogJar, siteCount, 0);
 
         // start VoltDB server using hzsqlsb backend
-        server = new ServerThread(catalogJar, target);
+        server = new ServerThread(catalogJar, pb.getPathToDeployment(), target);
         server.start();
         server.waitForInitialization();
 

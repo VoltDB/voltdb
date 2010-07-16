@@ -244,12 +244,8 @@ public class RealVoltDB implements VoltDBInterface
             Catalog catalog = new Catalog();
             catalog.execute(serializedCatalog);
 
-            // If VoltProjectBuilder was used, m_config.m_pathToDeployment will be null. No deployment.xml file was
-            // given to the server in this case because its deployment info has already been added to the catalog.
-            if (m_config.m_pathToDeployment != null) {
-                CatalogUtil.compileDeployment(catalog, m_config.m_pathToDeployment);
-                serializedCatalog = catalog.serialize();
-            }
+            CatalogUtil.compileDeployment(catalog, m_config.m_pathToDeployment);
+            serializedCatalog = catalog.serialize();
 
             m_catalogContext = new CatalogContext(catalog, m_config.m_pathToCatalog, catalogVersion);
             final SnapshotSchedule schedule =

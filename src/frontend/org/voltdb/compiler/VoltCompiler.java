@@ -278,23 +278,22 @@ public class VoltCompiler {
     }
 
     /**
-     * Compile with this method when you don't want the deployment.xml data to be applied to the catalog at this stage.
-     * This is the most common use case.
+     * Compile with this method for general use.
      *
      * @param projectFileURL URL of the project file.
      * @param jarOutputPath The location to put the finished JAR to.
      * @param output Where to print status/errors to, usually stdout.
      * @param procInfoOverrides Optional overridden values for procedure annotations.
      */
-    public boolean compile(final String projectFileURL,
-            final String jarOutputPath, final PrintStream output,
-            final Map<String, ProcInfoData> procInfoOverrides) {
+    public boolean compile(final String projectFileURL, final String jarOutputPath, final PrintStream output,
+                           final Map<String, ProcInfoData> procInfoOverrides) {
         return compile(projectFileURL, jarOutputPath, output, procInfoOverrides, null);
     }
 
+    // TODO: remove pathToDeployment after ENG-642 lands
     /**
-     * Compile with this method when you do want the deployment.xml data to be applied to the catalog at this stage. The
-     * only time you will probably want to do this is when using VoltProjectBuilder.
+     * Compile with this method to apply deployment settings to the catalog immediately. This is currently only used by
+     * VoltProjectBuilder as a convenience for creating delta catalogs to test catalog updates.
      *
      * @param projectFileURL URL of the project file.
      * @param jarOutputPath The location to put the finished JAR to.
@@ -302,11 +301,8 @@ public class VoltCompiler {
      * @param procInfoOverrides Optional overridden values for procedure annotations.
      * @param pathToDeployment Path to deployment.xml file.
      */
-    public boolean compile(final String projectFileURL,
-                           final String jarOutputPath, final PrintStream output,
-                           final Map<String, ProcInfoData> procInfoOverrides,
-                           final String pathToDeployment)
-    {
+    public boolean compile(final String projectFileURL, final String jarOutputPath, final PrintStream output,
+                           final Map<String, ProcInfoData> procInfoOverrides, final String pathToDeployment) {
         m_hsql = null;
         m_projectFileURL = projectFileURL;
         m_jarOutputPath = jarOutputPath;
@@ -321,8 +317,7 @@ public class VoltCompiler {
             return false;
         }
 
-        // pathToDeployment will be null unless this is being called by VoltProjectBuilder which needs deployment info
-        // to be built into the catalog now
+        // if pathToDeployment is set, bake its changes into the catalog now
         if (pathToDeployment != null) {
             CatalogUtil.compileDeployment(catalog, pathToDeployment);
         }

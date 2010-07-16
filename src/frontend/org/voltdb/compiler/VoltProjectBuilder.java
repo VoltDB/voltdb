@@ -188,6 +188,7 @@ public class VoltProjectBuilder {
     private int m_snapshotRetain = 0;
     private String m_snapshotPrefix = null;
     private String m_snapshotFrequency = null;
+    private String m_pathToDeployment = null;
 
 
     /**
@@ -389,18 +390,22 @@ public class VoltProjectBuilder {
         return compile(jarPath, sitesPerHost, 1, replication, "localhost");
     }
 
-    public boolean compile(final String jarPath, final int sitesPerHost, final int hostCount,
-                           final int replication, final String leaderAddress)
-    {
+    public boolean compile(final String jarPath, final int sitesPerHost, final int hostCount, final int replication,
+                           final String leaderAddress) {
         VoltCompiler compiler = new VoltCompiler();
-        return compile(compiler, jarPath, sitesPerHost, hostCount, replication,
-                       leaderAddress);
+        return compile(compiler, jarPath, sitesPerHost, hostCount, replication, leaderAddress, false);
     }
 
-    public boolean compile(final VoltCompiler compiler, final String jarPath,
-                           final int sitesPerHost, final int hostCount,
-                           final int replication, final String leaderAddress)
-    {
+    public boolean compile(final String jarPath, final int sitesPerHost, final int hostCount, final int replication,
+                           final String leaderAddress, final boolean compileDeployment) {
+        VoltCompiler compiler = new VoltCompiler();
+        return compile(compiler, jarPath, sitesPerHost, hostCount, replication, leaderAddress, compileDeployment);
+    }
+
+    // TODO: remove compileDeployment option after ENG-642 lands
+    public boolean compile(final VoltCompiler compiler, final String jarPath, final int sitesPerHost,
+                           final int hostCount, final int replication, final String leaderAddress,
+                           final boolean compileDeployment) {
         assert(jarPath != null);
         assert(sitesPerHost >= 1);
         assert(hostCount >= 1);
@@ -467,13 +472,30 @@ public class VoltProjectBuilder {
         final String projectPath = projectFile.getPath();
 
         String pathToDeployment = writeDeploymentFile(hostCount, sitesPerHost, leaderAddress, replication);
+        boolean success = false;
+        if (compileDeployment) {
+            success = compiler.compile(projectPath, jarPath, m_compilerDebugPrintStream, m_procInfoOverrides,
+                    pathToDeployment);
+        } else {
+            success = compiler.compile(projectPath, jarPath, m_compilerDebugPrintStream, m_procInfoOverrides);
+            m_pathToDeployment = pathToDeployment;
+        }
 
-        final boolean success = compiler.compile(projectPath,
-                                           jarPath,
-                                           m_compilerDebugPrintStream,
-                                           m_procInfoOverrides,
-                                           pathToDeployment);
         return success;
+    }
+
+    /**
+     * After compile() has been called, a deployment file will be written. This method exposes its location so it can be
+     * passed to org.voltdb.VoltDB on startup.
+     * @return Returns the deployment file location.
+     */
+    public String getPathToDeployment() {
+        if (m_pathToDeployment == null) {
+            System.err.println("ERROR: Call compile() before trying to get the deployment path.");
+            return null;
+        } else {
+            return m_pathToDeployment;
+        }
     }
 
     private void buildDatabaseElement(Document doc, final Element database) {

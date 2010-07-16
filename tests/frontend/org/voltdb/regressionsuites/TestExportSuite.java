@@ -705,7 +705,7 @@ public class TestExportSuite extends RegressionSuite {
         project.addPartitionInfo("EXPRESSIONS_NO_NULLS", "PKEY");
         project.addPartitionInfo("JUMBO_ROW", "PKEY");
         project.addProcedures(PROCEDURES2);
-        compile = config.compile(project);
+        compile = config.compile(project, true);
         assertTrue(compile);
 
         /*
@@ -736,7 +736,7 @@ public class TestExportSuite extends RegressionSuite {
         project.addPartitionInfo("NO_NULLS", "PKEY");
         project.addProcedures(PROCEDURES);
         project.addProcedures(PROCEDURES3);
-        compile = config.compile(project);
+        compile = config.compile(project, true);
         assertTrue(compile);
 
 

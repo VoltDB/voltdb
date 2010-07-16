@@ -88,6 +88,7 @@ public class BenchmarkController {
     // the application jar to start the benchmark with - benchmark clients
     // may change the jar during execution using @UpdateApplicatCatalog.
     String m_jarFileName;
+    String m_pathToDeployment;
     ServerThread m_localserver = null;
     private ClusterMonitor m_clusterMonitor;
     @SuppressWarnings("unused")
@@ -237,6 +238,7 @@ public class BenchmarkController {
                 m_config.k_factor,
                 m_config.hosts[0]);
         m_jarFileName = jarFileNames[0];
+        m_pathToDeployment = m_projectBuilder.getPathToDeployment();
 
         // copy the catalog to the servers, but don't bother in local mode
         boolean status;
@@ -332,6 +334,8 @@ public class BenchmarkController {
                         "org.voltdb.VoltDB",
                         "catalog",
                         m_jarFileName,
+                        "deployment",
+                        m_pathToDeployment,
                         m_config.useProfile,
                         m_config.backend};
 

@@ -46,6 +46,15 @@ public interface VoltServerConfig {
     public boolean compile(VoltProjectBuilder builder);
 
     /**
+     * Build a catalog jar with the required topology according to the
+     * configuration parameters of the given VoltProjectBuilder instance.
+     *
+     * @param builder The VoltProjectBuilder instance describing the project to build.
+     * @param compileDeployment If set to true, deployment changes will be built into the catalog immediately.
+     */
+    public boolean compile(VoltProjectBuilder builder, boolean compileDeployment);
+
+    /**
      * Start the instance of VoltDB.
      */
     public void startUp();

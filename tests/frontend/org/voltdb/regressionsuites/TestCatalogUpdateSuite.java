@@ -180,7 +180,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         loadSomeData(client, 55, 5);
 
         // remove the procedure we just added async
-        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-basewithdeployment.jar");
         callback = new CatTestCallback(ClientResponse.SUCCESS);
         client.callProcedure(callback, "@UpdateApplicationCatalog", newCatalogURL);
 
@@ -306,7 +306,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
 
         // revert to the original schema
-        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-basewithdeployment.jar");
         results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL).getResults();
         assertTrue(results.length == 1);
 
@@ -398,7 +398,16 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         // DELTA CATALOGS FOR TESTING
         /////////////////////////////////////////////////////////////
 
-        // Build a new catalog
+        // Build a copy of the starting catalog and compile the deployment into it immediately
+        config = new LocalCluster("catalogupdate-cluster-basewithdeployment.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addProcedures(BASEPROCS);
+        boolean compile = config.compile(project, true);
+        assertTrue(compile);
+
+        // Build a new catalog and compile the deployment into it immediately
         //config = new LocalSingleProcessServer("catalogupdate-local-addtables.jar", 2, BackendTarget.NATIVE_EE_JNI);
         config = new LocalCluster("catalogupdate-cluster-addtables.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
@@ -407,7 +416,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project.addDefaultPartitioning();
         project.addPartitionInfo("O1", "PKEY");
         project.addProcedures(BASEPROCS_OPROCS);
-        boolean compile = config.compile(project);
+        compile = config.compile(project, true);
         assertTrue(compile);
 
         // as above but also with a materialized view added to O1
@@ -420,40 +429,40 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
             project.addDefaultPartitioning();
             project.addPartitionInfo("O1", "PKEY");
             project.addProcedures(BASEPROCS_OPROCS);
-            compile = config.compile(project);
+            compile = config.compile(project, true);
             assertTrue(compile);
         } catch (IOException e) {
             fail();
         }
 
-        // Build a new catalog
+        // Build a new catalog and compile the deployment into it immediately
         //config = new LocalSingleProcessServer("catalogupdate-local-expanded.jar", 2, BackendTarget.NATIVE_EE_JNI);
         config = new LocalCluster("catalogupdate-cluster-expanded.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
         project.addProcedures(EXPANDEDPROCS);
-        compile = config.compile(project);
+        compile = config.compile(project, true);
         assertTrue(compile);
 
-        // Build a new catalog
+        // Build a new catalog and compile the deployment into it immediately
         //config = new LocalSingleProcessServer("catalogupdate-local-conflict.jar", 2, BackendTarget.NATIVE_EE_JNI);
         config = new LocalCluster("catalogupdate-cluster-conflict.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
         project.addProcedures(CONFLICTPROCS);
-        compile = config.compile(project);
+        compile = config.compile(project, true);
         assertTrue(compile);
 
-        // Build a new catalog
+        // Build a new catalog and compile the deployment into it immediately
         //config = new LocalSingleProcessServer("catalogupdate-local-many.jar", 2, BackendTarget.NATIVE_EE_JNI);
         config = new LocalCluster("catalogupdate-cluster-many.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
         project.addProcedures(SOMANYPROCS);
-        compile = config.compile(project);
+        compile = config.compile(project, true);
         assertTrue(compile);
 
         return builder;
