@@ -458,7 +458,6 @@ public final class DBBPool {
      * A lot of this code is commented out anyways because of the extra storage required
      * even if the code is compiled out.
      */
-    @SuppressWarnings("unused")
     private static final boolean traceAllocations = true;
 
     /**

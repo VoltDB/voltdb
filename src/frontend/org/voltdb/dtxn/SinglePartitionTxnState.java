@@ -17,7 +17,6 @@
 
 package org.voltdb.dtxn;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 
 import org.voltdb.ExecutionSite;

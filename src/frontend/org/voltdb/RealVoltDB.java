@@ -110,10 +110,12 @@ public class RealVoltDB implements VoltDBInterface
         private final int m_siteId;
         private final String m_serializedCatalog;
         private volatile ExecutionSite m_siteObj;
+        private final boolean m_recovering;
 
-        public ExecutionSiteRunner(final int siteId, final CatalogContext context, final String serializedCatalog) {
+        public ExecutionSiteRunner(final int siteId, final CatalogContext context, final String serializedCatalog, boolean recovering) {
             m_siteId = siteId;
             m_serializedCatalog = serializedCatalog;
+            m_recovering = recovering;
         }
 
         @Override
@@ -126,7 +128,8 @@ public class RealVoltDB implements VoltDBInterface
                                   mailbox,
                                   m_siteId,
                                   m_serializedCatalog,
-                                  null);
+                                  null,
+                                  m_recovering);
             synchronized (this) {
                 m_isSiteCreated = true;
                 this.notifyAll();
@@ -161,6 +164,10 @@ public class RealVoltDB implements VoltDBInterface
     private PartitionCountStats m_partitionCountStats = null;
     private IOStats m_ioStats = null;
     private StatsManager m_statsManager = null;
+
+    // Should the execution sites be started in recovery mode
+    // (used for joining a node to an existing cluster)
+    private boolean m_recovering = false;
 
     // Synchronize initialize and shutdown.
     private final Object m_startAndStopLock = new Object();
@@ -321,7 +328,7 @@ public class RealVoltDB implements VoltDBInterface
                         if (siteForThisThread == null) {
                             siteForThisThread = site;
                         } else {
-                            ExecutionSiteRunner runner = new ExecutionSiteRunner(siteId, m_catalogContext, serializedCatalog);
+                            ExecutionSiteRunner runner = new ExecutionSiteRunner(siteId, m_catalogContext, serializedCatalog, m_recovering);
                             m_runners.add(runner);
                             Thread runnerThread = new Thread(runner, "Site " + siteId);
                             runnerThread.start();
@@ -342,7 +349,8 @@ public class RealVoltDB implements VoltDBInterface
                                   VoltDB.instance().getMessenger().createMailbox(siteId, VoltDB.DTXN_MAILBOX_ID, null),
                                   siteId,
                                   serializedCatalog,
-                                  null);
+                                  null,
+                                  m_recovering);
             m_localSites.put(Integer.parseInt(siteForThisThread.getTypeName()), siteObj);
             m_currentThreadSite = siteObj;
 

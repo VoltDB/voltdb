@@ -47,7 +47,7 @@ public class CatalogContext {
     public final int catalogVersion;
 
     // PRIVATE
-    private final String m_path;
+    //private final String m_path;
     private final JarClassLoader m_catalogClassLoader;
 
     public CatalogContext(Catalog catalog, String pathToCatalogJar, int version) {
@@ -59,7 +59,7 @@ public class CatalogContext {
         if (pathToCatalogJar == null)
             throw new RuntimeException("Can't create CatalogContext with null jar path.");
 
-        m_path = pathToCatalogJar;
+        //m_path = pathToCatalogJar;
         if (pathToCatalogJar.startsWith(NO_PATH) == false)
             m_catalogClassLoader = new JarClassLoader(pathToCatalogJar);
         else

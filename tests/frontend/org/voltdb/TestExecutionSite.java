@@ -385,7 +385,7 @@ public class TestExecutionSite extends TestCase {
         for (int ss=0; ss < siteCount; ++ss) {
             m_mboxes[ss] = new RussianRouletteMailbox( ss );
             m_rpqs[ss] = new RestrictedPriorityARRR(getInitiatorIds(), ss, m_mboxes[ss]);
-            m_sites[ss] = new ExecutionSite(m_voltdb, m_mboxes[ss], ss, null, m_rpqs[ss]);
+            m_sites[ss] = new ExecutionSite(m_voltdb, m_mboxes[ss], ss, null, m_rpqs[ss], false);
             registerMailbox(ss, m_mboxes[ss]);
         }
     }
@@ -566,7 +566,6 @@ public class TestExecutionSite extends TestCase {
             return paramBuf;
         }
 
-        @SuppressWarnings("deprecation")
         @Override
         ClientResponseImpl call(TransactionState txnState, Object... paramList)
         {
