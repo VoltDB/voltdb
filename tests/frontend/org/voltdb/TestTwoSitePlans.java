@@ -84,7 +84,7 @@ public class TestTwoSitePlans extends TestCase {
 
         // update the catalog with the data from the deployment file
         String pathToDeployment = pb.getPathToDeployment();
-        CatalogUtil.compileDeployment(catalog, pathToDeployment);
+        assertTrue(CatalogUtil.compileDeployment(catalog, pathToDeployment));
 
         cluster = catalog.getClusters().get("cluster");
         CatalogMap<Procedure> procedures = cluster.getDatabases().get("database").getProcedures();

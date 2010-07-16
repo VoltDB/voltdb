@@ -244,7 +244,10 @@ public class RealVoltDB implements VoltDBInterface
             Catalog catalog = new Catalog();
             catalog.execute(serializedCatalog);
 
-            CatalogUtil.compileDeployment(catalog, m_config.m_pathToDeployment);
+            // note if this fails it will print an error first
+            if (!CatalogUtil.compileDeployment(catalog, m_config.m_pathToDeployment))
+                System.exit(-1);
+
             serializedCatalog = catalog.serialize();
 
             m_catalogContext = new CatalogContext(catalog, m_config.m_pathToCatalog, catalogVersion);

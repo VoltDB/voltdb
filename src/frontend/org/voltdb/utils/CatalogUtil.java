@@ -405,7 +405,7 @@ public abstract class CatalogUtil {
      * @param catalog Catalog to be updated.
      * @param pathToDeployment Path to the deployment.xml file.
      */
-    public static void compileDeployment(Catalog catalog, String deploymentURL) {
+    public static boolean compileDeployment(Catalog catalog, String deploymentURL) {
 
         // get the URL/path for the deployment and prep an InputStream
         InputStream deployIS = null;
@@ -425,8 +425,8 @@ public abstract class CatalogUtil {
 
         // make sure the file exists
         if (deployIS == null) {
-            hostLog.fatal("Could not locate deployment info at given URL: " + deploymentURL);
-            System.exit(-1);
+            hostLog.error("Could not locate deployment info at given URL: " + deploymentURL);
+            return false;
         } else {
             hostLog.info("URL of deployment info: " + deploymentURL);
         }
@@ -434,11 +434,19 @@ public abstract class CatalogUtil {
         // get deployment info from xml file
         DeploymentType deployment = getDeployment(deployIS);
 
+        // wasn't a valid xml deployment file
+        if (deployment == null) {
+            hostLog.error("Not a valid XML deployment file at URL: " + deploymentURL);
+            return false;
+        }
+
         // set the cluster info
         setClusterInfo(catalog, deployment.getCluster());
 
         // set the users info
         setUsersInfo(catalog, deployment.getUsers());
+
+        return true;
     }
 
     /**

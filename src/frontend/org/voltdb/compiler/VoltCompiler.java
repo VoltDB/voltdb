@@ -53,16 +53,16 @@ import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
+import org.voltdb.compiler.projectfile.ClassdependenciesType.Classdependency;
 import org.voltdb.compiler.projectfile.DatabaseType;
+import org.voltdb.compiler.projectfile.ExportsType.Connector;
+import org.voltdb.compiler.projectfile.ExportsType.Connector.Tables;
 import org.voltdb.compiler.projectfile.GroupsType;
 import org.voltdb.compiler.projectfile.ProceduresType;
 import org.voltdb.compiler.projectfile.ProjectType;
 import org.voltdb.compiler.projectfile.SchemasType;
 import org.voltdb.compiler.projectfile.SecurityType;
 import org.voltdb.compiler.projectfile.SnapshotType;
-import org.voltdb.compiler.projectfile.ClassdependenciesType.Classdependency;
-import org.voltdb.compiler.projectfile.ExportsType.Connector;
-import org.voltdb.compiler.projectfile.ExportsType.Connector.Tables;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.CatalogUtil;
@@ -319,7 +319,10 @@ public class VoltCompiler {
 
         // if pathToDeployment is set, bake its changes into the catalog now
         if (pathToDeployment != null) {
-            CatalogUtil.compileDeployment(catalog, pathToDeployment);
+            if (!CatalogUtil.compileDeployment(catalog, pathToDeployment)) {
+                compilerLog.error("Unable to read from deployment file.");
+                return false;
+            }
         }
 
         // WRITE CATALOG TO JAR HERE
