@@ -130,6 +130,7 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
 
     public void prepareCatalogUpdate(
             String catalogURL,
+            String deploymentURL,
             long clientHandle,
             long connectionId,
             String hostname,
@@ -142,6 +143,7 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
         work.sequenceNumber = sequenceNumber;
         work.clientData = clientData;
         work.catalogURL = catalogURL;
+        work.deploymentURL = deploymentURL;
         m_work.add(work);
     }
 
@@ -278,6 +280,7 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
 
         // catalog change specific boiler plate
         retval.catalogURL = work.catalogURL;
+        retval.deploymentURL = work.deploymentURL;
 
         // get the diff between catalogs
         try {
@@ -289,6 +292,12 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
             }
             Catalog newCatalog = new Catalog();
             newCatalog.execute(newCatalogCommands);
+
+            // If VoltProjectBuilder was used, work.deploymentURL will be null. No deployment.xml file was
+            // given to the server in this case because its deployment info has already been added to the catalog.
+            if (work.deploymentURL != null) {
+                CatalogUtil.compileDeployment(newCatalog, work.deploymentURL);
+            }
 
             // get the current catalog
             CatalogContext context = VoltDB.instance().getCatalogContext();

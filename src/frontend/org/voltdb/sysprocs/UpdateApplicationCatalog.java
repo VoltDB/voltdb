@@ -21,8 +21,16 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 
-import org.voltdb.*;
+import org.voltdb.BackendTarget;
+import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltdb.HsqlBackend;
+import org.voltdb.ParameterSet;
+import org.voltdb.ProcInfo;
+import org.voltdb.SiteProcedureConnection;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltSystemProcedure;
+import org.voltdb.VoltTable;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.utils.Encoder;
@@ -72,7 +80,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
      * @return Standard STATUS table.
      */
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
-            String catalogDiffCommands, String catalogURL, int expectedCatalogVersion)
+            String catalogDiffCommands, String catalogURL,
+            int expectedCatalogVersion, String deploymentURL)
     {
         // TODO: compute CRC for catalog vs. a crc provided by the initiator.
         // validateCRC(catalogURL, initiatorsCRC);

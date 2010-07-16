@@ -31,8 +31,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.Test;
 
-import org.voltdb.*;
+import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.benchmark.tpcc.procedures.InsertNewOrder;
 import org.voltdb.catalog.LoadCatalogToString;
@@ -135,7 +137,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         // add a procedure "InsertOrderLineBatched"
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.jar");
         callback = new CatTestCallback(ClientResponse.SUCCESS);
-        client.callProcedure(callback, "@UpdateApplicationCatalog", newCatalogURL);
+        client.callProcedure(callback, "@UpdateApplicationCatalog", newCatalogURL, null);
 
         // don't care if this succeeds or fails.
         // calling the new proc before the cat change returns is not guaranteed to work
@@ -165,7 +167,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // this is a do nothing change... shouldn't affect anything
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.jar");
-        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL).getResults();
+        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, null).getResults();
         assertTrue(results.length == 1);
         client.drain();
         assertTrue(callbackSuccess);
@@ -182,7 +184,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         // remove the procedure we just added async
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-basewithdeployment.jar");
         callback = new CatTestCallback(ClientResponse.SUCCESS);
-        client.callProcedure(callback, "@UpdateApplicationCatalog", newCatalogURL);
+        client.callProcedure(callback, "@UpdateApplicationCatalog", newCatalogURL, null);
 
         // don't care if this works now
         x = 4;
@@ -213,7 +215,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // change the insert new order procedure
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-conflict.jar");
-        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL).getResults();
+        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, null).getResults();
         assertTrue(results.length == 1);
 
         // call the new proc and make sure the one we want gets run
@@ -223,7 +225,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // load a big catalog change just to make sure nothing fails horribly
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-many.jar");
-        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL).getResults();
+        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, null).getResults();
         assertTrue(results.length == 1);
 
         loadSomeData(client, 65, 5);
@@ -245,7 +247,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         URL url = LoadCatalogToString.class.getResource("catalog.txt");
         String newCatalogURL = URLDecoder.decode(url.getPath(), "UTF-8");
         try {
-            client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
+            client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, null);
             fail();
         }
         catch (Exception e) {
@@ -278,7 +280,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // add tables O1, O2, O3
         String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtables.jar");
-        VoltTable[] results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL).getResults();
+        VoltTable[] results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, null).getResults();
         assertTrue(results.length == 1);
 
         // verify that the new table(s) support an insert
@@ -307,7 +309,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // revert to the original schema
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-basewithdeployment.jar");
-        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL).getResults();
+        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, null).getResults();
         assertTrue(results.length == 1);
 
         // requests to the dropped table should fail
@@ -339,7 +341,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // add new tables and materialized view
         String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtableswithmatview.jar");
-        VoltTable[] results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL).getResults();
+        VoltTable[] results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, null).getResults();
         assertTrue(results.length == 1);
 
         // verify that the new table(s) support an insert
