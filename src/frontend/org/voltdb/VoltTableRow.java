@@ -643,7 +643,7 @@ public abstract class VoltTableRow {
         case DECIMAL:
             Object dec = getDecimalAsBigDecimal(columnIndex);
             if (dec == null)
-                js.value("NULL");
+                js.value(null);
             else
                 js.value(dec.toString());
             break;
