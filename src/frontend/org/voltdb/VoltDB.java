@@ -97,7 +97,7 @@ public class VoltDB {
         public int m_httpAdminPort = 8080;
 
         /** information used to rejoin this new node to a cluster */
-        public String rejoinToHostAndPort = null;
+        public String m_rejoinToHostAndPort = null;
 
         public boolean listenForDumpRequests = false;
 
@@ -181,10 +181,10 @@ public class VoltDB {
                 }
 
                 else if (arg.equals("rejoinhost")) {
-                    rejoinToHostAndPort = args[++i].trim();
+                    m_rejoinToHostAndPort = args[++i].trim();
                 }
                 else if (arg.startsWith("rejoinhost ")) {
-                    rejoinToHostAndPort = arg.substring("rejoinhost ".length()).trim();
+                    m_rejoinToHostAndPort = arg.substring("rejoinhost ".length()).trim();
                 }
 
                 else if (arg.equals("catalog")) {

@@ -54,6 +54,7 @@ public class LocalCluster implements VoltServerConfig {
     final BackendTarget m_target;
     final String m_buildDir;
     int m_portOffset;
+    boolean m_hasLocalServer = true;
 
     // state
     boolean m_compiled = false;
@@ -67,7 +68,7 @@ public class LocalCluster implements VoltServerConfig {
 
     /* class pipes a process's output to a file name.
      * Also watches for "Server completed initialization"
-     * in output - the sygil of readiness!
+     * in output - the signal of readiness!
      */
     public static class PipeToFile implements Runnable {
         FileWriter m_writer ;
@@ -185,6 +186,10 @@ public class LocalCluster implements VoltServerConfig {
         java.lang.Runtime.getRuntime().addShutdownHook(shutdownThread);
     }
 
+    public void setHasLocalServer(boolean hasLocalServer) {
+        m_hasLocalServer = hasLocalServer;
+    }
+
     @Override
     public boolean compile(VoltProjectBuilder builder) {
         if (m_compiled) {
@@ -210,19 +215,25 @@ public class LocalCluster implements VoltServerConfig {
             System.out.println("********** Starting cluster at: " + startTime);
         }
 
-        // create the in-process server
-        Configuration config = new Configuration();
-        config.m_backend = m_target;
-        config.m_noLoadLibVOLTDB = (m_target == BackendTarget.HSQLDB_BACKEND);
-        config.m_pathToCatalog = m_jarFileName;
-        config.m_profilingLevel = ProcedureProfiler.Level.DISABLED;
-        config.m_port = VoltDB.DEFAULT_PORT;
+        int oopStartIndex = 0;
 
-        m_localServer = new ServerThread(config);
-        m_localServer.start();
+        // create the in-process server
+        if (m_hasLocalServer) {
+            Configuration config = new Configuration();
+            config.m_backend = m_target;
+            config.m_noLoadLibVOLTDB = (m_target == BackendTarget.HSQLDB_BACKEND);
+            config.m_pathToCatalog = m_jarFileName;
+            config.m_profilingLevel = ProcedureProfiler.Level.DISABLED;
+            config.m_port = VoltDB.DEFAULT_PORT;
+
+            m_localServer = new ServerThread(config);
+            m_localServer.start();
+
+            oopStartIndex++;
+        }
 
         // create all the out-of-process servers
-        for (int i = 1; i < m_hostCount; i++) {
+        for (int i = oopStartIndex; i < m_hostCount; i++) {
             try {
                 m_procBuilder.command().set(m_portOffset,
                                             String.valueOf(VoltDB.DEFAULT_PORT + i));
@@ -281,7 +292,8 @@ public class LocalCluster implements VoltServerConfig {
         if (logtime) System.out.println("********** post witness: " + (System.currentTimeMillis() - startTime) + " ms");
 
         // Finally, make sure the local server thread is running and wait if it is not.
-        m_localServer.waitForInitialization();
+        if (m_hasLocalServer)
+            m_localServer.waitForInitialization();
         if (logtime) System.out.println("********** DONE: " + (System.currentTimeMillis() - startTime) + " ms");
         m_running = true;
     }

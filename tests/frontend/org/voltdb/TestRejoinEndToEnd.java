@@ -23,7 +23,13 @@
 
 package org.voltdb;
 
+import java.io.File;
+import java.net.URLEncoder;
+
 import junit.framework.TestCase;
+
+import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.LocalCluster;
 
 public class TestRejoinEndToEnd extends TestCase {
 
@@ -31,7 +37,7 @@ public class TestRejoinEndToEnd extends TestCase {
 
     }
 
-    /*public void testRejoin() throws Exception {
+    public void testRejoin() throws Exception {
         String simpleSchema =
             "create table blah (" +
             "ival bigint default 0 not null, " +
@@ -48,11 +54,48 @@ public class TestRejoinEndToEnd extends TestCase {
         boolean success = builder.compile("rejoin.jar", 1, 2, 1, "localhost");
         assertTrue(success);
 
+        LocalCluster cluster = new LocalCluster("rejoin.jar", 1, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        cluster.compile(builder);
+        cluster.setHasLocalServer(false);
+
+        cluster.startUp();
+        cluster.shutDownSingleHost(0);
+
         VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_httpAdminPort = 8095;
-        config.m_pathToCatalog = "json.jar";
-        ServerThread server = new ServerThread(config);
-        server.start();
-        server.waitForInitialization();
-    }*/
+        config.m_pathToCatalog = "rejoin.jar";
+        config.m_rejoinToHostAndPort = "localhost";
+        ServerThread localServer = new ServerThread(config);
+
+        localServer.start();
+        localServer.waitForInitialization();
+
+        Thread.sleep(100);
+
+        localServer.shutdown();
+        cluster.shutDown();
+
+        /*VoltDB.Configuration config1 = new VoltDB.Configuration();
+        config1.m_pathToCatalog = "rejoin.jar";
+        ServerThread server1 = new ServerThread(config1);
+
+
+        VoltDB.Configuration config2 = new VoltDB.Configuration();
+        config2.m_pathToCatalog = "rejoin.jar";
+        config2.m_port = config1.m_port + 1;
+        ServerThread server2 = new ServerThread(config2);
+
+        server1.start();
+        // give server 1 a headstart so it will be the leader
+        Thread.sleep(100);
+        server2.start();
+
+        server1.waitForInitialization();
+        server2.waitForInitialization();
+
+        server1.shutdown();
+        server2.shutdown();
+
+        server1.join();
+        server2.join();*/
+    }
 }
