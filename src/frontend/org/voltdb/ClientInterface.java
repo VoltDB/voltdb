@@ -867,7 +867,7 @@ public class ClientInterface implements DumpManager.Dumpable {
             final ClientResponseImpl errorResponse =
                 new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                                        new VoltTable[0],
-                                       "User does not have permission to invoke " + catProc.getTypeName(),
+                                       "User does not have permission to invoke " + task.procName,
                                        task.clientHandle);
             c.writeStream().enqueue(errorResponse);
             return;

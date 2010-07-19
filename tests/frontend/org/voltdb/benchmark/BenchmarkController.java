@@ -240,7 +240,7 @@ public class BenchmarkController {
         m_jarFileName = jarFileNames[0];
         m_pathToDeployment = m_projectBuilder.getPathToDeployment();
 
-        // copy the catalog to the servers, but don't bother in local mode
+        // copy the catalog and deployment file to the servers, but don't bother in local mode
         boolean status;
         if (m_config.localmode == false) {
             for (String fileName : jarFileNames) {
@@ -266,6 +266,20 @@ public class BenchmarkController {
                         System.out.println("SSH copyFromLocal failed to copy "
                         + fileName + " to "
                         + m_config.remoteUser + "@" + client + ":" + m_config.remotePath);
+                }
+            }
+
+            // copy the deployment file to the servers (clients don't need it)
+            for (String host : m_config.hosts) {
+                status = SSHTools.copyFromLocal(
+                        new File(m_pathToDeployment),
+                        m_config.remoteUser,
+                        host,
+                        m_config.remotePath);
+                if (!status) {
+                    System.out.println("SSH copyFromLocal failed to copy "
+                        + m_pathToDeployment + " to "
+                        + m_config.remoteUser + "@" + host + ":" + m_config.remotePath);
                 }
             }
 
@@ -335,7 +349,7 @@ public class BenchmarkController {
                         "catalog",
                         m_jarFileName,
                         "deployment",
-                        m_pathToDeployment,
+                        new File(m_pathToDeployment).getName(),
                         m_config.useProfile,
                         m_config.backend};
 
