@@ -23,18 +23,23 @@
 
 package org.voltdb.regressionsuites;
 
-import junit.framework.Test;
-
 import java.io.IOException;
 import java.util.ArrayList;
-import org.voltdb.compiler.VoltProjectBuilder.*;
+
+import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
-import org.voltdb.regressionsuites.securityprocs.*;
-import org.voltdb.client.*;
-import org.voltdb.elt.ExportTestClient;
 import org.voltdb.VoltTable;
+import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
+import org.voltdb.client.Client;
+import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
+import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
+import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
+import org.voltdb.elt.ExportTestClient;
+import org.voltdb.regressionsuites.securityprocs.DoNothing1;
+import org.voltdb.regressionsuites.securityprocs.DoNothing2;
+import org.voltdb.regressionsuites.securityprocs.DoNothing3;
 
 public class TestSecuritySuite extends RegressionSuite {
 
@@ -202,6 +207,16 @@ public class TestSecuritySuite extends RegressionSuite {
         try {
             client.callProcedure("DoNothing3", 1);
         } catch (ProcCallException e) {
+            e.printStackTrace();
+            exceptionThrown = true;
+        }
+        assertTrue(exceptionThrown);
+
+        // user3 shouldn't gleam much info from a made up proc
+        try {
+            client.callProcedure("RyanLikesTheYankees", 1);
+        } catch (ProcCallException e) {
+            assertFalse(e.getMessage().contains("lost before a response was received"));
             e.printStackTrace();
             exceptionThrown = true;
         }
