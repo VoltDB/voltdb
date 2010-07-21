@@ -102,6 +102,14 @@ public class ExecutionSiteFuzzChecker
                 retval = new HashSet<SiteLog>();
                 retval.add(site);
             }
+            else if (site.currentTxn().getTxnId().compareTo(Long.MAX_VALUE) == 0)
+            {
+                // if the TXN ID is actually Long.MAX_VALUE, then this is a bogus
+                // transaction record, just ignore it.  Makes the empty
+                // list case when a site fails IMMEDIATELY and has no transactions
+                // in it work
+                // DO NOTHING
+            }
             else if (site.currentTxn().getTxnId().compareTo(min_txn_id) == 0)
             {
                 retval.add(site);
@@ -128,6 +136,8 @@ public class ExecutionSiteFuzzChecker
         // - If the elements are a multi-part TXN:
         // -- If there is one per surviving site, pass
         // -- If there is fewer than one per surviving site, they must all be rollback
+        // --- This is the case where one or more sites never even start the
+        // --- transaction because of the coordinator failure
         boolean valid = true;
 
         // Should all match
@@ -142,7 +152,7 @@ public class ExecutionSiteFuzzChecker
             else if (!model_txn.equals(site.currentTxn()))
             {
                 System.out.println("VALIDATION FAILURE, MISMATCHED TRANSACTIONS");
-                junit.framework.Assert.assertTrue(false);
+                //junit.framework.Assert.assertTrue(false);
                 valid = false;
             }
         }
@@ -157,7 +167,7 @@ public class ExecutionSiteFuzzChecker
             if (model_txn.isMultiPart() && sites.size() != m_liveSites.size() && !model_txn.rolledBack())
             {
                 System.out.println("VALIDATION FAILURE, PARTIALLY COMMITTED TXN");
-                junit.framework.Assert.assertTrue(false);
+                //junit.framework.Assert.assertTrue(false);
                 valid = false;
             }
         }
