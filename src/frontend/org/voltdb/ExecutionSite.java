@@ -793,9 +793,15 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             // Every non-heartbeat notice requires a transaction state.
             TransactionState ts = m_transactionsById.get(info.getTxnId());
 
-            // Check for a rollback FragmentTask.  Would eventually like to
-            // replace the overloading of FragmentTask with a separate
-            // TransactionCompletionMessage (or something similarly named)
+            // Check for a rollback FragmentTask.  Need to do this because
+            // a multi-partition participant can rollback locally and then
+            // move on to a new transaction; the final commit notification
+            // from the coordinator needs to avoid re-creating a new
+            // transaction state.
+            //
+            // FUTURE: Would eventually like to replace the overloading of
+            // FragmentTask with a separate TransactionCompletionMessage
+            // (or something similarly named)
             boolean isRollback = false;
             if (message instanceof FragmentTaskMessage)
             {
