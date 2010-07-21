@@ -127,11 +127,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     // The time in ms since epoch of the last call to tick()
     long lastTickTime = 0;
     long lastCommittedTxnId = 0;
-    // The transaction ID of the last committed multi-partition transaction is
-    // tracked so that participants can determine whether or not to commit or
-    // roll back if the coordinator fails while notifying each participant of
-    // the final outcome for the txn.
-    long lastCommittedMultiPartTxnId = 0;
 
     /*
      * Due to failures we may find out about commited multi-part txns
@@ -744,7 +739,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 lastCommittedTxnId = txnState.txnId;
                 if (!txnState.isSinglePartition())
                 {
-                    lastCommittedMultiPartTxnId = txnState.txnId;
                     lastKnownGloballyCommitedMultiPartTxnId =
                         Math.max(txnState.txnId, lastKnownGloballyCommitedMultiPartTxnId);
                 }
