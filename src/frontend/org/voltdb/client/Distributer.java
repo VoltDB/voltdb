@@ -25,6 +25,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
@@ -131,6 +132,7 @@ class Distributer {
     }
 
     class NodeConnection extends VoltProtocolHandler implements org.voltdb.network.QueueMonitor {
+        private final AtomicInteger m_callbacksToInvoke = new AtomicInteger(0);
         private final HashMap<Long, Object[]> m_callbacks;
         private final HashMap<String, ProcedureStats> m_stats
             = new HashMap<String, ProcedureStats>();
@@ -178,6 +180,7 @@ class Distributer {
                     return;
                 }
                 m_callbacks.put(handle, new Object[] { System.currentTimeMillis(), callback, name });
+                m_callbacksToInvoke.incrementAndGet();
             }
             m_connection.writeStream().enqueue(c);
         }
@@ -204,6 +207,7 @@ class Distributer {
                     return;
                 }
                 m_callbacks.put(handle, new Object[]{ System.currentTimeMillis(), callback, name });
+                m_callbacksToInvoke.incrementAndGet();
             }
             m_connection.writeStream().enqueue(f);
         }
@@ -271,6 +275,7 @@ class Distributer {
                         t.printStackTrace();
                     }
                 }
+                m_callbacksToInvoke.decrementAndGet();
             }
             else if (m_isConnected) {
                 // TODO: what's the right error path here?
@@ -334,6 +339,7 @@ class Distributer {
                             t.printStackTrace();
                         }
                     }
+                    m_callbacksToInvoke.decrementAndGet();
                 }
             }
         }
@@ -413,9 +419,7 @@ class Distributer {
             more = false;
             synchronized (this) {
                 for (NodeConnection cxn : m_connections) {
-                    synchronized(cxn.m_callbacks) {
-                        more = more || cxn.m_callbacks.size() > 0;
-                    }
+                    more = more || cxn.m_callbacksToInvoke.get() > 0;
                 }
             }
             if (more) {
@@ -553,10 +557,8 @@ class Distributer {
                 throw new NoConnectionsException("No connections.");
             }
 
-            int queuedInvocations = 0;
             for (int i=0; i < totalConnections; ++i) {
                 cxn = m_connections.get(Math.abs(++m_nextConnection % totalConnections));
-                queuedInvocations += cxn.m_callbacks.size();
                 if (!cxn.hadBackPressure() || ignoreBackpressure) {
                     // serialize and queue the invocation
                     backpressure = false;
