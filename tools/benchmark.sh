@@ -13,6 +13,11 @@ echo "cd ~/trunk && BMCLIENT=$BMCLIENT BMDURATION=$BMDURATION BMCLIENTCOUNT=1 FI
 echo "date" >> ~/trunk/tools/benchmark-$HOSTNAME.sh
 chmod a+x ~/trunk/tools/benchmark-$HOSTNAME.sh
 
+if [ ! -f ~/workspace/build-centos/trunk/obj/release/voltbin/mysqlp -a -f ~/voltbin/mysqlp ]
+then
+    cp ~/workspace/build-centos/trunk/obj/release/voltbin/mysqlp ~/voltbin/
+fi
+
 rm -f /home/test/output/benchmark-$HOSTNAME.log
 touch /home/test/output/benchmark-$HOSTNAME.log
 tail -f /home/test/output/benchmark-$HOSTNAME.log &
