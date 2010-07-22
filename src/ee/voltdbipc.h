@@ -113,10 +113,12 @@ private:
 
     int8_t loadTable(struct ipc_command *cmd);
 
+    int8_t processRecoveryMessage( struct ipc_command *cmd);
+
     void sendException( int8_t errorCode);
 
-    int8_t activateCopyOnWrite(struct ipc_command *cmd);
-    void  cowSerializeMore(struct ipc_command *cmd);
+    int8_t activateTableStream(struct ipc_command *cmd);
+    void  tableStreamSerializeMore(struct ipc_command *cmd);
     void  eltAction(struct ipc_command *cmd);
 
     void signalHandler(int signum, siginfo_t *info, void *context);

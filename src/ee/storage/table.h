@@ -206,6 +206,15 @@ public:
     bool serializeTupleTo(SerializeOutput &serialize_out, TableTuple *tuples, int numTuples);
 
     /**
+     * Loads only tuple data and assumes there is no schema present.
+     * Used for recovery where the schema is not sent.
+     * @param allowELT if false, elt enabled is overriden for this load.
+     */
+    void loadTuplesFromNoHeader(bool allowELT,
+                                SerializeInput &serialize_in,
+                                Pool *stringPool = NULL);
+
+    /**
      * Loads only tuple data, not schema, from the serialized table.
      * Used for initial data loading and receiving dependencies.
      * @param allowELT if false, elt enabled is overriden for this load.

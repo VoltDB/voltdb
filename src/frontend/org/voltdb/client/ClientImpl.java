@@ -68,6 +68,7 @@ final class ClientImpl implements Client {
                 m_defaultMaxArenaSize//262144
         },
         false,
+        null,
         null);
     }
 
@@ -84,25 +85,34 @@ final class ClientImpl implements Client {
             int expectedOutgoingMessageSize,
             int maxArenaSizes[],
             boolean heavyweight,
-            StatsUploaderSettings statsSettings) {
+            StatsUploaderSettings statsSettings,
+            UncaughtExceptionHandler handler) {
         m_expectedOutgoingMessageSize = expectedOutgoingMessageSize;
         m_distributer = new Distributer(
                 expectedOutgoingMessageSize,
                 maxArenaSizes,
                 heavyweight,
-                statsSettings);
+                statsSettings,
+                handler);
         m_distributer.addClientStatusListener(new CSL());
+    }
+
+    public void createConnection(String host, String program, String password)
+    throws UnknownHostException, IOException
+    {
+        createConnection(host, Client.VOLTDB_SERVER_PORT, program, password);
     }
 
      /**
      * Create a connection to another VoltDB node.
      * @param host
+     * @param port
      * @param program
      * @param password
      * @throws UnknownHostException
      * @throws IOException
      */
-    public void createConnection(String host, String program, String password)
+    public void createConnection(String host, int port, String program, String password)
         throws UnknownHostException, IOException
     {
         if (m_isShutdown) {
@@ -110,7 +120,7 @@ final class ClientImpl implements Client {
         }
         final String subProgram = (program == null) ? "" : program;
         final String subPassword = (password == null) ? "" : password;
-        m_distributer.createConnection(host, subProgram, subPassword);
+        m_distributer.createConnection(host, subProgram, subPassword, port);
     }
 
     /**

@@ -48,7 +48,7 @@
 
 using namespace voltdb;
 
-TableIndex::TableIndex(const TableIndexScheme &scheme)
+TableIndex::TableIndex(const TableIndexScheme &scheme) : m_scheme(scheme)
 {
     name_ = scheme.name;
     column_indices_vector_ = scheme.columnIndices;

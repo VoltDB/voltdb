@@ -64,6 +64,7 @@
 #include "common/tabletuple.h"
 #include "common/executorcontext.hpp"
 #include "common/FatalException.hpp"
+#include "common/RecoveryProtoMessage.h"
 #include "catalog/catalogmap.h"
 #include "catalog/catalog.h"
 #include "catalog/cluster.h"
@@ -1090,9 +1091,9 @@ int64_t VoltDBEngine::uniqueIdForFragment(catalog::PlanFragment *frag) {
 }
 
 /**
- * Activate copy on write mode for the specified table
+ * Activate a table stream for the specified table
  */
-bool VoltDBEngine::activateCopyOnWrite(const CatalogId tableId) {
+bool VoltDBEngine::activateTableStream(const CatalogId tableId, TableStreamType streamType) {
     map<int32_t, Table*>::iterator it = m_tables.find(tableId);
     if (it == m_tables.end()) {
         return false;
@@ -1104,19 +1105,31 @@ bool VoltDBEngine::activateCopyOnWrite(const CatalogId tableId) {
         return false;
     }
 
-    if (table->activateCopyOnWrite(&m_tupleSerializer, m_partitionId)) {
+    switch (streamType) {
+    case TABLE_STREAM_SNAPSHOT:
+        if (table->activateCopyOnWrite(&m_tupleSerializer, m_partitionId)) {
+            return false;
+        }
+
+        // keep track of snapshotting tables. a table already in cow mode
+        // can not be re-activated for cow mode.
+        if (m_snapshottingTables.find(tableId) != m_snapshottingTables.end()) {
+            assert(false);
+            return false;
+        }
+
+        table->incrementRefcount();
+        m_snapshottingTables[tableId] = table;
+        break;
+
+    case TABLE_STREAM_RECOVERY:
+        if (table->activateRecoveryStream(it->first)) {
+            return false;
+        }
+        break;
+    default:
         return false;
     }
-
-    // keep track of snapshotting tables. a table already in cow mode
-    // can not be re-activated for cow mode.
-    if (m_snapshottingTables.find(tableId) != m_snapshottingTables.end()) {
-        assert(false);
-        return false;
-    }
-
-    table->incrementRefcount();
-    m_snapshottingTables[tableId] = table;
     return true;
 }
 
@@ -1129,26 +1142,65 @@ bool VoltDBEngine::activateCopyOnWrite(const CatalogId tableId) {
  * cowSerializeMore which returns 0 (and deletes the COW
  * context). Further calls will return -1
  */
-int VoltDBEngine::cowSerializeMore(ReferenceSerializeOutput *out, const CatalogId tableId)
+int VoltDBEngine::tableStreamSerializeMore(
+        ReferenceSerializeOutput *out,
+        const CatalogId tableId,
+        const TableStreamType streamType)
 {
-    // If a completed table is polled, return 0 bytes serialized. The
-    // Java engine will always poll a fully serialized table one more
-    // time (it doesn't see the hasMore return code).  Note that the
-    // dynamic cast was already verified in activateCopyOnWrite.
 
-    map<int32_t, Table*>::iterator pos = m_snapshottingTables.find(tableId);
-    if (pos == m_snapshottingTables.end()) {
-        return 0;
+    switch (streamType) {
+    case TABLE_STREAM_SNAPSHOT: {
+        // If a completed table is polled, return 0 bytes serialized. The
+        // Java engine will always poll a fully serialized table one more
+        // time (it doesn't see the hasMore return code).  Note that the
+        // dynamic cast was already verified in activateCopyOnWrite.
+        map<int32_t, Table*>::iterator pos = m_snapshottingTables.find(tableId);
+        if (pos == m_snapshottingTables.end()) {
+            return 0;
+        }
+
+        PersistentTable *table = dynamic_cast<PersistentTable*>(pos->second);
+        bool hasMore = table->serializeMore(out);
+        if (!hasMore) {
+            m_snapshottingTables.erase(tableId);
+            table->decrementRefcount();
+        }
+        break;
     }
 
-    PersistentTable *table = dynamic_cast<PersistentTable*>(pos->second);
-    bool hasMore = table->serializeMore(out);
-    if (!hasMore) {
-        m_snapshottingTables.erase(tableId);
-        table->decrementRefcount();
+    case TABLE_STREAM_RECOVERY: {
+        /*
+         * Table ids don't change during recovery because
+         * catalog changes are not allowed.
+         */
+        map<int32_t, Table*>::iterator pos = m_tables.find(tableId);
+        if (pos == m_tables.end()) {
+            return 0;
+        }
+        PersistentTable *table = dynamic_cast<PersistentTable*>(pos->second);
+        table->nextRecoveryMessage(out);
+        break;
     }
+    default:
+        return -1;
+    }
+
 
     return static_cast<int>(out->position());
+}
+
+/*
+ * Apply the updates in a recovery message.
+ */
+void VoltDBEngine::processRecoveryMessage(RecoveryProtoMsg *message) {
+    CatalogId tableId = message->tableId();
+    map<int32_t, Table*>::iterator pos = m_tables.find(tableId);
+    if (pos == m_tables.end()) {
+        throwFatalException(
+                "Attempted to process recovery message for tableId %d but the table could not be found", tableId);
+    }
+    PersistentTable *table = dynamic_cast<PersistentTable*>(pos->second);
+    table->processRecoveryMessage( message, NULL, false);
 }
 
 long

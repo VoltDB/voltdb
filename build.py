@@ -191,6 +191,9 @@ CTX.INPUT['common'] = """
  types.cpp
  UndoLog.cpp
  NValue.cpp
+ RecoveryProtoMessage.cpp
+ RecoveryProtoMessageBuilder.cpp
+ DefaultTupleSerializer.cpp
 """
 
 CTX.INPUT['execution'] = """
@@ -260,7 +263,6 @@ CTX.INPUT['storage'] = """
  constraintutil.cpp
  CopyOnWriteContext.cpp
  CopyOnWriteIterator.cpp
- DefaultTupleSerializer.cpp
  ConstraintFailureException.cpp
  MaterializedViewMetadata.cpp
  persistenttable.cpp
@@ -277,6 +279,7 @@ CTX.INPUT['storage'] = """
  tableutil.cpp
  temptable.cpp
  TupleStreamWrapper.cpp
+ RecoveryContext.cpp
 """
 
 CTX.INPUT['stats'] = """

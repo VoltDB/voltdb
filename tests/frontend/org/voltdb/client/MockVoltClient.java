@@ -243,4 +243,11 @@ public class MockVoltClient implements Client {
         // TODO Auto-generated method stub
 
     }
+
+    @Override
+    public void createConnection(String host, int port, String username,
+            String password) throws UnknownHostException, IOException {
+        // TODO Auto-generated method stub
+
+    }
 }

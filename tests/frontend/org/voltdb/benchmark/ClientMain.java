@@ -486,7 +486,8 @@ public abstract class ClientMain {
                 getExpectedOutgoingMessageSize(),
                 null,
                 useHeavyweightClient(),
-                statsSettings);
+                statsSettings,
+                null);
 
         m_id = id;
         m_exitOnCompletion = exitOnCompletion;
@@ -709,7 +710,7 @@ public abstract class ClientMain {
         String dir = "/tmp";
         String nonce = "data_verification";
         Client client = ClientFactory.createClient(getExpectedOutgoingMessageSize(), null,
-                                                   false, null);
+                                                   false, null, null);
         // Host ID to IP mappings
         LinkedHashMap<Integer, String> hostMappings = new LinkedHashMap<Integer, String>();
         /*

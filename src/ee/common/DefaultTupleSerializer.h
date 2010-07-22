@@ -15,17 +15,29 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.client;
+#ifndef DEFAULTTUPLESERIALIZER_H_
+#define DEFAULTTUPLESERIALIZER_H_
+#include "common/TupleSerializer.h"
+#include "common/tabletuple.h"
 
-/**
- * Abstract base class for callbacks that are invoked when an asynchronously invoked transaction receives a response.
- * Extend this class and provide an implementation of {@link #clientCallback} to receive a response to a
- * stored procedure invocation.
- */
-public interface ProcedureCallback {
+namespace voltdb {
+class ReferenceSerializeOutput;
+class TupleSchema;
+
+class DefaultTupleSerializer : public TupleSerializer {
+public:
     /**
-     * Implementation of callback to be provided by client applications
-     * @param clientResponse Response to the stored procedure invocation this callback is associated with
+     * Serialize the provided tuple to the provide serialize output
      */
-    abstract public void clientCallback(ClientResponse clientResponse) throws Exception;
+    void serializeTo(TableTuple tuple, ReferenceSerializeOutput *out);
+
+    /**
+     * Calculate the maximum size of a serialized tuple based upon the schema of the table/tuple
+     */
+    int getMaxSerializedTupleSize(const TupleSchema *schema);
+
+    virtual ~DefaultTupleSerializer() {}
+};
 }
+
+#endif /* DEFAULTTUPLESERIALIZER_H_ */

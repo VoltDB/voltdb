@@ -47,6 +47,7 @@
 #include <cassert>
 #include <cstdio>
 
+#include "boost/scoped_ptr.hpp"
 #include "storage/persistenttable.h"
 
 #include "common/debuglog.h"
@@ -56,7 +57,10 @@
 #include "common/UndoQuantum.h"
 #include "common/executorcontext.hpp"
 #include "common/FatalException.hpp"
+#include "common/types.h"
+#include "common/RecoveryProtoMessage.h"
 #include "indexes/tableindex.h"
+#include "indexes/tableindexfactory.h"
 #include "storage/table.h"
 #include "storage/tableiterator.h"
 #include "storage/TupleStreamWrapper.h"
@@ -772,10 +776,79 @@ bool PersistentTable::serializeMore(ReferenceSerializeOutput *out) {
     const bool hasMore = m_COWContext->serializeMore(out);
     if (!hasMore) {
         m_COWContext.reset(NULL);
-        fflush(stdout);
     }
 
     return hasMore;
+}
+
+/**
+ * Create a recovery stream for this table. Returns true if the table already has an active recovery stream
+ */
+bool PersistentTable::activateRecoveryStream(int32_t tableId) {
+    if (m_recoveryContext != NULL) {
+        return true;
+    }
+    if (m_tupleCount == 0) {
+        return false;
+    }
+    m_recoveryContext.reset(new RecoveryContext( this, tableId ));
+    return false;
+}
+
+/**
+ * Serialize the next message in the stream of recovery messages. Returns true if there are
+ * more messages and false otherwise.
+ */
+void PersistentTable::nextRecoveryMessage(ReferenceSerializeOutput *out) {
+    if (m_recoveryContext == NULL) {
+        return;
+    }
+
+    const bool hasMore = m_recoveryContext->nextMessage(out);
+    if (!hasMore) {
+        m_recoveryContext.reset(NULL);
+    }
+}
+
+/**
+ * Process the updates from a recovery message
+ */
+void PersistentTable::processRecoveryMessage(RecoveryProtoMsg* message, Pool *pool, bool allowELT) {
+    switch (message->msgType()) {
+    case voltdb::RECOVERY_MSG_TYPE_SCAN_TUPLES: {
+        loadTuplesFromNoHeader( allowELT, *message->stream(), pool);
+        break;
+    }
+    default:
+        throwFatalException("Attempted to process a recovery message of unknown type %d", message->msgType());
+    }
+}
+
+/**
+ * Create a tree index on the primary key and then iterate it and hash
+ * the tuple data.
+ */
+size_t PersistentTable::hashCode() {
+    TableIndexScheme sourceScheme = m_pkeyIndex->getScheme();
+    sourceScheme.setTree();
+    boost::scoped_ptr<TableIndex> pkeyIndex(TableIndexFactory::getInstance(m_pkeyIndex->getScheme()));
+    TableIterator iter(this);
+    TableTuple tuple(schema());
+    while (iter.next(tuple)) {
+        pkeyIndex->addEntry(&tuple);
+    }
+
+    pkeyIndex->moveToEnd(true);
+
+    size_t hashCode = 0;
+    while (true) {
+         tuple = pkeyIndex->nextValue();
+         if (tuple.isNullTuple()) {
+             break;
+         }
+         tuple.hashCode(hashCode);
+    }
+    return hashCode;
 }
 
 }

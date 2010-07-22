@@ -31,7 +31,7 @@ import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.DBBPool.BBContainer;
 
-/*
+/**
  * Encapsulates the state needed to manage an ongoing snapshot at the
  * per-execution site level. Also contains some static global snapshot
  * counters. This class requires callers to maintain thread safety;
@@ -149,7 +149,7 @@ public class SnapshotSiteProcessor {
                 assert(m_snapshotTargets != null);
                 m_snapshotTargets.add(task.m_target);
             }
-            if (!ee.activateCopyOnWrite(task.m_tableId)) {
+            if (!ee.activateTableStream(task.m_tableId, TableStreamType.SNAPSHOT )) {
                 hostLog.error("Attempted to activate copy on write mode for table "
                         + task.m_name + " and failed");
                 hostLog.error(task);
@@ -183,7 +183,11 @@ public class SnapshotSiteProcessor {
             assert(snapshotBuffer != null);
             snapshotBuffer.b.clear();
             snapshotBuffer.b.position(headerSize);
-            final int serialized = ee.cowSerializeMore( snapshotBuffer, currentTask.m_tableId);
+            final int serialized =
+                ee.tableStreamSerializeMore(
+                    snapshotBuffer,
+                    currentTask.m_tableId,
+                    TableStreamType.SNAPSHOT);
 
             if (serialized < 0) {
                 hostLog.error("Failure while serialize data from a table for COW snapshot");

@@ -269,7 +269,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                      */
                     m_numConnections.incrementAndGet();
 
-                    m_executor.submit(new Runnable() {
+                    m_executor.execute(new Runnable() {
                         @Override
                         public void run() {
                             if (socket != null) {

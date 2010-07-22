@@ -464,7 +464,10 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
     }
 
     /**
-     * Return a {@link VoltTableRow} instance with the specified index.
+     * Return a {@link VoltTableRow} instance with the specified index. This method
+     * is not performant because it has to scan the length prefix of every row preceding
+     * the requested row in order to find the position of the requested row. Use advanceRow
+     * or advanceToRow instead.
      * @param index Index of the row
      * @return The requested {@link VoltTableRow Row}.
      * @throws IndexOutOfBoundsException if no row exists at the given index.

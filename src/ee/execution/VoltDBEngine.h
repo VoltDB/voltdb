@@ -62,7 +62,7 @@
 #include "common/DummyUndoQuantum.hpp"
 #include "common/SerializableEEException.h"
 #include "common/Topend.h"
-#include "storage/DefaultTupleSerializer.h"
+#include "common/DefaultTupleSerializer.h"
 #include "logging/LogManager.h"
 #include "logging/LogProxy.h"
 #include "logging/StdoutLogProxy.h"
@@ -101,6 +101,7 @@ class ReferenceSerializeInput;
 class ReferenceSerializeOutput;
 class PlanNodeFragment;
 class ExecutorContext;
+class RecoveryProtoMsg;
 
 /**
  * Represents an Execution Engine which holds catalog objects (i.e. table) and executes
@@ -338,19 +339,27 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         static int64_t uniqueIdForFragment(catalog::PlanFragment *frag);
 
         /**
-         * Activate copy on write mode for the specified table.
+         * Activate a table stream of the specified type for the specified table.
          * Returns true on success and false on failure
          */
-        bool activateCopyOnWrite(const CatalogId tableId);
+        bool activateTableStream(const CatalogId tableId, const TableStreamType streamType);
 
         /**
-         * Serialize more tuples from the specified table that is in COW mode.
+         * Serialize more tuples from the specified table that has an active stream of the specified type
          * Returns the number of bytes worth of tuple data serialized or 0 if there are no more.
-         * Returns -1 if the table is no in COW mode. The table continues to be in COW (although no copies are made)
+         * Returns -1 if the table is not in COW mode. The table continues to be in COW (although no copies are made)
          * after all tuples have been serialize until the last call to cowSerializeMore which returns 0 (and deletes
          * the COW context). Further calls will return -1
          */
-        int cowSerializeMore(ReferenceSerializeOutput *out, const CatalogId tableId);
+        int tableStreamSerializeMore(
+                ReferenceSerializeOutput *out,
+                CatalogId tableId,
+                const TableStreamType streamType);
+
+        /*
+         * Apply the updates in a recovery message.
+         */
+        void processRecoveryMessage(RecoveryProtoMsg *message);
 
         /**
          * Perform an action on behalf of ELT.

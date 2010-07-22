@@ -47,6 +47,7 @@ import org.voltdb.exceptions.SerializableException;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltdb.TableStreamType;
 
 
 /* Serializes data over a connection that presumably is being read
@@ -120,10 +121,11 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         CustomPlanFragment(12),
         SetLogLevels(13),
         Quiesce(16),
-        ActivateCopyOnWrite(17),
-        COWSerializeMore(18),
+        ActivateTableStream(17),
+        TableStreamSerializeMore(18),
         UpdateCatalog(19),
-        ELTAction(20);
+        ELTAction(20),
+        RecoveryMessage(21);
         Commands(final int id) {
             m_id = id;
         }
@@ -1228,10 +1230,11 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateCopyOnWrite(int tableId) {
+    public boolean activateTableStream(int tableId, TableStreamType streamType) {
         m_data.clear();
-        m_data.putInt(Commands.ActivateCopyOnWrite.m_id);
+        m_data.putInt(Commands.ActivateTableStream.m_id);
         m_data.putInt(tableId);
+        m_data.putInt(streamType.ordinal());
 
         try {
             m_data.flip();
@@ -1256,13 +1259,14 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public int cowSerializeMore(BBContainer c, int tableId) {
+    public int tableStreamSerializeMore(BBContainer c, int tableId, TableStreamType streamType) {
         int bytesReturned = -1;
         ByteBuffer view = c.b.duplicate();
         try {
             m_data.clear();
-            m_data.putInt(Commands.COWSerializeMore.m_id);
+            m_data.putInt(Commands.TableStreamSerializeMore.m_id);
             m_data.putInt(tableId);
+            m_data.putInt(streamType.ordinal());
             m_data.putInt(c.b.remaining());
 
             m_data.flip();
@@ -1348,6 +1352,24 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             throw new RuntimeException(e);
         }
 
+    }
+
+    @Override
+    public void processRecoveryMessage(byte[] message) {
+        try {
+            m_data.clear();
+            m_data.putInt(Commands.RecoveryMessage.m_id);
+            m_data.putInt(message.length);
+            m_data.put(message);
+
+            m_data.flip();
+            m_connection.write();
+
+            m_connection.readStatusByte();
+        } catch (final IOException e) {
+            System.out.println("Exception: " + e.getMessage());
+            throw new RuntimeException(e);
+        }
     }
 
 }

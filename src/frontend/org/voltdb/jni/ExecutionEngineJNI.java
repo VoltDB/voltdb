@@ -34,6 +34,7 @@ import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FastSerializer.BufferGrowCallback;
 import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltdb.TableStreamType;
 
 /**
  * Wrapper for native Execution Engine library.
@@ -471,13 +472,13 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateCopyOnWrite(int tableId) {
-        return nativeActivateCopyOnWrite( pointer, tableId);
+    public boolean activateTableStream(int tableId, TableStreamType streamType) {
+        return nativeActivateTableStream( pointer, tableId, streamType.ordinal());
     }
 
     @Override
-    public int cowSerializeMore(BBContainer c, int tableId) {
-        return nativeCOWSerializeMore(pointer, c.address, c.b.position(), c.b.remaining(), tableId);
+    public int tableStreamSerializeMore(BBContainer c, int tableId, TableStreamType streamType) {
+        return nativeTableStreamSerializeMore(pointer, c.address, c.b.position(), c.b.remaining(), tableId, streamType.ordinal());
     }
 
     /**
@@ -520,5 +521,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             throw new RuntimeException(e);
         }
         return result;
+    }
+
+    @Override
+    public void processRecoveryMessage(byte[] message) {
+        nativeProcessRecoveryMessage( pointer, message);
     }
 }

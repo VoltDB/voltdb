@@ -1018,7 +1018,11 @@ public abstract class BulkClient {
             ProcedureCallback cb = null;
             cb = m_callbacks.remove(response.getClientHandle());
             if (cb != null) {
-                cb.clientCallback(response);
+                try {
+                    cb.clientCallback(response);
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                }
             }
             else {
                 // TODO: what's the right error path here?

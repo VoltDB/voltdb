@@ -75,6 +75,7 @@ import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
+import org.voltdb.messaging.RecoveryMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.messaging.SiteMailbox;
 import org.voltdb.messaging.Subject;
@@ -153,6 +154,8 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
 
     // Each execution site manages snapshot using a SnapshotSiteProcessor
     private final SnapshotSiteProcessor m_snapshotter;
+
+    private RecoverySiteProcessor m_recoveryProcessor = null;
 
     // Trigger if shutdown has been run already.
     private boolean haveShutdownAlready;
@@ -344,6 +347,9 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         // do other periodic work
         m_snapshotter.doSnapshotWork(ee);
         m_watchdog.pet();
+        if (m_recoveryProcessor != null) {
+            m_recoveryProcessor.doRecoveryWork();
+        }
 
         /*
          * grab the table statistics from ee and put it into the statistics
@@ -824,6 +830,13 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 if (message instanceof FragmentTaskMessage) {
                     ts.createLocalFragmentWork((FragmentTaskMessage)message, false);
                 }
+            }
+        } else if (message instanceof RecoveryMessage) {
+            RecoveryMessage rm = (RecoveryMessage)message;
+            if (m_recoveryProcessor != null) {
+                m_recoveryProcessor.handleRecoveryMessage(rm);
+            } else {
+                VoltDB.crashVoltDB();
             }
         }
         else if (message instanceof FragmentResponseMessage) {

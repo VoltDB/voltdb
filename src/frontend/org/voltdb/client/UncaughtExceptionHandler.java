@@ -14,18 +14,11 @@
  * You should have received a copy of the GNU General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 package org.voltdb.client;
 
 /**
- * Abstract base class for callbacks that are invoked when an asynchronously invoked transaction receives a response.
- * Extend this class and provide an implementation of {@link #clientCallback} to receive a response to a
- * stored procedure invocation.
+ * A handler for uncaught exceptions thrown by callbacks.
  */
-public interface ProcedureCallback {
-    /**
-     * Implementation of callback to be provided by client applications
-     * @param clientResponse Response to the stored procedure invocation this callback is associated with
-     */
-    abstract public void clientCallback(ClientResponse clientResponse) throws Exception;
+public interface UncaughtExceptionHandler {
+    public void uncaughtException(ProcedureCallback callback, ClientResponse r, Throwable e);
 }

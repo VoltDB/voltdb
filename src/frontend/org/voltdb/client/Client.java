@@ -86,6 +86,18 @@ public interface Client {
         throws UnknownHostException, IOException;
 
     /**
+     * Create a connection to another VoltDB node.
+     * @param host hostname or IP address of the host to connect to
+     * @param port Port on remote host to connected to
+     * @param username Username to authorize. Username is ignored if authentication is disabled.
+     * @param password Password to authenticate. Password is ignored if authentication is disabled.
+     * @throws UnknownHostException
+     * @throws IOException
+     */
+    public void createConnection(String host, int port, String username, String password)
+        throws UnknownHostException, IOException;
+
+    /**
      * Synchronously invoke a procedure. Blocks until a result is available. A {@link ProcCallException}
      * is thrown if the response is anything other then success.
      * @param procName <code>class</code> name (not qualified by package) of the procedure to execute.

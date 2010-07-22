@@ -26,7 +26,7 @@
 #include <vector>
 #include "boost/scoped_array.hpp"
 
-#define throwFatalException(...) { char reallysuperbig_nonce_message[8192]; sprintf(reallysuperbig_nonce_message, __VA_ARGS__); throw voltdb::FatalException( reallysuperbig_nonce_message, __FILE__, __LINE__); }
+#define throwFatalException(...) { char reallysuperbig_nonce_message[8192]; snprintf(reallysuperbig_nonce_message, 8192, __VA_ARGS__); throw voltdb::FatalException( reallysuperbig_nonce_message, __FILE__, __LINE__); }
 namespace voltdb {
 class FatalException {
 public:

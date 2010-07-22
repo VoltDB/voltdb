@@ -261,6 +261,7 @@ public:
                           int colOffset, uint8_t *nullArray);
 
     void freeObjectColumns();
+    size_t hashCode(size_t seed) const;
     size_t hashCode() const;
 protected:
     inline void setDeletedTrue() {
@@ -610,15 +611,18 @@ inline int TableTuple::compare(const TableTuple &other) const {
     return 0;
 }
 
-inline size_t TableTuple::hashCode() const {
-    size_t seed = 0;
-    std::string s;
+inline size_t TableTuple::hashCode(size_t seed) const {
     const int columnCount = m_schema->columnCount();
     for (int i = 0; i < columnCount; i++) {
         const NValue value = getNValue(i);
         value.hashCombine(seed);
     }
     return seed;
+}
+
+inline size_t TableTuple::hashCode() const {
+    size_t seed = 0;
+    return hashCode(seed);
 }
 
 /**

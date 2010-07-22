@@ -14,18 +14,32 @@
  * You should have received a copy of the GNU General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+package org.voltdb.messaging;
 
-package org.voltdb.client;
-
-/**
- * Abstract base class for callbacks that are invoked when an asynchronously invoked transaction receives a response.
- * Extend this class and provide an implementation of {@link #clientCallback} to receive a response to a
- * stored procedure invocation.
- */
-public interface ProcedureCallback {
-    /**
-     * Implementation of callback to be provided by client applications
-     * @param clientResponse Response to the stored procedure invocation this callback is associated with
+public enum RecoveryMessageType {
+    /*
+     * Message containing freshly scanned tuples to be inserted
      */
-    abstract public void clientCallback(ClientResponse clientResponse) throws Exception;
+    ScanTuples,
+    /*
+     * Message indicating that the table scan is complete, future polling
+     * will produce delta data
+     */
+    ScanComplete,
+    /*
+     * Message containing whole tuples that are either updates or inserts
+     */
+    MergeTuples,
+    /*
+     * Message containing primary keys that must be deleted
+     */
+    DeletePkeys,
+    /*
+     * Generated when all recovery data for a table has been generated
+     */
+    Complete,
+    /*
+     * Not used in the EE. Sites receiving blocks of data ack them with this message
+     */
+    Ack;
 }

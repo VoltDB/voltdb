@@ -335,6 +335,7 @@ public class HostMessenger implements Messenger {
                                 throw new IOException(e);
                             }
                         }
+
                         /*
                          * Since messageBytes is shared a duplicate view must be made before manipulating the
                          * position, limit, etc. It would be good to only do this copy once and then reference count,

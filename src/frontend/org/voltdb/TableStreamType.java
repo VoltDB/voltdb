@@ -14,18 +14,22 @@
  * You should have received a copy of the GNU General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+package org.voltdb;
 
-package org.voltdb.client;
-
-/**
- * Abstract base class for callbacks that are invoked when an asynchronously invoked transaction receives a response.
- * Extend this class and provide an implementation of {@link #clientCallback} to receive a response to a
- * stored procedure invocation.
+/*
+ * Define two different types of ways that a table can be streams
  */
-public interface ProcedureCallback {
-    /**
-     * Implementation of callback to be provided by client applications
-     * @param clientResponse Response to the stored procedure invocation this callback is associated with
+public enum TableStreamType {
+    /*
+     * A snapshot stream of a table is a copy of all the tuple data contained
+     * in table at the time that the stream was created. The snapshot
+     * is maintained using a copy on write mechanism.
      */
-    abstract public void clientCallback(ClientResponse clientResponse) throws Exception;
+    SNAPSHOT,
+    /*
+     * A stream of tuple data that can be used to retrieve the latest state of a table
+     * that is actively being modified. The stream starts by transporting all the tuple data
+     * and then transports the set of modified and deleted tuples in a separate synchronous phase.
+     */
+    RECOVERY
 }

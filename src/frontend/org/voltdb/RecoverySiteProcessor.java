@@ -14,30 +14,20 @@
  * You should have received a copy of the GNU General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+package org.voltdb;
 
-#ifndef DEFAULTTUPLESERIALIZER_H_
-#define DEFAULTTUPLESERIALIZER_H_
-#include "storage/TupleSerializer.h"
-#include "common/tabletuple.h"
+import java.util.HashSet;
 
-namespace voltdb {
-class ReferenceSerializeOutput;
-class TupleSchema;
+import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.messaging.RecoveryMessage;
 
-class DefaultTupleSerializer : public TupleSerializer {
-public:
-    /**
-     * Serialize the provided tuple to the provide serialize output
-     */
-    void serializeTo(TableTuple tuple, ReferenceSerializeOutput *out);
-
-    /**
-     * Calculate the maximum size of a serialized tuple based upon the schema of the table/tuple
-     */
-    int getMaxSerializedTupleSize(const TupleSchema *schema);
-
-    virtual ~DefaultTupleSerializer() {}
-};
+/**
+ * Base class for functionality used during recovery. Derived classes implement
+ * one set of functionality for the source partition and another set of functionality for the destination
+ *
+ */
+public interface RecoverySiteProcessor {
+    public void handleRecoveryMessage(RecoveryMessage message);
+    public void handleNodeFault(HashSet<Integer> failedNodes, SiteTracker tracker);
+    public void doRecoveryWork();
 }
-
-#endif /* DEFAULTTUPLESERIALIZER_H_ */
