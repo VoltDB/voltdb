@@ -55,20 +55,19 @@ import org.voltdb.debugstate.InitiatorContext;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.HeartbeatMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
-import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
-import org.voltdb.messaging.SiteMailbox;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 /** Supports correct execution of multiple partition transactions by executing them one at a time. */
 public class SimpleDtxnInitiator extends TransactionInitiator {
     final TransactionIdManager m_idManager;
 
-    private final DtxnInitiatorQueue m_queue;
     private final ExecutorTxnIdSafetyState m_safetyState;
 
     private static final VoltLogger transactionLog = new VoltLogger("TRANSACTION");
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     /**
      * Task to run when a backpressure condition starts
@@ -94,9 +93,14 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     private final static int MAX_DESIRED_PENDING_TXNS = 15000;
     private long m_pendingTxnBytes = 0;
     private int m_pendingTxnCount = 0;
-    private final Mailbox m_mailbox;
+    private final DtxnInitiatorMailbox m_mailbox;
     private final int m_siteId;
     private final int m_hostId;
+    private final Thread m_thread;
+    private final ConcurrentLinkedQueue<Runnable> m_transactionsToCreate =
+        new ConcurrentLinkedQueue<Runnable>();
+
+    private volatile boolean m_threadShouldContinue = true;
 
     public SimpleDtxnInitiator(CatalogContext context,
                                Messenger messenger, int hostId, int siteId,
@@ -112,79 +116,108 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         m_hostId = hostId;
         m_siteId = siteId;
         m_safetyState = new ExecutorTxnIdSafetyState(siteId, context.siteTracker);
-        m_queue = new DtxnInitiatorQueue(siteId, m_safetyState);
-        m_mailbox = messenger.createMailbox(siteId, VoltDB.DTXN_MAILBOX_ID,
-                                            m_queue);
-        m_queue.setInitiator(this);
-        m_safetyState.setMailbox(m_mailbox);
+        m_mailbox =
+            new DtxnInitiatorMailbox(
+                    siteId,
+                    m_safetyState,
+                    (org.voltdb.messaging.HostMessenger)messenger);
+        messenger.createMailbox(siteId, VoltDB.DTXN_MAILBOX_ID,
+                                            m_mailbox);
+        m_mailbox.setInitiator(this);
         m_onBackPressure = onBackPressure;
         m_offBackPressure = offBackPressure;
+        m_thread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                while (m_threadShouldContinue) {
+                    try {
+                        synchronized (SimpleDtxnInitiator.this) {
+                            m_mailbox.processResponses();
+                            Runnable createTransaction = null;
+                            while ((createTransaction = m_transactionsToCreate.poll()) != null) {
+                                createTransaction.run();
+                            }
+                        }
+                        Thread.yield();
+                    } catch (Exception e) {
+                        hostLog.error(e);
+                    }
+                }
+            }
+        },
+        "InitiatorThread");
+        m_thread.start();
     }
 
     @Override
     public synchronized void createTransaction(
-                                  long connectionId,
+                                  final long connectionId,
                                   final String connectionHostname,
-                                  StoredProcedureInvocation invocation,
-                                  boolean isReadOnly,
-                                  boolean isSinglePartition,
-                                  boolean isEveryPartition,
-                                  int partitions[],
-                                  int numPartitions,
-                                  Object clientData,
-                                  int messageSize,
-                                  long now)
+                                  final StoredProcedureInvocation invocation,
+                                  final boolean isReadOnly,
+                                  final boolean isSinglePartition,
+                                  final boolean isEveryPartition,
+                                  final int partitions[],
+                                  final int numPartitions,
+                                  final Object clientData,
+                                  final int messageSize,
+                                  final long now)
     {
         assert(invocation != null);
         assert(partitions != null);
         assert(numPartitions >= 1);
 
-        if (isSinglePartition || isEveryPartition)
-        {
-            createSinglePartitionTxn(connectionId, connectionHostname, invocation, isReadOnly,
-                                     partitions, clientData, messageSize, now);
-            return;
-        }
-        else
-        {
-            long txnId = m_idManager.getNextUniqueTransactionId();
-
-            // store only partitions that are NOT the coordinator
-            // this is a bit too slow
-            int[] allSiteIds =
-                VoltDB.instance().getCatalogContext().
-                siteTracker.getLiveSitesForEachPartition(partitions);
-            int coordinatorId = allSiteIds[0];
-            int[] otherSiteIds = new int[allSiteIds.length - 1];
-
-            for (int i = 1; i < allSiteIds.length; i++)
-            {
-                // if this site is on the same host as the initiator
-                // then take over as the coordinator
-                if (m_hostId == allSiteIds[i] / VoltDB.SITES_TO_HOST_DIVISOR)
+        m_transactionsToCreate.offer(new Runnable() {
+            @Override
+            public void run() {
+                if (isSinglePartition || isEveryPartition)
                 {
-                    otherSiteIds[i - 1] = coordinatorId;
-                    coordinatorId = allSiteIds[i];
+                    createSinglePartitionTxn(connectionId, connectionHostname, invocation, isReadOnly,
+                                             partitions, clientData, messageSize, now);
+                    return;
                 }
                 else
                 {
-                    otherSiteIds[i - 1] = allSiteIds[i];
+                    long txnId = m_idManager.getNextUniqueTransactionId();
+
+                    // store only partitions that are NOT the coordinator
+                    // this is a bit too slow
+                    int[] allSiteIds =
+                        VoltDB.instance().getCatalogContext().
+                        siteTracker.getLiveSitesForEachPartition(partitions);
+                    int coordinatorId = allSiteIds[0];
+                    int[] otherSiteIds = new int[allSiteIds.length - 1];
+
+                    for (int i = 1; i < allSiteIds.length; i++)
+                    {
+                        // if this site is on the same host as the initiator
+                        // then take over as the coordinator
+                        if (m_hostId == allSiteIds[i] / VoltDB.SITES_TO_HOST_DIVISOR)
+                        {
+                            otherSiteIds[i - 1] = coordinatorId;
+                            coordinatorId = allSiteIds[i];
+                        }
+                        else
+                        {
+                            otherSiteIds[i - 1] = allSiteIds[i];
+                        }
+                    }
+
+                    InFlightTxnState txn = new InFlightTxnState(txnId,
+                                                                coordinatorId,
+                                                                otherSiteIds,
+                                                                isReadOnly,
+                                                                false,
+                                                                invocation,
+                                                                clientData,
+                                                                messageSize,
+                                                                now,
+                                                                connectionId,
+                                                                connectionHostname);
+                    dispatchMultiPartitionTxn(txn);
                 }
             }
-
-            InFlightTxnState txn = new InFlightTxnState(txnId,
-                                                        coordinatorId,
-                                                        otherSiteIds,
-                                                        isReadOnly,
-                                                        false,
-                                                        invocation,
-                                                        clientData,
-                                                        messageSize,
-                                                        now,
-                                                        connectionId,
-                                                        connectionHostname);
-            dispatchMultiPartitionTxn(txn);
-        }
+        });
     }
 
     long m_lastTickTime = 0;
@@ -275,7 +308,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                      connectionId,
                                      connectionHostname);
             txn_states.add(txn);
-            m_queue.addPendingTxn(txn);
+            m_mailbox.addPendingTxn(txn);
         }
 
         for (InFlightTxnState txn_state : txn_states)
@@ -294,7 +327,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
      */
     private void dispatchMultiPartitionTxn(InFlightTxnState txn)
     {
-        m_queue.addPendingTxn(txn);
+        m_mailbox.addPendingTxn(txn);
         increaseBackpressure(txn.messageSize);
 
         MultiPartitionParticipantMessage notice = new MultiPartitionParticipantMessage(
@@ -370,7 +403,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     }
 
     public void getDumpContents(StringBuilder sb) {
-        List<InFlightTxnState> in_flight_txns = m_queue.getInFlightTxns();
+        List<InFlightTxnState> in_flight_txns = m_mailbox.getInFlightTxns();
         sb.append("Transactions in Flight (").append(in_flight_txns.size()).append("):\n");
         for (InFlightTxnState state : in_flight_txns)
         {
@@ -384,15 +417,21 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     public void getDumpContents(InitiatorContext context)
     {
         // add mailbox history
-        if (m_mailbox instanceof SiteMailbox)
-            context.mailboxHistory = ((SiteMailbox) m_mailbox).getHistory();
+//        if (m_mailbox instanceof SiteMailbox)
+//            context.mailboxHistory = ((SiteMailbox) m_mailbox).getHistory();
 
         // list transactions in flight
-        List<InFlightTxnState> inFlightTxnList = m_queue.getInFlightTxns();
+        List<InFlightTxnState> inFlightTxnList = m_mailbox.getInFlightTxns();
         context.inFlightTxns = new InFlightTxnState[inFlightTxnList.size()];
         for (int i = 0; i < inFlightTxnList.size(); i++)
         {
             context.inFlightTxns[i] = inFlightTxnList.get(i);
         }
+    }
+
+    @Override
+    public void shutdown() throws InterruptedException {
+        m_threadShouldContinue = false;
+        m_thread.join();
     }
 }

@@ -119,7 +119,7 @@ public class RealVoltDB implements VoltDBInterface
         @Override
         public void run() {
             Mailbox mailbox = VoltDB.instance().getMessenger()
-            .createMailbox(m_siteId, VoltDB.DTXN_MAILBOX_ID, null);
+            .createMailbox(m_siteId, VoltDB.DTXN_MAILBOX_ID);
 
             m_siteObj =
                 new ExecutionSite(VoltDB.instance(),
@@ -338,7 +338,7 @@ public class RealVoltDB implements VoltDBInterface
             int siteId = Integer.parseInt(siteForThisThread.getTypeName());
             ExecutionSite siteObj =
                 new ExecutionSite(VoltDB.instance(),
-                                  VoltDB.instance().getMessenger().createMailbox(siteId, VoltDB.DTXN_MAILBOX_ID, null),
+                                  VoltDB.instance().getMessenger().createMailbox(siteId, VoltDB.DTXN_MAILBOX_ID),
                                   siteId,
                                   serializedCatalog,
                                   null);

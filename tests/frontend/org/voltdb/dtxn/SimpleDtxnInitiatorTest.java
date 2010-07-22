@@ -51,7 +51,6 @@
 package org.voltdb.dtxn;
 
 import java.nio.ByteBuffer;
-import java.util.Deque;
 
 import junit.framework.TestCase;
 
@@ -61,7 +60,6 @@ import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.MockMailbox;
-import org.voltdb.messaging.VoltMessage;
 import org.voltdb.network.Connection;
 import org.voltdb.network.NIOReadStream;
 import org.voltdb.network.WriteStream;
@@ -99,15 +97,14 @@ public class SimpleDtxnInitiatorTest extends TestCase {
     class MockMessenger implements Messenger
     {
         @Override
-        public Mailbox createMailbox(int siteId, int mailboxId,
-                Deque<VoltMessage> queue)
+        public Mailbox createMailbox(int siteId, int mailboxId)
         {
-            if (queue == null) {
-                return new MockMailbox(null);
-            }
-            else {
-                throw new UnsupportedOperationException("Test case doesn't supoprt mailbox queue.");
-            }
+            return new MockMailbox();
+        }
+
+        @Override
+        public void createMailbox(int siteId, int mailboxId, Mailbox mailbox) {
+            throw new UnsupportedOperationException();
         }
     }
 

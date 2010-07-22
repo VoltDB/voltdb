@@ -41,20 +41,12 @@ public class SiteMailbox implements Mailbox {
     ArrayDeque<VoltMessage> m_lastTenMembershipNotices = new ArrayDeque<VoltMessage>();
     ArrayDeque<VoltMessage> m_lastTenHeartbeats = new ArrayDeque<VoltMessage>();
 
-    SiteMailbox(HostMessenger hostMessenger, int siteId, int mailboxId, Deque<VoltMessage> deque) {
+    SiteMailbox(HostMessenger hostMessenger, int siteId, int mailboxId) {
         this.m_hostMessenger = hostMessenger;
         this.m_siteId = siteId;
         MESSAGE_HISTORY_SIZE = 0;
         for (Subject s : Subject.values()) {
-            if (s.equals(Subject.DEFAULT)) {
-                if (deque == null) {
-                    m_messages.add( s.getId(), new ArrayDeque<VoltMessage>());
-                } else {
-                    m_messages.add( s.getId(), deque);
-                }
-            } else {
-                m_messages.add( s.getId(), new ArrayDeque<VoltMessage>());
-            }
+            m_messages.add( s.getId(), new ArrayDeque<VoltMessage>());
         }
     }
 
@@ -109,11 +101,6 @@ public class SiteMailbox implements Mailbox {
                     m_lastTenReceivedMessages.pollFirst();
             }
         }
-    }
-
-    @Override
-    public int getWaitingCount() {
-        return m_messages.get(Subject.DEFAULT.getId()).size();
     }
 
     @Override

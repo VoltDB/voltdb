@@ -24,7 +24,6 @@ import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.Deque;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Map.Entry;
@@ -113,6 +112,15 @@ public class HostMessenger implements Messenger {
         m_foreignHosts = new ForeignHost[expectedHosts + 1];
         m_messengerSites = new MessengerSite[VoltDB.MAX_SITES_PER_HOST + 1];
         m_largestHostId = expectedHosts;
+    }
+
+    //For test only
+    protected HostMessenger() {
+        m_messengerSites = null;
+        m_foreignHosts = null;
+        m_network = null;
+        m_expectedHosts = 0;
+        m_joiner = null;
     }
 
     /* In production, this is always the network created by VoltDB.
@@ -216,7 +224,7 @@ public class HostMessenger implements Messenger {
         if (hostId == m_localHostId) {
             MessengerSite site = m_messengerSites[localSiteId];
             if (site != null) {
-                SiteMailbox mbox = site.getMailbox(mailboxId);
+                Mailbox mbox = site.getMailbox(mailboxId);
                 if (mbox != null) {
                     mbox.deliver(message);
                     return null;
@@ -241,13 +249,13 @@ public class HostMessenger implements Messenger {
     }
 
     @Override
-    public Mailbox createMailbox(int siteId, int mailboxId, Deque<VoltMessage> queue) {
+    public Mailbox createMailbox(int siteId, int mailboxId) {
         assert(m_initialized);
         int localSiteId = siteId % VoltDB.SITES_TO_HOST_DIVISOR;
         MessengerSite site = m_messengerSites[localSiteId];
         if (site == null) return null;
 
-        return site.createMailbox(mailboxId, queue);
+        return site.createMailbox(mailboxId);
     }
 
     public void send(final int siteId, final int mailboxId, final VoltMessage message)
@@ -278,7 +286,7 @@ public class HostMessenger implements Messenger {
      * Will always allocate non pooled heap byte buffers
      */
     private final DBBPool heapPool = new DBBPool(true, false);
-    void send(int[] siteIds, int mailboxId, final VoltMessage message)
+    public void send(int[] siteIds, int mailboxId, final VoltMessage message)
             throws MessagingException {
 
         assert(m_initialized);
@@ -460,5 +468,14 @@ public class HostMessenger implements Messenger {
      */
     synchronized void hostIsReady(int hostId) {
         m_hostsToWaitFor.decrementAndGet();
+    }
+
+    @Override
+    public void createMailbox(int siteId, int mailboxId, Mailbox mailbox) {
+        assert(m_initialized);
+        int localSiteId = siteId % VoltDB.SITES_TO_HOST_DIVISOR;
+        MessengerSite site = m_messengerSites[localSiteId];
+        if (site == null) throw new IllegalStateException("No messenger site for siteId " + siteId);
+        site.createMailbox(mailboxId, mailbox);
     }
 }

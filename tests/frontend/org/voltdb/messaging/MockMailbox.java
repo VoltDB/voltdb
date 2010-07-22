@@ -64,17 +64,9 @@ public class MockMailbox implements Mailbox {
         postoffice.put(siteId, mbox);
     }
 
-    public MockMailbox(Deque<VoltMessage> queue) {
+    public MockMailbox() {
         for (Subject s : Subject.values()) {
-            if (s.equals(Subject.DEFAULT)) {
-                if (queue == null) {
-                    m_messages.add( s.getId(), new ArrayDeque<VoltMessage>());
-                } else {
-                    m_messages.add( s.getId(), queue);
-                }
-            } else {
-                m_messages.add( s.getId(), new ArrayDeque<VoltMessage>());
-            }
+            m_messages.add( s.getId(), new ArrayDeque<VoltMessage>());
         }
     }
 

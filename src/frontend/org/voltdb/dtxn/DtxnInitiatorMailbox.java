@@ -18,13 +18,11 @@
 package org.voltdb.dtxn;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Deque;
 import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.PrivateVoltTableFactory;
@@ -35,8 +33,12 @@ import org.voltdb.fault.NodeFailureFault;
 import org.voltdb.fault.VoltFault;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.messaging.HeartbeatResponseMessage;
+import org.voltdb.messaging.HostMessenger;
 import org.voltdb.messaging.InitiateResponseMessage;
+import org.voltdb.messaging.MessagingException;
+import org.voltdb.messaging.Subject;
 import org.voltdb.messaging.VoltMessage;
+import org.voltdb.messaging.Mailbox;
 import org.voltdb.network.Connection;
 import org.voltdb.utils.EstTime;
 
@@ -51,27 +53,29 @@ import org.voltdb.utils.EstTime;
  * with the synchronization mechanism that existed before the extraction of
  * this class, so it should JustWork(tm).
  */
-public class DtxnInitiatorQueue implements Deque<VoltMessage>
+public class DtxnInitiatorMailbox implements Mailbox
 {
     private class InitiatorNodeFailureFaultHandler implements FaultHandler
     {
         @Override
         public void faultOccured(Set<VoltFault> faults)
         {
-            for (VoltFault fault : faults) {
-                if (fault instanceof NodeFailureFault)
-                {
-                    NodeFailureFault node_fault = (NodeFailureFault) fault;
-                    ArrayList<Integer> dead_sites =
-                        VoltDB.instance().getCatalogContext().siteTracker.
-                        getAllSitesForHost(node_fault.getHostId());
-                    for (Integer site_id : dead_sites)
+            synchronized (m_initiator) {
+                for (VoltFault fault : faults) {
+                    if (fault instanceof NodeFailureFault)
                     {
-                        removeSite(site_id);
-                        m_safetyState.removeState(site_id);
+                        NodeFailureFault node_fault = (NodeFailureFault) fault;
+                        ArrayList<Integer> dead_sites =
+                            VoltDB.instance().getCatalogContext().siteTracker.
+                            getAllSitesForHost(node_fault.getHostId());
+                        for (Integer site_id : dead_sites)
+                        {
+                            removeSite(site_id);
+                            m_safetyState.removeState(site_id);
+                        }
                     }
+                    VoltDB.instance().getFaultDistributor().reportFaultHandled(this, fault);
                 }
-                VoltDB.instance().getFaultDistributor().reportFaultHandled(this, fault);
             }
         }
     }
@@ -84,8 +88,12 @@ public class DtxnInitiatorQueue implements Deque<VoltMessage>
     // need a separate copy of the VoltTables so that we can have
     // thread-safe meta-data
     private final HashMap<Long, VoltTable[]> m_txnIdResults;
+    private final HostMessenger m_hostMessenger;
 
     private final ExecutorTxnIdSafetyState m_safetyState;
+
+    private final ConcurrentLinkedQueue<VoltMessage> m_messages =
+        new ConcurrentLinkedQueue<VoltMessage>();
 
     /**
      * Storage for initiator statistics
@@ -96,10 +104,11 @@ public class DtxnInitiatorQueue implements Deque<VoltMessage>
      * Construct a new DtxnInitiatorQueue
      * @param siteId  The mailbox siteId for this initiator
      */
-    public DtxnInitiatorQueue(int siteId, ExecutorTxnIdSafetyState safetyState)
+    public DtxnInitiatorMailbox(int siteId, ExecutorTxnIdSafetyState safetyState, HostMessenger hostMessenger)
     {
         assert(safetyState != null);
-
+        assert(hostMessenger != null);
+        m_hostMessenger = hostMessenger;
         m_siteId = siteId;
         m_safetyState = safetyState;
         m_stats = new InitiatorStats("Initiator " + siteId + " stats", siteId);
@@ -120,72 +129,58 @@ public class DtxnInitiatorQueue implements Deque<VoltMessage>
 
     public void addPendingTxn(InFlightTxnState txn)
     {
-        synchronized (m_initiator)
-        {
-            m_pendingTxns.addTxn(txn.txnId, txn.coordinatorId, txn);
-        }
+        m_pendingTxns.addTxn(txn.txnId, txn.coordinatorId, txn);
     }
 
     public void removeSite(int siteId)
     {
-        synchronized (m_initiator)
+        Map<Long, InFlightTxnState> txn_ids_affected =
+            m_pendingTxns.removeSite(siteId);
+        for (Long txn_id : txn_ids_affected.keySet())
         {
-            Map<Long, InFlightTxnState> txn_ids_affected =
-                m_pendingTxns.removeSite(siteId);
-            for (Long txn_id : txn_ids_affected.keySet())
+            if (m_pendingTxns.getTxnIdSize(txn_id) == 0)
             {
-                if (m_pendingTxns.getTxnIdSize(txn_id) == 0)
+                InFlightTxnState state = txn_ids_affected.get(txn_id);
+                if (!m_txnIdResponses.containsKey(txn_id))
                 {
-                    InFlightTxnState state = txn_ids_affected.get(txn_id);
-                    if (!m_txnIdResponses.containsKey(txn_id))
-                    {
-                        // No response was ever received for this TXN.
-                        // Currently, crashing is okay because there are
-                        // no valid node failures that can lead us to the
-                        // state where there are no more pending
-                        // InFlightTxnStates AND no responses for a TXN ID.
-                        // Multipartition initiators and coordinators are
-                        // currently co-located, so a node failure kills both
-                        // and this code doesn't run.  Single partition
-                        // transactions with replications are guaranteed a
-                        // response or an outstanding InFlightTxnState.
-                        // Single partition transactions with no replication
-                        // means that a node failure kills the cluster.
-                        VoltDB.crashVoltDB();
-                    }
-                    InitiateResponseMessage r = m_txnIdResponses.get(txn_id);
-                    m_pendingTxns.removeTxnId(r.getTxnId());
-                    m_initiator.reduceBackpressure(state.messageSize);
-                    m_txnIdResponses.remove(r.getTxnId());
-                    if (!state.isReadOnly)
-                    {
-                        enqueueResponse(r, state);
-                    }
+                    // No response was ever received for this TXN.
+                    // Currently, crashing is okay because there are
+                    // no valid node failures that can lead us to the
+                    // state where there are no more pending
+                    // InFlightTxnStates AND no responses for a TXN ID.
+                    // Multipartition initiators and coordinators are
+                    // currently co-located, so a node failure kills both
+                    // and this code doesn't run.  Single partition
+                    // transactions with replications are guaranteed a
+                    // response or an outstanding InFlightTxnState.
+                    // Single partition transactions with no replication
+                    // means that a node failure kills the cluster.
+                    VoltDB.crashVoltDB();
+                }
+                InitiateResponseMessage r = m_txnIdResponses.get(txn_id);
+                m_pendingTxns.removeTxnId(r.getTxnId());
+                m_initiator.reduceBackpressure(state.messageSize);
+                m_txnIdResponses.remove(r.getTxnId());
+                if (!state.isReadOnly)
+                {
+                    enqueueResponse(r, state);
                 }
             }
         }
     }
 
-    @Override
-    public boolean add(VoltMessage arg0) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean contains(Object arg0) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean offer(VoltMessage message)
+    /**
+     * Process all responses sent to this initiator's mailbox.
+     */
+    void processResponses()
     {
-        synchronized(m_initiator)
-        {
+        VoltMessage message = null;
+        while ((message = m_messages.poll()) != null) {
             // update the state of seen txnids for each executor
             if (message instanceof HeartbeatResponseMessage) {
                 HeartbeatResponseMessage hrm = (HeartbeatResponseMessage) message;
                 m_safetyState.updateLastSeenTxnIdFromExecutorBySiteId(hrm.getExecSiteId(), hrm.getLastReceivedTxnId(), hrm.isBlocked());
-                return true;
+                return;
             }
 
             // only valid messages are this and heartbeatresponse
@@ -278,8 +273,6 @@ public class DtxnInitiatorQueue implements Deque<VoltMessage>
                     enqueueResponse(r, state);
                 }
             }
-
-            return true;
         }
     }
 
@@ -305,81 +298,6 @@ public class DtxnInitiatorQueue implements Deque<VoltMessage>
         c.writeStream().enqueue(client_response);
     }
 
-    @Override
-    public boolean remove(Object arg0) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public VoltMessage element() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public VoltMessage peek() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public VoltMessage poll() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public VoltMessage remove() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean addAll(Collection<? extends VoltMessage> arg0) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public void clear() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean containsAll(Collection<?> arg0) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean isEmpty() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public Iterator<VoltMessage> iterator() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean removeAll(Collection<?> arg0) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean retainAll(Collection<?> arg0) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public int size() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public Object[] toArray() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public <T> T[] toArray(T[] arg0) {
-        throw new UnsupportedOperationException();
-    }
-
     /**
      * Currently used to provide object state for the dump manager
      * @return A list of outstanding transaction state objects
@@ -390,89 +308,54 @@ public class DtxnInitiatorQueue implements Deque<VoltMessage>
     }
 
     @Override
-    public void addFirst(VoltMessage e) {
+    public void deliver(VoltMessage message) {
+        m_messages.offer(message);
+    }
+
+    @Override
+    public void deliverFront(VoltMessage message) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void addLast(VoltMessage e) {
+    public VoltMessage recv() {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public boolean offerFirst(VoltMessage e) {
+    public VoltMessage recv(Subject[] s) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public boolean offerLast(VoltMessage e) {
+    public VoltMessage recvBlocking() {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public VoltMessage removeFirst() {
+    public VoltMessage recvBlocking(Subject[] s) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public VoltMessage removeLast() {
+    public void send(int siteId, int mailboxId, VoltMessage message) throws MessagingException {
+        m_hostMessenger.send(siteId, mailboxId, message);
+    }
+
+    @Override
+    public void send(int[] siteIds, int mailboxId, VoltMessage message) throws MessagingException {
+        assert(message != null);
+        assert(siteIds != null);
+        m_hostMessenger.send(siteIds, mailboxId, message);
+    }
+
+    @Override
+    public VoltMessage recvBlocking(long timeout) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public VoltMessage pollFirst() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public VoltMessage pollLast() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    @Override
-    public VoltMessage getFirst() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public VoltMessage getLast() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public VoltMessage peekFirst() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public VoltMessage peekLast() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean removeFirstOccurrence(Object o) {
-        // TODO Auto-generated method stub
-        return false;
-    }
-
-    @Override
-    public boolean removeLastOccurrence(Object o) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public void push(VoltMessage e) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public VoltMessage pop() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public Iterator<VoltMessage> descendingIterator() {
+    public VoltMessage recvBlocking(Subject[] s, long timeout) {
         throw new UnsupportedOperationException();
     }
 }

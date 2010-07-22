@@ -146,8 +146,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         return ++latestUndoToken;
     }
 
-    private final HashSet<Long> faultedTxns = new HashSet<Long>();
-
     // store the id used by the DumpManager to identify this execution site
     public final String m_dumpId;
     public long m_currentDumpTimestamp = 0;
@@ -677,7 +675,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                     }
                 }
                 if (currentTxnState != null) {
-                    assert(!faultedTxns.contains(currentTxnState.txnId));
                     recursableRun(currentTxnState);
                 }
             }
@@ -710,7 +707,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 }
             }
             if (currentTxnState != null) {
-                assert(!faultedTxns.contains(currentTxnState.txnId));
                 //System.out.println("ExecutionSite " + getSiteId() + " running txnid " + currentTxnState.txnId);
                 recursableRun(currentTxnState);
             }
@@ -1217,7 +1213,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 m_recoveryLog.info("Faulting non-globally initiated transaction " + ts.txnId);
                 it.remove();
                 m_transactionQueue.faultTransaction(ts);
-                faultedTxns.add(ts.txnId);
             }
 
             // Multipartition transaction without a surviving coordinator:
@@ -1253,7 +1248,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                             " because the coordinator was on a failed node");
                     it.remove();
                     m_transactionQueue.faultTransaction(ts);
-                    faultedTxns.add(ts.txnId);
                 }
             }
             // If we're the coordinator, then after we clean up our internal

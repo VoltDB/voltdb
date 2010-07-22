@@ -162,11 +162,11 @@ class Distributer {
                             ") was lost before a response was received");
                     try {
                         callback.clientCallback(r);
-                    } catch (Throwable t) {
+                    } catch (Exception t) {
                         if (m_handler != null) {
                             try {
                                 m_handler.uncaughtException( callback, r, t);
-                            } catch (Throwable t2) {
+                            } catch (Exception t2) {
                                 t.printStackTrace();
                                 t2.printStackTrace();
                             }
@@ -191,11 +191,11 @@ class Distributer {
                             ") was lost before a response was received");
                     try {
                         callback.clientCallback(r);
-                    } catch (Throwable t) {
+                    } catch (Exception t) {
                         if (m_handler != null) {
                             try {
                                 m_handler.uncaughtException( callback, r, t);
-                            } catch (Throwable t2) {
+                            } catch (Exception t2) {
                                 t.printStackTrace();
                                 t2.printStackTrace();
                             }
@@ -259,11 +259,11 @@ class Distributer {
                 response.setClientRoundtrip(delta);
                 try {
                     cb.clientCallback(response);
-                } catch (Throwable t) {
+                } catch (Exception t) {
                     if (m_handler != null) {
                         try {
                             m_handler.uncaughtException( cb, response, t);
-                        } catch (Throwable t2) {
+                        } catch (Exception t2) {
                             t.printStackTrace();
                             t2.printStackTrace();
                         }
@@ -322,11 +322,11 @@ class Distributer {
                 for (final Object stuff[] : m_callbacks.values()) {
                     try {
                         ((ProcedureCallback)stuff[1]).clientCallback(r);
-                    } catch (Throwable t) {
+                    } catch (Exception t) {
                         if (m_handler != null) {
                             try {
                                 m_handler.uncaughtException(((ProcedureCallback)stuff[1]), r, t);
-                            } catch (Throwable t2) {
+                            } catch (Exception t2) {
                                 t.printStackTrace();
                                 t2.printStackTrace();
                             }
