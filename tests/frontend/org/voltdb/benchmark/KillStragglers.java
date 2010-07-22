@@ -47,7 +47,8 @@ public class KillStragglers extends Thread {
     @Override
     public void run() {
         if (m_remotePath != null) {
-            ShellTools.cmdToStdOut(SSHTools.convert(m_username, m_hostname, m_remotePath,
+            final SSHTools ssh = new SSHTools(m_username);
+            ShellTools.cmdToStdOut(ssh.convert(m_hostname, m_remotePath,
                     "/bin/bash killstragglers.sh"));
         }
         else {

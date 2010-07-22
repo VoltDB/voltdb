@@ -44,6 +44,7 @@ public class ResultsUploader implements BenchmarkController.BenchmarkInterest {
     final HashMap<String, String[]> m_hostDistroCache = new HashMap<String, String[]>();
     final HashMap<String, String> m_clientArgs = new HashMap<String, String>();
     final HashMap<String, String> m_hostArgs = new HashMap<String, String>();
+    final SSHTools m_ssh;
 
     ResultsUploader(String benchmarkName, BenchmarkConfig config) {
         assert(config != null);
@@ -54,6 +55,8 @@ public class ResultsUploader implements BenchmarkController.BenchmarkInterest {
         for (Entry<String, String> param : config.parameters.entrySet())
             m_benchmarkOptions += param.getKey() + "=" + param.getValue() + " ";
         m_benchmarkOptions = m_benchmarkOptions.trim();
+
+        m_ssh = new SSHTools(m_config.remoteUser);
     }
 
     public void setCommandLineForClient(String clientAndIndex, String commandLine) {
@@ -257,7 +260,7 @@ public class ResultsUploader implements BenchmarkController.BenchmarkInterest {
     public String getHostIdForHostName(String hostname) {
         String mac = m_hostIdCache.get(hostname);
         if (mac == null) {
-            mac = SSHTools.cmd(m_config.remoteUser, hostname, m_config.remotePath, "./getmac.py");
+            mac = m_ssh.cmd(hostname, m_config.remotePath, "./getmac.py");
             mac = mac.trim();
             m_hostIdCache.put(hostname, mac);
         }
@@ -271,8 +274,8 @@ public class ResultsUploader implements BenchmarkController.BenchmarkInterest {
             return retval;
 
         retval = new String[2];
-        String distro = SSHTools.cmd(m_config.remoteUser, hostname,
-                                     m_config.remotePath, "lsb_release -ir");
+        String distro = m_ssh.cmd(hostname,
+                                  m_config.remotePath, "lsb_release -ir");
         String[] lines = distro.trim().split("\n");
         for (String l : lines) {
             String[] kv = l.split(":");

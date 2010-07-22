@@ -53,6 +53,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
+import org.voltdb.processtools.ProcessData;
 import org.voltdb.processtools.ProcessSetManager;
 import org.voltdb.processtools.SSHTools;
 import org.voltdb.processtools.ShellTools;
@@ -106,8 +107,8 @@ public class BenchmarkController {
             long resultsToRead = m_pollCount * m_clients.size();
 
             while (resultsToRead > 0) {
-                ProcessSetManager.OutputLine line = m_clientPSM.nextBlocking();
-                if (line.stream == ProcessSetManager.Stream.STDERR) {
+                ProcessData.OutputLine line = m_clientPSM.nextBlocking();
+                if (line.stream == ProcessData.Stream.STDERR) {
                     //System.err.printf("(%s): \"%s\"\n", line.processName, line.value);
                     continue;
                 }
@@ -241,15 +242,14 @@ public class BenchmarkController {
         m_pathToDeployment = m_projectBuilder.getPathToDeployment();
 
         // copy the catalog and deployment file to the servers, but don't bother in local mode
+        SSHTools ssh = new SSHTools(m_config.remoteUser);
         boolean status;
         if (m_config.localmode == false) {
             for (String fileName : jarFileNames) {
                 for (String host : m_config.hosts) {
-                    status = SSHTools.copyFromLocal(
-                                                    new File(fileName),
-                                                    m_config.remoteUser,
-                                                    host,
-                                                    m_config.remotePath);
+                    status = ssh.copyFromLocal(new File(fileName),
+                                               host,
+                                               m_config.remotePath);
                     if(!status)
                         System.out.println(
                         "SSH copyFromLocal failed to copy "
@@ -257,11 +257,9 @@ public class BenchmarkController {
                         + m_config.remoteUser + "@" + host + ":" + m_config.remotePath);
                 }
                 for (String client : m_config.clients) {
-                    status = SSHTools.copyFromLocal(
-                                                    new File(fileName),
-                                                    m_config.remoteUser,
-                                                    client,
-                                                    m_config.remotePath);
+                    status = ssh.copyFromLocal(new File(fileName),
+                                               client,
+                                               m_config.remotePath);
                     if(!status)
                         System.out.println("SSH copyFromLocal failed to copy "
                         + fileName + " to "
@@ -271,11 +269,9 @@ public class BenchmarkController {
 
             // copy the deployment file to the servers (clients don't need it)
             for (String host : m_config.hosts) {
-                status = SSHTools.copyFromLocal(
-                        new File(m_pathToDeployment),
-                        m_config.remoteUser,
-                        host,
-                        m_config.remotePath);
+                status = ssh.copyFromLocal(new File(m_pathToDeployment),
+                                           host,
+                                           m_config.remotePath);
                 if (!status) {
                     System.out.println("SSH copyFromLocal failed to copy "
                         + m_pathToDeployment + " to "
@@ -353,7 +349,7 @@ public class BenchmarkController {
                         m_config.useProfile,
                         m_config.backend};
 
-                command = SSHTools.convert(m_config.remoteUser, host, m_config.remotePath, command);
+                command = ssh.convert(host, m_config.remotePath, command);
 
                 StringBuilder fullCommand = new StringBuilder();
                 for (String s : command)
@@ -367,7 +363,7 @@ public class BenchmarkController {
 
             // WAIT FOR SERVERS TO BE READY
             String readyMsg = "Server completed initialization.";
-            ProcessSetManager.OutputLine line = m_serverPSM.nextBlocking();
+            ProcessData.OutputLine line = m_serverPSM.nextBlocking();
             while(line.value.equals(readyMsg) == false) {
                 line = m_serverPSM.nextBlocking();
             }
@@ -462,11 +458,9 @@ public class BenchmarkController {
                 ClientMain.main(m_loaderClass, localArgs.toArray(new String[0]), true);
             }
             else {
-                String[] command = SSHTools.convert(
-                        m_config.remoteUser,
-                        m_config.clients[0],
-                        m_config.remotePath,
-                        loaderCommand.toString());
+                String[] command = ssh.convert(m_config.clients[0],
+                                               m_config.remotePath,
+                                               loaderCommand.toString());
                 status = ShellTools.cmdToStdOut(command);
                 assert(status);
             }
@@ -522,7 +516,7 @@ public class BenchmarkController {
                 tempCLArgs.add("ID=" + clientIndex++);
                 String[] args = tempCLArgs.toArray(new String[0]);
 
-                args = SSHTools.convert(m_config.remoteUser, client, m_config.remotePath, args);
+                args = ssh.convert(client, m_config.remotePath, args);
 
                 StringBuilder fullCommand = new StringBuilder();
                 for (String s : args)
