@@ -1,6 +1,6 @@
 VoltDB Included Third-Party Software
 
-This list includes only software that is linked/compiled with VoltDB or distributed with VoltDB (i.e., included in the VoltDB repository). Additional tools may be needed to build and test VoltDB.
+This list includes only software that is linked/compiled with VoltDB and/or distributed with VoltDB (i.e., included in the VoltDB repository). Additional tools may be needed to build and test VoltDB.
 
 ================================================================================
 Linked with or Included in Core Clients or Server
@@ -347,10 +347,7 @@ Base64
  * @author Robert Harder
  * @author rob@iharder.net
  * @version 2.3.7
-
-
-================================================================================ 
-Build System Only (VoltDB includes these jars or binaries in our svn repository)
+ 
 ================================================================================
 Log4j 1.2
 
@@ -365,52 +362,44 @@ Log4j 1.2
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
-
+   
 ================================================================================
-Ant 1.7
-
-
-/*
- *  Licensed to the Apache Software Foundation (ASF) under one or more
- *  contributor license agreements.  See the NOTICE file distributed with
- *  this work for additional information regarding copyright ownership.
- *  The ASF licenses this file to You under the Apache License, Version 2.0
- *  (the "License"); you may not use this file except in compliance with
- *  the License.  You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- *
- */
-    
-The License is accompanied by a NOTICE
-   =========================================================================
-   ==  NOTICE file corresponding to the section 4 d of                    ==
-   ==  the Apache License, Version 2.0,                                   ==
-   ==  in this case for the Apache Ant distribution.                      ==
-   =========================================================================
-
-   This product includes software developed by
-   The Apache Software Foundation (http://www.apache.org/).
-
-   This product includes also software developed by :
-     - the W3C consortium (http://www.w3c.org) ,
-     - the SAX project (http://www.saxproject.org)
-
-   Please read the different LICENSE files present in the root directory of
-   this distribution.
-
-   The names "Ant" and  "Apache Software Foundation"  must not be used to
-   endorse  or promote  products derived  from this  software without prior
-   written permission. For written permission, please contact
-   apache@apache.org.
-
+Linked with or Included in VoltDB example applications
 ================================================================================
+Twitter4j (used in the VoltDB Twitter example application)
+
+Copyright (c) 2007-2010, Yusuke Yamamoto
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of the Yusuke Yamamoto nor the
+      names of its contributors may be used to endorse or promote products
+      derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY Yusuke Yamamoto ``AS IS'' AND ANY
+EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL Yusuke Yamamoto BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+Twitter4J includes software from JSON.org to parse JSON response from the Twitter API.
+See the JSON license included in this document.
+
+================================================================================ 
+Build and Test System Only (VoltDB includes these jars or binaries in our svn repository)
+================================================================================
+
 ant_doxygen
  * The Apache Software License, Version 1.1
  *
@@ -631,7 +620,11 @@ THE SOFTWARE.
  */
 
 ================================================================================
-Apache License Version 2.0, January 2004 http://www.apache.org/licenses/
+Licenses referred to by some above package license texts
+================================================================================
+
+Apache License  Version 2.0, January 2004 http://www.apache.org/licenses/
+
 TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
 1. Definitions.
 "License" shall mean the terms and conditions for use, reproduction, and distribution as defined by Sections 1 through 9 of this document.
@@ -791,34 +784,5 @@ Everyone is permitted to copy and distribute copies of this Agreement, but in or
 
 This Agreement is governed by the laws of the State of New York and the intellectual property laws of the United States of America. No party to this Agreement will bring a legal action under this Agreement more than one year after the cause of action arose. Each party waives its rights to a jury trial in any resulting litigation.
 
-================================================================================
-Twitter4j (used in the VoltDB Twitter example application)
 
-Copyright (c) 2007-2010, Yusuke Yamamoto
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-    * Redistributions of source code must retain the above copyright
-      notice, this list of conditions and the following disclaimer.
-    * Redistributions in binary form must reproduce the above copyright
-      notice, this list of conditions and the following disclaimer in the
-      documentation and/or other materials provided with the distribution.
-    * Neither the name of the Yusuke Yamamoto nor the
-      names of its contributors may be used to endorse or promote products
-      derived from this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY Yusuke Yamamoto ``AS IS'' AND ANY
-EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL Yusuke Yamamoto BE LIABLE FOR ANY
-DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-Twitter4J includes software from JSON.org to parse JSON response from the Twitter API.
-See the JSON license included in this document.
 
