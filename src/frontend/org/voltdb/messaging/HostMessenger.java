@@ -479,4 +479,15 @@ public class HostMessenger implements Messenger {
         if (site == null) throw new IllegalStateException("No messenger site for siteId " + siteId);
         site.createMailbox(mailboxId, mailbox);
     }
+
+    /**
+     * @return The number of up foreign hosts.
+     */
+    int countForeignHosts() {
+        int retval = 0;
+        for (ForeignHost host : m_foreignHosts)
+            if ((host != null) && (host.isUp()))
+                retval++;
+        return retval;
+    }
 }

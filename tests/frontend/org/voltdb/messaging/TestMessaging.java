@@ -29,6 +29,7 @@ import java.net.InetSocketAddress;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -521,9 +522,15 @@ public class TestMessaging extends TestCase {
 
     class MockNewNode extends Thread {
         final int m_port;
+        AtomicBoolean m_ready = new AtomicBoolean(false);
 
         MockNewNode(int port) {
             m_port = port;
+        }
+
+        void waitUntilReady() {
+            while (!m_ready.get())
+                Thread.yield();
         }
 
         @Override
@@ -535,6 +542,7 @@ public class TestMessaging extends TestCase {
                 VoltNetwork network = new VoltNetwork();
                 network.start();
                 HostMessenger msg = new HostMessenger(network, listener, 2, 0, null);
+                m_ready.set(true);
                 msg.waitForGroupJoin();
 
             } catch (Exception e) {
@@ -568,11 +576,9 @@ public class TestMessaging extends TestCase {
         msg2.waitForGroupJoin();
         System.out.println("Finished socket joiner for msg2");
 
-        assertEquals(0, msg1.getHostId());
-        assertEquals(1, msg2.getHostId());
-
         int siteId1 = msg1.getHostId() * VoltDB.SITES_TO_HOST_DIVISOR + 1;
         int siteId2 = msg2.getHostId() * VoltDB.SITES_TO_HOST_DIVISOR + 2;
+        int msg2hostId = msg2.getHostId();
 
         msg1.createLocalSite(siteId1);
         msg2.createLocalSite(siteId2);
@@ -580,14 +586,21 @@ public class TestMessaging extends TestCase {
         // kill host #2
         // triggers the fault manager
         msg2.shutdown();
-        Thread.sleep(20);
+        // this is just to wait for the fault manager to kick in
+        Thread.sleep(50);
+
+        // wait until the fault manager has kicked in
+        while (msg1.countForeignHosts() > 0)
+            Thread.yield();
 
         // rejoin the network in a new thread
         MockNewNode newnode = new MockNewNode(internalPort);
         newnode.start();
-        Thread.sleep(100);
+        newnode.waitUntilReady();
+        // this is just for extra safety
+        Thread.sleep(50);
 
-        msg1.rejoinForeignHostPrepare(1, new InetSocketAddress(internalPort));
+        msg1.rejoinForeignHostPrepare(msg2hostId, new InetSocketAddress(internalPort));
         msg1.rejoinForeignHostCommit();
 
         // this timeout is rather lousy, but neither is it exception safe!
