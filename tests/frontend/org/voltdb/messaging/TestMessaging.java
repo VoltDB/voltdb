@@ -586,16 +586,16 @@ public class TestMessaging extends TestCase {
 
         // kill host #2
         // triggers the fault manager
+        msg2.closeForeignHostScoket(msg1.getHostId());
         msg2.shutdown();
         // this is just to wait for the fault manager to kick in
         Thread.sleep(50);
 
         // wait until the fault manager has kicked in
         for (int i = 0; msg1.countForeignHosts() > 0; i++) {
-            if (i > 10) break;
+            if (i > 10) fail();
             Thread.sleep(50);
         }
-        msg1.killForeignHost(msg2hostId);
         assertEquals(0, msg1.countForeignHosts());
 
         // rejoin the network in a new thread

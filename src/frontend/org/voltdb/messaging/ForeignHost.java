@@ -19,6 +19,7 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.Set;
@@ -33,9 +34,9 @@ import org.voltdb.network.Connection;
 import org.voltdb.network.QueueMonitor;
 import org.voltdb.network.VoltProtocolHandler;
 import org.voltdb.utils.DBBPool;
+import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.EstTime;
-import org.voltdb.utils.DBBPool.BBContainer;
 
 public class ForeignHost {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -54,6 +55,9 @@ public class ForeignHost {
     private String m_remoteHostname;
     private boolean m_closing;
     boolean m_isUp;
+
+    // hold onto the socket so we can kill it
+    private final Socket m_socket;
 
     private long m_lastMessageMillis;
 
@@ -139,6 +143,7 @@ public class ForeignHost {
         m_closing = false;
         m_isUp = true;
         m_lastMessageMillis = Long.MAX_VALUE;
+        m_socket = socket.socket();
         //TestMessaging doesn't have the real deal
         if (VoltDB.instance() != null) {
             if (VoltDB.instance().getFaultDistributor() != null) {
@@ -156,6 +161,19 @@ public class ForeignHost {
         m_closing = true;
         if (m_connection != null)
             m_connection.unregister();
+    }
+
+    /**
+     * Used only for test code to kill this FH
+     */
+    void killSocket() {
+        try {
+            m_socket.close();
+        }
+        catch (Exception e) {
+            // don't REALLY care if this fails
+            e.printStackTrace();
+        }
     }
 
     /*

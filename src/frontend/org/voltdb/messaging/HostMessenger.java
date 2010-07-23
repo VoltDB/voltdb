@@ -493,15 +493,15 @@ public class HostMessenger implements Messenger {
     }
 
     /**
-     * Kill a foreign host connection by id.
+     * Kill a foreign host socket by id.
      * @param hostId The id of the foreign host to kill.
      */
-    public void killForeignHost(int hostId) {
+    public void closeForeignHostScoket(int hostId) {
         for (int i = 0; i < m_foreignHosts.length; i++) {
             ForeignHost host = m_foreignHosts[i];
             if ((host != null) && (host.isUp())) {
                 if (i == hostId) {
-                    host.m_isUp = false;
+                    host.killSocket();
                     return;
                 }
             }
