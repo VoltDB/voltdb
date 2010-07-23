@@ -143,20 +143,27 @@ public class TestRejoinEndToEnd extends TestCase {
         return retval;
     }
 
-    boolean failNext(int i) throws Exception {
+    final int FAIL_NO_OPEN_SOCKET = 0;
+    final int FAIL_TIMEOUT_ON_SOCKET = 1;
+    final int FAIL_SKEW = 2;
+    final int DONT_FAIL = 3;
+
+    boolean failNext(int failType) throws Exception {
         Context context = getServerReadyToReceiveNewNode();
 
         Client client = ClientFactory.createClient();
         client.createConnection("localhost", null, null);
 
         ServerSocketChannel listener = null;
-        try {
-            listener = ServerSocketChannel.open();
-            listener.socket().bind(new InetSocketAddress(VoltDB.DEFAULT_INTERNAL_PORT + 1));
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-            System.exit(-1);
+        if (failType != FAIL_NO_OPEN_SOCKET) {
+            try {
+                listener = ServerSocketChannel.open();
+                listener.socket().bind(new InetSocketAddress(VoltDB.DEFAULT_INTERNAL_PORT + 1));
+            } catch (IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+                System.exit(-1);
+            }
         }
 
         SyncCallback scb = new SyncCallback();
@@ -166,37 +173,62 @@ public class TestRejoinEndToEnd extends TestCase {
             if (!success) Thread.sleep(100);
         }
 
-        SocketChannel socket = listener.accept();
-        listener.close();
-        DataOutputStream out = new DataOutputStream(new BufferedOutputStream(socket.socket().getOutputStream()));
-        DataInputStream in = new DataInputStream(new BufferedInputStream(socket.socket().getInputStream()));
+        SocketChannel socket = null;
+        if (failType != FAIL_NO_OPEN_SOCKET) {
+            socket = listener.accept();
+            listener.close();
+            DataOutputStream out = new DataOutputStream(new BufferedOutputStream(socket.socket().getOutputStream()));
+            DataInputStream in = new DataInputStream(new BufferedInputStream(socket.socket().getInputStream()));
 
-        int hostId = in.readInt();
-        assertEquals(hostId, 1);
+            int hostId = in.readInt();
+            assertEquals(hostId, 1);
 
-        //COMMAND_SENDTIME_AND_CRC
-        out.writeInt(4);
-        out.flush();
-        // ignore what the other host says the time is
-        in.readLong();
-        // fake a clock skew of 1ms
-        out.writeLong(1);
-        // COMMAND_COMPLETE
-        out.writeInt(3);
-        out.flush();
-
-        //Thread.sleep(100000);
+            if (failType != FAIL_TIMEOUT_ON_SOCKET) {
+                //COMMAND_SENDTIME_AND_CRC
+                out.writeInt(4);
+                out.flush();
+                // ignore what the other host says the time is
+                in.readLong();
+                // fake a clock skew of 1ms
+                if (failType == FAIL_SKEW) {
+                    out.writeLong(100000);
+                    // COMMAND_NTPFAIL
+                    out.writeInt(5);
+                }
+                else {
+                    out.writeLong(1);
+                    // COMMAND_COMPLETE
+                    out.writeInt(3);
+                }
+                out.flush();
+            }
+        }
 
         scb.waitForResponse();
-        @SuppressWarnings("unused")
         ClientResponse response = scb.getResponse();
 
-        socket.close();
+        switch (failType) {
+            case FAIL_NO_OPEN_SOCKET:
+                assertTrue(response.getStatus() != ClientResponse.SUCCESS);
+                break;
+            case FAIL_TIMEOUT_ON_SOCKET:
+                assertTrue(response.getStatus() != ClientResponse.SUCCESS);
+                break;
+            case FAIL_SKEW:
+                assertTrue(response.getStatus() != ClientResponse.SUCCESS);
+                break;
+            case DONT_FAIL:
+                assertTrue(response.getStatus() == ClientResponse.SUCCESS);
+                break;
+        }
+
+        if (failType != FAIL_NO_OPEN_SOCKET)
+            socket.close();
         context.localServer.shutdown();
         context.localServer.join();
 
         // this means there is nothing else to try
-        return false;
+        return failType != DONT_FAIL;
     }
 
     public void testRejoinSysprocButFail() throws Exception {

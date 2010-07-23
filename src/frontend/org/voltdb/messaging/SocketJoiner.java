@@ -574,6 +574,7 @@ public class SocketJoiner extends Thread {
         try {
             // open a connection to the re-joining node
             remoteConnection = SocketChannel.open(address);
+            remoteConnection.socket().setSoTimeout(1000);
 
             // create helper streams for IO
             DataOutputStream out = new DataOutputStream(new BufferedOutputStream(remoteConnection.socket().getOutputStream()));
