@@ -481,9 +481,10 @@ public class HostMessenger implements Messenger {
     }
 
     /**
+     * Get the number of up foreign hosts. Used for test purposes.
      * @return The number of up foreign hosts.
      */
-    int countForeignHosts() {
+    public int countForeignHosts() {
         int retval = 0;
         for (ForeignHost host : m_foreignHosts)
             if ((host != null) && (host.isUp()))
