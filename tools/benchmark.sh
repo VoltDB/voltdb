@@ -15,7 +15,7 @@ chmod a+x ~/trunk/tools/benchmark-$HOSTNAME.sh
 
 if [ ! -f ~/workspace/build-centos/trunk/obj/release/voltbin/mysqlp -a -f ~/voltbin/mysqlp ]
 then
-    cp ~/workspace/build-centos/trunk/obj/release/voltbin/mysqlp ~/voltbin/
+    cp ~/voltbin/mysqlp ~/workspace/build-centos/trunk/obj/release/voltbin
 fi
 
 rm -f /home/test/output/benchmark-$HOSTNAME.log
