@@ -53,11 +53,6 @@ package org.voltdb.client;
 import java.io.IOException;
 import java.net.UnknownHostException;
 
-import org.voltdb.client.Client;
-import org.voltdb.client.ClientStatusListener;
-import org.voltdb.client.NoConnectionsException;
-import org.voltdb.client.ProcedureCallback;
-import org.voltdb.client.ProcCallException;
 import org.voltdb.VoltTable;
 
 /** Hack subclass of VoltClient that fakes callProcedure. */

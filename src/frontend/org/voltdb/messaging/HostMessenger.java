@@ -37,8 +37,8 @@ import org.voltdb.client.ConnectionUtil;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltdb.utils.DeferredSerialization;
 
 public class HostMessenger implements Messenger {
 
@@ -400,7 +400,8 @@ public class HostMessenger implements Messenger {
      */
     public int findDownHostId() {
         for (int hostId = 0; hostId < m_foreignHosts.length; hostId++) {
-            if (m_foreignHosts[hostId].isUp() == false)
+            ForeignHost fh = m_foreignHosts[hostId];
+            if ((fh != null) && (fh.isUp() == false))
                 return hostId;
         }
         return -1;

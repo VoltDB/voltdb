@@ -25,7 +25,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.types.ExpressionType;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 

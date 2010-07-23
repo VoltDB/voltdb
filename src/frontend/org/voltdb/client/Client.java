@@ -76,7 +76,7 @@ public interface Client {
 
      /**
      * Create a connection to another VoltDB node.
-     * @param host hostname or IP address of the host to connect to
+     * @param host Hostname or IP address of the host to connect to.
      * @param username Username to authorize. Username is ignored if authentication is disabled.
      * @param password Password to authenticate. Password is ignored if authentication is disabled.
      * @throws UnknownHostException
@@ -87,8 +87,8 @@ public interface Client {
 
     /**
      * Create a connection to another VoltDB node.
-     * @param host hostname or IP address of the host to connect to
-     * @param port Port on remote host to connected to
+     * @param host Hostname or IP address of the host to connect to.
+     * @param port Port number on remote host to connect to.
      * @param username Username to authorize. Username is ignored if authentication is disabled.
      * @param password Password to authenticate. Password is ignored if authentication is disabled.
      * @throws UnknownHostException

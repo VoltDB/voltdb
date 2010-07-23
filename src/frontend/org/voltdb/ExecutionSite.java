@@ -41,12 +41,14 @@ import org.voltdb.client.ConnectionUtil;
 import org.voltdb.debugstate.ExecutorContext;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
+import org.voltdb.dtxn.RecoveringMultiPartitionTxnState;
+import org.voltdb.dtxn.RecoveringSinglePartitionTxnState;
 import org.voltdb.dtxn.RestrictedPriorityQueue;
+import org.voltdb.dtxn.RestrictedPriorityQueue.QueueState;
 import org.voltdb.dtxn.SinglePartitionTxnState;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.SiteTransactionConnection;
 import org.voltdb.dtxn.TransactionState;
-import org.voltdb.dtxn.RestrictedPriorityQueue.QueueState;
 import org.voltdb.elt.ELTManager;
 import org.voltdb.elt.ELTProtoMessage;
 import org.voltdb.elt.processors.RawProcessor;
@@ -110,6 +112,8 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     final ExecutionEngine ee;
     final HsqlBackend hsql;
     public volatile boolean m_shouldContinue = true;
+
+    private boolean m_recovering = false;
 
     // Catalog
     public CatalogContext m_context;
@@ -416,18 +420,15 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         m_tableStats = null;
     }
 
-    ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox, final int siteId)
-    {
-        this(voltdb, mailbox, siteId, null, null);
-    }
-
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
                   final int siteId, String serializedCatalog,
-                  RestrictedPriorityQueue transactionQueue)
+                  RestrictedPriorityQueue transactionQueue,
+                  boolean recovering)
     {
         m_siteId = siteId;
         String txnlog_name = ExecutionSite.class.getName() + "." + m_siteId;
         m_txnlog = new VoltLogger(txnlog_name);
+        m_recovering = recovering;
 
         hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_Initializing.name(),
                         new Object[] { String.valueOf(siteId) }, null);
@@ -812,10 +813,20 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             // don't create a new transaction state
             if (ts == null && !isRollback) {
                 if (info.isSinglePartition()) {
-                    ts = new SinglePartitionTxnState(m_mailbox, this, info);
+                    if (m_recovering == false) {
+                        ts = new SinglePartitionTxnState(m_mailbox, this, info);
+                    }
+                    else {
+                        ts = new RecoveringSinglePartitionTxnState(m_mailbox, this, info);
+                    }
                 }
                 else {
-                    ts = new MultiPartitionParticipantTxnState(m_mailbox, this, info);
+                    if (m_recovering == false) {
+                        ts = new MultiPartitionParticipantTxnState(m_mailbox, this, info);
+                    }
+                    else {
+                        ts = new RecoveringMultiPartitionTxnState(m_mailbox, this, info);
+                    }
                 }
                 m_transactionQueue.add(ts);
                 m_transactionsById.put(ts.txnId, ts);

@@ -121,7 +121,7 @@ public class NanoHTTPD
      * @parm header Header entries, percent decoded
      * @return HTTP response, see class Response for details
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("rawtypes")
     public Response serve( String uri, String method, Properties header, Properties parms )
     {
         System.out.println( method + " '" + uri + "' " );
@@ -460,7 +460,7 @@ public class NanoHTTPD
         /**
          * Sends given response to the socket.
          */
-        @SuppressWarnings("unchecked")
+        @SuppressWarnings("rawtypes")
         private void sendResponse( String status, String mime, Properties header, InputStream data )
         {
             try

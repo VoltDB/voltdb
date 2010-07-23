@@ -103,12 +103,12 @@ final class ClientImpl implements Client {
         createConnection(host, Client.VOLTDB_SERVER_PORT, program, password);
     }
 
-     /**
+    /**
      * Create a connection to another VoltDB node.
-     * @param host
-     * @param port
-     * @param program
-     * @param password
+     * @param host Hostname or IP address of the host to connect to.
+     * @param port Port number to connect to.
+     * @param username Username to authorize. Username is ignored if authentication is disabled.
+     * @param password Password to authenticate. Password is ignored if authentication is disabled.
      * @throws UnknownHostException
      * @throws IOException
      */

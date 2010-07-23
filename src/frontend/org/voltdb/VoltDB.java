@@ -100,6 +100,9 @@ public class VoltDB {
         /** port number to run the http admin and json interface on */
         public int m_httpAdminPort = 8080;
 
+        /** information used to rejoin this new node to a cluster */
+        public String m_rejoinToHostAndPort = null;
+
         public boolean listenForDumpRequests = false;
 
         /**
@@ -179,6 +182,13 @@ public class VoltDB {
                 }
                 else if (arg.startsWith("httpadminport ")) {
                     m_httpAdminPort = Integer.parseInt(arg.substring("httpadminport ".length()));
+                }
+
+                else if (arg.equals("rejoinhost")) {
+                    m_rejoinToHostAndPort = args[++i].trim();
+                }
+                else if (arg.startsWith("rejoinhost ")) {
+                    m_rejoinToHostAndPort = arg.substring("rejoinhost ".length()).trim();
                 }
 
                 else if (arg.equals("catalog")) {

@@ -529,8 +529,6 @@ public class TestMessaging extends TestCase {
         @Override
         public void run() {
             try {
-
-
                 ServerSocketChannel listener = ServerSocketChannel.open();
                 listener.socket().bind(new InetSocketAddress(m_port));
 

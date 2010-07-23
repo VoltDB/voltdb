@@ -20,15 +20,22 @@ package org.voltdb.sysprocs;
 import java.util.HashMap;
 import java.util.List;
 
+import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
+import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltdb.HsqlBackend;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
+import org.voltdb.RejoinLog;
+import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.messaging.HostMessenger;
 
@@ -40,6 +47,16 @@ public class Rejoin extends VoltSystemProcedure {
 
     private static final int DEP_rejoinAggregate = (int)
         SysProcFragmentId.PF_rejoinAggregate;
+
+    @Override
+    public void init(int numberOfPartitions, SiteProcedureConnection site,
+            Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster) {
+        super.init(numberOfPartitions, site, catProc, eeType, hsql, cluster);
+        site.registerPlanFragment(SysProcFragmentId.PF_rejoinPrepare, this);
+        site.registerPlanFragment(SysProcFragmentId.PF_rejoinCommit, this);
+        site.registerPlanFragment(SysProcFragmentId.PF_rejoinRollback, this);
+        site.registerPlanFragment(SysProcFragmentId.PF_rejoinAggregate, this);
+    }
 
     /**
      *
@@ -142,12 +159,18 @@ public class Rejoin extends VoltSystemProcedure {
         }
     }
 
-    public long run(String rejoiningHostname, int portToConnect) {
+    public long run(SystemProcedureExecutionContext ctx, String rejoiningHostname, int portToConnect) {
+
+        RejoinLog.log("Starting a @Rejoin run()");
 
         // pick a hostid to replace
-
-        // TODO
-        int hostId = 0;
+        VoltDBInterface instance = VoltDB.instance();
+        HostMessenger hm = instance.getHostMessenger();
+        int hostId = hm.findDownHostId();
+        // if there are no down hosts from the point of view of this node
+        if (hostId == -1) {
+            throw new VoltAbortException("Unable to find down node to replace.");
+        }
 
         // start the chain of joining plan fragments
 
@@ -165,7 +188,7 @@ public class Rejoin extends VoltSystemProcedure {
         // create a work fragment to aggregate the results.
         // Set the MULTIPARTITION_DEPENDENCY bit to require a dependency from every site.
         pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_tableAggregator;
+        pfs[0].fragmentId = SysProcFragmentId.PF_rejoinAggregate;
         pfs[0].outputDepId = DEP_rejoinAggregate;
         pfs[0].inputDepIds = new int[]{ DEP_rejoinAllNodeWork };
         pfs[0].multipartition = false;
@@ -173,8 +196,7 @@ public class Rejoin extends VoltSystemProcedure {
 
         // distribute and execute these fragments providing pfs and id of the
         // aggregator's output dependency table.
-        results =
-            executeSysProcPlanFragments(pfs, DEP_rejoinAggregate);
+        results = executeSysProcPlanFragments(pfs, DEP_rejoinAggregate);
         boolean shouldCommit = true;
 
         // figure out if there were any problems
