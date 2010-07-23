@@ -40,12 +40,7 @@ public class ProcessSetManager {
         }
 
         @Override
-        public void notifyError(OutputLine line) {
-            m_output.add(line);
-        }
-
-        @Override
-        public void notifyOut(OutputLine line) {
+        public void update(OutputLine line) {
             m_output.add(line);
         }
     }

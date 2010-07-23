@@ -31,9 +31,8 @@ public class ProcessData {
 
     public enum Stream { STDERR, STDOUT; }
 
-    public final class OutputLine {
-        OutputLine(String processName, Stream stream, String value) {
-            assert(value != null);
+    public static class OutputLine {
+        public OutputLine(String processName, Stream stream, String value) {
             this.processName = processName;
             this.stream = stream;
             this.value = value;
@@ -81,10 +80,7 @@ public class ProcessData {
                 if (line != null) {
                     OutputLine ol = new OutputLine(m_processName, m_stream, line);
                     if (m_handler != null) {
-                        if (m_stream.equals(Stream.STDOUT))
-                            m_handler.notifyOut(ol);
-                        else
-                            m_handler.notifyError(ol);
+                        m_handler.update(ol);
                     } else {
                         final long now = (System.currentTimeMillis() / 1000) - 1256158053;
                         System.out.println("(" + now + ")" + m_processName + ": " + line);

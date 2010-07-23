@@ -26,14 +26,8 @@ import org.voltdb.processtools.ProcessData.OutputLine;
  */
 public interface ProgressHandler {
     /**
-     * Called when a new line from standard out is available.
+     * Called when a new line from standard output or error is available.
      * @param line
      */
-    public void notifyOut(OutputLine line);
-
-    /**
-     * Called when a new line from standard error is available.
-     * @param line
-     */
-    public void notifyError(OutputLine line);
+    public void update(OutputLine line);
 }
