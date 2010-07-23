@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include "storage/DefaultTupleSerializer.h"
+#include "common/DefaultTupleSerializer.h"
 #include "common/serializeio.h"
 #include "common/TupleSchema.h"
 

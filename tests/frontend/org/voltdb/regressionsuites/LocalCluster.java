@@ -55,6 +55,8 @@ public class LocalCluster implements VoltServerConfig {
     final String m_buildDir;
     int m_portOffset;
     boolean m_hasLocalServer = true;
+    String m_pathToDeployment;
+    int m_pathToDeploymentOffset;
 
     // state
     boolean m_compiled = false;
@@ -164,15 +166,20 @@ public class LocalCluster implements VoltServerConfig {
                                            "-Dlog4j.configuration=log.xml",
                                            "-ea",
                                            "-Xmx2048m",
-                                           "-XX:+HeapDumpOnOutOfMemoryError",                                           "-classpath",
+                                           "-XX:+HeapDumpOnOutOfMemoryError",
+                                           "-classpath",
                                            classPath,
                                            "org.voltdb.VoltDB",
                                            "catalog",
                                            m_jarFileName,
+                                           "deployment",
+                                           "",
                                            "port",
                                            "-1");
-        // When we actually append a port value, this will be correct.
+
+        // when we actually append a port value and deployment file, these will be correct
         m_portOffset = m_procBuilder.command().size() - 1;
+        m_pathToDeploymentOffset = m_procBuilder.command().size() - 3;
 
         for (String s : m_procBuilder.command()) {
             System.out.println(s);
@@ -192,11 +199,23 @@ public class LocalCluster implements VoltServerConfig {
 
     @Override
     public boolean compile(VoltProjectBuilder builder) {
+        return compile(builder, false);
+    }
+
+    // TODO: remove compileDeployment after ENG-642 lands
+    @Override
+    public boolean compile(VoltProjectBuilder builder, boolean compileDeployment) {
         if (m_compiled) {
             return true;
         }
-        m_compiled = builder.compile(m_jarFileName, m_siteCount, m_hostCount,
-                                     m_replication, "localhost");
+
+        if (compileDeployment) {
+            m_compiled = builder.compile(m_jarFileName, m_siteCount, m_hostCount, m_replication, "localhost", true);
+        } else {
+            m_compiled = builder.compile(m_jarFileName, m_siteCount, m_hostCount, m_replication, "localhost", false);
+            m_pathToDeployment = builder.getPathToDeployment();
+        }
+
         return m_compiled;
     }
 
@@ -223,6 +242,7 @@ public class LocalCluster implements VoltServerConfig {
             config.m_backend = m_target;
             config.m_noLoadLibVOLTDB = (m_target == BackendTarget.HSQLDB_BACKEND);
             config.m_pathToCatalog = m_jarFileName;
+            config.m_pathToDeployment = m_pathToDeployment;
             config.m_profilingLevel = ProcedureProfiler.Level.DISABLED;
             config.m_port = VoltDB.DEFAULT_PORT;
 
@@ -235,8 +255,8 @@ public class LocalCluster implements VoltServerConfig {
         // create all the out-of-process servers
         for (int i = oopStartIndex; i < m_hostCount; i++) {
             try {
-                m_procBuilder.command().set(m_portOffset,
-                                            String.valueOf(VoltDB.DEFAULT_PORT + i));
+                m_procBuilder.command().set(m_portOffset, String.valueOf(VoltDB.DEFAULT_PORT + i));
+                m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
 
                 Process proc = m_procBuilder.start();
                 m_cluster.add(proc);

@@ -58,6 +58,7 @@
 #include "storage/TableStats.h"
 #include "storage/PersistentTableStats.h"
 #include "storage/CopyOnWriteContext.h"
+#include "storage/RecoveryContext.h"
 
 namespace voltdb {
 
@@ -71,6 +72,7 @@ class Topend;
 class ReferenceSerializeOutput;
 class ExecutorContext;
 class MaterializedViewMetadata;
+class RecoveryProtoMsg;
 
 /**
  * Represents a non-temporary table which permanently resides in
@@ -192,11 +194,33 @@ class PersistentTable : public Table {
     bool activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId);
 
     /**
+     * Create a recovery stream for this table. Returns true if the table already has an active recovery stream
+     */
+    bool activateRecoveryStream(int32_t tableId);
+
+    /**
+     * Serialize the next message in the stream of recovery messages. Returns true if there are
+     * more messages and false otherwise.
+     */
+    void nextRecoveryMessage(ReferenceSerializeOutput *out);
+
+    /**
+     * Process the updates from a recovery message
+     */
+    void processRecoveryMessage(RecoveryProtoMsg* message, Pool *pool, bool allowELT);
+
+    /**
      * Attempt to serialize more tuples from the table to the provided
      * output stream.  Returns true if there are more tuples and false
      * if there are no more tuples waiting to be serialized.
      */
     bool serializeMore(ReferenceSerializeOutput *out);
+
+    /**
+     * Create a tree index on the primary key and then iterate it and hash
+     * the tuple data.
+     */
+    size_t hashCode();
 
 protected:
     // ------------------------------------------------------------------
@@ -262,6 +286,9 @@ protected:
 
     // Snapshot stuff
     boost::scoped_ptr<CopyOnWriteContext> m_COWContext;
+
+    //Recovery stuff
+    boost::scoped_ptr<RecoveryContext> m_recoveryContext;
 };
 
 inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {

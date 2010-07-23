@@ -119,7 +119,15 @@ public class SiteLog
 
     TransactionRecord currentTxn()
     {
-        if (isDone())
+        // if this site failed immediately and
+        // need to return a bogus TransactionRecord that indicates failure
+        // and doesn't interfere with the rest of the system.
+        if (m_txnInitOrder.size() == 0)
+        {
+            TransactionRecord null_txn = new TransactionRecord();
+            return null_txn;
+        }
+        else if (isDone())
         {
             return m_txnInitOrder.get(m_txnInitOrder.size() - 1);
         }

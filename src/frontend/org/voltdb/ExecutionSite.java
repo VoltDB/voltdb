@@ -77,6 +77,7 @@ import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
+import org.voltdb.messaging.RecoveryMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.messaging.SiteMailbox;
 import org.voltdb.messaging.Subject;
@@ -131,11 +132,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     // The time in ms since epoch of the last call to tick()
     long lastTickTime = 0;
     long lastCommittedTxnId = 0;
-    // The transaction ID of the last committed multi-partition transaction is
-    // tracked so that participants can determine whether or not to commit or
-    // roll back if the coordinator fails while notifying each participant of
-    // the final outcome for the txn.
-    long lastCommittedMultiPartTxnId = 0;
 
     /*
      * Due to failures we may find out about commited multi-part txns
@@ -154,14 +150,14 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         return ++latestUndoToken;
     }
 
-    private final HashSet<Long> faultedTxns = new HashSet<Long>();
-
     // store the id used by the DumpManager to identify this execution site
     public final String m_dumpId;
     public long m_currentDumpTimestamp = 0;
 
     // Each execution site manages snapshot using a SnapshotSiteProcessor
     private final SnapshotSiteProcessor m_snapshotter;
+
+    private RecoverySiteProcessor m_recoveryProcessor = null;
 
     // Trigger if shutdown has been run already.
     private boolean haveShutdownAlready;
@@ -353,6 +349,9 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         // do other periodic work
         m_snapshotter.doSnapshotWork(ee);
         m_watchdog.pet();
+        if (m_recoveryProcessor != null) {
+            m_recoveryProcessor.doRecoveryWork();
+        }
 
         /*
          * grab the table statistics from ee and put it into the statistics
@@ -677,7 +676,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                     }
                 }
                 if (currentTxnState != null) {
-                    assert(!faultedTxns.contains(currentTxnState.txnId));
                     recursableRun(currentTxnState);
                 }
             }
@@ -710,7 +708,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 }
             }
             if (currentTxnState != null) {
-                assert(!faultedTxns.contains(currentTxnState.txnId));
                 //System.out.println("ExecutionSite " + getSiteId() + " running txnid " + currentTxnState.txnId);
                 recursableRun(currentTxnState);
             }
@@ -745,7 +742,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 lastCommittedTxnId = txnState.txnId;
                 if (!txnState.isSinglePartition())
                 {
-                    lastCommittedMultiPartTxnId = txnState.txnId;
                     lastKnownGloballyCommitedMultiPartTxnId =
                         Math.max(txnState.txnId, lastKnownGloballyCommitedMultiPartTxnId);
                 }
@@ -800,9 +796,15 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             // Every non-heartbeat notice requires a transaction state.
             TransactionState ts = m_transactionsById.get(info.getTxnId());
 
-            // Check for a rollback FragmentTask.  Would eventually like to
-            // replace the overloading of FragmentTask with a separate
-            // TransactionCompletionMessage (or something similarly named)
+            // Check for a rollback FragmentTask.  Need to do this because
+            // a multi-partition participant can rollback locally and then
+            // move on to a new transaction; the final commit notification
+            // from the coordinator needs to avoid re-creating a new
+            // transaction state.
+            //
+            // FUTURE: Would eventually like to replace the overloading of
+            // FragmentTask with a separate TransactionCompletionMessage
+            // (or something similarly named)
             boolean isRollback = false;
             if (message instanceof FragmentTaskMessage)
             {
@@ -835,6 +837,13 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 if (message instanceof FragmentTaskMessage) {
                     ts.createLocalFragmentWork((FragmentTaskMessage)message, false);
                 }
+            }
+        } else if (message instanceof RecoveryMessage) {
+            RecoveryMessage rm = (RecoveryMessage)message;
+            if (m_recoveryProcessor != null) {
+                m_recoveryProcessor.handleRecoveryMessage(rm);
+            } else {
+                VoltDB.crashVoltDB();
             }
         }
         else if (message instanceof FragmentResponseMessage) {
@@ -1215,7 +1224,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 m_recoveryLog.info("Faulting non-globally initiated transaction " + ts.txnId);
                 it.remove();
                 m_transactionQueue.faultTransaction(ts);
-                faultedTxns.add(ts.txnId);
             }
 
             // Multipartition transaction without a surviving coordinator:
@@ -1251,7 +1259,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                             " because the coordinator was on a failed node");
                     it.remove();
                     m_transactionQueue.faultTransaction(ts);
-                    faultedTxns.add(ts.txnId);
                 }
             }
             // If we're the coordinator, then after we clean up our internal

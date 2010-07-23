@@ -157,7 +157,7 @@ public class TestMessaging extends TestCase {
             messenger.createLocalSite(mySiteId);
             // create the mailboxes
             for (int i = 0; i < mailboxCount; i++) {
-                mbox[i] = currentMessenger.createMailbox(mySiteId, i, null);
+                mbox[i] = currentMessenger.createMailbox(mySiteId, i);
             }
             // claim this site is done
             sitesDone.incrementAndGet();
@@ -529,8 +529,6 @@ public class TestMessaging extends TestCase {
         @Override
         public void run() {
             try {
-
-
                 ServerSocketChannel listener = ServerSocketChannel.open();
                 listener.socket().bind(new InetSocketAddress(m_port));
 

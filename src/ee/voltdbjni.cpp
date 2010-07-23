@@ -87,6 +87,7 @@
 #include "common/TheHashinator.h"
 #include "common/Pool.hpp"
 #include "common/FatalException.hpp"
+#include "common/RecoveryProtoMessage.h"
 #include "execution/VoltDBEngine.h"
 #include "execution/JNITopend.h"
 #include "json_spirit/json_spirit.h"
@@ -1062,16 +1063,16 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeS
 
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
- * Method:    nativeActivateCopyOnWrite
- * Signature: (JI)Z
+ * Method:    nativeActivateTableStream
+ * Signature: (JII)Z
  */
-SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeActivateCopyOnWrite
-  (JNIEnv *env, jobject obj, jlong engine_ptr, jint tableId) {
-    VOLT_DEBUG("nativeActivateCopyOnWrite in C++ called");
+SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeActivateTableStream
+  (JNIEnv *env, jobject obj, jlong engine_ptr, jint tableId, jint streamType) {
+    VOLT_DEBUG("nativeActivateTableStream in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     try {
-        return engine->activateCopyOnWrite(tableId);
+        return engine->activateTableStream(tableId, static_cast<voltdb::TableStreamType>(streamType));
     } catch (FatalException e) {
         topend->crashVoltDB(e);
     }
@@ -1080,24 +1081,28 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeA
 
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
- * Method:    nativeCOWSerializeMore
- * Signature: (JJIII)I
+ * Method:    nativeTableStreamSerializeMore
+ * Signature: (JJIIII)I
  */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeCOWSerializeMore
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTableStreamSerializeMore
   (JNIEnv *env,
    jobject obj,
    jlong engine_ptr,
    jlong bufferPtr,
    jint offset,
    jint length,
-   jint tableId) {
-    VOLT_DEBUG("nativeSetLogLevels in C++ called");
+   jint tableId,
+   jint streamType) {
+    VOLT_DEBUG("nativeTableStreamSerializeMore in C++ called");
     ReferenceSerializeOutput out(reinterpret_cast<char*>(bufferPtr) + offset, length - offset);
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     try {
         try {
-            return engine->cowSerializeMore( &out, tableId);
+            return engine->tableStreamSerializeMore(
+                    &out,
+                    tableId,
+                    static_cast<voltdb::TableStreamType>(streamType));
         } catch (SQLException e) {
             throwFatalException("%s", e.message().c_str());
         }
@@ -1148,6 +1153,40 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeELTA
     return 0;
 }
 
+class ArrayGuard {
+public:
+    ArrayGuard(JNIEnv *env, jbyteArray array, jbyte *data) : m_env(env), m_array(array), m_data(data) {}
+    ~ArrayGuard() {
+        m_env->ReleaseByteArrayElements( m_array, m_data, JNI_ABORT);
+    }
+    JNIEnv *m_env;
+    jbyteArray m_array;
+    jbyte *m_data;
+};
+/*
+ * Class:     org_voltdb_jni_ExecutionEngine
+ * Method:    nativeProcessRecoveryMessage
+ * Signature: (J[B)V
+ */
+SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeProcessRecoveryMessage
+  (JNIEnv *env, jobject obj, jlong engine_ptr, jbyteArray messageBytes) {
+    VOLT_DEBUG("nativeProcessRecoveryMessage in C++ called");
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    jbyte *data = env->GetByteArrayElements( messageBytes, NULL);
+    jsize messageLength = env->GetArrayLength(messageBytes);
+    ArrayGuard guard(env, messageBytes, data);
+    try {
+        if (data == NULL) {
+            throwFatalException("Failed to get byte array elements of recovery message");
+        }
+        ReferenceSerializeInput input(data, messageLength);
+        RecoveryProtoMsg message(&input);
+        return engine->processRecoveryMessage(&message);
+    } catch (FatalException e) {
+        topend->crashVoltDB(e);
+    }
+}
 #ifdef LINUX
 /*
  * Class:     org_voltdb_utils_ThreadUtils

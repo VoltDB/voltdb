@@ -81,6 +81,11 @@ public class TestTwoSitePlans extends TestCase {
         // create the catalog (that will be passed to the ClientInterface
         catalog = new Catalog();
         catalog.execute(serializedCatalog);
+
+        // update the catalog with the data from the deployment file
+        String pathToDeployment = pb.getPathToDeployment();
+        assertTrue(CatalogUtil.compileDeployment(catalog, pathToDeployment));
+
         cluster = catalog.getClusters().get("cluster");
         CatalogMap<Procedure> procedures = cluster.getDatabases().get("database").getProcedures();
         Procedure insertProc = procedures.get("InsertNewOrder");

@@ -17,7 +17,12 @@
 
 package org.voltdb.utils;
 
-import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -400,15 +405,48 @@ public abstract class CatalogUtil {
      * @param catalog Catalog to be updated.
      * @param pathToDeployment Path to the deployment.xml file.
      */
-    public static void compileDeployment(Catalog catalog, String pathToDeployment) {
+    public static boolean compileDeployment(Catalog catalog, String deploymentURL) {
+
+        // get the URL/path for the deployment and prep an InputStream
+        InputStream deployIS = null;
+        try {
+            URL deployURL = new URL(deploymentURL);
+            deployIS = deployURL.openStream();
+        } catch (MalformedURLException ex) {
+            // Invalid URL. Try as a file.
+            try {
+                deployIS = new FileInputStream(deploymentURL);
+            } catch (FileNotFoundException e) {
+                deployIS = null;
+            }
+        } catch (IOException ioex) {
+            deployIS = null;
+        }
+
+        // make sure the file exists
+        if (deployIS == null) {
+            hostLog.error("Could not locate deployment info at given URL: " + deploymentURL);
+            return false;
+        } else {
+            hostLog.info("URL of deployment info: " + deploymentURL);
+        }
+
         // get deployment info from xml file
-        DeploymentType deployment = getDeployment(pathToDeployment);
+        DeploymentType deployment = getDeployment(deployIS);
+
+        // wasn't a valid xml deployment file
+        if (deployment == null) {
+            hostLog.error("Not a valid XML deployment file at URL: " + deploymentURL);
+            return false;
+        }
 
         // set the cluster info
         setClusterInfo(catalog, deployment.getCluster());
 
         // set the users info
         setUsersInfo(catalog, deployment.getUsers());
+
+        return true;
     }
 
     /**
@@ -417,7 +455,7 @@ public abstract class CatalogUtil {
      * @return Returns a reference to the root <deployment> element.
      */
     @SuppressWarnings("unchecked")
-    private static DeploymentType getDeployment(String pathToDeployment) {
+    private static DeploymentType getDeployment(InputStream deployIS) {
         try {
             JAXBContext jc = JAXBContext.newInstance("org.voltdb.compiler.deploymentfile");
             // This schema shot the sheriff.
@@ -431,7 +469,7 @@ public abstract class CatalogUtil {
             // But did not shoot unmarshaller!
             unmarshaller.setSchema(schema);
             JAXBElement<DeploymentType> result =
-                (JAXBElement<DeploymentType>) unmarshaller.unmarshal(new File(pathToDeployment));
+                (JAXBElement<DeploymentType>) unmarshaller.unmarshal(deployIS);
             DeploymentType deployment = result.getValue();
             return deployment;
         } catch (JAXBException e) {

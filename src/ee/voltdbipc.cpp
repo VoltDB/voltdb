@@ -29,6 +29,7 @@
 #include "common/serializeio.h"
 #include "common/Pool.hpp"
 #include "common/FatalException.hpp"
+#include "common/RecoveryProtoMessage.h"
 #include "execution/IPCTopend.h"
 #include "execution/VoltDBEngine.h"
 
@@ -148,7 +149,8 @@ struct undo_token {
 typedef struct {
     struct ipc_command cmd;
     voltdb::CatalogId tableId;
-}__attribute__((packed)) activate_copy_on_write;
+    voltdb::TableStreamType streamType;
+}__attribute__((packed)) activate_tablestream;
 
 /*
  * Header for a Copy On Write Serialize More request
@@ -156,8 +158,18 @@ typedef struct {
 typedef struct {
     struct ipc_command cmd;
     voltdb::CatalogId tableId;
+    voltdb::TableStreamType streamType;
     int bufferSize;
-}__attribute__((packed)) cow_serialize_more;
+}__attribute__((packed)) tablestream_serialize_more;
+
+/*
+ * Header for an incoming recovery message
+ */
+typedef struct {
+    struct ipc_command cmd;
+    int32_t messageLength;
+    char message[0];
+}__attribute__((packed)) recovery_message;
 
 /*
  * Header for an ELT action.
@@ -274,10 +286,10 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
         result = quiesce(cmd);
         break;
       case 17:
-        result = activateCopyOnWrite(cmd);
+        result = activateTableStream(cmd);
         break;
       case 18:
-        cowSerializeMore(cmd);
+        tableStreamSerializeMore(cmd);
         result = kErrorCode_None;
         break;
       case 19:
@@ -286,6 +298,9 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
       case 20:
         eltAction(cmd);
         result = kErrorCode_None;
+        break;
+      case 21:
+          result = processRecoveryMessage(cmd);
         break;
       default:
         result = stub(cmd);
@@ -879,11 +894,13 @@ void VoltDBIPC::getStats(struct ipc_command *cmd) {
     }
 }
 
-int8_t VoltDBIPC::activateCopyOnWrite(struct ipc_command *cmd) {
-    activate_copy_on_write *activateCopyOnWriteCommand = (activate_copy_on_write*) cmd;
-    const voltdb::CatalogId tableId = ntohl(activateCopyOnWriteCommand->tableId);
+int8_t VoltDBIPC::activateTableStream(struct ipc_command *cmd) {
+    activate_tablestream *activateTableStreamCommand = (activate_tablestream*) cmd;
+    const voltdb::CatalogId tableId = ntohl(activateTableStreamCommand->tableId);
+    const voltdb::TableStreamType streamType =
+            static_cast<voltdb::TableStreamType>(ntohl(activateTableStreamCommand->streamType));
     try {
-        if (m_engine->activateCopyOnWrite(tableId)) {
+        if (m_engine->activateTableStream(tableId, streamType)) {
             return kErrorCode_Success;
         } else {
             return kErrorCode_Error;
@@ -894,10 +911,12 @@ int8_t VoltDBIPC::activateCopyOnWrite(struct ipc_command *cmd) {
     return kErrorCode_Error;
 }
 
-void VoltDBIPC::cowSerializeMore(struct ipc_command *cmd) {
-    cow_serialize_more *cowSerializeMore = (cow_serialize_more*) cmd;
-    const voltdb::CatalogId tableId = ntohl(cowSerializeMore->tableId);
-    const int bufferLength = ntohl(cowSerializeMore->bufferSize);
+void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
+    tablestream_serialize_more *tableStreamSerializeMore = (tablestream_serialize_more*) cmd;
+    const voltdb::CatalogId tableId = ntohl(tableStreamSerializeMore->tableId);
+    const voltdb::TableStreamType streamType =
+            static_cast<voltdb::TableStreamType>(ntohl(tableStreamSerializeMore->streamType));
+    const int bufferLength = ntohl(tableStreamSerializeMore->bufferSize);
     assert(bufferLength < MAX_MSG_SZ - 5);
 
     if (bufferLength >= MAX_MSG_SZ - 5) {
@@ -909,7 +928,7 @@ void VoltDBIPC::cowSerializeMore(struct ipc_command *cmd) {
 
     try {
         ReferenceSerializeOutput out(m_reusedResultBuffer + 5, bufferLength);
-        int serialized = m_engine->cowSerializeMore( &out, tableId);
+        int serialized = m_engine->tableStreamSerializeMore( &out, tableId, streamType);
         m_reusedResultBuffer[0] = kErrorCode_Success;
         *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[1]) = htonl(serialized);
 
@@ -925,6 +944,15 @@ void VoltDBIPC::cowSerializeMore(struct ipc_command *cmd) {
     } catch (FatalException e) {
         crashVoltDB(e);
     }
+}
+
+int8_t VoltDBIPC::processRecoveryMessage( struct ipc_command *cmd) {
+    recovery_message *recoveryMessage = (recovery_message*) cmd;
+    const int32_t messageLength = ntohl(recoveryMessage->messageLength);
+    ReferenceSerializeInput input(recoveryMessage->message, messageLength);
+    RecoveryProtoMsg message(&input);
+    m_engine->processRecoveryMessage(&message);
+    return kErrorCode_Success;
 }
 
 void VoltDBIPC::eltAction(struct ipc_command *cmd) {

@@ -34,7 +34,7 @@
 #include "indexes/tableindex.h"
 #include "storage/tableiterator.h"
 #include "storage/CopyOnWriteIterator.h"
-#include "storage/DefaultTupleSerializer.h"
+#include "common/DefaultTupleSerializer.h"
 #include <vector>
 #include <string>
 #include <stdint.h>

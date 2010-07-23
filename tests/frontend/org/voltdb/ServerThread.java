@@ -32,13 +32,31 @@ public class ServerThread extends Thread {
 
     public ServerThread(VoltDB.Configuration config) {
         m_config = config;
+
+        if (!m_config.validate()) {
+            m_config.usage();
+            System.exit(-1);
+        }
+
         setName("ServerThread");
     }
 
-    public ServerThread(String jarfile, BackendTarget target) {
+    public ServerThread(String pathToCatalog, BackendTarget target) {
         m_config = new VoltDB.Configuration();
-        m_config.m_pathToCatalog = jarfile;
+        m_config.m_pathToCatalog = pathToCatalog;
         m_config.m_backend = target;
+    }
+
+    public ServerThread(String pathToCatalog, String pathToDeployment, BackendTarget target) {
+        m_config = new VoltDB.Configuration();
+        m_config.m_pathToCatalog = pathToCatalog;
+        m_config.m_pathToDeployment = pathToDeployment;
+        m_config.m_backend = target;
+
+        if (!m_config.validate()) {
+            m_config.usage();
+            System.exit(-1);
+        }
     }
 
     @Override

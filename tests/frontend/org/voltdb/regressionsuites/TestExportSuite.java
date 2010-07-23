@@ -29,10 +29,10 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NullCallback;
@@ -40,7 +40,11 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.elt.ExportTestClient;
-import org.voltdb.regressionsuites.sqltypesprocs.*;
+import org.voltdb.regressionsuites.sqltypesprocs.Delete;
+import org.voltdb.regressionsuites.sqltypesprocs.Insert;
+import org.voltdb.regressionsuites.sqltypesprocs.InsertAddedTable;
+import org.voltdb.regressionsuites.sqltypesprocs.RollbackInsert;
+import org.voltdb.regressionsuites.sqltypesprocs.Update_ELT;
 import org.voltdb.utils.SnapshotVerifier;
 
 /**
@@ -139,7 +143,7 @@ public class TestExportSuite extends RegressionSuite {
 
         // add a new table
         final String newCatalogURL = Configuration.getPathToCatalogForTest("elt-ddl-addedtable.jar");
-        final ClientResponse callProcedure = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
+        final ClientResponse callProcedure = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, null);
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
 
         // make a new tester and see if it gets the new advertisement!
@@ -174,7 +178,7 @@ public class TestExportSuite extends RegressionSuite {
 
         // now drop the no-nulls table
         final String newCatalogURL = Configuration.getPathToCatalogForTest("elt-ddl-sans-nonulls.jar");
-        final ClientResponse callProcedure = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
+        final ClientResponse callProcedure = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, null);
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
 
         // must still be able to verify the elt data.
@@ -705,7 +709,7 @@ public class TestExportSuite extends RegressionSuite {
         project.addPartitionInfo("EXPRESSIONS_NO_NULLS", "PKEY");
         project.addPartitionInfo("JUMBO_ROW", "PKEY");
         project.addProcedures(PROCEDURES2);
-        compile = config.compile(project);
+        compile = config.compile(project, true);
         assertTrue(compile);
 
         /*
@@ -736,7 +740,7 @@ public class TestExportSuite extends RegressionSuite {
         project.addPartitionInfo("NO_NULLS", "PKEY");
         project.addProcedures(PROCEDURES);
         project.addProcedures(PROCEDURES3);
-        compile = config.compile(project);
+        compile = config.compile(project, true);
         assertTrue(compile);
 
 

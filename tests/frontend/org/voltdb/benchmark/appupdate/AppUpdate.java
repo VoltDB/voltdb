@@ -32,7 +32,10 @@ import org.voltdb.benchmark.ClientMain;
 import org.voltdb.benchmark.Verification.ForeignKeyConstraintBase;
 import org.voltdb.benchmark.appupdate.procs.InsertA;
 import org.voltdb.benchmark.appupdate.procs.InsertB;
-import org.voltdb.client.*;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.NotImplementedException;
 
@@ -278,7 +281,7 @@ public class AppUpdate extends ClientMain
         // System.err.println("Updating to catalog " + nextCatalog.name);
         return m_voltClient.callProcedure(
                   new AppUpdateCallback(nextCatalog),
-                  "@UpdateApplicationCatalog", nextCatalog.name);
+                  "@UpdateApplicationCatalog", nextCatalog.name, null);
     }
 
     @Override

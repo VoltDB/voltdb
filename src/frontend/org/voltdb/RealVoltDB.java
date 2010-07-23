@@ -25,6 +25,7 @@ import java.io.PrintStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.nio.channels.ServerSocketChannel;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Hashtable;
@@ -35,6 +36,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Site;
 import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.SyncCallback;
 import org.voltdb.elt.ELTManager;
 import org.voltdb.fault.FaultDistributor;
 import org.voltdb.fault.FaultDistributorInterface;
@@ -121,7 +126,7 @@ public class RealVoltDB implements VoltDBInterface
         @Override
         public void run() {
             Mailbox mailbox = VoltDB.instance().getMessenger()
-            .createMailbox(m_siteId, VoltDB.DTXN_MAILBOX_ID, null);
+            .createMailbox(m_siteId, VoltDB.DTXN_MAILBOX_ID);
 
             m_siteObj =
                 new ExecutionSite(VoltDB.instance(),
@@ -147,7 +152,7 @@ public class RealVoltDB implements VoltDBInterface
     public VoltDB.Configuration m_config = new VoltDB.Configuration();
     private CatalogContext m_catalogContext;
     private String m_buildString;
-    private String m_versionString = "1.1.01";
+    private String m_versionString = "1.2.01";
     // fields accessed via the singleton
     private HostMessenger m_messenger = null;
     private final ArrayList<ClientInterface> m_clientInterfaces =
@@ -195,6 +200,12 @@ public class RealVoltDB implements VoltDBInterface
      */
     public void initialize(VoltDB.Configuration config) {
         synchronized(m_startAndStopLock) {
+
+            if (config.m_port != VoltDB.DEFAULT_PORT) {
+                RejoinLog.setPortNo(config.m_port);
+            }
+            //RejoinLog.log("\n### RealVoltDB.initialize() for port %d ###", config.m_port);
+
             hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
 
             m_faultManager = new FaultDistributor();
@@ -251,12 +262,11 @@ public class RealVoltDB implements VoltDBInterface
             Catalog catalog = new Catalog();
             catalog.execute(serializedCatalog);
 
-            // If VoltProjectBuilder was used, m_config.m_pathToDeployment will be null. No deployment.xml file was
-            // given to the server in this case because its deployment info has already been added to the catalog.
-            if (m_config.m_pathToDeployment != null) {
-                CatalogUtil.compileDeployment(catalog, m_config.m_pathToDeployment);
-                serializedCatalog = catalog.serialize();
-            }
+            // note if this fails it will print an error first
+            if (!CatalogUtil.compileDeployment(catalog, m_config.m_pathToDeployment))
+                System.exit(-1);
+
+            serializedCatalog = catalog.serialize();
 
             m_catalogContext = new CatalogContext(catalog, m_config.m_pathToCatalog, catalogVersion);
             final SnapshotSchedule schedule =
@@ -266,32 +276,82 @@ public class RealVoltDB implements VoltDBInterface
             TheHashinator.initialize(catalog);
 
             // Prepare the network socket manager for work
-            m_network = new VoltNetwork(/* new Runnable[] { new Runnable() {
-                @Override
-                public void run() {
-                    for (final ClientInterface ci : m_clientInterfaces) {
-                        ci.processPeriodicWork();
-                    }
+            m_network = new VoltNetwork();
+
+            if (config.m_rejoinToHostAndPort == null) {
+                // Create the intra-cluster mesh
+                InetAddress leader = null;
+                try {
+                    leader = InetAddress.getByName(m_catalogContext.cluster.getLeaderaddress());
+                } catch (UnknownHostException ex) {
+                    hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_CouldNotRetrieveLeaderAddress.name(), new Object[] { m_catalogContext.cluster.getLeaderaddress() }, ex);
+                    throw new RuntimeException(ex);
                 }
-            }}*/);
+                // ensure at least one host (catalog compiler should check this too
+                if (m_catalogContext.numberOfNodes <= 0) {
+                    hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_InvalidHostCount.name(), new Object[] { m_catalogContext.numberOfNodes }, null);
+                    VoltDB.crashVoltDB();
+                }
 
-            // Create the intra-cluster mesh
-            InetAddress leader = null;
-            try {
-                leader = InetAddress.getByName(m_catalogContext.cluster.getLeaderaddress());
-            } catch (UnknownHostException ex) {
-                hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_CouldNotRetrieveLeaderAddress.name(), new Object[] { m_catalogContext.cluster.getLeaderaddress() }, ex);
-                throw new RuntimeException(ex);
+                hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_CreatingVoltDB.name(), new Object[] { m_catalogContext.numberOfNodes, leader }, null);
+                m_messenger = new HostMessenger(m_network, leader, m_catalogContext.numberOfNodes, catalogCRC, hostLog);
+                m_instanceId = m_messenger.waitForGroupJoin();
             }
-            // ensure at least one host (catalog compiler should check this too
-            if (m_catalogContext.numberOfNodes <= 0) {
-                hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_InvalidHostCount.name(), new Object[] { m_catalogContext.numberOfNodes }, null);
-                VoltDB.crashVoltDB();
-            }
+            else {
+                int rejoinPort = config.m_internalPort;
+                String rejoinHost = "localhost";
 
-            hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_CreatingVoltDB.name(), new Object[] { m_catalogContext.numberOfNodes, leader }, null);
-            m_messenger = new HostMessenger(m_network, leader, m_catalogContext.numberOfNodes, catalogCRC, hostLog);
-            m_instanceId = m_messenger.waitForGroupJoin();
+                int colonIndex = config.m_rejoinToHostAndPort.indexOf(':');
+                if (colonIndex == -1) {
+                    rejoinHost = config.m_rejoinToHostAndPort.trim();
+                }
+                else {
+                    rejoinHost = config.m_rejoinToHostAndPort.substring(0, colonIndex).trim();
+                    rejoinPort = Integer.parseInt(config.m_rejoinToHostAndPort.substring(colonIndex + 1).trim());
+                }
+
+                ServerSocketChannel listener = null;
+                try {
+                    listener = ServerSocketChannel.open();
+                    listener.socket().bind(new InetSocketAddress(config.m_internalPort));
+                } catch (IOException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                    System.exit(-1);
+                }
+                m_messenger = new HostMessenger(m_network, listener, m_catalogContext.numberOfNodes, catalogCRC, hostLog);
+
+                Client client = ClientFactory.createClient();
+                ClientResponse response = null;
+                SyncCallback scb = new SyncCallback();
+                try {
+                    client.createConnection(rejoinHost, rejoinPort, null, null);
+                    boolean success = false;
+                    while (!success) {
+                        success = client.callProcedure(scb, "@Rejoin", "localhost", config.m_internalPort);
+                        if (!success) Thread.sleep(100);
+                    }
+                } catch (Exception e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                    System.exit(-1);
+                }
+
+                m_messenger.waitForGroupJoin();
+                try {
+                    scb.waitForResponse();
+                    response = scb.getResponse();
+                    client.close();
+                }
+                catch (Exception e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                    System.exit(-1);
+                }
+
+                System.out.println("response:");
+                System.out.println(response);
+            }
 
             // Use the host messenger's hostId.
             int myHostId = m_messenger.getHostId();
@@ -346,7 +406,7 @@ public class RealVoltDB implements VoltDBInterface
             int siteId = Integer.parseInt(siteForThisThread.getTypeName());
             ExecutionSite siteObj =
                 new ExecutionSite(VoltDB.instance(),
-                                  VoltDB.instance().getMessenger().createMailbox(siteId, VoltDB.DTXN_MAILBOX_ID, null),
+                                  VoltDB.instance().getMessenger().createMailbox(siteId, VoltDB.DTXN_MAILBOX_ID),
                                   siteId,
                                   serializedCatalog,
                                   null,

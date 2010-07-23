@@ -61,17 +61,11 @@ public interface Mailbox {
     public void deliver(VoltMessage message);
 
     /**
-     * Deliver a message to the front of the mailbox queue so it will be processed first.
+     * Deliver a message to the front of the mailbox queue so it will be processed first. This method is
+     * NOT threadsafe. It can only be called by the execution site thread itself.
      * @param message
      */
     void deliverFront(VoltMessage message);
-
-    /**
-     * Get the number of messages waiting to be delivered for this mailbox.
-     *
-     * @return An integer representing the number of waiting messages.
-     */
-    public int getWaitingCount();
 
     /**
      * Get the next Object from this messaging queue from the default subjects.

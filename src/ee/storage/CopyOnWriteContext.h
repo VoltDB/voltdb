@@ -19,7 +19,7 @@
 
 #include <vector>
 #include <utility>
-#include "storage/TupleSerializer.h"
+#include "common/TupleSerializer.h"
 #include "storage/table.h"
 #include "common/Pool.hpp"
 #include "common/tabletuple.h"

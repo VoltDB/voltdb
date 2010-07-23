@@ -48,6 +48,8 @@ PRIMARY ENTRY POINTS
         <jvmarg value="-server" />
         <jvmarg value="-Xmx512m" />
         <jvmarg value="-XX:-ReduceInitialCardMarks" />
+        <arg value="catalog" />
+        <arg value="catalog.jar" /> <!-- catalog -->
         <arg value="deployment" />
         <arg value="deployment.xml" /> <!-- deployment file -->
         <classpath refid='project.classpath' />

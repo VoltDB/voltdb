@@ -18,29 +18,37 @@
 package org.voltdb.messaging;
 
 import java.util.HashMap;
-import java.util.Deque;
 
 class MessengerSite {
 
     HostMessenger m_hostMessenger;
     final int m_siteId;
-    HashMap<Integer, SiteMailbox> m_mailboxes = new HashMap<Integer, SiteMailbox>( 16, (float).1);
+    HashMap<Integer, Mailbox> m_mailboxes = new HashMap<Integer, Mailbox>( 16, (float).1);
 
     public MessengerSite(HostMessenger hostMessenger, int siteId) {
         m_hostMessenger = hostMessenger;
         m_siteId = siteId;
     }
 
-    public synchronized Mailbox createMailbox(int mailboxId, Deque<VoltMessage> queue) {
-        SiteMailbox mbox = getMailbox(mailboxId);
+    public synchronized Mailbox createMailbox(int mailboxId) {
+        SiteMailbox mbox = (SiteMailbox)getMailbox(mailboxId);
         if (mbox != null) return null;
 
-        SiteMailbox newMbox = new SiteMailbox(m_hostMessenger, m_siteId, mailboxId, queue);
+        SiteMailbox newMbox = new SiteMailbox(m_hostMessenger, m_siteId, mailboxId);
         m_mailboxes.put(mailboxId, newMbox);
         return newMbox;
     }
 
-    SiteMailbox getMailbox(int mailboxId) {
+    public synchronized void createMailbox(int mailboxId, Mailbox mailbox) {
+        assert(mailbox != null);
+        assert(!m_mailboxes.containsKey(mailboxId));
+        if (m_mailboxes.containsKey(mailboxId)) {
+            throw new IllegalStateException("MessengerSite " + m_siteId + " already contains mailbox " + mailboxId);
+        }
+        m_mailboxes.put(mailboxId, mailbox);
+    }
+
+    Mailbox getMailbox(int mailboxId) {
         return m_mailboxes.get(mailboxId);
     }
 }

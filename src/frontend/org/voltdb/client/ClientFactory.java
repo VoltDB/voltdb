@@ -42,13 +42,15 @@ public abstract class ClientFactory {
             int expectedOutgoingMessageSize,
             int maxArenaSizes[],
             boolean heavyweight,
-            StatsUploaderSettings statsSettings) {
+            StatsUploaderSettings statsSettings,
+            UncaughtExceptionHandler handler) {
         final int cores = Runtime.getRuntime().availableProcessors();
         return new ClientImpl(
                 expectedOutgoingMessageSize,
                 maxArenaSizes,
                 cores > 4 ? heavyweight : false,
-                statsSettings);
+                statsSettings,
+                handler);
     }
 
     /**

@@ -85,4 +85,10 @@ public abstract class TransactionInitiator {
      */
     abstract void increaseBackpressure(int messageSize);
     abstract void reduceBackpressure(int messageSize);
+
+    /**
+     * Terminate the initiator thread.
+     * @throws InterruptedException
+     */
+    public abstract void shutdown() throws InterruptedException;
 }

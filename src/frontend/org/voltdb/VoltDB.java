@@ -21,6 +21,8 @@ import java.io.File;
 import java.util.Map;
 import java.util.TimeZone;
 
+import org.voltdb.logging.VoltLogger;
+
 /**
  * <code>VoltDB</code> is the main class for VoltDB server.
  * It sets up global objects and then starts the individual threads
@@ -55,6 +57,8 @@ public class VoltDB {
     /** Encapsulates VoltDB configuration parameters */
     public static class Configuration {
 
+        private static final VoltLogger hostLog = new VoltLogger("HOST");
+
         /** Whether to enable watchdogs to check for possible deadlocks **/
         public boolean m_useWatchdogs = false;
 
@@ -62,7 +66,7 @@ public class VoltDB {
         public BackendTarget m_backend = BackendTarget.NATIVE_EE_JNI;
 
         /** name of the m_catalog JAR file */
-        public String m_pathToCatalog = "catalog.jar";
+        public String m_pathToCatalog = null;
 
         /** name of the deployment file */
         public String m_pathToDeployment = null;
@@ -114,7 +118,7 @@ public class VoltDB {
             // Arguments are accepted in any order.
             //
             // options:
-            // [noloadlib] [hsqldb|jni|ipc] [polite|intrusive] [catalog path_to_catalog]
+            // [noloadlib] [hsqldb|jni|ipc] [polite|intrusive] [catalog path_to_catalog] [deployment path_to_deployment]
 
             for (int i=0; i < args.length; ++i) {
                 arg = args[i];
@@ -202,20 +206,53 @@ public class VoltDB {
                 } else if (arg.equalsIgnoreCase("useWatchdogs")) {
                     m_useWatchdogs = true;
                 } else {
-                    /*
-                     * N.B: this text is user visible. It intentionally does NOT reveal
-                     * options not interesting to, say, the casual VoltDB operator.
-                     * Please do not reveal options not documented in the VoltDB
-                     * documentation set. (See GettingStarted.pdf).
-                     */
-                    System.out.println("Unrecognized option to VoltDB: " + arg);
-                    System.out.println("Usage: org.voltdb.VoltDB catalog <catalog.jar>");
-                    System.out.println("The _Getting Started With VoltDB_ book explains how to run " +
-                                       " VoltDB from the command line.");
+                    hostLog.fatal("Unrecognized option to VoltDB: " + arg);
+                    usage();
                     System.exit(-1);
                 }
             }
         }
+
+        /**
+         * Validates configuration settings and logs errors to the host log. You typically want to have the system exit
+         * when this fails, but this functionality is left outside of the method so that it is testable.
+         * @return Returns true if all required configuration settings are present.
+         */
+        public boolean validate() {
+            boolean isValid = true;
+
+            // require catalog file location
+            if (m_pathToCatalog == null) {
+                isValid = false;
+                hostLog.fatal("The catalog file location is missing.");
+            } else if (m_pathToCatalog.equals("")) {
+                isValid = false;
+                hostLog.fatal("The catalog file location is empty.");
+            }
+
+            // require deployment file location
+            if (m_pathToDeployment == null) {
+                isValid = false;
+                hostLog.fatal("The deployment file location is missing.");
+            } else if (m_pathToDeployment.equals("")) {
+                isValid = false;
+                hostLog.fatal("The deployment file location is empty.");
+            }
+
+            return isValid;
+        }
+
+        /**
+         * Prints a usage message as a fatal error.
+         */
+        public void usage() {
+            // N.B: this text is user visible. It intentionally does NOT reveal options not interesting to, say, the
+            // casual VoltDB operator. Please do not reveal options not documented in the VoltDB documentation set. (See
+            // GettingStarted.pdf).
+            hostLog.fatal("Usage: org.voltdb.VoltDB catalog <catalog.jar> deployment <deployment.xml>");
+            hostLog.fatal("The _Getting Started With VoltDB_ book explains how to run VoltDB from the command line.");
+        }
+
         /** Helper to set the path for compiled jar files.
          *  Could also live in VoltProjectBuilder but any code that creates
          *  a catalog will probably start VoltDB with a Configuration
@@ -283,13 +320,19 @@ public class VoltDB {
     /**
      * Entry point for the VoltDB server process.
      *
-     * @param args  Optional single string value which represents
-     *              path to m_catalog jar.
+     * @param args Requires catalog and deployment file locations.
      */
-    public static void main(String args[]) {
+    public static void main(String[] args) {
         //Thread.setDefaultUncaughtExceptionHandler(new VoltUncaughtExceptionHandler());
-        initialize(new Configuration(args));
-        instance().run();
+        Configuration config = new Configuration(args);
+
+        if (!config.validate()) {
+            config.usage();
+            System.exit(-1);
+        } else {
+            initialize(config);
+            instance().run();
+        }
     }
 
     /**

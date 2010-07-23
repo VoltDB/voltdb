@@ -27,5 +27,5 @@ public interface ProcedureCallback {
      * Implementation of callback to be provided by client applications
      * @param clientResponse Response to the stored procedure invocation this callback is associated with
      */
-    abstract public void clientCallback(ClientResponse clientResponse);
+    abstract public void clientCallback(ClientResponse clientResponse) throws Exception;
 }

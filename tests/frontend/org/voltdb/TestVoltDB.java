@@ -27,12 +27,14 @@ import org.voltdb.VoltDB;
 import junit.framework.TestCase;
 
 public class TestVoltDB extends TestCase {
+
     public void testConfigurationConstructor() {
         VoltDB.Configuration blankConfig = new VoltDB.Configuration();
         assertFalse(blankConfig.m_noLoadLibVOLTDB);
         assertEquals(BackendTarget.NATIVE_EE_JNI, blankConfig.m_backend);
         assertEquals(ProcedureProfiler.Level.DISABLED, blankConfig.m_profilingLevel);
-        assertEquals("catalog.jar", blankConfig.m_pathToCatalog);
+        assertEquals(null, blankConfig.m_pathToCatalog);
+        assertEquals(null, blankConfig.m_pathToDeployment);
         assertFalse(blankConfig.m_useThreadAffinity);
         assertEquals(VoltDB.DEFAULT_PORT, blankConfig.m_port);
 
@@ -83,4 +85,44 @@ public class TestVoltDB extends TestCase {
         // XXX don't test what happens if port is invalid, because the code
         // doesn't handle that
     }
+
+    public void testConfigurationValidate() {
+        VoltDB.Configuration config;
+
+        // missing catalog and missing deployment
+        String[] args1 = {};
+        config = new VoltDB.Configuration(args1);
+        assertFalse(config.validate());
+
+        // missing catalog
+        String[] args2 = {"deployment", "teststring1"};
+        config = new VoltDB.Configuration(args2);
+        assertFalse(config.validate());
+
+        // missing deployment
+        String[] args3 = {"catalog", "teststring2"};
+        config = new VoltDB.Configuration(args3);
+        assertFalse(config.validate());
+
+        // empty catalog and empty deployment
+        String[] args4 = {"catalog", "", "deployment", ""};
+        config = new VoltDB.Configuration(args4);
+        assertFalse(config.validate());
+
+        // empty catalog
+        String[] args5 = {"catalog", "", "deployment", "teststring5"};
+        config = new VoltDB.Configuration(args5);
+        assertFalse(config.validate());
+
+        // empty deployment
+        String[] args6 = {"catalog", "teststring6", "deployment", ""};
+        config = new VoltDB.Configuration(args6);
+        assertFalse(config.validate());
+
+        // valid config
+        String[] args7 = {"catalog", "teststring3", "deployment", "teststring4"};
+        config = new VoltDB.Configuration(args7);
+        assertTrue(config.validate());
+    }
+
 }

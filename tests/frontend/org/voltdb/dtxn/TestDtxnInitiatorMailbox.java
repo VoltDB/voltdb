@@ -23,7 +23,6 @@
 package org.voltdb.dtxn;
 
 import java.nio.ByteBuffer;
-import java.util.concurrent.Future;
 
 import junit.framework.TestCase;
 
@@ -37,6 +36,7 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.fault.FaultDistributor;
 import org.voltdb.fault.NodeFailureFault;
 import org.voltdb.messaging.FastSerializable;
+import org.voltdb.messaging.HostMessenger;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.network.Connection;
@@ -45,7 +45,7 @@ import org.voltdb.network.WriteStream;
 import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.DBBPool.BBContainer;
 
-public class TestDtxnInitiatorQueue extends TestCase
+public class TestDtxnInitiatorMailbox extends TestCase
 {
     static int INITIATOR_SITE_ID = 5;
     static int HOST_ID = 0;
@@ -122,6 +122,10 @@ public class TestDtxnInitiatorQueue extends TestCase
             return false;
         }
     }
+
+    private final HostMessenger m_mockMessenger = new HostMessenger() {
+
+    };
 
     class MockConnection implements Connection
     {
@@ -222,6 +226,12 @@ public class TestDtxnInitiatorQueue extends TestCase
             return 0;
         }
 
+        @Override
+        public void shutdown() throws InterruptedException {
+            // TODO Auto-generated method stub
+
+        }
+
     }
 
     InFlightTxnState createTxnState(long txnId, int coordId, boolean readOnly,
@@ -273,33 +283,37 @@ public class TestDtxnInitiatorQueue extends TestCase
     {
         MockInitiator initiator = new MockInitiator();
         ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
-        DtxnInitiatorQueue dut = new DtxnInitiatorQueue(INITIATOR_SITE_ID, safetyState);
-        dut.setInitiator(initiator);
+        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(INITIATOR_SITE_ID, safetyState, m_mockMessenger);
+        dim.setInitiator(initiator);
         m_testStream.reset();
         // Single-partition read-only txn
-        dut.addPendingTxn(createTxnState(0, 0, true, true));
-        dut.offer(createInitiateResponse(0, 0, true, true, createResultSet("dude")));
+        dim.addPendingTxn(createTxnState(0, 0, true, true));
+        dim.deliver(createInitiateResponse(0, 0, true, true, createResultSet("dude")));
+        dim.processResponses();
         assertTrue(m_testStream.gotResponse());
         assertEquals(1, initiator.m_reduceCount);
         assertEquals(MESSAGE_SIZE, initiator.m_reduceSize);
         m_testStream.reset();
         // multi-partition read-only txn
-        dut.addPendingTxn(createTxnState(1, 0, true, false));
-        dut.offer(createInitiateResponse(1, 0, true, false, createResultSet("dude")));
+        dim.addPendingTxn(createTxnState(1, 0, true, false));
+        dim.deliver(createInitiateResponse(1, 0, true, false, createResultSet("dude")));
+        dim.processResponses();
         assertTrue(m_testStream.gotResponse());
         assertEquals(2, initiator.m_reduceCount);
         assertEquals(MESSAGE_SIZE * 2, initiator.m_reduceSize);
         m_testStream.reset();
         // Single-partition read-write txn
-        dut.addPendingTxn(createTxnState(2, 0, false, true));
-        dut.offer(createInitiateResponse(2, 0, false, true, createResultSet("dude")));
+        dim.addPendingTxn(createTxnState(2, 0, false, true));
+        dim.deliver(createInitiateResponse(2, 0, false, true, createResultSet("dude")));
+        dim.processResponses();
         assertTrue(m_testStream.gotResponse());
         assertEquals(3, initiator.m_reduceCount);
         assertEquals(MESSAGE_SIZE * 3, initiator.m_reduceSize);
         m_testStream.reset();
         // multi-partition read-write txn
-        dut.addPendingTxn(createTxnState(3, 0, false, false));
-        dut.offer(createInitiateResponse(3, 0, false, false, createResultSet("dude")));
+        dim.addPendingTxn(createTxnState(3, 0, false, false));
+        dim.deliver(createInitiateResponse(3, 0, false, false, createResultSet("dude")));
+        dim.processResponses();
         assertEquals(4, initiator.m_reduceCount);
         assertEquals(MESSAGE_SIZE * 4, initiator.m_reduceSize);
         assertTrue(m_testStream.gotResponse());
@@ -311,30 +325,34 @@ public class TestDtxnInitiatorQueue extends TestCase
     {
         MockInitiator initiator = new MockInitiator();
         ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
-        DtxnInitiatorQueue dut = new DtxnInitiatorQueue(INITIATOR_SITE_ID, safetyState);
-        dut.setInitiator(initiator);
+        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(INITIATOR_SITE_ID, safetyState, m_mockMessenger);
+        dim.setInitiator(initiator);
         m_testStream.reset();
         // Single-partition read-only txn
-        dut.addPendingTxn(createTxnState(0, 0, true, true));
-        dut.addPendingTxn(createTxnState(0, 1, true, true));
-        dut.offer(createInitiateResponse(0, 0, true, true, createResultSet("dude")));
+        dim.addPendingTxn(createTxnState(0, 0, true, true));
+        dim.addPendingTxn(createTxnState(0, 1, true, true));
+        dim.deliver(createInitiateResponse(0, 0, true, true, createResultSet("dude")));
+        dim.processResponses();
         assertTrue(m_testStream.gotResponse());
         assertEquals(0, initiator.m_reduceCount);
         assertEquals(0, initiator.m_reduceSize);
         m_testStream.reset();
-        dut.offer(createInitiateResponse(0, 1, true, true, createResultSet("dude")));
+        dim.deliver(createInitiateResponse(0, 1, true, true, createResultSet("dude")));
+        dim.processResponses();
         assertFalse(m_testStream.gotResponse());
         assertEquals(1, initiator.m_reduceCount);
         assertEquals(MESSAGE_SIZE, initiator.m_reduceSize);
         m_testStream.reset();
         // Single-partition read-write txn
-        dut.addPendingTxn(createTxnState(2, 0, false, true));
-        dut.addPendingTxn(createTxnState(2, 1, false, true));
-        dut.offer(createInitiateResponse(2, 0, false, true, createResultSet("dude")));
+        dim.addPendingTxn(createTxnState(2, 0, false, true));
+        dim.addPendingTxn(createTxnState(2, 1, false, true));
+        dim.deliver(createInitiateResponse(2, 0, false, true, createResultSet("dude")));
+        dim.processResponses();
         assertFalse(m_testStream.gotResponse());
         assertEquals(1, initiator.m_reduceCount);
         assertEquals(MESSAGE_SIZE, initiator.m_reduceSize);
-        dut.offer(createInitiateResponse(2, 1, false, true, createResultSet("dude")));
+        dim.deliver(createInitiateResponse(2, 1, false, true, createResultSet("dude")));
+        dim.processResponses();
         assertTrue(m_testStream.gotResponse());
         assertEquals(2, initiator.m_reduceCount);
         assertEquals(MESSAGE_SIZE * 2, initiator.m_reduceSize);
@@ -344,19 +362,21 @@ public class TestDtxnInitiatorQueue extends TestCase
     {
         MockInitiator initiator = new MockInitiator();
         ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
-        DtxnInitiatorQueue dut = new DtxnInitiatorQueue(INITIATOR_SITE_ID, safetyState);
-        dut.setInitiator(initiator);
+        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(INITIATOR_SITE_ID, safetyState, m_mockMessenger);
+        dim.setInitiator(initiator);
         m_testStream.reset();
         // Single-partition read-only txn
-        dut.addPendingTxn(createTxnState(0, 0, true, true));
-        dut.addPendingTxn(createTxnState(0, 1, true, true));
-        dut.offer(createInitiateResponse(0, 0, true, true, createResultSet("dude")));
+        dim.addPendingTxn(createTxnState(0, 0, true, true));
+        dim.addPendingTxn(createTxnState(0, 1, true, true));
+        dim.deliver(createInitiateResponse(0, 0, true, true, createResultSet("dude")));
+        dim.processResponses();
         assertTrue(m_testStream.gotResponse());
         m_testStream.reset();
         boolean caught = false;
         try
         {
-            dut.offer(createInitiateResponse(0, 1, true, true, createResultSet("sweet")));
+            dim.deliver(createInitiateResponse(0, 1, true, true, createResultSet("sweet")));
+            dim.processResponses();
         }
         catch (RuntimeException e)
         {
@@ -368,14 +388,16 @@ public class TestDtxnInitiatorQueue extends TestCase
         assertTrue(caught);
         m_testStream.reset();
         // Single-partition read-write txn
-        dut.addPendingTxn(createTxnState(2, 0, false, true));
-        dut.addPendingTxn(createTxnState(2, 1, false, true));
-        dut.offer(createInitiateResponse(2, 0, false, true, createResultSet("dude")));
+        dim.addPendingTxn(createTxnState(2, 0, false, true));
+        dim.addPendingTxn(createTxnState(2, 1, false, true));
+        dim.deliver(createInitiateResponse(2, 0, false, true, createResultSet("dude")));
+        dim.processResponses();
         assertFalse(m_testStream.gotResponse());
         caught = false;
         try
         {
-            dut.offer(createInitiateResponse(2, 1, true, true, createResultSet("sweet")));
+            dim.deliver(createInitiateResponse(2, 1, true, true, createResultSet("sweet")));
+            dim.processResponses();
         }
         catch (RuntimeException e)
         {
@@ -403,14 +425,15 @@ public class TestDtxnInitiatorQueue extends TestCase
     {
         MockInitiator initiator = new MockInitiator();
         ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
-        DtxnInitiatorQueue dut = new DtxnInitiatorQueue(INITIATOR_SITE_ID, safetyState);
-        dut.setInitiator(initiator);
+        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(INITIATOR_SITE_ID, safetyState, m_mockMessenger);
+        dim.setInitiator(initiator);
         m_testStream.reset();
         // Single-partition read-write txn
-        dut.addPendingTxn(createTxnState(0, 0, false, true));
-        dut.addPendingTxn(createTxnState(0, 1, false, true));
-        dut.removeSite(0);
-        dut.offer(createInitiateResponse(0, 1, true, true, createResultSet("dude")));
+        dim.addPendingTxn(createTxnState(0, 0, false, true));
+        dim.addPendingTxn(createTxnState(0, 1, false, true));
+        dim.removeSite(0);
+        dim.deliver(createInitiateResponse(0, 1, true, true, createResultSet("dude")));
+        dim.processResponses();
         assertTrue(m_testStream.gotResponse());
         assertEquals(1, initiator.m_reduceCount);
         assertEquals(MESSAGE_SIZE, initiator.m_reduceSize);
@@ -420,14 +443,15 @@ public class TestDtxnInitiatorQueue extends TestCase
     {
         MockInitiator initiator = new MockInitiator();
         ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
-        DtxnInitiatorQueue dut = new DtxnInitiatorQueue(INITIATOR_SITE_ID, safetyState);
-        dut.setInitiator(initiator);
+        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(INITIATOR_SITE_ID, safetyState, m_mockMessenger);
+        dim.setInitiator(initiator);
         m_testStream.reset();
         // Single-partition read-write txn
-        dut.addPendingTxn(createTxnState(0, 0, false, true));
-        dut.addPendingTxn(createTxnState(0, 1, false, true));
-        dut.offer(createInitiateResponse(0, 1, true, true, createResultSet("dude")));
-        dut.removeSite(0);
+        dim.addPendingTxn(createTxnState(0, 0, false, true));
+        dim.addPendingTxn(createTxnState(0, 1, false, true));
+        dim.deliver(createInitiateResponse(0, 1, true, true, createResultSet("dude")));
+        dim.processResponses();
+        dim.removeSite(0);
         assertTrue(m_testStream.gotResponse());
         assertEquals(1, initiator.m_reduceCount);
         assertEquals(MESSAGE_SIZE, initiator.m_reduceSize);
@@ -437,17 +461,18 @@ public class TestDtxnInitiatorQueue extends TestCase
     {
         MockInitiator initiator = new MockInitiator();
         ExecutorTxnIdSafetyState safetyState = new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
-        DtxnInitiatorQueue dut = new DtxnInitiatorQueue(INITIATOR_SITE_ID, safetyState);
-        dut.setInitiator(initiator);
+        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(INITIATOR_SITE_ID, safetyState, m_mockMessenger);
+        dim.setInitiator(initiator);
         m_testStream.reset();
         // Single-partition read-write txn
-        dut.addPendingTxn(createTxnState(0, 0, false, true));
-        dut.addPendingTxn(createTxnState(0, 1, false, true));
-        dut.addPendingTxn(createTxnState(1, 0, false, true));
-        dut.addPendingTxn(createTxnState(1, 1, false, true));
-        dut.offer(createInitiateResponse(0, 1, true, true, createResultSet("dude")));
-        dut.offer(createInitiateResponse(1, 1, true, true, createResultSet("sweet")));
-        dut.removeSite(0);
+        dim.addPendingTxn(createTxnState(0, 0, false, true));
+        dim.addPendingTxn(createTxnState(0, 1, false, true));
+        dim.addPendingTxn(createTxnState(1, 0, false, true));
+        dim.addPendingTxn(createTxnState(1, 1, false, true));
+        dim.deliver(createInitiateResponse(0, 1, true, true, createResultSet("dude")));
+        dim.deliver(createInitiateResponse(1, 1, true, true, createResultSet("sweet")));
+        dim.processResponses();
+        dim.removeSite(0);
         assertTrue(m_testStream.gotResponse());
         assertEquals(2, initiator.m_reduceCount);
         assertEquals(MESSAGE_SIZE * 2, initiator.m_reduceSize);
@@ -471,13 +496,14 @@ public class TestDtxnInitiatorQueue extends TestCase
         MockInitiator initiator = new MockInitiator();
         ExecutorTxnIdSafetyState safetyState =
             new ExecutorTxnIdSafetyState(INITIATOR_SITE_ID, m_mockVolt.getCatalogContext().siteTracker);
-        DtxnInitiatorQueue dut = new DtxnInitiatorQueue(INITIATOR_SITE_ID, safetyState);
-        dut.setInitiator(initiator);
+        DtxnInitiatorMailbox dim = new DtxnInitiatorMailbox(INITIATOR_SITE_ID, safetyState, m_mockMessenger);
+        dim.setInitiator(initiator);
         m_testStream.reset();
         // Single-partition read-write txn
-        dut.addPendingTxn(createTxnState(0, 0, false, true));
-        dut.addPendingTxn(createTxnState(0, 1, false, true));
-        dut.offer(createInitiateResponse(0, 1, true, true, createResultSet("dude")));
+        dim.addPendingTxn(createTxnState(0, 0, false, true));
+        dim.addPendingTxn(createTxnState(0, 1, false, true));
+        dim.deliver(createInitiateResponse(0, 1, true, true, createResultSet("dude")));
+        dim.processResponses();
 
         synchronized (m_testStream) {
             NodeFailureFault node_failure = new NodeFailureFault(HOST_ID, "localhost");

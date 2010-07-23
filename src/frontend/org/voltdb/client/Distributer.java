@@ -25,15 +25,16 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.network.Connection;
-import org.voltdb.messaging.FastSerializable;
 import org.voltdb.network.QueueMonitor;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.network.VoltProtocolHandler;
@@ -66,6 +67,8 @@ class Distributer {
     private final boolean m_useMultipleThreads;
 
     private final String m_hostname;
+
+    private final UncaughtExceptionHandler m_handler;
 
     /**
      * Server's instances id. Unique for the cluster
@@ -129,6 +132,7 @@ class Distributer {
     }
 
     class NodeConnection extends VoltProtocolHandler implements org.voltdb.network.QueueMonitor {
+        private final AtomicInteger m_callbacksToInvoke = new AtomicInteger(0);
         private final HashMap<Long, Object[]> m_callbacks;
         private final HashMap<String, ProcedureStats> m_stats
             = new HashMap<String, ProcedureStats>();
@@ -158,11 +162,25 @@ class Distributer {
                             ClientResponse.CONNECTION_LOST, new VoltTable[0],
                             "Connection to database host (" + m_hostname +
                             ") was lost before a response was received");
-                    callback.clientCallback(r);
+                    try {
+                        callback.clientCallback(r);
+                    } catch (Exception t) {
+                        if (m_handler != null) {
+                            try {
+                                m_handler.uncaughtException( callback, r, t);
+                            } catch (Exception t2) {
+                                t.printStackTrace();
+                                t2.printStackTrace();
+                            }
+                        } else {
+                            t.printStackTrace();
+                        }
+                    }
                     c.discard();
                     return;
                 }
                 m_callbacks.put(handle, new Object[] { System.currentTimeMillis(), callback, name });
+                m_callbacksToInvoke.incrementAndGet();
             }
             m_connection.writeStream().enqueue(c);
         }
@@ -174,10 +192,22 @@ class Distributer {
                             ClientResponse.CONNECTION_LOST, new VoltTable[0],
                             "Connection to database host (" + m_hostname +
                             ") was lost before a response was received");
-                    callback.clientCallback(r);
+                    try {
+                        callback.clientCallback(r);
+                    } catch (Exception t) {
+                        if (m_handler != null) {
+                            try {
+                                m_handler.uncaughtException( callback, r, t);
+                            } catch (Exception t2) {
+                                t.printStackTrace();
+                                t2.printStackTrace();
+                            }
+                        }
+                    }
                     return;
                 }
                 m_callbacks.put(handle, new Object[]{ System.currentTimeMillis(), callback, name });
+                m_callbacksToInvoke.incrementAndGet();
             }
             m_connection.writeStream().enqueue(f);
         }
@@ -234,8 +264,18 @@ class Distributer {
                 try {
                     cb.clientCallback(response);
                 } catch (Exception t) {
-                    t.printStackTrace();
+                    if (m_handler != null) {
+                        try {
+                            m_handler.uncaughtException( cb, response, t);
+                        } catch (Exception t2) {
+                            t.printStackTrace();
+                            t2.printStackTrace();
+                        }
+                    } else {
+                        t.printStackTrace();
+                    }
                 }
+                m_callbacksToInvoke.decrementAndGet();
             }
             else if (m_isConnected) {
                 // TODO: what's the right error path here?
@@ -285,7 +325,21 @@ class Distributer {
                         "Connection to database host (" + m_hostname +
                         ") was lost before a response was received");
                 for (final Object stuff[] : m_callbacks.values()) {
-                    ((ProcedureCallback)stuff[1]).clientCallback(r);
+                    try {
+                        ((ProcedureCallback)stuff[1]).clientCallback(r);
+                    } catch (Exception t) {
+                        if (m_handler != null) {
+                            try {
+                                m_handler.uncaughtException(((ProcedureCallback)stuff[1]), r, t);
+                            } catch (Exception t2) {
+                                t.printStackTrace();
+                                t2.printStackTrace();
+                            }
+                        } else {
+                            t.printStackTrace();
+                        }
+                    }
+                    m_callbacksToInvoke.decrementAndGet();
                 }
             }
         }
@@ -365,9 +419,7 @@ class Distributer {
             more = false;
             synchronized (this) {
                 for (NodeConnection cxn : m_connections) {
-                    synchronized(cxn.m_callbacks) {
-                        more = more || cxn.m_callbacks.size() > 0;
-                    }
+                    more = more || cxn.m_callbacksToInvoke.get() > 0;
                 }
             }
             if (more) {
@@ -383,19 +435,21 @@ class Distributer {
     }
 
     Distributer() {
-        this( 128, null, false, null);
+        this( 128, null, false, null, null);
     }
 
     Distributer(
             int expectedOutgoingMessageSize,
             int arenaSizes[],
             boolean useMultipleThreads,
-            StatsUploaderSettings statsSettings) {
+            StatsUploaderSettings statsSettings,
+            UncaughtExceptionHandler handler) {
         if (statsSettings != null) {
             m_statsLoader = new ClientStatsLoader(statsSettings, this);
         } else {
             m_statsLoader = null;
         }
+        m_handler = handler;
         m_useMultipleThreads = useMultipleThreads;
         m_network = new VoltNetwork( useMultipleThreads, true, 3);
         m_expectedOutgoingMessageSize = expectedOutgoingMessageSize;
@@ -413,9 +467,10 @@ class Distributer {
 //                    while (true) {
 //                        Thread.sleep(10000);
 //                        final long now = System.currentTimeMillis();
-//                        org.voltdb.utils.Pair<Long, Long> counters = m_network.getCounters();
-//                        final long read = counters.getFirst();
-//                        final long written = counters.getSecond();
+//                        Map<Long, Pair<String, long[]>> stats = m_network.getIOStats(false);
+//                        long statsNums[] = stats.get(-1).getSecond();
+//                        final long read = statsNums[0];
+//                        final long written = statsNums[1];
 //                        final long readDelta = read - lastBytesRead;
 //                        final long writeDelta = written - lastBytesWritten;
 //                        final long timeDelta = now - lastRuntime;
@@ -434,12 +489,6 @@ class Distributer {
 //                }
 //            }
 //        }.start();
-    }
-
-    void createConnection(String host, String program, String password)
-        throws UnknownHostException, IOException
-    {
-        createConnection(host, program, password, Client.VOLTDB_SERVER_PORT);
     }
 
     synchronized void createConnection(String host, String program, String password, int port)
@@ -508,10 +557,8 @@ class Distributer {
                 throw new NoConnectionsException("No connections.");
             }
 
-            int queuedInvocations = 0;
             for (int i=0; i < totalConnections; ++i) {
                 cxn = m_connections.get(Math.abs(++m_nextConnection % totalConnections));
-                queuedInvocations += cxn.m_callbacks.size();
                 if (!cxn.hadBackPressure() || ignoreBackpressure) {
                     // serialize and queue the invocation
                     backpressure = false;

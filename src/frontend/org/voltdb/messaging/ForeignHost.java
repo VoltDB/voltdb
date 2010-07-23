@@ -288,7 +288,7 @@ public class ForeignHost {
         }
 
         // get the mailbox and print an error if it can't be gotten
-        SiteMailbox mailbox = site.getMailbox(mailboxId);
+        Mailbox mailbox = site.getMailbox(mailboxId);
         if (mailbox == null) {
             System.err.printf("Message sent to unknown mailbox id: %d:%d @ (%s:%d)\n",
                     siteId, mailboxId, m_ipAddress.toString(), m_tcpPort);

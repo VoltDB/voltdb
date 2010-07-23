@@ -61,16 +61,33 @@ namespace voltdb {
  */
 class TableIterator : public TupleIterator {
 public:
-    TableIterator(const Table *parent);
+    TableIterator(const Table *parent, bool scanAllBlocks = false);
+
     /**
      * Updates the given tuple so that it points to the next tuple in the table.
      * @param out the tuple will point to the retrieved tuple if this method returns true.
      * @return true if succeeded. false if no more active tuple is there.
     */
     bool next(TableTuple &out);
+    bool hasNext();
     int getLocation() const;
 
 private:
+
+    bool continuationPredicate();
+
+    /*
+     * Configuration parameter that controls whether the table iterator
+     * stops when it has found the expected number of tuples or when it has iterated
+     * all the blocks. The former is able to stop sooner without having to read to the end of
+     * of the block. The latter is useful when the table will be modified after the creation of
+     * the iterator. It is assumed that the code invoking this iterator is handling
+     * the modifications that occur after the iterator is created.
+     *
+     * When set to false the counting of found tuples method is used. When set to true
+     * all blocks are scanned.
+     */
+    bool m_scanAllBlocksOrCountFoundTuples;
     const Table *m_table;
     char *m_dataPtr;
     uint32_t m_location;
@@ -78,17 +95,37 @@ private:
     uint32_t m_foundTuples;
     uint32_t m_tupleLength;
     uint32_t m_tuplesPerBlock;
+    uint32_t m_blockIndex;
 };
 
-inline TableIterator::TableIterator(const Table *parent)
-    : m_table(parent), m_dataPtr(NULL), m_location(0),
+inline TableIterator::TableIterator(const Table *parent, bool scanAllBlocks)
+    : m_scanAllBlocksOrCountFoundTuples(scanAllBlocks),
+      m_table(parent), m_dataPtr(NULL), m_location(0),
     m_activeTuples((int) m_table->m_tupleCount),
     m_foundTuples(0), m_tupleLength(parent->m_tupleLength),
-    m_tuplesPerBlock(parent->m_tuplesPerBlock)
+    m_tuplesPerBlock(parent->m_tuplesPerBlock), m_blockIndex(0)
     {}
 
+inline bool TableIterator::continuationPredicate() {
+    if (m_scanAllBlocksOrCountFoundTuples) {
+        /*
+         * Scan until there are no more blocks to scan
+         */
+        return m_location < m_table->m_usedTuples;
+    } else {
+        /*
+         * Scan until all active tuples have been found
+         */
+        return m_foundTuples < m_activeTuples;
+    }
+}
+
+inline bool TableIterator::hasNext() {
+    return continuationPredicate();
+}
+
 inline bool TableIterator::next(TableTuple &out) {
-    while (m_foundTuples < m_activeTuples) {
+    while (continuationPredicate()) {
         if (m_location % m_tuplesPerBlock == 0) {
 #ifdef MEMCHECK_NOFREELIST
             /*

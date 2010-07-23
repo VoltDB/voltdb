@@ -36,6 +36,7 @@ import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltdb.TableStreamType;
 
 /**
  * Wrapper for native Execution Engine library. There are two implementations,
@@ -248,16 +249,18 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Interface frontend invokes to communicate to CPP execution engine.
      */
 
-    abstract public boolean activateCopyOnWrite(final int tableId);
+    abstract public boolean activateTableStream(final int tableId, TableStreamType type);
 
     /**
-     * Serialize more tuples from the specified table that is already in COW mode
+     * Serialize more tuples from the specified table that already has a stream enabled
      * @param c Buffer to serialize tuple data too
      * @param tableId Catalog ID of the table to serialize
      * @return A positive number indicating the number of bytes serialized or 0 if there is no more data.
-     *        -1 is returned if there is an error (such as the table not being COW mode).
+     *        -1 is returned if there is an error (such as the table not having the specified stream type activated).
      */
-    public abstract int cowSerializeMore(BBContainer c, int tableId);
+    public abstract int tableStreamSerializeMore(BBContainer c, int tableId, TableStreamType type);
+
+    public abstract void processRecoveryMessage(byte message[]);
 
     /** Releases the Engine object. */
     abstract public void release() throws EEException, InterruptedException;
@@ -569,24 +572,33 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     protected native boolean nativeSetLogLevels(long pointer, long logLevels);
 
     /**
-     * Active copy on write mode for a table.
+     * Active a table stream of the specified type for a table.
      * @param pointer Pointer to an engine instance
      * @param tableId Catalog ID of the table
+     * @param streamType type of stream to activate
      * @return <code>true</code> on success and <code>false</code> on failure
      */
-    protected native boolean nativeActivateCopyOnWrite(long pointer, int tableId);
+    protected native boolean nativeActivateTableStream(long pointer, int tableId, int streamType);
 
     /**
-     * Serialize more tuples from the specified table that is already in COW mode
+     * Serialize more tuples from the specified table that has an active stream of the specified type
      * @param pointer Pointer to an engine instance
      * @param bufferPointer Buffer to serialize data to
      * @param offset Offset into the buffer to start serializing to
      * @param length length of the buffer
      * @param tableId Catalog ID of the table to serialize
+     * @param streamType type of stream to pull data from
      * @return A positive number indicating the number of bytes serialized or 0 if there is no more data.
      *         -1 is returned if there is an error (such as the table not being COW mode).
      */
-    protected native int nativeCOWSerializeMore(long pointer, long bufferPointer, int offset, int length, int tableId);
+    protected native int nativeTableStreamSerializeMore(long pointer, long bufferPointer, int offset, int length, int tableId, int streamType);
+
+    /**
+     * Process a recovery message and load the data it contains.
+     * @param pointer Pointer to an engine instance
+     * @param message Recovery message to load
+     */
+    protected native void nativeProcessRecoveryMessage(long pointer, byte message[]);
 
     /**
      * Perform an ELT poll or ack action. Poll data will be returned via the usual

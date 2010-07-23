@@ -300,10 +300,45 @@ enum IndexLookupType {
 };
 
 // ------------------------------------------------------------------
+// Table Stream Types
+// ------------------------------------------------------------------
+enum TableStreamType {
+   TABLE_STREAM_SNAPSHOT,
+   TABLE_STREAM_RECOVERY
+};
+
+// ------------------------------------------------------------------
 // Statistics Selector Types
 // ------------------------------------------------------------------
 enum StatisticsSelectorType {
     STATISTICS_SELECTOR_TYPE_TABLE
+};
+
+// ------------------------------------------------------------------
+// Recovery protocol message types
+// ------------------------------------------------------------------
+enum RecoveryMsgType {
+    /*
+     * Message containing freshly scanned tuples to be inserted
+     */
+    RECOVERY_MSG_TYPE_SCAN_TUPLES = 0,
+    /*
+     * Message indicating that the table scan is complete, future polling
+     * will produce delta data
+     */
+    RECOVERY_MSG_TYPE_SCAN_COMPLETE = 1,
+    /*
+     * Message containing whole tuples that are either updates or inserts
+     */
+    RECOVERY_MSG_TYPE_DELTA_MERGE_TUPLES = 2,
+    /*
+     * Message containing primary keys that must be deleted
+     */
+    RECOVERY_MSG_TYPE_DELTA_DELETE_PKEYS = 3,
+    /*
+     * Generated when all recovery data for a table has been generated
+     */
+    RECOVERY_MSG_TYPE_COMPLETE = 4
 };
 
 // ------------------------------------------------------------------

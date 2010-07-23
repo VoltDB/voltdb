@@ -44,6 +44,7 @@ import org.voltdb.network.Connection;
 import org.voltdb.network.QueueMonitor;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.network.VoltProtocolHandler;
+import org.voltdb.client.UncaughtExceptionHandler;
 
 public class TestDistributer extends TestCase {
 
@@ -224,10 +225,26 @@ public class TestDistributer extends TestCase {
         volatile VoltNetwork network;
     }
 
+    private static class ExceptionHandler implements UncaughtExceptionHandler {
+        private volatile boolean m_exceptionHandled = false;
+        @Override
+        public void uncaughtException(ProcedureCallback callback,
+                ClientResponse r, Throwable e) {
+            m_exceptionHandled = true;
+        }
+    }
+
     public class ProcCallback implements ProcedureCallback {
         @Override
         public void clientCallback(ClientResponse clientResponse) {
             System.err.println("Ran callback.");
+        }
+    }
+
+    public class ThrowingCallback implements ProcedureCallback {
+        @Override
+        public void clientCallback(ClientResponse clientResponse) {
+            throw new RuntimeException();
         }
     }
 
@@ -289,7 +306,9 @@ public class TestDistributer extends TestCase {
             volt2 = new MockVolt(20002);
             volt2.start();
 
-            Distributer dist = new Distributer();
+            ExceptionHandler eh = new ExceptionHandler();
+
+            Distributer dist = new Distributer(128, null, false, null, eh);
             dist.createConnection("localhost", "", "", 20000);
             dist.createConnection("localhost", "", "", 20001);
             dist.createConnection("localhost", "", "", 20002);
@@ -305,7 +324,9 @@ public class TestDistributer extends TestCase {
             ProcedureInvocation pi5 = new ProcedureInvocation(++handle, "i1", new Integer(1));
             ProcedureInvocation pi6 = new ProcedureInvocation(++handle, "i1", new Integer(1));
 
-            dist.queue(pi1, new ProcCallback(), 128, true);
+            dist.queue(pi1, new ThrowingCallback(), 128, true);
+            dist.drain();
+            assertTrue(eh.m_exceptionHandled);
             dist.queue(pi2, new ProcCallback(), 128, true);
             dist.queue(pi3, new ProcCallback(), 128, true);
             dist.queue(pi4, new ProcCallback(), 128, true);

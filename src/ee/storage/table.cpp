@@ -453,6 +453,32 @@ std::vector<std::string> Table::getColumnNames() {
     return columnNames;
 }
 
+void Table::loadTuplesFromNoHeader(bool allowELT,
+                            SerializeInput &serialize_io,
+                            Pool *stringPool) {
+    int tupleCount = serialize_io.readInt();
+    assert(tupleCount >= 0);
+
+    // allocate required data blocks first to make them alligned well
+    while (tupleCount + m_usedTuples > m_allocatedTuples) {
+        allocateNextBlock();
+    }
+
+    for (int i = 0; i < tupleCount; ++i) {
+        m_tmpTarget1.move(dataPtrForTuple((int) m_usedTuples + i));
+        m_tmpTarget1.setDeletedFalse();
+        m_tmpTarget1.setDirtyFalse();
+        m_tmpTarget1.deserializeFrom(serialize_io, stringPool);
+
+        processLoadedTuple( allowELT, m_tmpTarget1);
+    }
+
+    populateIndexes(tupleCount);
+
+    m_tupleCount += tupleCount;
+    m_usedTuples += tupleCount;
+}
+
 void Table::loadTuplesFrom(bool allowELT,
                             SerializeInput &serialize_io,
                             Pool *stringPool) {
@@ -512,26 +538,6 @@ void Table::loadTuplesFrom(bool allowELT,
                                       message.str().c_str());
     }
 
-    int tupleCount = serialize_io.readInt();
-    assert(tupleCount >= 0);
-
-    // allocate required data blocks first to make them alligned well
-    while (tupleCount + m_usedTuples > m_allocatedTuples) {
-        allocateNextBlock();
-    }
-
-    for (int i = 0; i < tupleCount; ++i) {
-        m_tmpTarget1.move(dataPtrForTuple((int) m_usedTuples + i));
-        m_tmpTarget1.setDeletedFalse();
-        m_tmpTarget1.setDirtyFalse();
-        m_tmpTarget1.deserializeFrom(serialize_io, stringPool);
-
-        processLoadedTuple( allowELT, m_tmpTarget1);
-    }
-
-    populateIndexes(tupleCount);
-
-    m_tupleCount += tupleCount;
-    m_usedTuples += tupleCount;
+    loadTuplesFromNoHeader( allowELT, serialize_io, stringPool);
 }
 }

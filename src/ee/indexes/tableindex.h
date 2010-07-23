@@ -81,6 +81,14 @@ struct TableIndexScheme {
     bool intsOnly;
     TupleSchema *tupleSchema;
     TupleSchema *keySchema;
+
+public:
+    void setTree() {
+        type = BALANCED_TREE_INDEX;
+    }
+    void setHash() {
+        type = HASH_TABLE_INDEX;
+    }
 };
 
 /**
@@ -304,9 +312,14 @@ public:
     //TODO Useful implementation of == operator.
     virtual bool equals(const TableIndex *other) const;
 
+    TableIndexScheme getScheme() const {
+        return m_scheme;
+    }
+
 protected:
     TableIndex(const TableIndexScheme &scheme);
 
+    const TableIndexScheme m_scheme;
     TupleSchema* m_keySchema;
     std::string name_;
     std::vector<int> column_indices_vector_;

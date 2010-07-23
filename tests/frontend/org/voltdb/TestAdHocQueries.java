@@ -48,6 +48,8 @@ public class TestAdHocQueries extends TestCase {
         project.addProcedures(org.voltdb.compiler.procedures.EmptyProcedure.class);
         assertTrue(project.compile(config.m_pathToCatalog));
 
+        config.m_pathToDeployment = project.getPathToDeployment();
+
         ServerThread server = new ServerThread(config);
         server.start();
         server.waitForInitialization();

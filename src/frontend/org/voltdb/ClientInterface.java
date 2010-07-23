@@ -58,12 +58,12 @@ import org.voltdb.network.QueueMonitor;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.network.VoltProtocolHandler;
 import org.voltdb.network.WriteStream;
+import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.EstTime;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.Pair;
-import org.voltdb.utils.DBBPool.BBContainer;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -269,7 +269,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                      */
                     m_numConnections.incrementAndGet();
 
-                    m_executor.submit(new Runnable() {
+                    m_executor.execute(new Runnable() {
                         @Override
                         public void run() {
                             if (socket != null) {
@@ -838,18 +838,21 @@ public class ClientInterface implements DumpManager.Dumpable {
             if (task.procName.equals("@UpdateApplicationCatalog")) {
                 task.buildParameterSet();
                 // user only provides catalog URL.
-                if (task.params.m_params.length != 1) {
+                if (task.params.m_params.length != 2) {
                     final ClientResponseImpl errorResponse =
                         new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                                                new VoltTable[0],
                                                "UpdateApplicationCatalog system procedure requires exactly " +
-                                               "one parameter, the URL of the catalog to load",
+                                               "two parameters, the URL of the catalog to load and the URL " +
+                                               "of a deployment file.",
                                                task.clientHandle);
                     c.writeStream().enqueue(errorResponse);
                     return;
                 }
                 String catalogURL = (String) task.params.m_params[0];
+                String deploymentURL = (String) task.params.m_params[1];
                 m_asyncCompilerWorkThread.prepareCatalogUpdate(catalogURL,
+                                                               deploymentURL,
                                                                task.clientHandle,
                                                                handler.connectionId(),
                                                                handler.m_hostname,
@@ -864,7 +867,7 @@ public class ClientInterface implements DumpManager.Dumpable {
             final ClientResponseImpl errorResponse =
                 new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                                        new VoltTable[0],
-                                       "User does not have permission to invoke " + catProc.getTypeName(),
+                                       "User does not have permission to invoke " + task.procName,
                                        task.clientHandle);
             c.writeStream().enqueue(errorResponse);
             return;
@@ -954,7 +957,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                     task.params = new ParameterSet();
                     task.params.m_params = new Object[] {
                             changeResult.encodedDiffCommands, changeResult.catalogURL,
-                            changeResult.expectedCatalogVersion
+                            changeResult.expectedCatalogVersion, changeResult.deploymentURL
                     };
                     task.clientHandle = changeResult.clientHandle;
 
@@ -1060,7 +1063,9 @@ public class ClientInterface implements DumpManager.Dumpable {
         if (m_acceptor != null) {
             m_acceptor.shutdown();
         }
-
+        if (m_initiator != null) {
+            m_initiator.shutdown();
+        }
         if (m_asyncCompilerWorkThread != null) {
             m_asyncCompilerWorkThread.shutdown();
             m_asyncCompilerWorkThread.join();

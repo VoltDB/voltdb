@@ -44,7 +44,6 @@ public class ExecutorTxnIdSafetyState {
     LinkedHashMap<Integer, SiteState> m_stateBySite = new LinkedHashMap<Integer, SiteState>();
     LinkedHashMap<Integer, PartitionState> m_stateByPartition = new LinkedHashMap<Integer, PartitionState>();
 
-    Mailbox m_mailbox = null;
     final int m_siteId;
 
     public ExecutorTxnIdSafetyState(int siteId, SiteTracker tracker) {
@@ -91,11 +90,7 @@ public class ExecutorTxnIdSafetyState {
         }
     }
 
-    void setMailbox(Mailbox mbox) {
-        m_mailbox = mbox;
-    }
-
-    public synchronized long getNewestSafeTxnIdForExecutorBySiteId(int executorSiteId) {
+    public long getNewestSafeTxnIdForExecutorBySiteId(int executorSiteId) {
         SiteState ss = m_stateBySite.get(executorSiteId);
         // ss will be null if the node with this failed before we got here.
         // Just return DUMMY_LAST_SEEN_TXN_ID; any message generated for the
@@ -113,7 +108,7 @@ public class ExecutorTxnIdSafetyState {
         return ps.newestConfirmedTxnId;
     }
 
-    public synchronized void updateLastSeenTxnIdFromExecutorBySiteId(int executorSiteId, long lastSeenTxnId, boolean shouldRespond) {
+    public void updateLastSeenTxnIdFromExecutorBySiteId(int executorSiteId, long lastSeenTxnId, boolean shouldRespond) {
         // ignore these by convention
         if (lastSeenTxnId == DtxnConstants.DUMMY_LAST_SEEN_TXN_ID)
             return;
@@ -160,7 +155,7 @@ public class ExecutorTxnIdSafetyState {
      * Called from the DtxnInitiatorQueue's fault handler
      * @param executorSiteId The id of the site to remove
      */
-    public synchronized void removeState(int executorSiteId) {
+    public void removeState(int executorSiteId) {
         SiteState ss = m_stateBySite.get(executorSiteId);
         if (ss == null) return;
         PartitionState ps = ss.partition;

@@ -486,7 +486,8 @@ public abstract class ClientMain {
                 getExpectedOutgoingMessageSize(),
                 null,
                 useHeavyweightClient(),
-                statsSettings);
+                statsSettings,
+                null);
 
         m_id = id;
         m_exitOnCompletion = exitOnCompletion;
@@ -709,7 +710,7 @@ public abstract class ClientMain {
         String dir = "/tmp";
         String nonce = "data_verification";
         Client client = ClientFactory.createClient(getExpectedOutgoingMessageSize(), null,
-                                                   false, null);
+                                                   false, null, null);
         // Host ID to IP mappings
         LinkedHashMap<Integer, String> hostMappings = new LinkedHashMap<Integer, String>();
         /*
@@ -880,8 +881,9 @@ public abstract class ClientMain {
 
             // Copy the file over
             String localhostName =  ConnectionUtil.getHostnameOrAddress();
+            final SSHTools ssh = new SSHTools(m_username);
             if (!hostName.equals("localhost") && !hostName.equals(localhostName)) {
-                if (!SSHTools.copyFromRemote(file, m_username, hostName, file.getPath())) {
+                if (!ssh.copyFromRemote(file, hostName, file.getPath())) {
                     System.err.println("Failed to copy the snapshot file " + file.getPath()
                                        + " from host "
                                        + hostName);

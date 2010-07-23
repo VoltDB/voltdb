@@ -23,6 +23,9 @@
 
 package org.voltdb.regressionsuites;
 
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
@@ -31,8 +34,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.Test;
 
-import org.voltdb.*;
+import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.benchmark.tpcc.procedures.InsertNewOrder;
 import org.voltdb.catalog.LoadCatalogToString;
@@ -118,6 +123,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
     public void testUpdate() throws Exception {
         Client client = getClient();
         String newCatalogURL;
+        String deploymentURL;
         VoltTable[] results;
         CatTestCallback callback;
 
@@ -134,8 +140,9 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // add a procedure "InsertOrderLineBatched"
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.jar");
+        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.xml");
         callback = new CatTestCallback(ClientResponse.SUCCESS);
-        client.callProcedure(callback, "@UpdateApplicationCatalog", newCatalogURL);
+        client.callProcedure(callback, "@UpdateApplicationCatalog", newCatalogURL, deploymentURL);
 
         // don't care if this succeeds or fails.
         // calling the new proc before the cat change returns is not guaranteed to work
@@ -165,7 +172,8 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // this is a do nothing change... shouldn't affect anything
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.jar");
-        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL).getResults();
+        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.xml");
+        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
         assertTrue(results.length == 1);
         client.drain();
         assertTrue(callbackSuccess);
@@ -180,9 +188,10 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         loadSomeData(client, 55, 5);
 
         // remove the procedure we just added async
-        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-basewithdeployment.jar");
+        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-basewithdeployment.xml");
         callback = new CatTestCallback(ClientResponse.SUCCESS);
-        client.callProcedure(callback, "@UpdateApplicationCatalog", newCatalogURL);
+        client.callProcedure(callback, "@UpdateApplicationCatalog", newCatalogURL, deploymentURL);
 
         // don't care if this works now
         x = 4;
@@ -213,7 +222,8 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // change the insert new order procedure
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-conflict.jar");
-        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL).getResults();
+        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-conflict.xml");
+        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
         assertTrue(results.length == 1);
 
         // call the new proc and make sure the one we want gets run
@@ -223,7 +233,8 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // load a big catalog change just to make sure nothing fails horribly
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-many.jar");
-        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL).getResults();
+        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-many.xml");
+        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
         assertTrue(results.length == 1);
 
         loadSomeData(client, 65, 5);
@@ -245,7 +256,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         URL url = LoadCatalogToString.class.getResource("catalog.txt");
         String newCatalogURL = URLDecoder.decode(url.getPath(), "UTF-8");
         try {
-            client.callProcedure("@UpdateApplicationCatalog", newCatalogURL);
+            client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, null);
             fail();
         }
         catch (Exception e) {
@@ -278,7 +289,8 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // add tables O1, O2, O3
         String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtables.jar");
-        VoltTable[] results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL).getResults();
+        String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtables.xml");
+        VoltTable[] results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
         assertTrue(results.length == 1);
 
         // verify that the new table(s) support an insert
@@ -306,8 +318,9 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
 
         // revert to the original schema
-        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
-        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL).getResults();
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-basewithdeployment.jar");
+        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-basewithdeployment.xml");
+        results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
         assertTrue(results.length == 1);
 
         // requests to the dropped table should fail
@@ -339,7 +352,8 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // add new tables and materialized view
         String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtableswithmatview.jar");
-        VoltTable[] results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL).getResults();
+        String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtableswithmatview.xml");
+        VoltTable[] results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
         assertTrue(results.length == 1);
 
         // verify that the new table(s) support an insert
@@ -360,6 +374,31 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         System.out.println("MATVIEW:"); System.out.println(result);
         assertTrue(result.getRowCount() == 2);
+    }
+
+    /**
+     * Simple code to copy a file from one place to another...
+     * Java should have this built in... stupid java...
+     */
+    static void copyFile(String fromPath, String toPath) {
+        File inputFile = new File(fromPath);
+        File outputFile = new File(toPath);
+
+        try {
+            FileReader in = new FileReader(inputFile);
+            FileWriter out = new FileWriter(outputFile);
+            int c;
+
+            while ((c = in.read()) != -1)
+              out.write(c);
+
+            in.close();
+            out.close();
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            fail();
+        }
     }
 
     /**
@@ -390,6 +429,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         // build the jarfile
         boolean basecompile = config.compile(project);
         assertTrue(basecompile);
+        copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml"));
 
         // add this config to the set of tests to run
         builder.addServerConfig(config);
@@ -398,7 +438,18 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         // DELTA CATALOGS FOR TESTING
         /////////////////////////////////////////////////////////////
 
-        // Build a new catalog
+        // Build a copy of the starting catalog and compile the deployment into it immediately
+        config = new LocalCluster("catalogupdate-cluster-basewithdeployment.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addProcedures(BASEPROCS);
+        boolean compile = config.compile(project, false);
+        assertTrue(compile);
+        copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-basewithdeployment.xml"));
+
+
+        // Build a new catalog and compile the deployment into it immediately
         //config = new LocalSingleProcessServer("catalogupdate-local-addtables.jar", 2, BackendTarget.NATIVE_EE_JNI);
         config = new LocalCluster("catalogupdate-cluster-addtables.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
@@ -407,8 +458,9 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project.addDefaultPartitioning();
         project.addPartitionInfo("O1", "PKEY");
         project.addProcedures(BASEPROCS_OPROCS);
-        boolean compile = config.compile(project);
+        compile = config.compile(project, false);
         assertTrue(compile);
+        copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtables.xml"));
 
         // as above but also with a materialized view added to O1
         try {
@@ -420,41 +472,45 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
             project.addDefaultPartitioning();
             project.addPartitionInfo("O1", "PKEY");
             project.addProcedures(BASEPROCS_OPROCS);
-            compile = config.compile(project);
+            compile = config.compile(project, false);
             assertTrue(compile);
+            copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtableswithmatview.xml"));
         } catch (IOException e) {
             fail();
         }
 
-        // Build a new catalog
+        // Build a new catalog and compile the deployment into it immediately
         //config = new LocalSingleProcessServer("catalogupdate-local-expanded.jar", 2, BackendTarget.NATIVE_EE_JNI);
         config = new LocalCluster("catalogupdate-cluster-expanded.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
         project.addProcedures(EXPANDEDPROCS);
-        compile = config.compile(project);
+        compile = config.compile(project, false);
         assertTrue(compile);
+        copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.xml"));
 
-        // Build a new catalog
+        // Build a new catalog and compile the deployment into it immediately
         //config = new LocalSingleProcessServer("catalogupdate-local-conflict.jar", 2, BackendTarget.NATIVE_EE_JNI);
         config = new LocalCluster("catalogupdate-cluster-conflict.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
         project.addProcedures(CONFLICTPROCS);
-        compile = config.compile(project);
+        compile = config.compile(project, false);
         assertTrue(compile);
+        copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-conflict.xml"));
 
-        // Build a new catalog
+        // Build a new catalog and compile the deployment into it immediately
         //config = new LocalSingleProcessServer("catalogupdate-local-many.jar", 2, BackendTarget.NATIVE_EE_JNI);
         config = new LocalCluster("catalogupdate-cluster-many.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
         project.addProcedures(SOMANYPROCS);
-        compile = config.compile(project);
+        compile = config.compile(project, false);
         assertTrue(compile);
+        copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-many.xml"));
 
         return builder;
     }

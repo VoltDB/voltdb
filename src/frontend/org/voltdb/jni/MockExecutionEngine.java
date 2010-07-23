@@ -28,6 +28,7 @@ import org.voltdb.elt.ELTProtoMessage;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltdb.TableStreamType;
 
 public class MockExecutionEngine extends ExecutionEngine {
 
@@ -174,13 +175,13 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateCopyOnWrite(int tableId) {
+    public boolean activateTableStream(int tableId, TableStreamType type) {
         // TODO Auto-generated method stub
         return false;
     }
 
     @Override
-    public int cowSerializeMore(BBContainer c, int tableId) {
+    public int tableStreamSerializeMore(BBContainer c, int tableId, TableStreamType type) {
         // TODO Auto-generated method stub
         return 0;
     }
@@ -190,5 +191,11 @@ public class MockExecutionEngine extends ExecutionEngine {
             boolean resetAction, long ackOffset, int partitionId, long mTableId) {
         // TODO Auto-generated method stub
         return null;
+    }
+
+    @Override
+    public void processRecoveryMessage(byte[] message) {
+        // TODO Auto-generated method stub
+
     }
 }

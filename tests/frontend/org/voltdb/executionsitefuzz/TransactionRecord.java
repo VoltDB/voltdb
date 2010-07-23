@@ -32,6 +32,21 @@ public class TransactionRecord
     boolean m_selfFail;
     boolean m_otherFail;
 
+    // Creation of a TransactionRecord with no initial log string will
+    // create a null record.  Yes, ugly.
+    TransactionRecord()
+    {
+        // These two settings will keep the null record from affecting
+        // the state that the ExecutionFuzzChecker sees.
+        m_txnId = Long.MAX_VALUE;
+        m_selfFail = true;
+
+        m_closed = false;
+        m_rollback = false;
+        m_multipart = false;
+        m_otherFail = false;
+    }
+
     TransactionRecord(LogString logString)
     {
         assert(logString.isTxnStart());
