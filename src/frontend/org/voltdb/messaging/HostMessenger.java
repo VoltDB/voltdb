@@ -491,4 +491,20 @@ public class HostMessenger implements Messenger {
                 retval++;
         return retval;
     }
+
+    /**
+     * Kill a foreign host connection by id.
+     * @param hostId The id of the foreign host to kill.
+     */
+    public void killForeignHost(int hostId) {
+        for (int i = 0; i < m_foreignHosts.length; i++) {
+            ForeignHost host = m_foreignHosts[i];
+            if ((host != null) && (host.isUp())) {
+                if (i == hostId) {
+                    host.m_isUp = false;
+                    return;
+                }
+            }
+        }
+    }
 }

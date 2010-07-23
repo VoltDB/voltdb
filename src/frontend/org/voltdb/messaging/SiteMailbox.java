@@ -251,4 +251,13 @@ public class SiteMailbox implements Mailbox {
         }
         return null;
     }
+
+    /**
+     * Get the number of messages waiting to be delivered for this mailbox.
+     *
+     * @return An integer representing the number of waiting messages.
+     */
+    public int getWaitingCount() {
+        return m_messages.get(Subject.DEFAULT.getId()).size();
+    }
 }

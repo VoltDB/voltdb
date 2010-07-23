@@ -125,14 +125,19 @@ public class TestRejoinEndToEnd extends TestCase {
 
         retval.localServer.waitForInitialization();
 
+        int host2id = host2.getHostId();
         host2.shutdown();
         // this is just to wait for the fault manager to kick in
         Thread.sleep(50);
 
         // wait until the fault manager has kicked in
         HostMessenger host1 = VoltDB.instance().getHostMessenger();
-        while (host1.countForeignHosts() > 0)
-            Thread.yield();
+        for (int i = 0; host1.countForeignHosts() > 0; i++) {
+            if (i > 10) break;
+            Thread.sleep(50);
+        }
+        host1.killForeignHost(host2id);
+        assertEquals(0, host1.countForeignHosts());
 
         return retval;
     }

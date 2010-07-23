@@ -26,6 +26,7 @@ package org.voltdb.messaging;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.util.Random;
@@ -226,7 +227,7 @@ public class TestMessaging extends TestCase {
                 fout.writeObject(mt);
                 byte[] buf = fout.getBytes();
                 fin = new FastDeserializer(buf);
-                mt = (MsgTest) fin.readObject(mt.getClass());
+                mt = fin.readObject(mt.getClass());
             }
 
             long t2 = new Date().getTime();
@@ -271,7 +272,7 @@ public class TestMessaging extends TestCase {
 
     }*/
 
-    /*public void testJoiner() {
+    public void testJoiner() {
         try {
             SocketJoiner joiner1 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 0, null);
             SocketJoiner joiner2 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 0, null);
@@ -345,8 +346,8 @@ public class TestMessaging extends TestCase {
         msg1.createLocalSite(siteId1);
         msg2.createLocalSite(siteId2);
 
-        Mailbox mb1 = msg1.createMailbox(siteId1, 1, null);
-        Mailbox mb2 = msg2.createMailbox(siteId2, 1, null);
+        Mailbox mb1 = msg1.createMailbox(siteId1, 1);
+        Mailbox mb2 = msg2.createMailbox(siteId2, 1);
 
         MsgTest.initWithSize(16);
         MsgTest mt = (MsgTest) VoltMessage.createNewMessage(MsgTest.MSG_TEST_ID);
@@ -424,11 +425,11 @@ public class TestMessaging extends TestCase {
         msg3.createLocalSite(siteId3);
         msg3.createLocalSite(siteId4);
 
-        Mailbox mb1 = msg1.createMailbox(siteId1, 1, null);
-        Mailbox mb2 = msg2.createMailbox(siteId2, 1, null);
-        Mailbox mb3 = msg3.createMailbox(siteId3, 1, null);
-        Mailbox mb4 = msg3.createMailbox(siteId4, 1, null);
-        Mailbox mb5 = msg1.createMailbox(siteId5, 1, null);
+        Mailbox mb1 = msg1.createMailbox(siteId1, 1);
+        Mailbox mb2 = msg2.createMailbox(siteId2, 1);
+        Mailbox mb3 = msg3.createMailbox(siteId3, 1);
+        Mailbox mb4 = msg3.createMailbox(siteId4, 1);
+        Mailbox mb5 = msg1.createMailbox(siteId5, 1);
 
         MsgTest.initWithSize(16);
         MsgTest mt = (MsgTest) VoltMessage.createNewMessage(MsgTest.MSG_TEST_ID);
@@ -479,9 +480,9 @@ public class TestMessaging extends TestCase {
 
         mb3.send(new int[] {siteId5}, 1, mt);
 
-        assertEquals(mb2.getWaitingCount(), 0);
-        assertEquals(mb3.getWaitingCount(), 0);
-        assertEquals(mb4.getWaitingCount(), 0);
+        assertEquals(((SiteMailbox)mb2).getWaitingCount(), 0);
+        assertEquals(((SiteMailbox)mb3).getWaitingCount(), 0);
+        assertEquals(((SiteMailbox)mb4).getWaitingCount(), 0);
 
         // check that there is a single message for mb5
         // again, weird code, but I think it's right (jhugg)
@@ -489,7 +490,7 @@ public class TestMessaging extends TestCase {
         now = System.currentTimeMillis();
         while (wc != 1) {
             assertTrue((System.currentTimeMillis() - now) < 5000);
-            wc = mb5.getWaitingCount();
+            wc = ((SiteMailbox)mb5).getWaitingCount();
             if (wc == 0)
             assertTrue(wc < 2);
         }
@@ -497,7 +498,7 @@ public class TestMessaging extends TestCase {
         msg2.shutdown();
         msg3.shutdown();
         network.shutdown();
-    }*/
+    }
 
     /*public void testForStress1() {
         final int siteCount = 3;
@@ -590,8 +591,12 @@ public class TestMessaging extends TestCase {
         Thread.sleep(50);
 
         // wait until the fault manager has kicked in
-        while (msg1.countForeignHosts() > 0)
-            Thread.yield();
+        for (int i = 0; msg1.countForeignHosts() > 0; i++) {
+            if (i > 10) break;
+            Thread.sleep(50);
+        }
+        msg1.killForeignHost(msg2hostId);
+        assertEquals(0, msg1.countForeignHosts());
 
         // rejoin the network in a new thread
         MockNewNode newnode = new MockNewNode(internalPort);
