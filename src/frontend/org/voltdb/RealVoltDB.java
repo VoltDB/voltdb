@@ -34,6 +34,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Site;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.Client;
@@ -501,8 +502,13 @@ public class RealVoltDB implements VoltDBInterface
             hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartingNetwork.name(), null);
             m_network.start();
 
-            m_messenger.sendReadyMessage();
-            m_messenger.waitForAllHostsToBeReady();
+            // only needs to be done if this is an initial cluster startup, not a rejoin
+            if (config.m_rejoinToHostAndPort == null) {
+                // tell other booting nodes that this node is ready
+                m_messenger.sendReadyMessage();
+                // wait for all nodes to be ready
+                m_messenger.waitForAllHostsToBeReady();
+            }
 
             fivems = new PeriodicWorkTimerThread(m_clientInterfaces,
                                                  m_statsManager);
@@ -700,7 +706,43 @@ public class RealVoltDB implements VoltDBInterface
         HostMessenger messenger = getHostMessenger();
         if (commit) {
             // put the foreign host into the set of active ones
-            messenger.rejoinForeignHostCommit();
+            HostMessenger.JoiningNodeInfo joinNodeInfo = messenger.rejoinForeignHostCommit();
+
+            ArrayList<Integer> rejoiningSiteIds = new ArrayList<Integer>();
+            Cluster cluster = m_catalogContext.catalog.getClusters().get("cluster");
+            for (Site site : cluster.getSites()) {
+                int siteId = Integer.parseInt(site.getTypeName());
+                int hostId = Integer.parseInt(site.getHost().getTypeName());
+                if (hostId == joinNodeInfo.hostId) {
+                    assert(site.getIsup() == false);
+                    rejoiningSiteIds.add(siteId);
+                }
+            }
+            assert(rejoiningSiteIds.size() > 0);
+
+            // get a string list of all the new sites
+            StringBuilder newIds = new StringBuilder();
+            for (int siteId : rejoiningSiteIds) {
+                newIds.append(siteId).append(",");
+            }
+            // trim the last comma
+            newIds.setLength(newIds.length() - 1);
+
+            // change the catalog to reflect this change
+            hostLog.error("Host joined, hostname: " + joinNodeInfo.hostName);
+            hostLog.error("  Host ID: " + joinNodeInfo.hostId);
+            hostLog.error("  Adding sites to cluster: " + newIds);
+            StringBuilder sb = new StringBuilder();
+            for (int siteId : rejoiningSiteIds)
+            {
+                sb.append("set ");
+                String site_path = VoltDB.instance().getCatalogContext().catalog.
+                                   getClusters().get("cluster").getSites().
+                                   get(Integer.toString(siteId)).getPath();
+                sb.append(site_path).append(" ").append("isUp true");
+                sb.append("\n");
+            }
+            VoltDB.instance().clusterUpdate(sb.toString());
         }
         else {
             // clean up any connections made

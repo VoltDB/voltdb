@@ -48,6 +48,7 @@ import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.messaging.HostMessenger;
 import org.voltdb.network.VoltNetwork;
+import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.JarReader;
 
 public class TestRejoinEndToEnd extends TestCase {
@@ -128,6 +129,8 @@ public class TestRejoinEndToEnd extends TestCase {
 
         //int host2id = host2.getHostId();
         host2.closeForeignHostScoket(host1.getHostId());
+        // this is just to wait for the fault manager to kick in
+        Thread.sleep(50);
         host2.shutdown();
         // this is just to wait for the fault manager to kick in
         Thread.sleep(50);
@@ -267,19 +270,23 @@ public class TestRejoinEndToEnd extends TestCase {
         for (int i = 0; failNext(i); i++);
     }
 
-    /*public void testRejoin() throws Exception {
+    public void testRejoin() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 1, 2, 1, BackendTarget.NATIVE_EE_JNI);
-        cluster.compile(builder);
+        boolean success = cluster.compile(builder, false);
+        assertTrue(success);
+        copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
         cluster.setHasLocalServer(false);
 
         cluster.startUp();
         cluster.shutDownSingleHost(0);
+        Thread.sleep(100);
 
         VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = "rejoin.jar";
-        config.m_rejoinToHostAndPort = "localhost:21212";
+        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
+        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
+        config.m_rejoinToHostAndPort = "localhost:21213";
         ServerThread localServer = new ServerThread(config);
 
         localServer.start();
@@ -289,5 +296,5 @@ public class TestRejoinEndToEnd extends TestCase {
 
         localServer.shutdown();
         cluster.shutDown();
-    }*/
+    }
 }

@@ -52,7 +52,7 @@ public class ForeignHost {
     private final int m_tcpPort;
     private final int m_hostId;
 
-    private String m_remoteHostname;
+    private String m_remoteHostname = "UNKNOWN_HOSTNAME";
     private boolean m_closing;
     boolean m_isUp;
 

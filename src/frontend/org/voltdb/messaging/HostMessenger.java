@@ -78,6 +78,11 @@ public class HostMessenger implements Messenger {
     long m_joinerTimestamp;
     int m_joinerAddress;
 
+    public class JoiningNodeInfo {
+        public String hostName;
+        public int hostId;
+    }
+
     final AtomicInteger m_hostsToWaitFor = new AtomicInteger();
 
     /**
@@ -431,10 +436,19 @@ public class HostMessenger implements Messenger {
     /**
      * Finish joining the network.
      */
-    public void rejoinForeignHostCommit() {
+    public JoiningNodeInfo rejoinForeignHostCommit() {
         m_foreignHosts[m_tempNewHostId] = m_tempNewFH;
+
+        JoiningNodeInfo retval = new JoiningNodeInfo();
+        retval.hostId = m_tempNewHostId;
+        retval.hostName = "NEWNODETEMPNAME";
+
         m_tempNewFH = null;
         m_tempNewHostId = -1;
+
+        assert(retval.hostId >= 0);
+        assert(retval.hostName != null);
+        return retval;
     }
 
     /**
