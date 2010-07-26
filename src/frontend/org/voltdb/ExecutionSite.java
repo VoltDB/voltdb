@@ -77,8 +77,8 @@ import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
-import org.voltdb.messaging.RecoveryMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
+import org.voltdb.messaging.RecoveryMessage;
 import org.voltdb.messaging.SiteMailbox;
 import org.voltdb.messaging.Subject;
 import org.voltdb.messaging.TransactionInfoBaseMessage;
@@ -1111,7 +1111,8 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                         String hostname = String.valueOf(hostId);
                         if (VoltDB.instance() != null) {
                             if (VoltDB.instance().getHostMessenger() != null) {
-                                hostname = VoltDB.instance().getHostMessenger().getHostnameForHostID(hostId);
+                                String hostnameTemp = VoltDB.instance().getHostMessenger().getHostnameForHostID(hostId);
+                                if (hostnameTemp != null) hostname = hostnameTemp;
                             }
                         }
                         VoltDB.instance().getFaultDistributor().

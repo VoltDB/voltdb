@@ -26,6 +26,7 @@ public class NodeFailureFault extends VoltFault
     public NodeFailureFault(int hostId, String hostname)
     {
         super(FaultType.NODE_FAILURE);
+        assert(hostname != null);
         m_hostId = hostId;
         m_hostname = hostname;
     }
