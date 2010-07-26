@@ -168,7 +168,13 @@ public class ForeignHost {
      */
     void killSocket() {
         try {
+            m_socket.setKeepAlive(false);
+            m_socket.setSoLinger(false, 0);
+            Thread.sleep(25);
             m_socket.close();
+            Thread.sleep(25);
+            System.gc();
+            Thread.sleep(25);
         }
         catch (Exception e) {
             // don't REALLY care if this fails
