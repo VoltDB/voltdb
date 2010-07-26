@@ -125,7 +125,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         TableStreamSerializeMore(18),
         UpdateCatalog(19),
         ELTAction(20),
-        RecoveryMessage(21);
+        RecoveryMessage(21),
+        TableHashCode(22);
         Commands(final int id) {
             m_id = id;
         }
@@ -1366,6 +1367,32 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             m_connection.write();
 
             m_connection.readStatusByte();
+        } catch (final IOException e) {
+            System.out.println("Exception: " + e.getMessage());
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public long tableHashCode(int tableId) {
+        try {
+            m_data.clear();
+            m_data.putInt(Commands.TableHashCode.m_id);
+            m_data.putInt(tableId);
+
+            m_data.flip();
+            m_connection.write();
+
+            m_connection.readStatusByte();
+            ByteBuffer hashCode = ByteBuffer.allocate(8);
+            while (hashCode.hasRemaining()) {
+                int read = m_connection.m_socketChannel.read(hashCode);
+                if (read <= 0) {
+                    throw new EOFException();
+                }
+            }
+            hashCode.flip();
+            return hashCode.getLong();
         } catch (final IOException e) {
             System.out.println("Exception: " + e.getMessage());
             throw new RuntimeException(e);

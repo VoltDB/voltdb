@@ -1269,4 +1269,18 @@ VoltDBEngine::eltAction(bool ackAction, bool pollAction, bool resetAction,
     return (block->uso() + block->offset());
 }
 
+size_t VoltDBEngine::tableHashCode(int32_t tableId) {
+    map<int32_t, Table*>::iterator it = m_tables.find(tableId);
+    if (it == m_tables.end()) {
+        throwFatalException("Tried to calculate a hash code for a table that doesn't exist with id %d\n", tableId);
+    }
+
+    PersistentTable *table = dynamic_cast<PersistentTable*>(it->second);
+    if (table == NULL) {
+        throwFatalException(
+                "Tried to calculate a hash code for a table that is not a persistent table id %d\n",
+                tableId);
+    }
+    return table->hashCode();
+}
 }

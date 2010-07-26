@@ -198,4 +198,9 @@ public class MockExecutionEngine extends ExecutionEngine {
         // TODO Auto-generated method stub
 
     }
+
+    @Override
+    public long tableHashCode( int tableId) {
+        throw new UnsupportedOperationException();
+    }
 }

@@ -363,6 +363,13 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             boolean ackAction, boolean pollAction, boolean resetAction,
             long ackTxnId, int partitionId, long tableId);
 
+    /**
+     * Calculate a hash code for a table.
+     * @param pointer Pointer to an engine instance
+     * @param tableId table to calculate a hash code for
+     */
+    public abstract long tableHashCode(int tableId);
+
 
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to
@@ -599,6 +606,13 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param message Recovery message to load
      */
     protected native void nativeProcessRecoveryMessage(long pointer, byte message[]);
+
+    /**
+     * Calculate a hash code for a table.
+     * @param pointer Pointer to an engine instance
+     * @param tableId table to calculate a hash code for
+     */
+    protected native long nativeTableHashCode(long pointer, int tableId);
 
     /**
      * Perform an ELT poll or ack action. Poll data will be returned via the usual

@@ -376,6 +376,11 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         long eltAction(bool ackAction, bool pollAction, bool resetAction,
                        int64_t ackOffset, int64_t tableId);
 
+        /**
+         * Retrieve a hash code for the specified table
+         */
+        size_t tableHashCode(int32_t tableId);
+
     protected:
         /*
          * Get the list of persistent table Ids by inspecting the catalog.

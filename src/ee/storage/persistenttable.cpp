@@ -831,7 +831,7 @@ void PersistentTable::processRecoveryMessage(RecoveryProtoMsg* message, Pool *po
 size_t PersistentTable::hashCode() {
     TableIndexScheme sourceScheme = m_pkeyIndex->getScheme();
     sourceScheme.setTree();
-    boost::scoped_ptr<TableIndex> pkeyIndex(TableIndexFactory::getInstance(m_pkeyIndex->getScheme()));
+    boost::scoped_ptr<TableIndex> pkeyIndex(TableIndexFactory::getInstance(sourceScheme));
     TableIterator iter(this);
     TableTuple tuple(schema());
     while (iter.next(tuple)) {

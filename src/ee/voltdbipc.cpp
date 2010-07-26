@@ -172,6 +172,14 @@ typedef struct {
 }__attribute__((packed)) recovery_message;
 
 /*
+ * Header for a request for a table hash code
+ */
+typedef struct {
+    struct ipc_command cmd;
+    int32_t tableId;
+}__attribute__((packed)) table_hash_code;
+
+/*
  * Header for an ELT action.
  */
 typedef struct {
@@ -302,6 +310,9 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
       case 21:
           result = processRecoveryMessage(cmd);
         break;
+      case 22:
+          tableHashCode(cmd);
+          result = kErrorCode_None;
       default:
         result = stub(cmd);
     }
@@ -953,6 +964,16 @@ int8_t VoltDBIPC::processRecoveryMessage( struct ipc_command *cmd) {
     RecoveryProtoMsg message(&input);
     m_engine->processRecoveryMessage(&message);
     return kErrorCode_Success;
+}
+
+void VoltDBIPC::tableHashCode( struct ipc_command *cmd) {
+    table_hash_code *hashCodeRequest = (table_hash_code*) cmd;
+    const int32_t tableId = ntohl(hashCodeRequest->tableId);
+    int64_t tableHashCode = m_engine->tableHashCode(tableId);
+    char response[9];
+    response[0] = kErrorCode_Success;
+    *reinterpret_cast<int64_t*>(&response[1]) = htonll(tableHashCode);
+    writeOrDie(m_fd, (unsigned char*)response, 9);
 }
 
 void VoltDBIPC::eltAction(struct ipc_command *cmd) {

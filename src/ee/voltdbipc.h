@@ -115,6 +115,8 @@ private:
 
     int8_t processRecoveryMessage( struct ipc_command *cmd);
 
+    void tableHashCode( struct ipc_command *cmd);
+
     void sendException( int8_t errorCode);
 
     int8_t activateTableStream(struct ipc_command *cmd);

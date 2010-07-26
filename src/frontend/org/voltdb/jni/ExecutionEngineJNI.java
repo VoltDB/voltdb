@@ -527,4 +527,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     public void processRecoveryMessage(byte[] message) {
         nativeProcessRecoveryMessage( pointer, message);
     }
+
+    @Override
+    public long tableHashCode(int tableId) {
+        return nativeTableHashCode( pointer, tableId);
+    }
 }

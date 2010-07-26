@@ -1114,6 +1114,28 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTable
 
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
+ * Method:    nativeTableHashCode
+ * Signature: (JI)J
+ */
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTableHashCode
+  (JNIEnv *env, jobject obj, jlong engine_ptr, jint tableId) {
+    VOLT_DEBUG("nativeTableHashCode in C++ called");
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    try {
+        try {
+            return engine->tableHashCode(tableId);
+        } catch (SQLException e) {
+            throwFatalException("%s", e.message().c_str());
+        }
+    } catch (FatalException e) {
+        topend->crashVoltDB(e);
+    }
+    return 0;
+}
+
+/*
+ * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    nativeELTAction
  *
  * @param ackAction  true if this call contains an ack

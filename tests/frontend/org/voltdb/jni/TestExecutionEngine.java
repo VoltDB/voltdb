@@ -32,6 +32,10 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.LoadCatalogToString;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.messaging.RecoveryMessageType;
+import org.voltdb.TableStreamType;
+import org.voltdb.utils.DBBPool;
+import org.voltdb.utils.DBBPool.BBContainer;
 
 /**
  * Tests native execution engine JNI interface.
@@ -67,8 +71,8 @@ public class TestExecutionEngine extends TestCase {
     private void loadTestTables(Catalog catalog) throws Exception
     {
         final boolean allowELT = false;
-        int WAREHOUSE_TABLEID = catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("WAREHOUSE").getRelativeIndex();
-        int STOCK_TABLEID = catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("STOCK").getRelativeIndex();
+        int WAREHOUSE_TABLEID = warehouseTableId(catalog);
+        int STOCK_TABLEID = stockTableId(catalog);
 
         VoltTable warehousedata = new VoltTable(
                 new VoltTable.ColumnInfo("W_ID", VoltType.INTEGER),
@@ -97,13 +101,66 @@ public class TestExecutionEngine extends TestCase {
         catalog.execute(LoadCatalogToString.THE_CATALOG);
         engine.loadCatalog(catalog.serialize());
 
-        int WAREHOUSE_TABLEID = catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("WAREHOUSE").getRelativeIndex();
-        int STOCK_TABLEID = catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("STOCK").getRelativeIndex();
+        int WAREHOUSE_TABLEID = warehouseTableId(catalog);
+        int STOCK_TABLEID = stockTableId(catalog);
 
         loadTestTables(catalog);
 
         assertEquals(200, engine.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         assertEquals(1000, engine.serializeTable(STOCK_TABLEID).getRowCount());
+    }
+
+    public void testStreamTables() throws Exception {
+        final Catalog catalog = new Catalog();
+        catalog.execute(LoadCatalogToString.THE_CATALOG);
+        engine.loadCatalog(catalog.serialize());
+        ExecutionEngine engine2 = new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID, 0, 0, "");
+        engine2.loadCatalog(catalog.serialize());
+
+        int WAREHOUSE_TABLEID = warehouseTableId(catalog);
+        int STOCK_TABLEID = stockTableId(catalog);
+
+        loadTestTables(catalog);
+
+        engine.activateTableStream( WAREHOUSE_TABLEID, TableStreamType.RECOVERY );
+        engine.activateTableStream( STOCK_TABLEID, TableStreamType.RECOVERY );
+
+        BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);
+        try {
+            origin.b.clear();
+            long address = org.voltdb.utils.DBBPool.getBufferAddress(origin.b);
+            BBContainer container = new BBContainer(origin.b, address){
+
+                @Override
+                public void discard() {
+                }};
+
+            int serialized = engine.tableStreamSerializeMore( container, WAREHOUSE_TABLEID, TableStreamType.RECOVERY);
+            assertTrue(serialized > 0);
+            container.b.limit(serialized);
+            byte data[] = new byte[serialized];
+            container.b.get(data);
+            container.b.clear();
+            engine2.processRecoveryMessage(data);
+
+
+            serialized = engine.tableStreamSerializeMore( container, WAREHOUSE_TABLEID, TableStreamType.RECOVERY);
+            assertEquals( 5, serialized);
+            assertEquals( RecoveryMessageType.Complete.ordinal(), container.b.get());
+            assertEquals( WAREHOUSE_TABLEID, container.b.getInt());
+
+            assertEquals( engine.tableHashCode(WAREHOUSE_TABLEID), engine2.tableHashCode(WAREHOUSE_TABLEID));
+        } finally {
+            origin.discard();
+        }
+    }
+
+    private int warehouseTableId(Catalog catalog) {
+        return catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("WAREHOUSE").getRelativeIndex();
+    }
+
+    private int stockTableId(Catalog catalog) {
+        return catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("STOCK").getRelativeIndex();
     }
 
     public void testGetStats() throws Exception {
