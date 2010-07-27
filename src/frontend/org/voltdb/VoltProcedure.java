@@ -1184,7 +1184,7 @@ public abstract class VoltProcedure {
         ArrayList<ByteBuffer> distributedParams = new ArrayList<ByteBuffer>();
 
         // check if all local fragment work is non-transactional
-        boolean localFragsAreNonTransactional = true;
+        boolean localFragsAreNonTransactional = false;
 
         // iterate over all sql in the batch, filling out the above data structures
         for (int i = 0; i < batchSize; ++i) {
@@ -1228,7 +1228,7 @@ public abstract class VoltProcedure {
                     localParams[i] = params;
 
                     // if any frag is transactional, update this check
-                    if (frag.getNontransactional() == false)
+                    if (frag.getNontransactional() == true)
                         localFragsAreNonTransactional = true;
                 }
                 depsForLocalTask[i] = -1;
@@ -1253,7 +1253,7 @@ public abstract class VoltProcedure {
                         distributedOutputDepIds.add(outputDepId);
 
                         // if any frag is transactional, update this check
-                        if (frag.getNontransactional() == false)
+                        if (frag.getNontransactional() == true)
                             localFragsAreNonTransactional = true;
                     }
                 }
