@@ -26,13 +26,21 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 
 import junit.framework.Test;
+
 import org.voltdb.BackendTarget;
+import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.client.Client;
-import org.voltdb.VoltTable;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.regressionsuites.sqlfeatureprocs.*;
+import org.voltdb.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
+import org.voltdb.regressionsuites.sqlfeatureprocs.FeaturesSelectAll;
+import org.voltdb.regressionsuites.sqlfeatureprocs.PassAllArgTypes;
+import org.voltdb.regressionsuites.sqlfeatureprocs.PassByteArrayArg;
+import org.voltdb.regressionsuites.sqlfeatureprocs.SelectOrderLineByDistInfo;
+import org.voltdb.regressionsuites.sqlfeatureprocs.SelfJoinTest;
+import org.voltdb.regressionsuites.sqlfeatureprocs.UpdateTests;
+import org.voltdb.regressionsuites.sqlfeatureprocs.WorkWithBigString;
 
 public class TestSQLFeaturesSuite extends RegressionSuite {
 

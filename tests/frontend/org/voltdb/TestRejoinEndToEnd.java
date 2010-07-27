@@ -105,8 +105,8 @@ public class TestRejoinEndToEnd extends TestCase {
 
         VoltProjectBuilder builder = getBuilderForTest();
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("rejoin.jar"), 1, 2, 1, "localhost", false);
-        copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
         assertTrue(success);
+        copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
 
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");

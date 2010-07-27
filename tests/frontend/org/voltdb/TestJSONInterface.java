@@ -74,8 +74,8 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.compiler.CrazyBlahProc;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.procedures.CrazyBlahProc;
 import org.voltdb.types.TimestampType;
 
 public class TestJSONInterface extends TestCase {
@@ -89,7 +89,7 @@ public class TestJSONInterface extends TestCase {
         public String exception = null;
     }
 
-    String callProcOverJSON(String procName, ParameterSet pset) throws Exception {
+    public static String callProcOverJSON(String procName, ParameterSet pset) throws Exception {
         URL jsonAPIURL = new URL("http://localhost:8095/api/1.0/");
 
         // Call insert
@@ -144,7 +144,7 @@ public class TestJSONInterface extends TestCase {
         return response;
     }
 
-    static Response responseFromJSON(String jsonStr) throws JSONException, IOException {
+    public static Response responseFromJSON(String jsonStr) throws JSONException, IOException {
         Response response = new Response();
         JSONObject jsonObj = new JSONObject(jsonStr);
         JSONArray resultsJson = jsonObj.getJSONArray("results");
@@ -317,10 +317,12 @@ public class TestJSONInterface extends TestCase {
         server.join();
     }
 
-    String getHTTPVarString(Map<String,String> params) throws UnsupportedEncodingException {
+    static String getHTTPVarString(Map<String,String> params) throws UnsupportedEncodingException {
         String s = "";
-        for (Entry<String, String> e : params.entrySet())
-        s += "&"+ e.getKey() + "=" + URLEncoder.encode(e.getValue(), "UTF-8");
+        for (Entry<String, String> e : params.entrySet()) {
+            String encodedValue = URLEncoder.encode(e.getValue(), "UTF-8");
+            s += "&"+ e.getKey() + "=" + encodedValue;
+        }
         s = s.substring(1);
         return s;
     }

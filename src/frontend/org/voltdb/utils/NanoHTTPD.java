@@ -55,8 +55,10 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.Date;
 import java.util.Enumeration;
@@ -225,8 +227,8 @@ public class NanoHTTPD
      * Common mime types for dynamic content
      */
     public static final String
-        MIME_PLAINTEXT = "text/plain",
-        MIME_HTML = "text/html",
+        MIME_PLAINTEXT = "text/plain; charset=utf-8",
+        MIME_HTML = "text/html; charset=utf-8",
         MIME_DEFAULT_BINARY = "application/octet-stream";
 
     // ==================================================
@@ -321,9 +323,9 @@ public class NanoHTTPD
                 if ( qmi >= 0 )
                 {
                     decodeParms( uri.substring( qmi+1 ), parms );
-                    uri = decodePercent( uri.substring( 0, qmi ));
+                    uri = URLDecoder.decode( uri.substring( 0, qmi ), "UTF-8");
                 }
-                else uri = decodePercent(uri);
+                else uri = URLDecoder.decode(uri, "UTF-8");
 
 
                 // If there's another token, it's protocol version,
@@ -391,44 +393,10 @@ public class NanoHTTPD
         }
 
         /**
-         * Decodes the percent encoding scheme. <br/>
-         * For example: "an+example%20string" -> "an example string"
-         */
-        private String decodePercent( String str ) throws InterruptedException
-        {
-            try
-            {
-                StringBuffer sb = new StringBuffer();
-                for( int i=0; i<str.length(); i++ )
-                {
-                    char c = str.charAt( i );
-                    switch ( c )
-                    {
-                        case '+':
-                            sb.append( ' ' );
-                            break;
-                        case '%':
-                            sb.append((char)Integer.parseInt( str.substring(i+1,i+3), 16 ));
-                            i += 2;
-                            break;
-                        default:
-                            sb.append( c );
-                            break;
-                    }
-                }
-                return new String( sb.toString().getBytes());
-            }
-            catch( Exception e )
-            {
-                sendError( HTTP_BADREQUEST, "BAD REQUEST: Bad percent-encoding." );
-                return null;
-            }
-        }
-
-        /**
          * Decodes parameters in percent-encoded URI-format
          * ( e.g. "name=Jack%20Daniels&pass=Single%20Malt" ) and
          * adds them to given Properties.
+         * @throws UnsupportedEncodingException
          */
         private void decodeParms( String parms, Properties p )
             throws InterruptedException
@@ -436,14 +404,20 @@ public class NanoHTTPD
             if ( parms == null )
                 return;
 
-            StringTokenizer st = new StringTokenizer( parms, "&" );
-            while ( st.hasMoreTokens())
+            try {
+                StringTokenizer st = new StringTokenizer( parms, "&" );
+                while ( st.hasMoreTokens())
+                {
+                    String e = st.nextToken();
+                    int sep = e.indexOf( '=' );
+                    if ( sep >= 0 )
+                        p.put( URLDecoder.decode( e.substring( 0, sep ), "UTF-8").trim(),
+                               URLDecoder.decode( e.substring( sep+1 ), "UTF-8"));
+                }
+            }
+            catch( Exception e )
             {
-                String e = st.nextToken();
-                int sep = e.indexOf( '=' );
-                if ( sep >= 0 )
-                    p.put( decodePercent( e.substring( 0, sep )).trim(),
-                           decodePercent( e.substring( sep+1 )));
+                sendError( HTTP_BADREQUEST, "BAD REQUEST: Bad percent-encoding." );
             }
         }
 

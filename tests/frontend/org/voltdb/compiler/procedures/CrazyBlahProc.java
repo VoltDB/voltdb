@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.compiler;
+package org.voltdb.compiler.procedures;
 
 import java.math.BigDecimal;
 
@@ -43,7 +43,10 @@ public class CrazyBlahProc extends VoltProcedure {
         retval[0] = new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT));
         retval[0].addRow(1);
 
-        retval[1] = new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT));
+        retval[1] = new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.STRING));
+        // this ought to work
+        retval[1].addRow("你好");
+
         retval[2] = new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT));
 
         return retval;
