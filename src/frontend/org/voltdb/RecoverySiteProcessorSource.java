@@ -202,18 +202,27 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
         m_engine = engine;
         m_siteId = siteId;
         for (Map.Entry<Pair<String, Integer>, HashSet<Integer>> entry : tableToSites.entrySet()) {
+            if (entry.getValue().isEmpty()) {
+                continue;
+            }
             m_tablesToStream.add(
                     new RecoveryTable(
                             entry.getKey().getFirst(),
                             entry.getKey().getSecond(),
                             entry.getValue()));
-            if (!m_engine.activateTableStream(entry.getKey().getSecond(), TableStreamType.RECOVERY )) {
-                hostLog.error("Attempted to activate recovery stream for table "
-                        + entry.getKey().getFirst() + " and failed");
-                VoltDB.crashVoltDB();
-            }
         }
         m_onCompletion = onCompletion;
+        if (m_tablesToStream.isEmpty()) {
+            onCompletion.run();
+            return;
+        }
+        RecoveryTable table = m_tablesToStream.peek();
+        if (!m_engine.activateTableStream(table.m_tableId, TableStreamType.RECOVERY )) {
+            hostLog.error("Attempted to activate recovery stream for table "
+                    + table.m_name + " and failed");
+            VoltDB.crashVoltDB();
+        }
+        initializeBufferPool();
     }
 
     void initializeBufferPool() {
@@ -266,7 +275,7 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
      */
     @Override
     public void doRecoveryWork() {
-        while (m_allowedBuffers > 0 && !m_tablesToStream.isEmpty()) {
+        while (m_allowedBuffers > 0 && !m_tablesToStream.isEmpty() && !m_buffers.isEmpty()) {
             /*
              * Retrieve a buffer from the pool and decrement the number of buffers we are allowed
              * to send.
@@ -319,6 +328,14 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
              */
             if (rm.type() == RecoveryMessageType.Complete) {
                 m_tablesToStream.poll();
+                RecoveryTable nextTable = m_tablesToStream.peek();
+                if (nextTable != null) {
+                    if (!m_engine.activateTableStream(nextTable.m_tableId, TableStreamType.RECOVERY )) {
+                        hostLog.error("Attempted to activate recovery stream for table "
+                                + nextTable.m_name + " and failed");
+                        VoltDB.crashVoltDB();
+                    }
+                }
             }
 
             final int numDestinations = table.m_destinationIds.length;

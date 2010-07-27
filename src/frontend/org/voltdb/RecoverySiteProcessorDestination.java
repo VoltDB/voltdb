@@ -93,19 +93,19 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
 
         if (message.type() == RecoveryMessageType.ScanTuples) {
             m_engine.processRecoveryMessage(message.getMessageData());
-            int sourceSite = message.sourceSite();
-            RecoveryMessage ack = new RecoveryMessage( message, m_siteId);
-            try {
-                m_mailbox.send( sourceSite, 0, ack);
-            } catch (MessagingException e) {
-                // Continuing to propagate this horrible exception
-                throw new RuntimeException(e);
-            }
         } else if (message.type() == RecoveryMessageType.Complete) {
             m_tables.remove(message.tableId());
             if (m_tables.isEmpty()) {
                 m_onCompletion.run();
             }
+        }
+        int sourceSite = message.sourceSite();
+        RecoveryMessage ack = new RecoveryMessage( message, m_siteId);
+        try {
+            m_mailbox.send( sourceSite, 0, ack);
+        } catch (MessagingException e) {
+            // Continuing to propagate this horrible exception
+            throw new RuntimeException(e);
         }
     }
 
@@ -135,6 +135,7 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
             m_tables.put(entry.getKey().getSecond(), new RecoveryTable(entry.getKey().getFirst(), entry.getKey().getSecond(), entry.getValue()));
         }
         m_onCompletion = onCompletion;
+        assert(!m_tables.isEmpty());
     }
 
     @Override

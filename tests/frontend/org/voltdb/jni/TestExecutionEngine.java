@@ -25,17 +25,29 @@ package org.voltdb.jni;
 
 import junit.framework.TestCase;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.concurrent.atomic.AtomicReference;
+
 import org.voltdb.SysProcSelector;
 import org.voltdb.VoltDB;
+import org.voltdb.RecoverySiteProcessorSource;
+import org.voltdb.RecoverySiteProcessorDestination;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.LoadCatalogToString;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.messaging.Mailbox;
+import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.RecoveryMessageType;
+import org.voltdb.messaging.Subject;
+import org.voltdb.messaging.VoltMessage;
+import org.voltdb.messaging.RecoveryMessage;
 import org.voltdb.TableStreamType;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltdb.utils.Pair;
 
 /**
  * Tests native execution engine JNI interface.
@@ -45,7 +57,7 @@ public class TestExecutionEngine extends TestCase {
     public void testLoadCatalogs() throws Exception {
         Catalog catalog = new Catalog();
         catalog.execute(LoadCatalogToString.THE_CATALOG);
-        engine.loadCatalog(catalog.serialize());
+        sourceEngine.loadCatalog(catalog.serialize());
     }
 
     public void testLoadBadCatalogs() throws Exception {
@@ -56,7 +68,7 @@ public class TestExecutionEngine extends TestCase {
          */
         String badCatalog = LoadCatalogToString.THE_CATALOG.replaceFirst("set", "bad");
         try {
-            engine.loadCatalog(badCatalog);
+            sourceEngine.loadCatalog(badCatalog);
         } catch (final EEException e) {
             return;
         }
@@ -83,7 +95,7 @@ public class TestExecutionEngine extends TestCase {
         }
 
         System.out.println(warehousedata.toString());
-        engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, Long.MAX_VALUE, allowELT);
+        sourceEngine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, Long.MAX_VALUE, allowELT);
 
         VoltTable stockdata = new VoltTable(
                 new VoltTable.ColumnInfo("S_I_ID", VoltType.INTEGER),
@@ -93,37 +105,37 @@ public class TestExecutionEngine extends TestCase {
         for (int i = 0; i < 1000; ++i) {
             stockdata.addRow(i, i % 200, i * i);
         }
-        engine.loadTable(STOCK_TABLEID, stockdata, 0, 0, Long.MAX_VALUE, allowELT);
+        sourceEngine.loadTable(STOCK_TABLEID, stockdata, 0, 0, Long.MAX_VALUE, allowELT);
     }
 
     public void testLoadTable() throws Exception {
         Catalog catalog = new Catalog();
         catalog.execute(LoadCatalogToString.THE_CATALOG);
-        engine.loadCatalog(catalog.serialize());
+        sourceEngine.loadCatalog(catalog.serialize());
 
         int WAREHOUSE_TABLEID = warehouseTableId(catalog);
         int STOCK_TABLEID = stockTableId(catalog);
 
         loadTestTables(catalog);
 
-        assertEquals(200, engine.serializeTable(WAREHOUSE_TABLEID).getRowCount());
-        assertEquals(1000, engine.serializeTable(STOCK_TABLEID).getRowCount());
+        assertEquals(200, sourceEngine.serializeTable(WAREHOUSE_TABLEID).getRowCount());
+        assertEquals(1000, sourceEngine.serializeTable(STOCK_TABLEID).getRowCount());
     }
 
     public void testStreamTables() throws Exception {
         final Catalog catalog = new Catalog();
         catalog.execute(LoadCatalogToString.THE_CATALOG);
-        engine.loadCatalog(catalog.serialize());
-        ExecutionEngine engine2 = new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID, 0, 0, "");
-        engine2.loadCatalog(catalog.serialize());
+        sourceEngine.loadCatalog(catalog.serialize());
+        ExecutionEngine destinationEngine = new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID, 0, 0, "");
+        destinationEngine.loadCatalog(catalog.serialize());
 
         int WAREHOUSE_TABLEID = warehouseTableId(catalog);
         int STOCK_TABLEID = stockTableId(catalog);
 
         loadTestTables(catalog);
 
-        engine.activateTableStream( WAREHOUSE_TABLEID, TableStreamType.RECOVERY );
-        engine.activateTableStream( STOCK_TABLEID, TableStreamType.RECOVERY );
+        sourceEngine.activateTableStream( WAREHOUSE_TABLEID, TableStreamType.RECOVERY );
+        sourceEngine.activateTableStream( STOCK_TABLEID, TableStreamType.RECOVERY );
 
         BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);
         try {
@@ -135,24 +147,233 @@ public class TestExecutionEngine extends TestCase {
                 public void discard() {
                 }};
 
-            int serialized = engine.tableStreamSerializeMore( container, WAREHOUSE_TABLEID, TableStreamType.RECOVERY);
+            int serialized = sourceEngine.tableStreamSerializeMore( container, WAREHOUSE_TABLEID, TableStreamType.RECOVERY);
             assertTrue(serialized > 0);
             container.b.limit(serialized);
             byte data[] = new byte[serialized];
             container.b.get(data);
             container.b.clear();
-            engine2.processRecoveryMessage(data);
+            destinationEngine.processRecoveryMessage(data);
 
 
-            serialized = engine.tableStreamSerializeMore( container, WAREHOUSE_TABLEID, TableStreamType.RECOVERY);
+            serialized = sourceEngine.tableStreamSerializeMore( container, WAREHOUSE_TABLEID, TableStreamType.RECOVERY);
             assertEquals( 5, serialized);
             assertEquals( RecoveryMessageType.Complete.ordinal(), container.b.get());
             assertEquals( WAREHOUSE_TABLEID, container.b.getInt());
 
-            assertEquals( engine.tableHashCode(WAREHOUSE_TABLEID), engine2.tableHashCode(WAREHOUSE_TABLEID));
+            assertEquals( sourceEngine.tableHashCode(WAREHOUSE_TABLEID), destinationEngine.tableHashCode(WAREHOUSE_TABLEID));
+
+            container.b.clear();
+            serialized = sourceEngine.tableStreamSerializeMore( container, STOCK_TABLEID, TableStreamType.RECOVERY);
+            assertTrue(serialized > 0);
+            container.b.limit(serialized);
+            data = new byte[serialized];
+            container.b.get(data);
+            container.b.clear();
+            destinationEngine.processRecoveryMessage(data);
+
+
+            serialized = sourceEngine.tableStreamSerializeMore( container, STOCK_TABLEID, TableStreamType.RECOVERY);
+            assertEquals( 5, serialized);
+            assertEquals( RecoveryMessageType.Complete.ordinal(), container.b.get());
+            assertEquals( STOCK_TABLEID, container.b.getInt());
+
+            assertEquals( sourceEngine.tableHashCode(STOCK_TABLEID), destinationEngine.tableHashCode(STOCK_TABLEID));
         } finally {
             origin.discard();
         }
+    }
+
+    public void testRecoveryProcessors() throws Exception {
+        final int sourceId = 0;
+        final int destinationId = 32;
+        final AtomicReference<Boolean> sourceCompleted = new AtomicReference<Boolean>(false);
+        final AtomicReference<Boolean> destinationCompleted = new AtomicReference<Boolean>(false);
+        final Catalog catalog = new Catalog();
+        catalog.execute(LoadCatalogToString.THE_CATALOG);
+        sourceEngine.loadCatalog(catalog.serialize());
+        ExecutionEngine destinationEngine = new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID, destinationId, destinationId, "");
+        destinationEngine.loadCatalog(catalog.serialize());
+
+        int WAREHOUSE_TABLEID = warehouseTableId(catalog);
+        int STOCK_TABLEID = stockTableId(catalog);
+
+        loadTestTables(catalog);
+
+        HashMap<Pair<String, Integer>, HashSet<Integer>> tablesAndDestinations = new HashMap<Pair<String, Integer>, HashSet<Integer>>();
+        HashSet<Integer> destinations = new HashSet<Integer>();
+        destinations.add(destinationId);
+        tablesAndDestinations.put(Pair.of( "STOCK", STOCK_TABLEID), destinations);
+        tablesAndDestinations.put(Pair.of( "WAREHOUSE", WAREHOUSE_TABLEID), destinations);
+        final AtomicReference<RecoverySiteProcessorDestination> destinationReference
+            = new AtomicReference<RecoverySiteProcessorDestination>();
+
+        final Mailbox sourceMailbox = new Mailbox() {
+
+            @Override
+            public void send(int siteId, int mailboxId, VoltMessage message)
+                    throws MessagingException {
+                assertEquals( destinationId, siteId);
+                assertEquals( mailboxId, 0);
+                assertTrue(message instanceof RecoveryMessage);
+                destinationReference.get().handleRecoveryMessage((RecoveryMessage)message);
+                message.discard();
+            }
+
+            @Override
+            public void send(int[] siteIds, int mailboxId, VoltMessage message)
+                    throws MessagingException {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public void deliver(VoltMessage message) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public void deliverFront(VoltMessage message) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public VoltMessage recv() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public VoltMessage recvBlocking() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public VoltMessage recvBlocking(long timeout) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public VoltMessage recv(Subject[] s) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public VoltMessage recvBlocking(Subject[] s) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public VoltMessage recvBlocking(Subject[] s, long timeout) {
+                throw new UnsupportedOperationException();
+            }
+
+        };
+
+        final Runnable onSourceCompletion = new Runnable() {
+            @Override
+            public void run() {
+                sourceCompleted.set(true);
+            }
+        };
+
+        final RecoverySiteProcessorSource sourceProcessor =
+            new RecoverySiteProcessorSource(
+                    tablesAndDestinations,
+                    sourceEngine,
+                    sourceMailbox,
+                    sourceId,
+                    onSourceCompletion );
+
+        HashMap<Pair<String, Integer>, Integer> tablesAndSources = new HashMap<Pair<String, Integer>, Integer>();
+        tablesAndSources.put(Pair.of( "STOCK", STOCK_TABLEID), sourceId);
+        tablesAndSources.put(Pair.of( "WAREHOUSE", WAREHOUSE_TABLEID), sourceId);
+
+        Mailbox destinationMailbox = new Mailbox() {
+
+            @Override
+            public void send(int siteId, int mailboxId, VoltMessage message)
+                    throws MessagingException {
+                assertEquals( siteId, 0);
+                assertEquals( mailboxId, 0);
+                assertTrue( message instanceof RecoveryMessage);
+                assertEquals( RecoveryMessageType.Ack, ((RecoveryMessage)message).type());
+                sourceProcessor.handleRecoveryMessage((RecoveryMessage)message);
+            }
+
+            @Override
+            public void send(int[] siteIds, int mailboxId, VoltMessage message)
+                    throws MessagingException {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public void deliver(VoltMessage message) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public void deliverFront(VoltMessage message) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public VoltMessage recv() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public VoltMessage recvBlocking() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public VoltMessage recvBlocking(long timeout) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public VoltMessage recv(Subject[] s) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public VoltMessage recvBlocking(Subject[] s) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public VoltMessage recvBlocking(Subject[] s, long timeout) {
+                throw new UnsupportedOperationException();
+            }
+
+        };
+
+        final Runnable onDestinationCompletion = new Runnable() {
+            @Override
+            public void run() {
+                destinationCompleted.set(true);
+            }
+        };
+
+        RecoverySiteProcessorDestination destinationProcess =
+            new RecoverySiteProcessorDestination(
+                    tablesAndSources,
+                    destinationEngine,
+                    destinationMailbox,
+                    destinationId,
+                    onDestinationCompletion);
+        destinationReference.set(destinationProcess);
+
+        while (!destinationCompleted.get() || !destinationCompleted.get()) {
+            sourceProcessor.doRecoveryWork();
+        }
+
+        assertEquals( sourceEngine.tableHashCode(STOCK_TABLEID), destinationEngine.tableHashCode(STOCK_TABLEID));
+        assertEquals( sourceEngine.tableHashCode(WAREHOUSE_TABLEID), destinationEngine.tableHashCode(WAREHOUSE_TABLEID));
+
+        assertEquals(200, sourceEngine.serializeTable(WAREHOUSE_TABLEID).getRowCount());
+        assertEquals(1000, sourceEngine.serializeTable(STOCK_TABLEID).getRowCount());
+        assertEquals(200, destinationEngine.serializeTable(WAREHOUSE_TABLEID).getRowCount());
+        assertEquals(1000, destinationEngine.serializeTable(STOCK_TABLEID).getRowCount());
     }
 
     private int warehouseTableId(Catalog catalog) {
@@ -166,12 +387,12 @@ public class TestExecutionEngine extends TestCase {
     public void testGetStats() throws Exception {
         final Catalog catalog = new Catalog();
         catalog.execute(LoadCatalogToString.THE_CATALOG);
-        engine.loadCatalog(catalog.serialize());
+        sourceEngine.loadCatalog(catalog.serialize());
 
         final int WAREHOUSE_TABLEID = catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("WAREHOUSE").getRelativeIndex();
         final int STOCK_TABLEID = catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("STOCK").getRelativeIndex();
         final int locators[] = new int[] { WAREHOUSE_TABLEID, STOCK_TABLEID };
-        final VoltTable results[] = engine.getStats(SysProcSelector.TABLE, locators, false, 0L);
+        final VoltTable results[] = sourceEngine.getStats(SysProcSelector.TABLE, locators, false, 0L);
         assertNotNull(results);
         assertEquals(1, results.length);
         assertNotNull(results[0]);
@@ -183,7 +404,7 @@ public class TestExecutionEngine extends TestCase {
         }
     }
 
-    private ExecutionEngine engine;
+    private ExecutionEngine sourceEngine;
     private static final int CLUSTER_ID = 2;
     private static final int NODE_ID = 1;
 
@@ -191,13 +412,13 @@ public class TestExecutionEngine extends TestCase {
     protected void setUp() throws Exception {
         super.setUp();
         VoltDB.instance().readBuildInfo();
-        engine = new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID, 0, 0, "");
+        sourceEngine = new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID, 0, 0, "");
     }
 
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();
-        engine.release();
-        engine = null;
+        sourceEngine.release();
+        sourceEngine = null;
     }
 }
