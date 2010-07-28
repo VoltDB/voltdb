@@ -285,8 +285,8 @@ public class RealVoltDB implements VoltDBInterface
                 try {
                     leader = InetAddress.getByName(m_catalogContext.cluster.getLeaderaddress());
                 } catch (UnknownHostException ex) {
-                    hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_CouldNotRetrieveLeaderAddress.name(), new Object[] { m_catalogContext.cluster.getLeaderaddress() }, ex);
-                    throw new RuntimeException(ex);
+                    hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_CouldNotRetrieveLeaderAddress.name(), new Object[] { m_catalogContext.cluster.getLeaderaddress() }, null);
+                    VoltDB.crashVoltDB();
                 }
                 // ensure at least one host (catalog compiler should check this too
                 if (m_catalogContext.numberOfNodes <= 0) {
