@@ -41,11 +41,9 @@ import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.benchmark.tpcc.procedures.InsertNewOrder;
 import org.voltdb.catalog.LoadCatalogToString;
-import org.voltdb.client.Client;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcCallException;
-import org.voltdb.client.ProcedureCallback;
+import org.voltdb.client.*;
 import org.voltdb.compiler.VoltProjectBuilder.*;
+import org.voltdb.types.TimestampType;
 
 /**
  * Tests a mix of multi-partition and single partition procedures on a
@@ -118,7 +116,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
             }
         }
     }
-/*
+
     public void testUpdate() throws Exception {
         Client client = getClient();
         String newCatalogURL;
@@ -242,7 +240,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         assertTrue(callbackSuccess);
         assertTrue(true);
     }
-*/
+
     public void testEnableSecurity() throws IOException, ProcCallException, InterruptedException
     {
         System.out.println("\n\n-----\n testEnabledSecurity \n-----\n\n");
