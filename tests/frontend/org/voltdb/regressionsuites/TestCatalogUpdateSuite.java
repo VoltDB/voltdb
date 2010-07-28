@@ -45,8 +45,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.client.SyncCallback;
-import org.voltdb.types.TimestampType;
+import org.voltdb.compiler.VoltProjectBuilder.*;
 
 /**
  * Tests a mix of multi-partition and single partition procedures on a
@@ -119,7 +118,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
             }
         }
     }
-
+/*
     public void testUpdate() throws Exception {
         Client client = getClient();
         String newCatalogURL;
@@ -242,6 +241,43 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         client.drain();
         assertTrue(callbackSuccess);
         assertTrue(true);
+    }
+*/
+    public void testEnableSecurity() throws IOException, ProcCallException, InterruptedException
+    {
+        System.out.println("\n\n-----\n testEnabledSecurity \n-----\n\n");
+        Client client = getClient();
+        loadSomeData(client, 0, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
+
+        String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base-secure.jar");
+        String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base-secure.xml");
+        VoltTable[] results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
+        assertTrue(results.length == 1);
+
+        // a new client should need a username/password other than the regression suite default.
+        boolean caught = false;
+        try {
+            getClient();
+        } catch (IOException e) {
+            caught = true;
+        }
+        assertTrue(caught);
+
+        // create a valid client and call some procedures
+        this.m_username = "user1";
+        this.m_password = "userpass1";
+        Client client3 = getClient();
+        loadSomeData(client3, 50, 10);
+        client3.drain();
+        assertTrue(callbackSuccess);
+
+        // the old client should still work. This isn't really desirable.. but verify the
+        // expected behavior.
+        loadSomeData(client, 100, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
     }
 
     public void loadSomeData(Client client, int start, int count) throws IOException, ProcCallException {
@@ -448,8 +484,22 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         assertTrue(compile);
         copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-basewithdeployment.xml"));
 
+        // As catalogupdate-cluster-base but with security enabled. This requires users and groups..
+        GroupInfo groups[] = new GroupInfo[] {new GroupInfo("group1", false, false)};
+        UserInfo users[] = new UserInfo[] {new UserInfo("user1", "userpass1", new String[] {"group1"})};
+        ProcedureInfo procInfo = new ProcedureInfo(new String[] {"group1"}, InsertNewOrder.class);
 
-        // Build a new catalog and compile the deployment into it immediately
+        config = new LocalCluster("catalogupdate-cluster-base-secure.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addUsers(users);
+        project.addGroups(groups);
+        project.addProcedures(procInfo);
+        project.setSecurityEnabled(true);
+        compile = config.compile(project, false);
+        assertTrue(compile);
+        copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-base-secure.xml"));
+
         //config = new LocalSingleProcessServer("catalogupdate-local-addtables.jar", 2, BackendTarget.NATIVE_EE_JNI);
         config = new LocalCluster("catalogupdate-cluster-addtables.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
@@ -479,7 +529,6 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
             fail();
         }
 
-        // Build a new catalog and compile the deployment into it immediately
         //config = new LocalSingleProcessServer("catalogupdate-local-expanded.jar", 2, BackendTarget.NATIVE_EE_JNI);
         config = new LocalCluster("catalogupdate-cluster-expanded.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
@@ -490,7 +539,6 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         assertTrue(compile);
         copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.xml"));
 
-        // Build a new catalog and compile the deployment into it immediately
         //config = new LocalSingleProcessServer("catalogupdate-local-conflict.jar", 2, BackendTarget.NATIVE_EE_JNI);
         config = new LocalCluster("catalogupdate-cluster-conflict.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
@@ -501,7 +549,6 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         assertTrue(compile);
         copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-conflict.xml"));
 
-        // Build a new catalog and compile the deployment into it immediately
         //config = new LocalSingleProcessServer("catalogupdate-local-many.jar", 2, BackendTarget.NATIVE_EE_JNI);
         config = new LocalCluster("catalogupdate-cluster-many.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();

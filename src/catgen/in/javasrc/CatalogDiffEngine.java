@@ -90,6 +90,8 @@ public class CatalogDiffEngine {
         // Support modification of these specific fields
         if (suspect instanceof Database && field.equals("schema"))
             return true;
+        if (suspect instanceof Cluster && field.equals("securityEnabled"))
+            return true;
 
         // Support modification of these entire sub-trees
         do {

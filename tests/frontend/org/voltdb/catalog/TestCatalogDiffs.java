@@ -48,14 +48,15 @@ public class TestCatalogDiffs extends TestCase {
                                  org.voltdb.benchmark.tpcc.procedures.delivery.class };
 
     protected String compile(String name, Class<?>... procList) {
-        return  compileWithGroups(null, null, name, procList);
+        return  compileWithGroups(false, null, null, name, procList);
     }
 
-    protected String compileWithGroups(GroupInfo[] gi, UserInfo[] ui, String name, Class<?>... procList) {
+    protected String compileWithGroups(boolean securityEnabled, GroupInfo[] gi, UserInfo[] ui, String name, Class<?>... procList) {
         TPCCProjectBuilder builder = new TPCCProjectBuilder();
         builder.addDefaultSchema();
         builder.addDefaultPartitioning();
         builder.addProcedures(procList);
+        builder.setSecurityEnabled(securityEnabled);
 
         if (gi != null && gi.length > 0)
             builder.addGroups(gi);
@@ -131,7 +132,7 @@ public class TestCatalogDiffs extends TestCase {
 
         GroupInfo gi[] = new GroupInfo[1];
         gi[0] = new GroupInfo("group1", true, true);
-        String updated = compileWithGroups(gi, null, "base", BASEPROCS);
+        String updated = compileWithGroups(false, gi, null, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
 
         verifyDiff(catOriginal, catUpdated);
@@ -147,7 +148,7 @@ public class TestCatalogDiffs extends TestCase {
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
 
-        String updated = compileWithGroups(gi, ui, "base", BASEPROCS);
+        String updated = compileWithGroups(false, gi, ui, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
 
         verifyDiff(catOriginal, catUpdated);
@@ -160,12 +161,12 @@ public class TestCatalogDiffs extends TestCase {
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
 
-        String original = compileWithGroups(gi, ui, "base", BASEPROCS);
+        String original = compileWithGroups(false, gi, ui, "base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
 
         // change a user.
         ui[0] = new UserInfo("user1", "drowssap", new String[] {"group1"});
-        String updated = compileWithGroups(gi, ui, "base", BASEPROCS);
+        String updated = compileWithGroups(false, gi, ui, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
 
         verifyDiff(catOriginal, catUpdated);
@@ -178,11 +179,11 @@ public class TestCatalogDiffs extends TestCase {
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
 
-        String original = compileWithGroups(gi, ui, "base", BASEPROCS);
+        String original = compileWithGroups(false, gi, ui, "base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
 
         // no users this time
-        String updated = compileWithGroups(gi, null, "base", BASEPROCS);
+        String updated = compileWithGroups(false, gi, null, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
 
         verifyDiff(catOriginal, catUpdated);
@@ -195,11 +196,11 @@ public class TestCatalogDiffs extends TestCase {
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
 
-        String original = compileWithGroups(gi, ui, "base", BASEPROCS);
+        String original = compileWithGroups(false, gi, ui, "base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
 
         // no groups or users this time
-        String updated = compileWithGroups(null, null, "base", BASEPROCS);
+        String updated = compileWithGroups(false, null, null, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
 
         verifyDiff(catOriginal, catUpdated);
@@ -214,16 +215,35 @@ public class TestCatalogDiffs extends TestCase {
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
         ui[1] = new UserInfo("user2", "password", new String[] {"group2"});
 
-        String original = compileWithGroups(gi, ui, "base", BASEPROCS);
+        String original = compileWithGroups(false, gi, ui, "base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
 
         // swap the user's group assignments
         ui[0] = new UserInfo("user1", "password", new String[] {"group2"});
         ui[1] = new UserInfo("user2", "password", new String[] {"group1"});
-        String updated = compileWithGroups(gi, ui, "base", BASEPROCS);
+        String updated = compileWithGroups(false, gi, ui, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
 
         verifyDiff(catOriginal, catUpdated);
+    }
+
+    public void testChangeSecurityEnabled() {
+        GroupInfo gi[] = new GroupInfo[2];
+        gi[0] = new GroupInfo("group1", true, true);
+        gi[1] = new GroupInfo("group2", true, true);
+
+        UserInfo ui[] = new UserInfo[2];
+        ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
+        ui[1] = new UserInfo("user2", "password", new String[] {"group2"});
+
+        String original = compileWithGroups(false, gi, ui, "base", BASEPROCS);
+        Catalog catOriginal = catalogForJar(original);
+
+        // just turn on security
+        String updated = compileWithGroups(true, gi, ui, "base", BASEPROCS);
+        Catalog catUpdated = catalogForJar(updated);
+
+        verifyDiff (catOriginal, catUpdated);
     }
 
     public void testUnallowedChange() throws IOException {
