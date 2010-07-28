@@ -160,7 +160,7 @@ void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple) {
         }
         else {
             char message[128];
-            sprintf(message, "Error in materialized view table update for"
+            snprintf(message, 128, "Error in materialized view table update for"
                     " col %d. Expression type %d", i, m_outputColumnAggTypes[i]);
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                           message);

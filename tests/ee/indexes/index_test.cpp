@@ -104,7 +104,7 @@ public:
         vector<bool> columnAllowNull(NUM_OF_COLUMNS, false);
         for (int ctr = 0; ctr < NUM_OF_COLUMNS; ctr++)
         {
-            sprintf(buffer, "column%02d", ctr);
+            snprintf(buffer, 32, "column%02d", ctr);
             columnNames[ctr] = buffer;
         }
         TupleSchema* schema =

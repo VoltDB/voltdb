@@ -332,9 +332,9 @@ void Catalog::hexEncodeString(const char *string, char *buffer) {
     int32_t i = 0;
     for (; i < strlen(string); i++) {
         char ch[2];
-        sprintf(ch, "%x", (string[i] >> 4) & 0xF);
+        snprintf(ch, 2, "%x", (string[i] >> 4) & 0xF);
         buffer[i * 2] = ch[0];
-        sprintf(ch, "%x", string[i] & 0xF);
+        snprintf(ch, 2, "%x", string[i] & 0xF);
         buffer[(i * 2) + 1] = ch[0];
     }
     buffer[i*2] = '\0';

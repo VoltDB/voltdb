@@ -141,7 +141,7 @@ TEST_F(ConstraintTest, NotNull) {
     bool allow_null[4] = { false, false, false, true };
     for (int ctr = 0; ctr < 4; ctr++) {
         char name[16];
-        sprintf(name, "col%02d", ctr);
+        snprintf(name, 16, "col%02d", ctr);
         addColumn(name, VALUE_TYPE_BIGINT,
                   NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT),
                   allow_null[ctr]);
@@ -189,7 +189,7 @@ TEST_F(ConstraintTest, UniqueOneColumnNotNull) {
     bool allow_null[columnCount] = { false, true, true };
     for (int ctr = 0; ctr < columnCount; ctr++) {
         char name[16];
-        sprintf(name, "col%02d", ctr);
+        snprintf(name, 16, "col%02d", ctr);
         addColumn(name, VALUE_TYPE_BIGINT,
                   NValue::getTupleStorageSize(VALUE_TYPE_BIGINT),
                   allow_null[ctr]);
@@ -253,7 +253,7 @@ TEST_F(ConstraintTest, UniqueOneColumnAllowNull) {
     bool allow_null[columnCount] = { true, true, true };
     for (int ctr = 0; ctr < columnCount; ctr++) {
         char name[16];
-        sprintf(name, "col%02d", ctr);
+        snprintf(name, 16, "col%02d", ctr);
         addColumn(name, VALUE_TYPE_BIGINT,
                   NValue::getTupleStorageSize(VALUE_TYPE_BIGINT), allow_null[ctr]);
     }
@@ -310,7 +310,7 @@ TEST_F(ConstraintTest, UniqueTwoColumnNotNull) {
     bool allow_null[columnCount] = { false, true, false, false };
     for (int ctr = 0; ctr < columnCount; ctr++) {
         char name[16];
-        sprintf(name, "col%02d", ctr);
+        snprintf(name, 16, "col%02d", ctr);
         addColumn(name, VALUE_TYPE_BIGINT, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT), allow_null[ctr]);
     }
 
@@ -358,7 +358,7 @@ TEST_F(ConstraintTest, UniqueTwoColumnAllowNull) {
     bool allow_null[columnCount] = { true, true, true, true };
     for (int ctr = 0; ctr < columnCount; ctr++) {
         char name[16];
-        sprintf(name, "col%02d", ctr);
+        snprintf(name, 16, "col%02d", ctr);
         addColumn(name, VALUE_TYPE_BIGINT, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT), allow_null[ctr]);
     }
 

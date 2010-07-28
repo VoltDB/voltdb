@@ -84,7 +84,7 @@ getGeneral(ExpressionType c,
         return new ComparisonExpression<CmpGte>(c, l, r);
     default:
         char message[256];
-        sprintf(message, "Invalid ExpressionType '%s' called"
+        snprintf(message, 256, "Invalid ExpressionType '%s' called"
                 " for ComparisonExpression",
                 expressionutil::getTypeName(c).c_str());
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
@@ -113,7 +113,7 @@ getMoreSpecialized(ExpressionType c, L* l, R* r)
         return new InlinedComparisonExpression<CmpGte, L, R>(c, l, r);
     default:
         char message[256];
-        sprintf(message, "Invalid ExpressionType '%s' called for"
+        snprintf(message, 256, "Invalid ExpressionType '%s' called for"
                 " ComparisonExpression", expressionutil::getTypeName(c).c_str());
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
     }
@@ -447,7 +447,7 @@ expressionFactory(json_spirit::Object &obj,
         // must handle all known expressions in this factory
     default:
         char message[256];
-        sprintf(message, "Invalid ExpressionType '%s' requested from factory",
+        snprintf(message,256, "Invalid ExpressionType '%s' requested from factory",
                 expressionutil::getTypeName(et).c_str());
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
     }
@@ -591,7 +591,7 @@ getTypeName(voltdb::ExpressionType type)
             break;
         default: {
             char buffer[32];
-            sprintf(buffer, "UNKNOWN[%d]", type);
+            snprintf(buffer, 32, "UNKNOWN[%d]", type);
             ret = buffer;
         }
     }

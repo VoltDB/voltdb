@@ -191,7 +191,7 @@ std::string NValue::getTypeName(ValueType type) {
         break;
       default: {
           char buffer[32];
-          sprintf(buffer, "UNKNOWN[%d]", type);
+          snprintf(buffer, 32, "UNKNOWN[%d]", type);
           ret = buffer;
       }
     }
@@ -330,7 +330,7 @@ NValue NValue::opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const {
         TTInt retval;
         if (retval.FromInt(calc)  || retval > NValue::s_maxDecimal || retval < s_minDecimal) {
             char message[4096];
-            sprintf( message, "Attempted to multiply %s by %s causing overflow/underflow. Unscaled result was %s",
+            snprintf(message, 4096, "Attempted to multiply %s by %s causing overflow/underflow. Unscaled result was %s",
                     lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str(),
                     calc.ToString(10).c_str());
             throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
@@ -347,7 +347,7 @@ NValue NValue::opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const {
         retval.FromInt(calc);
         if (retval.FromInt(calc)  || retval > NValue::s_maxDecimal || retval < s_minDecimal) {
             char message[4096];
-            sprintf( message, "Attempted to multiply %s by %s causing overflow/underflow. Unscaled result was %s",
+            snprintf(message, 4096, "Attempted to multiply %s by %s causing overflow/underflow. Unscaled result was %s",
                     lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str(),
                     calc.ToString(10).c_str());
             throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
@@ -365,7 +365,7 @@ NValue NValue::opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const {
         retval.FromInt(calc);
         if (retval.FromInt(calc)  || retval > NValue::s_maxDecimal || retval < s_minDecimal) {
             char message[4096];
-            sprintf( message, "Attempted to multiply %s by %s causing overflow/underflow. Unscaled result was %s",
+            snprintf(message, 4096, "Attempted to multiply %s by %s causing overflow/underflow. Unscaled result was %s",
                     lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str(),
                     calc.ToString(10).c_str());
             throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
@@ -406,7 +406,7 @@ NValue NValue::opDivideDecimals(const NValue lhs, const NValue rhs) const {
     calc *= NValue::kMaxScaleFactor;
     if (calc.Div(rhs.getDecimal())) {
         char message[4096];
-        sprintf( message, "Attempted to divide %s by %s causing overflow/underflow (or divide by zero)",
+        snprintf( message, 4096, "Attempted to divide %s by %s causing overflow/underflow (or divide by zero)",
                 lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str());
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
                            message);
@@ -414,7 +414,7 @@ NValue NValue::opDivideDecimals(const NValue lhs, const NValue rhs) const {
     TTInt retval;
     if (retval.FromInt(calc)  || retval > NValue::s_maxDecimal || retval < s_minDecimal) {
         char message[4096];
-        sprintf( message, "Attempted to divide %s by %s causing overflow. Unscaled result was %s",
+        snprintf( message, 4096, "Attempted to divide %s by %s causing overflow. Unscaled result was %s",
                 lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str(),
                 calc.ToString(10).c_str());
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
@@ -429,7 +429,7 @@ void throwCastSQLValueOutOfRangeException<double>(
         const ValueType origType,
         const ValueType newType) {
     char msg[1024];
-    sprintf(msg, "Type %s with value %f can't be cast as %s because the value is "
+    snprintf(msg, 1024, "Type %s with value %f can't be cast as %s because the value is "
             "out of range for the destination type",
             valueToString(origType).c_str(),
             value,
@@ -445,7 +445,7 @@ void throwCastSQLValueOutOfRangeException<int64_t>(
                                   const ValueType newType)
 {
     char msg[1024];
-    sprintf(msg, "Type %s with value %jd can't be cast as %s because the value is "
+    snprintf(msg, 1024, "Type %s with value %jd can't be cast as %s because the value is "
             "out of range for the destination type",
             valueToString(origType).c_str(),
             (intmax_t)value,

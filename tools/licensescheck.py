@@ -65,6 +65,13 @@ def verifyTabs(f, content):
         return 1
     return 0
 
+def verifySprintf(f, content):
+    num = content.count('sprintf')
+    if num > 0:
+        print("ERROR: \"%s\" contains %d calls to sprintf(). Use snprintf()." % (f, num))
+        return 1
+    return 0
+
 def readFile(filename):
     "read a file into a string"
     FH=open(filename, 'r')
@@ -86,6 +93,9 @@ def processFile(f, approvedLicensesJavaC, approvedLicensesPython):
     if retval != 0:
         return retval
     retval = verifyTrailingWhitespace(f, content)
+    if (retval != 0):
+        return retval
+    retval = verifySprintf(f, content)
     if (retval != 0):
         return retval
     return 0

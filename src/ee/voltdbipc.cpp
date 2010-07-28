@@ -1030,7 +1030,7 @@ void VoltDBIPC::eltAction(struct ipc_command *cmd) {
 
 void VoltDBIPC::signalHandler(int signum, siginfo_t *info, void *context) {
     char err_msg[128];
-    sprintf(err_msg, "SIGSEGV caught: signal number %d, error value %d, signal"
+    snprintf(err_msg, 128, "SIGSEGV caught: signal number %d, error value %d, signal"
             " code %d\n\n", info->si_signo, info->si_errno, info->si_code);
     std::string message = err_msg;
     message.append(m_engine->debug());
@@ -1073,7 +1073,7 @@ void VoltDBIPC::signalHandler(int signum, siginfo_t *info, void *context) {
             symname = tmp;
 #endif
 
-        sprintf(trace, "% 2d: %p <%s+%lu> (%s)\n",
+        snprintf(trace, 1024, "% 2d: %p <%s+%lu> (%s)\n",
                 ++f,
                 ip,
                 symname,

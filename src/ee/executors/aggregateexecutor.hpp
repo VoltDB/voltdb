@@ -322,7 +322,7 @@ inline Agg* getAggInstance(Pool* memoryPool, ExpressionType agg_type)
         break;
     default: {
         char message[128];
-        sprintf(message, "Unknown aggregate type %d", agg_type);
+        snprintf(message, 128, "Unknown aggregate type %d", agg_type);
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       message);
     }

@@ -197,7 +197,7 @@ void signalHandler(int signum, siginfo_t *info, void *context) {
             symname = tmp;
 #endif
 
-        sprintf(trace, "% 2d: %p <%s+%lu> (%s)\n",
+        snprintf(trace, 1024, "% 2d: %p <%s+%lu> (%s)\n",
                 ++f,
                 ip,
                 symname,

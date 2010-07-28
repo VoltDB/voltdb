@@ -129,7 +129,7 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
             return false;
     } catch (exception& err) {
         char message[128];
-        sprintf(message, "The Executor failed to initialize PlanNode '%s'",
+        snprintf(message, 128, "The Executor failed to initialize PlanNode '%s'",
                 m_abstractNode->debug().c_str());
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       message);

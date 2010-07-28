@@ -115,7 +115,7 @@ string getTypeName(ValueType type) {
             break;
         default: {
             char buffer[32];
-            sprintf(buffer, "UNKNOWN[%d]", type);
+            snprintf(buffer, 32, "UNKNOWN[%d]", type);
             ret = buffer;
         }
     }

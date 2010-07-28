@@ -426,7 +426,7 @@ int VoltDBEngine::executePlanFragment(string fragmentString,
         else
         {
             char message[128];
-            sprintf(message, "Unable to load ad-hoc plan fragment for"
+            snprintf(message, 128, "Unable to load ad-hoc plan fragment for"
                     " transaction %jd.", (intmax_t)txnId);
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                           message);
@@ -1036,7 +1036,7 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
                 CatalogId locator = static_cast<CatalogId>(locators[ii]);
                 if (m_tables.find(locator) == m_tables.end()) {
                     char message[256];
-                    sprintf(message, "getStats() called with selector %d, and"
+                    snprintf(message, 256,  "getStats() called with selector %d, and"
                             " an invalid locator %d that does not correspond to"
                             " a table", selector, locator);
                     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
@@ -1050,7 +1050,7 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
             break;
         default:
             char message[256];
-            sprintf(message, "getStats() called with an unrecognized selector"
+            snprintf(message, 256, "getStats() called with an unrecognized selector"
                     " %d", selector);
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                           message);

@@ -107,7 +107,7 @@ class TableTest : public Test {
             std::vector<int32_t> columnLengths;
             std::vector<bool> columnAllowNull;
             for (int ctr = 0; ctr < NUM_OF_COLUMNS; ctr++) {
-                sprintf(buffer, "column%02d", ctr);
+                snprintf(buffer, 32, "column%02d", ctr);
                 columnNames[ctr] = buffer;
                 columnTypes.push_back(COLUMN_TYPES[ctr]);
                 columnLengths.push_back(COLUMN_SIZES[ctr]);
