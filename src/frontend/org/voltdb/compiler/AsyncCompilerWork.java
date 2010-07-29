@@ -27,7 +27,6 @@ public class AsyncCompilerWork implements Serializable {
     long clientHandle = -1;
     long connectionId = -1;
     String hostname = "";
-    int sequenceNumber = -1;
     transient public Object clientData = null;
 
     @Override
@@ -35,7 +34,6 @@ public class AsyncCompilerWork implements Serializable {
         String retval = "shouldShutdown:" + String.valueOf(shouldShutdown) + ", ";
         retval += "clientHandle:" + String.valueOf(clientHandle) + ", ";
         retval += "connectionId:" + String.valueOf(connectionId) + ", ";
-        retval += "sequenceNumber:" + String.valueOf(sequenceNumber) + ", ";
         return retval;
     }
 }

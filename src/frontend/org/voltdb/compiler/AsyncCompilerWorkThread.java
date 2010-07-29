@@ -107,7 +107,6 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
      * @param clientHandle Handle provided by the client application (not ClientInterface)
      * @param connectionId
      * @param hostname Hostname of the other end of the connection
-     * @param sequenceNumber
      * @param clientData Data supplied by ClientInterface (typically a VoltPort) that will be in the PlannedStmt produced later.
      */
     public void planSQL(
@@ -115,7 +114,6 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
             long clientHandle,
             long connectionId,
             String hostname,
-            int sequenceNumber,
             Object clientData) {
 
         AdHocPlannerWork work = new AdHocPlannerWork();
@@ -123,7 +121,6 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
         work.sql = sql;
         work.connectionId = connectionId;
         work.hostname = hostname;
-        work.sequenceNumber = sequenceNumber;
         work.clientData = clientData;
         m_work.add(work);
     }
@@ -140,7 +137,6 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
         work.clientHandle = clientHandle;
         work.connectionId = connectionId;
         work.hostname = hostname;
-        work.sequenceNumber = sequenceNumber;
         work.clientData = clientData;
         work.catalogURL = catalogURL;
         work.deploymentURL = deploymentURL;
@@ -250,6 +246,9 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
         plannedStmt.connectionId = work.connectionId;
         plannedStmt.hostname = work.hostname;
         plannedStmt.clientData = work.clientData;
+        // record the catalog version the query is planned against to
+        // catch races vs. updateApplicationCatalog.
+        plannedStmt.catalogVersion = m_context.catalogVersion;
 
         try {
             ensureLoadedPlanner();

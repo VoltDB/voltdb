@@ -813,7 +813,6 @@ public class ClientInterface implements DumpManager.Dumpable {
                                                   task.clientHandle,
                                                   handler.connectionId(),
                                                   handler.m_hostname,
-                                                  handler.sequenceId(),
                                                   c);
                 return;
             }
@@ -934,20 +933,32 @@ public class ClientInterface implements DumpManager.Dumpable {
             if (result.errorMsg == null) {
                 if (result instanceof AdHocPlannedStmt) {
                     AdHocPlannedStmt plannedStmt = (AdHocPlannedStmt) result;
-                    // create the execution site task
-                    StoredProcedureInvocation task = new StoredProcedureInvocation();
-                    task.procName = "@AdHoc";
-                    task.params = new ParameterSet();
-                    task.params.m_params = new Object[] {
-                            plannedStmt.aggregatorFragment, plannedStmt.collectorFragment,
-                            plannedStmt.sql, plannedStmt.isReplicatedTableDML ? 1 : 0
-                    };
-                    task.clientHandle = plannedStmt.clientHandle;
+                    if (plannedStmt.catalogVersion != m_catalogContext.get().catalogVersion) {
+                         /* The adhoc planner learns of catalog updates after the EE and the
+                            rest of the system. If the adhoc sql was planned against an
+                            obsolete catalog, re-plan. */
+                        m_asyncCompilerWorkThread.planSQL(plannedStmt.sql,
+                                                          plannedStmt.clientHandle,
+                                                          plannedStmt.connectionId,
+                                                          plannedStmt.hostname,
+                                                          plannedStmt.clientData);
+                    }
+                    else {
+                        // create the execution site task
+                        StoredProcedureInvocation task = new StoredProcedureInvocation();
+                        task.procName = "@AdHoc";
+                        task.params = new ParameterSet();
+                        task.params.m_params = new Object[] {
+                                                             plannedStmt.aggregatorFragment, plannedStmt.collectorFragment,
+                                                             plannedStmt.sql, plannedStmt.isReplicatedTableDML ? 1 : 0
+                        };
+                        task.clientHandle = plannedStmt.clientHandle;
 
-                    // initiate the transaction
-                    m_initiator.createTransaction(plannedStmt.connectionId, plannedStmt.hostname,
-                                                  task, false, false, false, m_allPartitions,
-                                                  m_allPartitions.length, plannedStmt.clientData, 0, 0);
+                        // initiate the transaction
+                        m_initiator.createTransaction(plannedStmt.connectionId, plannedStmt.hostname,
+                                                      task, false, false, false, m_allPartitions,
+                                                      m_allPartitions.length, plannedStmt.clientData, 0, 0);
+                    }
                 }
                 else if (result instanceof CatalogChangeResult) {
                     CatalogChangeResult changeResult = (CatalogChangeResult) result;

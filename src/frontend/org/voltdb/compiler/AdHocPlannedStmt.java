@@ -24,6 +24,7 @@ public class AdHocPlannedStmt extends AsyncCompilerResult {
     public String collectorFragment;
     public String sql;
     public boolean isReplicatedTableDML;
+    public int catalogVersion;
 
     @Override
     public String toString() {
