@@ -17,6 +17,7 @@
 
 package org.voltdb.jni;
 
+import java.util.ArrayList;
 import java.util.Random;
 
 import org.voltdb.DependencyPair;
@@ -44,17 +45,27 @@ public class MockExecutionEngine extends ExecutionEngine {
         VoltTable vt;
         // TestExecutionSite uses this mock site.
         //
-        // For interesting things to happen, the first parameter used by the fuzz
-        // tester must be a string indicating what transaction outcome should be simulated
-        // by the mock EE.
+        // For interesting things to happen, the fuzz tester must provide a parameter
+        // named 'txn_outcome'.  If this parameter is present, then the transaction
+        // result will be determined by the parameter which follows 'txn_outcome'
+        // according to:
         //
+        // commit : every execution site will complete this transaction normally
         // rollback_all : every execution site should throw an exception for rollback
         // rollback_random : each execution site should randomly decide to rollback
         //                   This includes the final aggregating execution site call.
 
-        if (parameterSet.toArray().length > 0 && parameterSet.toArray()[0] instanceof String)
+        ArrayList<Object> params = new ArrayList<Object>();
+
+        for (Object param : parameterSet.toArray())
         {
-            String txn_outcome = (String)parameterSet.toArray()[0];
+            params.add(param);
+        }
+
+        int txn_outcome_index = params.indexOf("txn_outcome");
+        if (txn_outcome_index != -1)
+        {
+            String txn_outcome = (String)params.get(txn_outcome_index + 1);
 
             if (txn_outcome.equals("rollback_all"))
             {

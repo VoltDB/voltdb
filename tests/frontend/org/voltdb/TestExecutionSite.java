@@ -284,19 +284,6 @@ public class TestExecutionSite extends TestCase {
             m_sites[m_siteId].shutdown();
             m_voltdb.killSite(m_siteId);
             m_voltdb.getFaultDistributor().reportFault(new NodeFailureFault( getHostIdForSiteId(m_siteId), String.valueOf(getHostIdForSiteId(m_siteId))));
-            // send failure message to all remaining sites
-//            int[] site_ids = m_voltdb.getCatalogContext().siteTracker.getUpExecutionSites();
-//            for (int site_id : site_ids)
-//            {
-//                RussianRouletteMailbox dest = postoffice.get(site_id);
-//                if (dest != null)
-//                {
-//                    HashSet<Integer> hostIds = new HashSet<Integer>();
-//                    hostIds.add();
-//                    //System.out.println("Sending Failure Notification to site: " + site_id);
-//                    dest.deliver(new ExecutionSite.ExecutionSiteNodeFailureMessage(hostIds));
-//                }
-//            }
             // remove this site from the postoffice
             postoffice.remove(m_siteId);
             // stop/join this site's thread
@@ -324,7 +311,6 @@ public class TestExecutionSite extends TestCase {
 
     private void setUp(int siteCount, int partitionCount, int kFactor) {
         long seed = System.currentTimeMillis();
-        //System.out.println("FUZZ SEED: " + seed);
         m_rand = new Random(seed);
         m_checker = new ExecutionSiteFuzzChecker();
 
@@ -531,6 +517,8 @@ public class TestExecutionSite extends TestCase {
     /* Multi-partition - mock VoltProcedure.slowPath() */
     public static class MockMPVoltProcedure extends VoltProcedure
     {
+        int m_numberOfBatches = 1;
+
         // Enable these simulated faults before running the procedure by setting
         // one of these booleans to true. Allows testcases to simulate various
         // coordinator node failures. Faults are turned back off once simulated
@@ -541,8 +529,9 @@ public class TestExecutionSite extends TestCase {
         public static int m_called = 0;
 
         // Some functions that can be overridden by subclasses to change behavior.
-        boolean finalTask()             { return false; }
-        boolean nonTransactional()      { return false; }
+        int numberOfBatches()           { return m_numberOfBatches; }
+        int statementsPerBatch()        { return 1; }
+        boolean nonTransactional()      { return true; }
         boolean rollbackParticipant()   { return false; }
 
         /* TODO: implement these.
@@ -550,6 +539,25 @@ public class TestExecutionSite extends TestCase {
         boolean userRollbackProcStart() { return false; }
         boolean userRollbackProcEnd()   { return false; }
         */
+
+        /** Helper to look for interesting params in the list and set
+         * internal state based on it
+         */
+        private void parseParamList(Object... paramList)
+        {
+            ArrayList<Object> params = new ArrayList<Object>();
+            for (Object param : paramList)
+            {
+                params.add(param);
+            }
+
+            // parse out number of batches
+            int num_batches_index = params.indexOf("number_of_batches");
+            if (num_batches_index != -1)
+            {
+                m_numberOfBatches = (Integer)params.get(num_batches_index + 1);
+            }
+        }
 
         /** Helper to turn object list into parameter set buffer */
         private ByteBuffer createParametersBuffer(Object... paramList) {
@@ -570,41 +578,48 @@ public class TestExecutionSite extends TestCase {
         ClientResponseImpl call(TransactionState txnState, Object... paramList)
         {
             try {
+                parseParamList(paramList);
                 ByteBuffer paramBuf = createParametersBuffer(paramList);
 
-                // Build the aggregator and the distributed tasks.
-                int localTask_startDep = txnState.getNextDependencyId() | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-                int localTask_outputDep = txnState.getNextDependencyId();
+                for (int i = 0; i < numberOfBatches(); i++)
+                {
+                    boolean finalTask = (i == numberOfBatches() - 1);
 
-                FragmentTaskMessage localTask =
-                    new FragmentTaskMessage(txnState.initiatorSiteId,
-                                            txnState.coordinatorSiteId,
-                                            txnState.txnId,
-                                            txnState.isReadOnly,
-                                            new long[] {1},
-                                            new int[] {localTask_outputDep},
-                                            new ByteBuffer[] {paramBuf},
-                                            finalTask());
+                    // XXX-IZZY these will turn into arrays for multi-statement batches
+                    // Build the aggregator and the distributed tasks.
+                    int localTask_startDep = txnState.getNextDependencyId() | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+                    int localTask_outputDep = txnState.getNextDependencyId();
 
-                localTask.addInputDepId(0, localTask_startDep);
+                    FragmentTaskMessage localTask =
+                        new FragmentTaskMessage(txnState.initiatorSiteId,
+                                                txnState.coordinatorSiteId,
+                                                txnState.txnId,
+                                                txnState.isReadOnly,
+                                                new long[] {1},
+                                                new int[] {localTask_outputDep},
+                                                new ByteBuffer[] {paramBuf},
+                                                false);
 
-                FragmentTaskMessage distributedTask =
-                    new FragmentTaskMessage(txnState.initiatorSiteId,
-                                            txnState.coordinatorSiteId,
-                                            txnState.txnId,
-                                            txnState.isReadOnly,
-                                            new long[] {0},
-                                            new int[] {localTask_startDep},
-                                            new ByteBuffer[] {paramBuf},
-                                            finalTask());
+                    localTask.addInputDepId(0, localTask_startDep);
 
-                txnState.createLocalFragmentWork(localTask, nonTransactional() && finalTask());
-                txnState.createAllParticipatingFragmentWork(distributedTask);
-                txnState.setupProcedureResume(finalTask(), new int[] {localTask_outputDep});
+                    FragmentTaskMessage distributedTask =
+                        new FragmentTaskMessage(txnState.initiatorSiteId,
+                                                txnState.coordinatorSiteId,
+                                                txnState.txnId,
+                                                txnState.isReadOnly,
+                                                new long[] {0},
+                                                new int[] {localTask_startDep},
+                                                new ByteBuffer[] {paramBuf},
+                                                finalTask);
 
-                final Map<Integer, List<VoltTable>> resultDeps =
-                    m_site.recursableRun(txnState);
-                assertTrue(resultDeps != null);
+                    txnState.createLocalFragmentWork(localTask, nonTransactional() && finalTask);
+                    txnState.createAllParticipatingFragmentWork(distributedTask);
+                    txnState.setupProcedureResume(finalTask, new int[] {localTask_outputDep});
+
+                    final Map<Integer, List<VoltTable>> resultDeps =
+                        m_site.recursableRun(txnState);
+                    assertTrue(resultDeps != null);
+                }
 
                 ++m_called;
 
@@ -1084,6 +1099,7 @@ public class TestExecutionSite extends TestCase {
             boolean rollback,
             boolean rollback_all,
             boolean readOnly,
+            int numberOfBatches,
             long txn_id,
             long safe_txn_id,
             int initiator_id,
@@ -1091,21 +1107,33 @@ public class TestExecutionSite extends TestCase {
             int coordinator_id,
             List<Integer> participants)
     {
+        ArrayList<Object> params = new ArrayList<Object>();
+        params.add("number_of_batches");
+        params.add(new Integer(numberOfBatches));
         final StoredProcedureInvocation spi = new StoredProcedureInvocation();
         if (!rollback) {
             spi.setProcName("org.voltdb.TestExecutionSite$MockMPVoltProcedure");
-            spi.setParams("commit", new Integer(partition_id));
+            params.add("txn_outcome");
+            params.add("commit");
+            params.add(new Integer(partition_id));
+            spi.setParams(params.toArray());
         }
         else {
             if (rollback_all)
             {
                 spi.setProcName("org.voltdb.TestExecutionSite$MockMPVoltProcedureRollbackParticipant");
-                spi.setParams("rollback_all", new Integer(partition_id));
+                params.add("txn_outcome");
+                params.add("rollback_all");
+                params.add(new Integer(partition_id));
+                spi.setParams(params.toArray());
             }
             else
             {
                 spi.setProcName("org.voltdb.TestExecutionSite$MockMPVoltProcedureRollbackParticipant");
-                spi.setParams("rollback_random", new Integer(partition_id));
+                params.add("txn_outcome");
+                params.add("rollback_random");
+                params.add(new Integer(partition_id));
+                spi.setParams(params.toArray());
             }
         }
 
@@ -1182,10 +1210,11 @@ public class TestExecutionSite extends TestCase {
                 createSPInitiation(readOnly, txnid, safe_txnid, initiator, partition);
             }
             else if (wheelOfDestiny < 70) {
+                int numberOfBatches = rand.nextInt(4) + 1;
                 List<Integer> participants = new ArrayList<Integer>();
                 int coordinator = selectCoordinatorAndParticipants(rand, partition, initiator, participants);
-                createMPInitiation(rollback, rollback_all, readOnly, txnid,
-                                   safe_txnid, initiator, partition,
+                createMPInitiation(rollback, rollback_all, readOnly, numberOfBatches,
+                                   txnid, safe_txnid, initiator, partition,
                                    coordinator, participants);
             }
             else {
