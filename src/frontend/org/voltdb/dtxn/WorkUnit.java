@@ -21,8 +21,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -80,6 +80,14 @@ class WorkUnit
             return retval;
         }
 
+        /**
+         * Dependencies from recovering sites use this.
+         */
+        void addDummyResult(int siteId, int mapId) {
+            m_expectedSites.remove(siteId);
+            m_expectedDeps--;
+        }
+
         void removeSite(int siteId)
         {
             // This is a really horrible hack to work around the fact that
@@ -92,9 +100,9 @@ class WorkUnit
             // not handle site failures (yet).
             if ((m_depId & DtxnConstants.MULTIPARTITION_DEPENDENCY) != 0)
             {
-                if (m_expectedSites.contains((Integer) siteId))
+                if (m_expectedSites.contains(siteId))
                 {
-                    m_expectedSites.remove((Integer) siteId);
+                    m_expectedSites.remove(siteId);
                 }
             }
         }
@@ -288,6 +296,24 @@ class WorkUnit
             msg += "\n  Mismatched results: " + payload.toString();
             throw new RuntimeException(msg);
         }
+    }
+
+    /**
+     * Dependencies from recovering sites use this.
+     */
+    void putDummyDependency(int dependencyId, int siteId) {
+        assert m_dependencies != null;
+        assert m_dependencies.containsKey(dependencyId);
+        assert m_dependencies.get(dependencyId) != null;
+
+        int partition = VoltDB.instance().getCatalogContext().siteTracker.getPartitionForSite(siteId);
+        int map_id = partition;
+        if (m_taskType == FragmentTaskMessage.SYS_PROC_PER_SITE)
+        {
+            map_id = siteId;
+        }
+
+        m_dependencies.get(dependencyId).addDummyResult(siteId, map_id);
     }
 
     boolean allDependenciesSatisfied() {

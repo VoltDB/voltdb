@@ -37,6 +37,7 @@ public class InitiateResponseMessage extends VoltMessage {
     private int m_initiatorSiteId;
     private int m_coordinatorSiteId;
     private boolean m_commit;
+    private boolean m_recovering;
     private ClientResponseImpl m_response;
     private long m_lastReceivedTxnId; // this is the largest txn acked by all partitions running the java for it
 
@@ -86,6 +87,14 @@ public class InitiateResponseMessage extends VoltMessage {
         return m_commit;
     }
 
+    public boolean isRecovering() {
+        return m_recovering;
+    }
+
+    public void setRecovering(boolean recovering) {
+        m_recovering = recovering;
+    }
+
     public ClientResponseImpl getClientResponseData() {
         return m_response;
     }
@@ -116,7 +125,7 @@ public class InitiateResponseMessage extends VoltMessage {
         ByteBuffer responseBytes = fs.getBuffer();
 
         // I don't know where the two fours that were originally here come from.
-        int msgsize = 8 + 4 + 4 + 4 + 4 + 8 + responseBytes.remaining();
+        int msgsize = 8 + 4 + 4 + 4 + 4 + 1 + 8 + responseBytes.remaining();
 
         if (m_buffer == null) {
             m_container = pool.acquire(msgsize + 1 + HEADER_SIZE);
@@ -131,6 +140,7 @@ public class InitiateResponseMessage extends VoltMessage {
         m_buffer.putLong(m_lastReceivedTxnId);
         m_buffer.putInt(m_initiatorSiteId);
         m_buffer.putInt(m_coordinatorSiteId);
+        m_buffer.put((byte) (m_recovering == true ? 1 : 0));
         m_buffer.put(responseBytes);
         m_buffer.limit(m_buffer.position());
     }
@@ -142,6 +152,7 @@ public class InitiateResponseMessage extends VoltMessage {
         m_lastReceivedTxnId = m_buffer.getLong();
         m_initiatorSiteId = m_buffer.getInt();
         m_coordinatorSiteId = m_buffer.getInt();
+        m_recovering = m_buffer.get() == 1;
 
         FastDeserializer fds = new FastDeserializer(m_buffer);
         try {

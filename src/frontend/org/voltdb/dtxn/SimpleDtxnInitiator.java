@@ -46,6 +46,7 @@ package org.voltdb.dtxn;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.voltdb.CatalogContext;
 import org.voltdb.StoredProcedureInvocation;
@@ -58,7 +59,6 @@ import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 /** Supports correct execution of multiple partition transactions by executing them one at a time. */
 public class SimpleDtxnInitiator extends TransactionInitiator {
@@ -273,17 +273,16 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     {
         long txnId = m_idManager.getNextUniqueTransactionId();
 
-        ArrayList<Integer> site_ids;
-        ArrayList<InFlightTxnState> txn_states = new ArrayList<InFlightTxnState>();
+        ArrayList<Integer> siteIds;
 
         // Special case the common 1 partition case -- cheap via SiteTracker
         if (partitions.length == 1) {
-            site_ids = VoltDB.instance().getCatalogContext().
+            siteIds = VoltDB.instance().getCatalogContext().
             siteTracker.getLiveSitesForPartition(partitions[0]);
         }
         // need all sites for a set of partitions -- a little more expensive
         else {
-            site_ids = VoltDB.instance().getCatalogContext().
+            siteIds = VoltDB.instance().getCatalogContext().
             siteTracker.getLiveSitesForEachPartitionAsList(partitions);
         }
 
@@ -293,27 +292,27 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         // transaction structure.  do this before transmitting them to avoid
         // races where we get a reply from a replica before we finish
         // transmission
-        for (int site_id : site_ids)
-        {
-            InFlightTxnState txn =
-                new InFlightTxnState(txnId,
-                                     site_id,
-                                     null,
-                                     isReadOnly,
-                                     true,
-                                     invocation.getShallowCopy(),
-                                     clientData,
-                                     messageSize,
-                                     now,
-                                     connectionId,
-                                     connectionHostname);
-            txn_states.add(txn);
-            m_mailbox.addPendingTxn(txn);
-        }
 
-        for (InFlightTxnState txn_state : txn_states)
-        {
-            sendTransactionToCoordinator(txn_state);
+        InFlightTxnState state =
+            new InFlightTxnState(txnId,
+                                 siteIds.get(0),
+                                 null,
+                                 isReadOnly,
+                                 true,
+                                 invocation.getShallowCopy(),
+                                 clientData,
+                                 messageSize,
+                                 now,
+                                 connectionId,
+                                 connectionHostname);
+
+        for (int siteId : siteIds) {
+            state.addCoordinator(siteId);
+        }
+        m_mailbox.addPendingTxn(state);
+
+        for (int coordId : state.outstandingCoordinators) {
+            sendTransactionToCoordinator(state, coordId);
         }
     }
 
@@ -331,14 +330,14 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         increaseBackpressure(txn.messageSize);
 
         MultiPartitionParticipantMessage notice = new MultiPartitionParticipantMessage(
-                m_siteId, txn.coordinatorId, txn.txnId, txn.isReadOnly);
+                m_siteId, txn.firstCoordinatorId, txn.txnId, txn.isReadOnly);
         try {
             m_mailbox.send(txn.otherSiteIds, 0, notice);
         } catch (MessagingException e) {
             throw new RuntimeException(e);
         }
 
-        sendTransactionToCoordinator(txn);
+        sendTransactionToCoordinator(txn, txn.firstCoordinatorId);
     }
 
     /**
@@ -349,15 +348,15 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
      *
      * @param txn Information about the transaction to send.
      */
-    private void sendTransactionToCoordinator(InFlightTxnState txn)
+    private void sendTransactionToCoordinator(InFlightTxnState txn, int coordinatorId)
     {
         // figure out what the newest txnid seen by ALL partitions for this execution
         //  site id is and tack it on to this message
-        long newestSafeTxnId = m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(txn.coordinatorId);
+        long newestSafeTxnId = m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(coordinatorId);
 
         InitiateTaskMessage workRequest = new InitiateTaskMessage(
                 m_siteId,
-                txn.coordinatorId,
+                coordinatorId,
                 txn.txnId,
                 txn.isReadOnly,
                 txn.isSinglePartition,
@@ -365,7 +364,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                 newestSafeTxnId); // this will allow all transactions to run for now
 
         try {
-            m_mailbox.send(txn.coordinatorId, 0, workRequest);
+            m_mailbox.send(coordinatorId, 0, workRequest);
         } catch (MessagingException e) {
             throw new RuntimeException(e);
         }

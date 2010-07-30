@@ -44,6 +44,7 @@ public class FragmentResponseMessage extends VoltMessage {
     byte m_status;
     // default dirty to true until proven otherwise
     boolean m_dirty = true;
+    boolean m_recovering = false;
     short m_dependencyCount = 0;
     int[] m_dependencyIds = new int[50];
     VoltTable[] m_dependencies = new VoltTable[50];
@@ -73,6 +74,14 @@ public class FragmentResponseMessage extends VoltMessage {
 
     public void setDirtyFlag(boolean value) {
         m_dirty = value;
+    }
+
+    public boolean isRecovering() {
+        return m_recovering;
+    }
+
+    public void setRecovering(boolean recovering) {
+        m_recovering = recovering;
     }
 
     public void addDependency(int dependencyId, VoltTable table) {
@@ -118,7 +127,7 @@ public class FragmentResponseMessage extends VoltMessage {
 
     @Override
     protected void flattenToBuffer(final DBBPool pool) throws IOException {
-        int msgsize = 4 + 4 + 8 + 1 + 1 + 2;
+        int msgsize = 4 + 4 + 8 + 1 + 1 + 1 + 2;
         assert(m_exception == null || m_status != SUCCESS);
 
         if (m_exception != null) {
@@ -158,6 +167,7 @@ public class FragmentResponseMessage extends VoltMessage {
         m_buffer.putLong(m_txnId);
         m_buffer.put(m_status);
         m_buffer.put((byte) (m_dirty ? 1 : 0));
+        m_buffer.put((byte) (m_recovering ? 1 : 0));
         m_buffer.putShort(m_dependencyCount);
         for (int i = 0; i < m_dependencyCount; i++)
             m_buffer.putInt(m_dependencyIds[i]);
@@ -180,6 +190,7 @@ public class FragmentResponseMessage extends VoltMessage {
         m_txnId = m_buffer.getLong();
         m_status = m_buffer.get();
         m_dirty = m_buffer.get() == 0 ? false : true;
+        m_recovering = m_buffer.get() == 0 ? false : true;
         m_dependencyCount = m_buffer.getShort();
         assert(m_dependencyCount <= 50);
         for (int i = 0; i < m_dependencyCount; i++)

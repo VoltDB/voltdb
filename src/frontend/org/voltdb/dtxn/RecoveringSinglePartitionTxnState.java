@@ -17,8 +17,13 @@
 
 package org.voltdb.dtxn;
 
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExecutionSite;
+import org.voltdb.VoltTable;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Mailbox;
+import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.TransactionInfoBaseMessage;
 
 public class RecoveringSinglePartitionTxnState extends SinglePartitionTxnState {
@@ -26,6 +31,31 @@ public class RecoveringSinglePartitionTxnState extends SinglePartitionTxnState {
     public RecoveringSinglePartitionTxnState(Mailbox mbox, ExecutionSite site, TransactionInfoBaseMessage task) {
         super(mbox, site, task);
         // TODO Auto-generated constructor stub
+    }
+
+    @Override
+    public boolean doWork() {
+        if (!m_done) {
+            InitiateResponseMessage response = new InitiateResponseMessage(m_task);
+
+            // add an empty dummy response
+            response.setResults(new ClientResponseImpl(
+                    ClientResponse.SUCCESS,
+                    new VoltTable[0],
+                    null));
+
+            // this tells the initiator that the response is a dummy
+            response.setRecovering(true);
+
+            try {
+                m_mbox.send(initiatorSiteId, 0, response);
+            } catch (MessagingException e) {
+                throw new RuntimeException(e);
+            }
+
+            m_done = true;
+        }
+        return m_done;
     }
 
 }

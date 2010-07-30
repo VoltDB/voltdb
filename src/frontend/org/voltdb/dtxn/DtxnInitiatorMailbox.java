@@ -25,9 +25,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.voltdb.ClientResponseImpl;
-import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
 import org.voltdb.fault.FaultHandler;
 import org.voltdb.fault.NodeFailureFault;
 import org.voltdb.fault.VoltFault;
@@ -35,10 +33,10 @@ import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.messaging.HeartbeatResponseMessage;
 import org.voltdb.messaging.HostMessenger;
 import org.voltdb.messaging.InitiateResponseMessage;
+import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.Subject;
 import org.voltdb.messaging.VoltMessage;
-import org.voltdb.messaging.Mailbox;
 import org.voltdb.network.Connection;
 import org.voltdb.utils.EstTime;
 
@@ -82,12 +80,13 @@ public class DtxnInitiatorMailbox implements Mailbox
 
     /** Map of transaction ids to transaction information */
     private final int m_siteId;
-    private final PendingTxnList m_pendingTxns = new PendingTxnList();
+    private final Map<Long, InFlightTxnState> m_pendingTxns =
+        new HashMap<Long, InFlightTxnState>();
     private TransactionInitiator m_initiator;
-    private final HashMap<Long, InitiateResponseMessage> m_txnIdResponses;
+    //private final HashMap<Long, InitiateResponseMessage> m_txnIdResponses;
     // need a separate copy of the VoltTables so that we can have
     // thread-safe meta-data
-    private final HashMap<Long, VoltTable[]> m_txnIdResults;
+    //private final HashMap<Long, VoltTable[]> m_txnIdResults;
     private final HostMessenger m_hostMessenger;
 
     private final ExecutorTxnIdSafetyState m_safetyState;
@@ -112,9 +111,9 @@ public class DtxnInitiatorMailbox implements Mailbox
         m_siteId = siteId;
         m_safetyState = safetyState;
         m_stats = new InitiatorStats("Initiator " + siteId + " stats", siteId);
-        m_txnIdResults =
-            new HashMap<Long, VoltTable[]>();
-        m_txnIdResponses = new HashMap<Long, InitiateResponseMessage>();
+        //m_txnIdResults =
+        //    new HashMap<Long, VoltTable[]>();
+        //m_txnIdResponses = new HashMap<Long, InitiateResponseMessage>();
         VoltDB.instance().getFaultDistributor().
         // For Node failure, the initiators need to be ordered after the catalog
         // but before everything else (to prevent any new work for bad sites)
@@ -129,43 +128,38 @@ public class DtxnInitiatorMailbox implements Mailbox
 
     public void addPendingTxn(InFlightTxnState txn)
     {
-        m_pendingTxns.addTxn(txn.txnId, txn.coordinatorId, txn);
+        m_pendingTxns.put(txn.txnId, txn);
     }
 
     public void removeSite(int siteId)
     {
-        Map<Long, InFlightTxnState> txn_ids_affected =
-            m_pendingTxns.removeSite(siteId);
-        for (Long txn_id : txn_ids_affected.keySet())
+        ArrayList<Long> txnIdsToRemove = new ArrayList<Long>();
+        for (InFlightTxnState state : m_pendingTxns.values())
         {
-            if (m_pendingTxns.getTxnIdSize(txn_id) == 0)
-            {
-                InFlightTxnState state = txn_ids_affected.get(txn_id);
-                if (!m_txnIdResponses.containsKey(txn_id))
-                {
-                    // No response was ever received for this TXN.
-                    // Currently, crashing is okay because there are
-                    // no valid node failures that can lead us to the
-                    // state where there are no more pending
-                    // InFlightTxnStates AND no responses for a TXN ID.
-                    // Multipartition initiators and coordinators are
-                    // currently co-located, so a node failure kills both
-                    // and this code doesn't run.  Single partition
-                    // transactions with replications are guaranteed a
-                    // response or an outstanding InFlightTxnState.
-                    // Single partition transactions with no replication
-                    // means that a node failure kills the cluster.
-                    VoltDB.crashVoltDB();
-                }
-                InitiateResponseMessage r = m_txnIdResponses.get(txn_id);
-                m_pendingTxns.removeTxnId(r.getTxnId());
+            // skips txns that don't have this site as coordinator
+            if (!state.siteIsCoordinator(siteId)) continue;
+
+            // note that the site failed
+            ClientResponseImpl toSend = state.addFailedOrRecoveringResponse(siteId);
+
+            // send a response if the state wants to
+            if (toSend != null) {
+                enqueueResponse(toSend, state);
+            }
+
+            if (state.hasAllResponses()) {
+                txnIdsToRemove.add(state.txnId);
                 m_initiator.reduceBackpressure(state.messageSize);
-                m_txnIdResponses.remove(r.getTxnId());
-                if (!state.isReadOnly)
-                {
-                    enqueueResponse(r, state);
+
+                if (!state.hasSentResponse()) {
+                    // TODO badness here...
+                    assert(false);
                 }
             }
+        }
+
+        for (long txnId : txnIdsToRemove) {
+            m_pendingTxns.remove(txnId);
         }
     }
 
@@ -190,93 +184,38 @@ public class DtxnInitiatorMailbox implements Mailbox
             m_safetyState.updateLastSeenTxnIdFromExecutorBySiteId(r.getCoordinatorSiteId(), r.getLastReceivedTxnId(), false);
 
             InFlightTxnState state;
-            int sites_left = -1;
-            state = m_pendingTxns.getTxn(r.getTxnId(), r.getCoordinatorSiteId());
-            sites_left = m_pendingTxns.getTxnIdSize(r.getTxnId());
+            state = m_pendingTxns.get(r.getTxnId());
 
-            assert(state.coordinatorId == r.getCoordinatorSiteId());
             assert(m_siteId == r.getInitiatorSiteId());
 
-            boolean first_response = false;
-            VoltTable[] first_results = null;
-            if (!m_txnIdResults.containsKey(r.getTxnId()))
-            {
-                ClientResponseImpl curr_response = r.getClientResponseData();
-                VoltTable[] curr_results = curr_response.getResults();
-                VoltTable[] saved_results = new VoltTable[curr_results.length];
-                // Create shallow copies of all the VoltTables to avoid
-                // race conditions with the ByteBuffer metadata
-                for (int i = 0; i < curr_results.length; ++i)
-                {
-                    if (curr_results[i] == null) {
-                        saved_results[i] = null;
-                    }
-                    else {
-                        saved_results[i] = PrivateVoltTableFactory.createVoltTableFromBuffer(
-                                curr_results[i].getTableDataReference(), true);
-                    }
-                }
-                m_txnIdResults.put(r.getTxnId(), saved_results);
-                m_txnIdResponses.put(r.getTxnId(), r);
-                first_response = true;
-            }
-            else
-            {
-                first_results = m_txnIdResults.get(r.getTxnId());
-            }
-            if (first_response)
-            {
-                // If this is a read-only transaction then we'll return
-                // the first response to the client
-                if (state.isReadOnly)
-                {
-                    enqueueResponse(r, state);
-                }
-            }
-            else
-            {
-                assert(first_results != null);
+            ClientResponseImpl toSend = null;
 
-                ClientResponseImpl curr_response = r.getClientResponseData();
-                VoltTable[] curr_results = curr_response.getResults();
-                if (first_results.length != curr_results.length)
-                {
-                    String msg = "Mismatched result count received for transaction ID: " + r.getTxnId();
-                    msg += "\n  while executing stored procedure: " + state.invocation.getProcName();
-                    msg += "\n  from execution site: " + r.getCoordinatorSiteId();
-                    msg += "\n  Expected number of results: " + first_results.length;
-                    msg += "\n  Mismatched number of results: " + curr_results.length;
-                    throw new RuntimeException(msg);
-                }
-                for (int i = 0; i < first_results.length; ++i)
-                {
-                    if (!curr_results[i].hasSameContents(first_results[i]))
-                    {
-                        String msg = "Mismatched results received for transaction ID: " + r.getTxnId();
-                        msg += "\n  while executing stored procedure: " + state.invocation.getProcName();
-                        msg += "\n  from execution site: " + r.getCoordinatorSiteId();
-                        msg += "\n  Expected results: " + first_results[i].toString();
-                        msg += "\n  Mismatched results: " + curr_results[i].toString();
-                        throw new RuntimeException(msg);
-                    }
-                }
+            // if this is a dummy response, make sure the m_pendingTxns list thinks
+            // the site has been removed from the list
+            if (r.isRecovering()) {
+                toSend = state.addFailedOrRecoveringResponse(r.getCoordinatorSiteId());
+            }
+            // otherwise update the InFlightTxnState with the response
+            else {
+                toSend = state.addResponse(r.getCoordinatorSiteId(), r.getClientResponseData());
             }
 
-            if (sites_left == 0)
-            {
-                m_pendingTxns.removeTxnId(r.getTxnId());
+            // addResponse returning non-null means send the response to the client
+            if (toSend != null) {
+                enqueueResponse(toSend, state);
+            }
+
+            if (state.hasAllResponses()) {
                 m_initiator.reduceBackpressure(state.messageSize);
-                m_txnIdResults.remove(r.getTxnId());
-                m_txnIdResponses.remove(r.getTxnId());
-                if (!state.isReadOnly)
-                {
-                    enqueueResponse(r, state);
-                }
+                m_pendingTxns.remove(r.getTxnId());
+
+                // TODO make this send an error message on failure
+                assert(state.hasSentResponse());
             }
         }
     }
 
-    private void enqueueResponse(InitiateResponseMessage response,
+    private void enqueueResponse(ClientResponseImpl response,
                                  InFlightTxnState state)
     {
         response.setClientHandle(state.invocation.getClientHandle());
@@ -286,16 +225,14 @@ public class DtxnInitiatorMailbox implements Mailbox
         assert(c != null) : "NULL connection in connection state client data.";
         final long now = EstTime.currentTimeMillis();
         final int delta = (int)(now - state.initiateTime);
-        final ClientResponseImpl client_response =
-            response.getClientResponseData();
-        client_response.setClusterRoundtrip(delta);
+        response.setClusterRoundtrip(delta);
         m_stats.logTransactionCompleted(
                 state.connectionId,
                 state.connectionHostname,
                 state.invocation,
                 delta,
-                client_response.getStatus());
-        c.writeStream().enqueue(client_response);
+                response.getStatus());
+        c.writeStream().enqueue(response);
     }
 
     /**
@@ -304,7 +241,9 @@ public class DtxnInitiatorMailbox implements Mailbox
      */
     public List<InFlightTxnState> getInFlightTxns()
     {
-        return m_pendingTxns.getInFlightTxns();
+        List<InFlightTxnState> retval = new ArrayList<InFlightTxnState>();
+        retval.addAll(m_pendingTxns.values());
+        return retval;
     }
 
     @Override

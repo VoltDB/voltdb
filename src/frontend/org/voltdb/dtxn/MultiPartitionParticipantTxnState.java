@@ -21,11 +21,13 @@ import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.HashSet;
 
-import org.voltdb.*;
+import org.voltdb.ExecutionSite;
+import org.voltdb.TransactionIdManager;
+import org.voltdb.VoltTable;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState.WorkUnitState;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -39,17 +41,17 @@ import org.voltdb.messaging.VoltMessage;
 
 public class MultiPartitionParticipantTxnState extends TransactionState {
 
-    private final ArrayDeque<WorkUnit> m_readyWorkUnits = new ArrayDeque<WorkUnit>();
-    private boolean m_isCoordinator;
-    private final int m_siteId;
-    private int[] m_nonCoordinatingSites;
-    private boolean m_shouldResumeProcedure = false;
-    private boolean m_hasStartedWork = false;
-    private HashMap<Integer, WorkUnit> m_missingDependencies = null;
-    private ArrayList<WorkUnit> m_stackFrameDropWUs = null;
-    private Map<Integer, List<VoltTable>> m_previousStackFrameDropDependencies = null;
-    private boolean m_dirty = false;
-    private boolean m_didRollback = false;
+    protected final ArrayDeque<WorkUnit> m_readyWorkUnits = new ArrayDeque<WorkUnit>();
+    protected boolean m_isCoordinator;
+    protected final int m_siteId;
+    protected int[] m_nonCoordinatingSites;
+    protected boolean m_shouldResumeProcedure = false;
+    protected boolean m_hasStartedWork = false;
+    protected HashMap<Integer, WorkUnit> m_missingDependencies = null;
+    protected ArrayList<WorkUnit> m_stackFrameDropWUs = null;
+    protected Map<Integer, List<VoltTable>> m_previousStackFrameDropDependencies = null;
+    protected boolean m_dirty = false;
+    protected boolean m_didRollback = false;
 
     /**
      *  This is thrown by the TransactionState instance when something
@@ -432,8 +434,13 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                 throw new FragmentFailureException();
             }
 
-            w.putDependency(dependencyId, response.getExecutorSiteId(),
-                            payload);
+            // if the node is recovering, it doesn't matter if the payload matches
+            if (response.isRecovering()) {
+                w.putDummyDependency(dependencyId, response.getExecutorSiteId());
+            }
+            else {
+                w.putDependency(dependencyId, response.getExecutorSiteId(), payload);
+            }
             if (w.allDependenciesSatisfied()) {
                 handleWorkUnitComplete(w);
             }

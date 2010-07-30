@@ -31,8 +31,8 @@ import org.voltdb.MockVoltDB;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 import org.voltdb.fault.FaultDistributor;
 import org.voltdb.fault.NodeFailureFault;
 import org.voltdb.messaging.FastSerializable;
@@ -42,8 +42,8 @@ import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.network.Connection;
 import org.voltdb.network.NIOReadStream;
 import org.voltdb.network.WriteStream;
-import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltdb.utils.DeferredSerialization;
 
 public class TestDtxnInitiatorMailbox extends TestCase
 {
@@ -234,13 +234,18 @@ public class TestDtxnInitiatorMailbox extends TestCase
 
     }
 
-    InFlightTxnState createTxnState(long txnId, int coordId, boolean readOnly,
+    InFlightTxnState createTxnState(long txnId, int[] coordIds, boolean readOnly,
                                     boolean isSinglePart)
     {
-        return new InFlightTxnState(txnId, coordId, new int[]{}, readOnly,
-                                    isSinglePart,
-                                    new StoredProcedureInvocation(),
-                                    m_testConnect, MESSAGE_SIZE, 0, 0, "");
+        InFlightTxnState retval = new InFlightTxnState(
+                txnId, coordIds[0], new int[]{}, readOnly,
+                isSinglePart, new StoredProcedureInvocation(),
+                m_testConnect, MESSAGE_SIZE, 0, 0, "");
+        if (coordIds.length > 1) {
+            for (int i = 1; i < coordIds.length; i++)
+                retval.addCoordinator(coordIds[i]);
+        }
+        return retval;
     }
 
     VoltTable[] createResultSet(String thing)
@@ -287,7 +292,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
         dim.setInitiator(initiator);
         m_testStream.reset();
         // Single-partition read-only txn
-        dim.addPendingTxn(createTxnState(0, 0, true, true));
+        dim.addPendingTxn(createTxnState(0, new int[] {0}, true, true));
         dim.deliver(createInitiateResponse(0, 0, true, true, createResultSet("dude")));
         dim.processResponses();
         assertTrue(m_testStream.gotResponse());
@@ -295,7 +300,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
         assertEquals(MESSAGE_SIZE, initiator.m_reduceSize);
         m_testStream.reset();
         // multi-partition read-only txn
-        dim.addPendingTxn(createTxnState(1, 0, true, false));
+        dim.addPendingTxn(createTxnState(1, new int[] {0}, true, false));
         dim.deliver(createInitiateResponse(1, 0, true, false, createResultSet("dude")));
         dim.processResponses();
         assertTrue(m_testStream.gotResponse());
@@ -303,7 +308,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
         assertEquals(MESSAGE_SIZE * 2, initiator.m_reduceSize);
         m_testStream.reset();
         // Single-partition read-write txn
-        dim.addPendingTxn(createTxnState(2, 0, false, true));
+        dim.addPendingTxn(createTxnState(2, new int[] {0}, false, true));
         dim.deliver(createInitiateResponse(2, 0, false, true, createResultSet("dude")));
         dim.processResponses();
         assertTrue(m_testStream.gotResponse());
@@ -311,7 +316,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
         assertEquals(MESSAGE_SIZE * 3, initiator.m_reduceSize);
         m_testStream.reset();
         // multi-partition read-write txn
-        dim.addPendingTxn(createTxnState(3, 0, false, false));
+        dim.addPendingTxn(createTxnState(3, new int[] {0}, false, false));
         dim.deliver(createInitiateResponse(3, 0, false, false, createResultSet("dude")));
         dim.processResponses();
         assertEquals(4, initiator.m_reduceCount);
@@ -329,8 +334,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
         dim.setInitiator(initiator);
         m_testStream.reset();
         // Single-partition read-only txn
-        dim.addPendingTxn(createTxnState(0, 0, true, true));
-        dim.addPendingTxn(createTxnState(0, 1, true, true));
+        dim.addPendingTxn(createTxnState(0, new int[] {0,1}, true, true));
         dim.deliver(createInitiateResponse(0, 0, true, true, createResultSet("dude")));
         dim.processResponses();
         assertTrue(m_testStream.gotResponse());
@@ -344,8 +348,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
         assertEquals(MESSAGE_SIZE, initiator.m_reduceSize);
         m_testStream.reset();
         // Single-partition read-write txn
-        dim.addPendingTxn(createTxnState(2, 0, false, true));
-        dim.addPendingTxn(createTxnState(2, 1, false, true));
+        dim.addPendingTxn(createTxnState(2, new int[] {0,1}, false, true));
         dim.deliver(createInitiateResponse(2, 0, false, true, createResultSet("dude")));
         dim.processResponses();
         assertFalse(m_testStream.gotResponse());
@@ -366,8 +369,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
         dim.setInitiator(initiator);
         m_testStream.reset();
         // Single-partition read-only txn
-        dim.addPendingTxn(createTxnState(0, 0, true, true));
-        dim.addPendingTxn(createTxnState(0, 1, true, true));
+        dim.addPendingTxn(createTxnState(0, new int[] {0,1}, true, true));
         dim.deliver(createInitiateResponse(0, 0, true, true, createResultSet("dude")));
         dim.processResponses();
         assertTrue(m_testStream.gotResponse());
@@ -388,8 +390,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
         assertTrue(caught);
         m_testStream.reset();
         // Single-partition read-write txn
-        dim.addPendingTxn(createTxnState(2, 0, false, true));
-        dim.addPendingTxn(createTxnState(2, 1, false, true));
+        dim.addPendingTxn(createTxnState(2, new int[] {0,1}, false, true));
         dim.deliver(createInitiateResponse(2, 0, false, true, createResultSet("dude")));
         dim.processResponses();
         assertFalse(m_testStream.gotResponse());
@@ -429,8 +430,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
         dim.setInitiator(initiator);
         m_testStream.reset();
         // Single-partition read-write txn
-        dim.addPendingTxn(createTxnState(0, 0, false, true));
-        dim.addPendingTxn(createTxnState(0, 1, false, true));
+        dim.addPendingTxn(createTxnState(0, new int[] {0,1}, false, true));
         dim.removeSite(0);
         dim.deliver(createInitiateResponse(0, 1, true, true, createResultSet("dude")));
         dim.processResponses();
@@ -447,8 +447,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
         dim.setInitiator(initiator);
         m_testStream.reset();
         // Single-partition read-write txn
-        dim.addPendingTxn(createTxnState(0, 0, false, true));
-        dim.addPendingTxn(createTxnState(0, 1, false, true));
+        dim.addPendingTxn(createTxnState(0, new int[] {0,1}, false, true));
         dim.deliver(createInitiateResponse(0, 1, true, true, createResultSet("dude")));
         dim.processResponses();
         dim.removeSite(0);
@@ -465,10 +464,8 @@ public class TestDtxnInitiatorMailbox extends TestCase
         dim.setInitiator(initiator);
         m_testStream.reset();
         // Single-partition read-write txn
-        dim.addPendingTxn(createTxnState(0, 0, false, true));
-        dim.addPendingTxn(createTxnState(0, 1, false, true));
-        dim.addPendingTxn(createTxnState(1, 0, false, true));
-        dim.addPendingTxn(createTxnState(1, 1, false, true));
+        dim.addPendingTxn(createTxnState(0, new int[] {0,1}, false, true));
+        dim.addPendingTxn(createTxnState(1, new int[] {0,1}, false, true));
         dim.deliver(createInitiateResponse(0, 1, true, true, createResultSet("dude")));
         dim.deliver(createInitiateResponse(1, 1, true, true, createResultSet("sweet")));
         dim.processResponses();
@@ -500,8 +497,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
         dim.setInitiator(initiator);
         m_testStream.reset();
         // Single-partition read-write txn
-        dim.addPendingTxn(createTxnState(0, 0, false, true));
-        dim.addPendingTxn(createTxnState(0, 1, false, true));
+        dim.addPendingTxn(createTxnState(0, new int[] {0,1}, false, true));
         dim.deliver(createInitiateResponse(0, 1, true, true, createResultSet("dude")));
         dim.processResponses();
 
