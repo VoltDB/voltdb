@@ -184,6 +184,7 @@ CTX.INPUT['catalog'] = """
 """
 
 CTX.INPUT['common'] = """
+ SegvException.cpp
  SerializableEEException.cpp
  SQLException.cpp
  tabletuple.cpp
