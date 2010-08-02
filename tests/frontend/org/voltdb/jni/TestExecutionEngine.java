@@ -31,19 +31,20 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltdb.SysProcSelector;
 import org.voltdb.VoltDB;
+import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.RecoverySiteProcessorSource;
+import org.voltdb.RecoverySiteProcessorSource.OnRecoveringPartitionInitiate;
 import org.voltdb.RecoverySiteProcessorDestination;
+import org.voltdb.RecoverySiteProcessor.OnRecoveryCompletion;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.LoadCatalogToString;
 import org.voltdb.exceptions.EEException;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.RecoveryMessageType;
-import org.voltdb.messaging.Subject;
 import org.voltdb.messaging.VoltMessage;
 import org.voltdb.messaging.RecoveryMessage;
+import org.voltdb.messaging.MockMailbox;
 import org.voltdb.TableStreamType;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
@@ -192,7 +193,7 @@ public class TestExecutionEngine extends TestCase {
         final Catalog catalog = new Catalog();
         catalog.execute(LoadCatalogToString.THE_CATALOG);
         sourceEngine.loadCatalog(catalog.serialize());
-        ExecutionEngine destinationEngine = new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID, destinationId, destinationId, "");
+        final ExecutionEngine destinationEngine = new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID, destinationId, destinationId, "");
         destinationEngine.loadCatalog(catalog.serialize());
 
         int WAREHOUSE_TABLEID = warehouseTableId(catalog);
@@ -205,73 +206,31 @@ public class TestExecutionEngine extends TestCase {
         destinations.add(destinationId);
         tablesAndDestinations.put(Pair.of( "STOCK", STOCK_TABLEID), destinations);
         tablesAndDestinations.put(Pair.of( "WAREHOUSE", WAREHOUSE_TABLEID), destinations);
-        final AtomicReference<RecoverySiteProcessorDestination> destinationReference
-            = new AtomicReference<RecoverySiteProcessorDestination>();
 
-        final Mailbox sourceMailbox = new Mailbox() {
-
-            @Override
-            public void send(int siteId, int mailboxId, VoltMessage message)
-                    throws MessagingException {
-                assertEquals( destinationId, siteId);
-                assertEquals( mailboxId, 0);
-                assertTrue(message instanceof RecoveryMessage);
-                destinationReference.get().handleRecoveryMessage((RecoveryMessage)message);
-                message.discard();
-            }
-
-            @Override
-            public void send(int[] siteIds, int mailboxId, VoltMessage message)
-                    throws MessagingException {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public void deliver(VoltMessage message) {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public void deliverFront(VoltMessage message) {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public VoltMessage recv() {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public VoltMessage recvBlocking() {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public VoltMessage recvBlocking(long timeout) {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public VoltMessage recv(Subject[] s) {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public VoltMessage recvBlocking(Subject[] s) {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public VoltMessage recvBlocking(Subject[] s, long timeout) {
-                throw new UnsupportedOperationException();
-            }
-
-        };
+        final MockMailbox sourceMailbox = new MockMailbox();
+        MockMailbox.registerMailbox( sourceId, sourceMailbox);
 
         final Runnable onSourceCompletion = new Runnable() {
             @Override
             public void run() {
                 sourceCompleted.set(true);
+            }
+        };
+
+        OnRecoveringPartitionInitiate onInitiate = new OnRecoveringPartitionInitiate() {
+
+            @Override
+            public long pickTxnToStopAfter(long recoveringPartitionTxnId) {
+                return 0;
+            }
+
+        };
+
+        final MessageHandler mh = new MessageHandler() {
+
+            @Override
+            public void handleMessage(VoltMessage message) {
+                fail();
             }
         };
 
@@ -281,91 +240,60 @@ public class TestExecutionEngine extends TestCase {
                     sourceEngine,
                     sourceMailbox,
                     sourceId,
-                    onSourceCompletion );
+                    onSourceCompletion,
+                    onInitiate,
+                    mh);
 
-        HashMap<Pair<String, Integer>, Integer> tablesAndSources = new HashMap<Pair<String, Integer>, Integer>();
+        Thread sourceThread = new Thread() {
+            @Override
+            public void run() {
+                VoltMessage message = sourceMailbox.recvBlocking();
+                assertTrue(message != null);
+                assertTrue(message instanceof RecoveryMessage);
+                sourceProcessor.handleRecoveryMessage((RecoveryMessage)message);
+            }
+        };
+        sourceThread.start();
+
+        final HashMap<Pair<String, Integer>, Integer> tablesAndSources = new HashMap<Pair<String, Integer>, Integer>();
         tablesAndSources.put(Pair.of( "STOCK", STOCK_TABLEID), sourceId);
         tablesAndSources.put(Pair.of( "WAREHOUSE", WAREHOUSE_TABLEID), sourceId);
 
-        Mailbox destinationMailbox = new Mailbox() {
+        final MockMailbox destinationMailbox = new MockMailbox();
+        MockMailbox.registerMailbox( destinationId, destinationMailbox);
 
+        final OnRecoveryCompletion onDestinationCompletion = new OnRecoveryCompletion() {
             @Override
-            public void send(int siteId, int mailboxId, VoltMessage message)
-                    throws MessagingException {
-                assertEquals( siteId, 0);
-                assertEquals( mailboxId, 0);
-                assertTrue( message instanceof RecoveryMessage);
-                assertEquals( RecoveryMessageType.Ack, ((RecoveryMessage)message).type());
-                sourceProcessor.handleRecoveryMessage((RecoveryMessage)message);
-            }
-
-            @Override
-            public void send(int[] siteIds, int mailboxId, VoltMessage message)
-                    throws MessagingException {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public void deliver(VoltMessage message) {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public void deliverFront(VoltMessage message) {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public VoltMessage recv() {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public VoltMessage recvBlocking() {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public VoltMessage recvBlocking(long timeout) {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public VoltMessage recv(Subject[] s) {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public VoltMessage recvBlocking(Subject[] s) {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public VoltMessage recvBlocking(Subject[] s, long timeout) {
-                throw new UnsupportedOperationException();
-            }
-
-        };
-
-        final Runnable onDestinationCompletion = new Runnable() {
-            @Override
-            public void run() {
+            public void complete(long txnId) {
                 destinationCompleted.set(true);
             }
         };
 
-        RecoverySiteProcessorDestination destinationProcess =
-            new RecoverySiteProcessorDestination(
-                    tablesAndSources,
-                    destinationEngine,
-                    destinationMailbox,
-                    destinationId,
-                    onDestinationCompletion);
-        destinationReference.set(destinationProcess);
+        Thread destinationThread = new Thread() {
+            @Override
+            public void run() {
+                RecoverySiteProcessorDestination destinationProcess =
+                    new RecoverySiteProcessorDestination(
+                            tablesAndSources,
+                            destinationEngine,
+                            destinationMailbox,
+                            destinationId,
+                            onDestinationCompletion,
+                            0,
+                            mh);
+                while (!destinationCompleted.get()) {
+                    VoltMessage message = destinationMailbox.recvBlocking();
+                    assertTrue(message != null);
+                    assertTrue(message instanceof RecoveryMessage);
+                    destinationProcess.handleRecoveryMessage((RecoveryMessage)message);
+                    message.discard();
+                }
+            }
+        };
+        destinationThread.start();
 
-        while (!destinationCompleted.get() || !destinationCompleted.get()) {
-            sourceProcessor.doRecoveryWork();
-        }
+        destinationThread.join();
+        sourceThread.join();
 
         assertEquals( sourceEngine.tableHashCode(STOCK_TABLEID), destinationEngine.tableHashCode(STOCK_TABLEID));
         assertEquals( sourceEngine.tableHashCode(WAREHOUSE_TABLEID), destinationEngine.tableHashCode(WAREHOUSE_TABLEID));

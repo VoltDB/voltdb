@@ -16,14 +16,18 @@
  */
 package org.voltdb;
 
+import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.voltdb.utils.DBBPool;
+import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
+import org.voltdb.messaging.VoltMessage;
 import org.voltdb.messaging.RecoveryMessage;
 import org.voltdb.messaging.RecoveryMessageType;
 import org.voltdb.utils.Pair;
@@ -53,7 +57,14 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
     /**
      * What to do when data recovery is completed
      */
-    private final Runnable m_onCompletion;
+    private final OnRecoveryCompletion m_onCompletion;
+
+    /**
+     * Transaction to resume execution from once data is synced
+     */
+    private long m_resumeTxnId;
+
+    private final MessageHandler m_messageHandler;
 
     /**
      * Data about a table that is being used as a source for a recovery stream.
@@ -89,15 +100,22 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
      */
     @Override
     public void handleRecoveryMessage(RecoveryMessage message) {
-        assert(message.type() == RecoveryMessageType.ScanTuples || message.type() == RecoveryMessageType.Complete);
+        assert(message.type() == RecoveryMessageType.ScanTuples ||
+                message.type() == RecoveryMessageType.Complete ||
+                message.type() == RecoveryMessageType.Initiate);
 
         if (message.type() == RecoveryMessageType.ScanTuples) {
             m_engine.processRecoveryMessage(message.getMessageData());
         } else if (message.type() == RecoveryMessageType.Complete) {
             m_tables.remove(message.tableId());
             if (m_tables.isEmpty()) {
-                m_onCompletion.run();
+                m_onCompletion.complete(m_resumeTxnId);
             }
+        } else if (message.type() == RecoveryMessageType.Initiate){
+            m_resumeTxnId = message.txnId();
+            return;
+        } else {
+            VoltDB.crashVoltDB();
         }
         int sourceSite = message.sourceSite();
         RecoveryMessage ack = new RecoveryMessage( message, m_siteId);
@@ -113,7 +131,7 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
      * A destination doesn't have periodic recovery work to do.
      */
     @Override
-    public void doRecoveryWork() {
+    public void doRecoveryWork(long txnId) {
     }
 
     /**
@@ -127,15 +145,48 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
             ExecutionEngine engine,
             Mailbox mailbox,
             final int siteId,
-            Runnable onCompletion) {
+            OnRecoveryCompletion onCompletion,
+            long currentTxnId,
+            MessageHandler messageHandler) {
         m_mailbox = mailbox;
         m_engine = engine;
         m_siteId = siteId;
+        m_messageHandler = messageHandler;
+
+        /*
+         * Only support recovering from one partition for now so just grab
+         * the first source site and send it the initiate message containing
+         * the txnId this site stopped at
+         */
+        int sourceSiteId = 0;
         for (Map.Entry<Pair<String, Integer>, Integer> entry : tableToSourceSite.entrySet()) {
             m_tables.put(entry.getKey().getSecond(), new RecoveryTable(entry.getKey().getFirst(), entry.getKey().getSecond(), entry.getValue()));
+            sourceSiteId = entry.getValue();
         }
         m_onCompletion = onCompletion;
+
+        ByteBuffer buf = ByteBuffer.allocate(2048);
+        BBContainer container = DBBPool.wrapBB(buf);
+        RecoveryMessage recoveryMessage = new RecoveryMessage(container, m_siteId, currentTxnId);
+        try {
+            m_mailbox.send( sourceSiteId, 0, recoveryMessage);
+        } catch (MessagingException e) {
+            throw new RuntimeException(e);
+        }
         assert(!m_tables.isEmpty());
+        while (true) {
+            VoltMessage message = m_mailbox.recv();
+            if (message != null) {
+                if (message instanceof RecoveryMessage) {
+                    handleRecoveryMessage((RecoveryMessage)message);
+                    return;
+                } else {
+                    m_messageHandler.handleMessage(message);
+                }
+                continue;
+            }
+            Thread.yield();
+        }
     }
 
     @Override

@@ -29,9 +29,11 @@ import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.RecoveryMessage;
 import org.voltdb.messaging.RecoveryMessageType;
+import org.voltdb.messaging.VoltMessage;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.jni.ExecutionEngine;
+import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.Pair;
 
 /**
@@ -45,6 +47,7 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
     static final int m_numBuffers = 3;
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger recoveryLog = new VoltLogger("RECOVERY");
 
     /**
      * Pick a buffer length that is big enough to store at least one of the largest size tuple supported
@@ -107,6 +110,30 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
      * What to do when all recovery data has been sent
      */
     private final Runnable m_onCompletion;
+
+    /**
+     * What to do when the initiate message is received from the recovering partition.
+     * Returns the txnId this EE will stop at and block on streaming out data
+     */
+    private final OnRecoveringPartitionInitiate m_onInitiate;
+
+    /**
+     * Transaction to stop and send recovery data at
+     */
+    private long m_txnIdToBlockAfter = Long.MAX_VALUE;
+
+    private final MessageHandler m_messageHandler;
+
+    /**
+     * When the recovering partition initiates the streaming of recovery data it will specify
+     * the transaction id that it stopped after. This handler will take that information
+     * and decide what transaction to stop after and stream the data. It will be some txnid >=
+     * what was supplied by the recovering partition, and the recovering partition will then
+     * skip to the transaction after the one specified by the return value once recovery is complete
+     */
+    public interface OnRecoveringPartitionInitiate {
+        public long pickTxnToStopAfter(long recoveringPartitionTxnId);
+    }
 
     /**
      * Keep track of how many times a block has been acked and how many acks are expected
@@ -197,10 +224,14 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
             ExecutionEngine engine,
             Mailbox mailbox,
             final int siteId,
-            Runnable onCompletion) {
+            Runnable onCompletion,
+            OnRecoveringPartitionInitiate initiateHandler,
+            MessageHandler messageHandler) {
         m_mailbox = mailbox;
         m_engine = engine;
         m_siteId = siteId;
+        m_onInitiate = initiateHandler;
+        m_messageHandler = messageHandler;
         for (Map.Entry<Pair<String, Integer>, HashSet<Integer>> entry : tableToSites.entrySet()) {
             if (entry.getValue().isEmpty()) {
                 continue;
@@ -259,9 +290,44 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
      */
     @Override
     public void handleRecoveryMessage(RecoveryMessage message) {
-        assert(message.type() == RecoveryMessageType.Ack);
-        if (m_ackTracker.ackReceived(message.blockIndex())) {
-            m_allowedBuffers++;
+        assert(message.type() == RecoveryMessageType.Ack || message.type() == RecoveryMessageType.Initiate);
+        if (message.type() == RecoveryMessageType.Ack) {
+            if (m_ackTracker.ackReceived(message.blockIndex())) {
+                m_allowedBuffers++;
+            }
+        } else if (message.type() == RecoveryMessageType.Initiate) {
+            /*
+             * This should supply return the last committed txn id. Need this to know if
+             * the processor should immediately start doing recovery work.
+             */
+            final long lastCommittedTxnId = m_onInitiate.pickTxnToStopAfter(Long.MIN_VALUE);
+
+            /*
+             * Provide the txn id from the message and see what txnId was picked. Will be lastCommittedTxnId
+             * or the one from the message (if that is greater).
+             */
+            m_txnIdToBlockAfter = m_onInitiate.pickTxnToStopAfter(message.txnId());
+
+            /*
+             * Send a response to the recovering partition with txnid it should resume after
+             */
+            ByteBuffer buf = ByteBuffer.allocate(2048);
+            BBContainer cont = DBBPool.wrapBB(buf);
+            RecoveryMessage response = new RecoveryMessage(cont, m_siteId, m_txnIdToBlockAfter);
+            try {
+                m_mailbox.send( message.sourceSite(), 0, response);
+            } catch (MessagingException e) {
+                throw new RuntimeException(e);
+            }
+
+            /*
+             * If the txnid to block after is the last commited txn id, start recovery work
+             */
+            if (lastCommittedTxnId == m_txnIdToBlockAfter) {
+                doRecoveryWork(lastCommittedTxnId);
+            }
+        } else {
+            VoltDB.crashVoltDB();
         }
     }
 
@@ -272,116 +338,140 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
      * that the pooled byte buffer be sent all the way to the NIOWriteStream and then discarded. The
      * current implementation of HostMessenger and ForeignHost does this, but only when delivering to a
      * single site.
+     *
+     * The currentTxnId is an argument that is used to determine if the txnId that this partition will
+     * block on until all recovery data is streamed has been reached.
      */
     @Override
-    public void doRecoveryWork() {
-        while (m_allowedBuffers > 0 && !m_tablesToStream.isEmpty() && !m_buffers.isEmpty()) {
-            /*
-             * Retrieve a buffer from the pool and decrement the number of buffers we are allowed
-             * to send.
-             */
-            m_allowedBuffers--;
-            BBContainer container = m_buffers.poll();
-            ByteBuffer buffer = container.b;
-
-            /*
-             * Constructor will set the Java portion of the message that contains
-             * the return address (siteId) as well as blockIndex (for acks), and the message id
-             * (so that Java knows what class to use to deserialize the message).
-             */
-            RecoveryMessage rm = new RecoveryMessage(container, m_siteId, m_blockIndex++);
-
-            /*
-             * Set the position to where the EE should serialize its portion of the recovery message.
-             * RecoveryMessage.getHeaderLength() defines the position where the EE portion starts.
-             */
-            buffer.clear();
-            buffer.position(RecoveryMessage.getHeaderLength());
-            RecoveryTable table = m_tablesToStream.peek();
-
-            /*
-             * Ask the engine to serialize more data.
-             */
-            int serialized = m_engine.tableStreamSerializeMore(container, table.m_tableId, TableStreamType.RECOVERY);
-
-            if (serialized <= 0) {
+    public void doRecoveryWork(long lastCommittedTxnId) {
+        if (lastCommittedTxnId < m_txnIdToBlockAfter) {
+            return;
+        } else if (lastCommittedTxnId > m_txnIdToBlockAfter) {
+            recoveryLog.error("Last committed txnId " + lastCommittedTxnId + " is after the txnid to block after " +
+                    m_txnIdToBlockAfter + " recovery has failed");
+            return;
+        }
+        while (true) {
+            while (m_allowedBuffers > 0 && !m_tablesToStream.isEmpty() && !m_buffers.isEmpty()) {
                 /*
-                 * Unlike COW the EE will actually serialize a message saying that recovery is
-                 * complete so it should never return 0 bytes written. It will return 0 bytes
-                 * written if a table is asked for more data when the recovery stream is not active
-                 * or complete (same thing really).
+                 * Retrieve a buffer from the pool and decrement the number of buffers we are allowed
+                 * to send.
                  */
-                VoltDB.crashVoltDB();
-            } else {
-                //Position should be unchanged from when tableStreamSerializeMore was called.
-                //Set the limit based on how much data the EE serialized past that position.
-                buffer.limit(buffer.position() + serialized);
-            }
-            assert(rm != null);
+                m_allowedBuffers--;
+                BBContainer container = m_buffers.poll();
+                ByteBuffer buffer = container.b;
 
-            /*
-             * If the EE encoded a recovery message with the type complete it indicates that there is no
-             * more data for this table. Remove it from the list of tables waiting to be recovered.
-             * The EE automatically cleans up its recovery data after it generates this message.
-             * This message still needs to be forwarded to the destinations so they know not
-             * to expect more data for that table.
-             */
-            if (rm.type() == RecoveryMessageType.Complete) {
-                m_tablesToStream.poll();
-                RecoveryTable nextTable = m_tablesToStream.peek();
-                if (nextTable != null) {
-                    if (!m_engine.activateTableStream(nextTable.m_tableId, TableStreamType.RECOVERY )) {
-                        hostLog.error("Attempted to activate recovery stream for table "
-                                + nextTable.m_name + " and failed");
-                        VoltDB.crashVoltDB();
+                /*
+                 * Constructor will set the Java portion of the message that contains
+                 * the return address (siteId) as well as blockIndex (for acks), and the message id
+                 * (so that Java knows what class to use to deserialize the message).
+                 */
+                RecoveryMessage rm = new RecoveryMessage(container, m_siteId, m_blockIndex++);
+
+                /*
+                 * Set the position to where the EE should serialize its portion of the recovery message.
+                 * RecoveryMessage.getHeaderLength() defines the position where the EE portion starts.
+                 */
+                buffer.clear();
+                buffer.position(RecoveryMessage.getHeaderLength());
+                RecoveryTable table = m_tablesToStream.peek();
+
+                /*
+                 * Ask the engine to serialize more data.
+                 */
+                int serialized = m_engine.tableStreamSerializeMore(container, table.m_tableId, TableStreamType.RECOVERY);
+
+                if (serialized <= 0) {
+                    /*
+                     * Unlike COW the EE will actually serialize a message saying that recovery is
+                     * complete so it should never return 0 bytes written. It will return 0 bytes
+                     * written if a table is asked for more data when the recovery stream is not active
+                     * or complete (same thing really).
+                     */
+                    VoltDB.crashVoltDB();
+                } else {
+                    //Position should be unchanged from when tableStreamSerializeMore was called.
+                    //Set the limit based on how much data the EE serialized past that position.
+                    buffer.limit(buffer.position() + serialized);
+                }
+                assert(rm != null);
+
+                /*
+                 * If the EE encoded a recovery message with the type complete it indicates that there is no
+                 * more data for this table. Remove it from the list of tables waiting to be recovered.
+                 * The EE automatically cleans up its recovery data after it generates this message.
+                 * This message still needs to be forwarded to the destinations so they know not
+                 * to expect more data for that table.
+                 */
+                if (rm.type() == RecoveryMessageType.Complete) {
+                    m_tablesToStream.poll();
+                    RecoveryTable nextTable = m_tablesToStream.peek();
+                    if (nextTable != null) {
+                        if (!m_engine.activateTableStream(nextTable.m_tableId, TableStreamType.RECOVERY )) {
+                            hostLog.error("Attempted to activate recovery stream for table "
+                                    + nextTable.m_name + " and failed");
+                            VoltDB.crashVoltDB();
+                        }
                     }
                 }
-            }
 
-            final int numDestinations = table.m_destinationIds.length;
+                final int numDestinations = table.m_destinationIds.length;
 
-            //Record that we are expecting this number of acks for this block
-            //before more data should be sent.
-            m_ackTracker.waitForAcks( rm.blockIndex(), numDestinations);
+                //Record that we are expecting this number of acks for this block
+                //before more data should be sent.
+                m_ackTracker.waitForAcks( rm.blockIndex(), numDestinations);
 
-            /*
-             * The common case is recovering a single destination. Take the slightly faster no
-             * copy path.
-             */
-            if (numDestinations == 1) {
-                try {
-                    m_mailbox.send(table.m_destinationIds[0], 0, rm);
-                } catch (MessagingException e) {
-                    // Continuing to propagate this horrible exception
-                    throw new RuntimeException(e);
-                }
-            } else {
                 /*
-                 * This path is broken right now because this version of send will not discard
-                 * the message. We don't plan on using it anyways so no biggie.
+                 * The common case is recovering a single destination. Take the slightly faster no
+                 * copy path.
                  */
-                VoltDB.crashVoltDB();
-//                try {
-//                    m_mailbox.send(table.m_destinationIdsArray, 0, rm);
-//                } catch (MessagingException e) {
-//                    // Continuing to propagate this horrible exception
-//                    throw new RuntimeException(e);
-//                }
-            }
-        }
-
-        if (m_tablesToStream.isEmpty()) {
-            /*
-             * See if it is possible to discard all the buffers
-             */
-            synchronized (this) {
-                m_recoveryComplete = true;
-                BBContainer buffer = null;
-                while ((buffer = m_buffers.poll()) != null) {
-                    m_bufferToOriginMap.remove(buffer).discard();
+                if (numDestinations == 1) {
+                    try {
+                        m_mailbox.send(table.m_destinationIds[0], 0, rm);
+                    } catch (MessagingException e) {
+                        // Continuing to propagate this horrible exception
+                        throw new RuntimeException(e);
+                    }
+                } else {
+                    /*
+                     * This path is broken right now because this version of send will not discard
+                     * the message. We don't plan on using it anyways so no biggie.
+                     */
+                    VoltDB.crashVoltDB();
+    //                try {
+    //                    m_mailbox.send(table.m_destinationIdsArray, 0, rm);
+    //                } catch (MessagingException e) {
+    //                    // Continuing to propagate this horrible exception
+    //                    throw new RuntimeException(e);
+    //                }
                 }
             }
-            m_onCompletion.run();;
+
+            if (m_tablesToStream.isEmpty()) {
+                /*
+                 * See if it is possible to discard all the buffers
+                 */
+                synchronized (this) {
+                    m_recoveryComplete = true;
+                    BBContainer buffer = null;
+                    while ((buffer = m_buffers.poll()) != null) {
+                        m_bufferToOriginMap.remove(buffer).discard();
+                    }
+                }
+                m_onCompletion.run();
+                return;
+            }
+
+            VoltMessage message = m_mailbox.recv();
+            if (message != null) {
+                if (message instanceof RecoveryMessage) {
+                    handleRecoveryMessage((RecoveryMessage)message);
+                } else {
+                    m_messageHandler.handleMessage(message);
+                }
+
+            }
+            Thread.yield();
         }
     }
 }

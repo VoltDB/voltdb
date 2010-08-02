@@ -28,6 +28,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.voltdb.RecoverySiteProcessor.MessageHandler;
+import org.voltdb.RecoverySiteProcessorSource.OnRecoveringPartitionInitiate;
+import org.voltdb.RecoverySiteProcessor.OnRecoveryCompletion;
 import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.CatalogMap;
@@ -334,7 +337,50 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         m_snapshotter.shutdown();
     }
 
+    /**
+     * Passed to recovery processors which forward non-recovery messages to this handler.
+     */
+    private final MessageHandler m_messageHandler = new MessageHandler() {
+        @Override
+        public void handleMessage(VoltMessage message) {
+            handleMailboxMessage(message);
+        }
+    };
 
+    /**
+     * Hook for source partition involved in recovery to determine what txn it will stop after
+     * and stream recovery data. Basically picks the larger of the two.
+     */
+    private final OnRecoveringPartitionInitiate m_onRecoveryInitiate = new OnRecoveringPartitionInitiate() {
+        @Override
+        public long pickTxnToStopAfter(long recoveringPartitionTxnId) {
+            if (recoveringPartitionTxnId > lastCommittedTxnId) {
+                return recoveringPartitionTxnId;
+            } else {
+                return lastCommittedTxnId;
+            }
+        }
+    };
+
+    /**
+     * This is invoked after all recovery data has been received/sent. The processor can be nulled out for GC.
+     * At this point the recovering partition may have to skip to the txn id the source site had stopped after
+     * before streaming
+     */
+    private final OnRecoveryCompletion m_onRecoveryCompletion = new OnRecoveryCompletion() {
+        @Override
+        public void complete(long txnId) {
+            m_recoveryProcessor = null;
+            if (lastCommittedTxnId != txnId) {
+                /*
+                 * Code to skip until after this txnId if necessary. Most likely has to pull txns
+                 * out of the priority queue and handle mailbox messages if the priority queue is empty
+                 * until it can commit this txnid.
+                 */
+            }
+        }
+
+    };
 
     public void tick() {
         // invoke native ee tick if at least one second has passed
@@ -349,9 +395,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         // do other periodic work
         m_snapshotter.doSnapshotWork(ee);
         m_watchdog.pet();
-        if (m_recoveryProcessor != null) {
-            m_recoveryProcessor.doRecoveryWork();
-        }
 
         /*
          * grab the table statistics from ee and put it into the statistics
@@ -744,6 +787,15 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 {
                     lastKnownGloballyCommitedMultiPartTxnId =
                         Math.max(txnState.txnId, lastKnownGloballyCommitedMultiPartTxnId);
+                }
+
+                /*
+                 * After each txn is committed check and see if it is time to
+                 * start doing the recovery work. Only do it this way right now
+                 * because recovery is a blocking process.
+                 */
+                if (m_recoveryProcessor != null) {
+                    m_recoveryProcessor.doRecoveryWork(lastCommittedTxnId);
                 }
             }
         }

@@ -41,5 +41,15 @@ public enum RecoveryMessageType {
     /*
      * Not used in the EE. Sites receiving blocks of data ack them with this message
      */
-    Ack;
+    Ack,
+    /*
+     * Not used in the EE. A recovering partition sends a message of this type
+     * to the source partition when its priority queue is synced. It contains
+     * the last committed txnId when the recovering partition heard from all initiators.
+     * The source partition sends back a response with the same subject
+     * indicating the last committed txnid at the source partition before sending recovery data.
+     * The recovering partition will then start running procedures after the txnid it receives
+     * from the source partition.
+     */
+    Initiate;
 }

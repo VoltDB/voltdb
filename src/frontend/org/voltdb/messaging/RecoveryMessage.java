@@ -43,6 +43,11 @@ public class RecoveryMessage extends VoltMessage {
     private static final int typeOffset = blockIndexOffset + 4;
     private static final int tableIdOffset = typeOffset + 1;
 
+    /*
+     * Offsets for a RecoveryMessageType.Initiate response
+     */
+    private static final int txnIdOffset = typeOffset + 1;
+
     /**
      * Constructor takes a ByteBuffer that already has enough space for the header and
      * already contains the recovery message as serialized by the EE. The limit has been
@@ -70,6 +75,31 @@ public class RecoveryMessage extends VoltMessage {
         m_buffer.limit(typeOffset + 1);
     }
 
+    /**
+     * Constructor takes a ByteBuffer that already has enough space for the header and
+     * sets the source siteId followed by the last committed txnId at the partition before recovery begins.
+     * The purpose of this message is to inform the source partition of what txnId the recovering partition
+     * decided to stop after (stops after hearing from all initiators)
+     * before syncing so that the source partition can decide what txnId the partitions
+     * will sync at (will be some txnId >= the one in this message).
+     *
+     * This constructor is used to generate the recovery message sent by the source partition to
+     * the recovering partition in response to the Initiate message received from the recovering partition.
+     * The purpose of this message is to inform the recovering partition of what txnId the source partition
+     * decided to stop after before syncing so that the recovering partition can start executing stored procedures
+     * at the correct txnId.
+     */
+    public RecoveryMessage(BBContainer container, int siteId, long txnId) {
+        m_subject = Subject.DEFAULT.getId();
+        m_container = container;
+        m_buffer = container.b;
+        m_buffer.put(HEADER_SIZE, RECOVERY_ID);
+        m_buffer.putInt(sourceSiteOffset, siteId);
+        m_buffer.put(typeOffset, (byte)RecoveryMessageType.Initiate.ordinal());
+        m_buffer.putLong(txnIdOffset, txnId);
+        m_buffer.limit(txnIdOffset + 8);
+    }
+
     @Override
     protected void flattenToBuffer(final DBBPool pool) throws IOException {
         /*
@@ -91,6 +121,10 @@ public class RecoveryMessage extends VoltMessage {
 
     public int tableId() {
         return m_buffer.getInt(tableIdOffset);//tableId is after recovery message type
+    }
+
+    public long txnId() {
+        return m_buffer.getInt(txnIdOffset);
     }
 
     public byte[] getMessageData() {

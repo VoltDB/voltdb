@@ -23,7 +23,6 @@ import java.util.Set;
 
 import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Site;
-import org.voltdb.messaging.Mailbox;
 
 public class ExecutorTxnIdSafetyState {
 
