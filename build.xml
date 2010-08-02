@@ -233,6 +233,9 @@ DISTRIBUTION
         <arg line="killstragglers.sh"/>
         <arg line="${build.dir}/voltbin"/>
     </exec>
+    <!-- populate the logging configuration files -->
+    <copy tofile="${build.dir}/voltbin/log4j.properties" file="${src.gpl.dir}/log4j.properties"/>
+    <copy tofile="${build.dir}/voltbin/log4j.xml" file="${src.gpl.dir}/log4j.xml"/>
     <!-- strip the voltbin shared library (~40x size reduction) -->
     <exec dir='${build.dir}/voltbin' executable='/bin/sh'>
         <arg line="-c '/usr/bin/strip -x libvoltdb*'"/>
@@ -299,6 +302,10 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/client/StatsUploaderSettings.java" />
         </fileset>
     </javadoc>
+
+    <!-- populate the logging configuration files -->
+    <copy tofile="${dist.dir}/voltdb/log4j.properties" file="${src.gpl.dir}/log4j.properties"/>
+    <copy tofile="${dist.dir}/voltdb/log4j.xml" file="${src.gpl.dir}/log4j.xml"/>
 
     <!-- populate java and native libraries -->
     <copy todir="${dist.dir}/voltdb" flatten="true" >
