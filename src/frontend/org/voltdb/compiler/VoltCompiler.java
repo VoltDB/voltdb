@@ -84,7 +84,6 @@ public class VoltCompiler {
     public static final int NO_LINE_NUMBER = -1;
 
     // feedback by filename
-    ArrayList<Feedback> m_allFeedback = new ArrayList<Feedback>();
     ArrayList<Feedback> m_infos = new ArrayList<Feedback>();
     ArrayList<Feedback> m_warnings = new ArrayList<Feedback>();
     ArrayList<Feedback> m_errors = new ArrayList<Feedback>();
@@ -140,8 +139,13 @@ public class VoltCompiler {
             if (severityLevel == Severity.UNEXPECTED)
                 retval = "UNEXPECTED ERROR";
 
+            return retval + " " + getLogString();
+        }
+
+        public String getLogString() {
+            String retval = new String();
             if (fileName != null) {
-                retval += " [" + fileName;
+                retval += "[" + fileName;
                 if (lineNo != NO_LINE_NUMBER)
                     retval += ":" + lineNo;
                 retval += "]";
@@ -256,25 +260,19 @@ public class VoltCompiler {
     void addInfo(final String msg, final int lineNo) {
         final Feedback fb = new Feedback(Severity.INFORMATIONAL, msg, m_currentFilename, lineNo);
         m_infos.add(fb);
-        addFeedback(fb);
+        compilerLog.info(fb.getLogString());
     }
 
     void addWarn(final String msg, final int lineNo) {
         final Feedback fb = new Feedback(Severity.WARNING, msg, m_currentFilename, lineNo);
         m_warnings.add(fb);
-        addFeedback(fb);
+        compilerLog.warn(fb.getLogString());
     }
 
     void addErr(final String msg, final int lineNo) {
         final Feedback fb = new Feedback(Severity.ERROR, msg, m_currentFilename, lineNo);
         m_errors.add(fb);
-        addFeedback(fb);
-    }
-
-    void addFeedback(final Feedback fb) {
-        m_allFeedback.add(fb);
-
-        if (m_outputStream != null) m_outputStream.println(fb.getStandardFeedbackLine());
+        compilerLog.error(fb.getLogString());
     }
 
     /**
@@ -362,11 +360,6 @@ public class VoltCompiler {
         cachedAddedClasses.clear();
         m_currentFilename = new File(projectFileURL).getName();
         m_jarBuilder = new JarBuilder(this);
-
-        if (m_outputStream != null) {
-            m_outputStream.println("\n** BEGIN PROJECT COMPILE: " + m_currentFilename + " **");
-        }
-
         ProjectType project = null;
 
         try {

@@ -57,14 +57,10 @@ public abstract class StatementCompiler {
             Statement catalogStmt, String stmt, boolean singlePartition)
     throws VoltCompiler.VoltCompilerException {
 
-        // Strip newlines for catalog compatibility
+        // Cleanup whitespace newlines for catalog compatibility
+        // and to make statement parsing easier.
         stmt = stmt.replaceAll("\n", " ");
-        // remove leading and trailing whitespace so the lines not
-        // too far below this doesn't fail (starts with "insert", etc...)
         stmt = stmt.trim();
-
-        //LOG.fine("Compiling Statement: ");
-        //LOG.fine(stmt);
         compiler.addInfo("Compiling Statement: " + stmt);
 
         // determine the type of the query
@@ -86,7 +82,7 @@ public abstract class StatementCompiler {
             catalogStmt.setReadonly(true);
         }
         else {
-            throw compiler.new VoltCompilerException("Unparsable SQL statement.");
+            throw compiler.new VoltCompilerException("Unparsable SQL statement: " + stmt);
         }
         catalogStmt.setQuerytype(qtype.getValue());
 
@@ -97,10 +93,7 @@ public abstract class StatementCompiler {
         catalogStmt.setParamnum(0);
 
         String name = catalogStmt.getParent().getTypeName() + "-" + catalogStmt.getTypeName();
-        //System.out.println("stmt: " + name);
-
         PlanNodeList node_list = null;
-
         TrivialCostModel costModel = new TrivialCostModel();
 
         QueryPlanner planner = new QueryPlanner(
@@ -117,11 +110,13 @@ public abstract class StatementCompiler {
             throw compiler.new VoltCompilerException("Failed to plan for stmt: " + catalogStmt.getTypeName());
         }
         if (plan == null) {
-            String msg = "Failed to plan for stmt type(" + catalogStmt.getTypeName() + ") "
-                            + catalogStmt.getSqltext();
+            String msg = "Failed to plan for statement type("
+                + catalogStmt.getTypeName() + ") "
+                + catalogStmt.getSqltext();
             String plannerMsg = planner.getErrorMessage();
-            if (plannerMsg != null)
+            if (plannerMsg != null) {
                 msg += " Error: \"" + plannerMsg + "\"";
+            }
             throw compiler.new VoltCompilerException(msg);
         }
 
@@ -130,14 +125,9 @@ public abstract class StatementCompiler {
         if (plan.fullWhereClause != null) {
             String json = "ERROR";
             try {
-                // serialize to pretty printed json
                 String jsonCompact = plan.fullWhereClause.toJSONString();
-                // pretty printing seems to cause issues
-                //JSONObject jobj = new JSONObject(jsonCompact);
-                //json = jobj.toString(4);
                 json = jsonCompact;
             } catch (Exception e) {
-                // hopefully someone will notice
                 e.printStackTrace();
             }
             String hexString = Encoder.hexEncode(json);
@@ -149,14 +139,9 @@ public abstract class StatementCompiler {
         if (plan.fullWinnerPlan != null) {
             String json = "ERROR";
             try {
-                // serialize to pretty printed json
                 String jsonCompact = plan.fullWinnerPlan.toJSONString();
-                // pretty printing seems to cause issues
-                //JSONObject jobj = new JSONObject(jsonCompact);
-                //json = jobj.toString(4);
                 json = jsonCompact;
             } catch (Exception e) {
-                // hopefully someone will notice
                 e.printStackTrace();
             }
             String hexString = Encoder.hexEncode(json);
@@ -165,7 +150,7 @@ public abstract class StatementCompiler {
 
         // Input Parameters
         // We will need to update the system catalogs with this new information
-        // If this is an ad hoc query then there won't be any parameters
+        // If this is an adhoc query then there won't be any parameters
         for (ParameterInfo param : plan.parameters) {
             StmtParameter catalogParam = catalogStmt.getParameters().add(String.valueOf(param.index));
             catalogParam.setJavatype(param.type.getValue());
@@ -191,31 +176,16 @@ public abstract class StatementCompiler {
             catColumn.setSize(col.getSize());
             index++;
         }
-
         catalogStmt.setReplicatedtabledml(plan.replicatedTableDML);
-
-        //Store the list of parameters types and indexes in the plan node list.
-
-        /*List<Pair<Integer, VoltType>> parameters = node_list.getParameters();
-        for (ParameterInfo param : plan.parameters) {
-            Pair<Integer, VoltType> parameter = new Pair<Integer, VoltType>(param.index, param.type);
-            parameters.add(parameter);
-        }*/
 
         int i = 0;
         Collections.sort(plan.fragments);
         for (CompiledPlan.Fragment fragment : plan.fragments) {
             node_list = new PlanNodeList(fragment.planGraph);
 
-            //
             // Now update our catalog information
-            // HACK: We're using the node_tree's hashCode() as it's name. It would be really
-            //     nice if the Catalog code give us an guid without needing a name first...
-            //
-            //String planFragmentName = Integer.toString(node_list.hashCode());
             String planFragmentName = Integer.toString(i);
             PlanFragment planFragment = catalogStmt.getFragments().add(planFragmentName);
-            //hzc.addInfo("PLAN FRAGMENT: " + planFragment.getGuid());
 
             // mark a fragment as non-transactional if it never touches a persistent table
             planFragment.setNontransactional(!fragmentReferencesPersistentTable(fragment.planGraph));
@@ -228,18 +198,9 @@ public abstract class StatementCompiler {
                 JSONObject jobj = new JSONObject(node_list.toJSONString());
                 json = jobj.toString(4);
             } catch (JSONException e2) {
-                // TODO Auto-generated catch block
                 e2.printStackTrace();
-                System.exit(-1);
+                throw compiler.new VoltCompilerException(e2.getMessage());
             }
-
-            // TODO: can't re-enable this until the EE accepts PlanColumn GUIDs
-            // instead of column names because the deserialization is done without
-            // any connection to the child nodes - required to map the PlanColumn's
-            // GUID to the child's column name.
-
-            // verify the plan serializes and deserializes correctly.
-            // assert(node_list.testJSONSerialization(db));
 
             // output the plan to disk for debugging
             PrintStream plansOut = BuildDirectoryUtils.getDebugOutputPrintStream(
@@ -247,11 +208,10 @@ public abstract class StatementCompiler {
             plansOut.println(json);
             plansOut.close();
 
-            //
-            // We then stick a serialized version of PlanNodeTree into a PlanFragment
-            //
+            // Place serialized version of PlanNodeTree into a PlanFragment
             try {
-                FastSerializer fs = new FastSerializer(false, false); // C++ needs little-endian
+                // C++ needs little-endian
+                FastSerializer fs = new FastSerializer(false, false);
                 fs.write(json.getBytes());
                 String hexString = fs.getHexEncodedBytes();
                 planFragment.setPlannodetree(hexString);
