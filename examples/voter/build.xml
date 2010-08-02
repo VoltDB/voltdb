@@ -10,6 +10,7 @@ PATHS AND PROPERTIES
 <property name='build.dir'             location='obj/' />
 <property name='src.dir'               location='src/' />
 <property name='debugoutput.dir'       location='debugoutput/' />
+<property name='log4j.configuration'  location='../../voltdb/log4j.properties'/>
 
 <path id='project.classpath'>
     <fileset dir='../../voltdb' >
@@ -35,6 +36,7 @@ PRIMARY ENTRY POINTS
         <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError" />
         <jvmarg value="-XX:HeapDumpPath=/tmp" />
         <jvmarg value="-XX:-ReduceInitialCardMarks" />
+        <jvmarg value="-Dlog4j.configuration=file://${log4j.configuration}"/>
         <arg value="catalog"/>
         <arg value="catalog.jar"/>
         <arg value="deployment"/>
@@ -66,6 +68,7 @@ PRIMARY ENTRY POINTS
     <java fork="yes" failonerror="true"
           classname="org.voltdb.compiler.VoltCompiler" >
         <jvmarg value="-Djava.library.path=../../voltdb" />
+        <jvmarg value="-Dlog4j.configuration=file://${log4j.configuration}"/>
         <arg value="project.xml"/>                  <!-- project file -->
         <arg value="catalog.jar"/>                  <!-- output -->
         <classpath refid='project.classpath' />

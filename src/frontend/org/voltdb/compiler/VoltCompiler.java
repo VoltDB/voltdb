@@ -43,16 +43,7 @@ import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltdb.ProcInfo;
 import org.voltdb.ProcInfoData;
 import org.voltdb.TransactionIdManager;
-import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Column;
-import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Group;
-import org.voltdb.catalog.GroupRef;
-import org.voltdb.catalog.MaterializedViewInfo;
-import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.SnapshotSchedule;
-import org.voltdb.catalog.Table;
+import org.voltdb.catalog.*;
 import org.voltdb.compiler.projectfile.ClassdependenciesType.Classdependency;
 import org.voltdb.compiler.projectfile.DatabaseType;
 import org.voltdb.compiler.projectfile.ExportsType.Connector;
@@ -948,7 +939,56 @@ public class VoltCompiler {
         final VoltCompiler compiler = new VoltCompiler();
         final boolean success = compiler.compile(projectPath, outputJar, System.out, null);
         if (!success) {
+            compiler.summarizeErrors();
             System.exit(-1);
+        }
+        else {
+            compiler.summarizeSuccess();
+        }
+    }
+
+    private void summarizeSuccess() {
+        if (m_outputStream != null) {
+
+            Database database = m_catalog.getClusters().get("cluster").
+            getDatabases().get("database");
+
+            m_outputStream.println("------------------------------------------");
+            m_outputStream.println("Successfully created " + m_jarOutputPath);
+
+            for (String ddl : m_ddlFilePaths.keySet()) {
+                m_outputStream.println("Includes schema: " + m_ddlFilePaths.get(ddl));
+            }
+
+            m_outputStream.println();
+
+            for (Procedure p : database.getProcedures()) {
+                if (p.getSystemproc()) {
+                    continue;
+                }
+                m_outputStream.printf("[%s][%s] %s\n",
+                                      p.getSinglepartition() ? "SP" : "MP",
+                                      p.getReadonly() ? "RO" : "RW",
+                                      p.getTypeName());
+                for (Statement s : p.getStatements()) {
+                    if (s.getSqltext().length() > 80) {
+                        m_outputStream.println("  " + s.getSqltext().substring(0, 80) + "...");
+                    }
+                    else {
+                        m_outputStream.println("  " + s.getSqltext());
+                    }
+                }
+                m_outputStream.println();
+            }
+            m_outputStream.println("------------------------------------------");
+        }
+    }
+
+    private void summarizeErrors() {
+        if (m_outputStream != null) {
+            m_outputStream.println("------------------------------------------");
+            m_outputStream.println("Project compilation failed. See log for errors.");
+            m_outputStream.println("------------------------------------------");
         }
     }
 

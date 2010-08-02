@@ -17,6 +17,7 @@ PATHS AND PROPERTIES
 <property name='build.testoutput.dir' location="${build.dir}/testoutput" />
 <property name='procedures.dir'       location='procedures/' />
 <property name='src.dir'              location='src/' />
+<property name='log4j.configuration'  location='../../voltdb/log4j.properties'/>
 
 <path id='project.classpath.server'>
     <pathelement location='${build.dir}' />
@@ -44,7 +45,7 @@ PRIMARY ENTRY POINTS
 
 <!--
 ***************************************
-CLEANING
+UTILITIES
 ***************************************
 -->
 
@@ -56,6 +57,23 @@ CLEANING
         </fileset>
     </delete>
 </target>
+
+
+<macrodef name="invoke-java">
+  <attribute name="classname"/>
+  <element name="javac"/>
+  <sequential>
+    <java fork="yes" failonerror="true" classname="@{classname}">
+        <jvmarg value="-Djava.library.path=../../voltdb" />
+        <jvmarg value="-Dlog4j.configuration=file://${log4j.configuration}"/>
+        <jvmarg value="-server" />
+        <jvmarg value="-Xmx512m" />
+        <classpath refid='project.classpath.server' />
+        <assertions><disable /></assertions>
+        <javac/>
+    </java>
+  </sequential>
+</macrodef>
 
 <!--
 ***************************************
@@ -85,14 +103,12 @@ JAVA & CATALOG COMPILATION
     <copy todir='${build.dir}/com/auctionexample' file='auction-ddl.sql' />
 
     <!-- Build the VoltDB Catalog for the Auction example -->
-    <java fork="yes" failonerror="true"
-          classname="org.voltdb.compiler.VoltCompiler" >
-        <jvmarg value="-Djava.library.path=../../voltdb" />
-        <arg value="project.xml"/> <!-- project file -->
+    <invoke-java classname="org.voltdb.compiler.VoltCompiler">
+      <javac>
+        <arg value="project.xml"/>    <!-- project file -->
         <arg value="${catalog_jar}"/> <!-- output -->
-        <classpath refid='project.classpath.server' />
-        <assertions><disable /></assertions>
-    </java>
+      </javac>
+    </invoke-java>
 </target>
 
 <!--
@@ -102,26 +118,21 @@ SERVER, EXPORT, & CLIENT TARGETS
 -->
 
 <target name="server" depends='compile' description="Example: ant server    Start a VoltDB server with the auction catalog.">
-    <java fork="yes" classname="org.voltdb.VoltDB" >
-        <jvmarg value="-Djava.library.path=../../voltdb" />
-        <jvmarg value="-server" />
-        <jvmarg value="-Xmx512m" />
+    <invoke-java classname="org.voltdb.VoltDB" >
+      <javac>
         <arg value="catalog"/>
         <arg value="auction.jar"/>
         <arg value="deployment"/>
         <arg value="deployment.xml"/>
-        <classpath refid='project.classpath.server' />
-        <assertions><disable /></assertions>
-    </java>
+      </javac>
+    </invoke-java>
 </target>
 
 <target name="export" depends='' description="Example: ant export    Start a VoltDB export receiver for the auction catalog.">
-    <java fork="yes" classname="org.voltdb.exportclient.ExportToFileClient" >
-        <jvmarg value="-Djava.library.path=../../voltdb" />
-        <jvmarg value="-server" />
-        <jvmarg value="-Xmx512m" />
+    <invoke-java classname="org.voltdb.exportclient.ExportToFileClient" >
+      <javac>
         <arg value="--servers"/>
-       <arg value="localhost"/>
+        <arg value="localhost"/>
         <arg value="--type"/>
         <arg value="csv"/>
         <arg value="--nonce"/>
@@ -130,15 +141,14 @@ SERVER, EXPORT, & CLIENT TARGETS
         <arg value="voltdb"/>
         <arg value="--password"/>
         <arg value="demo"/>
-        <classpath refid='project.classpath.server' />
-        <assertions><disable /></assertions>
-    </java>
+      </javac>
+    </invoke-java>
 </target>
 
 <target name="client" description="Example: ant client    Run auction example client.">
     <java fork="yes" classname="com.auctionexample.Client" >
         <classpath refid='project.classpath.client' />
-        <assertions><disable /></assertions>
+        <assertions><disable/></assertions>
     </java>
 </target>
 

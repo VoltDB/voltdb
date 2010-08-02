@@ -9,6 +9,7 @@ PATHS AND PROPERTIES
 
 <property name='catalog_jar' value='satellite.jar' />
 
+
 <condition property="address" value="${address}" else="localhost">
   <isset property="address" />
 </condition>
@@ -17,6 +18,7 @@ PATHS AND PROPERTIES
 <property name='build.testoutput.dir' location="${build.dir}/testoutput" />
 <property name='procedures.dir'       location='procedures/' />
 <property name='src.dir'              location='./' />
+<property name='log4j.configuration'  location='../../voltdb/log4j.properties'/>
 
 <path id='project.classpath'>
     <pathelement location='${build.dir}' />
@@ -74,6 +76,7 @@ JAVA & CATALOG COMPILATION
     <java fork="yes" failonerror="true"
           classname="org.voltdb.compiler.VoltCompiler" >
         <jvmarg value="-Djava.library.path=../../voltdb" />
+        <jvmarg value="-Dlog4j.configuration=file://${log4j.configuration}"/>
         <arg value="project.xml"/> <!-- project file -->
         <arg value="${catalog_jar}"/> <!-- output -->
         <classpath refid='project.classpath' />
@@ -93,6 +96,7 @@ SERVER & CLIENT TARGETS
         <jvmarg value="-Djava.library.path=../../voltdb" />
         <jvmarg value="-server" />
         <jvmarg value="-Xmx512m" />
+        <jvmarg value="-Dlog4j.configuration=file://${log4j.configuration}"/>
         <arg value="catalog"/>
         <arg value="${catalog_jar}"/>
         <arg value="deployment"/>
