@@ -10,7 +10,7 @@ import socket
 import traceback
 
 # volt server IP address and port
-volt_server_ip = 'volt3a'
+volt_server_ip = 'localhost'
 volt_server_port = 21212
 
 # volt username/password if database security is enabled
