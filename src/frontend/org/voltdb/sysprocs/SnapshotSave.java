@@ -210,23 +210,20 @@ public class SnapshotSave extends VoltSystemProcedure
                     final ArrayList<SnapshotTableTask> replicatedSnapshotTasks =
                         new ArrayList<SnapshotTableTask>();
 
-                    final ArrayList<String> tableNames = new ArrayList<String>();
-                    for (final Table table : getTablesToSave(context))
-                    {
-                        tableNames.add(table.getTypeName());
-                    }
+                    final List<Table> tables = getTablesToSave(context);
                     SnapshotUtil.recordSnapshotTableList(
                             startTime,
                             file_path,
                             file_nonce,
-                            tableNames);
-                    final AtomicInteger numTables = new AtomicInteger(tableNames.size());
+                            tables);
+                    final AtomicInteger numTables = new AtomicInteger(tables.size());
                     final SnapshotRegistry.Snapshot snapshotRecord =
                         SnapshotRegistry.startSnapshot(
                                 startTime,
+                                context.getExecutionSite().getCorrespondingHostId(),
                                 file_path,
                                 file_nonce,
-                                tableNames.toArray(new String[0]));
+                                tables.toArray(new Table[0]));
                     for (final Table table : getTablesToSave(context))
                     {
                         String canSnapshot = "SUCCESS";
@@ -515,23 +512,6 @@ public class SnapshotSave extends VoltSystemProcedure
         return my_tables;
     }
 
-    private final File constructFileForTable(Table table,
-                                             String filePath,
-                                             String fileNonce,
-                                             String hostId)
-    {
-        StringBuilder filename_builder = new StringBuilder(fileNonce);
-        filename_builder.append("-");
-        filename_builder.append(table.getTypeName());
-        if (!table.getIsreplicated())
-        {
-            filename_builder.append("-host_");
-            filename_builder.append(hostId);
-        }
-        filename_builder.append(".vpt");//Volt partitioned table
-        return new File(filePath, new String(filename_builder));
-    }
-
     private final SnapshotDataTarget constructSnapshotDataTargetForTable(
                                              SystemProcedureExecutionContext context,
                                              File f,
@@ -655,5 +635,13 @@ public class SnapshotSave extends VoltSystemProcedure
             retval[ii++] = Integer.parseInt(p.getTypeName());
         }
         return retval;
+    }
+
+    private final File constructFileForTable(Table table,
+                                             String filePath,
+                                             String fileNonce,
+                                             String hostId)
+    {
+        return new File(filePath, SnapshotUtil.constructFilenameForTable(table, fileNonce, hostId));
     }
 }

@@ -39,6 +39,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.logging.VoltLogger;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 @ProcInfo(singlePartition = false)
 public class SnapshotDelete extends VoltSystemProcedure {
@@ -244,7 +245,8 @@ public class SnapshotDelete extends VoltSystemProcedure {
         assert(f.isDirectory());
         assert(f.canRead());
         assert(f.canWrite());
-        final String digestName = nonce.substring(0, nonce.lastIndexOf('-')) + ".digest";
+        final String digestName =
+            SnapshotUtil.constructDigestFilenameForNonce(nonce.substring(0, nonce.lastIndexOf('-')));
         return java.util.Arrays.asList(f.listFiles(new FileFilter() {
 
             @Override

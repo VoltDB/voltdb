@@ -21,6 +21,8 @@ import java.util.HashMap;
 import java.util.TreeSet;
 import java.util.Iterator;
 
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+
 /**
  * The snapshot registry contains information about snapshots that executed
  * while the system was running.
@@ -49,14 +51,19 @@ public class SnapshotRegistry {
 
         private final HashMap< String, Table> tables = new HashMap< String, Table>();
 
-        private Snapshot(long startTime, String path, String nonce, String tables[]) {
+        private Snapshot(long startTime, int hostId, String path, String nonce,
+                         org.voltdb.catalog.Table tables[]) {
             timeStarted = startTime;
             this.path = path;
             this.nonce = nonce;
             timeFinished = 0;
             synchronized (this.tables) {
-                for (String table : tables) {
-                    this.tables.put( table, new Table(table, startTime));
+                for (org.voltdb.catalog.Table table : tables) {
+                    String filename =
+                        SnapshotUtil.constructFilenameForTable(table,
+                                                               nonce,
+                                                               Integer.toString(hostId));
+                    this.tables.put(table.getTypeName(), new Table(table.getTypeName(), filename, startTime));
                 }
             }
             result = false;
@@ -104,13 +111,15 @@ public class SnapshotRegistry {
 
         public class Table {
             public final String name;
+            public final String filename;
             public final long size;
             public final long timeClosed;
             public final long timeCreated;
             public final Exception error;
 
-            private Table(String name, long timeCreated) {
+            private Table(String name, String filename, long timeCreated) {
                 this.name = name;
+                this.filename = filename;
                 this.timeCreated = timeCreated;
                 size = 0;
                 timeClosed = 0;
@@ -119,6 +128,7 @@ public class SnapshotRegistry {
 
             public Table(Table t, long size, long timeClosed, Exception error) {
                 this.name = t.name;
+                this.filename = t.filename;
                 this.size = size;
                 this.timeClosed = timeClosed;
                 this.timeCreated = t.timeCreated;
@@ -127,8 +137,8 @@ public class SnapshotRegistry {
         }
     }
 
-    public static synchronized Snapshot startSnapshot(long startTime, String path, String nonce, String tables[]) {
-        final Snapshot s = new Snapshot(startTime, path, nonce, tables);
+    public static synchronized Snapshot startSnapshot(long startTime, int hostId, String path, String nonce, org.voltdb.catalog.Table tables[]) {
+        final Snapshot s = new Snapshot(startTime, hostId, path, nonce, tables);
 
         m_snapshots.add(s);
         if (m_snapshots.size() > m_maxStatusHistory) {

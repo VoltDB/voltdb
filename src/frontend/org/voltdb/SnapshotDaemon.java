@@ -138,6 +138,12 @@ class SnapshotDaemon {
             m_frequencyInMillis = TimeUnit.MILLISECONDS.convert( m_frequency, m_frequencyUnit);
             m_nextSnapshotTime += m_frequencyInMillis;
         }
+
+        // Register the snapshot status to the StatsAgent
+        SnapshotStatus snapshotStatus = new SnapshotStatus("Snapshot Status");
+        VoltDB.instance().getStatsAgent().registerStatsSource(SysProcSelector.SNAPSHOTSTATUS,
+                                                              0,
+                                                              snapshotStatus);
     }
 
     /**

@@ -41,6 +41,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.zip.CRC32;
 
+import org.voltdb.catalog.Table;
 import org.voltdb.utils.Pair;
 import org.voltdb.utils.DBBPool.BBContainer;
 
@@ -60,8 +61,8 @@ public class SnapshotUtil {
             long snapshotTime,
             String path,
             String nonce,
-            List<String> tables) throws IOException {
-        final File f = new File(path, nonce + ".digest");
+            List<Table> tables) throws IOException {
+        final File f = new File(path, constructDigestFilenameForNonce(nonce));
         if (f.exists()) {
             if (!f.delete()) {
                 throw new IOException("Unable to write table list file " + f);
@@ -74,7 +75,7 @@ public class SnapshotUtil {
             sw.append(',');
         }
         for (int ii = 0; ii < tables.size(); ii++) {
-            sw.append(tables.get(ii));
+            sw.append(tables.get(ii).getTypeName());
             if (!(ii == (tables.size() - 1))) {
                 sw.append(',');
             } else {
@@ -95,7 +96,7 @@ public class SnapshotUtil {
 
     public static List<String> retrieveRelevantTableNames(String path,
             String nonce) throws Exception {
-        return retrieveRelevantTableNamesAndTime(new File(path, nonce + ".digest")).getSecond();
+        return retrieveRelevantTableNamesAndTime(new File(path, constructDigestFilenameForNonce(nonce))).getSecond();
     }
 
     /**
@@ -106,6 +107,21 @@ public class SnapshotUtil {
      * @throws Exception
      */
     public static Pair<Long, List<String>> retrieveRelevantTableNamesAndTime(File f) throws Exception {
+        String tableList = CRCCheck(f);
+        String tableNames[] = tableList.split(",");
+        String actualTableNames[] = new String[tableNames.length - 1];
+        System.arraycopy( tableNames, 1, actualTableNames, 0, tableNames.length - 1);
+        return Pair.of(Long.valueOf(tableNames[0]),
+                       java.util.Arrays.asList(actualTableNames));
+    }
+
+    /**
+     * Check if the CRC of the snapshot file matches the digest.
+     * @param f The snapshot file object
+     * @return The table list as a string
+     * @throws IOException If CRC does not match
+     */
+    public static String CRCCheck(File f) throws IOException {
         final FileInputStream fis = new FileInputStream(f);
         try {
             final BufferedInputStream bis = new BufferedInputStream(fis);
@@ -135,19 +151,13 @@ public class SnapshotUtil {
             if (crc != calculatedValue) {
                 throw new IOException("CRC of snapshot digest did not match digest contents");
             }
-            String tableNames[] = tableList.split(",");
-            String actualTableNames[] = new String[tableNames.length - 1];
-            System.arraycopy( tableNames, 1, actualTableNames, 0, tableNames.length - 1);
-            return Pair.of(
-                    Long.valueOf(tableNames[0]),
-                    java.util.Arrays.asList(actualTableNames));
+
+            return tableList;
         } finally {
             try {
-                if (fis != null) {
+                if (fis != null)
                     fis.close();
-                }
-            } catch (IOException e) {
-            }
+            } catch (IOException e) {}
         }
     }
 
@@ -214,7 +224,7 @@ public class SnapshotUtil {
 
             for (String snapshotName : snapshotNames) {
                 if (pathname.getName().startsWith(snapshotName + "-") ||
-                        pathname.getName().equals(snapshotName + ".digest")) {
+                        pathname.getName().equals(constructDigestFilenameForNonce(snapshotName))) {
                     return true;
                 }
             }
@@ -576,4 +586,37 @@ public class SnapshotUtil {
             return Pair.of( false,  sb.toString());
         }
     }
+
+    /**
+     * Generates a Filename to the snapshot file for the given table.
+     * @param table
+     * @param fileNonce
+     * @param hostId
+     * @return
+     */
+    public static final String constructFilenameForTable(Table table,
+                                                         String fileNonce,
+                                                         String hostId)
+    {
+        StringBuilder filename_builder = new StringBuilder(fileNonce);
+        filename_builder.append("-");
+        filename_builder.append(table.getTypeName());
+        if (!table.getIsreplicated())
+        {
+            filename_builder.append("-host_");
+            filename_builder.append(hostId);
+        }
+        filename_builder.append(".vpt");//Volt partitioned table
+        return filename_builder.toString();
+    }
+
+    /**
+     * Generates the digest filename for the given nonce.
+     * @param nonce
+     * @return
+     */
+    public static final String constructDigestFilenameForNonce(String nonce) {
+        return (nonce + ".digest");
+    }
+
 }

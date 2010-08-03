@@ -498,9 +498,8 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
          */
         VoltTable statusResults[] = client.callProcedure("@SnapshotStatus").getResults();
         assertNotNull(statusResults);
-        assertEquals( 2, statusResults.length);
-        assertEquals( 8, statusResults[0].getColumnCount());
-        assertEquals( 1, statusResults[0].getRowCount());
+        assertEquals( 1, statusResults.length);
+        assertEquals( 13, statusResults[0].getColumnCount());
         assertTrue(statusResults[0].advanceRow());
         assertTrue(TMPDIR.equals(statusResults[0].getString("PATH")));
         assertTrue(TESTNONCE.equals(statusResults[0].getString("NONCE")));
@@ -534,8 +533,8 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         int count = 0;
         String completeStatus = null;
         do {
-            assertTrue(TMPDIR.equals(scanResults[0].getString("PATH")));
             if (TESTNONCE.equals(scanResults[0].getString("NONCE"))) {
+                assertTrue(TMPDIR.equals(scanResults[0].getString("PATH")));
                 count++;
                 completeStatus = scanResults[0].getString("COMPLETE");
             }
@@ -565,9 +564,9 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         count = 0;
         String missingTableName = null;
         do {
-            assertTrue(TMPDIR.equals(scanResults[0].getString("PATH")));
             if (TESTNONCE.equals(scanResults[0].getString("NONCE"))
                 && "FALSE".equals(scanResults[0].getString("COMPLETE"))) {
+                assertTrue(TMPDIR.equals(scanResults[0].getString("PATH")));
                 count++;
                 missingTableName = scanResults[0].getString("TABLES_MISSING");
             }
@@ -714,9 +713,9 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
          */
         VoltTable statusResults[] = client.callProcedure("@SnapshotStatus").getResults();
         assertNotNull(statusResults);
-        assertEquals( 2, statusResults.length);
-        assertEquals( 8, statusResults[0].getColumnCount());
-        assertEquals( 1, statusResults[0].getRowCount());
+        assertEquals( 1, statusResults.length);
+        assertEquals( 13, statusResults[0].getColumnCount());
+        assertEquals( 7, statusResults[0].getRowCount());
         assertTrue(statusResults[0].advanceRow());
         assertTrue(TMPDIR.equals(statusResults[0].getString("PATH")));
         assertTrue(TESTNONCE.equals(statusResults[0].getString("NONCE")));
@@ -829,7 +828,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             results = client.callProcedure("@SnapshotStatus").getResults();
             assertTrue(results[0].advanceRow());
             assertTrue(results[0].getString("RESULT").equals("SUCCESS"));
-            assertEquals( 1, results[0].getRowCount());
+            assertEquals( 7, results[0].getRowCount());
         }
         catch (Exception ex)
         {
@@ -899,8 +898,10 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         try
         {
             results = client.callProcedure("@SnapshotStatus").getResults();
-            assertTrue(results[0].advanceRow());
-            assertTrue(results[0].getString("RESULT").equals("FAILURE"));
+            boolean hasFailure = false;
+            while (results[0].advanceRow())
+                hasFailure |= results[0].getString("RESULT").equals("FAILURE");
+            assertTrue(hasFailure);
         }
         catch (Exception ex)
         {

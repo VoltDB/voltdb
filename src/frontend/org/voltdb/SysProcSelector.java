@@ -20,8 +20,10 @@ public enum SysProcSelector {
     TABLE,            // invoked as @stat table
     PROCEDURE,        // invoked as @stat procedure
     STARVATION,
-    INITIATOR,         // invoked as @stat initiator
+    INITIATOR,        // invoked as @stat initiator
     PARTITIONCOUNT,
     IOSTATS,
-    MANAGEMENT; //Returns pretty much everything
+    MANAGEMENT,       //Returns pretty much everything
+
+    SNAPSHOTSTATUS;
 }
