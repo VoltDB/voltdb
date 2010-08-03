@@ -763,7 +763,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         {
             m_txnlog.trace("FUZZTEST completeTransaction " + txnState.txnId);
         }
-        if (!txnState.isReadOnly) {
+        if (!txnState.isReadOnly()) {
             assert(latestUndoToken != kInvalidUndoToken);
             assert(txnState.getBeginUndoToken() != kInvalidUndoToken);
             assert(latestUndoToken >= txnState.getBeginUndoToken());
@@ -1524,7 +1524,20 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 assert(retval != null);
                 return retval;
             }
-            else {
+            // This is a bit ugly; more or less a straight-forward
+            // extraction of the logic that used to be in
+            // MultiPartitionParticipantTxnState.doWork()
+            else if (currentTxnState.isBlocked() &&
+                     !currentTxnState.isDone() &&
+                     currentTxnState.isCoordinator() &&
+                     currentTxnState.isReadOnly() &&
+                     !currentTxnState.hasTransactionalWork())
+            {
+                assert(!currentTxnState.isSinglePartition());
+                tryToSneakInASinglePartitionProcedure();
+            }
+            else
+            {
                 VoltMessage message = m_mailbox.recvBlocking(5);
                 tick();
                 if (message != null) {
@@ -1559,7 +1572,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             m_txnlog.trace("FUZZTEST beginNewTxn " + txnState.txnId + " " +
                            (txnState.isSinglePartition() ? "single" : "multi"));
         }
-        if (!txnState.isReadOnly) {
+        if (!txnState.isReadOnly()) {
             assert(txnState.getBeginUndoToken() == kInvalidUndoToken);
             txnState.setBeginUndoToken(latestUndoToken);
             assert(txnState.getBeginUndoToken() != kInvalidUndoToken);
@@ -1572,7 +1585,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         {
             m_txnlog.trace("FUZZTEST rollbackTransaction " + txnState.txnId);
         }
-        if (!txnState.isReadOnly) {
+        if (!txnState.isReadOnly()) {
             assert(latestUndoToken != kInvalidUndoToken);
             assert(txnState.getBeginUndoToken() != kInvalidUndoToken);
             assert(latestUndoToken >= txnState.getBeginUndoToken());
@@ -1721,7 +1734,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
      *
      * @return false if there is no possibility for speculative work.
      */
-    @Override
     public boolean tryToSneakInASinglePartitionProcedure() {
         // poll for an available message. don't block
         VoltMessage message = m_mailbox.recv();
@@ -1734,13 +1746,8 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             TransactionState nextTxn = m_transactionQueue.peek();
 
             // only sneak in single partition work
-            if (nextTxn instanceof SinglePartitionTxnState) {
-
-                // i think this line does nothing... it should go?
-                // seems it will get popped later, but not do any work because the done state is true
-                // ugh
-                //nextTxn = m_transactionQueue.peek();
-
+            if (nextTxn instanceof SinglePartitionTxnState)
+            {
                 boolean success = nextTxn.doWork();
                 assert(success);
                 return true;

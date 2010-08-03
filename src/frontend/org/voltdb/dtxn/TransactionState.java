@@ -42,7 +42,7 @@ public abstract class TransactionState implements Comparable<TransactionState> {
     public final long txnId;
     public final int initiatorSiteId;
     public final int coordinatorSiteId;
-    public final boolean isReadOnly;
+    protected final boolean m_isReadOnly;
     protected int m_nextDepId = 1;
     protected final Mailbox m_mbox;
     protected final SiteTransactionConnection m_site;
@@ -66,7 +66,7 @@ public abstract class TransactionState implements Comparable<TransactionState> {
         txnId = notice.getTxnId();
         initiatorSiteId = notice.getInitiatorSiteId();
         coordinatorSiteId = notice.getCoordinatorSiteId();
-        isReadOnly = notice.isReadOnly();
+        m_isReadOnly = notice.isReadOnly();
         m_beginUndoToken = ExecutionSite.kInvalidUndoToken;
     }
 
@@ -82,12 +82,23 @@ public abstract class TransactionState implements Comparable<TransactionState> {
         return false;
     }
 
+    public boolean isReadOnly()
+    {
+        return m_isReadOnly;
+    }
+
     /**
      * Indicate whether or not the transaction represented by this
      * TransactionState is single-partition.  Should be overridden to provide
      * sane results by subclasses.
      */
     public abstract boolean isSinglePartition();
+
+    public abstract boolean isCoordinator();
+
+    public abstract boolean isBlocked();
+
+    public abstract boolean hasTransactionalWork();
 
     public abstract boolean doWork();
 

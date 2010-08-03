@@ -43,11 +43,6 @@ public interface SiteTransactionConnection {
 
     public void beginNewTxn(TransactionState txnState);
 
-    // Multi-partition procedures currently decide when optimizations are
-    // viable. This work should happen in recursableRun() based on
-    // the transaction states currently in progress.
-    public boolean tryToSneakInASinglePartitionProcedure();
-
     // Workunits need topology to duplicate suppress replica responses.
     // Feels like another bad side-effect of the "site invokes txnState"
     // and "txnState invokes Site" relationship.

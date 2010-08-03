@@ -23,16 +23,17 @@
 
 package org.voltdb.regressionsuites;
 
-import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.Test;
+
 import org.voltdb.BackendTarget;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.regressionsuites.sneakyprocs.*;
+import org.voltdb.regressionsuites.sneakyprocs.MultiPartition;
+import org.voltdb.regressionsuites.sneakyprocs.SinglePartition;
 
 public class TestSneakyExecutionOrderSuite extends RegressionSuite {
 

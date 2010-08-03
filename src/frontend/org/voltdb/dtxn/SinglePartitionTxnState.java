@@ -48,6 +48,28 @@ public class SinglePartitionTxnState extends TransactionState {
         return true;
     }
 
+    // Single-partition transactions run only one place and it is always
+    // the coordinator (replicas all run in parallel, not coordinated)
+    @Override
+    public boolean isCoordinator()
+    {
+        return true;
+    }
+
+    // Single-partition transactions should never block
+    @Override
+    public boolean isBlocked()
+    {
+        return false;
+    }
+
+    // Single-partition transactions better always touch persistent tables
+    @Override
+    public boolean hasTransactionalWork()
+    {
+        return true;
+    }
+
     @Override
     public boolean doWork() {
         if (!m_done) {
@@ -78,7 +100,7 @@ public class SinglePartitionTxnState extends TransactionState {
         retval.txnId = txnId;
         retval.coordinatorSiteId = coordinatorSiteId;
         retval.initiatorSiteId = initiatorSiteId;
-        retval.isReadOnly = isReadOnly;
+        retval.isReadOnly = m_isReadOnly;
         retval.nonCoordinatingSites = null;
         retval.procedureIsAborting = false;
         return retval;

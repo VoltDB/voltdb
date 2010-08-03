@@ -26,6 +26,7 @@ import java.util.Map;
 
 import org.voltdb.ExecutionSite;
 import org.voltdb.TransactionIdManager;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState.WorkUnitState;
@@ -98,6 +99,37 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         return false;
     }
 
+    // XXX-IZZY make these members of base class in the future
+    public boolean isBlocked()
+    {
+        return m_readyWorkUnits.isEmpty();
+    }
+
+    public boolean isCoordinator()
+    {
+        return m_isCoordinator;
+    }
+
+    public boolean hasTransactionalWork()
+    {
+        // if there are no missing dependencies, we know nothing
+        // about whether there will be more SQL batches, so
+        // we should assume there will be more transactional work to come.
+        if (m_missingDependencies == null)
+        {
+            return true;
+        }
+
+        boolean has_transactional_work = false;
+        for (WorkUnit pendingWu : m_missingDependencies.values()) {
+            if (pendingWu.nonTransactional == false) {
+                has_transactional_work = true;
+                break;
+            }
+        }
+        return has_transactional_work;
+    }
+
     @Override
     public boolean doWork() {
         if (!m_hasStartedWork) {
@@ -109,8 +141,9 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
             return true;
         }
 
-        WorkUnit wu = m_readyWorkUnits.poll();
-        while (wu != null) {
+        while (!isBlocked())
+        {
+            WorkUnit wu = m_readyWorkUnits.poll();
             if (wu.shouldResumeProcedure()) {
                 assert(m_stackFrameDropWUs != null);
                 m_stackFrameDropWUs.remove(wu);
@@ -125,7 +158,6 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                     }
                 }
 
-                // return false if there is more work to do
                 return m_done;
             }
 
@@ -136,33 +168,6 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
             }
             else if (payload instanceof FragmentTaskMessage) {
                 processFragmentWork((FragmentTaskMessage) payload, wu.getDependencies());
-            }
-
-            // get the next workunit from the ready list
-            wu = m_readyWorkUnits.poll();
-
-            // if this procedure is blocked...
-            // check if it's safe to try to run another procedure while waiting
-            if ((!m_done) && (m_isCoordinator) && (wu == null) && (isReadOnly == true)) {
-                assert(m_missingDependencies != null);
-
-                boolean hasTransactionalWork = false;
-                for (WorkUnit pendingWu : m_missingDependencies.values()) {
-                    if (pendingWu.nonTransactional == false) {
-                        hasTransactionalWork = true;
-                        break;
-                    }
-                }
-
-                // if no transactional work, we can interleave
-                if (!hasTransactionalWork) {
-                    // repeat until no eligible procs or other work is ready
-                    boolean success = false;
-                    do {
-                        success = m_site.tryToSneakInASinglePartitionProcedure();
-                    }
-                    while(success && ((wu = m_readyWorkUnits.poll()) == null));
-                }
             }
         }
 
@@ -475,7 +480,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         retval.coordinatorSiteId = coordinatorSiteId;
         retval.initiatorSiteId = initiatorSiteId;
         retval.hasUndoWorkUnit = false;
-        retval.isReadOnly = isReadOnly;
+        retval.isReadOnly = m_isReadOnly;
         retval.nonCoordinatingSites = m_nonCoordinatingSites;
 
         if (m_missingDependencies != null) {
