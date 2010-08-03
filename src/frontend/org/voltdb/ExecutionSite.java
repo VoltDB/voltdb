@@ -1138,7 +1138,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 for (NodeFailureFault fault : faults) {
                     newFailedHostIds.add(fault.getHostId());
                 }
-                m_mailbox.deliver(m);
+                m_mailbox.deliverFront(m);
                 m_recoveryLog.info("Detected a concurrent failure from FaultDistributor, new failed hosts "
                         + newFailedHostIds);
                 return null;
