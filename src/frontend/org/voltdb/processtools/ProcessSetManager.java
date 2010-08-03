@@ -133,7 +133,7 @@ public class ProcessSetManager {
         psm.startProcess("ping3c", new String[] { "ping", "volt3c" });
         while(true) {
             OutputLine line = psm.nextBlocking();
-            System.out.printf("(%s:%s): %s\n", line.processName, line.stream.name(), line.value);
+            System.out.printf("(%s:%s): %s\n", line.processName, line.stream.name(), line.message);
         }
     }
 

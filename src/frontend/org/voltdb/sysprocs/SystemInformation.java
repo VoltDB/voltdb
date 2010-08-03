@@ -17,6 +17,7 @@
 
 package org.voltdb.sysprocs;
 
+import java.io.File;
 import java.net.InetAddress;
 import java.util.HashMap;
 import java.util.List;
@@ -74,6 +75,20 @@ public class SystemInformation extends VoltSystemProcedure {
         // version
         vt.addRow(VoltDB.instance().getHostMessenger().getHostId(),
                   "VERSION", VoltDB.instance().getVersionString());
+
+        // catalog path
+        String path = VoltDB.instance().getConfig().m_pathToCatalog;
+        if (!path.startsWith("http"))
+            path = (new File(path)).getAbsolutePath();
+        vt.addRow(VoltDB.instance().getHostMessenger().getHostId(),
+                  "CATALOG", path);
+
+        // deployment path
+        path = VoltDB.instance().getConfig().m_pathToDeployment;
+        if (!path.startsWith("http"))
+            path = (new File(path)).getAbsolutePath();
+        vt.addRow(VoltDB.instance().getHostMessenger().getHostId(),
+                  "DEPLOYMENT", path);
 
         return vt;
     }

@@ -35,12 +35,12 @@ public class ProcessData {
         public OutputLine(String processName, Stream stream, String value) {
             this.processName = processName;
             this.stream = stream;
-            this.value = value;
+            this.message = value;
         }
 
         public final String processName;
         public final Stream stream;
-        public final String value;
+        public final String message;
     }
 
     class StreamWatcher extends Thread {

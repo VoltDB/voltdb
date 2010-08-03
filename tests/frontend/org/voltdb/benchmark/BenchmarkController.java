@@ -116,23 +116,23 @@ public class BenchmarkController {
                 // assume stdout at this point
 
                 // split the string on commas and strip whitespace
-                String[] parts = line.value.split(",");
+                String[] parts = line.message.split(",");
                 for (int i = 0; i < parts.length; i++)
                     parts[i] = parts[i].trim();
 
                 // expect at least time and status
                 if (parts.length < 2) {
-                    if (line.value.startsWith("Listening for transport dt_socket at address:") ||
-                            line.value.contains("Attempting to load") ||
-                            line.value.contains("Successfully loaded native VoltDB library")) {
-                        benchmarkLog.info(line.processName + ": " + line.value + "\n");
+                    if (line.message.startsWith("Listening for transport dt_socket at address:") ||
+                            line.message.contains("Attempting to load") ||
+                            line.message.contains("Successfully loaded native VoltDB library")) {
+                        benchmarkLog.info(line.processName + ": " + line.message + "\n");
                         continue;
                     }
                     m_clientPSM.killProcess(line.processName);
                     LogKeys logkey =
                         LogKeys.benchmark_BenchmarkController_ProcessReturnedMalformedLine;
                     benchmarkLog.l7dlog( Level.ERROR, logkey.name(),
-                            new Object[] { line.processName, line.value }, null);
+                            new Object[] { line.processName, line.message }, null);
                     continue;
                 }
 
@@ -164,7 +164,7 @@ public class BenchmarkController {
                         LogKeys logkey =
                             LogKeys.benchmark_BenchmarkController_ProcessReturnedMalformedLine;
                         benchmarkLog.l7dlog( Level.ERROR, logkey.name(),
-                                new Object[] { line.processName, line.value }, null);
+                                new Object[] { line.processName, line.message }, null);
                         continue;
                     }
                     for (int i = 2; i < parts.length; i += 2) {
@@ -364,7 +364,7 @@ public class BenchmarkController {
             // WAIT FOR SERVERS TO BE READY
             String readyMsg = "Server completed initialization.";
             ProcessData.OutputLine line = m_serverPSM.nextBlocking();
-            while(line.value.equals(readyMsg) == false) {
+            while(line.message.equals(readyMsg) == false) {
                 line = m_serverPSM.nextBlocking();
             }
         }

@@ -406,7 +406,29 @@ public abstract class CatalogUtil {
      * @param pathToDeployment Path to the deployment.xml file.
      */
     public static boolean compileDeployment(Catalog catalog, String deploymentURL) {
+        DeploymentType deployment = parseDeployment(deploymentURL);
 
+        // wasn't a valid xml deployment file
+        if (deployment == null) {
+            hostLog.error("Not a valid XML deployment file at URL: " + deploymentURL);
+            return false;
+        }
+
+        // set the cluster info
+        setClusterInfo(catalog, deployment.getCluster());
+
+        // set the users info
+        setUsersInfo(catalog, deployment.getUsers());
+
+        return true;
+    }
+
+    /**
+     * Parses the deployment XML file.
+     * @param deploymentURL Path to the deployment.xml file.
+     * @return a reference to the root <deployment> element.
+     */
+    public static DeploymentType parseDeployment(String deploymentURL) {
         // get the URL/path for the deployment and prep an InputStream
         InputStream deployIS = null;
         try {
@@ -426,27 +448,13 @@ public abstract class CatalogUtil {
         // make sure the file exists
         if (deployIS == null) {
             hostLog.error("Could not locate deployment info at given URL: " + deploymentURL);
-            return false;
+            return null;
         } else {
             hostLog.info("URL of deployment info: " + deploymentURL);
         }
 
         // get deployment info from xml file
-        DeploymentType deployment = getDeployment(deployIS);
-
-        // wasn't a valid xml deployment file
-        if (deployment == null) {
-            hostLog.error("Not a valid XML deployment file at URL: " + deploymentURL);
-            return false;
-        }
-
-        // set the cluster info
-        setClusterInfo(catalog, deployment.getCluster());
-
-        // set the users info
-        setUsersInfo(catalog, deployment.getUsers());
-
-        return true;
+        return getDeployment(deployIS);
     }
 
     /**
