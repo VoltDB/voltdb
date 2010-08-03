@@ -14,11 +14,21 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         super();
     }
 
-    CompleteTransactionResponseMessage(CompleteTransactionMessage msg,
-                                       int siteId)
+    public CompleteTransactionResponseMessage(CompleteTransactionMessage msg,
+                                              int siteId)
     {
         m_executionSiteId = siteId;
         m_txnId = msg.getTxnId();
+    }
+
+    public long getTxnId()
+    {
+        return m_txnId;
+    }
+
+    public int getExecutionSiteId()
+    {
+        return m_executionSiteId;
     }
 
     @Override

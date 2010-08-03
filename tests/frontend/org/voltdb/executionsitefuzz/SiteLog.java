@@ -33,7 +33,6 @@ public class SiteLog
     private Integer m_partitionId;
     private StringWriter m_logBuffer;
     private int m_logIndex;
-    private boolean m_failed;
     private HashMap<Long, TransactionRecord> m_txns;
     private ArrayList<TransactionRecord> m_txnInitOrder;
     private ArrayList<TransactionRecord> m_txnCloseOrder;
@@ -44,7 +43,6 @@ public class SiteLog
         m_partitionId = partitionId;
         m_logBuffer = logBuffer;
         m_logIndex = 0;
-        m_failed = false;
         m_txns = new HashMap<Long, TransactionRecord>();
         m_txnInitOrder = new ArrayList<TransactionRecord>();
         m_txnCloseOrder = new ArrayList<TransactionRecord>();
@@ -52,7 +50,6 @@ public class SiteLog
 
     void reset()
     {
-        m_failed = false;
         m_logIndex = 0;
     }
 

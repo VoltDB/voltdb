@@ -80,6 +80,22 @@ public class LogString
         return m_text.contains("multi");
     }
 
+    boolean isReadOnly()
+    {
+        if (!isTxnStart())
+            throw new RuntimeException("isReadOnly called on inappropriate message");
+
+        return m_text.contains("readonly");
+    }
+
+    boolean isCoordinator()
+    {
+        if (!isTxnStart())
+            throw new RuntimeException("isCoordinator called on inappropriate message");
+
+        return m_text.contains("coord");
+    }
+
     boolean isOtherFault()
     {
         return m_text.contains("handleNodeFault");

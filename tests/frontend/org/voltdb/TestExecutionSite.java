@@ -445,9 +445,9 @@ public class TestExecutionSite extends TestCase {
         return coordinator;
     }
 
-    /* Host ids are site ids + 10,000 */
+    /* Host ids are site ids */
     int getHostIdForSiteId(int siteId) {
-        return siteId + 66000;
+        return siteId;
     }
 
     List<Integer> getSiteIdsForPartitionId(int partitionId) {

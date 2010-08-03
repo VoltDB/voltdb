@@ -63,11 +63,21 @@ public class TestExecutionSiteFuzzChecker extends TestCase
         }
     }
 
+    protected void tearDown()
+    {
+        m_siteLogs = null;
+    }
+
     // Convenience methods for generating log strings
-    void beginNewTxn(int partitionId, int siteId, int txnId, boolean isMulti)
+    void beginNewTxn(int partitionId, int siteId, int txnId, boolean isMulti,
+                     boolean isReadOnly, boolean isCoord)
     {
         StringWriter sw = m_siteLogs.get(partitionId).get(siteId);
-        String msg = "FUZZTEST beginNewTxn " + txnId + (isMulti ? " multi" : " single");
+        String msg = "FUZZTEST beginNewTxn " + txnId +
+                     (isMulti ? " multi" : " single") + " " +
+                     (isReadOnly ? "readonly" : "readwrite") + " " +
+                     (isCoord ? "coord" : "part");
+
         sw.getBuffer().append(msg + "\n");
     }
 
@@ -100,16 +110,18 @@ public class TestExecutionSiteFuzzChecker extends TestCase
     }
 
     // convenience method for generating a clean completed TXN
-    void addCommitTxn(int partitionId, int siteId, int txnId, boolean isMulti)
+    void addCommitTxn(int partitionId, int siteId, int txnId, boolean isMulti,
+                      boolean isReadOnly, boolean isCoord)
     {
-        beginNewTxn(partitionId, siteId, txnId, isMulti);
+        beginNewTxn(partitionId, siteId, txnId, isMulti, isReadOnly, isCoord);
         completeTransaction(partitionId, siteId, txnId);
     }
 
     // convenience method for generating a clean rolled-back TXN
-    void addRollbackTxn(int partitionId, int siteId, int txnId, boolean isMulti)
+    void addRollbackTxn(int partitionId, int siteId, int txnId, boolean isMulti,
+                        boolean isReadOnly, boolean isCoord)
     {
-        beginNewTxn(partitionId, siteId, txnId, isMulti);
+        beginNewTxn(partitionId, siteId, txnId, isMulti, isReadOnly, isCoord);
         rollbackTransaction(partitionId, siteId, txnId);
         completeTransaction(partitionId, siteId, txnId);
     }
@@ -123,9 +135,11 @@ public class TestExecutionSiteFuzzChecker extends TestCase
             for (Integer site : m_siteLogs.get(partition).keySet())
             {
                 dut.addSite(site, partition, m_siteLogs.get(partition).get(site));
-                addRollbackTxn(partition, site, 10000, true);
-                addRollbackTxn(partition, site, 10001, true);
-                addCommitTxn(partition, site, 10002, true);
+                boolean isCoord = false;
+                if (site == 0) { isCoord = true; }
+                addRollbackTxn(partition, site, 10000, true, false, isCoord);
+                addRollbackTxn(partition, site, 10001, true, false, isCoord);
+                addCommitTxn(partition, site, 10002, true, true, isCoord);
             }
         }
         dut.dumpLogs();
@@ -145,11 +159,11 @@ public class TestExecutionSiteFuzzChecker extends TestCase
                 dut.addSite(site, partition, m_siteLogs.get(partition).get(site));
                 if (site == 0)
                 {
-                    addCommitTxn(partition, site, 10000, true);
+                    addCommitTxn(partition, site, 10000, true, false, true);
                 }
                 else
                 {
-                    addRollbackTxn(partition, site, 10000, true);
+                    addRollbackTxn(partition, site, 10000, true, false, false);
                 }
             }
         }
@@ -166,15 +180,16 @@ public class TestExecutionSiteFuzzChecker extends TestCase
             for (Integer site : m_siteLogs.get(partition).keySet())
             {
                 dut.addSite(site, partition, m_siteLogs.get(partition).get(site));
-                addRollbackTxn(partition, site, 10000, true);
                 if (site == 0)
                 {
-                    beginNewTxn(partition, site, 10001, true);
+                    addRollbackTxn(partition, site, 10000, true, false, true);
+                    beginNewTxn(partition, site, 10001, true, false, true);
                     selfNodeFailure(partition, site, 66000);
                 }
                 else
                 {
-                    beginNewTxn(partition, site, 10001, true);
+                    addRollbackTxn(partition, site, 10000, true, false, false);
+                    beginNewTxn(partition, site, 10001, true, false, false);
                     handleNodeFault(partition, site, 66000);
                     completeTransaction(partition, site, 10001);
                 }
@@ -195,15 +210,16 @@ public class TestExecutionSiteFuzzChecker extends TestCase
             for (Integer site : m_siteLogs.get(partition).keySet())
             {
                 dut.addSite(site, partition, m_siteLogs.get(partition).get(site));
-                addRollbackTxn(partition, site, 10000, true);
                 if (site == 0)
                 {
-                    beginNewTxn(partition, site, 10001, true);
+                    addRollbackTxn(partition, site, 10000, true, false, true);
+                    beginNewTxn(partition, site, 10001, true, false, true);
                     selfNodeFailure(partition, site, 66000);
                 }
                 else
                 {
-                    beginNewTxn(partition, site, 10001, true);
+                    addRollbackTxn(partition, site, 10000, true, false, false);
+                    beginNewTxn(partition, site, 10001, true, false, false);
                     completeTransaction(partition, site, 10001);
                 }
             }
@@ -228,28 +244,29 @@ public class TestExecutionSiteFuzzChecker extends TestCase
                 dut.addSite(site, partition, m_siteLogs.get(partition).get(site));
                 // Need one clean transaction for all sites so site 0 doesn't
                 // appear to have failed
-                addCommitTxn(partition, site, 10000, true);
                 if (site == 0)
                 {
-                    // ADD NO TRANSACTION
+                    addCommitTxn(partition, site, 10000, true, false, true);
+                    // ADD NO TRANSACTION 10001
+                    // Need one clean transaction after so we don't
+                    // think site 0 is done.
+                    // This is technically a bug, we should error if one site
+                    // doesn't report anything for the last transaction
+                    addCommitTxn(partition, site, 10002, true, false, true);
                 }
                 else
                 {
-                    addRollbackTxn(partition, site, 10001, true);
+                    addCommitTxn(partition, site, 10000, true, false, false);
+                    addRollbackTxn(partition, site, 10001, true, false, false);
+                    addCommitTxn(partition, site, 10002, true, false, false);
                 }
-                // Need one clean transaction after so we don't
-                // think site 0 is done.
-                // This is technically a bug, we should error if one site
-                // doesn't report anything for hte last transaction
-                addCommitTxn(partition, site, 10002, true);
             }
         }
         dut.dumpLogs();
         assertTrue(dut.validateLogs());
     }
 
-    // close to the above case, but commit the transactions instead.  This
-    // should fail s
+    // close to the above case, but commit the transactions instead
     public void testFewerResponsesCommit()
     {
         ExecutionSiteFuzzChecker dut = new ExecutionSiteFuzzChecker();
@@ -261,20 +278,22 @@ public class TestExecutionSiteFuzzChecker extends TestCase
                 dut.addSite(site, partition, m_siteLogs.get(partition).get(site));
                 // Need one clean transaction for all sites so site 0 doesn't
                 // appear to have failed
-                addCommitTxn(partition, site, 10000, true);
                 if (site == 0)
                 {
-                    // ADD NO TRANSACTION
+                    addCommitTxn(partition, site, 10000, true, false, true);
+                    // ADD NO TRANSACTION 10001
+                    addCommitTxn(partition, site, 10002, true, false, true);
                 }
                 else
                 {
-                    addCommitTxn(partition, site, 10001, true);
+                    addCommitTxn(partition, site, 10000, true, false, false);
+                    addCommitTxn(partition, site, 10001, true, false, false);
+                    addCommitTxn(partition, site, 10002, true, false, false);
                 }
                 // Need one clean transaction after so we don't
                 // think site 0 is done.
                 // This is technically a bug, we should error if one site
                 // doesn't report anything for hte last transaction
-                addCommitTxn(partition, site, 10002, true);
             }
         }
         dut.dumpLogs();
@@ -299,12 +318,211 @@ public class TestExecutionSiteFuzzChecker extends TestCase
                 }
                 else
                 {
-                    addCommitTxn(partition, site, 10001, true);
+                    addCommitTxn(partition, site, 10001, true, false, true);
                 }
             }
         }
         dut.dumpLogs();
         assertTrue(dut.validateLogs());
+    }
+
+    // If a transaction is multipartition read-only, the participants can
+    // have different rollback results, but the coordinator must rollback if
+    // any participant rolls back
+    public void testReadOnlyMultiPartCoordRollbackDifference()
+    {
+        ExecutionSiteFuzzChecker dut = new ExecutionSiteFuzzChecker();
+        // pick site 0 to be the absent one.
+        for (Integer partition : m_siteLogs.keySet())
+        {
+            for (Integer site : m_siteLogs.get(partition).keySet())
+            {
+                dut.addSite(site, partition, m_siteLogs.get(partition).get(site));
+                // Site 0 is the coordinator and rolls back
+                if (site == 0)
+                {
+                    addRollbackTxn(partition, site, 10000, true, true, true);
+                }
+                // every even site ID also rolls back
+                else if (site % 2 == 0)
+                {
+                    addRollbackTxn(partition, site, 10000, true, true, false);
+                }
+                // every odd site commits
+                else
+                {
+                    addCommitTxn(partition, site, 10000, true, true, false);
+                }
+            }
+        }
+        dut.dumpLogs();
+        assertTrue(dut.validateLogs());
+    }
+
+    // Same as the above, but verify that if the coordinator commits that we
+    // interpret it as an error
+    public void testReadOnlyMultiPartCoordCommitDifference()
+    {
+        ExecutionSiteFuzzChecker dut = new ExecutionSiteFuzzChecker();
+        // pick site 0 to be the absent one.
+        for (Integer partition : m_siteLogs.keySet())
+        {
+            for (Integer site : m_siteLogs.get(partition).keySet())
+            {
+                dut.addSite(site, partition, m_siteLogs.get(partition).get(site));
+                // Site 0 is the coordinator and commits
+                if (site == 0)
+                {
+                    addCommitTxn(partition, site, 10000, true, true, true);
+                }
+                // every even site ID also rolls back
+                else if (site % 2 == 0)
+                {
+                    addRollbackTxn(partition, site, 10000, true, true, false);
+                }
+                // every odd site commits
+                else
+                {
+                    addCommitTxn(partition, site, 10000, true, true, false);
+                }
+            }
+        }
+        dut.dumpLogs();
+        assertFalse(dut.validateLogs());
+    }
+
+    // If a transaction is single partition read-only, the participants
+    // still must have identical rollback or commit results
+    public void testReadOnlySinglePartRollbackDifference()
+    {
+        ExecutionSiteFuzzChecker dut = new ExecutionSiteFuzzChecker();
+        // pick site 0 to be the absent one.
+        for (Integer partition : m_siteLogs.keySet())
+        {
+            for (Integer site : m_siteLogs.get(partition).keySet())
+            {
+                dut.addSite(site, partition, m_siteLogs.get(partition).get(site));
+                if (site % 2 == 0)
+                {
+                    addRollbackTxn(partition, site, 10000, false, true, true);
+                }
+                // every odd site commits
+                else
+                {
+                    addCommitTxn(partition, site, 10000, false, true, true);
+                }
+            }
+        }
+        dut.dumpLogs();
+        assertFalse(dut.validateLogs());
+    }
+
+    // The fuzz checker should notice if a transaction ID reappears
+    // (the transaction ID should increase between every transaction)
+    public void testBadTxnIdOrder()
+    {
+        ExecutionSiteFuzzChecker dut = new ExecutionSiteFuzzChecker();
+        // pick site 0 to be the absent one.
+        for (Integer partition : m_siteLogs.keySet())
+        {
+            for (Integer site : m_siteLogs.get(partition).keySet())
+            {
+                dut.addSite(site, partition, m_siteLogs.get(partition).get(site));
+                // Let's say that site 0 tries to do something speculatively
+                // and does it out of order
+                if (site == 0)
+                {
+                    addCommitTxn(partition, site, 10001, false, false, true);
+                    addCommitTxn(partition, site, 10000, false, false, true);
+                }
+                else
+                {
+                    addCommitTxn(partition, site, 10000, false, false, true);
+                    addCommitTxn(partition, site, 10001, false, false, true);
+                }
+            }
+        }
+        dut.dumpLogs();
+        assertFalse(dut.validateLogs());
+    }
+
+    // There are some failure cases where both the coordinator and a participant
+    // will fail concurrently at the end of a transaction where the failed
+    // participant is the only site that has received an ack and completed
+    // the transaction; since the coordinator then fails, the rest of the
+    // participants roll back.  The fuzz checker should notice and discard
+    // this 'false' completion of the failed participant.
+    public void testMultiPartDiscardCommmit()
+    {
+        ExecutionSiteFuzzChecker dut = new ExecutionSiteFuzzChecker();
+        // pick site 0 to be the failed one.
+        for (Integer partition : m_siteLogs.keySet())
+        {
+            for (Integer site : m_siteLogs.get(partition).keySet())
+            {
+                dut.addSite(site, partition, m_siteLogs.get(partition).get(site));
+                if (site == 0) // site 0 will be the failing coord
+                {
+                    addCommitTxn(partition, site, 10000, true, false, true);
+                    beginNewTxn(partition, site, 10001, true, false, true);
+                    selfNodeFailure(partition, site, 0);
+                }
+                else if (site == 1) // site 1 will be the failing participant
+                {
+                    addCommitTxn(partition, site, 10000, true, false, false);
+                    addCommitTxn(partition, site, 10001, true, false, false);
+                    addCommitTxn(partition, site, 10002, false, false, true);
+                    handleNodeFault(partition, site, 0);
+                    selfNodeFailure(partition, site, 1);
+                }
+                else // all other sites will see both failures (1 then 0)
+                {
+                    addCommitTxn(partition, site, 10000, true, false, false);
+                    beginNewTxn(partition, site, 10001, true, false, false);
+                    handleNodeFault(partition, site, 1);
+                    handleNodeFault(partition, site, 0);
+                    rollbackTransaction(partition, site, 10001);
+                    completeTransaction(partition, site, 10001);
+                }
+            }
+        }
+        dut.dumpLogs();
+        assertTrue(dut.validateLogs());
+    }
+
+    // This is similar to the above case, but there's a read-only case
+    // where the transaction can complete, the coordinator can move on, but
+    // it will appear to have failed during that transaction according to
+    // other participants that haven't finished yet.  This should NEVER
+    // happen during a read-write transaction, so verify that we notice
+    // failure in that case.
+    public void testMultiPartCoordCantFinishReadWriteEarly()
+    {
+        ExecutionSiteFuzzChecker dut = new ExecutionSiteFuzzChecker();
+        // pick site 0 to be the failed one.
+        for (Integer partition : m_siteLogs.keySet())
+        {
+            for (Integer site : m_siteLogs.get(partition).keySet())
+            {
+                dut.addSite(site, partition, m_siteLogs.get(partition).get(site));
+                if (site == 0) // site 0 will be the failing coord
+                {
+                    addCommitTxn(partition, site, 10000, true, false, true);
+                    addRollbackTxn(partition, site, 10001, true, false, true);
+                    selfNodeFailure(partition, site, 0);
+                }
+                else // all other sites will see both failures (1 then 0)
+                {
+                    addCommitTxn(partition, site, 10000, true, false, false);
+                    beginNewTxn(partition, site, 10001, true, false, false);
+                    handleNodeFault(partition, site, 0);
+                    rollbackTransaction(partition, site, 10001);
+                    completeTransaction(partition, site, 10001);
+                }
+            }
+        }
+        dut.dumpLogs();
+        assertFalse(dut.validateLogs());
     }
 }
 

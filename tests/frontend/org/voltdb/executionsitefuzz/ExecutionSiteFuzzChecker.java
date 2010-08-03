@@ -44,6 +44,7 @@ public class ExecutionSiteFuzzChecker
     ArrayList<SiteLog> m_liveSites;
     ArrayList<SiteLog> m_doneSites;
 
+    long m_lastTxnId = Long.MIN_VALUE;
 
     public ExecutionSiteFuzzChecker()
     {
@@ -128,7 +129,28 @@ public class ExecutionSiteFuzzChecker
         return retval;
     }
 
-    boolean validateSet(Set<SiteLog> sites)
+    boolean validateSinglePartitionSet(Set<SiteLog> sites)
+    {
+        // Single-partition txns are easy to verify, just
+        // ensure that all the members of the set are equal.
+        boolean valid = true;
+        TransactionRecord model_txn = null;
+        for (SiteLog site : sites)
+        {
+            if (model_txn == null)
+            {
+                model_txn = site.currentTxn();
+            }
+            else if (!model_txn.equals(site.currentTxn()))
+            {
+                System.out.println("VALIDATION FAILURE, MISMATCHED TRANSACTIONS");
+                valid = false;
+            }
+        }
+        return valid;
+    }
+
+    boolean validateMultiPartitionSet(Set<SiteLog> sites)
     {
         // validate this set as follows:
         // - The elements of the set should all match
@@ -142,37 +164,119 @@ public class ExecutionSiteFuzzChecker
 
         // Should all match
         TransactionRecord model_txn = null;
+        TransactionRecord coord_txn = null;
+        HashSet<Integer> failed_sites = new HashSet<Integer>();
+        boolean saw_rollback = false;
+
+        // Run through the list once and extract coordinator and failure info.
         for (SiteLog site : sites)
         {
             System.out.println("" + site.getPartitionId() + ", " + site.getSiteId() + ": " + site.currentTxn());
+            // If this site saw any failures during this TXN, add
+            // them to the failed_sites set.  Also, check to see if any
+            // of the state upon which we currently rely is on this failed site
+            if (site.currentTxn().sawFailure())
+            {
+                failed_sites.addAll(site.currentTxn().getFailedSites());
+            }
+            if (site.currentTxn().isCoordinator())
+            {
+                coord_txn = site.currentTxn();
+            }
+        }
+
+        for (SiteLog site : sites)
+        {
+            if (failed_sites.contains((Integer)site.getSiteId()))
+            {
+                // The coordinator cannot fail early during a read-write multi-partition txn
+                if (site.currentTxn().isCoordinator() && !site.currentTxn().isReadOnly())
+                {
+                    System.out.println("VALIDATION FAILURE, " +
+                                       "MULTIPARTITION COORDINATOR FAILED " +
+                                       "DURING READ/WRITE TRANSACTION BUT SOMEHOW COMPLETED");
+                    valid = false;
+                }
+                else
+                {
+                    System.out.println("Site: " + site.getSiteId() + " failed before " +
+                                       "TXN " + site.currentTxn().getTxnId() + " was resolved, ignoring");
+                }
+                continue;
+            }
+
+            if (site.currentTxn().rolledBack())
+            {
+                saw_rollback = true;
+            }
+
             if (model_txn == null)
             {
-                model_txn = site.currentTxn();
+                if (coord_txn == null)
+                {
+                    model_txn = site.currentTxn();
+                }
+                else
+                {
+                    model_txn = coord_txn;
+                }
             }
-            else if (!model_txn.equals(site.currentTxn()))
+            else if (!model_txn.isConsistent(site.currentTxn()))
             {
                 System.out.println("VALIDATION FAILURE, MISMATCHED TRANSACTIONS");
-                //junit.framework.Assert.assertTrue(false);
                 valid = false;
             }
         }
 
-        // check quantity/type requirements
+        // check quantity/type/other global requirements
         if (valid)
         {
-            if (model_txn.isMultiPart() && sites.size() != m_liveSites.size())
-            {
-                System.out.println("POTENTIAL FAILURE/ROLLBACK HICCUP!");
-            }
-            if (model_txn.isMultiPart() && sites.size() != m_liveSites.size() && !model_txn.rolledBack())
+            // There are cases where some sites will have started a multi-partition
+            // TXN before the coordinator fails, but other sites will not have
+            // started it, and so they will never start it.  In any case
+            // where the number of sites that run a TXN is less than the number
+            // of sites that are still live, we need to have rolled back that transaction.
+            // Only matters if the transaction is not read-only
+            if (model_txn.isMultiPart() && !model_txn.isReadOnly() &&
+                sites.size() != m_liveSites.size() && !model_txn.rolledBack())
             {
                 System.out.println("VALIDATION FAILURE, PARTIALLY COMMITTED TXN");
-                //junit.framework.Assert.assertTrue(false);
+                valid = false;
+            }
+            // If we're multi-partition and anyone rolled back, the coordinator
+            // better have rolled back.  Note that we might not
+            // have a coordinator because it may be a failed node
+            if (coord_txn != null && coord_txn.isMultiPart() && !coord_txn.rolledBack() && saw_rollback)
+            {
+                System.out.println("VALIDATION FAILURE, COORDINATOR COMMITTED WHEN PARTICIPANT ROLLED BACK");
                 valid = false;
             }
         }
 
         return valid;
+    }
+
+    public boolean validateSet(Set<SiteLog> sites)
+    {
+        long curr_txn_id = sites.iterator().next().currentTxn().getTxnId();
+        if (curr_txn_id <= m_lastTxnId)
+        {
+            System.out.println("VALIDATION FAILURE, TXN_ID FAILED TO ADVANCE");
+            return false;
+        }
+        else
+        {
+            m_lastTxnId = curr_txn_id;
+        }
+
+        if (sites.iterator().next().currentTxn().isMultiPart())
+        {
+            return validateMultiPartitionSet(sites);
+        }
+        else
+        {
+            return validateSinglePartitionSet(sites);
+        }
     }
 
     public boolean validateLogs()

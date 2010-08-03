@@ -26,11 +26,11 @@ import java.util.Map;
 
 import org.voltdb.ExecutionSite;
 import org.voltdb.TransactionIdManager;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState.WorkUnitState;
 import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -51,6 +51,9 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     protected HashMap<Integer, WorkUnit> m_missingDependencies = null;
     protected ArrayList<WorkUnit> m_stackFrameDropWUs = null;
     protected Map<Integer, List<VoltTable>> m_previousStackFrameDropDependencies = null;
+
+    private InitiateResponseMessage m_response;
+    private HashSet<Integer> m_outstandingAcks = null;
 
     /**
      *  This is thrown by the TransactionState instance when something
@@ -99,22 +102,31 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         return false;
     }
 
-    // XXX-IZZY make these members of base class in the future
+    @Override
     public boolean isBlocked()
     {
         return m_readyWorkUnits.isEmpty();
     }
 
+    @Override
     public boolean isCoordinator()
     {
         return m_isCoordinator;
     }
 
+    @Override
     public boolean hasTransactionalWork()
     {
-        // if there are no missing dependencies, we know nothing
-        // about whether there will be more SQL batches, so
-        // we should assume there will be more transactional work to come.
+        // this check is a little bit of a lie.  It depends not only on
+        // whether or not any of the pending WorkUnits touch tables in the EE,
+        // but also whether or not these pending WorkUnits are part of the final
+        // batch of SQL statements that a stored procedure is going to execute
+        // (Otherwise, we might see no transactional work remaining in this
+        // batch but the stored procedure could send us another batch that
+        // not only touches tables but does writes to them).  The
+        // WorkUnit.nonTransactional boolean ends up ultimately being gated on this
+        // condition in VoltProcedure.slowPath().  This is why the null case
+        // below is pessimistic.
         if (m_missingDependencies == null)
         {
             return true;
@@ -199,21 +211,10 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     void initiateProcedure(InitiateTaskMessage itask) {
         assert(m_isCoordinator);
 
-        InitiateResponseMessage response = m_site.processInitiateTask(this, itask);
-
-        // send commit notices to everyone
-        CompleteTransactionMessage complete_msg =
-            createCompleteTransactionMessage(response.shouldCommit() == false,
-                                             true);
-
-        try {
-            m_mbox.send(m_nonCoordinatingSites, 0, complete_msg);
-        }
-        catch (MessagingException e) {
-            throw new RuntimeException(e);
-        }
-
-        if (!response.shouldCommit()) {
+        // Cache the response locally and create accounting
+        // to track the outstanding acks.
+        m_response = m_site.processInitiateTask(this, itask);
+        if (!m_response.shouldCommit()) {
             if (m_missingDependencies != null)
             {
                 m_missingDependencies.clear();
@@ -221,13 +222,42 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
             m_needsRollback = true;
         }
 
-        try {
-            m_mbox.send(initiatorSiteId, 0, response);
-        } catch (MessagingException e) {
+        m_outstandingAcks = new HashSet<Integer>();
+        // if this transaction was readonly then don't require acks.
+        // We still need to send the completion message, however,
+        // since there are a number of circumstances where the coordinator
+        // is the only site that knows whether or not the transaction has
+        // completed.
+        if (!isReadOnly())
+        {
+            for (int site_id : m_nonCoordinatingSites)
+            {
+                m_outstandingAcks.add(site_id);
+            }
+        }
+        // send commit notices to everyone
+        CompleteTransactionMessage complete_msg =
+            createCompleteTransactionMessage(m_response.shouldCommit() == false,
+                                             !isReadOnly());
+
+        try
+        {
+            m_mbox.send(m_nonCoordinatingSites, 0, complete_msg);
+        }
+        catch (MessagingException e) {
             throw new RuntimeException(e);
         }
 
-        m_done = true;
+        if (m_outstandingAcks.size() == 0)
+        {
+            try {
+                m_mbox.send(initiatorSiteId, 0, m_response);
+            } catch (MessagingException e) {
+                throw new RuntimeException(e);
+            }
+
+            m_done = true;
+        }
     }
 
     void processFragmentWork(FragmentTaskMessage ftask, HashMap<Integer, List<VoltTable>> dependencies) {
@@ -269,6 +299,13 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                 m_mbox.send(response.getDestinationSiteId(), 0, response);
             } catch (MessagingException e) {
                 throw new RuntimeException(e);
+            }
+            // If we're not the coordinator, the transaction is read-only,
+            // and this was the final task, then we can try to move on after
+            // we've finished this work.
+            if (!isCoordinator() && isReadOnly() && ftask.isFinalTask())
+            {
+                m_done = true;
             }
         }
     }
@@ -353,6 +390,14 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
 
     @Override
     public void processRemoteWorkResponse(FragmentResponseMessage response) {
+        // if we've already decided that we're rolling back, then we just
+        // want to discard any incoming FragmentResponses that were
+        // possibly in flight
+        if (m_needsRollback)
+        {
+            return;
+        }
+
         if (response.getStatusCode() != FragmentResponseMessage.SUCCESS)
         {
             if (m_missingDependencies != null)
@@ -421,6 +466,35 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
             m_readyWorkUnits.clear();
             m_needsRollback = true;
         }
+        if (complete.requiresAck())
+        {
+            CompleteTransactionResponseMessage ctrm =
+                new CompleteTransactionResponseMessage(complete, m_siteId);
+            try
+            {
+                m_mbox.send(complete.getCoordinatorSiteId(), 0, ctrm);
+            }
+            catch (MessagingException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    @Override
+    public void
+    processCompleteTransactionResponse(CompleteTransactionResponseMessage response)
+    {
+        // need to do ack accounting
+        m_outstandingAcks.remove(response.getExecutionSiteId());
+        if (m_outstandingAcks.size() == 0)
+        {
+            try {
+                m_mbox.send(initiatorSiteId, 0, m_response);
+            } catch (MessagingException e) {
+                throw new RuntimeException(e);
+            }
+            m_done = true;
+        }
     }
 
     void handleWorkUnitComplete(WorkUnit w)
@@ -465,6 +539,22 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         for (WorkUnit w : done_wus)
         {
             handleWorkUnitComplete(w);
+        }
+
+        // Also, check to see if we're just waiting on acks from
+        // participants, and, if so, if the fault we just experienced
+        // freed us up.
+        if (m_outstandingAcks != null)
+        {
+            if (m_outstandingAcks.size() == 0)
+            {
+                try {
+                    m_mbox.send(initiatorSiteId, 0, m_response);
+                } catch (MessagingException e) {
+                    throw new RuntimeException(e);
+                }
+                m_done = true;
+            }
         }
     }
 
@@ -536,6 +626,17 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                 {
                     wu.removeSite(site_id);
                 }
+            }
+        }
+
+        // Also, if we're waiting on transaction completion acks from
+        // participants, remove any sites that failed that we still may
+        // be waiting on.
+        if (m_outstandingAcks != null)
+        {
+            for (Integer site_id : failedSites)
+            {
+                m_outstandingAcks.remove(site_id);
             }
         }
     }

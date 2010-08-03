@@ -70,6 +70,7 @@ import org.voltdb.jni.MockExecutionEngine;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.DebugMessage;
 import org.voltdb.messaging.FailureSiteUpdateMessage;
 import org.voltdb.messaging.FastDeserializer;
@@ -144,6 +145,9 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
      * before the fragment can be run due to the order messages are pulled
      * from subjects. Maintain and send this value when discovering/sending
      * failure data.
+     *
+     * This value only gets updated on multi-partition transactions that are
+     * not read-only.
      */
     long lastKnownGloballyCommitedMultiPartTxnId = 0;
 
@@ -784,7 +788,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         {
             if (txnState.txnId > lastCommittedTxnId) {
                 lastCommittedTxnId = txnState.txnId;
-                if (!txnState.isSinglePartition())
+                if (!txnState.isSinglePartition() && !txnState.isReadOnly())
                 {
                     lastKnownGloballyCommitedMultiPartTxnId =
                         Math.max(txnState.txnId, lastKnownGloballyCommitedMultiPartTxnId);
@@ -847,15 +851,30 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             TransactionState ts = m_transactionsById.get(info.getTxnId());
             if (info instanceof CompleteTransactionMessage)
             {
+                CompleteTransactionMessage complete = (CompleteTransactionMessage)info;
                 if (ts != null)
                 {
-                    ts.processCompleteTransaction((CompleteTransactionMessage)info);
+                    ts.processCompleteTransaction(complete);
                 }
                 else
                 {
                     // if we're getting a CompleteTransactionMessage
-                    // and there's no transaction state, what can we
-                    // assert about it?  Anything?
+                    // and there's no transaction state, it's because
+                    // we were the cause of the rollback and we bailed
+                    // as soon as we signaled our failure to the coordinator.
+                    // Just generate an ack to keep the coordinator happy.
+                    if (complete.requiresAck())
+                    {
+                        CompleteTransactionResponseMessage ctrm =
+                            new CompleteTransactionResponseMessage(complete, m_siteId);
+                        try
+                        {
+                            m_mailbox.send(complete.getCoordinatorSiteId(), 0, ctrm);
+                        }
+                        catch (MessagingException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
                 }
                 return;
             }
@@ -902,6 +921,19 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             if (txnState != null) {
                 assert (txnState instanceof MultiPartitionParticipantTxnState);
                 txnState.processRemoteWorkResponse(response);
+            }
+        }
+        else if (message instanceof CompleteTransactionResponseMessage)
+        {
+            CompleteTransactionResponseMessage response =
+                (CompleteTransactionResponseMessage)message;
+            TransactionState txnState = m_transactionsById.get(response.getTxnId());
+            // I believe a null txnState should eventually be impossible, let's
+            // check for null for now
+            if (txnState != null)
+            {
+                assert (txnState instanceof MultiPartitionParticipantTxnState);
+                txnState.processCompleteTransactionResponse(response);
             }
         }
         else if (message instanceof DebugMessage) {
@@ -953,7 +985,9 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         // arrive after sneaked-in SP transactions have advanced the last
         // committed transaction point. A commit message is a fragment task
         // with a null payload.
-        if (notice instanceof FragmentTaskMessage) {
+        if (notice instanceof FragmentTaskMessage ||
+            notice instanceof CompleteTransactionMessage)
+        {
             return;
         }
 
@@ -1570,7 +1604,9 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         if (m_txnlog.isTraceEnabled())
         {
             m_txnlog.trace("FUZZTEST beginNewTxn " + txnState.txnId + " " +
-                           (txnState.isSinglePartition() ? "single" : "multi"));
+                           (txnState.isSinglePartition() ? "single" : "multi") + " " +
+                           (txnState.isReadOnly() ? "readonly" : "readwrite") + " " +
+                           (txnState.isCoordinator() ? "coord" : "part"));
         }
         if (!txnState.isReadOnly()) {
             assert(txnState.getBeginUndoToken() == kInvalidUndoToken);
