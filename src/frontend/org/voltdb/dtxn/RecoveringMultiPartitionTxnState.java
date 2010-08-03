@@ -71,11 +71,7 @@ public class RecoveringMultiPartitionTxnState extends MultiPartitionParticipantT
 
             VoltMessage payload = wu.getPayload();
 
-            // commit messages have null payloads
-            if (payload == null) {
-                m_done = ((m_dirty == false) || (wu.commitEvenIfDirty));
-            }
-            else if (payload instanceof InitiateTaskMessage) {
+            if (payload instanceof InitiateTaskMessage) {
                 // this txn state shouldn't be used if coordinating
                 // during recovery
                 assert(false);

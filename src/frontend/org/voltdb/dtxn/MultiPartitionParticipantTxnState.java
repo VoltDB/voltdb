@@ -17,7 +17,6 @@
 
 package org.voltdb.dtxn;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -30,6 +29,7 @@ import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltTable;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState.WorkUnitState;
+import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -50,8 +50,6 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     protected HashMap<Integer, WorkUnit> m_missingDependencies = null;
     protected ArrayList<WorkUnit> m_stackFrameDropWUs = null;
     protected Map<Integer, List<VoltTable>> m_previousStackFrameDropDependencies = null;
-    protected boolean m_dirty = false;
-    protected boolean m_didRollback = false;
 
     /**
      *  This is thrown by the TransactionState instance when something
@@ -94,10 +92,6 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         return m_hasStartedWork;
     }
 
-    public boolean didRollback() {
-        return m_didRollback;
-    }
-
     @Override
     public boolean isSinglePartition()
     {
@@ -137,11 +131,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
 
             VoltMessage payload = wu.getPayload();
 
-            // commit messages have null payloads
-            if (payload == null) {
-                m_done = ((m_dirty == false) || (wu.commitEvenIfDirty));
-            }
-            else if (payload instanceof InitiateTaskMessage) {
+            if (payload instanceof InitiateTaskMessage) {
                 initiateProcedure((InitiateTaskMessage) payload);
             }
             else if (payload instanceof FragmentTaskMessage) {
@@ -188,16 +178,16 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         return false;
     }
 
-    public FragmentTaskMessage createConcludingFragmentTask() {
-        FragmentTaskMessage ft =
-            new FragmentTaskMessage(initiatorSiteId,
-                                    coordinatorSiteId,
-                                    txnId,
-                                    true,
-                                    new long[] {},
-                                    null,
-                                    new ByteBuffer[] {},
-                                    true);
+    public CompleteTransactionMessage createCompleteTransactionMessage(boolean rollback,
+                                                                       boolean requiresAck)
+    {
+        CompleteTransactionMessage ft =
+            new CompleteTransactionMessage(initiatorSiteId,
+                                           coordinatorSiteId,
+                                           txnId,
+                                           true,
+                                           rollback,
+                                           requiresAck);
         return ft;
     }
 
@@ -207,12 +197,12 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         InitiateResponseMessage response = m_site.processInitiateTask(this, itask);
 
         // send commit notices to everyone
-        FragmentTaskMessage ftask = createConcludingFragmentTask();
-        ftask.setShouldUndo(response.shouldCommit() == false);
-        assert(ftask.isFinalTask() == true);
+        CompleteTransactionMessage complete_msg =
+            createCompleteTransactionMessage(response.shouldCommit() == false,
+                                             true);
 
         try {
-            m_mbox.send(m_nonCoordinatingSites, 0, ftask);
+            m_mbox.send(m_nonCoordinatingSites, 0, complete_msg);
         }
         catch (MessagingException e) {
             throw new RuntimeException(e);
@@ -224,7 +214,6 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                 m_missingDependencies.clear();
             }
             m_needsRollback = true;
-            m_didRollback = true;
         }
 
         try {
@@ -240,13 +229,8 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         assert(ftask.getFragmentCount() > 0);
 
         FragmentResponseMessage response = m_site.processFragmentTask(this, dependencies, ftask);
-        // mark this transaction as dirty
-        if (response.getDirtyFlag())
-            m_dirty = true;
-
         if (response.getStatusCode() != FragmentResponseMessage.SUCCESS)
         {
-            m_dirty = true;
             if (m_missingDependencies != null)
                 m_missingDependencies.clear();
             m_readyWorkUnits.clear();
@@ -265,7 +249,6 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
             else
             {
                 m_needsRollback = true;
-                m_didRollback = true;
                 m_done = true;
             }
         }
@@ -334,32 +317,8 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
 
     @Override
     public void createLocalFragmentWork(FragmentTaskMessage task, boolean nonTransactional) {
-        // handle the undo case
-        if (task.shouldUndo()) {
-            if (m_missingDependencies != null) {
-                m_missingDependencies.clear();
-            }
-            m_readyWorkUnits.clear();
-            m_needsRollback = true;
-            m_didRollback = true;
-            m_done = true;
-            return;
-        }
-
         if (task.getFragmentCount() > 0) {
             createLocalFragmentWorkDependencies(task, nonTransactional);
-        }
-
-        // if this txn is a participant and this is a final task...
-        // if empty, then it's always a commit message
-        // if has work, then it's only a commit message if
-        //    the transaction is clean (and stays clean after this work)
-        if ((!m_isCoordinator) && (task.isFinalTask())) {
-            // add a workunit that will commit the txn
-            WorkUnit wu = new WorkUnit(m_site.getSiteTracker(), null, null,
-                                       m_siteId, null, false);
-            wu.commitEvenIfDirty = task.getFragmentCount() == 0;
-            m_readyWorkUnits.add(wu);
         }
     }
 
@@ -410,7 +369,6 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
             else
             {
                 m_needsRollback = true;
-                m_didRollback = true;
                 m_done = true;
             }
         }
@@ -444,6 +402,19 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
             if (w.allDependenciesSatisfied()) {
                 handleWorkUnitComplete(w);
             }
+        }
+    }
+
+    @Override
+    public void processCompleteTransaction(CompleteTransactionMessage complete)
+    {
+        m_done = true;
+        if (complete.isRollback()) {
+            if (m_missingDependencies != null) {
+                m_missingDependencies.clear();
+            }
+            m_readyWorkUnits.clear();
+            m_needsRollback = true;
         }
     }
 
@@ -579,4 +550,3 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     }
 
 }
-

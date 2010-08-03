@@ -43,6 +43,7 @@ public class FragmentResponseMessage extends VoltMessage {
     long m_txnId;
     byte m_status;
     // default dirty to true until proven otherwise
+    // Not currently used; leaving it in for now
     boolean m_dirty = true;
     boolean m_recovering = false;
     short m_dependencyCount = 0;
@@ -72,10 +73,6 @@ public class FragmentResponseMessage extends VoltMessage {
         m_exception = e;
     }
 
-    public void setDirtyFlag(boolean value) {
-        m_dirty = value;
-    }
-
     public boolean isRecovering() {
         return m_recovering;
     }
@@ -103,10 +100,6 @@ public class FragmentResponseMessage extends VoltMessage {
 
     public byte getStatusCode() {
         return m_status;
-    }
-
-    public boolean getDirtyFlag() {
-        return m_dirty;
     }
 
     public int getTableCount() {

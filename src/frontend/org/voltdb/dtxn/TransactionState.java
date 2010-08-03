@@ -24,6 +24,7 @@ import java.util.Map;
 import org.voltdb.ExecutionSite;
 import org.voltdb.VoltTable;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
+import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Mailbox;
@@ -137,6 +138,14 @@ public abstract class TransactionState implements Comparable<TransactionState> {
         String msg = "The current transaction context of type ";
         msg += this.getClass().getName();
         msg += " doesn't support receiving fragment responses.";
+        throw new UnsupportedOperationException(msg);
+    }
+
+    public void processCompleteTransaction(CompleteTransactionMessage complete)
+    {
+        String msg = "The current transaction context of type ";
+        msg += this.getClass().getName();
+        msg += " doesn't support receiving CompleteTransactionMessages.";
         throw new UnsupportedOperationException(msg);
     }
 

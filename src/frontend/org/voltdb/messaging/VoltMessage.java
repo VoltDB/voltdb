@@ -44,6 +44,8 @@ public abstract class VoltMessage {
     final public static byte DEBUG_MESSAGE_ID = 8;
     final public static byte FAILURE_SITE_UPDATE_ID = 9;
     final public static byte RECOVERY_ID = 10;
+    final public static byte COMPLETE_TRANSACTION_ID = 11;
+    final public static byte COMPLETE_TRANSACTION_RESPONSE_ID = 12;
 
     // place holder for destination site ids when using multi-cast
     final public static int SEND_TO_MANY = -2;
@@ -137,6 +139,12 @@ public abstract class VoltMessage {
             break;
         case RECOVERY_ID:
             message = new RecoveryMessage();
+            break;
+        case COMPLETE_TRANSACTION_ID:
+            message = new CompleteTransactionMessage();
+            break;
+        case COMPLETE_TRANSACTION_RESPONSE_ID:
+            message = new CompleteTransactionResponseMessage();
             break;
         default:
             Class<? extends VoltMessage> cls = externals.get(messageType);

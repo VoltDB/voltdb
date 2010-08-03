@@ -42,6 +42,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     ArrayList<?>[] m_inputDepIds = null;
     boolean m_isFinal = false;
     byte m_taskType = 0;
+    // Unused, should get removed from this message
     boolean m_shouldUndo = false;
     int m_inputDepCount = 0;
 
@@ -140,10 +141,6 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_taskType = value;
     }
 
-    public void setShouldUndo(boolean value) {
-        m_shouldUndo = value;
-    }
-
     public boolean isFinalTask() {
         return m_isFinal;
     }
@@ -154,10 +151,6 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
     public byte getFragmentTaskType() {
         return m_taskType;
-    }
-
-    public boolean shouldUndo() {
-        return m_shouldUndo;
     }
 
     public int getFragmentCount() {

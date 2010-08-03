@@ -931,7 +931,7 @@ public class TestExecutionSite extends TestCase {
         // post-conditions
         assertFalse(tx1_1.isDone());      // did not run to completion because of simulated fault
         assertTrue(tx1_2.isDone());       // did run to completion because of globalCommitPt.
-        assertEquals(should_rollback, tx1_2.didRollback()); // did not rollback because of globalCommitPt.
+        assertEquals(should_rollback, tx1_2.needsRollback()); // did not rollback because of globalCommitPt.
         assertEquals(null, m_sites[1].m_transactionsById.get(tx1_2.txnId));
         assertEquals((++callcheck), MockMPVoltProcedure.m_called);
     }
@@ -1051,7 +1051,7 @@ public class TestExecutionSite extends TestCase {
 
         // post-conditions
         assertTrue(tx1_1.isDone());
-        assertFalse(tx1_1.didRollback());
+        assertFalse(tx1_1.needsRollback());
         assertEquals(null, m_sites[0].m_transactionsById.get(tx1_1.txnId));
         assertEquals((++callcheck), MockMPVoltProcedure.m_called);
     }

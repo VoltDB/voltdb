@@ -69,6 +69,7 @@ import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.jni.MockExecutionEngine;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
+import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DebugMessage;
 import org.voltdb.messaging.FailureSiteUpdateMessage;
 import org.voltdb.messaging.FastDeserializer;
@@ -841,29 +842,25 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                                                   false,
                                                   DtxnConstants.DUMMY_LAST_SEEN_TXN_ID);
             }
-            else {
-                assert(info instanceof FragmentTaskMessage);
-            }
 
             // Every non-heartbeat notice requires a transaction state.
             TransactionState ts = m_transactionsById.get(info.getTxnId());
-
-            // Check for a rollback FragmentTask.  Need to do this because
-            // a multi-partition participant can rollback locally and then
-            // move on to a new transaction; the final commit notification
-            // from the coordinator needs to avoid re-creating a new
-            // transaction state.
-            //
-            // FUTURE: Would eventually like to replace the overloading of
-            // FragmentTask with a separate TransactionCompletionMessage
-            // (or something similarly named)
-            boolean isRollback = false;
-            if (message instanceof FragmentTaskMessage)
+            if (info instanceof CompleteTransactionMessage)
             {
-                isRollback = ((FragmentTaskMessage) message).shouldUndo();
+                if (ts != null)
+                {
+                    ts.processCompleteTransaction((CompleteTransactionMessage)info);
+                }
+                else
+                {
+                    // if we're getting a CompleteTransactionMessage
+                    // and there's no transaction state, what can we
+                    // assert about it?  Anything?
+                }
+                return;
             }
-            // don't create a new transaction state
-            if (ts == null && !isRollback) {
+
+            if (ts == null) {
                 if (info.isSinglePartition()) {
                     if (m_recovering == false) {
                         ts = new SinglePartitionTxnState(m_mailbox, this, info);
@@ -1294,16 +1291,16 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                     m_recoveryLog.info("Committing in progress multi-partition txn " + ts.txnId +
                             " even though coordinator was on a failed host because the txnId <= " +
                             "the global multi-part commit point");
-                    FragmentTaskMessage ft = mpts.createConcludingFragmentTask();
-                    ft.setShouldUndo(false);
+                    CompleteTransactionMessage ft =
+                        mpts.createCompleteTransactionMessage(false, false);
                     m_mailbox.deliverFront(ft);
                 }
                 else if (ts.isInProgress() && ts.txnId > globalMultiPartCommitPoint) {
                     m_recoveryLog.info("Rolling back in progress multi-partition txn " + ts.txnId +
                             " because the coordinator was on a failed host and the txnId > " +
                             "the global multi-part commit point");
-                    FragmentTaskMessage ft = mpts.createConcludingFragmentTask();
-                    ft.setShouldUndo(true);
+                    CompleteTransactionMessage ft =
+                        mpts.createCompleteTransactionMessage(true, false);
                     m_mailbox.deliverFront(ft);
                 }
                 else
