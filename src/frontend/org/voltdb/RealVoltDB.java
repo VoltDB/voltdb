@@ -299,8 +299,12 @@ public class RealVoltDB implements VoltDBInterface
                 m_instanceId = m_messenger.waitForGroupJoin();
             }
             else {
+                // sensible defaults (sorta)
                 int rejoinPort = config.m_internalPort;
                 String rejoinHost = "localhost";
+
+                // this will cause the ExecutionSites to start in recovering mode
+                m_recovering = true;
 
                 int colonIndex = config.m_rejoinToHostAndPort.indexOf(':');
                 if (colonIndex == -1) {
