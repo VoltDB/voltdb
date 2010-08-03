@@ -54,7 +54,7 @@
       <xsd:element name="exports" type="exportsType" minOccurs="0"/>
       <xsd:element name="snapshot" type="snapshotType" minOccurs="0" maxOccurs="1" />
     </xsd:all>
-    <xsd:attribute name="name" type="xsd:string" use="required"/>
+    <xsd:attribute name="name" type="xsd:string" use="optional" default="database"/>
   </xsd:complexType>
 
   <!-- <snapshot> -->

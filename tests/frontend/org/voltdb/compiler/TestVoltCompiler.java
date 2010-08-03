@@ -321,7 +321,7 @@ public class TestVoltCompiler extends TestCase {
         assertFalse(success);
     }
 
-    public void testInvalidXMLFile() {
+    public void testXMLFileWithInvalidSchemaReference() {
         final String simpleXML =
             "<?xml version=\"1.0\"?>\n" +
             "<project>" +
@@ -342,47 +342,69 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void testXMLFileWithSchemaError() {
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile("create table T(ID INTEGER);");
         final String simpleXML =
             "<?xml version=\"1.0\"?>\n" +
             "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='my schema file.sql' /></schemas>" +
-            "<procedures><procedure class='procedures/procs.jar'/></procedures>" +
+            "<database name='baddbname'>" +
+            "<schemas>" +
+            "<schema path='" +  schemaFile.getAbsolutePath()  + "'/>" +
+            "</schemas>" +
+            // invalid project file: no procedures
+            // "<procedures>" +
+            // "<procedure class='proc'><sql>select * from T</sql></procedure>" +
+            //"</procedures>" +
             "</database>" +
             "</project>";
-
         final File xmlFile = VoltProjectBuilder.writeStringToTempFile(simpleXML);
         final String path = xmlFile.getPath();
-
         final VoltCompiler compiler = new VoltCompiler();
-
         final boolean success = compiler.compile(path, "nothing", System.out, null);
-
         assertFalse(success);
     }
 
     public void testXMLFileWithWrongDBName() {
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile("create table T(ID INTEGER);");
         final String simpleXML =
             "<?xml version=\"1.0\"?>\n" +
             "<project>" +
-            "<database name='mydb1'>" +
+            "<database name='baddbname'>" +
             "<schemas>" +
-            "<schema path='my schema file.sql' />" +
+            "<schema path='" +  schemaFile.getAbsolutePath()  + "'/>" +
             "</schemas>" +
             "<procedures>" +
-            "<procedure class='procedures/procs.jar' />" +
+            "<procedure class='proc'><sql>select * from T</sql></procedure>" +
             "</procedures>" +
             "</database>" +
             "</project>";
-
         final File xmlFile = VoltProjectBuilder.writeStringToTempFile(simpleXML);
         final String path = xmlFile.getPath();
-
         final VoltCompiler compiler = new VoltCompiler();
-
         final boolean success = compiler.compile(path, "nothing", System.out, null);
-
         assertFalse(success);
+    }
+
+
+    public void testXMLFileWithDefaultDBName() {
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile("create table T(ID INTEGER);");
+        final String simpleXML =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "<database>" +
+            "<schemas>" +
+            "<schema path='" +  schemaFile.getAbsolutePath()  + "'/>" +
+            "</schemas>" +
+            "<procedures>" +
+            "<procedure class='proc'><sql>select * from T</sql></procedure>" +
+            "</procedures>" +
+            "</database>" +
+            "</project>";
+        final File xmlFile = VoltProjectBuilder.writeStringToTempFile(simpleXML);
+        final String path = xmlFile.getPath();
+        final VoltCompiler compiler = new VoltCompiler();
+        final boolean success = compiler.compile(path, "nothing", System.out, null);
+        assertTrue(success);
+        assertTrue(compiler.m_catalog.getClusters().get("cluster").getDatabases().get("database") != null);
     }
 
     public void testBadClusterConfig() throws IOException {
