@@ -153,6 +153,7 @@ for arg in sys.argv[1:]:
         print "Checking additional repository: " + arg;
         proLicenses = ["../" + arg + '/tools/approved_licenses/license.txt']
         proLicensesPy = ["../" + arg + '/tools/approved_licenses/license_python.txt']
+        errcount = 0
         errcount += processAllFiles("../" + arg + "/src/",
                                     tuple([readFile(f) for f in proLicenses]),
                                     tuple([readFile(f) for f in proLicensesPy]))
@@ -164,7 +165,7 @@ for arg in sys.argv[1:]:
         if errcount == 0:
             print "SUCCESS. Found 0 license text errors, 0 files containing tabs or trailing whitespace."
         else:
-            print "FAILURE (%s). Found %d license text or whitespace errors." % arg, errcount
+            print "FAILURE (%s). Found %d license text or whitespace errors." % (arg, errcount)
 
 
 
