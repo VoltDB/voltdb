@@ -27,6 +27,7 @@ import java.util.Map;
 import org.voltdb.ExecutionSite;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState.WorkUnitState;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -48,6 +49,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     protected int[] m_nonCoordinatingSites;
     protected boolean m_shouldResumeProcedure = false;
     protected boolean m_hasStartedWork = false;
+    protected boolean m_recovering = false;
     protected HashMap<Integer, WorkUnit> m_missingDependencies = null;
     protected ArrayList<WorkUnit> m_stackFrameDropWUs = null;
     protected Map<Integer, List<VoltTable>> m_previousStackFrameDropDependencies = null;
@@ -65,12 +67,14 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     }
 
     public MultiPartitionParticipantTxnState(Mailbox mbox, ExecutionSite site,
-                                             TransactionInfoBaseMessage notice)
+                                             TransactionInfoBaseMessage notice,
+                                             boolean recovering)
     {
         super(mbox, site, notice);
         m_siteId = site.getSiteId();
         m_nonCoordinatingSites = null;
         m_isCoordinator = false;
+        m_recovering = recovering;
         if (notice instanceof InitiateTaskMessage)
         {
             m_isCoordinator = true;
@@ -179,7 +183,12 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                 initiateProcedure((InitiateTaskMessage) payload);
             }
             else if (payload instanceof FragmentTaskMessage) {
-                processFragmentWork((FragmentTaskMessage) payload, wu.getDependencies());
+                if (m_recovering) {
+                    processRecoveringFragmentWork((FragmentTaskMessage) payload, wu.getDependencies());
+                }
+                else {
+                    processFragmentWork((FragmentTaskMessage) payload, wu.getDependencies());
+                }
             }
         }
 
@@ -307,6 +316,25 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
             {
                 m_done = true;
             }
+        }
+    }
+
+    void processRecoveringFragmentWork(FragmentTaskMessage ftask, HashMap<Integer, List<VoltTable>> dependencies) {
+        assert(ftask.getFragmentCount() > 0);
+
+        FragmentResponseMessage response = new FragmentResponseMessage(ftask, m_siteId);
+        response.setRecovering(true);
+
+        // add a dummy table for all of the expected dependency ids
+        for (int i = 0; i < ftask.getFragmentCount(); i++) {
+            response.addDependency(ftask.getOutputDepId(i),
+                    new VoltTable(new VoltTable.ColumnInfo("DUMMY", VoltType.BIGINT)));
+        }
+
+        try {
+            m_mbox.send(response.getDestinationSiteId(), 0, response);
+        } catch (MessagingException e) {
+            throw new RuntimeException(e);
         }
     }
 

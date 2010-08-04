@@ -29,8 +29,8 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
-import org.voltdb.RecoverySiteProcessorSource.OnRecoveringPartitionInitiate;
 import org.voltdb.RecoverySiteProcessor.OnRecoveryCompletion;
+import org.voltdb.RecoverySiteProcessorSource.OnRecoveringPartitionInitiate;
 import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.CatalogMap;
@@ -44,7 +44,6 @@ import org.voltdb.client.ConnectionUtil;
 import org.voltdb.debugstate.ExecutorContext;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
-import org.voltdb.dtxn.RecoveringMultiPartitionTxnState;
 import org.voltdb.dtxn.RecoveringSinglePartitionTxnState;
 import org.voltdb.dtxn.RestrictedPriorityQueue;
 import org.voltdb.dtxn.RestrictedPriorityQueue.QueueState;
@@ -889,12 +888,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                     }
                 }
                 else {
-                    if (m_recovering == false) {
-                        ts = new MultiPartitionParticipantTxnState(m_mailbox, this, info);
-                    }
-                    else {
-                        ts = new RecoveringMultiPartitionTxnState(m_mailbox, this, info);
-                    }
+                    ts = new MultiPartitionParticipantTxnState(m_mailbox, this, info, m_recovering);
                 }
                 m_transactionQueue.add(ts);
                 m_transactionsById.put(ts.txnId, ts);
