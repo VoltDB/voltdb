@@ -1143,6 +1143,7 @@ public class TestVoltCompiler extends TestCase {
 
         // In the debugger, this looks valid at parse time but is mangled somewhere
         // later, perhaps in HSQL or in the catalog assembly?
+        // ENG-681
         System.out.println(defaultvalue);
         // assertTrue(defaultvalue.equalsIgnoreCase("a\nbc"));
     }
