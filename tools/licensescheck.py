@@ -14,9 +14,6 @@ prunelist = ('hsqldb19b3',
              'projectfile',
              'xml')
 
-# pro directories to skip
-prolist = ('org/voltdb/management')
-
 def verifyLicense(f, content, approvedLicensesJavaC, approvedLicensesPython):
     if f.endswith('.py'):
         if not content.startswith("#"):
@@ -104,11 +101,6 @@ def processFile(f, approvedLicensesJavaC, approvedLicensesPython):
     return 0
 
 def processAllFiles(d, approvedLicensesJavaC, approvedLicensesPython):
-    # Skip files in pro
-    for p in prolist:
-        if d.endswith(p):
-            return 0
-
     files = os.listdir(d)
     errcount = 0
     for f in [f for f in files if not f.startswith('.') and f not in prunelist]:
