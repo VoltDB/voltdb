@@ -893,9 +893,9 @@ public class TestVoltCompiler extends TestCase {
         jar.delete();
     }
 
-    /*public void testMaterializedView() throws IOException {
+    public void testMaterializedView() throws IOException {
         final String simpleSchema =
-            "create table books (cash integer default 23, title varchar default 'foo', PRIMARY KEY(cash));\n" +
+            "create table books (cash integer default 23, title varchar(10) default 'foo', PRIMARY KEY(cash));\n" +
             "create view matt (title, num, foo) as select title, count(*), sum(cash) from books group by title;";
 
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
@@ -914,10 +914,9 @@ public class TestVoltCompiler extends TestCase {
         final String projectPath = projectFile.getPath();
 
         final VoltCompiler compiler = new VoltCompiler();
-        final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
+        // final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
 
-        final boolean success = compiler.compile(projectPath, cluster_config,
-                                                 "testout.jar", System.out, null);
+        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
 
         assertTrue(success);
 
@@ -932,7 +931,7 @@ public class TestVoltCompiler extends TestCase {
 
         final File jar = new File("testout.jar");
         jar.delete();
-    }*/
+    }
 
     /*public void testForeignKeys() {
         String schemaPath = "";
