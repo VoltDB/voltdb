@@ -3,13 +3,13 @@ Conway's Game of Life
 
 This example application implements Conway's Game of Life.  It includes a client to evolve the grid and another client to display the grid.
 
-Many attributes of the application are customizable through arguments passed to the client, including: 
+Many attributes of the application are customizable through arguments passed to the client, including:
 
   - The number of rows in the grid.
   - The number of columns in the grid.
   - The initial number of cells.
 
-These attributes can be adjusted by modifying the arguments to the "client" target in the Ant build script. 
+These attributes can be adjusted by modifying the arguments to the "client" target in the Ant build script.
 
 Additionally, a second client target "gui" will display the live grid.
 
@@ -23,8 +23,8 @@ ant server          : start the server
 
 ant client          : start the client to evolve the grid
 
-ant gui             : start the client to display the grid 
+ant gui             : start the client to display the grid
 
-ant compile         : build the catalog
+ant catalog         : build the catalog
 
 ant clean           : remove compiled files

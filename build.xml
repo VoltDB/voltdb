@@ -1250,7 +1250,7 @@ TEST CASES
         dir='${dist.examples.auction.dir}'
         inheritAll='false'
         inheritRefs='false'
-        target='main'
+        target='srccompile'
     />
 
     <!-- make sure game_of_life example compiles -->
@@ -1258,7 +1258,7 @@ TEST CASES
         dir='${dist.examples.game_of_life.dir}'
         inheritAll='false'
         inheritRefs='false'
-        target='main'
+        target='srccompile'
     />
 
     <!-- make sure key_value example compiles -->
@@ -1266,24 +1266,23 @@ TEST CASES
         dir='${dist.examples.key_value.dir}'
         inheritAll='false'
         inheritRefs='false'
-        target='main'
+        target='srccompile'
     />
 
-    <!-- make sure satellite example compiles
+    <!-- make sure satellite example compiles -->
     <ant
         dir='${dist.examples.satellite.dir}'
         inheritAll='false'
         inheritRefs='false'
-        target='main'
+        target='srccompile'
     />
-    -->
 
     <!-- make sure twitter example compiles -->
     <ant
         dir='${dist.examples.twitter.dir}'
         inheritAll='false'
         inheritRefs='false'
-        target='main'
+        target='srccompile'
     />
 
     <!-- make sure voter example compiles -->
@@ -1291,7 +1290,7 @@ TEST CASES
         dir='${dist.examples.voter.dir}'
         inheritAll='false'
         inheritRefs='false'
-        target='main'
+        target='srccompile'
     />
 
     <!-- test the generator -->

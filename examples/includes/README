@@ -1,0 +1,5 @@
+This directory contains some build files that are common across
+examples. It is not an example. These build files are not intended to
+be executed directly. See examples/README for help using the VoltDB
+examples.
+

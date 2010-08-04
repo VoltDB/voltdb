@@ -3,14 +3,14 @@ Twitter application
 
 This example application uses the Twitter API to monitor a stream of tweets and parse out hashtags. Hashtag trends are calculated and made available via a web interface.
 
-Many attributes of the application are customizable through arguments passed to the client, including: 
+Many attributes of the application are customizable through arguments passed to the client, including:
 
-  - The twitter login username.
-  - The twitter login password.
+  - The twitter login username (-DTwitterUsername).
+  - The twitter login password (-DTwitterPassword).
   - The local web server port.
   - The number of hash tags to show in each table.
 
-These attributes can be adjusted by modifying the arguments to the "client" target in the Ant build script. 
+These attributes can be adjusted by modifying the arguments to the "client" target in the Ant build script.
 
   *** Note *** that you MUST change the username and password to your own valid credentials for this application to work.
 

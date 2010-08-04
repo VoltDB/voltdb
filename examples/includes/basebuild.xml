@@ -1,0 +1,128 @@
+<?xml version="1.0" ?>
+<project name="basebuild">
+
+<!--
+***************************************
+SHARED PATHS AND PROPERTIES
+***************************************
+-->
+
+<property name='catalog'               value='catalog.jar'/>
+<property name='build.dir'             location='obj/'/>
+<property name='src.dir'               location='src/'/>
+<property name='debugoutput.dir'       location='debugoutput/'/>
+<property name='junit.haltonfailure'   value='true'/>
+<property name='log4j.configuration'   location='../../voltdb/log4j.properties'/>
+
+<path id='project.classpath'>
+    <fileset dir='../../voltdb' >
+        <include name='voltdb*.jar' />
+    </fileset>
+    <pathelement location='${build.dir}' />
+    <pathelement path="${java.class.path}"/>
+</path>
+
+<!--
+***************************************
+CONCRETE SHARED TARGETS
+***************************************
+-->
+
+<!-- Example client use this for default jvm arguments. -->
+<macrodef name="invoke-java">
+  <attribute name="classname"/>
+  <element name="javac" optional="true" implicit="true"/>
+  <sequential>
+    <java fork="yes" failonerror="true" classname="@{classname}">
+        <jvmarg value="-server" />
+        <jvmarg value="-Xmx512m" />
+        <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError" />
+        <jvmarg value="-XX:HeapDumpPath=/tmp" />
+        <jvmarg value="-XX:-ReduceInitialCardMarks" />
+        <classpath refid='project.classpath'/>
+        <assertions><disable/></assertions>
+        <javac/>
+    </java>
+  </sequential>
+</macrodef>
+
+<target name="default" depends="srccompile, catalog, server"
+        description="Compile and start server."/>
+
+<!-- Some examples override cleanImpl to remove adhoc files -->
+<target name='clean' depends="cleanImpl" description="Remove compilation artifacts"/>
+<target name="cleanImpl">
+    <delete includeemptydirs="true" failonerror='false'>
+        <fileset dir="${build.dir}" includes="**/*" />
+        <fileset dir="${debugoutput.dir}" includes="**/*" />
+        <fileset dir="." defaultexcludes="yes" >
+            <include name="${catalog}" />
+        </fileset>
+    </delete>
+</target>
+
+<!-- Some examples override srcCompileImpl to add additional srcs or dependencies -->
+<target name="srccompile" depends="srccompileImpl, proccompileImpl" description="Compile all java"/>
+
+<target name="srccompileImpl">
+    <mkdir dir='${build.dir}' />
+    <javac target="1.6" srcdir="${src.dir}" destdir='${build.dir}' debug='true'>
+        <classpath refid="project.classpath" />
+    </javac>
+</target>
+
+<target name="proccompileImpl" if="procedures.dir">
+    <javac target="1.6" srcdir="${procedures.dir}" destdir='${build.dir}' debug='true'>
+        <classpath refid="project.classpath" />
+    </javac>
+</target>
+
+<target name="catalog" depends="srccompile" description="Compile the catalog using the schema and the DDL file" >
+    <java fork="yes" failonerror="true" classname="org.voltdb.compiler.VoltCompiler" >
+        <jvmarg value="-Dlog4j.configuration=file://${log4j.configuration}"/>
+        <arg value="project.xml"/> <!-- project file -->
+        <arg value="${catalog}"/> <!-- output -->
+        <classpath refid='project.classpath' />
+        <assertions><disable/></assertions>
+    </java>
+</target>
+
+<target name="server" description="Start the server and load the catalog." >
+    <java fork="yes" classname="org.voltdb.VoltDB" >
+        <jvmarg value="-Djava.library.path=../../voltdb" />
+        <jvmarg value="-server" />
+        <jvmarg value="-Xmx512m" />
+        <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError" />
+        <jvmarg value="-XX:HeapDumpPath=/tmp" />
+        <jvmarg value="-XX:-ReduceInitialCardMarks" />
+        <jvmarg value="-Dlog4j.configuration=file://${log4j.configuration}"/>
+        <arg value="catalog" />
+        <arg value="${catalog}" />
+        <arg value="deployment" />
+        <arg value="deployment.xml" />
+        <classpath refid='project.classpath' />
+        <assertions><disable /></assertions>
+    </java>
+</target>
+
+<!-- To advertise this via ant -p, override export and depends.
+     See auction/build.xml for an example. Organized this way since
+     most examples don't include an example of export. -->
+<target name="export">
+    <invoke-java classname="org.voltdb.exportclient.ExportToFileClient" >
+      <javac>
+        <arg value="--servers"/>
+        <arg value="localhost"/>
+        <arg value="--type"/>
+        <arg value="csv"/>
+        <arg value="--nonce"/>
+        <arg value="EXPORTDEMO"/>
+        <arg value="--user"/>
+        <arg value="voltdb"/>
+        <arg value="--password"/>
+        <arg value="demo"/>
+      </javac>
+    </invoke-java>
+</target>
+
+</project>

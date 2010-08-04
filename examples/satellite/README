@@ -5,7 +5,7 @@ The satellite example is a simulation of satellite tracking. The example contain
 
 The easiest way to run the example is to use ant to build and run the application. You will need three terminal windows:
 
-- In window #1, run "ant" and "ant server"
+- In window #1, run "ant" and then "ant server"
 - In window #2. run "ant client"
 - In window #3, run "ant tracker"
 
