@@ -76,6 +76,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.procedures.CrazyBlahProc;
+import org.voltdb.compiler.procedures.SelectStarHelloWorld;
 import org.voltdb.types.TimestampType;
 
 public class TestJSONInterface extends TestCase {
@@ -89,19 +90,10 @@ public class TestJSONInterface extends TestCase {
         public String exception = null;
     }
 
-    public static String callProcOverJSON(String procName, ParameterSet pset) throws Exception {
+    static String japaneseTestVarStrings = "Procedure=Insert&Parameters=%5B%22%5Cu3053%5Cu3093%5Cu306b%5Cu3061%5Cu306f%22%2C%22%5Cu4e16%5Cu754c%22%2C%22Japanese%22%5D";
+
+    public static String callProcOverJSONRaw(String varString) throws Exception {
         URL jsonAPIURL = new URL("http://localhost:8095/api/1.0/");
-
-        // Call insert
-        String paramsInJSON = pset.toJSONString();
-        System.out.println(paramsInJSON);
-        HashMap<String,String> params = new HashMap<String,String>();
-        params.put("Procedure", procName);
-        params.put("Parameters", paramsInJSON);
-
-        String varString = getHTTPVarString(params);
-
-        varString = getHTTPVarString(params);
 
         HttpURLConnection conn = (HttpURLConnection) jsonAPIURL.openConnection();
         conn.setDoOutput(true);
@@ -116,13 +108,13 @@ public class TestJSONInterface extends TestCase {
             if(conn.getInputStream()!=null){
                 in = new BufferedReader(
                         new InputStreamReader(
-                        conn.getInputStream()));
+                        conn.getInputStream(), "UTF-8"));
             }
         } catch(IOException e){
             if(conn.getErrorStream()!=null){
                 in = new BufferedReader(
                         new InputStreamReader(
-                        conn.getErrorStream()));
+                        conn.getErrorStream(), "UTF-8"));
             }
         }
         if(in==null) {
@@ -142,6 +134,21 @@ public class TestJSONInterface extends TestCase {
 
         assertEquals(200, responseCode);
         return response;
+    }
+
+    public static String callProcOverJSON(String procName, ParameterSet pset) throws Exception {
+        // Call insert
+        String paramsInJSON = pset.toJSONString();
+        //System.out.println(paramsInJSON);
+        HashMap<String,String> params = new HashMap<String,String>();
+        params.put("Procedure", procName);
+        params.put("Parameters", paramsInJSON);
+
+        String varString = getHTTPVarString(params);
+
+        varString = getHTTPVarString(params);
+
+        return callProcOverJSONRaw(varString);
     }
 
     public static Response responseFromJSON(String jsonStr) throws JSONException, IOException {
@@ -312,6 +319,72 @@ public class TestJSONInterface extends TestCase {
         response = responseFromJSON(responseJSON);
         System.out.println(response.statusString);
         assertEquals(ClientResponse.SUCCESS, response.status);
+
+        server.shutdown();
+        server.join();
+    }
+
+    public void testJapaneseNastiness() throws Exception {
+        String simpleSchema =
+            "CREATE TABLE HELLOWORLD (\n" +
+            "    HELLO VARCHAR(15),\n" +
+            "    WORLD VARCHAR(15),\n" +
+            "    DIALECT VARCHAR(15) NOT NULL,\n" +
+            "    PRIMARY KEY (DIALECT)\n" +
+            ");";
+
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+        String schemaPath = schemaFile.getPath();
+        schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addSchema(schemaPath);
+        builder.addPartitionInfo("HELLOWORLD", "DIALECT");
+        builder.addStmtProcedure("Insert", "insert into HELLOWORLD values (?,?,?);");
+        builder.addStmtProcedure("Select", "select * from HELLOWORLD;");
+        builder.addProcedures(SelectStarHelloWorld.class);
+        boolean success = builder.compile("json.jar");
+        assertTrue(success);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_httpAdminPort = 8095;
+        config.m_pathToCatalog = "json.jar";
+        config.m_pathToDeployment = builder.getPathToDeployment();
+        ServerThread server = new ServerThread(config);
+        server.start();
+        server.waitForInitialization();
+
+        String response = callProcOverJSONRaw(japaneseTestVarStrings);
+        Response r = responseFromJSON(response);
+        assertEquals(1, r.status);
+
+        // Dunno WTF requires me to do this...
+        char[] test1 = {'こ', 'ん', 'に', 'ち', 'は' };
+        String test2 = new String(test1);
+
+        ParameterSet pset = new ParameterSet();
+        response = callProcOverJSON("Select", pset);
+        System.out.println(response);
+        System.out.println(test2);
+        r = responseFromJSON(response);
+        assertEquals(1, r.status);
+
+        // Useful for debugging
+        /*Logger log = Logger.getLogger(this.getClass());
+
+        byte[] bytes = response.getBytes("UTF-8");
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < bytes.length; i++) {
+            sb.append(bytes[i]).append(" ");
+        }
+        log.log(Level.INFO, sb.toString());
+
+        assertTrue(response.contains(test2));*/
+
+        response = callProcOverJSON("SelectStarHelloWorld", pset);
+        r = responseFromJSON(response);
+        assertEquals(1, r.status);
+        assertTrue(response.contains(test2));
 
         server.shutdown();
         server.join();

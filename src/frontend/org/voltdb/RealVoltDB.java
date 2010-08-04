@@ -22,6 +22,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
@@ -201,6 +202,15 @@ public class RealVoltDB implements VoltDBInterface
      */
     public void initialize(VoltDB.Configuration config) {
         synchronized(m_startAndStopLock) {
+
+            // Set std-out/err to use the UTF-8 encoding and fail if UTF-8 isn't supported
+            try {
+                System.setOut(new PrintStream(System.out, true, "UTF-8"));
+                System.setErr(new PrintStream(System.err, true, "UTF-8"));
+            } catch (UnsupportedEncodingException e) {
+                hostLog.fatal("Support for the UTF-8 encoding is required for VoltDB. This means you are likely running an unsupported JVM.");
+                VoltDB.crashVoltDB();
+            }
 
             if (config.m_port != VoltDB.DEFAULT_PORT) {
                 RejoinLog.setPortNo(config.m_port);

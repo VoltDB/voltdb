@@ -600,6 +600,7 @@ JAVA COMPILATION
         target="1.6"
         srcdir="${src.hsqldb.dir}"
         destdir='${build.prod.dir}'
+        encoding='UTF-8'
         debug='true'>
         <classpath refid="project.classpath" />
     </javac>
@@ -608,6 +609,7 @@ JAVA COMPILATION
         target="1.6"
         srcdir="${vendor.src.dir}"
         destdir='${build.prod.dir}'
+        encoding='UTF-8'
         debug='true'>
         <classpath refid="project.classpath" />
     </javac>
@@ -616,6 +618,7 @@ JAVA COMPILATION
         target="1.6"
         srcdir="${src.gpl.dir}"
         destdir='${build.prod.dir}'
+        encoding='UTF-8'
         debug='true'>
         <classpath refid="project.classpath" />
     </javac>
@@ -625,6 +628,7 @@ JAVA COMPILATION
         target="1.6"
         srcdir="${src.hsqldb.test.dir}"
         destdir='${build.test.dir}'
+        encoding='UTF-8'
         debug='true'>
         <classpath refid="project.classpath" />
     </javac>
@@ -634,6 +638,7 @@ JAVA COMPILATION
         srcdir="${src.test.dir}"
         destdir='${build.test.dir}'
         excludes="org/voltdb/benchmark/tpcc/JDBCClient.java,edu/mit/elt/ELTTester**"
+        encoding='UTF-8'
         debug='true'>
         <classpath refid="project.classpath" />
     </javac>
