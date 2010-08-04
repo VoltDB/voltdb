@@ -74,13 +74,14 @@ public class DDLCompiler {
     HSQLInterface m_hsql;
     VoltCompiler m_compiler;
     String m_fullDDL = "";
+    int m_currLineNo = 1;
 
     HashMap<String, Column> columnMap = new HashMap<String, Column>();
     HashMap<String, Index> indexMap = new HashMap<String, Index>();
     HashMap<Table, String> matViewMap = new HashMap<Table, String>();
 
     private class DDLStatement {
-        String statement;
+        String statement = "";
         int lineNo;
     }
 
@@ -98,15 +99,14 @@ public class DDLCompiler {
     public void loadSchema(String path)
     throws VoltCompiler.VoltCompilerException {
         File inputFile = new File(path);
-        FileReader fr = null;
-        LineNumberReader reader = null;
+        FileReader reader = null;
         try {
-            fr = new FileReader(inputFile);
-            reader = new LineNumberReader(fr);
+            reader = new FileReader(inputFile);
         } catch (FileNotFoundException e) {
             throw m_compiler.new VoltCompilerException("Unable to open schema file for reading");
         }
 
+        m_currLineNo = 0;
         this.loadSchema(path, reader);
     }
 
@@ -116,7 +116,7 @@ public class DDLCompiler {
      * @param reader
      * @throws VoltCompiler.VoltCompilerException
      */
-    public void loadSchema(String path, LineNumberReader reader)
+    public void loadSchema(String path, FileReader reader)
     throws VoltCompiler.VoltCompilerException {
         DDLStatement stmt = getNextStatement(reader, m_compiler);
         while (stmt != null) {
@@ -125,7 +125,7 @@ public class DDLCompiler {
                 m_hsql.runDDLCommand(stmt.statement);
                 stmt = getNextStatement(reader, m_compiler);
             } catch (HSQLParseException e) {
-                String msg = "DDL Error: \"" + e.getMessage() + "\" in statement ending on lineno: " + stmt.lineNo;
+                String msg = "DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
                 throw m_compiler.new VoltCompilerException(msg, stmt.lineNo);
             }
         }
@@ -162,44 +162,203 @@ public class DDLCompiler {
         fillCatalogFromXML(catalog, db, xmlCatalog);
     }
 
-    DDLStatement getNextStatement(LineNumberReader reader, VoltCompiler compiler)
-    throws VoltCompiler.VoltCompilerException {
-        DDLStatement retval = new DDLStatement();
+    /**
+     * Read until the next newline
+     * @throws IOException
+     */
+    String readToEndOfLine(FileReader reader) throws IOException {
+        LineNumberReader lnr = new LineNumberReader(reader);
+        String retval = lnr.readLine();
+        m_currLineNo++;
+        return retval;
+    }
 
-        try {
-            String stmt = "";
 
-            // skip over any empty lines to read first real line
-            while (stmt.equals("") || stmt.startsWith("--")) {
-                stmt = reader.readLine();
-                if (stmt == null) return null;
-                stmt = stmt.trim();
-            }
-            // record the line number
-            retval.lineNo = reader.getLineNumber();
 
-            // add all lines until one ends with a semicolon
-            while((stmt.endsWith(";") == false) && (stmt.endsWith(";\n") == false)) {
-                String newline = reader.readLine();
-                if (newline == null) {
-                    String msg = "Schema file ended mid statment (no semicolon found)";
-                    throw compiler.new VoltCompilerException(msg, retval.lineNo);
-                }
-                newline = newline.trim();
-                if (newline.equals(""))
-                    continue;
-                if (newline.startsWith("--"))
-                    continue;
-                stmt += " " + newline + "\n";
-            }
+    // Parsing states. Start in kStateInvalid
+    private static int kStateInvalid = 0;                         // have not yet found start of statement
+    private static int kStateReading = 1;                         // normal reading state
+    private static int kStateReadingCommentDelim = 2;             // dealing with first -
+    private static int kStateReadingComment = 3;                  // parsing after -- for a newline
+    private static int kStateReadingStringLiteralSpecialChar = 4; // dealing with one or more single quotes
+    private static int kStateReadingStringLiteral = 5;            // in the middle of a string literal
+    private static int kStateCompleteStatement = 6;               // found end of statement
 
-            retval.statement = stmt;
-
-        } catch (IOException e) {
-            throw compiler.new VoltCompilerException("Unable to read from file");
+    private int readingState(char[] nchar, DDLStatement retval) {
+        if (nchar[0] == '-') {
+            // remember that a possible '--' is being examined
+            return kStateReadingCommentDelim;
+        }
+        else if (nchar[0] == '\n') {
+            // normalize newlines to spaces
+            m_currLineNo += 1;
+            retval.statement += " ";
+        }
+        else if (nchar[0] == '\r') {
+            // ignore carriage returns
+        }
+        else if (nchar[0] == ';') {
+            // end of the statement
+            retval.statement += nchar[0];
+            return kStateCompleteStatement;
+        }
+        else if (nchar[0] == '\'') {
+            retval.statement += nchar[0];
+            return kStateReadingStringLiteral;
+        }
+        else {
+            // accumulate and continue
+            retval.statement += nchar[0];
         }
 
-        return retval;
+        return kStateReading;
+    }
+
+    private int readingStringLiteralState(char[] nchar, DDLStatement retval) {
+        // all characters in the literal are accumulated. keep track of
+        // newlines for error messages.
+        retval.statement += nchar[0];
+        if (nchar[0] == '\n') {
+            m_currLineNo += 1;
+        }
+
+        // if we see a SINGLE_QUOTE, change states to check for terminating literal
+        if (nchar[0] != '\'') {
+            return kStateReadingStringLiteral;
+        }
+        else {
+            return kStateReadingStringLiteralSpecialChar;
+        }
+    }
+
+
+    private int readingStringLiteralSpecialChar(char[] nchar, DDLStatement retval) {
+
+        // if this is an escaped quote, return kReadingStringLiteral.
+        // otherwise, the string is complete. Parse nchar as a non-literal
+        if (nchar[0] == '\'') {
+            retval.statement += nchar[0];
+            return kStateReadingStringLiteral;
+        }
+        else {
+            return readingState(nchar, retval);
+        }
+    }
+
+    private int readingCommentDelimState(char[] nchar, DDLStatement retval) {
+        if (nchar[0] == '-') {
+            // confirmed that a comment is being read
+            return kStateReadingComment;
+        }
+        else {
+            // need to append the previously skipped '-' to the statement
+            // and process the current character
+            retval.statement += '-';
+            return readingState(nchar, retval);
+        }
+    }
+
+    private int readingCommentState(char[] nchar, DDLStatement retval) {
+        if (nchar[0] == '\n') {
+            // a comment is continued until a newline is found.
+            m_currLineNo += 1;
+            return kStateReading;
+        }
+        return kStateReadingComment;
+    }
+
+    DDLStatement getNextStatement(FileReader reader, VoltCompiler compiler)
+    throws VoltCompiler.VoltCompilerException {
+
+        int state = kStateInvalid;
+
+        char[] nchar = new char[1];
+        DDLStatement retval = new DDLStatement();
+        retval.lineNo = m_currLineNo;
+
+        try {
+
+            // find the start of a statement and break out of the loop
+            // or return null if there is no next statement to be found
+            do {
+                if (reader.read(nchar) == -1) {
+                    return null;
+                }
+
+                // trim leading whitespace outside of a statement
+                if (nchar[0] == '\n') {
+                    m_currLineNo++;
+                }
+                else if (nchar[0] == '\r') {
+                }
+                else if (nchar[0] == ' ') {
+                }
+
+                // trim leading comments outside of a statement
+                else if (nchar[0] == '-') {
+                    // The next character must be a comment because no valid
+                    // statement will start with "-<foo>". If a comment was
+                    // found, read until the next newline.
+                    if (reader.read(nchar) == -1) {
+                        // garbage at the end of a file but easy to tolerable?
+                        return null;
+                    }
+                    if (nchar[0] != '-') {
+                        String msg = "Invalid content before or between DDL statements.";
+                        throw compiler.new VoltCompilerException(msg, m_currLineNo);
+                    }
+                    else {
+                        do {
+                            if (reader.read(nchar) == -1) {
+                                // a comment extending to EOF means no statement
+                                return null;
+                            }
+                        } while (nchar[0] != '\n');
+
+                        // process the newline and loop
+                        m_currLineNo++;
+                    }
+                }
+
+                // not whitespace or comment: start of a statement.
+                else {
+                    retval.statement += nchar[0];
+                    state = kStateReading;
+                    break;
+                }
+            } while (true);
+
+            while (state != kStateCompleteStatement) {
+                if (reader.read(nchar) == -1) {
+                    String msg = "Schema file ended mid-statement (no semicolon found).";
+                    throw compiler.new VoltCompilerException(msg, retval.lineNo);
+                }
+
+                if (state == kStateReading) {
+                    state = readingState(nchar, retval);
+                }
+                else if (state == kStateReadingCommentDelim) {
+                    state = readingCommentDelimState(nchar, retval);
+                }
+                else if (state == kStateReadingComment) {
+                    state = readingCommentState(nchar, retval);
+                }
+                else if (state == kStateReadingStringLiteral) {
+                    state = readingStringLiteralState(nchar, retval);
+                }
+                else if (state == kStateReadingStringLiteralSpecialChar) {
+                    state = readingStringLiteralSpecialChar(nchar, retval);
+                }
+                else {
+                    throw compiler.new VoltCompilerException("Unrecoverable error parsing DDL.");
+                }
+            }
+
+            return retval;
+        }
+        catch (IOException e) {
+            throw compiler.new VoltCompilerException("Unable to read from file");
+        }
     }
 
     public void fillCatalogFromXML(Catalog catalog, Database db, String xml)

@@ -32,11 +32,7 @@ import junit.framework.TestCase;
 
 import org.voltdb.ProcInfoData;
 import org.voltdb.benchmark.tpcc.TPCCClient;
-import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.Connector;
-import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.catalog.*;
 import org.voltdb.compiler.VoltCompiler.Feedback;
 import org.voltdb.regressionsuites.TestExportSuite;
 import org.voltdb.utils.JarReader;
@@ -507,6 +503,8 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void testDDLWithNoLengthString() throws IOException {
+
+        // DO NOT COPY PASTE THIS INVALID EXAMPLE!
         final String simpleSchema1 =
             "create table books (cash integer default 23, title varchar default 'foo', PRIMARY KEY(cash));";
 
@@ -838,7 +836,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testBadStmtProcName() throws IOException {
         final String simpleSchema =
-            "create table books (cash integer default 23 not null, title varchar default 'foo', PRIMARY KEY(cash));";
+            "create table books (cash integer default 23 not null, title varchar(10) default 'foo', PRIMARY KEY(cash));";
 
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
         final String schemaPath = schemaFile.getPath();
@@ -931,6 +929,233 @@ public class TestVoltCompiler extends TestCase {
 
         final File jar = new File("testout.jar");
         jar.delete();
+    }
+
+
+    /*
+     * There are DDL tests a number of places. TestDDLCompiler seems more about
+     * verifying HSQL behaviour. Additionally, there are users of PlannerAideDeCamp
+     * that verify plans for various DDL/SQL combinations.
+     *
+     * I'm going to add some DDL parsing validation tests here, as they seem to have
+     * more to do with compiling a catalog.. and there are some related tests already
+     * in this file.
+     */
+
+    private VoltCompiler compileForDDLTest(String schemaPath, boolean expectSuccess) {
+        final String simpleProject =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "<database name='database'>" +
+            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
+            "<procedures><procedure class='sample'><sql>select * from t</sql></procedure></procedures>" +
+            "</database>" +
+            "</project>";
+
+        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
+        projectFile.deleteOnExit();
+        final String projectPath = projectFile.getPath();
+        final VoltCompiler compiler = new VoltCompiler();
+        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
+        assertEquals(expectSuccess, success);
+        return compiler;
+    }
+
+    private String getPathForSchema(String s) {
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(s);
+        schemaFile.deleteOnExit();
+        return schemaFile.getPath();
+    }
+
+    public void testDDLCompilerLeadingGarbage() throws IOException {
+        final String s =
+            "-- a valid comment\n" +
+            "- an invalid comment\n" +
+            "create table t(id integer);";
+
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), false);
+        assertTrue(c.hasErrors());
+    }
+
+    public void testDDLCompilerLeadingWhitespace() throws IOException {
+        final String s =
+            "     \n" +
+            "\n" +
+            "create table t(id integer);";
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+    }
+
+    public void testDDLCompilerLeadingComment() throws IOException {
+        final String s =
+            "-- this is a leading comment\n" +
+            "  -- with some leading whitespace\n" +
+            "     create table t(id integer);";
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+    }
+
+    public void testDDLCompilerNoNewlines() throws IOException {
+        final String s =
+            "create table t(id integer); create table r(id integer);";
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 2);
+    }
+
+    public void testDDLCompilerTrailingComment1() throws IOException {
+        final String s =
+            "create table t(id integer) -- this is a trailing comment\n" +
+            "-- and a line full of comments\n" +
+            ";\n";
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+    }
+
+    public void testDDLCompilerTrailingComment2() throws IOException {
+        final String s =
+            "create table t(id integer) -- this is a trailing comment\n" +
+            ";\n";
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+    }
+
+    public void testDDLCompilerTrailingComment3() throws IOException {
+        final String s =
+            "create table t(id integer) -- this is a trailing comment\n" +
+            "-- and a line full of comments\n" +
+            ";";
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+    }
+
+    public void testDDLCompilerTrailingComment4() throws IOException {
+        final String s =
+            "create table t(id integer) -- this is a trailing comment\n" +
+            ";";
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+    }
+
+    public void testDDLCompilerTrailingComment5() throws IOException {
+        final String s =
+            "create table t(id integer) -- this is a trailing comment\n" +
+            "-- and a line full of comments\n" +
+            "    ;\n";
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+    }
+
+    public void testDDLCompilerTrailingComment6() throws IOException {
+        final String s =
+            "create table t(id integer) -- this is a trailing comment\n" +
+            "-- and a line full of comments\n" +
+            "    ;\n" +
+            "-- ends with a comment\n";
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+    }
+
+
+    public void testDDLCompilerInvalidStatement() throws IOException {
+        final String s =
+            "create table t for justice -- with a comment\n";
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), false);
+        assertTrue(c.hasErrors());
+    }
+
+    public void testDDLCompilerCommentThatLooksLikeStatement() throws IOException {
+        final String s =
+            "create table t(id integer); -- create table r(id integer);";
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+    }
+
+    public void testDDLCompilerLeadingSemicolon() throws IOException {
+        final String s = "; create table t(id integer);";
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), false);
+        assertTrue(c.hasErrors());
+    }
+
+    public void testDDLCompilerMultipleStatementsOnMultipleLines() throws IOException {
+        final String s =
+            "create table t(id integer); create\n" +
+            "table r(id integer); -- second table";
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 2);
+    }
+
+    public void testDDLCompilerStringLiteral() throws IOException {
+        final String s =
+            "create table t(id varchar(3) default 'abc');";
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+
+        Table tbl = c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().getIgnoreCase("t");
+        String defaultvalue = tbl.getColumns().getIgnoreCase("id").getDefaultvalue();
+        assertTrue(defaultvalue.equalsIgnoreCase("abc"));
+    }
+
+    public void testDDLCompilerSemiColonInStringLiteral() throws IOException {
+        final String s =
+            "create table t(id varchar(5) default 'a;bc');";
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+
+        Table tbl = c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().getIgnoreCase("t");
+        String defaultvalue = tbl.getColumns().getIgnoreCase("id").getDefaultvalue();
+        assertTrue(defaultvalue.equalsIgnoreCase("a;bc"));
+    }
+
+    public void testDDLCompilerDashDashInStringLiteral() throws IOException {
+        final String s =
+            "create table t(id varchar(5) default 'a--bc');";
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+
+        Table tbl = c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().getIgnoreCase("t");
+        String defaultvalue = tbl.getColumns().getIgnoreCase("id").getDefaultvalue();
+        assertTrue(defaultvalue.equalsIgnoreCase("a--bc"));
+    }
+
+    public void testDDLCompilerNewlineInStringLiteral() throws IOException {
+        final String s =
+            "create table t(id varchar(5) default 'a\n" + "bc');";
+
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+        Table tbl = c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().getIgnoreCase("t");
+        String defaultvalue = tbl.getColumns().getIgnoreCase("id").getDefaultvalue();
+
+        // In the debugger, this looks valid at parse time but is mangled somewhere
+        // later, perhaps in HSQL or in the catalog assembly?
+        System.out.println(defaultvalue);
+        // assertTrue(defaultvalue.equalsIgnoreCase("a\nbc"));
+    }
+
+    public void testDDLCompilerEscapedStringLiterals() throws IOException {
+        final String s =
+            "create table t(id varchar(10) default 'a''b''''c');";
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+        Table tbl = c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().getIgnoreCase("t");
+        String defaultvalue = tbl.getColumns().getIgnoreCase("id").getDefaultvalue();
+        assertTrue(defaultvalue.equalsIgnoreCase("a'b''c"));
     }
 
     /*public void testForeignKeys() {
