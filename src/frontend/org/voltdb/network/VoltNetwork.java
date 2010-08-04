@@ -218,6 +218,44 @@ import org.voltdb.utils.Pair;
                 }
             }).start();
         }
+
+        //It is really handy to be able to uncomment this and print bandwidth usage. Hopefully
+        //management tools will replace it.
+//        new Thread() {
+//            @Override
+//            public void run() {
+//                long last = System.currentTimeMillis();
+//                while (true) {
+//                    try {
+//                        Thread.sleep(10000);
+//                    } catch (InterruptedException e) {
+//                        // TODO Auto-generated catch block
+//                        e.printStackTrace();
+//                    }
+//                    final long now = System.currentTimeMillis();
+//                    long totalRead = 0;
+//                    long totalMessagesRead = 0;
+//                    long totalWritten = 0;
+//                    long totalMessagesWritten = 0;
+//                    synchronized (m_ports) {
+//                        for (VoltPort p : m_ports) {
+//                            final long read = p.readStream().getBytesRead(true);
+//                            final long writeInfo[] = p.writeStream().getBytesAndMessagesWritten(true);
+//                            final long messagesRead = p.getMessagesRead(true);
+//                            totalRead += read;
+//                            totalMessagesRead += messagesRead;
+//                            totalWritten += writeInfo[0];
+//                            totalMessagesWritten += writeInfo[1];
+//                        }
+//                    }
+//                    double delta = (now - last) / 1000.0;
+//                    double mbRead = totalRead / (1024.0 * 1024.0);
+//                    double mbWritten = totalWritten / (1024.0 * 1024.0);
+//                    System.out.printf("Transferred %.2f/%.2f (IN/OUT)/sec\n", mbRead / delta, mbWritten / delta);
+//                    last = now;
+//                }
+//            }
+//        }.start();
     }
 
 

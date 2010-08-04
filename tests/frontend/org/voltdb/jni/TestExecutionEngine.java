@@ -281,6 +281,7 @@ public class TestExecutionEngine extends TestCase {
                             onDestinationCompletion,
                             0,
                             mh);
+                destinationProcess.sendInitiateMessage();
                 while (!destinationCompleted.get()) {
                     VoltMessage message = destinationMailbox.recvBlocking();
                     assertTrue(message != null);

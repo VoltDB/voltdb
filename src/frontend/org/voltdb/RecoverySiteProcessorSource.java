@@ -203,13 +203,85 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
     }
 
     /**
-     * Perform necessary recovery
-     * @param failedNodes
-     * @param tracker
+     * The source site may have to decide to abort recovery if the recovering site is no longer available.
+     * Because doRecoveryWork is blocking this method will eventually return back to doRecoveryWork
      */
     @Override
     public void handleNodeFault(HashSet<Integer> failedNodes, SiteTracker tracker) {
-        throw new UnsupportedOperationException();
+        HashSet<Integer> failedSites = new HashSet<Integer>();
+        for (Integer failedHost : failedNodes) {
+            failedSites.addAll(tracker.getAllSitesForHost(failedHost));
+        }
+        int destinationSite = 0;
+        for (RecoveryTable table : m_tablesToStream) {
+            destinationSite = table.m_destinationIds[0];
+        }
+        if (failedSites.contains(destinationSite)) {
+            final BBContainer origin = org.voltdb.utils.DBBPool.allocateDirect(m_bufferLength);
+            try {
+                long bufferAddress = 0;
+                if (VoltDB.getLoadLibVOLTDB()) {
+                    bufferAddress = org.voltdb.utils.DBBPool.getBufferAddress(origin.b);
+                }
+                final BBContainer buffer = new BBContainer(origin.b, bufferAddress) {
+                    @Override
+                    public void discard() {
+                    }
+                };
+                handleFailure(buffer);
+            } finally {
+                origin.discard();
+            }
+        }
+    }
+
+    /*
+     * Flush the recovery stream for the table that is currently being streamed.
+     * Then clear the list of tables to stream.
+     */
+    private final void handleFailure(BBContainer container) {
+        container.b.clear();
+        while (!m_tablesToStream.isEmpty()) {
+            ByteBuffer buffer = container.b;
+            /*
+             * Constructor will set the Java portion of the message that contains
+             * the return address (siteId) as well as blockIndex (for acks), and the message id
+             * (so that Java knows what class to use to deserialize the message).
+             */
+            RecoveryMessage rm = new RecoveryMessage(container, m_siteId, m_blockIndex++);
+
+            /*
+             * Set the position to where the EE should serialize its portion of the recovery message.
+             * RecoveryMessage.getHeaderLength() defines the position where the EE portion starts.
+             */
+            buffer.clear();
+            buffer.position(RecoveryMessage.getHeaderLength());
+            RecoveryTable table = m_tablesToStream.peek();
+
+            /*
+             * Ask the engine to serialize more data.
+             */
+            int serialized = m_engine.tableStreamSerializeMore(container, table.m_tableId, TableStreamType.RECOVERY);
+
+            if (serialized <= 0) {
+                /*
+                 * Unlike COW the EE will actually serialize a message saying that recovery is
+                 * complete so it should never return 0 bytes written. It will return 0 bytes
+                 * written if a table is asked for more data when the recovery stream is not active
+                 * or complete (same thing really).
+                 */
+                VoltDB.crashVoltDB();
+            } else {
+                //Position should be unchanged from when tableStreamSerializeMore was called.
+                //Set the limit based on how much data the EE serialized past that position.
+                buffer.limit(buffer.position() + serialized);
+            }
+            assert(rm != null);
+
+            if (rm.type() == RecoveryMessageType.Complete) {
+                m_tablesToStream.clear();
+            }
+        }
     }
 
     /**

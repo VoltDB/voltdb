@@ -25,6 +25,7 @@ import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.jni.ExecutionEngine;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.VoltMessage;
@@ -33,6 +34,7 @@ import org.voltdb.messaging.RecoveryMessageType;
 import org.voltdb.utils.Pair;
 
 public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
+    private static final VoltLogger recoveryLog = new VoltLogger("RECOVERY");
 
     /**
      * List of tables that need to be streamed
@@ -65,6 +67,13 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
     private long m_resumeTxnId;
 
     private final MessageHandler m_messageHandler;
+
+    private final int m_sourceSiteId;
+
+    /*
+     * Last committed transaction before recovery was started
+     */
+    private final long m_startingTxnId;
 
     /**
      * Data about a table that is being used as a source for a recovery stream.
@@ -152,6 +161,7 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
         m_engine = engine;
         m_siteId = siteId;
         m_messageHandler = messageHandler;
+        m_startingTxnId = currentTxnId;
 
         /*
          * Only support recovering from one partition for now so just grab
@@ -163,17 +173,27 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
             m_tables.put(entry.getKey().getSecond(), new RecoveryTable(entry.getKey().getFirst(), entry.getKey().getSecond(), entry.getValue()));
             sourceSiteId = entry.getValue();
         }
+        m_sourceSiteId = sourceSiteId;
         m_onCompletion = onCompletion;
+        assert(!m_tables.isEmpty());
 
+    }
+
+    /**
+     * Need a separate method outside of constructor so that
+     * failures can be delivered to this processor while waiting
+     * for a response to the initiate message
+     */
+    public void sendInitiateMessage() {
         ByteBuffer buf = ByteBuffer.allocate(2048);
         BBContainer container = DBBPool.wrapBB(buf);
-        RecoveryMessage recoveryMessage = new RecoveryMessage(container, m_siteId, currentTxnId);
+        RecoveryMessage recoveryMessage = new RecoveryMessage(container, m_siteId, m_startingTxnId);
         try {
-            m_mailbox.send( sourceSiteId, 0, recoveryMessage);
+            m_mailbox.send( m_sourceSiteId, 0, recoveryMessage);
         } catch (MessagingException e) {
             throw new RuntimeException(e);
         }
-        assert(!m_tables.isEmpty());
+
         while (true) {
             VoltMessage message = m_mailbox.recv();
             if (message != null) {
@@ -189,9 +209,25 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
         }
     }
 
+    /*
+     * On a failure a destination needs to check if its source site was on the list and if it
+     * is it should call crash VoltDB.
+     */
     @Override
     public void handleNodeFault(HashSet<Integer> failedNodes,
             SiteTracker tracker) {
-        throw new UnsupportedOperationException();
+        HashSet<Integer> failedSites = new HashSet<Integer>();
+        for (Integer failedHost : failedNodes) {
+            failedSites.addAll(tracker.getAllSitesForHost(failedHost));
+        }
+
+        for (Map.Entry<Integer, RecoveryTable> entry : m_tables.entrySet()) {
+            if (failedSites.contains(entry.getValue().m_sourceSiteId)) {
+                recoveryLog.fatal("Node fault during recovery of Site " + m_siteId +
+                        " resulted in source Site " + entry.getValue().m_sourceSiteId +
+                        " becoming unavailable. Failing recovering node.");
+                VoltDB.crashVoltDB();
+            }
+        }
     }
 }
