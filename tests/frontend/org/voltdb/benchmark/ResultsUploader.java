@@ -23,6 +23,7 @@
 
 package org.voltdb.benchmark;
 
+import java.net.InetSocketAddress;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -145,16 +146,17 @@ public class ResultsUploader implements BenchmarkController.BenchmarkInterest {
             }
 
             // add all of the server participants in the benchmark
-            for (String host : m_config.hosts) {
-                String args = m_hostArgs.get(host);
+            for (InetSocketAddress host : m_config.hosts) {
+                String hostname = host.getHostName();
+                String args = m_hostArgs.get(hostname);
                 if (args == null) args = "";
-                addToHostsTableIfMissing(host);
-                String distro[] = getHostDistroForHostName(host);
+                addToHostsTableIfMissing(hostname);
+                String distro[] = getHostDistroForHostName(hostname);
 
                 sql = new StringBuilder();
                 sql.append("INSERT INTO participants (`resultid`, `hostid`, `distributor`, `release`, `role`, `commandline`) values (");
                 sql.append(String.valueOf(resultid)).append(", ");
-                sql.append("'").append(getHostIdForHostName(host)).append("', ");
+                sql.append("'").append(getHostIdForHostName(hostname)).append("', ");
                 sql.append("'").append(distro[0]).append("', ");
                 sql.append("'").append(distro[1]).append("', ");
                 sql.append("'SERVER', ");

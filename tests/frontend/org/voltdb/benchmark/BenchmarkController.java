@@ -28,6 +28,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Date;
@@ -237,7 +238,7 @@ public class BenchmarkController {
                 m_config.sitesPerHost,
                 m_config.hosts.length,
                 m_config.k_factor,
-                m_config.hosts[0]);
+                m_config.hosts[0].getHostName());
         m_jarFileName = jarFileNames[0];
         m_pathToDeployment = m_projectBuilder.getPathToDeployment();
 
@@ -246,9 +247,9 @@ public class BenchmarkController {
         boolean status;
         if (m_config.localmode == false) {
             for (String fileName : jarFileNames) {
-                for (String host : m_config.hosts) {
+                for (InetSocketAddress host : m_config.hosts) {
                     status = ssh.copyFromLocal(new File(fileName),
-                                               host,
+                                               host.getHostName(),
                                                m_config.remotePath);
                     if(!status)
                         System.out.println(
@@ -268,9 +269,9 @@ public class BenchmarkController {
             }
 
             // copy the deployment file to the servers (clients don't need it)
-            for (String host : m_config.hosts) {
+            for (InetSocketAddress host : m_config.hosts) {
                 status = ssh.copyFromLocal(new File(m_pathToDeployment),
-                                           host,
+                                           host.getHostName(),
                                            m_config.remotePath);
                 if (!status) {
                     System.out.println("SSH copyFromLocal failed to copy "
@@ -281,13 +282,17 @@ public class BenchmarkController {
 
             // KILL ALL JAVA ORG.VOLTDB PROCESSES NOW
             Set<Thread> threads = new HashSet<Thread>();
-            for (String host : m_config.hosts) {
-                Thread t = new KillStragglers(m_config.remoteUser, host, m_config.remotePath);
+            for (InetSocketAddress host : m_config.hosts) {
+                Thread t = new KillStragglers(m_config.remoteUser,
+                                              host.getHostName(),
+                                              m_config.remotePath);
                 t.start();
                 threads.add(t);
             }
-            for (String host : m_config.clients) {
-                Thread t = new KillStragglers(m_config.remoteUser, host, m_config.remotePath);
+            for (String client : m_config.clients) {
+                Thread t = new KillStragglers(m_config.remoteUser,
+                                              client,
+                                              m_config.remotePath);
                 t.start();
                 threads.add(t);
             }
@@ -303,18 +308,22 @@ public class BenchmarkController {
 
 
             // SETUP THE CLEANUP HOOKS
-            for (String host : m_config.hosts) {
+            for (InetSocketAddress host : m_config.hosts) {
                 Runtime.getRuntime().addShutdownHook(
-                        new KillStragglers(m_config.remoteUser, host, m_config.remotePath));
+                        new KillStragglers(m_config.remoteUser,
+                                           host.getHostName(),
+                                           m_config.remotePath));
             }
             for (String client : m_config.clients) {
                 Runtime.getRuntime().addShutdownHook(
-                        new KillStragglers(m_config.remoteUser, client, m_config.remotePath));
+                        new KillStragglers(m_config.remoteUser,
+                                           client,
+                                           m_config.remotePath));
             }
 
             // START THE SERVERS
             m_serverPSM = new ProcessSetManager();
-            for (String host : m_config.hosts) {
+            for (InetSocketAddress host : m_config.hosts) {
 
                 String debugString = "";
                 if (m_config.listenForDebugger) {
@@ -347,18 +356,22 @@ public class BenchmarkController {
                         "deployment",
                         new File(m_pathToDeployment).getName(),
                         m_config.useProfile,
-                        m_config.backend};
+                        m_config.backend,
+                        "port",
+                        Integer.toString(host.getPort())};
 
-                command = ssh.convert(host, m_config.remotePath, command);
+                command = ssh.convert(host.getHostName(), m_config.remotePath,
+                                      command);
 
                 StringBuilder fullCommand = new StringBuilder();
                 for (String s : command)
                     fullCommand.append(s).append(" ");
-                uploader.setCommandLineForHost(host, fullCommand.toString());
+                uploader.setCommandLineForHost(host.getHostName(),
+                                               fullCommand.toString());
 
                 benchmarkLog.debug(fullCommand.toString());
 
-                m_serverPSM.startProcess(host, command);
+                m_serverPSM.startProcess(host.getHostName(), command);
             }
 
             // WAIT FOR SERVERS TO BE READY
@@ -386,7 +399,7 @@ public class BenchmarkController {
                     m_config.sitesPerHost,
                     m_config.hosts.length * m_config.sitesPerHost,
                     m_config.k_factor,
-                    new ArrayList<String>(java.util.Arrays.asList(m_config.hosts)),
+                    new ArrayList<InetSocketAddress>(java.util.Arrays.asList(m_config.hosts)),
                     "",
                     "",
                     m_config.statsDatabaseURL,
@@ -424,10 +437,9 @@ public class BenchmarkController {
             }
             loaderCommand.append(" -cp \"" + classpath + "\" ");
             loaderCommand.append(m_loaderClass.getCanonicalName());
-            for (String host : m_config.hosts) {
-                String port = String.valueOf(VoltDB.DEFAULT_PORT);
-                loaderCommand.append(" HOST=" + host + ":" + port);
-                localArgs.add("HOST=" + host + ":" + port);
+            for (InetSocketAddress host : m_config.hosts) {
+                loaderCommand.append(" HOST=" + host.getHostName() + ":" + host.getPort());
+                localArgs.add("HOST=" + host.getHostName() + ":" + host.getPort());
             }
 
             loaderCommand.append(" STATSDATABASEURL=" + m_config.statsDatabaseURL + " ");
@@ -500,8 +512,8 @@ public class BenchmarkController {
         clArgs.add("STATSDATABASEURL=" + m_config.statsDatabaseURL);
         clArgs.add("STATSPOLLINTERVAL=" + m_config.interval);
 
-        for (String host : m_config.hosts)
-            clArgs.add("HOST=" + host + ":" + String.valueOf(VoltDB.DEFAULT_PORT));
+        for (InetSocketAddress host : m_config.hosts)
+            clArgs.add("HOST=" + host.getHostName() + ":" + host.getPort());
 
         int clientIndex = 0;
         for (String client : m_config.clients) {
@@ -545,7 +557,9 @@ public class BenchmarkController {
         m_clientPSM.killAll();
         Client client = ClientFactory.createClient();
         try {
-            client.createConnection(m_config.hosts[0], "", "");
+            client.createConnection(m_config.hosts[0].getHostName(),
+                                    m_config.hosts[0].getPort(),
+                                    "", "");
             NullCallback cb = new NullCallback();
             client.callProcedure(cb, "@Shutdown");
         } catch (NoConnectionsException e) {
@@ -705,9 +719,10 @@ public class BenchmarkController {
     /** Call dump on each of the servers */
     public void tryDumpAll() {
         Client dumpClient = ClientFactory.createClient();
-        for (String host : m_config.hosts) {
+        for (InetSocketAddress host : m_config.hosts) {
             try {
-                dumpClient.createConnection(host, "program", "password");
+                dumpClient.createConnection(host.getHostName(), host.getPort(),
+                                            "program", "password");
                 dumpClient.callProcedure("@dump");
             } catch (UnknownHostException e) {
                 e.printStackTrace();
@@ -946,7 +961,7 @@ public class BenchmarkController {
                 clientParams.put("loadthreads", "4");
         }
 
-        ArrayList<String> hosts = new ArrayList<String>();
+        ArrayList<InetSocketAddress> hosts = new ArrayList<InetSocketAddress>();
         ArrayList<String> clients = new ArrayList<String>();
 
         for (String arg : vargs) {
@@ -961,19 +976,30 @@ public class BenchmarkController {
                  * Name of a host to be used for Volt servers
                  */
                 String hostnport[] = parts[1].split("\\:",2);
-                hosts.add(hostnport[0]);
+                String host = hostnport[0];
+                int port;
+                if (hostnport.length < 2)
+                {
+                    port = VoltDB.DEFAULT_PORT;
+                }
+                else
+                {
+                    port = Integer.valueOf(hostnport[1]);
+                }
+                hosts.add(new InetSocketAddress(host, port));
             } else if (parts[0].equals("CLIENTHOST")) {
                 /*
                  * Name of a host to be used for Volt clients
                  */
                 String hostnport[] = parts[1].split("\\:",2);
-                clients.add(hostnport[0]);
+                String host = hostnport[0];
+                clients.add(host);
             }
         }
 
         // if no hosts given, use localhost
         if (hosts.size() == 0)
-            hosts.add("localhost");
+            hosts.add(new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT));
         if (clients.size() == 0)
             clients.add("localhost");
 
@@ -994,16 +1020,16 @@ public class BenchmarkController {
 
         // copy the lists of hostnames into array of the right lengths
         // (this truncates the list to the right number)
-        String[] hostNames = new String[hostCount];
+        InetSocketAddress[] hostlist = new InetSocketAddress[hostCount];
         for (int i = 0; i < hostCount; i++)
-            hostNames[i] = hosts.get(i);
-        String[] clientNames = new String[clientCount];
+            hostlist[i] = hosts.get(i);
+        String[] clientlist = new String[clientCount];
         for (int i = 0; i < clientCount; i++)
-            clientNames[i] = clients.get(i);
+            clientlist[i] = clients.get(i);
 
         // create a config object, mostly for the results uploader at this point
-        BenchmarkConfig config = new BenchmarkConfig(clientClassname, backend, hostNames,
-                sitesPerHost, k_factor, clientNames, processesPerClient, interval, duration,
+        BenchmarkConfig config = new BenchmarkConfig(clientClassname, backend, hostlist,
+                sitesPerHost, k_factor, clientlist, processesPerClient, interval, duration,
                 remotePath, remoteUser, listenForDebugger, serverHeapSize, clientHeapSize,
                 localmode, useProfile, checkTransaction, checkTables, snapshotPath, snapshotPrefix,
                 snapshotFrequency, snapshotRetain, databaseURL[0], databaseURL[1], statsTag,

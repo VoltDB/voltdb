@@ -23,6 +23,7 @@
 
 package org.voltdb.benchmark;
 
+import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -30,7 +31,7 @@ public class BenchmarkConfig {
 
     public final String benchmarkClient;
     public final String backend;
-    public final String[] hosts;
+    public final InetSocketAddress[] hosts;
     public final int sitesPerHost;
     public final int k_factor;
     public final String[] clients;
@@ -61,7 +62,7 @@ public class BenchmarkConfig {
     public BenchmarkConfig(
             String benchmarkClient,
             String backend,
-            String[] hosts,
+            InetSocketAddress[] hosts,
             int sitesPerHost,
             int kFactor,
             String[] clients,
@@ -90,7 +91,7 @@ public class BenchmarkConfig {
 
         this.benchmarkClient = benchmarkClient;
         this.backend = backend;
-        this.hosts = new String[hosts.length];
+        this.hosts = new InetSocketAddress[hosts.length];
         for (int i = 0; i < hosts.length; i++)
             this.hosts[i] = hosts[i];
         this.sitesPerHost = sitesPerHost;
@@ -125,7 +126,7 @@ public class BenchmarkConfig {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append("HOSTS:");
-        for (String host : hosts)
+        for (InetSocketAddress host : hosts)
             sb.append(" ").append(host);
         sb.append("\n");
         sb.append("SITES PER HOST: ").append(sitesPerHost).append("\n");

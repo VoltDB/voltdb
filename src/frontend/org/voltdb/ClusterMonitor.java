@@ -18,6 +18,7 @@ package org.voltdb;
 
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -92,7 +93,7 @@ public class ClusterMonitor {
         long pollInterval = 10000;
         String tag = null;
 
-        ArrayList<String> voltHosts = new ArrayList<String>();
+        ArrayList<InetSocketAddress> voltHosts = new ArrayList<InetSocketAddress>();
         for (String arg : args) {
             String[] parts = arg.split("=",2);
             if (parts.length == 1) {
@@ -122,12 +123,22 @@ public class ClusterMonitor {
                     System.exit(-1);
                 }
             } else if (parts[0].startsWith("voltHost")) {
-                final String host = parts[1];
+                String hostnport[] = parts[1].split("\\:",2);
+                String host = hostnport[0];
+                int port;
+                if (hostnport.length < 2)
+                {
+                    port = VoltDB.DEFAULT_PORT;
+                }
+                else
+                {
+                    port = Integer.valueOf(hostnport[1]);
+                }
                 if (host.isEmpty()) {
                     System.err.println("voltHost can't be empty");
                     System.exit(-1);
                 }
-                voltHosts.add(host);
+                voltHosts.add(new InetSocketAddress(host, port));
             } else if (parts[0].equals("voltUsername")) {
                 voltUsername = parts[1];
             } else if (parts[0].equals("voltPassword")) {
@@ -221,7 +232,7 @@ public class ClusterMonitor {
             int partitionsPerHost,
             int totalPartitions,
             int kFactor,
-            ArrayList<String> voltHosts,
+            ArrayList<InetSocketAddress> voltHosts,
             String voltUsername,
             String voltPassword,
             String databaseURL,
@@ -248,9 +259,11 @@ public class ClusterMonitor {
         m_pollInterval = pollInterval;
         m_client = ClientFactory.createClient();
         int successfulConnections = 0;
-        for (String host : voltHosts) {
+        for (InetSocketAddress host : voltHosts) {
             try {
-                m_client.createConnection(host, voltUsername, voltPassword);
+                m_client.createConnection(host.getHostName(),
+                                          host.getPort(),
+                                          voltUsername, voltPassword);
                 successfulConnections++;
             } catch (IOException e) {
                 e.printStackTrace();
