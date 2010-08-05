@@ -68,8 +68,6 @@ import java.util.Properties;
 import java.util.StringTokenizer;
 import java.util.TimeZone;
 
-import com.sun.tools.javac.util.FatalError;
-
 /**
  * A simple, tiny, nicely embeddable HTTP 1.0 server in Java
  *
@@ -183,7 +181,7 @@ public class NanoHTTPD
             try {
                 this.data = new ByteArrayInputStream( txt.getBytes("UTF-8"));
             } catch (UnsupportedEncodingException e) {
-                throw new FatalError("JVM is missing UTF-8 encoding support. Therefore JVM is not supported.");
+                throw new RuntimeException("JVM is missing UTF-8 encoding support. Therefore JVM is not supported.");
             }
         }
 
