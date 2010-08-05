@@ -86,7 +86,7 @@ public class TransactionRecord
         {
             // XXX future add record of other failure site ID
             m_otherFail = true;
-            m_failedSites.add(logString.getFaultNode());
+            m_failedSites.addAll(logString.getFaultNodes());
         }
         else if (logString.isTxnEnd())
         {

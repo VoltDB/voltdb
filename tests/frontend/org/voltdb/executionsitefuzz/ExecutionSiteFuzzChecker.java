@@ -30,8 +30,12 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 
+import org.voltdb.logging.VoltLogger;
+
 public class ExecutionSiteFuzzChecker
 {
+    private static final VoltLogger testLog = new VoltLogger("TEST");
+
     HashMap<Integer, HashMap<Integer, SiteLog>> m_replicaSets;
     ArrayList<SiteLog> m_failedSites;
     // a list of replica sets (partition IDs) on which progress can be made
@@ -119,13 +123,13 @@ public class ExecutionSiteFuzzChecker
 
         StringBuilder sb = new StringBuilder();
 
-        sb.append("Next TXN ID set:  TXN ID: " + min_txn_id).append("\n");
+        sb.append("Next TXN ID set:  TXN ID: " + min_txn_id).append(" ");
         sb.append("  Members: ");
         for (SiteLog site : retval)
         {
             sb.append(site.getSiteId()).append(", ");
         }
-        System.out.println(sb.toString());
+        testLog.info(sb.toString());
         return retval;
     }
 
@@ -137,13 +141,14 @@ public class ExecutionSiteFuzzChecker
         TransactionRecord model_txn = null;
         for (SiteLog site : sites)
         {
+            testLog.info("" + site.getPartitionId() + ", " + site.getSiteId() + ": " + site.currentTxn());
             if (model_txn == null)
             {
                 model_txn = site.currentTxn();
             }
             else if (!model_txn.equals(site.currentTxn()))
             {
-                System.out.println("VALIDATION FAILURE, MISMATCHED TRANSACTIONS");
+                testLog.error("VALIDATION FAILURE, MISMATCHED TRANSACTIONS");
                 valid = false;
             }
         }
@@ -171,7 +176,7 @@ public class ExecutionSiteFuzzChecker
         // Run through the list once and extract coordinator and failure info.
         for (SiteLog site : sites)
         {
-            System.out.println("" + site.getPartitionId() + ", " + site.getSiteId() + ": " + site.currentTxn());
+            testLog.info("" + site.getPartitionId() + ", " + site.getSiteId() + ": " + site.currentTxn());
             // If this site saw any failures during this TXN, add
             // them to the failed_sites set.  Also, check to see if any
             // of the state upon which we currently rely is on this failed site
@@ -192,15 +197,15 @@ public class ExecutionSiteFuzzChecker
                 // The coordinator cannot fail early during a read-write multi-partition txn
                 if (site.currentTxn().isCoordinator() && !site.currentTxn().isReadOnly())
                 {
-                    System.out.println("VALIDATION FAILURE, " +
-                                       "MULTIPARTITION COORDINATOR FAILED " +
-                                       "DURING READ/WRITE TRANSACTION BUT SOMEHOW COMPLETED");
+                    testLog.error("VALIDATION FAILURE, " +
+                                  "MULTIPARTITION COORDINATOR FAILED " +
+                                  "DURING READ/WRITE TRANSACTION BUT SOMEHOW COMPLETED");
                     valid = false;
                 }
                 else
                 {
-                    System.out.println("Site: " + site.getSiteId() + " failed before " +
-                                       "TXN " + site.currentTxn().getTxnId() + " was resolved, ignoring");
+                    testLog.info("Site: " + site.getSiteId() + " failed before " +
+                                 "TXN " + site.currentTxn().getTxnId() + " was resolved, ignoring");
                 }
                 continue;
             }
@@ -223,7 +228,7 @@ public class ExecutionSiteFuzzChecker
             }
             else if (!model_txn.isConsistent(site.currentTxn()))
             {
-                System.out.println("VALIDATION FAILURE, MISMATCHED TRANSACTIONS");
+                testLog.error("VALIDATION FAILURE, MISMATCHED TRANSACTIONS");
                 valid = false;
             }
         }
@@ -240,7 +245,7 @@ public class ExecutionSiteFuzzChecker
             if (model_txn.isMultiPart() && !model_txn.isReadOnly() &&
                 sites.size() != m_liveSites.size() && !model_txn.rolledBack())
             {
-                System.out.println("VALIDATION FAILURE, PARTIALLY COMMITTED TXN");
+                testLog.error("VALIDATION FAILURE, PARTIALLY COMMITTED TXN");
                 valid = false;
             }
             // If we're multi-partition and anyone rolled back, the coordinator
@@ -248,7 +253,7 @@ public class ExecutionSiteFuzzChecker
             // have a coordinator because it may be a failed node
             if (coord_txn != null && coord_txn.isMultiPart() && !coord_txn.rolledBack() && saw_rollback)
             {
-                System.out.println("VALIDATION FAILURE, COORDINATOR COMMITTED WHEN PARTICIPANT ROLLED BACK");
+                testLog.error("VALIDATION FAILURE, COORDINATOR COMMITTED WHEN PARTICIPANT ROLLED BACK");
                 valid = false;
             }
         }
@@ -261,7 +266,7 @@ public class ExecutionSiteFuzzChecker
         long curr_txn_id = sites.iterator().next().currentTxn().getTxnId();
         if (curr_txn_id <= m_lastTxnId)
         {
-            System.out.println("VALIDATION FAILURE, TXN_ID FAILED TO ADVANCE");
+            testLog.error("VALIDATION FAILURE, TXN_ID FAILED TO ADVANCE");
             return false;
         }
         else
@@ -308,7 +313,7 @@ public class ExecutionSiteFuzzChecker
                     SiteLog site = site_iter.next();
                     if (site.currentTxn().failed())
                     {
-                        System.out.println("Pruning site: " + site.getSiteId());
+                        testLog.info("Pruning site: " + site.getSiteId());
                         site_iter.remove();
                         m_failedSites.add(site);
                         pruned = false;

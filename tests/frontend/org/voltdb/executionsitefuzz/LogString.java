@@ -23,6 +23,8 @@
 
 package org.voltdb.executionsitefuzz;
 
+import java.util.HashSet;
+
 public class LogString
 {
     String m_text;
@@ -106,13 +108,22 @@ public class LogString
         return m_text.contains("selfNodeFailure");
     }
 
-    int getFaultNode()
+    HashSet<Integer> getFaultNodes()
     {
         if (!isOtherFault())
         {
             throw new RuntimeException("getFaultNode called on non-fault message");
         }
-        return Integer.valueOf(m_text.substring(m_text.indexOf("FUZZTEST")).split(" ")[2]);
+        HashSet<Integer> retval = new HashSet<Integer>();
+        String[] failed_nodes =
+            m_text.substring(m_text.indexOf("handleNodeFault"),
+                             m_text.indexOf("with")).split(" ");
+        // index 0 is handleNodeFault, skip it
+        for (int i = 1; i < failed_nodes.length; i++)
+        {
+            retval.add(Integer.valueOf(failed_nodes[i]));
+        }
+        return retval;
     }
 
     boolean isRollback()

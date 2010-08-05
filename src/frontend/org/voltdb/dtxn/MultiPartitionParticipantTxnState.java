@@ -30,6 +30,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState.WorkUnitState;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -56,6 +57,8 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
 
     private InitiateResponseMessage m_response;
     private HashSet<Integer> m_outstandingAcks = null;
+
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     /**
      *  This is thrown by the TransactionState instance when something
@@ -467,7 +470,14 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
 
             WorkUnit w = m_missingDependencies.get(dependencyId);
             if (w == null) {
-                throw new FragmentFailureException();
+                String msg = "Unable to find WorkUnit for dependency: " +
+                             dependencyId +
+                             " as part of TXN: " + txnId +
+                             " received from execution site: " +
+                             response.getExecutorSiteId();
+                hostLog.warn(msg);
+                //throw new FragmentFailureException();
+                return;
             }
 
             // if the node is recovering, it doesn't matter if the payload matches

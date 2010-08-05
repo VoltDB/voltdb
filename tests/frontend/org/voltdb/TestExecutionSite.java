@@ -66,6 +66,8 @@ import org.voltdb.messaging.VoltMessage;
 
 public class TestExecutionSite extends TestCase {
 
+    private static final VoltLogger testLog = new VoltLogger("TEST");
+
     private static final int FAIL_RANGE = 80000;
 
     private static HashMap<Integer, RussianRouletteMailbox> postoffice =
@@ -112,6 +114,11 @@ public class TestExecutionSite extends TestCase {
         synchronized boolean shouldFail(boolean broadcast)
         {
             boolean fail = false;
+            // if we don't want failure, don't give m_nextMustDie a chance to kill us
+            if (m_failureProb == 0)
+            {
+                return false;
+            }
             int failchance = m_failureProb;
             if (broadcast)
             {
@@ -1137,7 +1144,7 @@ public class TestExecutionSite extends TestCase {
             }
         }
 
-        System.out.println("Creating MP proc, TXN ID: " + txn_id + ", participants: " + participants.toString());
+        testLog.info("Creating MP proc, TXN ID: " + txn_id + ", participants: " + participants.toString());
 
         final InitiateTaskMessage itm =
             new InitiateTaskMessage(initiator_id,
@@ -1199,7 +1206,7 @@ public class TestExecutionSite extends TestCase {
 
             int wheelOfDestiny = rand.nextInt(100);
             if (i == totalTransactions) {
-                System.out.println("Queueing final heartbeat.");
+                testLog.info("Queueing final heartbeat.");
                 int offset = 0;
                 for (int inid : getInitiatorIds()) {
                     createHeartBeat(txnid + offset, txnid + offset, inid);

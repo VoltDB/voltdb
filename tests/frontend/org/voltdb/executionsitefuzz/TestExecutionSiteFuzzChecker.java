@@ -24,6 +24,7 @@
 package org.voltdb.executionsitefuzz;
 
 import java.io.StringWriter;
+import java.util.ArrayList;
 import java.util.HashMap;
 
 import junit.framework.TestCase;
@@ -102,11 +103,24 @@ public class TestExecutionSiteFuzzChecker extends TestCase
         sw.getBuffer().append(msg + "\n");
     }
 
-    void handleNodeFault(int partitionId, int siteId, int nodeId)
+    void handleNodeFault(int partitionId, int siteId, ArrayList<Integer> nodeIds)
     {
         StringWriter sw = m_siteLogs.get(partitionId).get(siteId);
-        String msg = "FUZZTEST handleNodeFault " + nodeId;
+        StringBuilder nodestring = new StringBuilder();
+        for (Integer node : nodeIds)
+        {
+            nodestring.append(node).append(" ");
+        }
+        String msg = "FUZZTEST handleNodeFault " + nodestring.toString() +
+                     " with DONT CARE";
         sw.getBuffer().append(msg + "\n");
+    }
+
+    void handleNodeFault(int partitionId, int siteId, int nodeId)
+    {
+        ArrayList<Integer> nodes = new ArrayList<Integer>();
+        nodes.add(nodeId);
+        handleNodeFault(partitionId, siteId, nodes);
     }
 
     // convenience method for generating a clean completed TXN
@@ -479,8 +493,10 @@ public class TestExecutionSiteFuzzChecker extends TestCase
                 {
                     addCommitTxn(partition, site, 10000, true, false, false);
                     beginNewTxn(partition, site, 10001, true, false, false);
-                    handleNodeFault(partition, site, 1);
-                    handleNodeFault(partition, site, 0);
+                    ArrayList<Integer> nodefaults = new ArrayList<Integer>();
+                    nodefaults.add(0);
+                    nodefaults.add(1);
+                    handleNodeFault(partition, site, nodefaults);
                     rollbackTransaction(partition, site, 10001);
                     completeTransaction(partition, site, 10001);
                 }

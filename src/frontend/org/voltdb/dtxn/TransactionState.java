@@ -71,10 +71,6 @@ public abstract class TransactionState implements Comparable<TransactionState> {
         m_beginUndoToken = ExecutionSite.kInvalidUndoToken;
     }
 
-    /**
-     * Package private accessors for test cases.
-     * @return true of transaction state is complete
-     */
     final public boolean isDone() {
         return m_done;
     }
