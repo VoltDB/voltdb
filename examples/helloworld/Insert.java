@@ -1,7 +1,7 @@
 import org.voltdb.*;
 
 @ProcInfo(
-    partitionInfo = "HELLOWORLD.DIALECT: 0",
+    partitionInfo = "HELLOWORLD.DIALECT: 2",
     singlePartition = true
 )
 
