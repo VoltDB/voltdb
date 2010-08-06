@@ -232,6 +232,12 @@ public class TestDtxnInitiatorMailbox extends TestCase
 
         }
 
+        @Override
+        public void notifyExecutonSiteRejoin(int executorSiteId) {
+            // TODO Auto-generated method stub
+
+        }
+
     }
 
     InFlightTxnState createTxnState(long txnId, int[] coordIds, boolean readOnly,

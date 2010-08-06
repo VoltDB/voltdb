@@ -42,6 +42,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.SyncCallback;
+import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.elt.ELTManager;
 import org.voltdb.fault.FaultDistributor;
 import org.voltdb.fault.FaultDistributorInterface;
@@ -352,7 +353,7 @@ public class RealVoltDB implements VoltDBInterface
                     System.exit(-1);
                 }
 
-                m_messenger.waitForGroupJoin();
+                m_instanceId = m_messenger.waitForGroupJoin();
                 try {
                     scb.waitForResponse();
                     response = scb.getResponse();
@@ -723,6 +724,7 @@ public class RealVoltDB implements VoltDBInterface
             HostMessenger.JoiningNodeInfo joinNodeInfo = messenger.rejoinForeignHostCommit();
 
             ArrayList<Integer> rejoiningSiteIds = new ArrayList<Integer>();
+            ArrayList<Integer> rejoiningExecSiteIds = new ArrayList<Integer>();
             Cluster cluster = m_catalogContext.catalog.getClusters().get("cluster");
             for (Site site : cluster.getSites()) {
                 int siteId = Integer.parseInt(site.getTypeName());
@@ -730,6 +732,9 @@ public class RealVoltDB implements VoltDBInterface
                 if (hostId == joinNodeInfo.hostId) {
                     assert(site.getIsup() == false);
                     rejoiningSiteIds.add(siteId);
+                    if (site.getIsexec() == true) {
+                        rejoiningExecSiteIds.add(siteId);
+                    }
                 }
             }
             assert(rejoiningSiteIds.size() > 0);
@@ -756,7 +761,15 @@ public class RealVoltDB implements VoltDBInterface
                 sb.append(site_path).append(" ").append("isUp true");
                 sb.append("\n");
             }
-            VoltDB.instance().clusterUpdate(sb.toString());
+            clusterUpdate(sb.toString());
+
+            // update the SafteyState in the initiators
+            for (ClientInterface ci : m_clientInterfaces) {
+                TransactionInitiator initiator = ci.getInitiator();
+                for (int siteId : rejoiningExecSiteIds) {
+                    initiator.notifyExecutonSiteRejoin(siteId);
+                }
+            }
         }
         else {
             // clean up any connections made

@@ -766,6 +766,14 @@ public class ClientInterface implements DumpManager.Dumpable {
     }
 
     /**
+     * Get the initiator for this client interface. Be careful with this.
+     * @return The initiator for this client interface.
+     */
+    TransactionInitiator getInitiator() {
+        return m_initiator;
+    }
+
+    /**
      *
      * @param port
      * * return True if an error was generated and needs to be returned to the client

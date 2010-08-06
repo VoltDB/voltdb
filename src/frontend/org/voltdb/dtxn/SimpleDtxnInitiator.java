@@ -401,6 +401,11 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         }
     }
 
+    @Override
+    public void notifyExecutonSiteRejoin(int executorSiteId) {
+        m_safetyState.addRejoinedState(executorSiteId);
+    }
+
     public void getDumpContents(StringBuilder sb) {
         List<InFlightTxnState> in_flight_txns = m_mailbox.getInFlightTxns();
         sb.append("Transactions in Flight (").append(in_flight_txns.size()).append("):\n");

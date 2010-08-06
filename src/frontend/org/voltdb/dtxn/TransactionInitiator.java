@@ -91,4 +91,12 @@ public abstract class TransactionInitiator {
      * @throws InterruptedException
      */
     public abstract void shutdown() throws InterruptedException;
+
+    /**
+     * Called to notify an initiator that it is safe to send work
+     * to rejoined sites.
+     * @param executorSiteId The id of the site that joined.
+     */
+    public abstract void notifyExecutonSiteRejoin(int executorSiteId);
+
 }

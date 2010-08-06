@@ -19,8 +19,8 @@ package org.voltdb.dtxn;
 
 import java.util.Arrays;
 import java.util.LinkedHashMap;
-import java.util.PriorityQueue;
 import java.util.Map.Entry;
+import java.util.PriorityQueue;
 
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltDB;
@@ -70,6 +70,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
     long m_lastTxnPopped = 0;
     QueueState m_state = QueueState.BLOCKED_EMPTY;
     final Mailbox m_mailbox;
+    boolean m_recovering;
 
     /**
      * Tell this queue about all initiators. If any initiators
@@ -81,6 +82,11 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
         m_mailbox = mbox;
         for (int id : initiatorSiteIds)
             m_initiatorData.put(id, new LastInitiatorData());
+        m_recovering = false;
+    }
+
+    public void setRecovering(boolean recovering) {
+        m_recovering = recovering;
     }
 
     /**
@@ -271,8 +277,9 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
                 newState = QueueState.BLOCKED_ORDERING;
             }
             else {
+                // note the exception to the safety dance for recovering partitions
                 lid = m_initiatorData.get(ts.initiatorSiteId);
-                if ((lid != null) && (ts.txnId > lid.m_lastSafeTxnId)) {
+                if ((lid != null) && (ts.txnId > lid.m_lastSafeTxnId) && (!m_recovering)) {
                     newState = QueueState.BLOCKED_SAFETY;
                 }
             }

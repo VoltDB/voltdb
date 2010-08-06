@@ -18,7 +18,9 @@
 package org.voltdb.dtxn;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 
 import org.voltdb.catalog.Partition;
@@ -40,8 +42,11 @@ public class ExecutorTxnIdSafetyState {
         public PartitionState partition;
     }
 
-    LinkedHashMap<Integer, SiteState> m_stateBySite = new LinkedHashMap<Integer, SiteState>();
-    LinkedHashMap<Integer, PartitionState> m_stateByPartition = new LinkedHashMap<Integer, PartitionState>();
+    Map<Integer, SiteState> m_stateBySite = new LinkedHashMap<Integer, SiteState>();
+    Map<Integer, PartitionState> m_stateByPartition = new LinkedHashMap<Integer, PartitionState>();
+
+    // kept across failures and rejoins to understand the unchanging maps of sites to partitions
+    Map<Integer, Integer> m_stateToPartitionMap = new HashMap<Integer, Integer>();
 
     final int m_siteId;
 
@@ -86,6 +91,9 @@ public class ExecutorTxnIdSafetyState {
             // link the partition state and site state
             ps.sites.add(ss);
             ss.partition = ps;
+
+            // note the site to partition mapping
+            m_stateToPartitionMap.put(ss.siteId, ps.partitionId);
         }
     }
 
@@ -165,5 +173,30 @@ public class ExecutorTxnIdSafetyState {
             }
         }
         m_stateBySite.remove(executorSiteId);
+    }
+
+    /**
+     * Once a failed node is rejoined, put it's sites back into
+     * all of the data structures here.
+     * @param executorSiteId
+     * @param partitionId
+     */
+    public void addRejoinedState(int executorSiteId) {
+        int partitionId = m_stateToPartitionMap.get(executorSiteId);
+
+        SiteState ss = m_stateBySite.get(executorSiteId);
+        if (ss != null) return;
+        ss = new SiteState();
+        ss.siteId = executorSiteId;
+
+        PartitionState ps = m_stateByPartition.get(partitionId);
+        assert(ps != null);
+        ss.partition = ps;
+        ps.sites.add(ss);
+
+        ss.newestConfirmedTxnId = ps.newestConfirmedTxnId;
+        ss.lastSentTxnId = ps.newestConfirmedTxnId;
+
+        m_stateBySite.put(executorSiteId, ss);
     }
 }

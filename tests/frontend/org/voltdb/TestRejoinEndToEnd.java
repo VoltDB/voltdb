@@ -67,6 +67,7 @@ public class TestRejoinEndToEnd extends TestCase {
         builder.addSchema(schemaPath);
         builder.addPartitionInfo("blah", "ival");
         builder.addStmtProcedure("Insert", "insert into blah values (?);");
+        builder.addStmtProcedure("InsertSinglePartition", "insert into blah values (?);", "blah.ival:0");
         return builder;
     }
 
@@ -234,7 +235,7 @@ public class TestRejoinEndToEnd extends TestCase {
         return failType != DONT_FAIL;
     }
 
-    public void testRejoinSysprocButFail() throws Exception {
+    /*public void testRejoinSysprocButFail() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("rejoin.jar"), 1, 1, 0, "localhost", false);
         assertTrue(success);
@@ -268,7 +269,7 @@ public class TestRejoinEndToEnd extends TestCase {
 
     public void testWithFakeSecondHostMessenger() throws Exception {
         for (int i = 0; failNext(i); i++);
-    }
+    }*/
 
     public void testRejoin() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
@@ -293,6 +294,11 @@ public class TestRejoinEndToEnd extends TestCase {
         localServer.waitForInitialization();
 
         Thread.sleep(100);
+
+        /*Client client = ClientFactory.createClient();
+        client.createConnection("localhost", null, null);
+        ClientResponse response = client.callProcedure("InsertSinglePartition", 0);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());*/
 
         localServer.shutdown();
         cluster.shutDown();

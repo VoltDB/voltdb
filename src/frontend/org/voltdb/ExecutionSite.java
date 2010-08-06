@@ -544,7 +544,9 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 initiatorIds[index++] = Integer.parseInt(s.getTypeName());
 
         assert(m_mailbox != null);
-        return new RestrictedPriorityQueue(initiatorIds, siteId, m_mailbox);
+        RestrictedPriorityQueue retval = new RestrictedPriorityQueue(initiatorIds, siteId, m_mailbox);
+        retval.setRecovering(m_recovering);
+        return retval;
     }
 
     private HsqlBackend initializeHSQLBackend()

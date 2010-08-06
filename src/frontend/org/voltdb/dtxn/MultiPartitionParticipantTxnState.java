@@ -186,10 +186,11 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                 initiateProcedure((InitiateTaskMessage) payload);
             }
             else if (payload instanceof FragmentTaskMessage) {
-                if (m_recovering) {
+                if (m_recovering && (wu.nonTransactional == false)) {
                     processRecoveringFragmentWork((FragmentTaskMessage) payload, wu.getDependencies());
                 }
                 else {
+                    // when recovering, still do non-transactional work
                     processFragmentWork((FragmentTaskMessage) payload, wu.getDependencies());
                 }
             }
@@ -327,6 +328,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
 
         FragmentResponseMessage response = new FragmentResponseMessage(ftask, m_siteId);
         response.setRecovering(true);
+        response.setStatus(FragmentResponseMessage.SUCCESS, null);
 
         // add a dummy table for all of the expected dependency ids
         for (int i = 0; i < ftask.getFragmentCount(); i++) {
