@@ -21,4 +21,4 @@ fi
 rm -f /home/test/output/benchmark-$HOSTNAME.log
 touch /home/test/output/benchmark-$HOSTNAME.log
 tail -f /home/test/output/benchmark-$HOSTNAME.log &
-java -jar ~/.hudson/hudson-cli.jar -s http://newbobbi:8080 build $MULTINODE_HELPER -p COMMAND="~/trunk/tools/benchmark-$HOSTNAME.sh" -p COUNT=$BMHOSTCOUNT -p HOST2=empty -p HOST3=empty -p HOST4=empty -p HOST5=empty -p HOST6=empty -p OUTPUTFILE=/home/test/output/benchmark-$HOSTNAME.log -s
+java -jar ~/.hudson/hudson-cli.jar -s http://newbobbi:8080 build $MULTINODE_HELPER -p COMMAND="~/trunk/tools/benchmark-$HOSTNAME.sh" -p COUNT=$BMHOSTCOUNT -p HOST2=empty -p HOST3=empty -p HOST4=empty -p HOST5=empty -p HOST6=empty -p HOST7=empty -p HOST8=empty -p HOST9=empty -p HOST10=empty -p HOST11=empty -p HOST12=empty -p OUTPUTFILE=/home/test/output/benchmark-$HOSTNAME.log -s
