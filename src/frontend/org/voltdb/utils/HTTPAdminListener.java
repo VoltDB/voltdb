@@ -62,7 +62,7 @@ public class HTTPAdminListener extends NanoHTTPD {
         String msg = "<html><body>\n";
         msg += "<h2>VoltDB Version " + VoltDB.instance().getVersionString() + "</h2>\n";
         msg += "<p><b>Buildstring:</b> " + VoltDB.instance().getBuildString() + "</p>\n";
-        msg += "<p>Running on a cluser of " + context.numberOfNodes + " hosts ";
+        msg += "<p>Running on a cluster of " + context.numberOfNodes + " hosts ";
         msg += " with " + context.numberOfExecSites + " sites ";
         msg += " (" + context.numberOfExecSites / context.numberOfNodes + " per host).</p>\n";
         msg += "</body></html>\n";

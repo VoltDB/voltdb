@@ -73,7 +73,7 @@ public final class VoltLoggerFactory implements LoggerFactory {
 
         if (log4JConfigFile == null) {
             System.err.println("No logging configuration supplied via -Dlog4j.configuration. " +
-                    "Supplying default config that logs to INFO or higher to STDOUT");
+                    "Supplying default config that logs INFO or higher to STDOUT");
             TTCCLayout layout = new TTCCLayout();
             AsyncAppender asyncAppender = new AsyncAppender();
             asyncAppender.setName("Default global appender");
