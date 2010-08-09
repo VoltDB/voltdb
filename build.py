@@ -136,7 +136,7 @@ if CTX.PLATFORM == "Darwin":
     CTX.JNIFLAGS = "-framework JavaVM,1.6"
 
 if CTX.PLATFORM == "Linux":
-    CTX.CPPFLAGS += " -Wno-attributes -DLINUX -fPIC"
+    CTX.CPPFLAGS += " -Wno-attributes -DLINUX -fpic"
     CTX.NMFLAGS += " --demangle"
 
 ###############################################################################
