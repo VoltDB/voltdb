@@ -160,7 +160,7 @@ public class PlannerTool {
 
         // bucket and process the lines into a response
         for (String line : output) {
-            if (line.equals("No logging configuration supplied via -Dlog4j.configuration. Supplying default config that logs to INFO or higher to STDOUT")) {
+            if (line.equals("No logging configuration supplied via -Dlog4j.configuration. Supplying default config that logs INFO or higher to STDOUT")) {
                 continue;
             }
 

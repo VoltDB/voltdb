@@ -19,6 +19,7 @@ package org.voltdb;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
@@ -198,11 +199,30 @@ public class RealVoltDB implements VoltDBInterface
 
     PeriodicWorkTimerThread fivems;
 
+    private File m_pidFile = null;
+
     /**
      * Initialize all the global components, then initialize all the m_sites.
      */
     public void initialize(VoltDB.Configuration config) {
         synchronized(m_startAndStopLock) {
+            if (m_pidFile == null) {
+                String name = java.lang.management.ManagementFactory.getRuntimeMXBean().getName();
+                String pidString = name.substring(0, name.indexOf('@'));
+                m_pidFile = new java.io.File("/var/lock/voltpid." + pidString);
+                try {
+                    boolean success = m_pidFile.createNewFile();
+                    if (!success) {
+                        hostLog.error("Could not create PID file " + m_pidFile + " because it already exists");
+                    }
+                    m_pidFile.deleteOnExit();
+                    FileOutputStream fos = new FileOutputStream(m_pidFile);
+                    fos.write(pidString.getBytes("UTF-8"));
+                    fos.close();
+                } catch (IOException e) {
+                    hostLog.error("Error creating PID file " + m_pidFile, e);
+                }
+            }
 
             // Set std-out/err to use the UTF-8 encoding and fail if UTF-8 isn't supported
             try {
@@ -670,6 +690,7 @@ public class RealVoltDB implements VoltDBInterface
             // probably unnecessary
             System.gc();
             m_isRunning = false;
+            m_pidFile.delete();
         }
     }
 

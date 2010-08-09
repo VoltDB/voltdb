@@ -72,6 +72,12 @@ public final class VoltLoggerFactory implements LoggerFactory {
         }
 
         if (log4JConfigFile == null) {
+            /*
+             * If you change this string it will break the adhoc planner.
+             * The adhoc planner checks for this string and skips it when reading
+             * output from the adhoc planner. If the match fails when the string changes
+             * it is interpereted as an error
+             */
             System.err.println("No logging configuration supplied via -Dlog4j.configuration. " +
                     "Supplying default config that logs INFO or higher to STDOUT");
             TTCCLayout layout = new TTCCLayout();
