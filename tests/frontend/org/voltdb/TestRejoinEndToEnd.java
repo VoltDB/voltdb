@@ -295,10 +295,24 @@ public class TestRejoinEndToEnd extends TestCase {
 
         Thread.sleep(100);
 
-        /*Client client = ClientFactory.createClient();
+        ClientResponse response;
+        Client client;
+
+        client = ClientFactory.createClient();
         client.createConnection("localhost", null, null);
-        ClientResponse response = client.callProcedure("InsertSinglePartition", 0);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());*/
+        response = client.callProcedure("InsertSinglePartition", 0);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = client.callProcedure("Insert", 1);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        client.close();
+
+        client = ClientFactory.createClient();
+        client.createConnection("localhost", 21213, null, null);
+        response = client.callProcedure("InsertSinglePartition", 2);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = client.callProcedure("Insert", 3);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        client.close();
 
         localServer.shutdown();
         cluster.shutDown();

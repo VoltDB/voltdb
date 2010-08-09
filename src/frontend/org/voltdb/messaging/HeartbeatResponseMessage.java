@@ -23,7 +23,7 @@ import org.voltdb.utils.DBBPool;
 public class HeartbeatResponseMessage extends VoltMessage {
 
     int m_execSiteId;
-    long m_lastReceivedTxnId; // this is the largest txn acked by all partitions running the java for it
+    long m_lastReceivedTxnId; // this is the largest txn seen by the exec site from the destination init site
     boolean m_siteIsBlocked;
 
     HeartbeatResponseMessage() {
@@ -85,8 +85,9 @@ public class HeartbeatResponseMessage extends VoltMessage {
         StringBuilder sb = new StringBuilder();
 
         sb.append("HEARTBEAT_RESPONSE");
-        sb.append(" TO ");
-        sb.append(receivedFromSiteId);
+        sb.append(" (EXEC ").append(m_execSiteId);
+        sb.append(", LAST_REC ").append(m_lastReceivedTxnId);
+        sb.append(", BLOCKED ").append(m_siteIsBlocked ? "YES" : "NO");
         sb.append(")");
 
         return sb.toString();

@@ -211,6 +211,21 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
     }
 
     /**
+     * After a catalog change, double check that all initators in the catalog
+     * that are known to be "up" are here, in the RPQ's list.
+     * @param initiatorId Initiator present in the catalog.
+     * @return The number of initiators that weren't known
+     */
+    public int ensureInitiatorIsKnown(int initiatorId) {
+        int newInitiatorCount = 0;
+        if (m_initiatorData.get(initiatorId) == null) {
+            m_initiatorData.put(initiatorId, new LastInitiatorData());
+            newInitiatorCount++;
+        }
+        return newInitiatorCount;
+    }
+
+    /**
      * @return The id of the newest safe transaction to run.
      */
     long getNewestSafeTransaction() {
@@ -279,7 +294,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
             else {
                 // note the exception to the safety dance for recovering partitions
                 lid = m_initiatorData.get(ts.initiatorSiteId);
-                if ((lid != null) && (ts.txnId > lid.m_lastSafeTxnId) && (!m_recovering)) {
+                if ((lid != null) && (ts.txnId > lid.m_lastSafeTxnId)) {
                     newState = QueueState.BLOCKED_SAFETY;
                 }
             }

@@ -624,6 +624,17 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         m_context = VoltDB.instance().getCatalogContext();
         loadProceduresFromCatalog(VoltDB.getEEBackendType());
         ee.updateCatalog(catalogDiffCommands, m_context.catalogVersion);
+
+        // make sure the restricted priority queue knows about all of the up initiators
+        // for most catalog changes this will do nothing
+        // for rejoin, it will matter
+        int newInitiators = 0;
+        for (Site s : m_context.catalog.getClusters().get("cluster").getSites()) {
+            if (s.getIsexec() == false) {
+                newInitiators += m_transactionQueue.ensureInitiatorIsKnown(Integer.parseInt(s.getTypeName()));
+            }
+        }
+
         return true;
     }
 
@@ -770,11 +781,15 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         }
         if (!txnState.isReadOnly()) {
             assert(latestUndoToken != kInvalidUndoToken);
-            assert(txnState.getBeginUndoToken() != kInvalidUndoToken);
             assert(latestUndoToken >= txnState.getBeginUndoToken());
 
+            if (txnState.getBeginUndoToken() == kInvalidUndoToken) {
+                if (m_recovering == false) {
+                    throw new AssertionError("Non-recovering write txn has invalid undo state.");
+                }
+            }
             // release everything through the end of the current window.
-            if (latestUndoToken > txnState.getBeginUndoToken()) {
+            else if (latestUndoToken > txnState.getBeginUndoToken()) {
                 ee.releaseUndoToken(latestUndoToken);
             }
 

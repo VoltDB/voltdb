@@ -233,10 +233,11 @@ public class RealVoltDB implements VoltDBInterface
                 VoltDB.crashVoltDB();
             }
 
+            // useful for debugging, but doesn't do anything unless VLog is enabled
             if (config.m_port != VoltDB.DEFAULT_PORT) {
-                RejoinLog.setPortNo(config.m_port);
+                VLog.setPortNo(config.m_port);
             }
-            //RejoinLog.log("\n### RealVoltDB.initialize() for port %d ###", config.m_port);
+            VLog.log("\n### RealVoltDB.initialize() for port %d ###", config.m_port);
 
             hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
 
@@ -729,8 +730,7 @@ public class RealVoltDB implements VoltDBInterface
      * execution site threads */
     private static Long lastNodeRejoinFinish_txnId = 0L;
     @Override
-    public synchronized String doRejoinCommitOrRollback(long currentTxnId, boolean commit)
-    {
+    public synchronized String doRejoinCommitOrRollback(long currentTxnId, boolean commit) {
         // another site already did this work.
         if (currentTxnId == lastNodeRejoinFinish_txnId) {
             return null;
@@ -782,7 +782,8 @@ public class RealVoltDB implements VoltDBInterface
                 sb.append(site_path).append(" ").append("isUp true");
                 sb.append("\n");
             }
-            clusterUpdate(sb.toString());
+            String catalogDiffCommands = sb.toString();
+            clusterUpdate(catalogDiffCommands);
 
             // update the SafteyState in the initiators
             for (ClientInterface ci : m_clientInterfaces) {

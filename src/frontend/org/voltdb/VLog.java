@@ -18,23 +18,23 @@
 package org.voltdb;
 
 import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
 
 /**
  * This file isn't long for this world. It's just something I've been using
  * to debug multi-process rejoin stuff.
  *
  */
-public class RejoinLog {
-    static File m_logfile = new File("rejoinlog.txt");
+public class VLog {
+    static File m_logfile = new File("vlog.txt");
 
     public synchronized static void setPortNo(int portNo) {
-        m_logfile = new File(String.format("rejoinlog-%d.txt", portNo));
+        m_logfile = new File(String.format("vlog-%d.txt", portNo));
     }
 
     public synchronized static void log(String str) {
-        try {
+
+        // turn off this stupid thing for now
+        /*try {
             FileWriter log = new FileWriter(m_logfile, true);
             log.write(str + "\n");
             log.flush();
@@ -42,7 +42,7 @@ public class RejoinLog {
         } catch (IOException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
-        }
+        }*/
     }
 
     public static void log(String format, Object... args) {
