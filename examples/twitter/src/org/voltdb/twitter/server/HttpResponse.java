@@ -1,3 +1,25 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2010 VoltDB L.L.C.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
 package org.voltdb.twitter.server;
 
 import java.io.ByteArrayOutputStream;
@@ -12,17 +34,17 @@ import java.util.List;
 import org.voltdb.twitter.util.Timestamp;
 
 public class HttpResponse {
-    
+
     private HttpStatus status;
     private HttpContentType contentType;
     private ByteArrayOutputStream payload;
-    
+
     // static resources
     public HttpResponse(File file, String contentType) {
         this.status = new HttpStatus(200);
         this.contentType = new HttpContentType(contentType);
         this.payload = new ByteArrayOutputStream();
-        
+
         // read the file
         InputStream reader = null;
         try {
@@ -36,7 +58,7 @@ public class HttpResponse {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        
+
         // write the payload
         try {
             payload.write(bytes);
@@ -44,13 +66,13 @@ public class HttpResponse {
             e.printStackTrace();
         }
     }
-    
+
     // dynamic resources
     public HttpResponse(List<String> data, String contentType) {
         this.status = new HttpStatus(200);
         this.contentType = new HttpContentType(contentType);
         this.payload = new ByteArrayOutputStream();
-        
+
         for (String line : data) {
             try {
                 payload.write(line.getBytes());
@@ -60,7 +82,7 @@ public class HttpResponse {
             }
         }
     }
-    
+
     // flushes payload with appropriate headers and closes the output stream
     public void send(OutputStream outputStream) {
         try {
@@ -71,7 +93,7 @@ public class HttpResponse {
             e.printStackTrace();
         }
     }
-    
+
     private void headers(OutputStream outputStream) throws IOException {
         ByteArrayOutputStream headers = new ByteArrayOutputStream();
         headers.write(("HTTP/1.1 " + status + "\n").getBytes());
@@ -82,5 +104,5 @@ public class HttpResponse {
         headers.write('\n');
         headers.writeTo(outputStream);
     }
-    
+
 }

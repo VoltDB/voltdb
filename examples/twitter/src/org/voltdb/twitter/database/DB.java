@@ -1,3 +1,25 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2010 VoltDB L.L.C.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
 package org.voltdb.twitter.database;
 
 import java.io.IOException;
@@ -20,9 +42,9 @@ import org.voltdb.twitter.database.procedures.Select;
 import org.voltdb.twitter.util.HashTag;
 
 public class DB {
-    
+
     private Client client;
-    
+
     public DB(List<String> servers) {
         client = ClientFactory.createClient();
         for (String server : servers) {
@@ -37,7 +59,7 @@ public class DB {
             }
         }
     }
-    
+
     // insert a new hashtag
     public void insertHashTag(String hashTag) {
         try {
@@ -46,7 +68,7 @@ public class DB {
 
                         @Override
                         public void clientCallback(ClientResponse response) {}
-                        
+
                     },
                     Insert.class.getSimpleName(),
                     hashTag,
@@ -58,7 +80,7 @@ public class DB {
             e.printStackTrace();
         }
     }
-    
+
     // select hashtags within a certain time range
     public List<HashTag> selectHashTags(long maxAgeMicros, int limit) {
         try {
@@ -69,12 +91,12 @@ public class DB {
                 // execute the query on one of the partitions
                 VoltTable[] tables = client.callProcedure(Select.class.getSimpleName(), partition,
                         System.currentTimeMillis() * 1000L - maxAgeMicros, limit).getResults();
-                
+
                 // nothing more to do if an empty result set was returned
                 if (tables.length == 0) {
                     continue;
                 }
-                
+
                 // add this partition's rows to the hashtag list
                 VoltTable table = tables[0];
                 VoltTableRow row = table.fetchRow(0);
@@ -84,15 +106,15 @@ public class DB {
                     row.advanceRow();
                 }
             }
-            
+
             // sort hashtags by count
             Collections.sort(hashTags);
-            
+
             // apply the limit
             while (hashTags.size() > limit) {
                 hashTags.remove(limit);
             }
-            
+
             return hashTags;
         } catch (NoConnectionsException e) {
             e.printStackTrace();
@@ -104,7 +126,7 @@ public class DB {
         }
         return null;
     }
-    
+
     // delete hashtags older than a certain max age
     public long deleteHashTags(long maxAgeMicros) {
         try {
@@ -122,7 +144,7 @@ public class DB {
         }
         return -1;
     }
-    
+
     // get the number of partitions in the database
     private int getPartitions() {
         try {
@@ -137,5 +159,5 @@ public class DB {
         }
         return 0;
     }
-    
+
 }

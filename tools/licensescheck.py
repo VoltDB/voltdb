@@ -12,7 +12,8 @@ prunelist = ('hsqldb19b3',
              'xml2',
              'simplejson',
              'projectfile',
-             'xml')
+             'xml',
+             'CSVReader.java')
 
 def verifyLicense(f, content, approvedLicensesJavaC, approvedLicensesPython):
     if f.endswith('.py'):
@@ -135,6 +136,10 @@ errcount += processAllFiles("../src",
                             tuple([readFile(f) for f in srcLicensesPy]))
 
 errcount += processAllFiles("../tests",
+                            tuple([readFile(f) for f in testLicenses]),
+                            tuple([readFile(f) for f in testLicensesPy]))
+
+errcount += processAllFiles("../examples",
                             tuple([readFile(f) for f in testLicenses]),
                             tuple([readFile(f) for f in testLicensesPy]))
 

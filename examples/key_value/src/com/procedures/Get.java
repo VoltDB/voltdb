@@ -21,6 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+
 // Get stored procedure
 //
 //   Gets and returns the value associated with the given key
@@ -39,10 +40,10 @@ public class Get extends VoltProcedure {
     public final SQLStmt getData = new SQLStmt("select value_column from key_value where key_column = ?;");
 
     public VoltTable[] run(
-            String strKey 
+            String strKey
     ) {
         voltQueueSQL(getData, strKey);
 
         return voltExecuteSQL(true);
     }
-} 
+}
