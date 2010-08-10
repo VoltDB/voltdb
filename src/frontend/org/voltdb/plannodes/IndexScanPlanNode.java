@@ -28,6 +28,7 @@ import org.voltdb.planner.StatsField;
 import org.voltdb.types.*;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
@@ -71,6 +72,11 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // The sorting direction
     protected SortDirectionType m_sortDirection = SortDirectionType.INVALID;
 
+    // A reference to the Catalog index object which defined the index which
+    // this index scan is going to use
+    // XXX-IZZY use more specific data later, perhaps, rather than whole object
+    protected Index m_catalogIndex = null;
+
     public IndexScanPlanNode() {
         super();
     }
@@ -96,6 +102,16 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         for (AbstractExpression exp : m_searchkeyExpressions) {
             exp.validate();
         }
+    }
+
+    public void setCatalogIndex(Index index)
+    {
+        m_catalogIndex = index;
+    }
+
+    public Index getCatalogIndex()
+    {
+        return m_catalogIndex;
     }
 
     /**
@@ -249,8 +265,18 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         assert(target != null);
         DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(target.getTypeName());
         stats.incrementStatistic(0, StatsField.TREE_INDEX_LEVELS_TRAVERSED, (long)(Math.log(tableEstimates.maxTuples)));
-        stats.incrementStatistic(0, StatsField.TUPLES_READ, 1);
-        m_estimatedOutputTupleCount = 1;
+        // ENG-604 hack.  Prefer unique access to reduce cardinality quickly
+        // rather than scanning a tree index for equality.
+        if (m_lookupType == IndexLookupType.EQ && m_catalogIndex.getUnique())
+        {
+            stats.incrementStatistic(0, StatsField.TUPLES_READ, 1);
+            m_estimatedOutputTupleCount = 1;
+        }
+        else
+        {
+            stats.incrementStatistic(0, StatsField.TUPLES_READ, 100);
+            m_estimatedOutputTupleCount = 100;
+        }
         return true;
     }
 

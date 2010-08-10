@@ -575,6 +575,7 @@ public abstract class SubPlanAssembler {
             scanNode.addSearchKeyExpression(expr2);
         }
         // create the IndexScanNode with all its metadata
+        scanNode.setCatalogIndex(index);
         scanNode.setKeyIterate(path.keyIterate);
         scanNode.setLookupType(path.lookupType);
         scanNode.setSortDirection(path.sortDirection);
