@@ -18,6 +18,7 @@
 package org.voltdb.dtxn;
 
 import org.voltdb.StoredProcedureInvocation;
+import java.util.ArrayList;
 
 /**
  * <p>A <code>TransactionInitiator</code> is the center of the distributed
@@ -87,16 +88,10 @@ public abstract class TransactionInitiator {
     abstract void reduceBackpressure(int messageSize);
 
     /**
-     * Terminate the initiator thread.
-     * @throws InterruptedException
-     */
-    public abstract void shutdown() throws InterruptedException;
-
-    /**
      * Called to notify an initiator that it is safe to send work
      * to rejoined sites.
-     * @param executorSiteId The id of the site that joined.
+     * @param executorSiteIds The ids of the sites that joined.
      */
-    public abstract void notifyExecutonSiteRejoin(int executorSiteId);
+    public abstract void notifyExecutonSiteRejoin(ArrayList<Integer> executorSiteIds);
 
 }

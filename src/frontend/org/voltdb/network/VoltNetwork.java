@@ -75,7 +75,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.DBBPool;
@@ -89,7 +88,10 @@ import org.voltdb.utils.Pair;
     private static final VoltLogger m_logger = new VoltLogger(VoltNetwork.class.getName());
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
     private final ArrayDeque<Runnable> m_tasks = new ArrayDeque<Runnable>();
-    private ConcurrentLinkedQueue<VoltPort> m_updateList = new ConcurrentLinkedQueue<VoltPort>();
+    // keep two lists and swap them in and out to minimize contention
+    private final ArrayDeque<VoltPort> m_selectorUpdates_1 = new ArrayDeque<VoltPort>();//Used as the lock for swapping lists
+    private final ArrayDeque<VoltPort> m_selectorUpdates_2 = new ArrayDeque<VoltPort>();
+    private ArrayDeque<VoltPort> m_activeUpdateList = m_selectorUpdates_1;
     private volatile boolean m_shouldStop = false;//volatile boolean is sufficient
     private final Thread m_thread;
     private final HashSet<VoltPort> m_ports = new HashSet<VoltPort>();
@@ -368,7 +370,9 @@ import org.voltdb.utils.Pair;
 
     /** Set interest registrations for a port */
     public void addToChangeList(VoltPort port) {
-        m_updateList.offer(port);
+        synchronized (m_selectorUpdates_1) {
+            m_activeUpdateList.add(port);
+        }
         if (m_useBlockingSelect) {
             m_selector.wakeup();
         }
@@ -446,8 +450,24 @@ import org.voltdb.utils.Pair;
     }
 
     protected void installInterests() {
-        VoltPort port = null;
-        while ((port = m_updateList.poll()) != null) {
+     // swap the update lists to avoid contention while
+        // draining the requested values. also guarantees
+        // that the end of the list will be reached if code
+        // appends to the update list without bound.
+        ArrayDeque<VoltPort> oldlist;
+        synchronized(m_selectorUpdates_1) {
+            if (m_activeUpdateList == m_selectorUpdates_1) {
+                oldlist = m_selectorUpdates_1;
+                m_activeUpdateList = m_selectorUpdates_2;
+            }
+            else {
+                oldlist = m_selectorUpdates_2;
+                m_activeUpdateList = m_selectorUpdates_1;
+            }
+        }
+
+        while (!oldlist.isEmpty()) {
+            final VoltPort port = oldlist.poll();
             if (port.isRunning()) {
                 continue;
             }

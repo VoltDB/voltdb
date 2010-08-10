@@ -1082,9 +1082,6 @@ public class ClientInterface implements DumpManager.Dumpable {
         if (m_acceptor != null) {
             m_acceptor.shutdown();
         }
-        if (m_initiator != null) {
-            m_initiator.shutdown();
-        }
         if (m_asyncCompilerWorkThread != null) {
             m_asyncCompilerWorkThread.shutdown();
             m_asyncCompilerWorkThread.join();

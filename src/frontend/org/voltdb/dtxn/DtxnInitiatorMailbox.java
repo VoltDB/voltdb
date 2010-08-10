@@ -22,7 +22,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
@@ -90,9 +89,6 @@ public class DtxnInitiatorMailbox implements Mailbox
     private final HostMessenger m_hostMessenger;
 
     private final ExecutorTxnIdSafetyState m_safetyState;
-
-    private final ConcurrentLinkedQueue<VoltMessage> m_messages =
-        new ConcurrentLinkedQueue<VoltMessage>();
 
     /**
      * Storage for initiator statistics
@@ -163,58 +159,6 @@ public class DtxnInitiatorMailbox implements Mailbox
         }
     }
 
-    /**
-     * Process all responses sent to this initiator's mailbox.
-     */
-    void processResponses()
-    {
-        VoltMessage message = null;
-        while ((message = m_messages.poll()) != null) {
-            // update the state of seen txnids for each executor
-            if (message instanceof HeartbeatResponseMessage) {
-                HeartbeatResponseMessage hrm = (HeartbeatResponseMessage) message;
-                m_safetyState.updateLastSeenTxnIdFromExecutorBySiteId(hrm.getExecSiteId(), hrm.getLastReceivedTxnId(), hrm.isBlocked());
-                return;
-            }
-
-            // only valid messages are this and heartbeatresponse
-            assert(message instanceof InitiateResponseMessage);
-            final InitiateResponseMessage r = (InitiateResponseMessage) message;
-            // update the state of seen txnids for each executor
-            m_safetyState.updateLastSeenTxnIdFromExecutorBySiteId(r.getCoordinatorSiteId(), r.getLastReceivedTxnId(), false);
-
-            InFlightTxnState state;
-            state = m_pendingTxns.get(r.getTxnId());
-
-            assert(m_siteId == r.getInitiatorSiteId());
-
-            ClientResponseImpl toSend = null;
-
-            // if this is a dummy response, make sure the m_pendingTxns list thinks
-            // the site has been removed from the list
-            if (r.isRecovering()) {
-                toSend = state.addFailedOrRecoveringResponse(r.getCoordinatorSiteId());
-            }
-            // otherwise update the InFlightTxnState with the response
-            else {
-                toSend = state.addResponse(r.getCoordinatorSiteId(), r.getClientResponseData());
-            }
-
-            // addResponse returning non-null means send the response to the client
-            if (toSend != null) {
-                enqueueResponse(toSend, state);
-            }
-
-            if (state.hasAllResponses()) {
-                m_initiator.reduceBackpressure(state.messageSize);
-                m_pendingTxns.remove(r.getTxnId());
-
-                // TODO make this send an error message on failure
-                assert(state.hasSentResponse());
-            }
-        }
-    }
-
     private void enqueueResponse(ClientResponseImpl response,
                                  InFlightTxnState state)
     {
@@ -248,7 +192,50 @@ public class DtxnInitiatorMailbox implements Mailbox
 
     @Override
     public void deliver(VoltMessage message) {
-        m_messages.offer(message);
+        ClientResponseImpl toSend = null;
+        InFlightTxnState state = null;
+        synchronized (m_initiator) {
+            // update the state of seen txnids for each executor
+            if (message instanceof HeartbeatResponseMessage) {
+                HeartbeatResponseMessage hrm = (HeartbeatResponseMessage) message;
+                m_safetyState.updateLastSeenTxnIdFromExecutorBySiteId(hrm.getExecSiteId(), hrm.getLastReceivedTxnId(), hrm.isBlocked());
+                return;
+            }
+
+            // only valid messages are this and heartbeatresponse
+            assert(message instanceof InitiateResponseMessage);
+            final InitiateResponseMessage r = (InitiateResponseMessage) message;
+            // update the state of seen txnids for each executor
+            m_safetyState.updateLastSeenTxnIdFromExecutorBySiteId(r.getCoordinatorSiteId(), r.getLastReceivedTxnId(), false);
+
+            state = m_pendingTxns.get(r.getTxnId());
+
+            assert(m_siteId == r.getInitiatorSiteId());
+
+            // if this is a dummy response, make sure the m_pendingTxns list thinks
+            // the site has been removed from the list
+            if (r.isRecovering()) {
+                toSend = state.addFailedOrRecoveringResponse(r.getCoordinatorSiteId());
+            }
+            // otherwise update the InFlightTxnState with the response
+            else {
+                toSend = state.addResponse(r.getCoordinatorSiteId(), r.getClientResponseData());
+            }
+
+            if (state.hasAllResponses()) {
+                m_initiator.reduceBackpressure(state.messageSize);
+                m_pendingTxns.remove(r.getTxnId());
+
+                // TODO make this send an error message on failure
+                assert(state.hasSentResponse());
+            }
+        }
+        //Stop moving the response send into the initiator locked section. It isn't necessary,
+        //and several other locks need to be acquired in the network subsystem. Bad voodoo.
+        //addResponse returning non-null means send the response to the client
+        if (toSend != null) {
+            enqueueResponse(toSend, state);
+        }
     }
 
     @Override

@@ -199,7 +199,7 @@ public class RealVoltDB implements VoltDBInterface
 
     PeriodicWorkTimerThread fivems;
 
-    private File m_pidFile = null;
+    private static File m_pidFile = null;
 
     /**
      * Initialize all the global components, then initialize all the m_sites.
@@ -209,7 +209,7 @@ public class RealVoltDB implements VoltDBInterface
             if (m_pidFile == null) {
                 String name = java.lang.management.ManagementFactory.getRuntimeMXBean().getName();
                 String pidString = name.substring(0, name.indexOf('@'));
-                m_pidFile = new java.io.File("/var/lock/voltpid." + pidString);
+                m_pidFile = new java.io.File("/var/tmp/voltpid." + pidString);
                 try {
                     boolean success = m_pidFile.createNewFile();
                     if (!success) {
@@ -691,7 +691,6 @@ public class RealVoltDB implements VoltDBInterface
             // probably unnecessary
             System.gc();
             m_isRunning = false;
-            m_pidFile.delete();
         }
     }
 
@@ -788,9 +787,7 @@ public class RealVoltDB implements VoltDBInterface
             // update the SafteyState in the initiators
             for (ClientInterface ci : m_clientInterfaces) {
                 TransactionInitiator initiator = ci.getInitiator();
-                for (int siteId : rejoiningExecSiteIds) {
-                    initiator.notifyExecutonSiteRejoin(siteId);
-                }
+                initiator.notifyExecutonSiteRejoin(rejoiningExecSiteIds);
             }
         }
         else {

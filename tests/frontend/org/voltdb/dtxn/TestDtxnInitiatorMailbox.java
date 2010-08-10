@@ -23,6 +23,7 @@
 package org.voltdb.dtxn;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 
 import junit.framework.TestCase;
 
@@ -227,13 +228,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
         }
 
         @Override
-        public void shutdown() throws InterruptedException {
-            // TODO Auto-generated method stub
-
-        }
-
-        @Override
-        public void notifyExecutonSiteRejoin(int executorSiteId) {
+        public void notifyExecutonSiteRejoin(ArrayList<Integer> executorSiteIds) {
             // TODO Auto-generated method stub
 
         }
@@ -301,7 +296,6 @@ public class TestDtxnInitiatorMailbox extends TestCase
         // Single-partition read-only txn
         dim.addPendingTxn(createTxnState(0, new int[] {0}, true, true));
         dim.deliver(createInitiateResponse(0, 0, true, true, false, createResultSet("dude")));
-        dim.processResponses();
         assertTrue(m_testStream.gotResponse());
         assertEquals(1, initiator.m_reduceCount);
         assertEquals(MESSAGE_SIZE, initiator.m_reduceSize);
@@ -309,7 +303,6 @@ public class TestDtxnInitiatorMailbox extends TestCase
         // multi-partition read-only txn
         dim.addPendingTxn(createTxnState(1, new int[] {0}, true, false));
         dim.deliver(createInitiateResponse(1, 0, true, false, false, createResultSet("dude")));
-        dim.processResponses();
         assertTrue(m_testStream.gotResponse());
         assertEquals(2, initiator.m_reduceCount);
         assertEquals(MESSAGE_SIZE * 2, initiator.m_reduceSize);
@@ -317,7 +310,6 @@ public class TestDtxnInitiatorMailbox extends TestCase
         // Single-partition read-write txn
         dim.addPendingTxn(createTxnState(2, new int[] {0}, false, true));
         dim.deliver(createInitiateResponse(2, 0, false, true, false, createResultSet("dude")));
-        dim.processResponses();
         assertTrue(m_testStream.gotResponse());
         assertEquals(3, initiator.m_reduceCount);
         assertEquals(MESSAGE_SIZE * 3, initiator.m_reduceSize);
@@ -325,7 +317,6 @@ public class TestDtxnInitiatorMailbox extends TestCase
         // multi-partition read-write txn
         dim.addPendingTxn(createTxnState(3, new int[] {0}, false, false));
         dim.deliver(createInitiateResponse(3, 0, false, false, false, createResultSet("dude")));
-        dim.processResponses();
         assertEquals(4, initiator.m_reduceCount);
         assertEquals(MESSAGE_SIZE * 4, initiator.m_reduceSize);
         assertTrue(m_testStream.gotResponse());
@@ -343,13 +334,11 @@ public class TestDtxnInitiatorMailbox extends TestCase
         // Single-partition read-only txn
         dim.addPendingTxn(createTxnState(0, new int[] {0,1}, true, true));
         dim.deliver(createInitiateResponse(0, 0, true, true, false, createResultSet("dude")));
-        dim.processResponses();
         assertTrue(m_testStream.gotResponse());
         assertEquals(0, initiator.m_reduceCount);
         assertEquals(0, initiator.m_reduceSize);
         m_testStream.reset();
         dim.deliver(createInitiateResponse(0, 1, true, true, false, createResultSet("dude")));
-        dim.processResponses();
         assertFalse(m_testStream.gotResponse());
         assertEquals(1, initiator.m_reduceCount);
         assertEquals(MESSAGE_SIZE, initiator.m_reduceSize);
@@ -357,12 +346,10 @@ public class TestDtxnInitiatorMailbox extends TestCase
         // Single-partition read-write txn
         dim.addPendingTxn(createTxnState(2, new int[] {0,1}, false, true));
         dim.deliver(createInitiateResponse(2, 0, false, true, false, createResultSet("dude")));
-        dim.processResponses();
         assertFalse(m_testStream.gotResponse());
         assertEquals(1, initiator.m_reduceCount);
         assertEquals(MESSAGE_SIZE, initiator.m_reduceSize);
         dim.deliver(createInitiateResponse(2, 1, false, true, false, createResultSet("dude")));
-        dim.processResponses();
         assertTrue(m_testStream.gotResponse());
         assertEquals(2, initiator.m_reduceCount);
         assertEquals(MESSAGE_SIZE * 2, initiator.m_reduceSize);
@@ -382,7 +369,6 @@ public class TestDtxnInitiatorMailbox extends TestCase
         dim.addPendingTxn(createTxnState(0, new int[] {0,1}, true, true));
         // recovering message
         dim.deliver(createInitiateResponse(0, 0, true, true, true, createResultSet("fido")));
-        dim.processResponses();
         assertFalse(m_testStream.gotResponse());
         assertEquals(0, initiator.m_reduceCount);
         assertEquals(0, initiator.m_reduceSize);
@@ -394,7 +380,6 @@ public class TestDtxnInitiatorMailbox extends TestCase
         dim.deliver(createInitiateResponse(0, 0, true, true, true, createResultSet("fido")));
         // valid message gets sent out
         dim.deliver(createInitiateResponse(0, 1, true, true, false, createResultSet("dude")));
-        dim.processResponses();
         assertTrue(m_testStream.gotResponse());
         assertEquals(1, initiator.m_reduceCount);
         assertEquals(MESSAGE_SIZE, initiator.m_reduceSize);
@@ -406,7 +391,6 @@ public class TestDtxnInitiatorMailbox extends TestCase
         dim.deliver(createInitiateResponse(0, 0, true, true, false, createResultSet("dude")));
         // recovering message
         dim.deliver(createInitiateResponse(0, 1, true, true, true, createResultSet("fido")));
-        dim.processResponses();
         assertTrue(m_testStream.gotResponse());
         assertEquals(2, initiator.m_reduceCount);
         assertEquals(MESSAGE_SIZE * 2, initiator.m_reduceSize);
@@ -418,7 +402,6 @@ public class TestDtxnInitiatorMailbox extends TestCase
         dim.deliver(createInitiateResponse(0, 0, false, true, false, createResultSet("dude")));
         // recovering message
         dim.deliver(createInitiateResponse(0, 1, false, true, true, createResultSet("fido")));
-        dim.processResponses();
         assertTrue(m_testStream.gotResponse());
         assertEquals(3, initiator.m_reduceCount);
         assertEquals(MESSAGE_SIZE * 3, initiator.m_reduceSize);
@@ -430,7 +413,6 @@ public class TestDtxnInitiatorMailbox extends TestCase
         dim.deliver(createInitiateResponse(0, 0, false, true, true, createResultSet("fido")));
         // valid message gets sent out
         dim.deliver(createInitiateResponse(0, 1, false, true, false, createResultSet("dude")));
-        dim.processResponses();
         assertTrue(m_testStream.gotResponse());
         assertEquals(4, initiator.m_reduceCount);
         assertEquals(MESSAGE_SIZE * 4, initiator.m_reduceSize);
@@ -446,14 +428,12 @@ public class TestDtxnInitiatorMailbox extends TestCase
         // Single-partition read-only txn
         dim.addPendingTxn(createTxnState(0, new int[] {0,1}, true, true));
         dim.deliver(createInitiateResponse(0, 0, true, true, false, createResultSet("dude")));
-        dim.processResponses();
         assertTrue(m_testStream.gotResponse());
         m_testStream.reset();
         boolean caught = false;
         try
         {
             dim.deliver(createInitiateResponse(0, 1, true, true, false, createResultSet("sweet")));
-            dim.processResponses();
         }
         catch (RuntimeException e)
         {
@@ -467,13 +447,11 @@ public class TestDtxnInitiatorMailbox extends TestCase
         // Single-partition read-write txn
         dim.addPendingTxn(createTxnState(2, new int[] {0,1}, false, true));
         dim.deliver(createInitiateResponse(2, 0, false, true, false, createResultSet("dude")));
-        dim.processResponses();
         assertFalse(m_testStream.gotResponse());
         caught = false;
         try
         {
             dim.deliver(createInitiateResponse(2, 1, true, true, false, createResultSet("sweet")));
-            dim.processResponses();
         }
         catch (RuntimeException e)
         {
@@ -508,7 +486,6 @@ public class TestDtxnInitiatorMailbox extends TestCase
         dim.addPendingTxn(createTxnState(0, new int[] {0,1}, false, true));
         dim.removeSite(0);
         dim.deliver(createInitiateResponse(0, 1, true, true, false, createResultSet("dude")));
-        dim.processResponses();
         assertTrue(m_testStream.gotResponse());
         assertEquals(1, initiator.m_reduceCount);
         assertEquals(MESSAGE_SIZE, initiator.m_reduceSize);
@@ -524,7 +501,6 @@ public class TestDtxnInitiatorMailbox extends TestCase
         // Single-partition read-write txn
         dim.addPendingTxn(createTxnState(0, new int[] {0,1}, false, true));
         dim.deliver(createInitiateResponse(0, 1, true, true, false, createResultSet("dude")));
-        dim.processResponses();
         dim.removeSite(0);
         assertTrue(m_testStream.gotResponse());
         assertEquals(1, initiator.m_reduceCount);
@@ -543,7 +519,6 @@ public class TestDtxnInitiatorMailbox extends TestCase
         dim.addPendingTxn(createTxnState(1, new int[] {0,1}, false, true));
         dim.deliver(createInitiateResponse(0, 1, true, true, false, createResultSet("dude")));
         dim.deliver(createInitiateResponse(1, 1, true, true, false, createResultSet("sweet")));
-        dim.processResponses();
         dim.removeSite(0);
         assertTrue(m_testStream.gotResponse());
         assertEquals(2, initiator.m_reduceCount);
@@ -574,7 +549,6 @@ public class TestDtxnInitiatorMailbox extends TestCase
         // Single-partition read-write txn
         dim.addPendingTxn(createTxnState(0, new int[] {0,1}, false, true));
         dim.deliver(createInitiateResponse(0, 1, true, true, false, createResultSet("dude")));
-        dim.processResponses();
 
         synchronized (m_testStream) {
             NodeFailureFault node_failure = new NodeFailureFault(HOST_ID, "localhost");
