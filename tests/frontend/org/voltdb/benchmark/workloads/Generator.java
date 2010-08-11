@@ -377,6 +377,7 @@ public class Generator extends ClientMain
         {
             List<Microbenchmark.Workload> wlList = mb.getWorkload();
             Microbenchmark.Workload toBuild = wlList.get(0);
+            boolean foundWL = false;
 
             if (workloadToBuild != null)
             {
@@ -387,10 +388,21 @@ public class Generator extends ClientMain
                     if (wl.getWlName().equals(workloadToBuild))
                     {
                         toBuild = wl;
+                        foundWL = true;
                         break;
                     }
                 }
             }
+
+            if (!foundWL)
+            {
+                System.err.println("***************************************************************************************************");
+                System.err.println("|                                                                                                 |");
+                System.err.println("|    Specified workload not found in config file. Defaulting to first workload of config file.    |");
+                System.err.println("|                                                                                                 |");
+                System.err.println("***************************************************************************************************");
+            }
+
             Workload myWL = new Workload(toBuild.getWlName());
 
             System.err.println("Building workload " + myWL.name);
