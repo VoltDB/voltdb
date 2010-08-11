@@ -148,6 +148,9 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
      */
     public long noteTransactionRecievedAndReturnLastSeen(int initiatorSiteId, long txnId, boolean isHeartbeat, long lastSafeTxnIdFromInitiator)
     {
+        //VLog.log("Site %d got heartbeat message from initiator %d with txnid/safeid: %d/%d",
+        //        m_siteId, initiatorSiteId, txnId, lastSafeTxnIdFromInitiator);
+
         // this doesn't exclude dummy txnid but is also a sanity check
         assert(txnId != 0);
 
@@ -301,6 +304,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
         }
         if (newState != m_state) {
             // THIS CODE IS HERE TO HANDLE A STATE CHANGE
+            //VLog.log("RPQ State for site id %d is now %s", m_siteId, newState.name());
 
             // note if we get non-empty but blocked
             if ((newState == QueueState.BLOCKED_ORDERING) || (newState == QueueState.BLOCKED_SAFETY)) {

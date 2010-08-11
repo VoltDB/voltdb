@@ -148,7 +148,7 @@ public class Rejoin extends VoltSystemProcedure {
                 new ColumnInfo("Error", VoltType.STRING) // string on failure, null on success
         );
 
-        String error = VoltDB.instance().doRejoinCommitOrRollback(getTransactionId(), true);
+        String error = VoltDB.instance().doRejoinCommitOrRollback(getTransactionId(), false);
 
         retval.addRow(hostId, error);
         return retval;

@@ -169,6 +169,8 @@ public class LocalCluster implements VoltServerConfig {
             m_buildDir = System.getProperty("user.dir") + "/obj/release";
         else
             m_buildDir = buildDir;
+        m_failureState = failureState;
+        //m_failureState = FailureState.ALL_RUNNING;
 
         m_failureState = failureState;
         // don't fail nodes without k-safety

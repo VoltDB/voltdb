@@ -719,7 +719,7 @@ public class RealVoltDB implements VoltDBInterface
             messenger.rejoinForeignHostPrepare(rejoinHostId, addr);
             return null;
         } catch (Exception e) {
-            e.printStackTrace();
+            //e.printStackTrace();
             return e.getMessage();
         }
     }

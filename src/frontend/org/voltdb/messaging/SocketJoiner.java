@@ -585,8 +585,9 @@ public class SocketJoiner extends Thread {
      * @param hostId The calling node's host id.
      * @param address The address the re-joining node is listening on.
      * @return A connected SocketChannel to the re-joining node, or null on failure.
+     * @throws Exception
      */
-    static SocketChannel connect(int localHostId, int rejoiningHostId, InetSocketAddress address) {
+    static SocketChannel connect(int localHostId, int rejoiningHostId, InetSocketAddress address) throws Exception {
         SocketChannel remoteConnection = null;
         try {
             // open a connection to the re-joining node
@@ -626,10 +627,10 @@ public class SocketJoiner extends Thread {
             }
         }
         catch (Exception e) {
-            e.printStackTrace();
-            remoteConnection = null;
+            //e.printStackTrace();
+            String msg = String.format("Unable to re-join node. Socket failure with message: " + e.getMessage());
+            throw new Exception(msg);
         }
-        return remoteConnection;
     }
 
     int getLocalHostId() {
