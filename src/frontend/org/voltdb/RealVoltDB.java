@@ -795,6 +795,8 @@ public class RealVoltDB implements VoltDBInterface
             messenger.rejoinForeginHostRollback();
         }
 
+        lastNodeRejoinFinish_txnId = currentTxnId;
+
         return null;
     }
 

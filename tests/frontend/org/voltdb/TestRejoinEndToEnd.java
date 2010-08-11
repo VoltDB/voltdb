@@ -274,7 +274,7 @@ public class TestRejoinEndToEnd extends TestCase {
     public void testLocalClusterRecoveringMode() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
 
-        LocalCluster cluster = new LocalCluster("rejoin.jar", 1, 2, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_FAILURE);
+        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_FAILURE);
         boolean success = cluster.compile(builder, false);
         assertTrue(success);
         copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
@@ -285,7 +285,7 @@ public class TestRejoinEndToEnd extends TestCase {
 
         cluster.shutDown();
 
-        cluster = new LocalCluster("rejoin.jar", 1, 2, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_RECOVERING);
+        cluster = new LocalCluster("rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_RECOVERING);
         success = cluster.compile(builder, false);
         assertTrue(success);
         copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
@@ -300,7 +300,7 @@ public class TestRejoinEndToEnd extends TestCase {
     public void testRejoin() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
 
-        LocalCluster cluster = new LocalCluster("rejoin.jar", 1, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         boolean success = cluster.compile(builder, false);
         assertTrue(success);
         copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
