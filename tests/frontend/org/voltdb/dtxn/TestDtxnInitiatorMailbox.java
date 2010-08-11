@@ -556,6 +556,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
             m_testStream.wait(10000);
         }
 
+        Thread.sleep(100);
         assertTrue(m_testStream.gotResponse());
         assertEquals(1, initiator.m_reduceCount);
         assertEquals(MESSAGE_SIZE, initiator.m_reduceSize);
