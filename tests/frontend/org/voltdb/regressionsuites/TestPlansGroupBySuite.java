@@ -644,12 +644,18 @@ public class TestPlansGroupBySuite extends RegressionSuite {
         config = new LocalCluster("plansgroupby-cluster.jar", 2, 2,
                                   1, BackendTarget.NATIVE_EE_JNI);
         config.compile(project);
-        builder.addServerConfig(config);
+
+        // Cluster with failure
+        /*builder.addServerConfig(config);
+        config = new LocalCluster("plansgroupby-cluster.jar", 2, 2,
+                1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_FAILURE);
+        //config.compile(project);
+        builder.addServerConfig(config);*/
 
         return builder;
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("rawtypes")
     public class VRowComparator<T> implements Comparator {
 
         @Override

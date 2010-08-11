@@ -56,6 +56,7 @@ public class SocketJoiner extends Thread {
     static final int COMMAND_SENDTIME_AND_CRC = 4;
     static final int COMMAND_NTPFAIL = 5;
     static final int COMMAND_CRCFAIL = 6;
+    static final int COMMAND_HOSTIDFAIL = 7;
     static final int RESPONSE_LISTENING = 0;
     static final int RESPONSE_CONNECTED = 1;
     static final int MAX_ACCEPTABLE_TIME_DIFF_IN_MS = 100;
@@ -506,16 +507,24 @@ public class SocketJoiner extends Thread {
             }
 
             // read the timestamps from all
-            int difftimei = 0;
+
             long difftimes[] = new long[m_expectedHosts - 1];
+            int readHostIds[] = new int[m_expectedHosts - 1];
             for (Entry<Integer, SocketChannel> e : m_sockets.entrySet()) {
                 out = getOutputForHost(e.getKey());
-                in = getInputForHost(e.getKey());
 
                 out.writeInt(COMMAND_SENDTIME_AND_CRC);
                 out.flush();
+
+            }
+            int i = 0;
+            for (Entry<Integer, SocketChannel> e : m_sockets.entrySet()) {
+                in = getInputForHost(e.getKey());
+
+                readHostIds[i] = in.readInt();
                 long timestamp = in.readLong();
-                difftimes[difftimei++] = System.currentTimeMillis() - timestamp;
+                difftimes[i] = System.currentTimeMillis() - timestamp;
+                i++;
             }
 
             // figure out how bad the skew is and if it's acceptable
@@ -531,6 +540,14 @@ public class SocketJoiner extends Thread {
             long maxDiffMS = maximumDiff - minimumDiff;
             if (maxDiffMS > MAX_ACCEPTABLE_TIME_DIFF_IN_MS)
                 command = COMMAND_NTPFAIL;
+
+            // ensure all hostids are the same
+            m_localHostId = readHostIds[0];
+            for (i = 1; i < readHostIds.length; i++) {
+                if (readHostIds[i] != m_localHostId) {
+                    command = COMMAND_HOSTIDFAIL;
+                }
+            }
 
             for (Entry<Integer, SocketChannel> e : m_sockets.entrySet()) {
                 out = getOutputForHost(e.getKey());
@@ -569,7 +586,7 @@ public class SocketJoiner extends Thread {
      * @param address The address the re-joining node is listening on.
      * @return A connected SocketChannel to the re-joining node, or null on failure.
      */
-    static SocketChannel connect(int hostId, InetSocketAddress address) {
+    static SocketChannel connect(int localHostId, int rejoiningHostId, InetSocketAddress address) {
         SocketChannel remoteConnection = null;
         try {
             // open a connection to the re-joining node
@@ -581,13 +598,17 @@ public class SocketJoiner extends Thread {
             DataInputStream in = new DataInputStream(new BufferedInputStream(remoteConnection.socket().getInputStream()));
 
             // write the id of this host
-            out.writeInt(hostId);
+            out.writeInt(localHostId);
             out.flush();
 
             // read in the command to acknowledge connection and to request the time
             int command = in.readInt();
             if (command != COMMAND_SENDTIME_AND_CRC)
                 throw new Exception(String.format("Unexpected command (%d) from joining node.", command));
+
+            // write the id of the new host
+            out.writeInt(rejoiningHostId);
+            out.flush();
 
             // write the current time so the re-join node can measure skew
             out.writeLong(System.currentTimeMillis());

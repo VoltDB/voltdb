@@ -46,6 +46,12 @@ import org.voltdb.compiler.VoltProjectBuilder;
  */
 public class LocalCluster implements VoltServerConfig {
 
+    public enum FailureState {
+        ALL_RUNNING,
+        ONE_FAILURE,
+        ONE_RECOVERING
+    }
+
     // configuration data
     final String m_jarFileName;
     final int m_siteCount;
@@ -57,6 +63,7 @@ public class LocalCluster implements VoltServerConfig {
     boolean m_hasLocalServer = true;
     String m_pathToDeployment;
     int m_pathToDeploymentOffset;
+    FailureState m_failureState;
 
     // state
     boolean m_compiled = false;
@@ -134,7 +141,15 @@ public class LocalCluster implements VoltServerConfig {
     }
 
     public LocalCluster(String jarFileName, int siteCount,
-                        int hostCount, int replication, BackendTarget target)
+            int hostCount, int replication, BackendTarget target) {
+        this(jarFileName, siteCount,
+            hostCount, replication, target,
+            FailureState.ALL_RUNNING);
+    }
+
+    public LocalCluster(String jarFileName, int siteCount,
+                        int hostCount, int replication, BackendTarget target,
+                        FailureState failureState)
     {
         System.out.println("Instantiating LocalCluster for " + jarFileName);
         System.out.println("Sites: " + siteCount + " hosts: " + hostCount
@@ -154,6 +169,11 @@ public class LocalCluster implements VoltServerConfig {
             m_buildDir = System.getProperty("user.dir") + "/obj/release";
         else
             m_buildDir = buildDir;
+
+        m_failureState = failureState;
+        // don't fail nodes without k-safety
+        if (m_replication < 1)
+            m_failureState = FailureState.ALL_RUNNING;
 
         String classPath = System.getProperty("java.class.path")+ ":" + m_buildDir + File.separator + m_jarFileName;
         classPath += ":" + m_buildDir + File.separator + "prod";
@@ -316,6 +336,90 @@ public class LocalCluster implements VoltServerConfig {
             m_localServer.waitForInitialization();
         if (logtime) System.out.println("********** DONE: " + (System.currentTimeMillis() - startTime) + " ms");
         m_running = true;
+
+        // if supposed to kill a server, it's go time
+        if (m_failureState != FailureState.ALL_RUNNING) {
+            System.out.println("Killing one cluster member.");
+            Process proc = m_cluster.get(0);
+            proc.destroy();
+            int retval = 0;
+            try {
+                retval = proc.waitFor();
+            } catch (InterruptedException e) {
+                System.out.println("External VoltDB process is acting crazy.");
+            } finally {
+                m_cluster.set(0, null);
+            }
+            // exit code 143 is the forcible shutdown code from .destroy()
+            if (retval != 0 && retval != 143) {
+                System.out.println("External VoltDB process terminated abnormally with return: " + retval);
+            }
+        }
+
+        // after killing a server, bring it back in recovery mode
+        if (m_failureState == FailureState.ONE_RECOVERING) {
+            System.out.println("Adding a cluster member in the recovery state.");
+            int hostId = m_hasLocalServer ? 1 : 0;
+
+            // port for the new node
+            int portNo = VoltDB.DEFAULT_PORT + hostId;
+
+            // port to connect to (not too simple, eh?)
+            int portNoToRejoin = VoltDB.DEFAULT_PORT + hostId + 1;
+            if (m_hasLocalServer) portNoToRejoin = VoltDB.DEFAULT_PORT;
+
+            PipeToFile ptf = null;
+
+            try {
+                m_procBuilder.command().set(m_portOffset, String.valueOf(portNo));
+                m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
+                // this is the command line magic to make this work
+                m_procBuilder.command().add("rejoinhost localhost:" + String.valueOf(portNoToRejoin));
+
+                Process proc = m_procBuilder.start();
+                // replace the existing dead proc
+                m_cluster.set(0, proc);
+                // write output to obj/release/testoutput/<test name>-n.txt
+                // this may need to be more unique? Also very useful to just
+                // set this to a hardcoded path and use "tail -f" to debug.
+                String testoutputdir = m_buildDir + File.separator + "testoutput";
+                // make sure the directory exists
+                File dir = new File(testoutputdir);
+                if (dir.exists()) {
+                    assert(dir.isDirectory());
+                }
+                else {
+                    boolean status = dir.mkdirs();
+                    assert(status);
+                }
+
+                ptf = new PipeToFile(testoutputdir + File.separator +
+                        getName() + "-" + hostId + ".txt", proc.getInputStream());
+                m_pipes.set(0, ptf);
+                Thread t = new Thread(ptf);
+                t.setName("ClusterPipe:" + String.valueOf(hostId));
+                t.start();
+            }
+            catch (IOException ex) {
+                System.out.println("Failed to start cluster process:" + ex.getMessage());
+                Logger.getLogger(LocalCluster.class.getName()).log(Level.SEVERE, null, ex);
+                assert (false);
+            }
+
+            // wait for the joining site to be ready
+            while (ptf.m_witnessedReady.get() != true) {
+                if (logtime) System.out.println("********** pre witness: " + (System.currentTimeMillis() - startTime) + " ms");
+                try {
+                    // wait for explicit notification
+                    synchronized (ptf) {
+                        ptf.wait();
+                    }
+                }
+                catch (InterruptedException ex) {
+                    Logger.getLogger(LocalCluster.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+        }
     }
 
     @Override
@@ -345,6 +449,8 @@ public class LocalCluster implements VoltServerConfig {
     {
         if (m_cluster != null) {
             for (Process proc : m_cluster) {
+                if (proc == null)
+                    continue;
                 proc.destroy();
                 int retval = proc.waitFor();
                 // exit code 143 is the forcible shutdown code from .destroy()

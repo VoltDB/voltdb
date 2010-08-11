@@ -295,7 +295,7 @@ public class TestRejoinEndToEnd extends TestCase {
 
         Thread.sleep(100);
 
-        /*ClientResponse response;
+        ClientResponse response;
         Client client;
 
         client = ClientFactory.createClient();
@@ -312,7 +312,7 @@ public class TestRejoinEndToEnd extends TestCase {
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         response = client.callProcedure("Insert", 3);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        client.close();*/
+        client.close();
 
         localServer.shutdown();
         cluster.shutDown();

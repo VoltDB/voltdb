@@ -427,7 +427,7 @@ public class HostMessenger implements Messenger {
         if (m_foreignHosts[hostId].isUp())
             throw new Exception("Rejoin HostId is not a failed host.");
 
-        SocketChannel sock = SocketJoiner.connect(1, addr);
+        SocketChannel sock = SocketJoiner.connect(m_localHostId, hostId, addr);
 
         m_tempNewFH = new ForeignHost(this, hostId, sock);
         m_tempNewHostId = hostId;
@@ -437,6 +437,9 @@ public class HostMessenger implements Messenger {
      * Finish joining the network.
      */
     public JoiningNodeInfo rejoinForeignHostCommit() {
+        assert(m_tempNewFH != null);
+        assert(m_tempNewHostId >= 0);
+
         m_foreignHosts[m_tempNewHostId] = m_tempNewFH;
 
         JoiningNodeInfo retval = new JoiningNodeInfo();
