@@ -269,6 +269,31 @@ public class TestRejoinEndToEnd extends TestCase {
 
     public void testWithFakeSecondHostMessenger() throws Exception {
         for (int i = 0; failNext(i); i++);
+    }
+
+    /*public void testLocalClusterRecoveringMode() throws Exception {
+        VoltProjectBuilder builder = getBuilderForTest();
+
+        LocalCluster cluster = new LocalCluster("rejoin.jar", 1, 2, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_FAILURE);
+        boolean success = cluster.compile(builder, false);
+        assertTrue(success);
+        copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+        cluster.setHasLocalServer(false);
+
+        cluster.startUp();
+        Thread.sleep(100);
+
+        cluster.shutDown();
+
+        cluster = new LocalCluster("rejoin.jar", 1, 2, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_RECOVERING);
+        success = cluster.compile(builder, false);
+        assertTrue(success);
+        copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+        cluster.setHasLocalServer(false);
+
+        cluster.startUp();
+        cluster.shutDownSingleHost(0);
+        Thread.sleep(100);
     }*/
 
     public void testRejoin() throws Exception {
@@ -295,7 +320,7 @@ public class TestRejoinEndToEnd extends TestCase {
 
         Thread.sleep(100);
 
-        ClientResponse response;
+        /*ClientResponse response;
         Client client;
 
         client = ClientFactory.createClient();
@@ -312,7 +337,7 @@ public class TestRejoinEndToEnd extends TestCase {
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         response = client.callProcedure("Insert", 3);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        client.close();
+        client.close();*/
 
         localServer.shutdown();
         cluster.shutDown();
