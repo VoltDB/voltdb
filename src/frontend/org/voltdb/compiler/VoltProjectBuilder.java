@@ -243,7 +243,7 @@ public class VoltProjectBuilder {
      * committed by John.
      */
     public void addLiteralSchema(String ddlText) throws IOException {
-        File temp = File.createTempFile("difftest", "sql");
+        File temp = File.createTempFile("literalschema", "sql");
         temp.deleteOnExit();
         FileWriter out = new FileWriter(temp);
         out.write(ddlText);

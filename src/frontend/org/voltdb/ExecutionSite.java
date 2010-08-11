@@ -556,13 +556,14 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             hsqlTemp = new HsqlBackend(getSiteId());
             final String hexDDL = m_context.database.getSchema();
             final String ddl = Encoder.hexDecodeToString(hexDDL);
-            final String[] commands = ddl.split(";");
+            final String[] commands = ddl.split("\n");
             for (String command : commands) {
-                command = command.trim();
-                if (command.length() == 0) {
+                String decoded_cmd = Encoder.hexDecodeToString(command);
+                decoded_cmd = decoded_cmd.trim();
+                if (decoded_cmd.length() == 0) {
                     continue;
                 }
-                hsqlTemp.runDDL(command);
+                hsqlTemp.runDDL(decoded_cmd);
             }
         }
         catch (final Exception ex) {

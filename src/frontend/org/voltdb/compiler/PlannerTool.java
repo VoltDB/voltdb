@@ -57,6 +57,11 @@ public class PlannerTool {
         String errors = null;
         boolean replicatedDML = false;
 
+        public String getErrors()
+        {
+            return errors;
+        }
+
         @Override
         public String toString() {
             StringBuilder sb = new StringBuilder();
@@ -299,16 +304,18 @@ public class PlannerTool {
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
         String hexDDL = db.getSchema();
         String ddl = Encoder.hexDecodeToString(hexDDL);
-        String[] commands = ddl.split(";");
+        String[] commands = ddl.split("\n");
         for (String command : commands) {
-            command = command.trim();
-            if (command.length() == 0)
+            String decoded_cmd = Encoder.hexDecodeToString(command);
+            decoded_cmd = decoded_cmd.trim();
+            if (decoded_cmd.length() == 0)
                 continue;
             try {
-                hsql.runDDLCommand(command);
+                hsql.runDDLCommand(decoded_cmd);
             } catch (HSQLParseException e) {
                 // need a good error message here
                 log("Error creating hsql: " + e.getMessage());
+                log("   in DDL statement: " + decoded_cmd);
                 System.exit(82);
             }
         }

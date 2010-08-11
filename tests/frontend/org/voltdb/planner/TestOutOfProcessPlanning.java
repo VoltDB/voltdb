@@ -24,12 +24,15 @@
 package org.voltdb.planner;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import junit.framework.TestCase;
 
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
+import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.PlannerTool;
+import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.CatalogUtil;
 
 public class TestOutOfProcessPlanning extends TestCase {
@@ -114,4 +117,45 @@ public class TestOutOfProcessPlanning extends TestCase {
         }
     }
 
+    public void testBadDDL() throws IOException
+    {
+        // semicolons in in-lined comments are bad
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("CREATE TABLE A (C1 BIGINT NOT NULL, PRIMARY KEY(C1)); -- this; is bad");
+        builder.addPartitionInfo("A", "C1");
+        // semicolons in string literals are bad
+        builder.addLiteralSchema("create table t(id bigint not null, name varchar(5) default 'a;bc', primary key(id));");
+        builder.addPartitionInfo("t", "id");
+        // Add a newline string literal case just for fun
+        builder.addLiteralSchema("create table s(id bigint not null, name varchar(5) default 'a\nb', primary key(id));");
+        builder.addStmtProcedure("MakeCompileHappy",
+                                 "SELECT * FROM A WHERE C1 = ?;",
+                                 "A.C1: 0");
+
+        builder.compile("testbadddl-oop.jar");
+        String serializedCatalog = CatalogUtil.loadCatalogFromJar("testbadddl-oop.jar", null);
+        assertNotNull(serializedCatalog);
+        Catalog c = new Catalog();
+        c.execute(serializedCatalog);
+        m_pt = PlannerTool.createPlannerToolProcess(serializedCatalog);
+
+        PlannerKillerThread ptKiller = new PlannerKillerThread();
+        ptKiller.m_serializedCatalog = serializedCatalog;
+        ptKiller.start();
+
+        // Bad DDL would kill the planner before it starts and this query
+        // would return a Stream Closed error
+        PlannerTool.Result result = null;
+        result = m_pt.planSql("select * from A;");
+        System.out.println(result);
+        assertNotSame("Stream closed", result.getErrors());
+        assertNull(result.getErrors());
+
+        ptKiller.m_shouldStop.set(true);
+        try {
+            ptKiller.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
 }

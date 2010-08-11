@@ -121,7 +121,10 @@ public class DDLCompiler {
         DDLStatement stmt = getNextStatement(reader, m_compiler);
         while (stmt != null) {
             try {
-                m_fullDDL += stmt.statement + " ";
+                // kind of ugly.  We hex-encode each statement so we can
+                // avoid embedded newlines so we can delimit statements
+                // with newline.
+                m_fullDDL += Encoder.hexEncode(stmt.statement) + "\n";
                 m_hsql.runDDLCommand(stmt.statement);
                 stmt = getNextStatement(reader, m_compiler);
             } catch (HSQLParseException e) {
