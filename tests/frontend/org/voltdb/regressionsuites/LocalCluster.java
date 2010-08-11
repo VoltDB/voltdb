@@ -443,7 +443,8 @@ public class LocalCluster implements VoltServerConfig {
     public void shutDownSingleHost(int hostNum)
     {
         Process proc = m_cluster.get(hostNum);
-        proc.destroy();
+        if (proc != null)
+            proc.destroy();
         m_cluster.remove(hostNum);
     }
 

@@ -621,10 +621,8 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         return eeTemp;
     }
 
-    public boolean updateCatalog(String catalogDiffCommands) {
+    public boolean updateClusterState(String catalogDiffCommands) {
         m_context = VoltDB.instance().getCatalogContext();
-        loadProceduresFromCatalog(VoltDB.getEEBackendType());
-        ee.updateCatalog(catalogDiffCommands, m_context.catalogVersion);
 
         // make sure the restricted priority queue knows about all of the up initiators
         // for most catalog changes this will do nothing
@@ -635,6 +633,14 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 newInitiators += m_transactionQueue.ensureInitiatorIsKnown(Integer.parseInt(s.getTypeName()));
             }
         }
+
+        return true;
+    }
+
+    public boolean updateCatalog(String catalogDiffCommands) {
+        m_context = VoltDB.instance().getCatalogContext();
+        loadProceduresFromCatalog(VoltDB.getEEBackendType());
+        ee.updateCatalog(catalogDiffCommands, m_context.catalogVersion);
 
         return true;
     }

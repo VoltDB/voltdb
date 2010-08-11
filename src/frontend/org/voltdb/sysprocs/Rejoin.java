@@ -135,7 +135,7 @@ public class Rejoin extends VoltSystemProcedure {
         String catalogDiffCommands = sb.toString();
 
         String error = VoltDB.instance().doRejoinCommitOrRollback(getTransactionId(), true);
-        context.getExecutionSite().updateCatalog(catalogDiffCommands);
+        context.getExecutionSite().updateClusterState(catalogDiffCommands);
 
         retval.addRow(Integer.parseInt(context.getSite().getTypeName()), error);
 
