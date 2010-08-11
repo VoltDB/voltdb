@@ -79,8 +79,19 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
     public void verifyEverthingIsKosher() {
         if (m_ptool != null) {
             // check if the planner process has been blocked for 10 seconds
-            if (m_ptool.perhapsIsHung(10000)) {
-                ahpLog.error("Was forced to kill the planner process due to a timeout. It will be restarted if needed.");
+            if (m_ptool.perhapsIsHung(60000)) {
+                ahpLog.error("Out-of-process planner unresponsive.");
+                // Get the actual cause of death, maybe
+                if (!m_ptool.expensiveIsRunningCheck())
+                {
+                    int exit_code = m_ptool.getExitValue();
+                    ahpLog.error("  Out-of-process planner died with exit code: " + exit_code);
+                }
+                else
+                {
+                    ahpLog.error("  Out-of-process planner appears to have hung.  Killing it off.");
+                    ahpLog.error("  Last attempted to plan SQL: " + m_ptool.getLastSql());
+                }
                 m_ptool.kill();
                 m_ptool = null;
             }

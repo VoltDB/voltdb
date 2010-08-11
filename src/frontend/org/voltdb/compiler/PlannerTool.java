@@ -50,6 +50,7 @@ public class PlannerTool {
     Process m_process;
     OutputStreamWriter m_in;
     AtomicLong m_timeOfLastPlannerCall = new AtomicLong(0);
+    String m_lastSql = "";
 
     public static class Result {
         String onePlan = null;
@@ -103,6 +104,19 @@ public class PlannerTool {
         return false;
     }
 
+    public int getExitValue()
+    {
+        return m_process.exitValue();
+    }
+
+    public String getLastSql()
+    {
+        synchronized (m_lastSql)
+        {
+            return m_lastSql;
+        }
+    }
+
     public boolean perhapsIsHung(long msTimeout) {
         long start = m_timeOfLastPlannerCall.get();
         if (start == 0) return false;
@@ -128,6 +142,10 @@ public class PlannerTool {
         }
         // remove any spaces or newlines
         sql = sql.trim();
+        synchronized (m_lastSql)
+        {
+            m_lastSql = sql;
+        }
         try {
             m_in.write(sql + "\n");
             m_in.flush();
@@ -196,7 +214,10 @@ public class PlannerTool {
 
         // reset the clock to zero, meaning not currently planning
         m_timeOfLastPlannerCall.set(0);
-
+        synchronized (m_lastSql)
+        {
+            m_lastSql = "";
+        }
         return retval;
     }
 
