@@ -42,6 +42,12 @@ public class TestOutOfProcessPlanning extends TestCase {
     class PlannerKillerThread extends Thread {
         AtomicBoolean m_shouldStop = new AtomicBoolean(false);
         String m_serializedCatalog = null;
+        int m_timeout = 2000;
+
+        public PlannerKillerThread(int timeout)
+        {
+            m_timeout = timeout;
+        }
 
         @Override
         public void run() {
@@ -50,7 +56,7 @@ public class TestOutOfProcessPlanning extends TestCase {
                 //  m_pt =
                 //}
 
-                if (m_pt.perhapsIsHung(2000)) {
+                if (m_pt.perhapsIsHung(m_timeout)) {
                     m_pt.kill();
                     m_pt = PlannerTool.createPlannerToolProcess(m_serializedCatalog);
                 }
@@ -70,7 +76,7 @@ public class TestOutOfProcessPlanning extends TestCase {
 
         m_pt = PlannerTool.createPlannerToolProcess(serializedCatalog);
 
-        PlannerKillerThread ptKiller = new PlannerKillerThread();
+        PlannerKillerThread ptKiller = new PlannerKillerThread(2000);
         ptKiller.m_serializedCatalog = serializedCatalog;
         ptKiller.start();
 
@@ -139,7 +145,7 @@ public class TestOutOfProcessPlanning extends TestCase {
         c.execute(serializedCatalog);
         m_pt = PlannerTool.createPlannerToolProcess(serializedCatalog);
 
-        PlannerKillerThread ptKiller = new PlannerKillerThread();
+        PlannerKillerThread ptKiller = new PlannerKillerThread(60000);
         ptKiller.m_serializedCatalog = serializedCatalog;
         ptKiller.start();
 
