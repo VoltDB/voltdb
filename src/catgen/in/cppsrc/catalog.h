@@ -77,12 +77,13 @@ protected:
     static std::vector<std::string> splitToTwoString(const std::string &str, char delimiter);
 
     void addUnresolvedInfo(std::string path, CatalogType *type, std::string fieldName);
-
 private:
     void resolveUnresolvedInfo(std::string path);
     void cleanupExecutionBookkeeping();
 
 public:
+    void purgeDeletions();
+
     /**
      * Create a new Catalog hierarchy.
      */

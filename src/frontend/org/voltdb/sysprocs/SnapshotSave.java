@@ -19,6 +19,8 @@ package org.voltdb.sysprocs;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.StringWriter;
+import java.io.PrintWriter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -202,13 +204,17 @@ public class SnapshotSave extends VoltSystemProcedure
             boolean willDoSetup = m_snapshotCreateSetupPermit.tryAcquire();
             final int numLocalSites = VoltDB.instance().getLocalSites().values().size();
             if (willDoSetup) {
+                /*
+                 * Used to close targets on failure
+                 */
+                final ArrayList<SnapshotDataTarget> targets = new ArrayList<SnapshotDataTarget>();
                 try {
-                    assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() == -1);
-                    final long startTime = (Long)params.toArray()[2];
                     final ArrayDeque<SnapshotTableTask> partitionedSnapshotTasks =
                         new ArrayDeque<SnapshotTableTask>();
                     final ArrayList<SnapshotTableTask> replicatedSnapshotTasks =
                         new ArrayList<SnapshotTableTask>();
+                    assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() == -1);
+                    final long startTime = (Long)params.toArray()[2];
 
                     final List<Table> tables = getTablesToSave(context);
                     SnapshotUtil.recordSnapshotTableList(
@@ -231,8 +237,9 @@ public class SnapshotSave extends VoltSystemProcedure
                         final File saveFilePath =
                             constructFileForTable(table, file_path, file_nonce,
                                                   context.getSite().getHost().getTypeName());
+                        SnapshotDataTarget sdt = null;
                         try {
-                            final SnapshotDataTarget sdt =
+                            sdt =
                                 constructSnapshotDataTargetForTable(
                                         context,
                                         saveFilePath,
@@ -240,7 +247,8 @@ public class SnapshotSave extends VoltSystemProcedure
                                         context.getSite().getHost(),
                                         context.getCluster().getPartitions().size(),
                                         startTime);
-
+                            targets.add(sdt);
+                            final SnapshotDataTarget sdtFinal = sdt;
                             final Runnable onClose = new Runnable() {
                                 @Override
                                 public void run() {
@@ -252,9 +260,9 @@ public class SnapshotSave extends VoltSystemProcedure
                                                 SnapshotRegistry.Snapshot.Table registryTable) {
                                             return snapshotRecord.new Table(
                                                     registryTable,
-                                                    sdt.getBytesWritten(),
+                                                    sdtFinal.getBytesWritten(),
                                                     now,
-                                                    sdt.getLastWriteException());
+                                                    sdtFinal.getLastWriteException());
                                         }
                                     });
                                     int tablesLeft = numTables.decrementAndGet();
@@ -286,9 +294,27 @@ public class SnapshotSave extends VoltSystemProcedure
                                 partitionedSnapshotTasks.offer(task);
                             }
                         } catch (IOException ex) {
+                            /*
+                             * Creation of this specific target failed. Close it if it was created.
+                             * Continue attempting the snapshot anyways so that at least some of the data
+                             * can be retrieved.
+                             */
+                            try {
+                                if (sdt != null) {
+                                    targets.remove(sdt);
+                                    sdt.close();
+                                }
+                            } catch (Exception e) {
+                                HOST_LOG.error(e);
+                            }
+
+                            StringWriter sw = new StringWriter();
+                            PrintWriter pw = new PrintWriter(sw);
+                            ex.printStackTrace(pw);
+                            pw.flush();
                             canSnapshot = "FAILURE";
                             err_msg = "SNAPSHOT INITIATION OF " + saveFilePath +
-                            "RESULTED IN IOException: " + ex.getMessage();
+                            "RESULTED IN IOException: \n" + sw.toString();
                         }
 
                         result.addRow(Integer.parseInt(context.getSite().getHost().getTypeName()),
@@ -302,6 +328,9 @@ public class SnapshotSave extends VoltSystemProcedure
                         if (!partitionedSnapshotTasks.isEmpty() || !replicatedSnapshotTasks.isEmpty()) {
                             SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.set(
                                     VoltDB.instance().getLocalSites().values().size());
+                            for (int ii = 0; ii < numLocalSites; ii++) {
+                                m_taskListsForSites.add(new ArrayDeque<SnapshotTableTask>());
+                            }
                         } else {
                             SnapshotRegistry.discardSnapshot(snapshotRecord);
                         }
@@ -310,7 +339,7 @@ public class SnapshotSave extends VoltSystemProcedure
                          * Distribute the writing of replicated tables to exactly one partition.
                          */
                         for (int ii = 0; ii < numLocalSites && !partitionedSnapshotTasks.isEmpty(); ii++) {
-                            m_taskListsForSites.add(new ArrayDeque<SnapshotTableTask>(partitionedSnapshotTasks));
+                            m_taskListsForSites.get(ii).addAll(partitionedSnapshotTasks);
                         }
 
                         int siteIndex = 0;
@@ -319,13 +348,29 @@ public class SnapshotSave extends VoltSystemProcedure
                         }
                     }
                 } catch (Exception ex) {
+                    /*
+                     * Close all the targets to release the threads. Don't let sites get any tasks.
+                     */
+                    m_taskListsForSites.clear();
+                    for (SnapshotDataTarget sdt : targets) {
+                        try {
+                            sdt.close();
+                        } catch (Exception e) {
+                            HOST_LOG.error(ex);
+                        }
+                    }
+
+                    StringWriter sw = new StringWriter();
+                    PrintWriter pw = new PrintWriter(sw);
+                    ex.printStackTrace(pw);
+                    pw.flush();
                     result.addRow(
                             Integer.parseInt(context.getSite().getHost().getTypeName()),
                             hostname,
                             "",
                             "FAILURE",
                             "SNAPSHOT INITIATION OF " + file_path + file_nonce +
-                            "RESULTED IN Exception: " + ex.getMessage());
+                            "RESULTED IN Exception: \n" + sw.toString());
                     HOST_LOG.error(ex);
                 } finally {
                     m_snapshotPermits.release(numLocalSites);
@@ -343,7 +388,7 @@ public class SnapshotSave extends VoltSystemProcedure
                 return new DependencyPair( DEP_createSnapshotTargets, result);
             } finally {
                 /*
-                 * The last thead to acquire a snapshot permit has to be the one
+                 * The last thread to acquire a snapshot permit has to be the one
                  * to release the setup permit to ensure that a thread
                  * doesn't come late and think it is supposed to do the setup work
                  */

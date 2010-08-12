@@ -109,6 +109,11 @@ public class Catalog extends CatalogType {
         }
         else if (cmd.equals("delete")) {
             resolved.delete(arg1, arg2);
+            String toDelete = ref + "/" + arg1 + "[" + arg2 + "]";
+            CatalogType thing = m_pathCache.remove(toDelete);
+            if (thing == null) {
+                throw new CatalogException("Unable to find reference to delete: " + toDelete);
+            }
         }
         else if (cmd.equals("set")) {
             resolved.set(arg1, arg2);

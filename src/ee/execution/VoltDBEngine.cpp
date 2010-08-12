@@ -648,6 +648,7 @@ VoltDBEngine::updateCatalog(const string &catalogPayload, int catalogVersion)
         return false;
     }
 
+    m_catalog->purgeDeletions();
     VOLT_DEBUG("Updated catalog...");
     return true;
 }

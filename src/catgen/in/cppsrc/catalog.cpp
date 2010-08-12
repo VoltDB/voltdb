@@ -64,6 +64,20 @@ void Catalog::cleanupExecutionBookkeeping() {
     m_deletions.clear();
 }
 
+void Catalog::purgeDeletions() {
+    for (std::vector<std::string>::iterator i = m_deletions.begin();
+         i != m_deletions.end();
+         i++) {
+        boost::unordered_map<std::string, CatalogType*>::iterator object = m_allCatalogObjects.find(*i);
+        if (object == m_allCatalogObjects.end()) {
+            std::string errmsg = "Catalog reference for " + (*i) + " not found.";
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, errmsg);
+        }
+        delete object->second;
+        m_allCatalogObjects.erase(object);
+    }
+}
+
 void Catalog::execute(const string &stmts) {
     cleanupExecutionBookkeeping();
 
