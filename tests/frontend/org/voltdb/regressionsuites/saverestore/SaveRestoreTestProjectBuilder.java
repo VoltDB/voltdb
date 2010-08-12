@@ -74,6 +74,15 @@ public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
         addStmtProcedure("JumboCount", "SELECT COUNT(*) FROM JUMBO_ROW");
     }
 
+    /*
+     * Different default set for the test of ENG-696 TestReplicatedSaveRestoreSysprocSuite
+     * Has no partitioned tables.
+     */
+    public void addAllDefaultsNoPartitioning() {
+        addDefaultProcedures();
+        addDefaultSchema();
+    }
+
     public String getJARFilename()
     {
         return jarFilename;
