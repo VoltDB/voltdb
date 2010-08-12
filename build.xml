@@ -191,15 +191,41 @@ PRIMARY ENTRY POINTS
     description="Compile Java classes and C++ JNI library."
 />
 <target name="check"
-    depends="compile, voltdbipc, eecheck, junit, distcheck, pythonfser,
-             licensecheck, ant_unit_tests"
-    description="Run Java and C++ JNI testcases and test plan fragments."
-/>
+    depends="compile, voltdbipc, ee"
+    description="Run Java and C++ JNI testcases and test plan fragments." >
+    <condition property="timeoutLength" value="${timeoutLength}" else='900000'>
+        <isset property="timeoutLength"/>
+    </condition>
+
+    <exec executable="/usr/bin/ant" failonerror="true" timeout="9000000">
+        <arg value="eecheck" />
+        <arg value="junit" />
+        <arg value="distcheck" />
+        <arg value="pythonfser" />
+        <arg value="licensecheck" />
+        <arg value="ant_unit_tests" />
+        <arg value="-Dbuild=${build}" />
+        <arg value="-DtimeoutLength=${timeoutLength}" />
+        <arg value="-DVOLT_REGRESSIONS=${VOLT_REGRESSIONS}" />
+    </exec>
+</target>
 <target name="check_quick"
-    depends="compile, licensecheck, voltdbipc, junit_quick, distcheck,
-             ant_unit_tests"
-    description="Run a subset of Java testcases and test fragments."
-/>
+    depends="compile, voltdbipc"
+    description="Run a subset of Java testcases and test fragments." >
+    <condition property="timeoutLength" value="${timeoutLength}" else='240000'>
+        <isset property="timeoutLength"/>
+    </condition>
+
+    <exec executable="/usr/bin/ant" failonerror="true" timeout="1800000">
+        <arg value="licensecheck" />
+        <arg value="junit_quick" />
+        <arg value="distcheck" />
+        <arg value="ant_unit_tests" />
+        <arg value="-Dbuild=${build}" />
+        <arg value="-DtimeoutLength=${timeoutLength}" />
+        <arg value="-DVOLT_REGRESSIONS=${VOLT_REGRESSIONS}" />
+    </exec>
+</target>
 <target name="all"
     depends="compile, ee, junit, eecheck, doc, eedoc, jars"
     description="Do all tasks."
@@ -921,10 +947,6 @@ TEST CASES
     name="junit_quick"
     description="Tests and suites that run in under 3 minutes under memcheck"
 >
-    <condition property="timeoutLength" value="${timeoutLength}" else='240000'>
-        <isset property="timeoutLength"/>
-    </condition>
-
     <run_junit timeout="${timeoutLength}" printsummary="no">
         <formatters>
             <formatter type="plain" unless="hudson"/>
