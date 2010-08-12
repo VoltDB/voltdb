@@ -46,6 +46,9 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
+import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
+import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.messaging.HostMessenger;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.regressionsuites.LocalCluster;
@@ -66,8 +69,16 @@ public class TestRejoinEndToEnd extends TestCase {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addSchema(schemaPath);
         builder.addPartitionInfo("blah", "ival");
-        builder.addStmtProcedure("Insert", "insert into blah values (?);");
-        builder.addStmtProcedure("InsertSinglePartition", "insert into blah values (?);", "blah.ival:0");
+
+        GroupInfo gi = new GroupInfo("foo", true, true);
+        builder.addGroups(new GroupInfo[] { gi } );
+        UserInfo ui = new UserInfo("ry@nlikesthe", "y@nkees", new String[] { "foo" } );
+        builder.addUsers(new UserInfo[] { ui } );
+
+        ProcedureInfo[] pi = new ProcedureInfo[2];
+        pi[0] = new ProcedureInfo(new String[] { "foo" }, "Insert", "insert into blah values (?);", null);
+        pi[1] = new ProcedureInfo(new String[] { "foo" }, "InsertSinglePartition", "insert into blah values (?);", "blah.ival:0");
+        builder.addProcedures(pi);
         return builder;
     }
 
@@ -268,7 +279,11 @@ public class TestRejoinEndToEnd extends TestCase {
     }
 
     public void testWithFakeSecondHostMessenger() throws Exception {
-        for (int i = 0; failNext(i); i++);
+        // failNext(i) runs the test
+        for (int i = 0; failNext(i); i++) {
+            // makes this less likely to fail for dumbness
+            Thread.sleep(100);
+        }
     }
 
     public void testLocalClusterRecoveringMode() throws Exception {
@@ -299,6 +314,7 @@ public class TestRejoinEndToEnd extends TestCase {
 
     public void testRejoin() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
+        builder.setSecurityEnabled(true);
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         boolean success = cluster.compile(builder, false);
@@ -310,10 +326,13 @@ public class TestRejoinEndToEnd extends TestCase {
         cluster.shutDownSingleHost(0);
         Thread.sleep(100);
 
+        String username = URLEncoder.encode("ry@nlikesthe", "UTF-8");
+        String password = URLEncoder.encode("y@nkees", "UTF-8");
+
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
-        config.m_rejoinToHostAndPort = "localhost:21213";
+        config.m_rejoinToHostAndPort = username + ":" + password + "@localhost:21213";
         ServerThread localServer = new ServerThread(config);
 
         localServer.start();
@@ -325,7 +344,7 @@ public class TestRejoinEndToEnd extends TestCase {
         Client client;
 
         client = ClientFactory.createClient();
-        client.createConnection("localhost", null, null);
+        client.createConnection("localhost", "ry@nlikesthe", "y@nkees");
         response = client.callProcedure("InsertSinglePartition", 0);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         response = client.callProcedure("Insert", 1);
@@ -333,7 +352,7 @@ public class TestRejoinEndToEnd extends TestCase {
         client.close();
 
         client = ClientFactory.createClient();
-        client.createConnection("localhost", 21213, null, null);
+        client.createConnection("localhost", 21213, "ry@nlikesthe", "y@nkees");
         response = client.callProcedure("InsertSinglePartition", 2);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         response = client.callProcedure("Insert", 3);

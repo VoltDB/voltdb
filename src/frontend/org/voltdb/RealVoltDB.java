@@ -17,15 +17,18 @@
 
 package org.voltdb;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.net.UnknownHostException;
 import java.nio.channels.ServerSocketChannel;
 import java.util.ArrayList;
@@ -331,65 +334,7 @@ public class RealVoltDB implements VoltDBInterface
                 m_instanceId = m_messenger.waitForGroupJoin();
             }
             else {
-                // sensible defaults (sorta)
-                int rejoinPort = config.m_internalPort;
-                String rejoinHost = "localhost";
-
-                // this will cause the ExecutionSites to start in recovering mode
-                m_recovering = true;
-
-                int colonIndex = config.m_rejoinToHostAndPort.indexOf(':');
-                if (colonIndex == -1) {
-                    rejoinHost = config.m_rejoinToHostAndPort.trim();
-                }
-                else {
-                    rejoinHost = config.m_rejoinToHostAndPort.substring(0, colonIndex).trim();
-                    rejoinPort = Integer.parseInt(config.m_rejoinToHostAndPort.substring(colonIndex + 1).trim());
-                }
-
-                ServerSocketChannel listener = null;
-                try {
-                    listener = ServerSocketChannel.open();
-                    listener.socket().bind(new InetSocketAddress(config.m_internalPort));
-                } catch (IOException e) {
-                    VLog.log("Problem opening listening rejoin socket: %s", e.getMessage());
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                    System.exit(-1);
-                }
-                m_messenger = new HostMessenger(m_network, listener, m_catalogContext.numberOfNodes, catalogCRC, hostLog);
-
-                Client client = ClientFactory.createClient();
-                ClientResponse response = null;
-                SyncCallback scb = new SyncCallback();
-                try {
-                    client.createConnection(rejoinHost, rejoinPort, null, null);
-                    boolean success = false;
-                    while (!success) {
-                        success = client.callProcedure(scb, "@Rejoin", "localhost", config.m_internalPort);
-                        if (!success) Thread.sleep(100);
-                    }
-                } catch (Exception e) {
-                    VLog.log("Problem connecting client: %s", e.getMessage());
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                    System.exit(-1);
-                }
-
-                m_instanceId = m_messenger.waitForGroupJoin();
-                try {
-                    scb.waitForResponse();
-                    response = scb.getResponse();
-                    client.close();
-                }
-                catch (Exception e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                    System.exit(-1);
-                }
-
-                System.out.println("response:");
-                System.out.println(response);
+                initializeForRejoin(config, catalogCRC);
             }
 
             // Use the host messenger's hostId.
@@ -553,6 +498,113 @@ public class RealVoltDB implements VoltDBInterface
             fivems.start();
 
             hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null);
+        }
+    }
+
+    public void initializeForRejoin(VoltDB.Configuration config, long catalogCRC) {
+     // sensible defaults (sorta)
+        String rejoinHostCredentialString = null;
+        String rejoinHostAddressString = null;
+
+        int rejoinPort = config.m_internalPort;
+        String rejoinHost = null;
+        String rejoinUser = null;
+        String rejoinPass = null;
+
+        // this will cause the ExecutionSites to start in recovering mode
+        m_recovering = true;
+
+        // split a "user:pass@host:port" string into "user:pass" and "host:port"
+        int atSignIndex = config.m_rejoinToHostAndPort.indexOf('@');
+        if (atSignIndex == -1) {
+            rejoinHostAddressString = config.m_rejoinToHostAndPort;
+        }
+        else {
+            rejoinHostCredentialString = config.m_rejoinToHostAndPort.substring(0, atSignIndex).trim();
+            rejoinHostAddressString = config.m_rejoinToHostAndPort.substring(atSignIndex + 1).trim();
+        }
+
+
+        int colonIndex = -1;
+        // split a "user:pass" string into "user" and "pass"
+        if (rejoinHostCredentialString != null) {
+            colonIndex = rejoinHostCredentialString.indexOf(':');
+            if (colonIndex == -1) {
+                rejoinUser = rejoinHostCredentialString.trim();
+                System.out.print("password: ");
+                BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+                try {
+                    rejoinPass = br.readLine();
+                } catch (IOException e) {
+                    hostLog.error("Unable to read passord for rejoining credentials from console.");
+                    System.exit(-1);
+                }
+            }
+            else {
+                rejoinUser = rejoinHostCredentialString.substring(0, colonIndex).trim();
+                rejoinPass = rejoinHostCredentialString.substring(colonIndex + 1).trim();
+            }
+        }
+
+        // split a "host:port" string into "host" and "port"
+        colonIndex = rejoinHostAddressString.indexOf(':');
+        if (colonIndex == -1) {
+            rejoinHost = rejoinHostAddressString.trim();
+            // note rejoinPort has a default
+        }
+        else {
+            rejoinHost = rejoinHostAddressString.substring(0, colonIndex).trim();
+            rejoinPort = Integer.parseInt(rejoinHostAddressString.substring(colonIndex + 1).trim());
+        }
+
+        ServerSocketChannel listener = null;
+        try {
+            listener = ServerSocketChannel.open();
+            listener.socket().bind(new InetSocketAddress(config.m_internalPort));
+        } catch (IOException e) {
+            hostLog.error("Problem opening listening rejoin socket: " + e.getMessage());
+            System.exit(-1);
+        }
+        m_messenger = new HostMessenger(m_network, listener, m_catalogContext.numberOfNodes, catalogCRC, hostLog);
+
+        // make empty strings null
+        if ((rejoinUser != null) && (rejoinUser.length() == 0)) rejoinUser = null;
+        if ((rejoinPass != null) && (rejoinPass.length() == 0)) rejoinPass = null;
+
+        // URL Decode so usernames/passwords can contain weird stuff
+        try {
+            if (rejoinUser != null) rejoinUser = URLDecoder.decode(rejoinUser, "UTF-8");
+            if (rejoinPass != null) rejoinPass = URLDecoder.decode(rejoinPass, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            hostLog.error("Problem URL-decoding credentials for rejoin authentication: " + e.getMessage());
+            System.exit(-1);
+        }
+
+        Client client = ClientFactory.createClient();
+        ClientResponse response = null;
+        SyncCallback scb = new SyncCallback();
+        try {
+            client.createConnection(rejoinHost, rejoinPort, rejoinUser, rejoinPass);
+            client.callProcedure(scb, "@Rejoin", "localhost", config.m_internalPort);
+        }
+        catch (Exception e) {
+            hostLog.error("Problem connecting client: " + e.getMessage());
+            System.exit(-1);
+        }
+
+        m_instanceId = m_messenger.waitForGroupJoin();
+        try {
+            scb.waitForResponse();
+            response = scb.getResponse();
+            client.close();
+            if (response.getStatus() != ClientResponse.SUCCESS) {
+                hostLog.error("Unable to rejoin to cluster with error: " + response.getStatusString());
+                System.exit(-1);
+            }
+        }
+        catch (Exception e) {
+            hostLog.error("Unable to rejoin to cluster with error: " + e.getMessage());
+            System.exit(-1);
         }
     }
 
