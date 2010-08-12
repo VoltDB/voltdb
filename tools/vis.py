@@ -65,7 +65,7 @@ LIMIT %u
             key = (i["time"], i["hosts"])
             if i["latency"] == None:
                 continue
-            if float(i["latency"]) > 40 * i["hosts"]:
+            if float(i["latency"]) > 40:
                 continue
             if key not in latencies \
                     or i["latency"] < latencies[key]["latency"]:
@@ -82,7 +82,8 @@ SELECT resultid as id,
 FROM results
 WHERE time >= '%s'
       AND benchmarkname = 'org.voltdb.benchmark.tpcc.TPCCClient'
-      AND txnpersecond >= hostcount * 30000
+      AND txnpersecond >= hostcount * 32000
+      AND txnpersecond >= 35001
 GROUP BY hostcount, DATE(time)
 ORDER BY time DESC
 LIMIT %u
@@ -223,18 +224,18 @@ def main():
         datenum = matplotlib.dates.date2num(v["time"])
         print "hosts", v["hosts"], "time", v["time"], "tps", v["tps"]
         throughput_map[v["hosts"]]["time"].append(datenum)
-        throughput_map[v["hosts"]]["tps"].append(v["tps"])
+        throughput_map[v["hosts"]]["tps"].append(v["tps"]/v["hosts"])
 
     if 1 in throughput_map:
         pl = Plot("Single Node Performance", "Time", "Throughput (txns/sec)",
                   path + "-throughput-single.png",
                   width, height)
-        v = throughput_map.pop(1)
+        v = throughput_map[1]
         pl.plot(v["time"], v["tps"], COLORS(1), 1)
         pl.close()
 
     if len(throughput_map) > 0:
-        pl = Plot("Performance", "Time", "Throughput (txns/sec)",
+        pl = Plot("Per Node Performance", "Time", "Throughput (txns/sec/node)",
                   path + "-throughput.png", width, height)
         for k in throughput_map.iterkeys():
             v = throughput_map[k]
