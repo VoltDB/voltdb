@@ -100,13 +100,19 @@ public class JarReader {
     }
 
     static public long crcForJar(String jarpath) throws IOException {
-        InputStream fin = openJarFile(jarpath);
-        if (fin == null)
+        JarInputStream jar_in = openJar(jarpath);
+        if (jar_in == null)
             throw new FileNotFoundException();
         CRC32 crc = new CRC32();
-        int b = -1;
-        while ((b = fin.read()) != -1)
-            crc.update(b);
+
+        JarEntry next_entry = jar_in.getNextJarEntry();
+        while (next_entry != null)
+        {
+            int b = -1;
+            while ((b = jar_in.read()) != -1)
+                crc.update(b);
+            next_entry = jar_in.getNextJarEntry();
+        }
         return crc.getValue();
     }
 

@@ -119,6 +119,7 @@ public class JarBuilder {
             JarEntry entry = new JarEntry(key);
             try {
                 entry.setSize(bytes.length);
+                entry.setTime(System.currentTimeMillis());
                 jarOut.putNextEntry(entry);
                 jarOut.write(bytes);
                 jarOut.flush();

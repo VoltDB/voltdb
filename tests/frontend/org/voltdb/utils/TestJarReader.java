@@ -30,6 +30,8 @@ import java.io.LineNumberReader;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
+import java.util.jar.JarEntry;
+import java.util.jar.JarInputStream;
 
 import junit.framework.TestCase;
 
@@ -41,14 +43,12 @@ import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestJarReader extends TestCase {
 
-    protected File jarPath;
-    protected Catalog catalog;
-    protected Database catalog_db;
+    protected File m_jarPath;
+    protected Catalog m_catalog;
+    protected Database m_catalogDb;
 
-    @Override
-    protected void setUp() throws Exception {
-        super.setUp();
-
+    private Catalog createTestJarFile(String jarFileName, boolean adhoc)
+    {
         String schemaPath = "";
         try {
             URL url = TPCCClient.class.getResource("tpcc-ddl.sql");
@@ -57,51 +57,51 @@ public class TestJarReader extends TestCase {
             e.printStackTrace();
             System.exit(-1);
         }
-
         String simpleProject =
             "<?xml version=\"1.0\"?>\n" +
             "<project>" +
             "<database name='database'>" +
             "<groups>" +
-            "<group adhoc='true' name='default' sysproc='true'/>" +
+            "<group adhoc='" + Boolean.toString(adhoc) + "' name='default' sysproc='true'/>" +
             "</groups>" +
             "<schemas><schema path='" + schemaPath + "' /></schemas>" +
             "<procedures><procedure class='org.voltdb.compiler.procedures.TPCCTestProc' /></procedures>" +
             "<partitions><partition table='WAREHOUSE' column='W_ID' /></partitions>" +
             "</database>" +
             "</project>";
-
         System.out.println(simpleProject);
-
         File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
         String projectPath = projectFile.getPath();
-
         VoltCompiler compiler = new VoltCompiler();
-        assertTrue(compiler.compile(projectPath, "testout.jar", System.out, null));
+        assertTrue(compiler.compile(projectPath, jarFileName, System.out, null));
+        return compiler.getCatalog();
+    }
 
-        // Now read the jar file back in and make sure that we can grab the
-        // class file from it using JarClassLoader
-        this.jarPath = new File("testout.jar");
-        this.catalog = compiler.getCatalog();
-        assertNotNull(this.catalog);
-        this.catalog_db = this.catalog.getClusters().get("cluster").getDatabases().get("database");
-        assertNotNull(this.catalog_db);
+    @Override
+    protected void setUp() throws Exception {
+        System.out.print("START: " + System.currentTimeMillis());
+        super.setUp();
+        m_catalog = createTestJarFile("testout.jar", true);
+        assertNotNull(m_catalog);
+        m_catalogDb = m_catalog.getClusters().get("cluster").getDatabases().get("database");
+        assertNotNull(m_catalogDb);
+        m_jarPath = new File("testout.jar");
     }
 
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();
-        if (jarPath != null) assertTrue(jarPath.delete());
+        if (m_jarPath != null) assertTrue(m_jarPath.delete());
     }
 
     /**
      *
      */
     public void testReadFileFromJarfile() throws IOException {
-        String catalog0 = this.catalog.serialize();
+        String catalog0 = this.m_catalog.serialize();
         assertTrue(catalog0.length() > 0);
 
-        String catalog1 = JarReader.readFileFromJarfile(this.jarPath.getAbsolutePath(), CatalogUtil.CATALOG_FILENAME);
+        String catalog1 = JarReader.readFileFromJarfile(this.m_jarPath.getAbsolutePath(), CatalogUtil.CATALOG_FILENAME);
         assertTrue(catalog1.length() > 0);
 
         assertEquals(catalog0.length(), catalog1.length());
@@ -123,5 +123,42 @@ public class TestJarReader extends TestCase {
             ex.printStackTrace();
             assertTrue(false);
         }
+    }
+
+    public void testIdenticalJarContentsMatchCRCs()
+    throws IOException, InterruptedException
+    {
+        // Create a second jarfile with identical contents
+        // Sleep for 5 seconds so the timestamps will differ
+        // and cause different global CRCs
+        Thread.sleep(5000);
+        createTestJarFile("testout-dupe.jar", true);
+        long crc1 = JarReader.crcForJar("testout.jar");
+        long crc2 = JarReader.crcForJar("testout-dupe.jar");
+        assertEquals(crc1, crc2);
+
+        // Check the modification times and make sure
+        // that they differ in the two jars
+        JarInputStream j_in = JarReader.openJar("testout.jar");
+        JarEntry entry = j_in.getNextJarEntry();
+        long time1 = entry.getTime();
+        j_in.close();
+        j_in = JarReader.openJar("testout-dupe.jar");
+        entry = j_in.getNextJarEntry();
+        long time2 = entry.getTime();
+        assertFalse(time1 == time2);
+    }
+
+    public void testDifferentJarContentsDontMatchCRCs()
+    throws IOException, InterruptedException
+    {
+        // Create a second jarfile with identical contents
+        // Sleep for 5 seconds so the timestamps will differ
+        // and cause different global CRCs
+        Thread.sleep(5000);
+        createTestJarFile("testout-dupe.jar", false);
+        long crc1 = JarReader.crcForJar("testout.jar");
+        long crc2 = JarReader.crcForJar("testout-dupe.jar");
+        assertFalse(crc1 == crc2);
     }
 }
