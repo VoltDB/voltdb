@@ -48,7 +48,7 @@ We have included a multi-threaded client (ClientThreadedKV.java) that creates a 
 ant targets described
 ---------------------
 
-ant                   : compile all Java clients and stored procedures, build the catalog
+ant                   : compile all Java clients and stored procedures, build the catalog, and start the server
 
 ant server            : start the server
 
@@ -56,7 +56,7 @@ ant client            : start the client, [if needed, initialize the given numbe
 
 ant client-threaded   : start the multi-threaded client, [if needed, initialize the given number of key-value pairs (puts),] begin normal client processing (gets and puts)
 
-ant catalog           : build the catalog
+ant catalog           : compile sources and build the catalog
 
 ant clean             : remove compiled files
     

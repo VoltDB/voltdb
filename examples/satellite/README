@@ -5,11 +5,11 @@ The satellite example is a simulation of satellite tracking. The example contain
 
 The easiest way to run the example is to use ant to build and run the application. You will need three terminal windows:
 
-- In window #1, run "ant" and then "ant server"
+- In window #1, run "ant" 
 - In window #2. run "ant client"
 - In window #3, run "ant tracker"
 
-The "server" target creates the database. The "client" target runs the signal client, pretending to send location information for 5 satellites (by default). The "tracker" client displays a window trakcing the location of the satellites.
+The default "ant" target compiles the sources, builds the catalog, and creates the database. The "client" target runs the signal client, pretending to send location information for 5 satellites (by default). The "tracker" client displays a window trakcing the location of the satellites.
 
 It is also possible to run multiple signal clients, so you can demonstrate in real-time that the tracker is pulling data out of the database (as new satellites appear on the map). To customize the signal.Client, you can specify the number of satellites it simulates and their country of origin:
 

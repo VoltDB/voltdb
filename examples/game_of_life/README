@@ -17,7 +17,7 @@ Additionally, a second client target "gui" will display the live grid.
 ant targets
 -----------
 
-ant                 : compile all Java clients and stored procedures, build the catalog
+ant                 : compile all Java clients and stored procedures, build the catalog, and start the server
 
 ant server          : start the server
 
@@ -25,6 +25,6 @@ ant client          : start the client to evolve the grid
 
 ant gui             : start the client to display the grid
 
-ant catalog         : build the catalog
+ant catalog         : compile sources and build the catalog
 
 ant clean           : remove compiled files

@@ -22,7 +22,7 @@ Additionally, a second client target "cull" can be run that will periodically de
 ant targets
 -----------
 
-ant                 : compile all Java clients and stored procedures, build the catalog
+ant                 : compile all Java clients and stored procedures, build the catalog, and start the server
 
 ant server          : start the server
 

@@ -1,0 +1,15 @@
+<?xml version="1.0" ?>
+<project default="default" name="VoltDB Tutorial: Hello World!">
+
+<property name='catalog' value='helloworld.jar'/>
+<property name='src.dir' location='./'/>
+<property name='procedures.dir' location='./'/>
+
+<import file="../includes/basebuild.xml"/>
+
+<target name="client" description='Start Hello World client.'>
+  <invoke-java classname="Client"/>
+</target>
+
+</project>
+
