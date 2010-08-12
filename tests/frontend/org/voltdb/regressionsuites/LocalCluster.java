@@ -63,6 +63,7 @@ public class LocalCluster implements VoltServerConfig {
     boolean m_hasLocalServer = true;
     String m_pathToDeployment;
     int m_pathToDeploymentOffset;
+    int m_rejoinOffset;
     FailureState m_failureState;
 
     // state
@@ -197,11 +198,14 @@ public class LocalCluster implements VoltServerConfig {
                                            "deployment",
                                            "",
                                            "port",
+                                           "-1",
+                                           "rejoinhost",
                                            "-1");
 
         // when we actually append a port value and deployment file, these will be correct
-        m_portOffset = m_procBuilder.command().size() - 1;
-        m_pathToDeploymentOffset = m_procBuilder.command().size() - 3;
+        m_portOffset = m_procBuilder.command().size() - 3;
+        m_pathToDeploymentOffset = m_procBuilder.command().size() - 5;
+        m_rejoinOffset = m_procBuilder.command().size() - 1;
 
         for (String s : m_procBuilder.command()) {
             System.out.println(s);
@@ -279,6 +283,7 @@ public class LocalCluster implements VoltServerConfig {
             try {
                 m_procBuilder.command().set(m_portOffset, String.valueOf(VoltDB.DEFAULT_PORT + i));
                 m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
+                m_procBuilder.command().set(m_rejoinOffset, "");
 
                 Process proc = m_procBuilder.start();
                 m_cluster.add(proc);
@@ -375,8 +380,7 @@ public class LocalCluster implements VoltServerConfig {
             try {
                 m_procBuilder.command().set(m_portOffset, String.valueOf(portNo));
                 m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
-                // this is the command line magic to make this work
-                m_procBuilder.command().add("rejoinhost localhost:" + String.valueOf(portNoToRejoin));
+                m_procBuilder.command().set(m_rejoinOffset, "localhost:" + String.valueOf(portNoToRejoin));
 
                 Process proc = m_procBuilder.start();
                 // replace the existing dead proc
@@ -479,8 +483,14 @@ public class LocalCluster implements VoltServerConfig {
 
     @Override
     public String getName() {
-        return "localCluster-" + String.valueOf(m_siteCount) +
-               "-" + String.valueOf(m_hostCount) + "-" + m_target.display.toUpperCase();
+        String prefix = "localCluster";
+        if (m_failureState == FailureState.ONE_FAILURE)
+            prefix += "OneFail";
+        if (m_failureState == FailureState.ONE_RECOVERING)
+            prefix += "OneRecov";
+
+        return prefix + "-" + String.valueOf(m_siteCount) + "-" +
+            String.valueOf(m_hostCount) + "-" + m_target.display.toUpperCase();
     }
 
     @Override

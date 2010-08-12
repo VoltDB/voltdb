@@ -186,9 +186,13 @@ public class VoltDB {
 
                 else if (arg.equals("rejoinhost")) {
                     m_rejoinToHostAndPort = args[++i].trim();
+                    if (m_rejoinToHostAndPort.compareTo("") == 0)
+                        m_rejoinToHostAndPort = null;
                 }
                 else if (arg.startsWith("rejoinhost ")) {
                     m_rejoinToHostAndPort = arg.substring("rejoinhost ".length()).trim();
+                    if (m_rejoinToHostAndPort.compareTo("") == 0)
+                        m_rejoinToHostAndPort = null;
                 }
 
                 else if (arg.equals("catalog")) {

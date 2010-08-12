@@ -264,6 +264,8 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         project.addStmtProcedure("InsertNewOrder",
                 "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID: 2");
 
+        boolean success;
+
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 1 Local Site/Partitions running on JNI backend
         /////////////////////////////////////////////////////////////
@@ -272,7 +274,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         config = new LocalSingleProcessServer("sqlfeatures-onesite.jar", 1, BackendTarget.NATIVE_EE_JNI);
 
         // build the jarfile
-        boolean success = config.compile(project);
+        success = config.compile(project);
         assert(success);
 
         // add this config to the set of tests to run
@@ -307,6 +309,15 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         config = new LocalCluster("sqlfeatures-cluster.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        success = config.compile(project);
+        assert(success);
+        builder.addServerConfig(config);
+
+        /////////////////////////////////////////////////////////////
+        // CONFIG #5: Local Cluster (of processes) with recovering node
+        /////////////////////////////////////////////////////////////
+
+        config = new LocalCluster("sqlfeatures-cluster-rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_RECOVERING);
         success = config.compile(project);
         assert(success);
         builder.addServerConfig(config);

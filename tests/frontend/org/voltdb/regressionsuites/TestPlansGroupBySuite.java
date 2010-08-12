@@ -645,13 +645,6 @@ public class TestPlansGroupBySuite extends RegressionSuite {
                                   1, BackendTarget.NATIVE_EE_JNI);
         config.compile(project);
 
-        // Cluster with failure
-        /*builder.addServerConfig(config);
-        config = new LocalCluster("plansgroupby-cluster.jar", 2, 2,
-                1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_FAILURE);
-        //config.compile(project);
-        builder.addServerConfig(config);*/
-
         return builder;
     }
 

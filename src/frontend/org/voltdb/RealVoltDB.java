@@ -352,6 +352,7 @@ public class RealVoltDB implements VoltDBInterface
                     listener = ServerSocketChannel.open();
                     listener.socket().bind(new InetSocketAddress(config.m_internalPort));
                 } catch (IOException e) {
+                    VLog.log("Problem opening listening rejoin socket: %s", e.getMessage());
                     // TODO Auto-generated catch block
                     e.printStackTrace();
                     System.exit(-1);
@@ -369,6 +370,7 @@ public class RealVoltDB implements VoltDBInterface
                         if (!success) Thread.sleep(100);
                     }
                 } catch (Exception e) {
+                    VLog.log("Problem connecting client: %s", e.getMessage());
                     // TODO Auto-generated catch block
                     e.printStackTrace();
                     System.exit(-1);
