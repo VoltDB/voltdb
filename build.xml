@@ -947,6 +947,7 @@ TEST CASES
                 <exclude name="**/*$*.class"/>
                 <exclude name="**/TestMaliciousClientSuite.class" />
                 <exclude name="**/TestELTSuite.class" />
+                <exclude name="**/TestFailuresSuite.class" />
                 <exclude name="**/TestFixedSQLSuite.class" />
                 <exclude name="**/TestPlansGroupBySuite.class" />
                 <exclude name="**/TestRollbackSuite.class" />
