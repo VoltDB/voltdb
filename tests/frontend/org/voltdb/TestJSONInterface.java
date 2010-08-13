@@ -358,7 +358,8 @@ public class TestJSONInterface extends TestCase {
         Response r = responseFromJSON(response);
         assertEquals(1, r.status);
 
-        // Dunno WTF requires me to do this...
+        // If this line doesn't compile, right click the file in the package explorer.
+        // Select the properties menu. Set the text file encoding to UTF-8.
         char[] test1 = {'こ', 'ん', 'に', 'ち', 'は' };
         String test2 = new String(test1);
 
