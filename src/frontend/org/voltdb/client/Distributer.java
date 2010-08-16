@@ -492,39 +492,46 @@ class Distributer {
     }
 
     synchronized void createConnection(String host, String program, String password, int port)
-    throws UnknownHostException, IOException
-{
-    final Object connectionStuff[] =
-        ConnectionUtil.getAuthenticatedConnection(host, program, password, port);
-    final SocketChannel aChannel = (SocketChannel)connectionStuff[0];
-    final long numbers[] = (long[])connectionStuff[1];
-    if (m_clusterInstanceId == null) {
-        long timestamp = numbers[2];
-        int addr = (int)numbers[3];
-        m_clusterInstanceId = new Object[] { timestamp, addr };
-        if (m_statsLoader != null) {
-            try {
-                m_statsLoader.start( timestamp, addr);
-            } catch (SQLException e) {
-                throw new IOException(e);
+        throws UnknownHostException, IOException
+    {
+        byte hashedPassword[] = ConnectionUtil.getHashedPassword(password);
+        createConnectionWithHashedCredentials(host, program, hashedPassword, port);
+    }
+
+    public void createConnectionWithHashedCredentials(String host, String program, byte[] hashedPassword, int port)
+        throws UnknownHostException, IOException
+    {
+        final Object connectionStuff[] =
+            ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port);
+        final SocketChannel aChannel = (SocketChannel)connectionStuff[0];
+        final long numbers[] = (long[])connectionStuff[1];
+        if (m_clusterInstanceId == null) {
+            long timestamp = numbers[2];
+            int addr = (int)numbers[3];
+            m_clusterInstanceId = new Object[] { timestamp, addr };
+            if (m_statsLoader != null) {
+                try {
+                    m_statsLoader.start( timestamp, addr);
+                } catch (SQLException e) {
+                    throw new IOException(e);
+                }
+            }
+        } else {
+            if (!(((Long)m_clusterInstanceId[0]).longValue() == numbers[2]) ||
+                !(((Integer)m_clusterInstanceId[1]).longValue() == numbers[3])) {
+                aChannel.close();
+                throw new IOException(
+                        "Cluster instance id mismatch. Current is " + m_clusterInstanceId[0] + "," + m_clusterInstanceId[1]
+                        + " and server's was " + numbers[2] + "," + numbers[3]);
             }
         }
-    } else {
-        if (!(((Long)m_clusterInstanceId[0]).longValue() == numbers[2]) ||
-            !(((Integer)m_clusterInstanceId[1]).longValue() == numbers[3])) {
-            aChannel.close();
-            throw new IOException(
-                    "Cluster instance id mismatch. Current is " + m_clusterInstanceId[0] + "," + m_clusterInstanceId[1]
-                    + " and server's was " + numbers[2] + "," + numbers[3]);
-        }
+        m_buildString = (String)connectionStuff[2];
+        NodeConnection cxn = new NodeConnection(numbers);
+        m_connections.add(cxn);
+        Connection c = m_network.registerChannel( aChannel, cxn);
+        cxn.m_hostname = c.getHostname();
+        cxn.m_connection = c;
     }
-    m_buildString = (String)connectionStuff[2];
-    NodeConnection cxn = new NodeConnection(numbers);
-    m_connections.add(cxn);
-    Connection c = m_network.registerChannel( aChannel, cxn);
-    cxn.m_hostname = c.getHostname();
-    cxn.m_connection = c;
-}
 
 //    private HashMap<String, Long> reportedSizes = new HashMap<String, Long>();
 

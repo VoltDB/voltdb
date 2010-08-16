@@ -19,6 +19,7 @@ package org.voltdb.client;
 
 import java.io.IOException;
 import java.net.UnknownHostException;
+import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
@@ -36,6 +37,12 @@ final class ClientImpl implements Client {
     private final AtomicLong m_handle = new AtomicLong(Long.MIN_VALUE);
 
     private final int m_expectedOutgoingMessageSize;
+
+    // stored credentials
+    private boolean m_credentialsSet = false;
+    private String m_username = null;
+    private byte[] m_hashedPassword = null;
+    private int m_passwordHashCode = 0;
 
     /****************************************************
                         Public API
@@ -97,6 +104,44 @@ final class ClientImpl implements Client {
         m_distributer.addClientStatusListener(new CSL());
     }
 
+    private boolean verifyCredentialsAreAlwaysTheSame(String username, byte[] hashedPassword) {
+        // handle the unauthenticated case
+        if (m_username == null) {
+            m_username = "";
+            return true;
+        }
+
+        synchronized(m_username) {
+            if (m_credentialsSet == false) {
+                m_credentialsSet = true;
+                m_username = username;
+                if (m_hashedPassword != null) {
+                    m_hashedPassword = Arrays.copyOf(hashedPassword, hashedPassword.length);
+                    m_passwordHashCode = Arrays.hashCode(hashedPassword);
+                }
+                return true;
+            }
+            else {
+                if (m_username != username) return false;
+                if (hashedPassword == null)
+                    return m_hashedPassword == null;
+                else
+                    for (int i = 0; i < hashedPassword.length; i++)
+                        if (hashedPassword[i] != m_hashedPassword[i])
+                            return false;
+                return true;
+            }
+        }
+    }
+
+    public String getUsername() {
+        return m_username;
+    }
+
+    public int getPasswordHashCode() {
+        return m_passwordHashCode;
+    }
+
     public void createConnection(String host, String program, String password)
     throws UnknownHostException, IOException
     {
@@ -115,12 +160,31 @@ final class ClientImpl implements Client {
     public void createConnection(String host, int port, String program, String password)
         throws UnknownHostException, IOException
     {
+        if (password == null) password = "";
+        byte[] hashedPassword = ConnectionUtil.getHashedPassword(password);
+        createConnectionWithHashedCredentials(host, port, program, hashedPassword);
+    }
+
+    public void createConnectionWithHashedCredentials(String host, int port, String program, byte[] hashedPassword)
+        throws IOException
+    {
         if (m_isShutdown) {
             throw new IOException("Client instance is shutdown");
         }
         final String subProgram = (program == null) ? "" : program;
-        final String subPassword = (password == null) ? "" : password;
-        m_distributer.createConnection(host, subProgram, subPassword, port);
+        final byte[] subPassword = (hashedPassword == null) ? ConnectionUtil.getHashedPassword("") : hashedPassword;
+
+        if (!verifyCredentialsAreAlwaysTheSame(subProgram, subPassword)) {
+            throw new IOException("New connection authorization credentials do not match previous credentials for client.");
+        }
+
+        try {
+            m_distributer.createConnectionWithHashedCredentials(host, subProgram, subPassword, port);
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            throw new IOException("foo", e);
+        }
     }
 
     /**

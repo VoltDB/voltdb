@@ -19,6 +19,7 @@ package org.voltdb.client;
 
 import java.io.EOFException;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -83,6 +84,31 @@ public class ConnectionUtil {
     private static final AtomicLong m_handle = new AtomicLong(Long.MIN_VALUE);
 
     /**
+     * Get a hashed password using SHA-1 in a consistent way.
+     * @param password The password to encode.
+     * @return The bytes of the hashed password.
+     */
+    public static byte[] getHashedPassword(String password) {
+        if (password == null)
+            return null;
+
+        MessageDigest md = null;
+        try {
+            md = MessageDigest.getInstance("SHA-1");
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+            System.exit(-1);
+        }
+        byte hashedPassword[] = null;
+        try {
+            hashedPassword = md.digest(password.getBytes("UTF-8"));
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException("JVM doesn't support UTF-8. Please use a supported JVM", e);
+        }
+        return hashedPassword;
+    }
+
+    /**
      * Create a connection to a Volt server and authenticate the connection.
      * @param host
      * @param username
@@ -95,9 +121,9 @@ public class ConnectionUtil {
      * The last object is the build string
      */
     public static Object[] getAuthenticatedConnection(
-            String host, String username, String password, int port) throws IOException
+            String host, String username, byte[] hashedPassword, int port) throws IOException
     {
-        return getAuthenticatedConnection("database", host, username, password, port);
+        return getAuthenticatedConnection("database", host, username, hashedPassword, port);
     }
 
     /**
@@ -113,9 +139,9 @@ public class ConnectionUtil {
      * The last object is the build string
      */
     public static Object[] getAuthenticatedExportConnection(
-            String host, String username, String password, int port) throws IOException
+            String host, String username, byte[] hashedPassword, int port) throws IOException
     {
-        return getAuthenticatedConnection("export", host, username, password, port);
+        return getAuthenticatedConnection("export", host, username, hashedPassword, port);
     }
 
     public static String getHostnameOrAddress() {
@@ -176,7 +202,7 @@ public class ConnectionUtil {
         }
     }
     private static Object[] getAuthenticatedConnection(
-            String service, String host, String username, String password, int port)
+            String service, String host, String username, byte[] hashedPassword, int port)
     throws IOException {
         Object returnArray[] = new Object[3];
         boolean success = false;
@@ -199,20 +225,12 @@ public class ConnectionUtil {
              */
             aChannel.configureBlocking(true);
             aChannel.socket().setTcpNoDelay(true);
-            MessageDigest md = null;
-            try {
-                md = MessageDigest.getInstance("SHA-1");
-            } catch (NoSuchAlgorithmException e) {
-                e.printStackTrace();
-                System.exit(-1);
-            }
-            byte passwordHash[] = md.digest(password.getBytes());
             FastSerializer fs = new FastSerializer();
             fs.writeInt(0);             // placeholder for length
             fs.writeByte(0);            // version
             fs.writeString(service);    // data service (export|database)
             fs.writeString(username);
-            fs.write(passwordHash);
+            fs.write(hashedPassword);
             final ByteBuffer fsBuffer = fs.getBuffer();
             final ByteBuffer b = ByteBuffer.allocate(fsBuffer.remaining());
             b.put(fsBuffer);

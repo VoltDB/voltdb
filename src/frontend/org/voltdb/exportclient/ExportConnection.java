@@ -75,11 +75,12 @@ public class ExportConnection implements Runnable {
     public void openELTConnection() throws IOException
     {
         m_logger.info("Starting EL Client socket to: " + m_connectionName);
+        byte hashedPassword[] = ConnectionUtil.getHashedPassword(m_password);
         Object[] cxndata =
             ConnectionUtil.
             getAuthenticatedExportConnection(m_serverAddr.getHostName(),
                                              m_username,
-                                             m_password,
+                                             hashedPassword,
                                              m_serverAddr.getPort());
 
         m_socket = (SocketChannel) cxndata[0];

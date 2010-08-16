@@ -44,7 +44,6 @@ import org.voltdb.network.Connection;
 import org.voltdb.network.QueueMonitor;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.network.VoltProtocolHandler;
-import org.voltdb.client.UncaughtExceptionHandler;
 
 public class TestDistributer extends TestCase {
 
@@ -398,7 +397,7 @@ public class TestDistributer extends TestCase {
         final String hostname = "doesnotexist";
         boolean threwException = false;
         try {
-            ConnectionUtil.getAuthenticatedConnection(hostname, "", "", 32);
+            ConnectionUtil.getAuthenticatedConnection(hostname, "", new byte[0], 32);
         } catch (java.net.UnknownHostException e) {
             threwException = true;
             assertTrue(e.getMessage().equals(hostname));

@@ -19,38 +19,47 @@ package org.voltdb;
 
 import java.util.Properties;
 
+import org.voltdb.client.AuthenticatedConnectionCache;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.SyncCallback;
 
 public class HTTPClientInterface {
 
-    Client m_client = null;
+    AuthenticatedConnectionCache m_connections = null;
+    static final int CACHE_TARGET_SIZE = 10;
 
     public String process(String uri, String method, Properties header, Properties parms) {
         String msg;
 
+        Client client = null;
+
         try {
-            if (m_client == null) {
-                m_client = ClientFactory.createClient();
-                m_client.createConnection("localhost", null, null);
+            if (m_connections == null) {
+                int port = VoltDB.instance().getConfig().m_port;
+                m_connections = new AuthenticatedConnectionCache(10, "localhost", port);
             }
 
-            //String username = parms.getProperty("User");
-            //String password = parms.getProperty("Password");
+            String username = parms.getProperty("User");
+            String password = parms.getProperty("Password");
             String procName = parms.getProperty("Procedure");
             String params = parms.getProperty("Parameters");
+
+            byte[] hashedPassword = null;
+            if (password != null)
+                hashedPassword = password.getBytes("UTF-8");
+
+            client = m_connections.getClient(username, hashedPassword);
 
             SyncCallback scb = new SyncCallback();
             boolean success;
 
             if (params != null) {
                 ParameterSet paramSet = ParameterSet.fromJSONString(params);
-                success =  m_client.callProcedure(scb, procName, paramSet.toArray());
+                success =  client.callProcedure(scb, procName, paramSet.toArray());
             }
             else {
-                success = m_client.callProcedure(scb, procName);
+                success = client.callProcedure(scb, procName);
             }
             if (!success) {
                 throw new Exception("Server is not accepting work at this time.");
@@ -65,8 +74,13 @@ public class HTTPClientInterface {
             msg = e.getMessage();
             ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
             e.printStackTrace();
-            m_client = null;
             msg = rimpl.toJSONString();
+        }
+        finally {
+            if (client != null) {
+                assert(m_connections != null);
+                m_connections.releaseClient(client);
+            }
         }
 
         return msg;
