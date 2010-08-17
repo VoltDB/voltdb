@@ -44,6 +44,26 @@ public class TestFixedSQLSuite extends RegressionSuite {
     /** Procedures used by this suite */
     static final Class<?>[] PROCEDURES = { Insert.class };
 
+    public void testInsertNullPartitionString() throws IOException, ProcCallException
+    {
+        // This test is for issue ENG-697
+        Client client = getClient();
+        boolean caught = false;
+        try
+        {
+            client.callProcedure("InsertNullString", null, 0, 1);
+        }
+        catch (final ProcCallException e)
+        {
+            if (e.getMessage().contains("CONSTRAINT VIOLATION"))
+                caught = true;
+            else {
+                e.printStackTrace();
+                fail();
+            }
+        }
+        assertTrue(caught);
+    }
 
     public void testTicket309() throws IOException, ProcCallException
     {
@@ -933,9 +953,12 @@ public class TestFixedSQLSuite extends RegressionSuite {
         project.addPartitionInfo("P2", "ID");
         project.addPartitionInfo("ASSET", "ASSET_ID");
         project.addPartitionInfo("OBJECT_DETAIL", "OBJECT_DETAIL_ID");
+        project.addPartitionInfo("STRINGPART", "NAME");
         project.addProcedures(PROCEDURES);
         project.addStmtProcedure("Eng397Limit1", "Select P1.NUM from P1 order by P1.NUM limit ?;");
         //project.addStmtProcedure("Eng490Select", "SELECT A.ASSET_ID, A.OBJECT_DETAIL_ID,  OD.OBJECT_DETAIL_ID FROM ASSET A, OBJECT_DETAIL OD WHERE A.OBJECT_DETAIL_ID = OD.OBJECT_DETAIL_ID;");
+        project.addStmtProcedure("InsertNullString", "Insert into STRINGPART values (?, ?, ?);",
+                                 "STRINGPART.NAME: 0");
 
         // CONFIG #1: Local Site/Partitions running on IPC backend
         // config = new LocalSingleProcessServer("sqltypes-onesite.jar", 1, BackendTarget.NATIVE_EE_IPC);

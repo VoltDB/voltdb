@@ -18,13 +18,15 @@
 #ifndef THEHASHINATOR_H_
 #define THEHASHINATOR_H_
 
+#include "common/FatalException.hpp"
+#include "common/NValue.hpp"
+#include "common/ValueFactory.hpp"
+#include "common/ValuePeeker.hpp"
+
 #include <cstring>
 #include <string>
 #include <cassert>
-#include <vector>
 #include <stdlib.h>
-#include <boost/foreach.hpp>
-#include "common/FatalException.hpp"
 
 namespace voltdb {
 
@@ -34,6 +36,51 @@ namespace voltdb {
  */
 class TheHashinator {
   public:
+
+    /**
+     * Given an NValue, pick a partition to store the data
+     *
+     * @param value the NValue to hash.
+     * @param partitionCount The number of partitions to choose from.
+     * @return A value between 0 and partitionCount-1, hopefully
+     * pretty evenly distributed
+     *
+     * FUTURE: This could get pushed into NValue at some point.
+     * However, since we currently have two matching implementations
+     * of hashinate, it's nice to centralize and isolate the code here.
+     */
+    static int32_t hashinate(NValue value, int32_t partitionCount)
+    {
+        // All null values hash to partition 0
+        if (value.isNull())
+        {
+            return 0;
+        }
+        ValueType val_type = ValuePeeker::peekValueType(value);
+        switch (val_type)
+        {
+        case VALUE_TYPE_TINYINT:
+        case VALUE_TYPE_SMALLINT:
+        case VALUE_TYPE_INTEGER:
+        case VALUE_TYPE_BIGINT:
+        {
+            return hashinate(ValuePeeker::peekAsRawInt64(value),
+                             partitionCount);
+        }
+        case VALUE_TYPE_VARCHAR:
+        {
+            return hashinate(reinterpret_cast<char*>(ValuePeeker::peekObjectValue(value)),
+                             ValuePeeker::peekObjectLength(value),
+                             partitionCount);
+        }
+        default:
+            // XXX-IZZY MAYBE THIS SHOULD BE NON-FATAL?
+            throwFatalException("Attempted to hashinate an unsupported type: %s",
+                                getTypeName(val_type).c_str());
+        }
+    }
+
+ private:
 
     /**
      * Given a long value, pick a partition to store the data.

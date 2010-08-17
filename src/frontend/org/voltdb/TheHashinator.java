@@ -30,7 +30,7 @@ import org.voltdb.utils.LogKeys;
  * really. It'll get more complicated if you give it time.
  */
 public abstract class TheHashinator {
-    static int partitionCount;
+    static int catalogPartitionCount;
     private static final VoltLogger hostLogger = new VoltLogger("HOST");
 
     /**
@@ -39,7 +39,7 @@ public abstract class TheHashinator {
      */
     public static void initialize(Catalog catalog) {
         Cluster cluster = catalog.getClusters().get("cluster");
-        partitionCount = cluster.getPartitions().size();
+        catalogPartitionCount = cluster.getPartitions().size();
     }
 
     /**
@@ -91,7 +91,7 @@ public abstract class TheHashinator {
      * @return The id of the partition desired.
      */
     public static int hashToPartition(Object obj) {
-        return (hashToPartition(obj, TheHashinator.partitionCount));
+        return (hashToPartition(obj, TheHashinator.catalogPartitionCount));
     }
 
     /**
@@ -102,7 +102,11 @@ public abstract class TheHashinator {
      */
     public static int hashToPartition(Object obj, int partitionCount) {
         int index = 0;
-        if (obj instanceof Long) {
+        if (obj == null || VoltType.isNullVoltType(obj))
+        {
+            index = 0;
+        }
+        else if (obj instanceof Long) {
             long value = ((Long) obj).longValue();
             index = hashinate(value, partitionCount);
         } else if (obj instanceof String) {

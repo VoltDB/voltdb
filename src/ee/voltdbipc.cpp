@@ -31,6 +31,7 @@
 #include "common/FatalException.hpp"
 #include "common/SegvException.hpp"
 #include "common/RecoveryProtoMessage.h"
+#include "common/TheHashinator.h"
 #include "execution/IPCTopend.h"
 #include "execution/VoltDBEngine.h"
 
@@ -180,6 +181,12 @@ typedef struct {
     int32_t tableId;
 }__attribute__((packed)) table_hash_code;
 
+typedef struct {
+    struct ipc_command cmd;
+    int32_t partitionCount;
+    char data[0];
+}__attribute__((packed)) hashinate_msg;
+
 /*
  * Header for an ELT action.
  */
@@ -314,6 +321,11 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
       case 22:
           tableHashCode(cmd);
           result = kErrorCode_None;
+          break;
+      case 23:
+          hashinate(cmd);
+          result = kErrorCode_None;
+          break;
       default:
         result = stub(cmd);
     }
@@ -994,6 +1006,35 @@ void VoltDBIPC::eltAction(struct ipc_command *cmd) {
 
     // write the poll data. It is at least 4 bytes of length prefix.
     writeOrDie(m_fd, (unsigned char*)(m_engine->getReusedResultBuffer()), buflength);
+}
+
+void VoltDBIPC::hashinate(struct ipc_command* cmd)
+{
+    hashinate_msg* hash = (hashinate_msg*)cmd;
+    NValueArray& params = m_engine->getParameterContainer();
+
+    int32_t partCount = ntohl(hash->partitionCount);
+    void* offset = hash->data;
+    int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(hash));
+    ReferenceSerializeInput serialize_in(offset, sz);
+
+    int retval = -1;
+    try {
+        int cnt = serialize_in.readShort();
+        assert(cnt> -1);
+        Pool *pool = m_engine->getStringPool();
+        deserializeParameterSetCommon(cnt, serialize_in, params, pool);
+        retval =
+            voltdb::TheHashinator::hashinate(params[0], partCount);
+        pool->purge();
+    } catch (FatalException e) {
+        crashVoltDB(e);
+    }
+
+    char response[5];
+    response[0] = kErrorCode_Success;
+    *reinterpret_cast<int32_t*>(&response[1]) = htonl(retval);
+    writeOrDie(m_fd, (unsigned char*)response, 5);
 }
 
 void VoltDBIPC::signalHandler(int signum, siginfo_t *info, void *context) {

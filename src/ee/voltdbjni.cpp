@@ -849,37 +849,6 @@ Java_org_voltdb_jni_ExecutionEngine_nativeGetStats(JNIEnv *env, jobject obj,
     return static_cast<jint>(result);
 }
 
-/*
- * Class:     org_voltdb_jni_ExecutionEngine
- * Method:    hashinate
- * Signature: (J)I
- */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_hashinate__JI
-  (JNIEnv *, jobject, jlong value, jint partitionCount) {
-    return voltdb::TheHashinator::hashinate(value, partitionCount);
-}
-
-/*
- * Class:     org_voltdb_jni_ExecutionEngine
- * Method:    hashinate
- * Signature: (Ljava/lang/String;I)I
- */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_hashinate__Ljava_lang_String_2I
-  (JNIEnv *env, jobject, jstring value, jint partitionCount) {
-    jsize length = env->GetStringUTFLength(value);
-    if (env->ExceptionCheck()) {
-        env->ExceptionDescribe();
-        return 0;
-    }
-    const char *string = env->GetStringUTFChars( value, NULL);
-    if (string == NULL) {
-        return 0;
-    }
-    int32_t retval = voltdb::TheHashinator::hashinate(string, length, partitionCount);
-    env->ReleaseStringUTFChars(value, string);
-    return retval;
-}
-
 /**
  * Turns on or off profiler.
  * @returns 0 on success.
@@ -1213,6 +1182,28 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_utils_ThreadUtils_getNumCores
     long int NUM_PROCS = sysconf(_SC_NPROCESSORS_CONF);
     return static_cast<jint>(NUM_PROCS);
 }
+
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeHashinate (JNIEnv *env, jobject obj, jlong engine_ptr, jint partitionCount)
+{
+    VOLT_DEBUG("nativeHashinate in C++ called");
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+    assert(engine);
+    try {
+        updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
+        NValueArray& params = engine->getParameterContainer();
+        Pool *stringPool = engine->getStringPool();
+        deserializeParameterSet(engine->getParameterBuffer(), engine->getParameterBufferCapacity(), params, engine->getStringPool());
+        int retval =
+            voltdb::TheHashinator::hashinate(params[0], partitionCount);
+        stringPool->purge();
+        return retval;
+    } catch (FatalException e) {
+        std::cout << "HASHINATE ERROR: " << e.m_reason << std::endl;
+        return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
+    }
+    return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
+}
+
 #endif
 
 /** @} */ // end of JNI doxygen group

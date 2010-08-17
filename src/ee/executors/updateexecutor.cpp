@@ -196,15 +196,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
             // check for partition problems
             // get the value for the partition column
             NValue value = tempTuple.getNValue(m_partitionColumn);
-            bool isLocal = false;
-            if (m_partitionColumnIsString) {
-                isLocal = m_engine->isLocalSite(
-                        reinterpret_cast<char*>(ValuePeeker::peekObjectValue(value)),
-                                ValuePeeker::peekObjectLength(value));
-            } else {
-                int64_t intvalue = ValuePeeker::peekAsRawInt64(value);
-                isLocal = m_engine->isLocalSite(intvalue);
-            }
+            bool isLocal = m_engine->isLocalSite(value);
 
             // if it doesn't map to this site
             if (!isLocal) {

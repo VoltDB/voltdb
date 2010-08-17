@@ -215,9 +215,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         bool isELEnabled() { return m_isELEnabled; }
 
         /** check if this value hashes to the local partition */
-        bool isLocalSite(int64_t value);
-        bool isLocalSite(char *string, int32_t length);
-
+        bool isLocalSite(const NValue& value);
 
         // -------------------------------------------------
         // Non-transactional work methods

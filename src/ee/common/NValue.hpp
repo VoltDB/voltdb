@@ -1972,8 +1972,12 @@ inline const NValue NValue::deserializeFromAllocateForStorage(SerializeInput &in
           break;
 
       }
+      case VALUE_TYPE_NULL: {
+          retval.setNull();
+          break;
+      }
       default:
-          throwFatalException("NValue::getTupleStorageSize() unrecognized type '%d'", type);
+          throwFatalException("NValue::deserializeFromAllocateForStorage() unrecognized type '%d'", type);
     }
     return retval;
 }

@@ -949,13 +949,9 @@ void VoltDBEngine::printReport() {
     cout << "==========" << endl;
 }
 
-bool VoltDBEngine::isLocalSite(int64_t value) {
+bool VoltDBEngine::isLocalSite(const NValue& value)
+{
     int index = TheHashinator::hashinate(value, m_totalPartitions);
-    return index == m_partitionId;
-}
-
-bool VoltDBEngine::isLocalSite(char *string, int32_t length) {
-    int index = TheHashinator::hashinate(string, length, m_totalPartitions);
     return index == m_partitionId;
 }
 

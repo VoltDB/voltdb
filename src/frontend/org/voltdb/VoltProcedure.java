@@ -104,7 +104,7 @@ public abstract class VoltProcedure {
     private int paramTypesLength;
     private Procedure catProc;
     private boolean isNative = true;
-    private int numberOfPartitions;
+    private int m_numberOfPartitions;
 
     // cached fake SQLStmt array for single statement non-java procs
     SQLStmt[] m_cachedSingleStmt = { null };
@@ -166,7 +166,7 @@ public abstract class VoltProcedure {
         this.isNative = (eeType != BackendTarget.HSQLDB_BACKEND);
         this.hsql = hsql;
         this.m_cluster = cluster;
-        this.numberOfPartitions = numberOfPartitions;
+        m_numberOfPartitions = numberOfPartitions;
         statsCollector = new ProcedureStatsCollector();
         VoltDB.instance().getStatsAgent().registerStatsSource(
                 SysProcSelector.PROCEDURE,
@@ -1322,7 +1322,7 @@ public abstract class VoltProcedure {
             results[i] = matchingTablesForId.get(0);
 
             if (batchStmts[i].catStmt.getReplicatedtabledml()) {
-                long newVal = results[i].asScalarLong() / numberOfPartitions;
+                long newVal = results[i].asScalarLong() / m_numberOfPartitions;
                 results[i] = new VoltTable(new VoltTable.ColumnInfo("", VoltType.BIGINT));
                 results[i].addRow(newVal);
             }

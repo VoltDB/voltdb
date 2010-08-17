@@ -532,4 +532,21 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     public long tableHashCode(int tableId) {
         return nativeTableHashCode( pointer, tableId);
     }
+
+    @Override
+    public int hashinate(Object value, int partitionCount)
+    {
+        ParameterSet parameterSet = new ParameterSet(true);
+        parameterSet.setParameters(value);
+
+        // serialize the param set
+        fsForParameterSet.clear();
+        try {
+            parameterSet.writeExternal(fsForParameterSet);
+        } catch (final IOException exception) {
+            throw new RuntimeException(exception); // can't happen
+        }
+
+        return nativeHashinate(pointer, partitionCount);
+    }
 }

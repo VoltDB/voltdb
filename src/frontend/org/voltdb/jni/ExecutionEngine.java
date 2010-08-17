@@ -370,6 +370,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     public abstract long tableHashCode(int tableId);
 
+    /**
+     * Compute the partition to which the parameter value maps using the
+     * ExecutionEngine's hashinator.  Currently only valid for int types
+     * (tiny, small, integer, big) and strings.
+     *
+     * THIS METHOD IS CURRENTLY ONLY USED FOR TESTING
+     */
+    public abstract int hashinate(Object value, int partitionCount);
 
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to
@@ -377,7 +385,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * jni_class instances in the execution engine. From the EE perspective, a single
      * JNI class is better.  So put this here with the backend->frontend api definition.
      */
-
 
     protected native byte[] nextDependencyTest(int dependencyId);
 
@@ -530,28 +537,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     protected native int nativeToggleProfiler(long pointer, int mode);
 
     /**
-     * Given a long value, pick a partition to store the data.
-     * This is for test code only. Identical functionality exists in Java in
-     * TheHashinator.hashinate(..).
-     *
-     * @param value The value to hash.
-     * @param partitionCount The number of partitions to choose from.
-     * @return A value between 0 and partitionCount-1, hopefully pretty evenly
-     * distributed.
+     * Use the EE's hashinator to compute the partition to which the
+     * value provided in the input parameter buffer maps.  This is
+     * currently a test-only method.
+     * @param pointer
+     * @param partitionCount
+     * @return
      */
-    public native int hashinate(long value, int partitionCount);
-
-    /**
-     * Given a String value, pick a partition to store the data.
-     * This is for test code only. Identical functionality exists in Java in
-     * TheHashinator.hashinate(..).
-     *
-     * @param string value The value to hash.
-     * @param partitionCount The number of partitions to choose from.
-     * @return A value between 0 and partitionCount-1, hopefully pretty evenly
-     * distributed.
-     */
-    public native int hashinate(String string, int partitionCount);
+    protected native int nativeHashinate(long pointer, int partitionCount);
 
     /**
      * @param nextUndoToken The undo token to associate with future work

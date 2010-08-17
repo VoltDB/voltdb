@@ -117,6 +117,8 @@ private:
 
     void tableHashCode( struct ipc_command *cmd);
 
+    void hashinate(struct ipc_command* cmd);
+
     void sendException( int8_t errorCode);
 
     int8_t activateTableStream(struct ipc_command *cmd);
