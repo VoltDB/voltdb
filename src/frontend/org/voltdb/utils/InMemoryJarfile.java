@@ -46,15 +46,13 @@ import java.util.zip.CRC32;
 public class InMemoryJarfile extends TreeMap<String, byte[]> {
 
     private static final long serialVersionUID = 1L;
-    protected final JarLoader m_loader;
+    protected final JarLoader m_loader = new JarLoader();;
 
     ///////////////////////////////////////////////////////
     // CONSTRUCTION
     ///////////////////////////////////////////////////////
 
-    public InMemoryJarfile() {
-        m_loader = new JarLoader();
-    }
+    public InMemoryJarfile() {}
 
     public InMemoryJarfile(String pathOrURL) throws IOException {
         InputStream fin = null;
@@ -66,17 +64,14 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
             fin = new FileInputStream(pathOrURL);
         }
         loadFromStream(fin);
-        m_loader = new JarLoader();
     }
 
     public InMemoryJarfile(URL url) throws IOException {
         loadFromStream(url.openStream());
-        m_loader = new JarLoader();
     }
 
     public InMemoryJarfile(File file) throws IOException {
         loadFromStream(new FileInputStream(file));
-        m_loader = new JarLoader();
     }
 
     private void loadFromStream(InputStream in) throws IOException {
@@ -182,16 +177,25 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
         final Map<String, Class<?>> m_cache = new HashMap<String, Class<?>>();
         final Set<String> m_classNames = new HashSet<String>();
 
-        JarLoader() {
-            for (Entry<String, byte[]> e : entrySet()) {
-                String classFileName = e.getKey();
-                if (!classFileName.endsWith(".class"))
-                    continue;
-                String javaClassName = classFileName.replace(File.separatorChar, '.');
-                javaClassName = javaClassName.substring(0, javaClassName.length() - 6);
-                m_classNames.add(javaClassName);
-            }
+        void noteUpdated(String key) {
+            if (!key.endsWith(".class"))
+                return;
+            String javaClassName = key.replace(File.separatorChar, '.');
+            javaClassName = javaClassName.substring(0, javaClassName.length() - 6);
+            m_classNames.add(javaClassName);
         }
+
+        void noteRemoved(String key) {
+            if (!key.endsWith(".class"))
+                return;
+            String javaClassName = key.replace(File.separatorChar, '.');
+            javaClassName = javaClassName.substring(0, javaClassName.length() - 6);
+            m_classNames.remove(javaClassName);
+            m_cache.remove(javaClassName);
+        }
+
+        // prevent this from being publicly called
+        JarLoader() {}
 
         @Override
         public synchronized Class<?> loadClass(String className) throws ClassNotFoundException {
@@ -235,7 +239,9 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
     public byte[] put(String key, byte[] value) {
         if (value == null)
             throw new RuntimeException("InMemoryJarFile cannon contain null entries.");
-        return super.put(key, value);
+        byte[] retval = super.put(key, value);
+        m_loader.noteUpdated(key);
+        return retval;
     }
 
     @Override
@@ -243,5 +249,41 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
         for (Entry<? extends String, ? extends byte[]> e : m.entrySet()) {
             put(e.getKey(), e.getValue());
         }
+    }
+
+    @Override
+    public byte[] remove(Object key) {
+        String realKey = null;
+        try {
+            realKey = (String) key;
+        }
+        catch (Exception e) {
+            return null;
+        }
+
+        m_loader.noteRemoved(realKey);
+        return super.remove(key);
+    }
+
+    @Override
+    public void clear() {
+        for (String key : keySet())
+            m_loader.noteRemoved(key);
+        super.clear();
+    }
+
+    @Override
+    public Object clone() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public java.util.Map.Entry<String, byte[]> pollFirstEntry() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public java.util.Map.Entry<String, byte[]> pollLastEntry() {
+        throw new UnsupportedOperationException();
     }
 }
