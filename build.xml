@@ -14,6 +14,23 @@
     </sequential>
 </macrodef>
 
+<macrodef name="invoke-javac">
+    <attribute name="srcdir"/>
+    <attribute name="destdir" default="${build.prod.dir}"/>
+    <attribute name="excludes" default=""/>
+    <sequential>
+        <javac
+            target="1.6"
+            srcdir="@{srcdir}"
+            destdir="@{destdir}"
+            excludes="@{excludes}"
+            encoding='UTF-8'
+            debug='true'>
+            <classpath refid="project.classpath" />
+        </javac>
+    </sequential>
+</macrodef>
+
 <!-- PATHS AND PROPERTIES -->
 
 <!-- make environment var foo available as env.foo -->
@@ -622,52 +639,14 @@ JAVA COMPILATION
         todir='${build.test.dir}/org/voltdb/catalog'/>
 
     <!-- compile the individual source directories -->
-    <javac
-        target="1.6"
-        srcdir="${src.hsqldb.dir}"
-        destdir='${build.prod.dir}'
-        encoding='UTF-8'
-        debug='true'>
-        <classpath refid="project.classpath" />
-    </javac>
-
-    <javac
-        target="1.6"
-        srcdir="${vendor.src.dir}"
-        destdir='${build.prod.dir}'
-        encoding='UTF-8'
-        debug='true'>
-        <classpath refid="project.classpath" />
-    </javac>
-
-    <javac
-        target="1.6"
-        srcdir="${src.gpl.dir}"
-        destdir='${build.prod.dir}'
-        encoding='UTF-8'
-        debug='true'>
-        <classpath refid="project.classpath" />
-    </javac>
+    <invoke-javac srcdir="${src.hsqldb.dir}"/>
+    <invoke-javac srcdir="${vendor.src.dir}"/>
+    <invoke-javac srcdir="${src.gpl.dir}"/>
 
     <!-- compile the individual test directories -->
-    <javac
-        target="1.6"
-        srcdir="${src.hsqldb.test.dir}"
-        destdir='${build.test.dir}'
-        encoding='UTF-8'
-        debug='true'>
-        <classpath refid="project.classpath" />
-    </javac>
-
-    <javac
-        target="1.6"
-        srcdir="${src.test.dir}"
-        destdir='${build.test.dir}'
-        excludes="org/voltdb/benchmark/tpcc/JDBCClient.java,edu/mit/elt/ELTTester**"
-        encoding='UTF-8'
-        debug='true'>
-        <classpath refid="project.classpath" />
-    </javac>
+    <invoke-javac srcdir="${src.hsqldb.test.dir}" destdir='${build.test.dir}'/>
+    <invoke-javac srcdir="${src.test.dir}" destdir='${build.test.dir}'
+        excludes="org/voltdb/benchmark/tpcc/JDBCClient.java,edu/mit/elt/ELTTester**"/>
 </target>
 
 <!-- This task only executes if the voltpro.flavor property is set. -->
