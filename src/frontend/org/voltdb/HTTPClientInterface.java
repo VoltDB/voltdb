@@ -23,6 +23,7 @@ import org.voltdb.client.AuthenticatedConnectionCache;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.SyncCallback;
+import org.voltdb.utils.Encoder;
 
 public class HTTPClientInterface {
 
@@ -45,10 +46,22 @@ public class HTTPClientInterface {
             String procName = parms.getProperty("Procedure");
             String params = parms.getProperty("Parameters");
 
+            // Password must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded)
             byte[] hashedPassword = null;
-            if (password != null)
-                hashedPassword = password.getBytes("UTF-8");
+            if (password != null) {
+                if (password.length() != 40) {
+                    throw new Exception("Password must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded).");
+                }
+                try {
+                    hashedPassword = Encoder.hexDecode(password);
+                }
+                catch (Exception e) {
+                    throw new Exception("Password must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded).");
+                }
+            }
+            assert((hashedPassword == null) || (hashedPassword.length == 20));
 
+            // get a connection to localhost from the pool
             client = m_connections.getClient(username, hashedPassword);
 
             SyncCallback scb = new SyncCallback();
@@ -73,7 +86,7 @@ public class HTTPClientInterface {
         catch (Exception e) {
             msg = e.getMessage();
             ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
-            e.printStackTrace();
+            //e.printStackTrace();
             msg = rimpl.toJSONString();
         }
         finally {

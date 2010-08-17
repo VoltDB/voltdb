@@ -135,7 +135,7 @@ public class TestSimpleCJK extends TestCase {
         Response response2;
 
         pset.setParameters();
-        responseJSON = TestJSONInterface.callProcOverJSON("Select", pset);
+        responseJSON = TestJSONInterface.callProcOverJSON("Select", pset, null, null);
         System.out.println(responseJSON);
         response2 = TestJSONInterface.responseFromJSON(responseJSON);
         assertTrue(response2.status == ClientResponse.SUCCESS);
@@ -173,14 +173,14 @@ public class TestSimpleCJK extends TestCase {
 
         // Call insert
         pset.setParameters(POORLY_TRANSLATED_CHINESE, POORLY_TRANSLATED_JAPANESE, POORLY_TRANSLATED_KOREAN);
-        responseJSON = TestJSONInterface.callProcOverJSON("Insert", pset);
+        responseJSON = TestJSONInterface.callProcOverJSON("Insert", pset, null, null);
         System.out.println(responseJSON);
         response = TestJSONInterface.responseFromJSON(responseJSON);
         assertTrue(response.status == ClientResponse.SUCCESS);
 
         // Call select
         pset.setParameters();
-        responseJSON = TestJSONInterface.callProcOverJSON("Select", pset);
+        responseJSON = TestJSONInterface.callProcOverJSON("Select", pset, null, null);
         System.out.println(responseJSON);
         response = TestJSONInterface.responseFromJSON(responseJSON);
         assertTrue(response.status == ClientResponse.SUCCESS);

@@ -64,6 +64,8 @@ import java.math.BigDecimal;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -75,9 +77,13 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
+import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
+import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.compiler.procedures.CrazyBlahProc;
 import org.voltdb.compiler.procedures.SelectStarHelloWorld;
 import org.voltdb.types.TimestampType;
+import org.voltdb.utils.Encoder;
 
 public class TestJSONInterface extends TestCase {
 
@@ -91,6 +97,16 @@ public class TestJSONInterface extends TestCase {
     }
 
     static String japaneseTestVarStrings = "Procedure=Insert&Parameters=%5B%22%5Cu3053%5Cu3093%5Cu306b%5Cu3061%5Cu306f%22%2C%22%5Cu4e16%5Cu754c%22%2C%22Japanese%22%5D";
+
+    static String getHTTPVarString(Map<String,String> params) throws UnsupportedEncodingException {
+        String s = "";
+        for (Entry<String, String> e : params.entrySet()) {
+            String encodedValue = URLEncoder.encode(e.getValue(), "UTF-8");
+            s += "&"+ e.getKey() + "=" + encodedValue;
+        }
+        s = s.substring(1);
+        return s;
+    }
 
     public static String callProcOverJSONRaw(String varString) throws Exception {
         URL jsonAPIURL = new URL("http://localhost:8095/api/1.0/");
@@ -136,13 +152,39 @@ public class TestJSONInterface extends TestCase {
         return response;
     }
 
-    public static String callProcOverJSON(String procName, ParameterSet pset) throws Exception {
+    public static String getPasswordForHTTPVar(String password) {
+        assert(password != null);
+
+        MessageDigest md = null;
+        try {
+            md = MessageDigest.getInstance("SHA-1");
+        } catch (NoSuchAlgorithmException e) {
+            fail();
+        }
+        byte hashedPassword[] = null;
+        try {
+            hashedPassword = md.digest(password.getBytes("UTF-8"));
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException("JVM doesn't support UTF-8. Please use a supported JVM", e);
+        }
+
+        String retval = Encoder.hexEncode(hashedPassword);
+        assertEquals(40, retval.length());
+        return retval;
+    }
+
+    public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password) throws Exception {
         // Call insert
         String paramsInJSON = pset.toJSONString();
         //System.out.println(paramsInJSON);
         HashMap<String,String> params = new HashMap<String,String>();
         params.put("Procedure", procName);
         params.put("Parameters", paramsInJSON);
+        if (username != null)
+            params.put("User", username);
+        if (password != null) {
+            params.put("Password", getPasswordForHTTPVar(password));
+        }
 
         String varString = getHTTPVarString(params);
 
@@ -210,13 +252,13 @@ public class TestJSONInterface extends TestCase {
 
         // Call insert
         pset.setParameters(1, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
-        responseJSON = callProcOverJSON("Insert", pset);
+        responseJSON = callProcOverJSON("Insert", pset, null, null);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
         assertTrue(response.status == ClientResponse.SUCCESS);
 
         // Call insert again (with failure expected)
-        responseJSON = callProcOverJSON("Insert", pset);
+        responseJSON = callProcOverJSON("Insert", pset, null, null);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
         assertTrue(response.status != ClientResponse.SUCCESS);
@@ -230,7 +272,7 @@ public class TestJSONInterface extends TestCase {
                            new BigDecimal[] {},
                            new TimestampType(System.currentTimeMillis()));
 
-        responseJSON = callProcOverJSON("CrazyBlahProc", pset);
+        responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
         assertTrue(response.status == ClientResponse.SUCCESS);
@@ -257,7 +299,7 @@ public class TestJSONInterface extends TestCase {
                 new BigDecimal[] {},
                 ts.toString());
 
-        responseJSON = callProcOverJSON("CrazyBlahProc", pset);
+        responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
         assertTrue(response.status == ClientResponse.SUCCESS);
@@ -271,7 +313,7 @@ public class TestJSONInterface extends TestCase {
                 new BigDecimal[] {},
                 new TimestampType(System.currentTimeMillis()));
 
-        responseJSON = callProcOverJSON("CrazyBlahProc", pset);
+        responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
         assertFalse(response.status == ClientResponse.SUCCESS);
@@ -285,7 +327,7 @@ public class TestJSONInterface extends TestCase {
                 new BigDecimal[] {},
                 new TimestampType(System.currentTimeMillis()));
 
-        responseJSON = callProcOverJSON("CrazyBlahProc", pset);
+        responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
         assertFalse(response.status == ClientResponse.SUCCESS);
@@ -299,7 +341,7 @@ public class TestJSONInterface extends TestCase {
                 new BigDecimal[] {},
                 new TimestampType(System.currentTimeMillis()));
 
-        responseJSON = callProcOverJSON("CrazyBlahProc", pset);
+        responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
         System.out.println(response.statusString);
@@ -314,7 +356,7 @@ public class TestJSONInterface extends TestCase {
                 new BigDecimal[] {},
                 null);
 
-        responseJSON = callProcOverJSON("CrazyBlahProc", pset);
+        responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
         System.out.println(response.statusString);
@@ -364,25 +406,13 @@ public class TestJSONInterface extends TestCase {
         String test2 = new String(test1);
 
         ParameterSet pset = new ParameterSet();
-        response = callProcOverJSON("Select", pset);
+        response = callProcOverJSON("Select", pset, null, null);
         System.out.println(response);
         System.out.println(test2);
         r = responseFromJSON(response);
         assertEquals(1, r.status);
 
-        // Useful for debugging
-        /*Logger log = Logger.getLogger(this.getClass());
-
-        byte[] bytes = response.getBytes("UTF-8");
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < bytes.length; i++) {
-            sb.append(bytes[i]).append(" ");
-        }
-        log.log(Level.INFO, sb.toString());
-
-        assertTrue(response.contains(test2));*/
-
-        response = callProcOverJSON("SelectStarHelloWorld", pset);
+        response = callProcOverJSON("SelectStarHelloWorld", pset, null, null);
         r = responseFromJSON(response);
         assertEquals(1, r.status);
         assertTrue(response.contains(test2));
@@ -391,13 +421,106 @@ public class TestJSONInterface extends TestCase {
         server.join();
     }
 
-    static String getHTTPVarString(Map<String,String> params) throws UnsupportedEncodingException {
-        String s = "";
-        for (Entry<String, String> e : params.entrySet()) {
-            String encodedValue = URLEncoder.encode(e.getValue(), "UTF-8");
-            s += "&"+ e.getKey() + "=" + encodedValue;
+    public void testJSONAuth() throws Exception {
+        String simpleSchema =
+            "CREATE TABLE HELLOWORLD (\n" +
+            "    HELLO VARCHAR(15),\n" +
+            "    WORLD VARCHAR(15),\n" +
+            "    DIALECT VARCHAR(15) NOT NULL,\n" +
+            "    PRIMARY KEY (DIALECT)\n" +
+            ");";
+
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+        String schemaPath = schemaFile.getPath();
+        schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addSchema(schemaPath);
+        builder.addPartitionInfo("HELLOWORLD", "DIALECT");
+
+        GroupInfo gi = new GroupInfo("foo", true, true);
+        builder.addGroups(new GroupInfo[] { gi } );
+
+        // create 20 users, only the first one has an interesting user/pass
+        UserInfo[] ui = new UserInfo[15];
+        ui[0] = new UserInfo("ry@nlikesthe", "y@nkees", new String[] { "foo" } );
+        for (int i = 1; i < ui.length; i++) {
+            ui[i] = new UserInfo("USER" + String.valueOf(i), "PASS" + String.valueOf(i), new String[] { "foo" } );
         }
-        s = s.substring(1);
-        return s;
+        builder.addUsers(ui);
+
+        builder.setSecurityEnabled(true);
+
+        ProcedureInfo[] pi = new ProcedureInfo[2];
+        pi[0] = new ProcedureInfo(new String[] { "foo" }, "Insert", "insert into HELLOWORLD values (?,?,?);", null);
+        pi[1] = new ProcedureInfo(new String[] { "foo" }, "Select", "select * from HELLOWORLD;", null);
+        builder.addProcedures(pi);
+
+        boolean success = builder.compile("json.jar");
+        assertTrue(success);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_httpAdminPort = 8095;
+        config.m_pathToCatalog = "json.jar";
+        config.m_pathToDeployment = builder.getPathToDeployment();
+        ServerThread server = new ServerThread(config);
+        server.start();
+        server.waitForInitialization();
+
+        // test good auths
+        for (UserInfo u : ui) {
+            ParameterSet pset = new ParameterSet();
+            pset.setParameters(u.name, u.password, u.name);
+            String response = callProcOverJSON("Insert", pset, u.name, u.password);
+            Response r = responseFromJSON(response);
+            assertEquals(ClientResponse.SUCCESS, r.status);
+        }
+        // test re-using auths
+        for (UserInfo u : ui) {
+            ParameterSet pset = new ParameterSet();
+            pset.setParameters(u.name + "-X", u.password + "-X", u.name + "-X");
+            String response = callProcOverJSON("Insert", pset, u.name, u.password);
+            Response r = responseFromJSON(response);
+            assertEquals(ClientResponse.SUCCESS, r.status);
+        }
+
+        // test bad auth
+        UserInfo u = ui[0];
+        ParameterSet pset = new ParameterSet();
+        pset.setParameters(u.name + "-X1", u.password + "-X1", u.name + "-X1");
+        String response = callProcOverJSON("Insert", pset, u.name, "ick");
+        Response r = responseFromJSON(response);
+        assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
+
+        // test malformed auth (too short hash)
+        pset = new ParameterSet();
+        pset.setParameters(u.name + "-X2", u.password + "-X2", u.name + "-X2");
+        String paramsInJSON = pset.toJSONString();
+        HashMap<String,String> params = new HashMap<String,String>();
+        params.put("Procedure", "Insert");
+        params.put("Parameters", paramsInJSON);
+        params.put("User", u.name);
+        params.put("Password", Encoder.hexEncode(new byte[] {1,2,3}));
+        String varString = getHTTPVarString(params);
+        response = callProcOverJSONRaw(varString);
+        r = responseFromJSON(response);
+        assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
+
+        // test malformed auth (gibberish password, but good length)
+        pset = new ParameterSet();
+        pset.setParameters(u.name + "-X3", u.password + "-X3", u.name + "-X3");
+        paramsInJSON = pset.toJSONString();
+        params = new HashMap<String,String>();
+        params.put("Procedure", "Insert");
+        params.put("Parameters", paramsInJSON);
+        params.put("User", u.name);
+        params.put("Password", "abcdefghiabcdefghiabcdefghiabcdefghi");
+        varString = getHTTPVarString(params);
+        response = callProcOverJSONRaw(varString);
+        r = responseFromJSON(response);
+        assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
+
+        server.shutdown();
+        server.join();
     }
 }

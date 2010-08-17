@@ -178,13 +178,7 @@ final class ClientImpl implements Client {
             throw new IOException("New connection authorization credentials do not match previous credentials for client.");
         }
 
-        try {
-            m_distributer.createConnectionWithHashedCredentials(host, subProgram, subPassword, port);
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-            throw new IOException("foo", e);
-        }
+        m_distributer.createConnectionWithHashedCredentials(host, subProgram, subPassword, port);
     }
 
     /**
