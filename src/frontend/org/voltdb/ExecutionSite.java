@@ -707,20 +707,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         if (VoltDB.getUseWatchdogs()) {
             m_watchdog.start(Thread.currentThread());
         }
-        if (VoltDB.getUseThreadAffinity()) {
-            final boolean startingAffinity[] = org.voltdb.utils.ThreadUtils.getThreadAffinity();
-            for (int ii = 0; ii < startingAffinity.length; ii++) {
-                log.l7dlog( Level.INFO, LogKeys.org_voltdb_ExecutionSite_StartingThreadAffinity.name(), new Object[] { startingAffinity[ii] }, null);
-                startingAffinity[ii] = false;
-            }
-            startingAffinity[ siteIndex % startingAffinity.length] = true;
-            org.voltdb.utils.ThreadUtils.setThreadAffinity(startingAffinity);
-            final boolean endingAffinity[] = org.voltdb.utils.ThreadUtils.getThreadAffinity();
-            for (int ii = 0; ii < endingAffinity.length; ii++) {
-                log.l7dlog( Level.INFO, LogKeys.org_voltdb_ExecutionSite_EndingThreadAffinity.name(), new Object[] { endingAffinity[ii] }, null);
-                startingAffinity[ii] = false;
-            }
-        }
+
         try {
             // Only poll messaging layer if necessary. Allow the poll
             // to block if the execution site is truly idle.

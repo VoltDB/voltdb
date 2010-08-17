@@ -61,7 +61,7 @@ public class TPCCServer {
         boolean doCompile = true;
 
         if (args.length > 5) {
-            System.err.println("TPCCServer [partitions=1] [compile=true] [useProfiling=0] [-useThreadAffinity true/false]");
+            System.err.println("TPCCServer [partitions=1] [compile=true] [useProfiling=0]");
             System.exit(1);
         }
 
@@ -76,12 +76,6 @@ public class TPCCServer {
                 config.m_profilingLevel = ProcedureProfiler.Level.POLITE;
             if (args[2].equals("2"))
                 config.m_profilingLevel = ProcedureProfiler.Level.INTRUSIVE;
-        }
-
-        for (int ii = 0; ii < args.length; ii++) {
-            if (args[ii].equals("-useThreadAffinity true")) {
-                config.m_useThreadAffinity = true;
-            }
         }
 
         if (doCompile) {

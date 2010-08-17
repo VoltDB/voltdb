@@ -35,7 +35,6 @@ public class TestVoltDB extends TestCase {
         assertEquals(ProcedureProfiler.Level.DISABLED, blankConfig.m_profilingLevel);
         assertEquals(null, blankConfig.m_pathToCatalog);
         assertEquals(null, blankConfig.m_pathToDeployment);
-        assertFalse(blankConfig.m_useThreadAffinity);
         assertEquals(VoltDB.DEFAULT_PORT, blankConfig.m_port);
 
         String args1[] = { "noloadlib" };
@@ -71,9 +70,6 @@ public class TestVoltDB extends TestCase {
         String args10[] = { "catalog", "ytestystringy" };
         VoltDB.Configuration cfg10 = new VoltDB.Configuration(args10);
         assertEquals("ytestystringy", cfg10.m_pathToCatalog);
-
-        String args11[] = { "usethreadaffinity" };
-        assertTrue(new VoltDB.Configuration(args11).m_useThreadAffinity);
 
         String args12[] = { "port 1234" };
         VoltDB.Configuration cfg12 = new VoltDB.Configuration(args12);

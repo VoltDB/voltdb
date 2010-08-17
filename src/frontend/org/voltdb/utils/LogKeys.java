@@ -95,8 +95,6 @@ public enum LogKeys {
 
     org_voltdb_ExecutionSite_ImportingDependency,
     org_voltdb_ExecutionSite_Watchdog_possibleHang,
-    org_voltdb_ExecutionSite_StartingThreadAffinity,
-    org_voltdb_ExecutionSite_EndingThreadAffinity,
     org_voltdb_ExecutionSite_ExpectedProcedureException,
     org_voltdb_ExecutionSite_GotDtxnWU,
     org_voltdb_ExecutionSite_StackFrameDrop,

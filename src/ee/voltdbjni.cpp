@@ -77,8 +77,6 @@
 
 #include "org_voltdb_jni_ExecutionEngine.h" // the header file output by javah
 #include "org_voltdb_utils_DBBPool.h" //Utility method for DBBContainer
-#include "org_voltdb_utils_ThreadUtils.h"
-
 
 #include "boost/shared_ptr.hpp"
 #include "boost/scoped_array.hpp"
@@ -1113,104 +1111,5 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeHashi
     }
     return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
 }
-
-#ifdef LINUX
-/*
- * Class:     org_voltdb_utils_ThreadUtils
- * Method:    getThreadAffinity
- * Signature: ()[Z
- */
-SHAREDLIB_JNIEXPORT jbooleanArray JNICALL Java_org_voltdb_utils_ThreadUtils_getThreadAffinity
-  (JNIEnv *env, jclass clazz) {
-    /*
-     * First get the affinity mask for this thread.
-     */
-    cpu_set_t mycpuid;
-    CPU_ZERO(&mycpuid);
-    sched_getaffinity(0, sizeof(mycpuid), &mycpuid);
-
-    //Also get the total number of processors
-    long int NUM_PROCS = sysconf(_SC_NPROCESSORS_CONF);
-
-    /*
-     * Create the Java array and get the memory region.
-     */
-    jbooleanArray returnArray = env->NewBooleanArray(static_cast<jsize>(NUM_PROCS));
-    if (returnArray == NULL) {
-        return NULL;
-    }
-    jboolean *boolArray = env->GetBooleanArrayElements(returnArray, NULL);
-    if (boolArray == NULL) {
-        return NULL;
-    }
-
-    for (int ii = 0; ii < NUM_PROCS; ii++) {
-        if (CPU_ISSET(ii, &mycpuid)) {
-            boolArray[ii] = JNI_TRUE;
-        } else {
-            boolArray[ii] = JNI_FALSE;
-        }
-    }
-
-    /*
-     * Now released and commit the boolArray
-     */
-    env->ReleaseBooleanArrayElements(returnArray, boolArray, 0);
-    if (env->ExceptionCheck()) {
-        env->ExceptionDescribe();
-        return NULL;
-    }
-    return returnArray;
-}
-
-
-/*
- * Class:     org_voltdb_utils_ThreadUtils
- * Method:    setThreadAffinity
- * Signature: ([Z)V
- */
-SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_utils_ThreadUtils_setThreadAffinity
-  (JNIEnv *env, jclass clazz, jbooleanArray coresArray) {
-    jsize numCores = env->GetArrayLength(coresArray);
-    if (env->ExceptionCheck()) {
-        env->ExceptionDescribe();
-        return;
-    }
-    jboolean *cores = env->GetBooleanArrayElements(coresArray, NULL);
-    if (cores == NULL) {
-        return;
-    }
-
-    //Also get the total number of processors
-    //sysconf(_SC_NPROCESSORS_CONF);
-    //assert(numCores <= NUM_PROCS);
-
-    cpu_set_t mask;
-    CPU_ZERO(&mask);
-    for (int ii = 0; ii < numCores; ii++) {
-        if (JNI_TRUE == cores[ii]) {
-            CPU_SET(ii, &mask);
-        }
-    }
-
-    if ( sched_setaffinity( 0, sizeof(mask), &mask) == -1) {
-        std::cout << "Couldn't set CPU affinity" << std::endl;
-        assert(false);
-    }
-}
-
-/*
- * Class:     org_voltdb_utils_ThreadUtils
- * Method:    getNumCores
- * Signature: ()I
- */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_utils_ThreadUtils_getNumCores
-  (JNIEnv *env, jclass clazz) {
-    long int NUM_PROCS = sysconf(_SC_NPROCESSORS_CONF);
-    return static_cast<jint>(NUM_PROCS);
-}
-
-
-#endif
 
 /** @} */ // end of JNI doxygen group

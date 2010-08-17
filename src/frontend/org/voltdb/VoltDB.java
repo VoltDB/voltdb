@@ -80,11 +80,6 @@ public class VoltDB {
          */
         public boolean m_noLoadLibVOLTDB = false;
 
-        /** if set to true each execution site will tie its thread to a core
-         *  in a round robin fashion
-         */
-        public boolean m_useThreadAffinity = false;
-
         /** port number for the first client interface for each server */
         public int m_port = DEFAULT_PORT;
 
@@ -204,9 +199,6 @@ public class VoltDB {
                 }
                 else if (arg.equals("deployment")) {
                     m_pathToDeployment = args[++i];
-                }
-                else if (arg.equalsIgnoreCase("useThreadAffinity")) {
-                    m_useThreadAffinity = true;
                 } else if (arg.equalsIgnoreCase("useWatchdogs")) {
                     m_useWatchdogs = true;
                 } else {
@@ -285,10 +277,6 @@ public class VoltDB {
 
     public static BackendTarget getEEBackendType() {
         return m_config.m_backend;
-    }
-
-    public static boolean getUseThreadAffinity() {
-        return m_config.m_useThreadAffinity;
     }
 
     public static boolean getUseWatchdogs() {
