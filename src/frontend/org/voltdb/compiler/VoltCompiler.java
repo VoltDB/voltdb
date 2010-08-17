@@ -101,7 +101,7 @@ public class VoltCompiler {
     String m_currentFilename = null;
     Map<String, String> m_ddlFilePaths = new HashMap<String, String>();
 
-    JarBuilder m_jarBuilder = null;
+    InMemoryJarfile m_jarOutput = null;
     Catalog m_catalog = null;
     //Cluster m_cluster = null;
     HSQLInterface m_hsql = null;
@@ -339,12 +339,12 @@ public class VoltCompiler {
         }
 
         try {
-            m_jarBuilder.addEntry("catalog.txt", catalogBytes);
-            m_jarBuilder.addEntry("project.xml", new File(projectFileURL));
+            m_jarOutput.put("catalog.txt", catalogBytes);
+            m_jarOutput.put("project.xml", new File(projectFileURL));
             for (final Entry<String, String> e : m_ddlFilePaths.entrySet())
-                m_jarBuilder.addEntry(e.getKey(), new File(e.getValue()));
-            m_jarBuilder.writeJarToDisk(jarOutputPath);
-        } catch (final VoltCompilerException e) {
+                m_jarOutput.put(e.getKey(), new File(e.getValue()));
+            m_jarOutput.writeToFile(new File(jarOutputPath));
+        } catch (final Exception e) {
             return false;
         }
 
@@ -363,7 +363,7 @@ public class VoltCompiler {
         // Compiler instance is reusable. Clear the cache.
         cachedAddedClasses.clear();
         m_currentFilename = new File(projectFileURL).getName();
-        m_jarBuilder = new JarBuilder(this);
+        m_jarOutput = new InMemoryJarfile();
         ProjectType project = null;
 
         try {
@@ -423,11 +423,6 @@ public class VoltCompiler {
         if (m_procInfoOverrides == null)
             return null;
         return m_procInfoOverrides.get(procName);
-    }
-
-    void addEntryToJarOutput(final String key, final byte[] bytes)
-    throws VoltCompilerException {
-        m_jarBuilder.addEntry(key, bytes);
     }
 
     public Catalog getCatalog() {
@@ -1070,7 +1065,7 @@ public class VoltCompiler {
             throw compiler.new VoltCompilerException(msg);
         }
 
-        compiler.addEntryToJarOutput(packagePath, fileBytes);
+        compiler.m_jarOutput.put(packagePath, fileBytes);
     }
 
     /**
