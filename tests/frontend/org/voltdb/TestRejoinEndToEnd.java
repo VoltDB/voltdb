@@ -52,7 +52,7 @@ import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.messaging.HostMessenger;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.regressionsuites.LocalCluster;
-import org.voltdb.utils.JarReader;
+import org.voltdb.utils.InMemoryJarfile;
 
 public class TestRejoinEndToEnd extends TestCase {
 
@@ -126,7 +126,7 @@ public class TestRejoinEndToEnd extends TestCase {
         retval.localServer = new ServerThread(config);
 
         // start the fake HostMessenger
-        retval.catalogCRC = JarReader.crcForJar(Configuration.getPathToCatalogForTest("rejoin.jar"));
+        retval.catalogCRC = new InMemoryJarfile(Configuration.getPathToCatalogForTest("rejoin.jar")).getCRC();
         VoltNetwork network2 = new VoltNetwork();
         InetAddress leader = InetAddress.getByName("localhost");
         HostMessenger host2 = new HostMessenger(network2, leader, 2, retval.catalogCRC, null);

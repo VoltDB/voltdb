@@ -80,7 +80,9 @@ public abstract class CatalogUtil {
 
         String serializedCatalog = null;
         try {
-            serializedCatalog = JarReader.readFileFromJarfile(pathToCatalog, CATALOG_FILENAME);
+            InMemoryJarfile jarfile = new InMemoryJarfile(pathToCatalog);
+            byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
+            serializedCatalog = new String(serializedCatalogBytes, "UTF-8");
         } catch (Exception e) {
             if (log != null)
                 log.l7dlog( Level.FATAL, LogKeys.host_VoltDB_CatalogReadFailure.name(), e);

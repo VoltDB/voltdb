@@ -25,6 +25,7 @@ package org.voltdb.utils;
 
 import java.io.CharArrayReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.LineNumberReader;
 import java.io.UnsupportedEncodingException;
@@ -41,7 +42,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 
-public class TestJarReader extends TestCase {
+public class TestInMemoryJarfile extends TestCase {
 
     protected File m_jarPath;
     protected Catalog m_catalog;
@@ -101,7 +102,9 @@ public class TestJarReader extends TestCase {
         String catalog0 = this.m_catalog.serialize();
         assertTrue(catalog0.length() > 0);
 
-        String catalog1 = JarReader.readFileFromJarfile(this.m_jarPath.getAbsolutePath(), CatalogUtil.CATALOG_FILENAME);
+        InMemoryJarfile jarfile = new InMemoryJarfile(m_jarPath.getAbsolutePath());
+        byte[] catalogBytes = jarfile.get(CatalogUtil.CATALOG_FILENAME);
+        String catalog1 = new String(catalogBytes, "UTF-8");
         assertTrue(catalog1.length() > 0);
 
         assertEquals(catalog0.length(), catalog1.length());
@@ -133,17 +136,18 @@ public class TestJarReader extends TestCase {
         // and cause different global CRCs
         Thread.sleep(5000);
         createTestJarFile("testout-dupe.jar", true);
-        long crc1 = JarReader.crcForJar("testout.jar");
-        long crc2 = JarReader.crcForJar("testout-dupe.jar");
+        long crc1 = new InMemoryJarfile("testout.jar").getCRC();
+        long crc2 = new InMemoryJarfile("testout-dupe.jar").getCRC();
         assertEquals(crc1, crc2);
 
         // Check the modification times and make sure
         // that they differ in the two jars
-        JarInputStream j_in = JarReader.openJar("testout.jar");
+        JarInputStream j_in = new JarInputStream(new FileInputStream("testout.jar"));
         JarEntry entry = j_in.getNextJarEntry();
         long time1 = entry.getTime();
         j_in.close();
-        j_in = JarReader.openJar("testout-dupe.jar");
+
+        j_in = new JarInputStream(new FileInputStream("testout-dupe.jar"));
         entry = j_in.getNextJarEntry();
         long time2 = entry.getTime();
         assertFalse(time1 == time2);
@@ -157,8 +161,8 @@ public class TestJarReader extends TestCase {
         // and cause different global CRCs
         Thread.sleep(5000);
         createTestJarFile("testout-dupe.jar", false);
-        long crc1 = JarReader.crcForJar("testout.jar");
-        long crc2 = JarReader.crcForJar("testout-dupe.jar");
+        long crc1 = new InMemoryJarfile("testout.jar").getCRC();
+        long crc2 = new InMemoryJarfile("testout-dupe.jar").getCRC();
         assertFalse(crc1 == crc2);
     }
 }

@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
@@ -31,6 +32,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.jar.JarEntry;
+import java.util.jar.JarInputStream;
 
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
@@ -43,7 +46,17 @@ import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltdb.ProcInfo;
 import org.voltdb.ProcInfoData;
 import org.voltdb.TransactionIdManager;
-import org.voltdb.catalog.*;
+import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Group;
+import org.voltdb.catalog.GroupRef;
+import org.voltdb.catalog.MaterializedViewInfo;
+import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.catalog.Statement;
+import org.voltdb.catalog.Table;
 import org.voltdb.compiler.projectfile.ClassdependenciesType.Classdependency;
 import org.voltdb.compiler.projectfile.DatabaseType;
 import org.voltdb.compiler.projectfile.ExportsType.Connector;
@@ -57,7 +70,7 @@ import org.voltdb.compiler.projectfile.SnapshotType;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.JarReader;
+import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.StringInputStream;
 import org.xml.sax.ErrorHandler;
@@ -587,7 +600,7 @@ public class VoltCompiler {
             if (schemaPath.contains(".jar!")) {
                 String ddlText = null;
                 try {
-                    ddlText = JarReader.readFileFromJarfile(schemaPath);
+                    ddlText = readFileFromJarfile(schemaPath);
                 } catch (final Exception e) {
                     throw new VoltCompilerException(e);
                 }
@@ -1030,7 +1043,7 @@ public class VoltCompiler {
             fileSize = (int) file.length();
         } catch (final FileNotFoundException e) {
             try {
-                final String contents = JarReader.readFileFromJarfile(absolutePath.getPath());
+                final String contents = readFileFromJarfile(absolutePath.getPath());
                 fis = new StringInputStream(contents);
                 fileSize = contents.length();
             }
@@ -1058,5 +1071,43 @@ public class VoltCompiler {
         }
 
         compiler.addEntryToJarOutput(packagePath, fileBytes);
+    }
+
+    /**
+     * Read a file from a jar in the form path/to/jar.jar!/path/to/file.ext
+     */
+    static String readFileFromJarfile(String fulljarpath) throws IOException {
+        assert (fulljarpath.contains(".jar!"));
+
+        String[] paths = fulljarpath.split("!");
+        if (paths[0].startsWith("file:"))
+            paths[0] = paths[0].substring("file:".length());
+        paths[1] = paths[1].substring(1);
+
+        return readFileFromJarfile(paths[0], paths[1]);
+    }
+
+    static String readFileFromJarfile(String jarfilePath, String entryPath) throws IOException {
+        InputStream fin = null;
+        try {
+            URL jar_url = new URL(jarfilePath);
+            fin = jar_url.openStream();
+        } catch (MalformedURLException ex) {
+            // Invalid URL. Try as a file.
+            fin = new FileInputStream(jarfilePath);
+        }
+        JarInputStream jarIn = new JarInputStream(fin);
+
+        JarEntry catEntry = jarIn.getNextJarEntry();
+        while ((catEntry != null) && (catEntry.getName().equals(entryPath) == false)) {
+            catEntry = jarIn.getNextJarEntry();
+        }
+        if (catEntry == null) {
+            return null;
+        }
+
+        byte[] bytes = InMemoryJarfile.readFromJarEntry(jarIn, catEntry);
+
+        return new String(bytes, "UTF-8");
     }
 }

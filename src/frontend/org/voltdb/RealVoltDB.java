@@ -63,7 +63,7 @@ import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.HTTPAdminListener;
-import org.voltdb.utils.JarReader;
+import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltSampler;
 
@@ -288,7 +288,8 @@ public class RealVoltDB implements VoltDBInterface
             // get a CRC for the jarfile to check if everyone has the same one
             long catalogCRC = 0;
             try {
-                catalogCRC = JarReader.crcForJar(m_config.m_pathToCatalog);
+                InMemoryJarfile inMemJar = new InMemoryJarfile(m_config.m_pathToCatalog);
+                catalogCRC = inMemJar.getCRC();
             } catch (IOException e1) {
                 VoltDB.crashVoltDB();
             }

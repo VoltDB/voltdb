@@ -22,24 +22,23 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
-import java.util.jar.JarEntry;
-import java.util.jar.JarInputStream;
 
 public class JarClassLoader extends ClassLoader {
     final Map<String, Class<?>> m_cache = new HashMap<String, Class<?>>();
     final Set<String> m_classNames = new HashSet<String>();
     final String m_jarFilePath;
+    final InMemoryJarfile m_jarfile;
 
-    public JarClassLoader(String jarFilePath) {
+    public JarClassLoader(String jarFilePath) throws IOException {
         m_jarFilePath = jarFilePath;
+        m_jarfile = new InMemoryJarfile(jarFilePath);
         loadAllClassNamesFromJar();
     }
 
     @Override
     public synchronized Class<?> loadClass(String className) throws ClassNotFoundException {
-        //System.out.printf("Loading %s... ", className);
-
         // try the fast cache first
         Class<?> result;
         if (m_cache.containsKey(className)) {
@@ -51,9 +50,7 @@ public class JarClassLoader extends ClassLoader {
         if (m_classNames.contains(className)) {
             String classPath = className.replace('.', File.separatorChar) + ".class";
 
-            //System.out.println("loading from jar.");
-
-            byte bytes[] = JarReader.readFileFromJarAtURL(m_jarFilePath, classPath);
+            byte bytes[] = m_jarfile.get(classPath);
             if (bytes == null)
                 throw new ClassNotFoundException(className);
 
@@ -70,22 +67,13 @@ public class JarClassLoader extends ClassLoader {
     }
 
     void loadAllClassNamesFromJar() {
-        JarInputStream jarIn = JarReader.openJar(m_jarFilePath);
-        if (jarIn == null)
-            throw new RuntimeException("Failed to locate jarfile.");
-
-        try {
-            for (JarEntry catEntry = jarIn.getNextJarEntry(); catEntry != null; catEntry = jarIn.getNextJarEntry()) {
-                String classFileName = catEntry.getName();
-                if (!classFileName.endsWith(".class"))
-                    continue;
-                String javaClassName = classFileName.replace(File.separatorChar, '.');
-                javaClassName = javaClassName.substring(0, javaClassName.length() - 6);
-                m_classNames.add(javaClassName);
-            }
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+        for (Entry<String, byte[]> e : m_jarfile.entrySet()) {
+            String classFileName = e.getKey();
+            if (!classFileName.endsWith(".class"))
+                continue;
+            String javaClassName = classFileName.replace(File.separatorChar, '.');
+            javaClassName = javaClassName.substring(0, javaClassName.length() - 6);
+            m_classNames.add(javaClassName);
         }
     }
 }

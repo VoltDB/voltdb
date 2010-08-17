@@ -34,7 +34,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.utils.Encoder;
-import org.voltdb.utils.JarReader;
+import org.voltdb.utils.InMemoryJarfile;
 
 @ProcInfo(singlePartition = false)
 public class UpdateApplicationCatalog extends VoltSystemProcedure {
@@ -61,7 +61,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
     {
         long localcrc;
         try {
-            localcrc = JarReader.crcForJar(catalogURL);
+            localcrc = new InMemoryJarfile(catalogURL).getCRC();
         } catch (IOException e) {
             throw new VoltAbortException("Error reading Catalog URL.");
         }

@@ -61,7 +61,12 @@ public class CatalogContext {
 
         //m_path = pathToCatalogJar;
         if (pathToCatalogJar.startsWith(NO_PATH) == false)
-            m_catalogClassLoader = new JarClassLoader(pathToCatalogJar);
+            try {
+                m_catalogClassLoader = new JarClassLoader(pathToCatalogJar);
+            }
+            catch (Exception e) {
+                throw new RuntimeException(e);
+            }
         else
             m_catalogClassLoader = null;
         this.catalog = catalog;
