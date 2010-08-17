@@ -304,58 +304,62 @@ CTX.THIRD_PARTY_INPUT['json_spirit'] = """
 # SPECIFY THE TESTS
 ###############################################################################
 
+whichtests = os.getenv("EETESTSUITE")
 # input format similar to source, but the executable name is listed
 CTX.TESTS['.'] = """
  harness_test
 """
 
-CTX.TESTS['catalog'] = """
- catalog_test
-"""
+if whichtests in ("${eetestsuite}", "catalog"):
+    CTX.TESTS['catalog'] = """
+    catalog_test
+    """
 
-CTX.TESTS['logging'] = """
- logging_test
-"""
+if whichtests in ("${eetestsuite}", "logging"):
+    CTX.TESTS['logging'] = """
+    logging_test
+    """
 
-CTX.TESTS['common'] = """
- debuglog_test
- serializeio_test
- undolog_test
- valuearray_test
- nvalue_test
-"""
+if whichtests in ("${eetestsuite}", "common"):
+    CTX.TESTS['common'] = """
+     debuglog_test
+     serializeio_test
+     undolog_test
+     valuearray_test
+     nvalue_test
+    """
 
-CTX.TESTS['execution'] = """
- add_drop_table
- engine_test
-"""
+if whichtests in ("${eetestsuite}", "execution"):
+    CTX.TESTS['execution'] = """
+     add_drop_table
+     engine_test
+    """
 
-CTX.TESTS['expressions'] = """
- expression_test
-"""
+if whichtests in ("${eetestsuite}", "expressions"):
+    CTX.TESTS['expressions'] = """
+     expression_test
+    """
 
-CTX.TESTS['indexes'] = """
- index_key_test
- index_scripted_test
- index_test
-"""
+if whichtests in ("${eetestsuite}", "indexes"):
+    CTX.TESTS['indexes'] = """
+     index_key_test
+     index_scripted_test
+     index_test
+    """
 
-CTX.TESTS['storage'] = """
- CopyOnWriteTest
- constraint_test
- filter_test
- persistent_table_log_test
- serialize_test
- StreamedTable_test
- table_and_indexes_test
- table_test
- tabletuple_elt_test
- TupleStreamWrapper_test
-"""
-
-# these are incomplete and out of date. need to be replaced
-# CTX.TESTS['expressions'] = """expserialize_test expression_test"""
-
+if whichtests in ("${eetestsuite}", "storage"):
+    CTX.TESTS['storage'] = """
+     CopyOnWriteTest
+     constraint_test
+     filter_test
+     persistent_table_log_test
+     serialize_test
+     StreamedTable_test
+     table_and_indexes_test
+     table_test
+     tabletuple_elt_test
+     TupleStreamWrapper_test
+    """
 
 ###############################################################################
 # BUILD THE MAKEFILE

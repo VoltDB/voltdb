@@ -776,6 +776,7 @@ NATIVE EE STUFF
     <exec dir='.' executable='python' failonerror='true'>
         <env key='M1CATALOG_PATH' value='${m1catalog}' />
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
+        <env key="EETESTSUITE" value="${eetestsuite}"/>
         <arg line="build.py ${build} test" />
     </exec>
 </target>
