@@ -24,7 +24,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.utils.JarClassLoader;
+import org.voltdb.utils.InMemoryJarfile;
 
 public class CatalogContext {
 
@@ -48,7 +48,7 @@ public class CatalogContext {
 
     // PRIVATE
     //private final String m_path;
-    private final JarClassLoader m_catalogClassLoader;
+    private final InMemoryJarfile m_jarfile;
 
     public CatalogContext(Catalog catalog, String pathToCatalogJar, int version) {
         // check the heck out of the given params in this immutable class
@@ -62,13 +62,13 @@ public class CatalogContext {
         //m_path = pathToCatalogJar;
         if (pathToCatalogJar.startsWith(NO_PATH) == false)
             try {
-                m_catalogClassLoader = new JarClassLoader(pathToCatalogJar);
+                m_jarfile = new InMemoryJarfile(pathToCatalogJar);
             }
             catch (Exception e) {
                 throw new RuntimeException(e);
             }
         else
-            m_catalogClassLoader = null;
+            m_jarfile = null;
         this.catalog = catalog;
         cluster = catalog.getClusters().get("cluster");
         database = cluster.getDatabases().get("database");
@@ -118,6 +118,6 @@ public class CatalogContext {
             return Class.forName(procedureClassName);
 
         // look in the catalog for the file
-        return m_catalogClassLoader.loadClass(procedureClassName);
+        return m_jarfile.getLoader().loadClass(procedureClassName);
     }
 }

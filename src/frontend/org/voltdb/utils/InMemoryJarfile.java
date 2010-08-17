@@ -27,8 +27,11 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
@@ -43,12 +46,15 @@ import java.util.zip.CRC32;
 public class InMemoryJarfile extends TreeMap<String, byte[]> {
 
     private static final long serialVersionUID = 1L;
+    protected final JarLoader m_loader;
 
     ///////////////////////////////////////////////////////
     // CONSTRUCTION
     ///////////////////////////////////////////////////////
 
-    public InMemoryJarfile() {}
+    public InMemoryJarfile() {
+        m_loader = new JarLoader();
+    }
 
     public InMemoryJarfile(String pathOrURL) throws IOException {
         InputStream fin = null;
@@ -60,14 +66,17 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
             fin = new FileInputStream(pathOrURL);
         }
         loadFromStream(fin);
+        m_loader = new JarLoader();
     }
 
     public InMemoryJarfile(URL url) throws IOException {
         loadFromStream(url.openStream());
+        m_loader = new JarLoader();
     }
 
     public InMemoryJarfile(File file) throws IOException {
         loadFromStream(new FileInputStream(file));
+        m_loader = new JarLoader();
     }
 
     private void loadFromStream(InputStream in) throws IOException {
@@ -163,6 +172,59 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
         assert(bytesRead != -1);
 
         return put(key, bytes);
+    }
+
+    ///////////////////////////////////////////////////////
+    // CLASSLOADING
+    ///////////////////////////////////////////////////////
+
+    public class JarLoader extends ClassLoader {
+        final Map<String, Class<?>> m_cache = new HashMap<String, Class<?>>();
+        final Set<String> m_classNames = new HashSet<String>();
+
+        JarLoader() {
+            for (Entry<String, byte[]> e : entrySet()) {
+                String classFileName = e.getKey();
+                if (!classFileName.endsWith(".class"))
+                    continue;
+                String javaClassName = classFileName.replace(File.separatorChar, '.');
+                javaClassName = javaClassName.substring(0, javaClassName.length() - 6);
+                m_classNames.add(javaClassName);
+            }
+        }
+
+        @Override
+        public synchronized Class<?> loadClass(String className) throws ClassNotFoundException {
+            // try the fast cache first
+            Class<?> result;
+            if (m_cache.containsKey(className)) {
+                //System.out.println("found in cache.");
+                return m_cache.get(className);
+            }
+
+            // now look through the list
+            if (m_classNames.contains(className)) {
+                String classPath = className.replace('.', File.separatorChar) + ".class";
+
+                byte bytes[] = get(classPath);
+                if (bytes == null)
+                    throw new ClassNotFoundException(className);
+
+                result = this.defineClass(className, bytes, 0, bytes.length);
+
+                resolveClass(result);
+                m_cache.put(className, result);
+                return result;
+            }
+
+            // default to parent
+            //System.out.println("deferring to parent.");
+            return getParent().loadClass(className);
+        }
+    }
+
+    public JarLoader getLoader() {
+        return m_loader;
     }
 
     ///////////////////////////////////////////////////////
