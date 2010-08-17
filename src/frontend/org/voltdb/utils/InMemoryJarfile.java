@@ -140,6 +140,8 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
             jarOut.flush();
             jarOut.closeEntry();
         }
+
+        jarOut.close();
     }
 
     ///////////////////////////////////////////////////////
