@@ -435,7 +435,7 @@ final class ClientImpl implements Client {
             throw new IllegalStateException("Attempted to use createConnection(String host) " +
                     "with a client that wasn't constructed with a username and password specified");
         }
-        m_distributer.createConnection( host, m_username, m_password, Client.VOLTDB_SERVER_PORT);
+        createConnection( host, Client.VOLTDB_SERVER_PORT, m_username, m_password);
     }
 
     @Override
@@ -444,7 +444,6 @@ final class ClientImpl implements Client {
             throw new IllegalStateException("Attempted to use createConnection(String host) " +
                     "with a client that wasn't constructed with a username and password specified");
         }
-        m_distributer.createConnection( host, m_username, m_password, port);
-
+        createConnection( host, port, m_username, m_password);
     }
 }
