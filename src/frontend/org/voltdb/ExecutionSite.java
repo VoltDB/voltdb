@@ -27,10 +27,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.Semaphore;
 
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
-import org.voltdb.RecoverySiteProcessor.OnRecoveryCompletion;
-import org.voltdb.RecoverySiteProcessorSource.OnRecoveringPartitionInitiate;
 import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.CatalogMap;
@@ -87,6 +86,7 @@ import org.voltdb.messaging.SiteMailbox;
 import org.voltdb.messaging.Subject;
 import org.voltdb.messaging.TransactionInfoBaseMessage;
 import org.voltdb.messaging.VoltMessage;
+import org.voltdb.messaging.RecoveryMessageType;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.Encoder;
@@ -117,7 +117,16 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     final HsqlBackend hsql;
     public volatile boolean m_shouldContinue = true;
 
+    /*
+     * Recover a site at a time to make the interval in which other sites
+     * are blocked as small as possible. The permit will be generated once.
+     * The permit is only acquired by recovering partitions and not the source
+     * partitions.
+     */
+    private static final Semaphore m_recoveryPermit = new Semaphore(1);
+
     private boolean m_recovering = false;
+    private boolean m_haveRecoveryPermit = false;
 
     // Catalog
     public CatalogContext m_context;
@@ -352,38 +361,24 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     };
 
     /**
-     * Hook for source partition involved in recovery to determine what txn it will stop after
-     * and stream recovery data. Basically picks the larger of the two.
-     */
-    private final OnRecoveringPartitionInitiate m_onRecoveryInitiate = new OnRecoveringPartitionInitiate() {
-        @Override
-        public long pickTxnToStopAfter(long recoveringPartitionTxnId) {
-            if (recoveringPartitionTxnId > lastCommittedTxnId) {
-                return recoveringPartitionTxnId;
-            } else {
-                return lastCommittedTxnId;
-            }
-        }
-    };
-
-    /**
      * This is invoked after all recovery data has been received/sent. The processor can be nulled out for GC.
-     * At this point the recovering partition may have to skip to the txn id the source site had stopped after
-     * before streaming
      */
-    private final OnRecoveryCompletion m_onRecoveryCompletion = new OnRecoveryCompletion() {
+    private final Runnable m_onRecoveryCompletion = new Runnable() {
         @Override
-        public void complete(long txnId) {
+        public void run() {
             m_recoveryProcessor = null;
-            if (lastCommittedTxnId != txnId) {
-                /*
-                 * Code to skip until after this txnId if necessary. Most likely has to pull txns
-                 * out of the priority queue and handle mailbox messages if the priority queue is empty
-                 * until it can commit this txnid.
-                 */
+            m_recovering = false;
+            if (m_haveRecoveryPermit) {
+                m_haveRecoveryPermit = false;
+                m_recoveryPermit.release();
+                m_recoveryLog.info(
+                        "Destination recovery complete for site " + m_siteId +
+                        " partition " + m_context.siteTracker.getPartitionForSite(m_siteId));
+            } else {
+                m_recoveryLog.info("Source recovery complete for site " + m_siteId +
+                        " partition " + m_context.siteTracker.getPartitionForSite(m_siteId));
             }
         }
-
     };
 
     public void tick() {
@@ -545,7 +540,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
 
         assert(m_mailbox != null);
         RestrictedPriorityQueue retval = new RestrictedPriorityQueue(initiatorIds, siteId, m_mailbox);
-        retval.setRecovering(m_recovering);
         return retval;
     }
 
@@ -712,6 +706,27 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             // Only poll messaging layer if necessary. Allow the poll
             // to block if the execution site is truly idle.
             while (m_shouldContinue) {
+                /*
+                 * If this partition is recovering, check for a permit and RPQ
+                 * readiness. If it is time, create a recovery processor and send
+                 * the initiate message.
+                 */
+                if (m_recovering && !m_haveRecoveryPermit) {
+                    Long safeTxnId = m_transactionQueue.safeToRecover();
+                    if (safeTxnId != null && m_recoveryPermit.tryAcquire()) {
+                        m_haveRecoveryPermit = true;
+                        m_recoveryProcessor =
+                            RecoverySiteProcessorDestination.createProcessor(
+                                    m_context.database,
+                                    m_context.siteTracker,
+                                    ee,
+                                    m_mailbox,
+                                    m_siteId,
+                                    m_onRecoveryCompletion,
+                                    m_messageHandler);
+                    }
+                }
+
                 TransactionState currentTxnState = m_transactionQueue.poll();
                 if (currentTxnState == null) {
                     // poll the messaging layer for a while as this site has nothing to do
@@ -730,7 +745,22 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                     }
                 }
                 if (currentTxnState != null) {
+                    /*
+                     * Before doing a transaction check if it is time to start recovery
+                     * or do recovery work. The recovery processor checks
+                     * if the txn is greater than X
+                     */
+                    if (m_recoveryProcessor != null) {
+                        m_recoveryProcessor.doRecoveryWork(currentTxnState.txnId);
+                    }
                     recursableRun(currentTxnState);
+                } else  if (m_recoveryProcessor != null) {
+                    /*
+                     * If there is no work in the system the minimum safe txnId is used to move
+                     * recovery forward. This works because heartbeats will move the minimum safe txnId
+                     * up even when there is no work for this partition.
+                     */
+                    m_recoveryProcessor.doRecoveryWork(m_transactionQueue.safeToRecover());
                 }
             }
         }
@@ -802,15 +832,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 {
                     lastKnownGloballyCommitedMultiPartTxnId =
                         Math.max(txnState.txnId, lastKnownGloballyCommitedMultiPartTxnId);
-                }
-
-                /*
-                 * After each txn is committed check and see if it is time to
-                 * start doing the recovery work. Only do it this way right now
-                 * because recovery is a blocking process.
-                 */
-                if (m_recoveryProcessor != null) {
-                    m_recoveryProcessor.doRecoveryWork(lastCommittedTxnId);
                 }
             }
         }
@@ -913,10 +934,27 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             }
         } else if (message instanceof RecoveryMessage) {
             RecoveryMessage rm = (RecoveryMessage)message;
+            if (m_recovering) {
+                assert(m_recoveryProcessor != null);
+            }
             if (m_recoveryProcessor != null) {
                 m_recoveryProcessor.handleRecoveryMessage(rm);
             } else {
-                VoltDB.crashVoltDB();
+                assert(!m_recovering);
+                assert(m_recoveryProcessor == null);
+                assert(rm.type() == RecoveryMessageType.Initiate);
+                final long recoveringPartitionTxnId = rm.txnId();
+                m_recoveryLog.info("Recovery initiate received at site " + m_siteId + " from site " + rm.sourceSite());
+                m_recoveryProcessor = RecoverySiteProcessorSource.createProcessor(
+                        recoveringPartitionTxnId,
+                        rm.sourceSite(),
+                        m_context.database,
+                        m_context.siteTracker,
+                        ee,
+                        m_mailbox,
+                        m_siteId,
+                        m_onRecoveryCompletion,
+                        m_messageHandler);
             }
         }
         else if (message instanceof FragmentResponseMessage) {
@@ -1363,6 +1401,9 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                     m_mailbox.deliverFront(new CheckTxnStateCompletionMessage(ts.txnId));
                 }
             }
+        }
+        if (m_recoveryProcessor != null) {
+            m_recoveryProcessor.handleNodeFault( hostIds, m_context.siteTracker);
         }
     }
 

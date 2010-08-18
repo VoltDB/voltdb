@@ -70,7 +70,6 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
     long m_lastTxnPopped = 0;
     QueueState m_state = QueueState.BLOCKED_EMPTY;
     final Mailbox m_mailbox;
-    boolean m_recovering;
 
     /**
      * Tell this queue about all initiators. If any initiators
@@ -82,11 +81,6 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
         m_mailbox = mbox;
         for (int id : initiatorSiteIds)
             m_initiatorData.put(id, new LastInitiatorData());
-        m_recovering = false;
-    }
-
-    public void setRecovering(boolean recovering) {
-        m_recovering = recovering;
     }
 
     /**
@@ -338,6 +332,26 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
         } catch (MessagingException e) {
             // I really hope this doesn't happen
             throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Returns true if it is safe to recover. Need to have heard from every initiator before recovery
+     * so that there is a safe txnid at which recovery can take place where the site knows about all work
+     * it will need to apply to the data is receives from the source partition once the data has been streamed.
+     * @return
+     */
+    public Long safeToRecover() {
+        boolean safe = true;
+        for (LastInitiatorData data : m_initiatorData.values()) {
+            if (data.m_lastSeenTxnId == DtxnConstants.DUMMY_LAST_SEEN_TXN_ID) {
+                safe = false;
+            }
+        }
+        if (!safe) {
+            return null;
+        } else {
+            return m_newestCandidateTransaction;
         }
     }
 }

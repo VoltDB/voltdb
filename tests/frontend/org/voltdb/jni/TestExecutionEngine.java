@@ -28,14 +28,13 @@ import junit.framework.TestCase;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.concurrent.atomic.AtomicReference;
+import java.nio.ByteBuffer;
 
 import org.voltdb.SysProcSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.RecoverySiteProcessorSource;
-import org.voltdb.RecoverySiteProcessorSource.OnRecoveringPartitionInitiate;
 import org.voltdb.RecoverySiteProcessorDestination;
-import org.voltdb.RecoverySiteProcessor.OnRecoveryCompletion;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
@@ -193,7 +192,8 @@ public class TestExecutionEngine extends TestCase {
         final Catalog catalog = new Catalog();
         catalog.execute(LoadCatalogToString.THE_CATALOG);
         sourceEngine.loadCatalog(catalog.serialize());
-        final ExecutionEngine destinationEngine = new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID, destinationId, destinationId, "");
+        final ExecutionEngine destinationEngine =
+            new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID, destinationId, destinationId, "");
         destinationEngine.loadCatalog(catalog.serialize());
 
         int WAREHOUSE_TABLEID = warehouseTableId(catalog);
@@ -201,7 +201,8 @@ public class TestExecutionEngine extends TestCase {
 
         loadTestTables(catalog);
 
-        HashMap<Pair<String, Integer>, HashSet<Integer>> tablesAndDestinations = new HashMap<Pair<String, Integer>, HashSet<Integer>>();
+        final HashMap<Pair<String, Integer>, HashSet<Integer>> tablesAndDestinations =
+            new HashMap<Pair<String, Integer>, HashSet<Integer>>();
         HashSet<Integer> destinations = new HashSet<Integer>();
         destinations.add(destinationId);
         tablesAndDestinations.put(Pair.of( "STOCK", STOCK_TABLEID), destinations);
@@ -217,15 +218,6 @@ public class TestExecutionEngine extends TestCase {
             }
         };
 
-        OnRecoveringPartitionInitiate onInitiate = new OnRecoveringPartitionInitiate() {
-
-            @Override
-            public long pickTxnToStopAfter(long recoveringPartitionTxnId) {
-                return 0;
-            }
-
-        };
-
         final MessageHandler mh = new MessageHandler() {
 
             @Override
@@ -234,42 +226,45 @@ public class TestExecutionEngine extends TestCase {
             }
         };
 
-        final RecoverySiteProcessorSource sourceProcessor =
-            new RecoverySiteProcessorSource(
-                    tablesAndDestinations,
-                    sourceEngine,
-                    sourceMailbox,
-                    sourceId,
-                    onSourceCompletion,
-                    onInitiate,
-                    mh);
-
-        Thread sourceThread = new Thread() {
+        Thread sourceThread = new Thread("Source thread") {
             @Override
             public void run() {
                 VoltMessage message = sourceMailbox.recvBlocking();
                 assertTrue(message != null);
                 assertTrue(message instanceof RecoveryMessage);
-                sourceProcessor.handleRecoveryMessage((RecoveryMessage)message);
+                RecoveryMessage rm = (RecoveryMessage)message;
+
+                final RecoverySiteProcessorSource sourceProcessor =
+                    new RecoverySiteProcessorSource(
+                            rm.txnId(),
+                            rm.sourceSite(),
+                            tablesAndDestinations,
+                            sourceEngine,
+                            sourceMailbox,
+                            sourceId,
+                            onSourceCompletion,
+                            mh);
+                sourceProcessor.doRecoveryWork(0);
             }
         };
         sourceThread.start();
 
-        final HashMap<Pair<String, Integer>, Integer> tablesAndSources = new HashMap<Pair<String, Integer>, Integer>();
+        final HashMap<Pair<String, Integer>, Integer> tablesAndSources =
+            new HashMap<Pair<String, Integer>, Integer>();
         tablesAndSources.put(Pair.of( "STOCK", STOCK_TABLEID), sourceId);
         tablesAndSources.put(Pair.of( "WAREHOUSE", WAREHOUSE_TABLEID), sourceId);
 
         final MockMailbox destinationMailbox = new MockMailbox();
         MockMailbox.registerMailbox( destinationId, destinationMailbox);
 
-        final OnRecoveryCompletion onDestinationCompletion = new OnRecoveryCompletion() {
+        final Runnable onDestinationCompletion = new Runnable() {
             @Override
-            public void complete(long txnId) {
+            public void run() {
                 destinationCompleted.set(true);
             }
         };
 
-        Thread destinationThread = new Thread() {
+        Thread destinationThread = new Thread("Destination thread") {
             @Override
             public void run() {
                 RecoverySiteProcessorDestination destinationProcess =
@@ -279,15 +274,24 @@ public class TestExecutionEngine extends TestCase {
                             destinationMailbox,
                             destinationId,
                             onDestinationCompletion,
-                            0,
                             mh);
-                destinationProcess.sendInitiateMessage();
+                /*
+                 * Do a lot of craziness so we can intercept the mailbox calls
+                 * and discard the buffer so it is returned to the source
+                 */
+                destinationProcess.doRecoveryWork(-1);
+                destinationProcess.m_recoveryBegan = true;
+                int ii = 0;
                 while (!destinationCompleted.get()) {
                     VoltMessage message = destinationMailbox.recvBlocking();
                     assertTrue(message != null);
                     assertTrue(message instanceof RecoveryMessage);
                     destinationProcess.handleRecoveryMessage((RecoveryMessage)message);
                     message.discard();
+                    ii++;
+                    if (ii == 4) {
+                        destinationProcess.doRecoveryWork(0);
+                    }
                 }
             }
         };

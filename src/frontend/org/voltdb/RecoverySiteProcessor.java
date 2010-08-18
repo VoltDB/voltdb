@@ -37,17 +37,6 @@ public interface RecoverySiteProcessor {
         public void handleMessage(VoltMessage message);
     }
 
-    /**
-     * This handler is invoked upon recovery completion. It is passed the txnid of the last
-     * committed txn executed by the partition that was a source of recovery data. This site
-     * should skip to the first txn after this ID and start executing. If this site
-     * was the source it will already be there.
-     *
-     */
-    public interface OnRecoveryCompletion {
-        void complete(long txnId);
-    }
-
     public void handleRecoveryMessage(RecoveryMessage message);
     public void handleNodeFault(HashSet<Integer> failedNodes, SiteTracker tracker);
     public void doRecoveryWork(long currentTxnId);

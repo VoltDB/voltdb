@@ -788,9 +788,6 @@ bool PersistentTable::activateRecoveryStream(int32_t tableId) {
     if (m_recoveryContext != NULL) {
         return true;
     }
-    if (m_tupleCount == 0) {
-        return false;
-    }
     m_recoveryContext.reset(new RecoveryContext( this, tableId ));
     return false;
 }

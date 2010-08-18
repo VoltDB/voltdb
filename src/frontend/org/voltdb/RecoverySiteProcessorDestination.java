@@ -17,9 +17,7 @@
 package org.voltdb;
 
 import java.nio.ByteBuffer;
-import java.util.HashSet;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
@@ -32,7 +30,14 @@ import org.voltdb.messaging.VoltMessage;
 import org.voltdb.messaging.RecoveryMessage;
 import org.voltdb.messaging.RecoveryMessageType;
 import org.voltdb.utils.Pair;
+import org.voltdb.catalog.*;
+import org.voltdb.utils.CatalogUtil;
 
+/**
+ * Manages recovery of a partition. By sending messages via the mailbox system and interacting with
+ * the execution engine directly. Uses the ExecutionSites thread to do work via the doRecoveryWork method
+ * that is invoked by ExecutionSite.run().
+ */
 public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
     private static final VoltLogger recoveryLog = new VoltLogger("RECOVERY");
 
@@ -47,7 +52,7 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
     private final ExecutionEngine m_engine;
 
     /**
-     * Mailbox used to send acks
+     * Mailbox used to send acks and receive recovery messages
      */
     private final Mailbox m_mailbox;
 
@@ -59,21 +64,27 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
     /**
      * What to do when data recovery is completed
      */
-    private final OnRecoveryCompletion m_onCompletion;
+    private final Runnable m_onCompletion;
 
     /**
-     * Transaction to resume execution from once data is synced
+     * Transaction to stop before and do the sync
      */
-    private long m_resumeTxnId;
+    private long m_stopBeforeTxnId;
 
     private final MessageHandler m_messageHandler;
 
     private final int m_sourceSiteId;
 
+    private boolean m_sentInitiate = false;
+
+
     /*
-     * Last committed transaction before recovery was started
+     * Recovery messages received before the appropriate txn has been committed
+     * are buffered and then played back in doRecoveryWork
      */
-    private final long m_startingTxnId;
+    public boolean m_recoveryBegan = false;
+
+    private final ArrayList<RecoveryMessage> m_buffered = new ArrayList<RecoveryMessage>();
 
     /**
      * Data about a table that is being used as a source for a recovery stream.
@@ -110,20 +121,22 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
     @Override
     public void handleRecoveryMessage(RecoveryMessage message) {
         assert(message.type() == RecoveryMessageType.ScanTuples ||
-                message.type() == RecoveryMessageType.Complete ||
-                message.type() == RecoveryMessageType.Initiate);
+                message.type() == RecoveryMessageType.Complete);
+        if (!m_recoveryBegan) {
+            m_buffered.add(message);
+            return;
+        }
 
         if (message.type() == RecoveryMessageType.ScanTuples) {
             m_engine.processRecoveryMessage(message.getMessageData());
+            recoveryLog.info("Received tuple data at site " + m_siteId +
+                    " for table " + m_tables.get(message.tableId()).m_name);
         } else if (message.type() == RecoveryMessageType.Complete) {
-            m_tables.remove(message.tableId());
-            if (m_tables.isEmpty()) {
-                m_onCompletion.complete(m_resumeTxnId);
-            }
-        } else if (message.type() == RecoveryMessageType.Initiate){
-            m_resumeTxnId = message.txnId();
-            return;
+            RecoveryTable table = m_tables.remove(message.tableId());
+            recoveryLog.info("Received completion message at site " + m_siteId +
+                    " for table " + table.m_name);
         } else {
+            System.out.println(message.type());
             VoltDB.crashVoltDB();
         }
         int sourceSite = message.sourceSite();
@@ -137,10 +150,43 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
     }
 
     /**
-     * A destination doesn't have periodic recovery work to do.
+     * Send the initiate message if necessary. Block if the sync after txn has been completed
+     * and perform recovery work.
      */
     @Override
     public void doRecoveryWork(long txnId) {
+        if (!m_sentInitiate) {
+            m_sentInitiate = true;
+            sendInitiateMessage(txnId);
+        }
+
+        if (txnId < m_stopBeforeTxnId) {
+            return;
+        }
+
+        m_recoveryBegan = true;
+        for (RecoveryMessage rm : m_buffered) {
+            handleRecoveryMessage(rm);
+        }
+        m_buffered.clear();
+
+        while (true) {
+            VoltMessage message = m_mailbox.recv();
+            if (message != null) {
+                if (message instanceof RecoveryMessage) {
+                    handleRecoveryMessage((RecoveryMessage)message);
+                } else {
+                    m_messageHandler.handleMessage(message);
+                }
+            } else {
+                Thread.yield();
+            }
+
+            if (m_tables.isEmpty()) {
+                m_onCompletion.run();
+                return;
+            }
+        }
     }
 
     /**
@@ -154,14 +200,12 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
             ExecutionEngine engine,
             Mailbox mailbox,
             final int siteId,
-            OnRecoveryCompletion onCompletion,
-            long currentTxnId,
+            Runnable onCompletion,
             MessageHandler messageHandler) {
         m_mailbox = mailbox;
         m_engine = engine;
         m_siteId = siteId;
         m_messageHandler = messageHandler;
-        m_startingTxnId = currentTxnId;
 
         /*
          * Only support recovering from one partition for now so just grab
@@ -184,10 +228,10 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
      * failures can be delivered to this processor while waiting
      * for a response to the initiate message
      */
-    public void sendInitiateMessage() {
+    public void sendInitiateMessage(long txnId) {
         ByteBuffer buf = ByteBuffer.allocate(2048);
         BBContainer container = DBBPool.wrapBB(buf);
-        RecoveryMessage recoveryMessage = new RecoveryMessage(container, m_siteId, m_startingTxnId);
+        RecoveryMessage recoveryMessage = new RecoveryMessage(container, m_siteId, txnId);
         try {
             m_mailbox.send( m_sourceSiteId, 0, recoveryMessage);
         } catch (MessagingException e) {
@@ -198,14 +242,23 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
             VoltMessage message = m_mailbox.recv();
             if (message != null) {
                 if (message instanceof RecoveryMessage) {
-                    handleRecoveryMessage((RecoveryMessage)message);
+                    RecoveryMessage rm = (RecoveryMessage)message;
+                    if (rm.type() == RecoveryMessageType.Initiate) {
+                        m_stopBeforeTxnId = rm.txnId();
+                        recoveryLog.info("Recovery initiate ack received at site " + m_siteId + " from site " +
+                                rm.sourceSite() + " will sync after txnId " + rm.txnId());
+                        return;
+                    } else {
+                        VoltDB.crashVoltDB();
+                    }
                     return;
                 } else {
                     m_messageHandler.handleMessage(message);
                 }
                 continue;
+            } else {
+                Thread.yield();
             }
-            Thread.yield();
         }
     }
 
@@ -229,5 +282,44 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
                 VoltDB.crashVoltDB();
             }
         }
+    }
+
+    public static RecoverySiteProcessorDestination createProcessor(
+            Database db,
+            SiteTracker tracker,
+            ExecutionEngine engine,
+            Mailbox mailbox,
+            final int siteId,
+            Runnable onCompletion,
+            MessageHandler messageHandler) {
+        ArrayList<Pair<String, Integer>> tables = new ArrayList<Pair<String, Integer>>();
+        Iterator<Table> ti = db.getTables().iterator();
+        while (ti.hasNext()) {
+            Table t = ti.next();
+            if (!CatalogUtil.isTableExportOnly( db, t) && t.getMaterializer() == null) {
+                tables.add(Pair.of(t.getTypeName(),t.getRelativeIndex()));
+            }
+        }
+        int partitionId = tracker.getPartitionForSite(siteId);
+        ArrayList<Integer> sourceSites = new ArrayList<Integer>(tracker.getAllSitesForPartition(partitionId));
+        sourceSites.remove(new Integer(siteId));
+
+        if (sourceSites.isEmpty()) {
+            VoltDB.crashVoltDB();
+        }
+
+        HashMap<Pair<String, Integer>, Integer> tableToSourceSite =
+            new HashMap<Pair<String, Integer>, Integer>();
+        for (Pair<String, Integer> table : tables) {
+            tableToSourceSite.put( table, sourceSites.get(0));
+        }
+
+        return new RecoverySiteProcessorDestination(
+                tableToSourceSite,
+                engine,
+                mailbox,
+                siteId,
+                onCompletion,
+                messageHandler);
     }
 }

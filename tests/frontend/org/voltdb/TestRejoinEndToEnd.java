@@ -344,7 +344,9 @@ public class TestRejoinEndToEnd extends TestCase {
         Client client;
 
         client = ClientFactory.createClient();
+
         client.createConnection("localhost", "ry@nlikesthe", "y@nkees");
+
         response = client.callProcedure("InsertSinglePartition", 0);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         response = client.callProcedure("Insert", 1);

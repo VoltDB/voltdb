@@ -20,7 +20,9 @@ import java.nio.ByteBuffer;
 
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.ArrayDeque;
 
@@ -30,9 +32,12 @@ import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.RecoveryMessage;
 import org.voltdb.messaging.RecoveryMessageType;
 import org.voltdb.messaging.VoltMessage;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.jni.ExecutionEngine;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.Pair;
 
@@ -112,28 +117,25 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
     private final Runnable m_onCompletion;
 
     /**
-     * What to do when the initiate message is received from the recovering partition.
-     * Returns the txnId this EE will stop at and block on streaming out data
+     * Transaction the remote partition stopped at (without executing it) before
+     * sending the initiate message
      */
-    private final OnRecoveringPartitionInitiate m_onInitiate;
+    private long m_destinationStoppedBeforeTxnId = Long.MAX_VALUE;
+
+    private final int m_destinationSiteId;
+
+    /*
+     * Only send the response to the initiate request once in doRecoveryWork
+     */
+    private boolean m_sentInitiateResponse = false;
 
     /**
-     * Transaction to stop and send recovery data at
+     * Transaction to stop before and do the sync. Once doRecoveryWork is passed a txnId
+     * that is >= this txnId it will stop and do the recovery
      */
-    private long m_txnIdToBlockAfter = Long.MAX_VALUE;
+    private long m_stopBeforeTxnId;
 
     private final MessageHandler m_messageHandler;
-
-    /**
-     * When the recovering partition initiates the streaming of recovery data it will specify
-     * the transaction id that it stopped after. This handler will take that information
-     * and decide what transaction to stop after and stream the data. It will be some txnid >=
-     * what was supplied by the recovering partition, and the recovering partition will then
-     * skip to the transaction after the one specified by the return value once recovery is complete
-     */
-    public interface OnRecoveringPartitionInitiate {
-        public long pickTxnToStopAfter(long recoveringPartitionTxnId);
-    }
 
     /**
      * Keep track of how many times a block has been acked and how many acks are expected
@@ -162,6 +164,10 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
         private void handleNodeFault(HashSet<Integer> failedNodes, SiteTracker tracker) {
             throw new UnsupportedOperationException();
         }
+
+        public boolean hasOutstanding() {
+            return !m_acks.isEmpty();
+        }
     }
 
     /**
@@ -171,6 +177,7 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
      */
     public static class RecoveryTable {
         final String m_name;
+
         /**
          * What phase of recovery is this table currently in? e.g.
          * is it stream the base data or streaming updates.
@@ -235,7 +242,7 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
         }
     }
 
-    /*
+    /**
      * Flush the recovery stream for the table that is currently being streamed.
      * Then clear the list of tables to stream.
      */
@@ -292,17 +299,19 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
      * @param onCompletion What to do when data recovery is complete.
      */
     public RecoverySiteProcessorSource(
+            long destinationTxnId,
+            int destinationSiteId,
             HashMap<Pair<String, Integer>, HashSet<Integer>> tableToSites,
             ExecutionEngine engine,
             Mailbox mailbox,
             final int siteId,
             Runnable onCompletion,
-            OnRecoveringPartitionInitiate initiateHandler,
             MessageHandler messageHandler) {
         m_mailbox = mailbox;
         m_engine = engine;
         m_siteId = siteId;
-        m_onInitiate = initiateHandler;
+        m_destinationSiteId = destinationSiteId;
+        m_destinationStoppedBeforeTxnId = destinationTxnId;
         m_messageHandler = messageHandler;
         for (Map.Entry<Pair<String, Integer>, HashSet<Integer>> entry : tableToSites.entrySet()) {
             if (entry.getValue().isEmpty()) {
@@ -315,10 +324,6 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
                             entry.getValue()));
         }
         m_onCompletion = onCompletion;
-        if (m_tablesToStream.isEmpty()) {
-            onCompletion.run();
-            return;
-        }
         RecoveryTable table = m_tablesToStream.peek();
         if (!m_engine.activateTableStream(table.m_tableId, TableStreamType.RECOVERY )) {
             hostLog.error("Attempted to activate recovery stream for table "
@@ -326,6 +331,7 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
             VoltDB.crashVoltDB();
         }
         initializeBufferPool();
+
     }
 
     void initializeBufferPool() {
@@ -366,37 +372,13 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
         if (message.type() == RecoveryMessageType.Ack) {
             if (m_ackTracker.ackReceived(message.blockIndex())) {
                 m_allowedBuffers++;
-            }
-        } else if (message.type() == RecoveryMessageType.Initiate) {
-            /*
-             * This should supply return the last committed txn id. Need this to know if
-             * the processor should immediately start doing recovery work.
-             */
-            final long lastCommittedTxnId = m_onInitiate.pickTxnToStopAfter(Long.MIN_VALUE);
-
-            /*
-             * Provide the txn id from the message and see what txnId was picked. Will be lastCommittedTxnId
-             * or the one from the message (if that is greater).
-             */
-            m_txnIdToBlockAfter = m_onInitiate.pickTxnToStopAfter(message.txnId());
-
-            /*
-             * Send a response to the recovering partition with txnid it should resume after
-             */
-            ByteBuffer buf = ByteBuffer.allocate(2048);
-            BBContainer cont = DBBPool.wrapBB(buf);
-            RecoveryMessage response = new RecoveryMessage(cont, m_siteId, m_txnIdToBlockAfter);
-            try {
-                m_mailbox.send( message.sourceSite(), 0, response);
-            } catch (MessagingException e) {
-                throw new RuntimeException(e);
-            }
-
-            /*
-             * If the txnid to block after is the last commited txn id, start recovery work
-             */
-            if (lastCommittedTxnId == m_txnIdToBlockAfter) {
-                doRecoveryWork(lastCommittedTxnId);
+                /*
+                 * All recovery messages have been acked by the remote partition.
+                 * Recovery is really complete so run the handler
+                 */
+                if (m_allowedBuffers == m_numBuffers && m_tablesToStream.isEmpty()) {
+                    m_onCompletion.run();
+                }
             }
         } else {
             VoltDB.crashVoltDB();
@@ -410,19 +392,40 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
      * that the pooled byte buffer be sent all the way to the NIOWriteStream and then discarded. The
      * current implementation of HostMessenger and ForeignHost does this, but only when delivering to a
      * single site.
-     *
-     * The currentTxnId is an argument that is used to determine if the txnId that this partition will
-     * block on until all recovery data is streamed has been reached.
      */
     @Override
-    public void doRecoveryWork(long lastCommittedTxnId) {
-        if (lastCommittedTxnId < m_txnIdToBlockAfter) {
-            return;
-        } else if (lastCommittedTxnId > m_txnIdToBlockAfter) {
-            recoveryLog.error("Last committed txnId " + lastCommittedTxnId + " is after the txnid to block after " +
-                    m_txnIdToBlockAfter + " recovery has failed");
+    public void doRecoveryWork(long nextTxnId) {
+        /*
+         * Send an initiate response to the recovering partition with txnid it should stop at
+         * before receiving the recovery data. Pick a txn id that is >= the next txn that
+         * hasn't been executed yet at this partition. We know the next txnId from nextTxnId.
+         * That will be an actual transactionId, or minimum safe txnId based on heartbeats if
+         * the priority queue is empty.
+         */
+        if (!m_sentInitiateResponse) {
+            m_sentInitiateResponse = true;
+            m_stopBeforeTxnId = Math.max(nextTxnId, m_destinationStoppedBeforeTxnId);
+            ByteBuffer buf = ByteBuffer.allocate(2048);
+            BBContainer cont = DBBPool.wrapBB(buf);
+            RecoveryMessage response = new RecoveryMessage(cont, m_siteId, m_stopBeforeTxnId);
+            try {
+                m_mailbox.send( m_destinationSiteId, 0, response);
+            } catch (MessagingException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        /*
+         * Need to execute more transactions to approach the txn id
+         * that we agreed to stop before. The nextTxnId will be a txnId that is for the
+         * next transaction to execute that is greater then the one agreed to stop at (if the agreement
+         * was to stop at an actual heartbeat) or it may be greater if nextTxnId is based on heartbeat data
+         * and not actual work.
+         */
+        if (nextTxnId < m_stopBeforeTxnId) {
             return;
         }
+
         while (true) {
             while (m_allowedBuffers > 0 && !m_tablesToStream.isEmpty() && !m_buffers.isEmpty()) {
                 /*
@@ -452,7 +455,7 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
                  * Ask the engine to serialize more data.
                  */
                 int serialized = m_engine.tableStreamSerializeMore(container, table.m_tableId, TableStreamType.RECOVERY);
-
+                recoveryLog.info("Serialized " + serialized + " for table " + table.m_name);
                 if (serialized <= 0) {
                     /*
                      * Unlike COW the EE will actually serialize a message saying that recovery is
@@ -490,7 +493,8 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
                 final int numDestinations = table.m_destinationIds.length;
 
                 //Record that we are expecting this number of acks for this block
-                //before more data should be sent.
+                //before more data should be sent. The complete message is also acked
+                //and is given a block index.
                 m_ackTracker.waitForAcks( rm.blockIndex(), numDestinations);
 
                 /*
@@ -507,7 +511,7 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
                 } else {
                     /*
                      * This path is broken right now because this version of send will not discard
-                     * the message. We don't plan on using it anyways so no biggie.
+                     * the message and thus leaks the buffer. We don't plan on using it anyways so no biggie.
                      */
                     VoltDB.crashVoltDB();
     //                try {
@@ -520,20 +524,29 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
             }
 
             if (m_tablesToStream.isEmpty()) {
-                /*
-                 * See if it is possible to discard all the buffers
-                 */
-                synchronized (this) {
-                    m_recoveryComplete = true;
-                    BBContainer buffer = null;
-                    while ((buffer = m_buffers.poll()) != null) {
-                        m_bufferToOriginMap.remove(buffer).discard();
+                if (!m_recoveryComplete) {
+                    /*
+                     * Make sure all buffers get discarded. Those that have been returned already
+                     * are discarded. Those that will be returned will check m_recoveryComplete
+                     * and behave appropriately
+                     */
+                    synchronized (this) {
+                        m_recoveryComplete = true;
+                        BBContainer buffer = null;
+                        while ((buffer = m_buffers.poll()) != null) {
+                            m_bufferToOriginMap.remove(buffer).discard();
+                        }
                     }
                 }
-                m_onCompletion.run();
-                return;
+                if (!m_ackTracker.hasOutstanding()) {
+                    return;
+                }
             }
 
+            /*
+             * Process mailbox messages as part of this loop. Hand off non-recovery messages to
+             * the ES provided handler
+             */
             VoltMessage message = m_mailbox.recv();
             if (message != null) {
                 if (message instanceof RecoveryMessage) {
@@ -541,9 +554,68 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
                 } else {
                     m_messageHandler.handleMessage(message);
                 }
-
+            } else {
+                Thread.yield();
             }
-            Thread.yield();
         }
+    }
+
+    public static RecoverySiteProcessorSource createProcessor(
+            long destinationTxnId,
+            int destinationSiteId,
+            Database db,
+            SiteTracker tracker,
+            ExecutionEngine engine,
+            Mailbox mailbox,
+            final int siteId,
+            Runnable onCompletion,
+            MessageHandler messageHandler) {
+        /*
+         * First make sure the recovering partition didn't go down before this message was received.
+         * Return null so no recovery work is done.
+         */
+        boolean isUp = false;
+        for (int up : tracker.getUpExecutionSites()) {
+            if (destinationSiteId == up) {
+                isUp = true;
+            }
+        }
+        if (!isUp) {
+            return null;
+        }
+
+        ArrayList<Pair<String, Integer>> tables = new ArrayList<Pair<String, Integer>>();
+        Iterator<Table> ti = db.getTables().iterator();
+        while (ti.hasNext()) {
+            Table t = ti.next();
+            if (!CatalogUtil.isTableExportOnly( db, t) && t.getMaterializer() == null) {
+                tables.add(Pair.of(t.getTypeName(), t.getRelativeIndex()));
+            }
+        }
+
+        recoveryLog.info("Found " + tables.size() + " tables to recover");
+        HashMap<Pair<String, Integer>, HashSet<Integer>> tableToDestinationSite =
+            new HashMap<Pair<String, Integer>, HashSet<Integer>>();
+        for (Pair<String, Integer> table : tables) {
+            recoveryLog.info("Initiating recovery for table " + table.getFirst());
+            HashSet<Integer> destinations = tableToDestinationSite.get(table);
+            if (destinations == null) {
+                destinations = new HashSet<Integer>();
+                tableToDestinationSite.put(table, destinations);
+            }
+            destinations.add(destinationSiteId);
+        }
+
+        RecoverySiteProcessorSource source = new RecoverySiteProcessorSource(
+                destinationTxnId,
+                destinationSiteId,
+                tableToDestinationSite,
+                engine,
+                mailbox,
+                siteId,
+                onCompletion,
+                messageHandler);
+
+        return source;
     }
 }
