@@ -80,7 +80,7 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
         while ((catEntry = jarIn.getNextJarEntry()) != null) {
             byte[] value = readFromJarEntry(jarIn, catEntry);
             String key = catEntry.getName();
-            super.put(key, value);
+            put(key, value);
         }
     }
 
