@@ -32,8 +32,8 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.regressionsuites.sneakyprocs.MultiPartition;
-import org.voltdb.regressionsuites.sneakyprocs.SinglePartition;
+import org.voltdb_testprocs.regressionsuites.sneakyprocs.MultiPartition;
+import org.voltdb_testprocs.regressionsuites.sneakyprocs.SinglePartition;
 
 public class TestSneakyExecutionOrderSuite extends RegressionSuite {
 

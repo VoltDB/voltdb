@@ -61,7 +61,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
     static Class<?>[] BASEPROCS_OPROCS =  { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
                                             org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
                                             org.voltdb.benchmark.tpcc.procedures.delivery.class,
-                                            org.voltdb.regressionsuites.orderbyprocs.InsertO1.class};
+                                            org.voltdb_testprocs.regressionsuites.orderbyprocs.InsertO1.class};
 
 
     static Class<?>[] EXPANDEDPROCS = { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,

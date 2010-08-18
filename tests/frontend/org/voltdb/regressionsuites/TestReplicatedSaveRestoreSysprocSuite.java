@@ -26,8 +26,8 @@ package org.voltdb.regressionsuites;
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.regressionsuites.saverestore.CatalogChangeSingleProcessServer;
-import org.voltdb.regressionsuites.saverestore.SaveRestoreTestProjectBuilder;
+import org.voltdb_testprocs.regressionsuites.saverestore.CatalogChangeSingleProcessServer;
+import org.voltdb_testprocs.regressionsuites.saverestore.SaveRestoreTestProjectBuilder;
 
 
 /**

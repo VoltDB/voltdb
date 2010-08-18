@@ -37,9 +37,9 @@ import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.elt.ExportTestClient;
-import org.voltdb.regressionsuites.securityprocs.DoNothing1;
-import org.voltdb.regressionsuites.securityprocs.DoNothing2;
-import org.voltdb.regressionsuites.securityprocs.DoNothing3;
+import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing1;
+import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing2;
+import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing3;
 
 public class TestSecuritySuite extends RegressionSuite {
 

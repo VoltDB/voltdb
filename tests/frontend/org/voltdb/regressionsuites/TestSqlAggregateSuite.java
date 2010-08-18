@@ -33,7 +33,7 @@ import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.regressionsuites.aggregates.*;
+import org.voltdb_testprocs.regressionsuites.aggregates.*;
 
 /**
  * System tests for basic aggregate and DISTINCT functionality

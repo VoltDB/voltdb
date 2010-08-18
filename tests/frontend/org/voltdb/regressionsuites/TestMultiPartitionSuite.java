@@ -29,7 +29,7 @@ import org.voltdb.client.Client;
 import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.benchmark.tpcc.procedures.UpdateNewOrder;
-import org.voltdb.regressionsuites.multipartitionprocs.*;
+import org.voltdb_testprocs.regressionsuites.multipartitionprocs.*;
 
 import java.io.IOException;
 

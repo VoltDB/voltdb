@@ -47,10 +47,10 @@ import org.voltdb.planner.TestPlansGroupBy;
 public class TestPlansGroupBySuite extends RegressionSuite {
 
     static final Class<?>[] PROCEDURES = {
-        org.voltdb.regressionsuites.plansgroupbyprocs.CountT1A1.class,
-        org.voltdb.regressionsuites.plansgroupbyprocs.InsertF.class,
-        org.voltdb.regressionsuites.plansgroupbyprocs.InsertDims.class,
-        org.voltdb.regressionsuites.plansgroupbyprocs.SumGroupSingleJoin.class };
+        org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.CountT1A1.class,
+        org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.InsertF.class,
+        org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.InsertDims.class,
+        org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.SumGroupSingleJoin.class };
 
     /** Load 1 1's, 2 2's, 3 3's .. 10 10's and 1 11 */
     private int loaderNxN(Client client, int pkey) throws ProcCallException,

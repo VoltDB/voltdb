@@ -40,12 +40,12 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.elt.ExportTestClient;
-import org.voltdb.regressionsuites.sqltypesprocs.Delete;
-import org.voltdb.regressionsuites.sqltypesprocs.Insert;
-import org.voltdb.regressionsuites.sqltypesprocs.InsertAddedTable;
-import org.voltdb.regressionsuites.sqltypesprocs.RollbackInsert;
-import org.voltdb.regressionsuites.sqltypesprocs.Update_ELT;
 import org.voltdb.utils.SnapshotVerifier;
+import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Delete;
+import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Insert;
+import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertAddedTable;
+import org.voltdb_testprocs.regressionsuites.sqltypesprocs.RollbackInsert;
+import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Update_ELT;
 
 /**
  *  End to end ELT tests using the RawProcessor and the ELSinkServer.

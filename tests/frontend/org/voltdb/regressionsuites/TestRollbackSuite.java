@@ -34,8 +34,8 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.benchmark.tpcc.procedures.*;
-import org.voltdb.regressionsuites.rollbackprocs.*;
 import org.voltdb.types.TimestampType;
+import org.voltdb_testprocs.regressionsuites.rollbackprocs.*;
 
 public class TestRollbackSuite extends RegressionSuite {
 

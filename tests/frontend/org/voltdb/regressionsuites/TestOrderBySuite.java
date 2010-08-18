@@ -35,11 +35,11 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.regressionsuites.orderbyprocs.InsertO1;
-import org.voltdb.regressionsuites.orderbyprocs.InsertO3;
-import org.voltdb.regressionsuites.orderbyprocs.OrderByCountStarAlias;
-import org.voltdb.regressionsuites.orderbyprocs.OrderByNonIndex;
-import org.voltdb.regressionsuites.orderbyprocs.OrderByOneIndex;
+import org.voltdb_testprocs.regressionsuites.orderbyprocs.InsertO1;
+import org.voltdb_testprocs.regressionsuites.orderbyprocs.InsertO3;
+import org.voltdb_testprocs.regressionsuites.orderbyprocs.OrderByCountStarAlias;
+import org.voltdb_testprocs.regressionsuites.orderbyprocs.OrderByNonIndex;
+import org.voltdb_testprocs.regressionsuites.orderbyprocs.OrderByOneIndex;
 
 public class TestOrderBySuite extends RegressionSuite {
 

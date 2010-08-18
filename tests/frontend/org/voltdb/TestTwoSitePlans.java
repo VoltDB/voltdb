@@ -39,9 +39,9 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineJNI;
-import org.voltdb.regressionsuites.multipartitionprocs.MultiSiteSelect;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb_testprocs.regressionsuites.multipartitionprocs.MultiSiteSelect;
 
 public class TestTwoSitePlans extends TestCase {
 

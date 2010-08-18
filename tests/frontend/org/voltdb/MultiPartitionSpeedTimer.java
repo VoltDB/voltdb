@@ -34,6 +34,7 @@ import org.voltdb.client.*;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalSingleProcessServer;
 import org.voltdb.regressionsuites.VoltServerConfig;
+
 import junit.framework.TestCase;
 
 public class MultiPartitionSpeedTimer extends TestCase {

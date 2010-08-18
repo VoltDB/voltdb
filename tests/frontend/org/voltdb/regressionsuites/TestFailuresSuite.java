@@ -35,16 +35,16 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.exceptions.ConstraintFailureException;
-import org.voltdb.regressionsuites.failureprocs.CleanupFail;
-import org.voltdb.regressionsuites.failureprocs.DivideByZero;
-import org.voltdb.regressionsuites.failureprocs.FetchTooMuch;
-import org.voltdb.regressionsuites.failureprocs.InsertBigString;
-import org.voltdb.regressionsuites.failureprocs.InsertLotsOfData;
-import org.voltdb.regressionsuites.failureprocs.ReturnAppStatus;
-import org.voltdb.regressionsuites.failureprocs.TooFewParams;
-import org.voltdb.regressionsuites.failureprocs.ViolateUniqueness;
-import org.voltdb.regressionsuites.failureprocs.ViolateUniquenessAndCatchException;
-import org.voltdb.regressionsuites.sqlfeatureprocs.WorkWithBigString;
+import org.voltdb_testprocs.regressionsuites.failureprocs.CleanupFail;
+import org.voltdb_testprocs.regressionsuites.failureprocs.DivideByZero;
+import org.voltdb_testprocs.regressionsuites.failureprocs.FetchTooMuch;
+import org.voltdb_testprocs.regressionsuites.failureprocs.InsertBigString;
+import org.voltdb_testprocs.regressionsuites.failureprocs.InsertLotsOfData;
+import org.voltdb_testprocs.regressionsuites.failureprocs.ReturnAppStatus;
+import org.voltdb_testprocs.regressionsuites.failureprocs.TooFewParams;
+import org.voltdb_testprocs.regressionsuites.failureprocs.ViolateUniqueness;
+import org.voltdb_testprocs.regressionsuites.failureprocs.ViolateUniquenessAndCatchException;
+import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.WorkWithBigString;
 
 public class TestFailuresSuite extends RegressionSuite {
 

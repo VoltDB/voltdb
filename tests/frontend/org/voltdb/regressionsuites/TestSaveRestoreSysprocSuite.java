@@ -49,10 +49,10 @@ import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.regressionsuites.saverestore.CatalogChangeSingleProcessServer;
-import org.voltdb.regressionsuites.saverestore.SaveRestoreTestProjectBuilder;
 import org.voltdb.utils.SnapshotConverter;
 import org.voltdb.utils.SnapshotVerifier;
+import org.voltdb_testprocs.regressionsuites.saverestore.CatalogChangeSingleProcessServer;
+import org.voltdb_testprocs.regressionsuites.saverestore.SaveRestoreTestProjectBuilder;
 
 /**
  * Test the SnapshotSave and SnapshotRestore system procedures

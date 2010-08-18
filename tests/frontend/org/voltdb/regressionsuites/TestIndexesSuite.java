@@ -28,8 +28,8 @@ import java.io.IOException;
 import org.voltdb.*;
 import org.voltdb.client.*;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.regressionsuites.indexes.CheckMultiMultiIntGTEFailure;
-import org.voltdb.regressionsuites.indexes.Insert;
+import org.voltdb_testprocs.regressionsuites.indexes.CheckMultiMultiIntGTEFailure;
+import org.voltdb_testprocs.regressionsuites.indexes.Insert;
 
 /**
  * Actual regression tests for SQL that I found that was broken and

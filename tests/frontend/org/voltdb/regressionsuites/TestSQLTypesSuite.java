@@ -36,9 +36,9 @@ import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.regressionsuites.sqltypesprocs.*;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
+import org.voltdb_testprocs.regressionsuites.sqltypesprocs.*;
 
 public class TestSQLTypesSuite extends RegressionSuite {
 

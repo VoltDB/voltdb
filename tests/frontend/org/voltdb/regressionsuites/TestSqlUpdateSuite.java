@@ -29,7 +29,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.regressionsuites.fixedsql.*;
+import org.voltdb_testprocs.regressionsuites.fixedsql.*;
 
 /**
  * System tests for UPDATE, mainly focusing on the correctness of the WHERE

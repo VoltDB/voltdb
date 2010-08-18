@@ -39,7 +39,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ConnectionUtil;
-import org.voltdb.regressionsuites.malicious.GoSleep;
+import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
 public class TestMaliciousClientSuite extends RegressionSuite {
 

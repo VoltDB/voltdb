@@ -32,7 +32,7 @@ import org.voltdb.VoltTableRow;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.regressionsuites.matviewprocs.*;
+import org.voltdb_testprocs.regressionsuites.matviewprocs.*;
 
 public class TestMaterializedViewSuite extends RegressionSuite {
 

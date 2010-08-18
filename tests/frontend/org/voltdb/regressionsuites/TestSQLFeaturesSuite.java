@@ -33,14 +33,14 @@ import org.voltdb.VoltTableRow;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
-import org.voltdb.regressionsuites.sqlfeatureprocs.FeaturesSelectAll;
-import org.voltdb.regressionsuites.sqlfeatureprocs.PassAllArgTypes;
-import org.voltdb.regressionsuites.sqlfeatureprocs.PassByteArrayArg;
-import org.voltdb.regressionsuites.sqlfeatureprocs.SelectOrderLineByDistInfo;
-import org.voltdb.regressionsuites.sqlfeatureprocs.SelfJoinTest;
-import org.voltdb.regressionsuites.sqlfeatureprocs.UpdateTests;
-import org.voltdb.regressionsuites.sqlfeatureprocs.WorkWithBigString;
+import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
+import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.FeaturesSelectAll;
+import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.PassAllArgTypes;
+import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.PassByteArrayArg;
+import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.SelectOrderLineByDistInfo;
+import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.SelfJoinTest;
+import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.UpdateTests;
+import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.WorkWithBigString;
 
 public class TestSQLFeaturesSuite extends RegressionSuite {
 
