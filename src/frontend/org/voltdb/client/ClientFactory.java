@@ -37,28 +37,56 @@ public abstract class ClientFactory {
      * case stats will not be uploaded.
      * @return Newly constructed {@link Client}
      * @see Client
+     * @deprecated As of 1.2. Since no username or password is specified when creating the client
+     * it is neccessary to supply one when creating each connection and that makes it possible to connect
+     * with more than one set of credentials. When invoking procedures there is no way of knowing which set
+     * of credentials is being used. createConnection will generate an error if you attempt to createConnections
+     * with differing credentials.
      */
+    @Deprecated
     public static Client createClient(
             int expectedOutgoingMessageSize,
             int maxArenaSizes[],
             boolean heavyweight,
-            StatsUploaderSettings statsSettings,
-            UncaughtExceptionHandler handler) {
+            StatsUploaderSettings statsSettings) {
         final int cores = Runtime.getRuntime().availableProcessors();
         return new ClientImpl(
                 expectedOutgoingMessageSize,
                 maxArenaSizes,
                 cores > 4 ? heavyweight : false,
                 statsSettings,
-                handler);
+                null,
+                null,
+                null);
     }
 
     /**
      * Create a {@link Client} with no connections. The Client will be optimized to send stored procedure invocations
-     * that are 128 bytes in size.
+     * that are 128 bytes in size. Authentictation will use a blank username and password unless
+     * you use the deprecated createConnection methods.
      * @return Newly constructed {@link Client}
      */
     public static Client createClient() {
         return new ClientImpl();
+    }
+
+    /**
+     * Recommended method for creating a client. Using a config object ensures
+     * that a client application is isolated from changes to the configuration options.
+     * Authentication credentials are provided at construction time with this method
+     * instead of when invoking createConnection.
+     * @param config A config object specifying what type of client to create
+     * @return A configured client
+     */
+    public static Client createClient(ClientConfig config) {
+        final int cores = Runtime.getRuntime().availableProcessors();
+        return new ClientImpl(
+                config.m_expectedOutgoingMessageSize,
+                config.m_maxArenaSizes,
+                cores > 4 ? config.m_heavyweight : false,
+                config.m_statsSettings,
+                config.m_username,
+                config.m_password,
+                config.m_listener);
     }
 }

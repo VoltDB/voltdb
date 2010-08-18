@@ -38,11 +38,22 @@ final class ClientImpl implements Client {
 
     private final int m_expectedOutgoingMessageSize;
 
+    /*
+     * Username and password as set by createConnection. Used
+     * to ensure that the same credentials are used every time
+     * with that inconsistent API.
+     */
     // stored credentials
     private boolean m_credentialsSet = false;
-    private String m_username = null;
+    private String m_createConnectionUsername = null;
     private byte[] m_hashedPassword = null;
     private int m_passwordHashCode = 0;
+
+    /*
+     * Username and password as set by the constructor.
+     */
+    private final String m_username;
+    private final String m_password;
 
     /****************************************************
                         Public API
@@ -76,6 +87,8 @@ final class ClientImpl implements Client {
         },
         false,
         null,
+        "",
+        "",
         null);
     }
 
@@ -93,28 +106,34 @@ final class ClientImpl implements Client {
             int maxArenaSizes[],
             boolean heavyweight,
             StatsUploaderSettings statsSettings,
-            UncaughtExceptionHandler handler) {
+            String username,
+            String password,
+            ClientStatusListener listener) {
         m_expectedOutgoingMessageSize = expectedOutgoingMessageSize;
         m_distributer = new Distributer(
                 expectedOutgoingMessageSize,
                 maxArenaSizes,
                 heavyweight,
-                statsSettings,
-                handler);
+                statsSettings);
         m_distributer.addClientStatusListener(new CSL());
+        m_username = username;
+        m_password = password;
+        if (listener != null) {
+            m_distributer.addClientStatusListener(listener);
+        }
     }
 
     private boolean verifyCredentialsAreAlwaysTheSame(String username, byte[] hashedPassword) {
         // handle the unauthenticated case
-        if (m_username == null) {
-            m_username = "";
+        if (m_createConnectionUsername == null) {
+            m_createConnectionUsername = "";
             return true;
         }
 
-        synchronized(m_username) {
+        synchronized(m_createConnectionUsername) {
             if (m_credentialsSet == false) {
                 m_credentialsSet = true;
-                m_username = username;
+                m_createConnectionUsername = username;
                 if (m_hashedPassword != null) {
                     m_hashedPassword = Arrays.copyOf(hashedPassword, hashedPassword.length);
                     m_passwordHashCode = Arrays.hashCode(hashedPassword);
@@ -122,7 +141,7 @@ final class ClientImpl implements Client {
                 return true;
             }
             else {
-                if (m_username != username) return false;
+                if (m_createConnectionUsername != username) return false;
                 if (hashedPassword == null)
                     return m_hashedPassword == null;
                 else
@@ -135,7 +154,7 @@ final class ClientImpl implements Client {
     }
 
     public String getUsername() {
-        return m_username;
+        return m_createConnectionUsername;
     }
 
     public int getPasswordHashCode() {
@@ -326,7 +345,7 @@ final class ClientImpl implements Client {
         }
     }
 
-    private class CSL implements ClientStatusListener {
+    class CSL implements ClientStatusListener {
 
         @Override
         public void backpressure(boolean status) {
@@ -350,6 +369,10 @@ final class ClientImpl implements Client {
                     m_backpressureLock.notifyAll();
                 }
             }
+        }
+
+        @Override
+        public void uncaughtException(ProcedureCallback callback, ClientResponse r, Throwable e) {
         }
 
     }
@@ -404,5 +427,24 @@ final class ClientImpl implements Client {
     @Override
     public boolean blocking() {
         return m_blockingQueue;
+    }
+
+    @Override
+    public void createConnection(String host) throws UnknownHostException, IOException {
+        if (m_username == null) {
+            throw new IllegalStateException("Attempted to use createConnection(String host) " +
+                    "with a client that wasn't constructed with a username and password specified");
+        }
+        m_distributer.createConnection( host, m_username, m_password, Client.VOLTDB_SERVER_PORT);
+    }
+
+    @Override
+    public void createConnection(String host, int port) throws UnknownHostException, IOException {
+        if (m_username == null) {
+            throw new IllegalStateException("Attempted to use createConnection(String host) " +
+                    "with a client that wasn't constructed with a username and password specified");
+        }
+        m_distributer.createConnection( host, m_username, m_password, port);
+
     }
 }

@@ -68,8 +68,6 @@ class Distributer {
 
     private final String m_hostname;
 
-    private final UncaughtExceptionHandler m_handler;
-
     /**
      * Server's instances id. Unique for the cluster
      */
@@ -164,17 +162,8 @@ class Distributer {
                             ") was lost before a response was received");
                     try {
                         callback.clientCallback(r);
-                    } catch (Exception t) {
-                        if (m_handler != null) {
-                            try {
-                                m_handler.uncaughtException( callback, r, t);
-                            } catch (Exception t2) {
-                                t.printStackTrace();
-                                t2.printStackTrace();
-                            }
-                        } else {
-                            t.printStackTrace();
-                        }
+                    } catch (Exception e) {
+                        uncaughtException(callback, r, e);
                     }
                     c.discard();
                     return;
@@ -194,15 +183,8 @@ class Distributer {
                             ") was lost before a response was received");
                     try {
                         callback.clientCallback(r);
-                    } catch (Exception t) {
-                        if (m_handler != null) {
-                            try {
-                                m_handler.uncaughtException( callback, r, t);
-                            } catch (Exception t2) {
-                                t.printStackTrace();
-                                t2.printStackTrace();
-                            }
-                        }
+                    } catch (Exception e) {
+                        uncaughtException(callback, r, e);
                     }
                     return;
                 }
@@ -263,17 +245,8 @@ class Distributer {
                 response.setClientRoundtrip(delta);
                 try {
                     cb.clientCallback(response);
-                } catch (Exception t) {
-                    if (m_handler != null) {
-                        try {
-                            m_handler.uncaughtException( cb, response, t);
-                        } catch (Exception t2) {
-                            t.printStackTrace();
-                            t2.printStackTrace();
-                        }
-                    } else {
-                        t.printStackTrace();
-                    }
+                } catch (Exception e) {
+                    uncaughtException(cb, response, e);
                 }
                 m_callbacksToInvoke.decrementAndGet();
             }
@@ -327,17 +300,8 @@ class Distributer {
                 for (final Object stuff[] : m_callbacks.values()) {
                     try {
                         ((ProcedureCallback)stuff[1]).clientCallback(r);
-                    } catch (Exception t) {
-                        if (m_handler != null) {
-                            try {
-                                m_handler.uncaughtException(((ProcedureCallback)stuff[1]), r, t);
-                            } catch (Exception t2) {
-                                t.printStackTrace();
-                                t2.printStackTrace();
-                            }
-                        } else {
-                            t.printStackTrace();
-                        }
+                    } catch (Exception e) {
+                        uncaughtException(((ProcedureCallback)stuff[1]), r, e);
                     }
                     m_callbacksToInvoke.decrementAndGet();
                 }
@@ -435,21 +399,19 @@ class Distributer {
     }
 
     Distributer() {
-        this( 128, null, false, null, null);
+        this( 128, null, false, null);
     }
 
     Distributer(
             int expectedOutgoingMessageSize,
             int arenaSizes[],
             boolean useMultipleThreads,
-            StatsUploaderSettings statsSettings,
-            UncaughtExceptionHandler handler) {
+            StatsUploaderSettings statsSettings) {
         if (statsSettings != null) {
             m_statsLoader = new ClientStatsLoader(statsSettings, this);
         } else {
             m_statsLoader = null;
         }
-        m_handler = handler;
         m_useMultipleThreads = useMultipleThreads;
         m_network = new VoltNetwork( useMultipleThreads, true, 3);
         m_expectedOutgoingMessageSize = expectedOutgoingMessageSize;
@@ -628,6 +590,24 @@ class Distributer {
         m_network.shutdown();
         synchronized (this) {
             m_pool.clear();
+        }
+    }
+
+    private void uncaughtException(ProcedureCallback cb, ClientResponse r, Throwable t) {
+        boolean handledByClient = false;
+        for (ClientStatusListener csl : m_listeners) {
+            if (csl instanceof ClientImpl.CSL) {
+                continue;
+            }
+            try {
+               csl.uncaughtException(cb, r, t);
+               handledByClient = true;
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        if (!handledByClient) {
+            t.printStackTrace();
         }
     }
 

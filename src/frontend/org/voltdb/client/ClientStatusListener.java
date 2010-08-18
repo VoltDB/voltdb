@@ -37,4 +37,6 @@ public interface ClientStatusListener {
      * @param status <code>true</code> if there is backpressure and <code>false</code> otherwise.
      */
     void backpressure(boolean status);
+
+    void uncaughtException(ProcedureCallback callback, ClientResponse r, Throwable e);
 }

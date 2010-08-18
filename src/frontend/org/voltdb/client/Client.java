@@ -74,15 +74,42 @@ public interface Client {
     // default port number for volt cluster instances.
     public static final int VOLTDB_SERVER_PORT = 21212;
 
-     /**
+    /**
      * Create a connection to another VoltDB node.
+     * @param host Hostname or IP address of the host to connect to.
+     * @throws UnknownHostException
+     * @throws IOException
+     */
+    public void createConnection(String host)
+        throws UnknownHostException, IOException;
+
+     /**
+     * Create a connection to another VoltDB node. This version can only be used when
+     * the username and password were specified when the client was constructed.
      * @param host Hostname or IP address of the host to connect to.
      * @param username Username to authorize. Username is ignored if authentication is disabled.
      * @param password Password to authenticate. Password is ignored if authentication is disabled.
      * @throws UnknownHostException
      * @throws IOException
+     * @deprecated This method is deprecated as of 1.2 because it makes it possible for a client
+     * to connect to servers with a different username and password. When invoking a procedure
+     * there is no way for the application to know what server will receive a given request.
+     * Provide a username and password when constructing the client instead and use the non-deprecated
+     * creat connection methods.
      */
+    @Deprecated
     public void createConnection(String host, String username, String password)
+        throws UnknownHostException, IOException;
+
+    /**
+     * Create a connection to another VoltDB node. This version can only be used when
+     * the username and password were specified when the client was constructed.
+     * @param host Hostname or IP address of the host to connect to.
+     * @param port Port number on remote host to connect to.
+     * @throws UnknownHostException
+     * @throws IOException
+     */
+    public void createConnection(String host, int port)
         throws UnknownHostException, IOException;
 
     /**
@@ -93,7 +120,13 @@ public interface Client {
      * @param password Password to authenticate. Password is ignored if authentication is disabled.
      * @throws UnknownHostException
      * @throws IOException
+     * @deprecated This method is deprecated as of 1.2 because it makes it possible for a client
+     * to connect to servers with a different username and password. When invoking a procedure
+     * there is no way for the application to know what server will receive a given request.
+     * Provide a username and password when constructing the client instead and use the non-deprecated
+     * creat connection methods.
      */
+    @Deprecated
     public void createConnection(String host, int port, String username, String password)
         throws UnknownHostException, IOException;
 
@@ -168,19 +201,6 @@ public interface Client {
      * @throws InterruptedException
      */
     public void close() throws InterruptedException;
-
-    /**
-     * Add to the list of listeners that will be notified of events
-     * @param listener Listener to register
-     */
-    public void addClientStatusListener(ClientStatusListener listener);
-
-    /**
-     * Remove listener so that it will no longer be notified of events
-     * @param listener Listener to unregister
-     * @return <code>true</code> if the listener was removed and <code>false</code> if it wasn't registered
-     */
-    public boolean removeClientStatusListener(ClientStatusListener listener);
 
     /**
      * Blocks the current thread until there is no more backpressure or there are no more connections

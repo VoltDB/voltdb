@@ -130,12 +130,6 @@ public class MockVoltClient implements Client {
     public String abortMessage;
 
     @Override
-    public void addClientStatusListener(ClientStatusListener listener) {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
     public boolean callProcedure(ProcedureCallback callback, String procName,
             Object... parameters) throws NoConnectionsException {
         // TODO Auto-generated method stub
@@ -153,12 +147,6 @@ public class MockVoltClient implements Client {
     public void drain() throws NoConnectionsException {
         // TODO Auto-generated method stub
 
-    }
-
-    @Override
-    public boolean removeClientStatusListener(ClientStatusListener listener) {
-        // TODO Auto-generated method stub
-        return false;
     }
 
     @Override
@@ -242,6 +230,18 @@ public class MockVoltClient implements Client {
     @Override
     public void createConnection(String host, int port, String username,
             String password) throws UnknownHostException, IOException {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public void createConnection(String host) throws UnknownHostException, IOException {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public void createConnection(String host, int port) throws UnknownHostException, IOException {
         // TODO Auto-generated method stub
 
     }

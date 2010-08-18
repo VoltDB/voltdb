@@ -224,12 +224,22 @@ public class TestDistributer extends TestCase {
         volatile VoltNetwork network;
     }
 
-    private static class ExceptionHandler implements UncaughtExceptionHandler {
+    private static class CSL implements ClientStatusListener {
         private volatile boolean m_exceptionHandled = false;
         @Override
         public void uncaughtException(ProcedureCallback callback,
                 ClientResponse r, Throwable e) {
             m_exceptionHandled = true;
+        }
+        @Override
+        public void backpressure(boolean status) {
+            // TODO Auto-generated method stub
+
+        }
+        @Override
+        public void connectionLost(String hostname, int connectionsLeft) {
+            // TODO Auto-generated method stub
+
         }
     }
 
@@ -305,9 +315,10 @@ public class TestDistributer extends TestCase {
             volt2 = new MockVolt(20002);
             volt2.start();
 
-            ExceptionHandler eh = new ExceptionHandler();
+            CSL csl = new CSL();
 
-            Distributer dist = new Distributer(128, null, false, null, eh);
+            Distributer dist = new Distributer(128, null, false, null);
+            dist.addClientStatusListener(csl);
             dist.createConnection("localhost", "", "", 20000);
             dist.createConnection("localhost", "", "", 20001);
             dist.createConnection("localhost", "", "", 20002);
@@ -325,7 +336,7 @@ public class TestDistributer extends TestCase {
 
             dist.queue(pi1, new ThrowingCallback(), 128, true);
             dist.drain();
-            assertTrue(eh.m_exceptionHandled);
+            assertTrue(csl.m_exceptionHandled);
             dist.queue(pi2, new ProcCallback(), 128, true);
             dist.queue(pi3, new ProcCallback(), 128, true);
             dist.queue(pi4, new ProcCallback(), 128, true);
