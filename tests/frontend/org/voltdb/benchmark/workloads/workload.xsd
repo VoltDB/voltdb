@@ -1,77 +1,85 @@
 <?xml version="1.0" ?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:jaxb="http://java.sun.com/xml/ns/jaxb" jaxb:version="1.0">
-    <xs:element name="microbenchmark">
+  <xs:element name="microbenchmark">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="loader" type="loaderType" minOccurs="0" maxOccurs="1">
+        </xs:element>
+        <xs:element name="workload" type="procedureType" minOccurs="1" maxOccurs="unbounded">
+        </xs:element>
+      </xs:sequence>
+      <xs:attribute name="mbName" type="xs:string" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:complexType name="loaderType">
+    <xs:sequence>
+      <xs:element name="loaderClass" minOccurs="1" maxOccurs="unbounded">
         <xs:complexType>
-            <xs:sequence>
-                <xs:element name="loader" minOccurs="0" maxOccurs="1">
-                    <xs:complexType>
-                        <xs:sequence>
-                            <xs:element name="loaderClass" minOccurs="1" maxOccurs="unbounded">
-                                <xs:complexType>
-                                    <xs:attribute name="pathName" type="xs:anyURI" />
-                                </xs:complexType>
-                            </xs:element>
-                        </xs:sequence>
-                        <xs:attribute name="loaderName" type="xs:string" />
-                    </xs:complexType>
-                </xs:element>
-                <xs:element name="workload" minOccurs="1" maxOccurs="unbounded">
-                    <xs:complexType>
-                        <xs:sequence>
-                            <xs:element name="procedure" minOccurs="1" maxOccurs="unbounded">
-                                <xs:complexType>
-                                    <xs:sequence>
-                                        <xs:element name="param" minOccurs="0" maxOccurs="unbounded">
-                                            <xs:complexType>
-                                                <xs:sequence>
-                                                    <xs:element name="value" minOccurs="1" maxOccurs="1">
-                                                        <xs:complexType>
-                                                            <xs:attribute name="generator" type="generatorType" />
-                                                        </xs:complexType>
-                                                    </xs:element>
-                                                </xs:sequence>
-                                                <xs:attribute name="type" type="voltType" />
-                                            </xs:complexType>
-                                        </xs:element>
-                                    </xs:sequence>
-                                    <xs:attribute name="procName" type="xs:string" />
-                                    <xs:attribute name="percOfWL" type="percent" />
-                                </xs:complexType>
-                            </xs:element>
-                        </xs:sequence>
-                        <xs:attribute name="wlName" type="xs:string" />
-                    </xs:complexType>
-                </xs:element>
-            </xs:sequence>
-            <xs:attribute name="mbName" type="xs:string" />
+          <xs:attribute name="pathName" type="xs:anyURI" />
         </xs:complexType>
-    </xs:element>
-    <xs:simpleType name="voltType">
-        <xs:restriction base="xs:string">
-            <xs:enumeration value="TINYINT" />
-            <xs:enumeration value="SHORTINT" />
-            <xs:enumeration value="INTEGER" />
-            <xs:enumeration value="BIGINT" />
-            <xs:enumeration value="FLOAT" />
-            <xs:enumeration value="DECIMAL" />
-            <xs:enumeration value="CHAR" />
-            <xs:enumeration value="CHAR()" />
-            <xs:enumeration value="VARCHAR()" />
-            <xs:enumeration value="TIMESTAMP" />
-        </xs:restriction>
-    </xs:simpleType>
-    <xs:simpleType name="generatorType">
-        <xs:restriction base="xs:string">
-            <xs:enumeration value="random" />
-            <xs:enumeration value="sequential" />
-            <xs:enumeration value="user" />
-        </xs:restriction>
-    </xs:simpleType>
-    <xs:simpleType name="percent">
-        <xs:restriction base="xs:decimal">
-            <xs:maxInclusive value="100" />
-            <xs:minInclusive value="0" />
-            <xs:fractionDigits value='2' />
-        </xs:restriction>
-    </xs:simpleType>
+      </xs:element>
+    </xs:sequence>
+    <xs:attribute name="loaderName" type="xs:string" />
+  </xs:complexType>
+
+  <xs:complexType name="procedureType">
+    <xs:sequence>
+      <xs:element name="procedure" type="paramType" minOccurs="1" maxOccurs="unbounded">
+      </xs:element>
+    </xs:sequence>
+    <xs:attribute name="wlName" type="xs:string" />
+  </xs:complexType>
+
+  <xs:complexType name="paramType">
+    <xs:sequence>
+      <xs:element name="param" type="valueType" minOccurs="0" maxOccurs="unbounded">
+      </xs:element>
+    </xs:sequence>
+    <xs:attribute name="procName" type="xs:string" />
+    <xs:attribute name="percOfWL" type="percent" />
+  </xs:complexType>
+
+  <xs:complexType name="valueType">
+    <xs:sequence>
+      <xs:element name="value" minOccurs="1" maxOccurs="1">
+        <xs:complexType>
+          <xs:attribute name="generator" type="generatorType" />
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+    <xs:attribute name="type" type="voltType" />
+  </xs:complexType>
+
+  <xs:simpleType name="voltType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="TINYINT" />
+      <xs:enumeration value="SHORTINT" />
+      <xs:enumeration value="INTEGER" />
+      <xs:enumeration value="BIGINT" />
+      <xs:enumeration value="FLOAT" />
+      <xs:enumeration value="DECIMAL" />
+      <xs:enumeration value="CHAR" />
+      <xs:enumeration value="CHAR()" />
+      <xs:enumeration value="VARCHAR()" />
+      <xs:enumeration value="TIMESTAMP" />
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="generatorType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="random" />
+      <xs:enumeration value="sequential" />
+      <xs:enumeration value="user" />
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="percent">
+    <xs:restriction base="xs:decimal">
+      <xs:maxInclusive value="100" />
+      <xs:minInclusive value="0" />
+      <xs:fractionDigits value='2' />
+    </xs:restriction>
+  </xs:simpleType>
+
 </xs:schema>

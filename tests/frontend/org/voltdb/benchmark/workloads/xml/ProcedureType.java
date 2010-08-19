@@ -14,24 +14,22 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlType;
 
 
 /**
- * <p>Java class for anonymous complex type.
+ * <p>Java class for procedureType complex type.
  * 
  * <p>The following schema fragment specifies the expected content contained within this class.
  * 
  * <pre>
- * &lt;complexType>
+ * &lt;complexType name="procedureType">
  *   &lt;complexContent>
  *     &lt;restriction base="{http://www.w3.org/2001/XMLSchema}anyType">
  *       &lt;sequence>
- *         &lt;element name="loader" type="{}loaderType" minOccurs="0"/>
- *         &lt;element name="workload" type="{}procedureType" maxOccurs="unbounded"/>
+ *         &lt;element name="procedure" type="{}paramType" maxOccurs="unbounded"/>
  *       &lt;/sequence>
- *       &lt;attribute name="mbName" type="{http://www.w3.org/2001/XMLSchema}string" />
+ *       &lt;attribute name="wlName" type="{http://www.w3.org/2001/XMLSchema}string" />
  *     &lt;/restriction>
  *   &lt;/complexContent>
  * &lt;/complexType>
@@ -40,94 +38,67 @@ import javax.xml.bind.annotation.XmlType;
  * 
  */
 @XmlAccessorType(XmlAccessType.FIELD)
-@XmlType(name = "", propOrder = {
-    "loader",
-    "workload"
+@XmlType(name = "procedureType", propOrder = {
+    "procedure"
 })
-@XmlRootElement(name = "microbenchmark")
-public class Microbenchmark {
+public class ProcedureType {
 
-    protected LoaderType loader;
     @XmlElement(required = true)
-    protected List<ProcedureType> workload;
+    protected List<ParamType> procedure;
     @XmlAttribute
-    protected String mbName;
+    protected String wlName;
 
     /**
-     * Gets the value of the loader property.
-     * 
-     * @return
-     *     possible object is
-     *     {@link LoaderType }
-     *     
-     */
-    public LoaderType getLoader() {
-        return loader;
-    }
-
-    /**
-     * Sets the value of the loader property.
-     * 
-     * @param value
-     *     allowed object is
-     *     {@link LoaderType }
-     *     
-     */
-    public void setLoader(LoaderType value) {
-        this.loader = value;
-    }
-
-    /**
-     * Gets the value of the workload property.
+     * Gets the value of the procedure property.
      * 
      * <p>
      * This accessor method returns a reference to the live list,
      * not a snapshot. Therefore any modification you make to the
      * returned list will be present inside the JAXB object.
-     * This is why there is not a <CODE>set</CODE> method for the workload property.
+     * This is why there is not a <CODE>set</CODE> method for the procedure property.
      * 
      * <p>
      * For example, to add a new item, do as follows:
      * <pre>
-     *    getWorkload().add(newItem);
+     *    getProcedure().add(newItem);
      * </pre>
      * 
      * 
      * <p>
      * Objects of the following type(s) are allowed in the list
-     * {@link ProcedureType }
+     * {@link ParamType }
      * 
      * 
      */
-    public List<ProcedureType> getWorkload() {
-        if (workload == null) {
-            workload = new ArrayList<ProcedureType>();
+    public List<ParamType> getProcedure() {
+        if (procedure == null) {
+            procedure = new ArrayList<ParamType>();
         }
-        return this.workload;
+        return this.procedure;
     }
 
     /**
-     * Gets the value of the mbName property.
+     * Gets the value of the wlName property.
      * 
      * @return
      *     possible object is
      *     {@link String }
      *     
      */
-    public String getMbName() {
-        return mbName;
+    public String getWlName() {
+        return wlName;
     }
 
     /**
-     * Sets the value of the mbName property.
+     * Sets the value of the wlName property.
      * 
      * @param value
      *     allowed object is
      *     {@link String }
      *     
      */
-    public void setMbName(String value) {
-        this.mbName = value;
+    public void setWlName(String value) {
+        this.wlName = value;
     }
 
 }

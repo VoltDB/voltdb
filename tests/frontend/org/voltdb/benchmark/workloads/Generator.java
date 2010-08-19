@@ -375,16 +375,16 @@ public class Generator extends ClientMain
 
         try
         {
-            List<Microbenchmark.Workload> wlList = mb.getWorkload();
-            Microbenchmark.Workload toBuild = wlList.get(0);
+            List<ProcedureType> wlList = mb.getWorkload();
+            ProcedureType toBuild = wlList.get(0);
             boolean foundWL = false;
 
             if (workloadToBuild != null)
             {
-                ListIterator<Microbenchmark.Workload> wlLI = wlList.listIterator();
+                ListIterator<ProcedureType> wlLI = wlList.listIterator();
                 while (wlLI.hasNext())
                 {
-                    Microbenchmark.Workload wl = wlLI.next();
+                    ProcedureType wl = wlLI.next();
                     if (wl.getWlName().equals(workloadToBuild))
                     {
                         toBuild = wl;
@@ -407,30 +407,30 @@ public class Generator extends ClientMain
 
             System.err.println("Building workload " + myWL.name);
 
-            List<Microbenchmark.Workload.Procedure> procList = toBuild.getProcedure();
+            List<ParamType> procList = toBuild.getProcedure();
             myWL.procs = new String[procList.size()];
             myWL.percs = new double[procList.size()];
             myWL.paramTypes = new String[procList.size()][];
             myWL.generatorTypes = new GeneratorType[procList.size()][];
             myWL.params = new Object[procList.size()][];
 
-            ListIterator<Microbenchmark.Workload.Procedure> procLI = procList.listIterator();
+            ListIterator<ParamType> procLI = procList.listIterator();
             int procIndex = 0;
             while (procLI.hasNext())
             {
-                Microbenchmark.Workload.Procedure proc = procLI.next();
+                ParamType proc = procLI.next();
                 myWL.procs[procIndex] = proc.getProcName();
                 myWL.percs[procIndex] = proc.getPercOfWL().doubleValue();
-                List<Microbenchmark.Workload.Procedure.Param> paramList = proc.getParam();
+                List<ValueType> paramList = proc.getParam();
                 myWL.paramTypes[procIndex] = new String[paramList.size()];
                 myWL.generatorTypes[procIndex] = new GeneratorType[paramList.size()];
                 myWL.params[procIndex] = new Object[paramList.size()];
 
-                ListIterator<Microbenchmark.Workload.Procedure.Param> paramLI = paramList.listIterator();
+                ListIterator<ValueType> paramLI = paramList.listIterator();
                 int paramIndex = 0;
                 while (paramLI.hasNext())
                 {
-                    Microbenchmark.Workload.Procedure.Param param = paramLI.next();
+                    ValueType param = paramLI.next();
                     myWL.paramTypes[procIndex][paramIndex] = param.getType();
                     myWL.generatorTypes[procIndex][paramIndex] = param.getValue().getGenerator();
 
@@ -454,11 +454,11 @@ public class Generator extends ClientMain
         if (mb == null)
             return false;
 
-        Microbenchmark.Loader loader = mb.getLoader();
+        LoaderType loader = mb.getLoader();
         System.err.println("Running loader " + loader.getLoaderName());
-        List<Microbenchmark.Loader.LoaderClass> loaderClasses = loader.getLoaderClass();
+        List<LoaderType.LoaderClass> loaderClasses = loader.getLoaderClass();
 
-        ListIterator<Microbenchmark.Loader.LoaderClass> loaderClassLI = loaderClasses.listIterator();
+        ListIterator<LoaderType.LoaderClass> loaderClassLI = loaderClasses.listIterator();
         String pathName;
         while (loaderClassLI.hasNext())
         {
