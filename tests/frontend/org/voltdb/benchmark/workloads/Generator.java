@@ -375,16 +375,16 @@ public class Generator extends ClientMain
 
         try
         {
-            List<ProcedureType> wlList = mb.getWorkload();
-            ProcedureType toBuild = wlList.get(0);
+            List<WorkloadType> wlList = mb.getWorkload();
+            WorkloadType toBuild = wlList.get(0);
             boolean foundWL = false;
 
             if (workloadToBuild != null)
             {
-                ListIterator<ProcedureType> wlLI = wlList.listIterator();
+                ListIterator<WorkloadType> wlLI = wlList.listIterator();
                 while (wlLI.hasNext())
                 {
-                    ProcedureType wl = wlLI.next();
+                    WorkloadType wl = wlLI.next();
                     if (wl.getWlName().equals(workloadToBuild))
                     {
                         toBuild = wl;
@@ -407,30 +407,30 @@ public class Generator extends ClientMain
 
             System.err.println("Building workload " + myWL.name);
 
-            List<ParamType> procList = toBuild.getProcedure();
+            List<ProcedureType> procList = toBuild.getProcedure();
             myWL.procs = new String[procList.size()];
             myWL.percs = new double[procList.size()];
             myWL.paramTypes = new String[procList.size()][];
             myWL.generatorTypes = new GeneratorType[procList.size()][];
             myWL.params = new Object[procList.size()][];
 
-            ListIterator<ParamType> procLI = procList.listIterator();
+            ListIterator<ProcedureType> procLI = procList.listIterator();
             int procIndex = 0;
             while (procLI.hasNext())
             {
-                ParamType proc = procLI.next();
+                ProcedureType proc = procLI.next();
                 myWL.procs[procIndex] = proc.getProcName();
                 myWL.percs[procIndex] = proc.getPercOfWL().doubleValue();
-                List<ValueType> paramList = proc.getParam();
+                List<ParamType> paramList = proc.getParam();
                 myWL.paramTypes[procIndex] = new String[paramList.size()];
                 myWL.generatorTypes[procIndex] = new GeneratorType[paramList.size()];
                 myWL.params[procIndex] = new Object[paramList.size()];
 
-                ListIterator<ValueType> paramLI = paramList.listIterator();
+                ListIterator<ParamType> paramLI = paramList.listIterator();
                 int paramIndex = 0;
                 while (paramLI.hasNext())
                 {
-                    ValueType param = paramLI.next();
+                    ParamType param = paramLI.next();
                     myWL.paramTypes[procIndex][paramIndex] = param.getType();
                     myWL.generatorTypes[procIndex][paramIndex] = param.getValue().getGenerator();
 

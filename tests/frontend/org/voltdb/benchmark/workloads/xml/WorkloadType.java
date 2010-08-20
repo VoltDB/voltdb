@@ -8,29 +8,28 @@
 
 package org.voltdb.benchmark.workloads.xml;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlAttribute;
+import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlType;
 
 
 /**
- * <p>Java class for procedureType complex type.
+ * <p>Java class for workloadType complex type.
  * 
  * <p>The following schema fragment specifies the expected content contained within this class.
  * 
  * <pre>
- * &lt;complexType name="procedureType">
+ * &lt;complexType name="workloadType">
  *   &lt;complexContent>
  *     &lt;restriction base="{http://www.w3.org/2001/XMLSchema}anyType">
  *       &lt;sequence>
- *         &lt;element name="param" type="{}paramType" maxOccurs="unbounded" minOccurs="0"/>
+ *         &lt;element name="procedure" type="{}procedureType" maxOccurs="unbounded"/>
  *       &lt;/sequence>
- *       &lt;attribute name="procName" type="{http://www.w3.org/2001/XMLSchema}string" />
- *       &lt;attribute name="percOfWL" type="{}percent" />
+ *       &lt;attribute name="wlName" type="{http://www.w3.org/2001/XMLSchema}string" />
  *     &lt;/restriction>
  *   &lt;/complexContent>
  * &lt;/complexType>
@@ -39,92 +38,67 @@ import javax.xml.bind.annotation.XmlType;
  * 
  */
 @XmlAccessorType(XmlAccessType.FIELD)
-@XmlType(name = "procedureType", propOrder = {
-    "param"
+@XmlType(name = "workloadType", propOrder = {
+    "procedure"
 })
-public class ProcedureType {
+public class WorkloadType {
 
-    protected List<ParamType> param;
+    @XmlElement(required = true)
+    protected List<ProcedureType> procedure;
     @XmlAttribute
-    protected String procName;
-    @XmlAttribute
-    protected BigDecimal percOfWL;
+    protected String wlName;
 
     /**
-     * Gets the value of the param property.
+     * Gets the value of the procedure property.
      * 
      * <p>
      * This accessor method returns a reference to the live list,
      * not a snapshot. Therefore any modification you make to the
      * returned list will be present inside the JAXB object.
-     * This is why there is not a <CODE>set</CODE> method for the param property.
+     * This is why there is not a <CODE>set</CODE> method for the procedure property.
      * 
      * <p>
      * For example, to add a new item, do as follows:
      * <pre>
-     *    getParam().add(newItem);
+     *    getProcedure().add(newItem);
      * </pre>
      * 
      * 
      * <p>
      * Objects of the following type(s) are allowed in the list
-     * {@link ParamType }
+     * {@link ProcedureType }
      * 
      * 
      */
-    public List<ParamType> getParam() {
-        if (param == null) {
-            param = new ArrayList<ParamType>();
+    public List<ProcedureType> getProcedure() {
+        if (procedure == null) {
+            procedure = new ArrayList<ProcedureType>();
         }
-        return this.param;
+        return this.procedure;
     }
 
     /**
-     * Gets the value of the procName property.
+     * Gets the value of the wlName property.
      * 
      * @return
      *     possible object is
      *     {@link String }
      *     
      */
-    public String getProcName() {
-        return procName;
+    public String getWlName() {
+        return wlName;
     }
 
     /**
-     * Sets the value of the procName property.
+     * Sets the value of the wlName property.
      * 
      * @param value
      *     allowed object is
      *     {@link String }
      *     
      */
-    public void setProcName(String value) {
-        this.procName = value;
-    }
-
-    /**
-     * Gets the value of the percOfWL property.
-     * 
-     * @return
-     *     possible object is
-     *     {@link BigDecimal }
-     *     
-     */
-    public BigDecimal getPercOfWL() {
-        return percOfWL;
-    }
-
-    /**
-     * Sets the value of the percOfWL property.
-     * 
-     * @param value
-     *     allowed object is
-     *     {@link BigDecimal }
-     *     
-     */
-    public void setPercOfWL(BigDecimal value) {
-        this.percOfWL = value;
+    public void setWlName(String value) {
+        this.wlName = value;
     }
 
 }

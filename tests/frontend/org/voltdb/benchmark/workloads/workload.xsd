@@ -3,10 +3,8 @@
   <xs:element name="microbenchmark">
     <xs:complexType>
       <xs:sequence>
-        <xs:element name="loader" type="loaderType" minOccurs="0" maxOccurs="1">
-        </xs:element>
-        <xs:element name="workload" type="procedureType" minOccurs="1" maxOccurs="unbounded">
-        </xs:element>
+        <xs:element name="loader" type="loaderType" minOccurs="0" maxOccurs="1"/>
+        <xs:element name="workload" type="workloadType" minOccurs="1" maxOccurs="unbounded"/>
       </xs:sequence>
       <xs:attribute name="mbName" type="xs:string" />
     </xs:complexType>
@@ -23,24 +21,22 @@
     <xs:attribute name="loaderName" type="xs:string" />
   </xs:complexType>
 
-  <xs:complexType name="procedureType">
+  <xs:complexType name="workloadType">
     <xs:sequence>
-      <xs:element name="procedure" type="paramType" minOccurs="1" maxOccurs="unbounded">
-      </xs:element>
+      <xs:element name="procedure" type="procedureType" minOccurs="1" maxOccurs="unbounded"/>
     </xs:sequence>
     <xs:attribute name="wlName" type="xs:string" />
   </xs:complexType>
 
-  <xs:complexType name="paramType">
+  <xs:complexType name="procedureType">
     <xs:sequence>
-      <xs:element name="param" type="valueType" minOccurs="0" maxOccurs="unbounded">
-      </xs:element>
+      <xs:element name="param" type="paramType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
     <xs:attribute name="procName" type="xs:string" />
     <xs:attribute name="percOfWL" type="percent" />
   </xs:complexType>
 
-  <xs:complexType name="valueType">
+  <xs:complexType name="paramType">
     <xs:sequence>
       <xs:element name="value" minOccurs="1" maxOccurs="1">
         <xs:complexType>
