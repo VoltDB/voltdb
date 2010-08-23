@@ -214,11 +214,7 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
      * Because doRecoveryWork is blocking this method will eventually return back to doRecoveryWork
      */
     @Override
-    public void handleNodeFault(HashSet<Integer> failedNodes, SiteTracker tracker) {
-        HashSet<Integer> failedSites = new HashSet<Integer>();
-        for (Integer failedHost : failedNodes) {
-            failedSites.addAll(tracker.getAllSitesForHost(failedHost));
-        }
+    public void handleSiteFaults(HashSet<Integer> failedSites, SiteTracker tracker) {
         int destinationSite = 0;
         for (RecoveryTable table : m_tablesToStream) {
             destinationSite = table.m_destinationIds[0];
@@ -455,7 +451,7 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
                  * Ask the engine to serialize more data.
                  */
                 int serialized = m_engine.tableStreamSerializeMore(container, table.m_tableId, TableStreamType.RECOVERY);
-                recoveryLog.info("Serialized " + serialized + " for table " + table.m_name);
+                recoveryLog.trace("Serialized " + serialized + " for table " + table.m_name);
                 if (serialized <= 0) {
                     /*
                      * Unlike COW the EE will actually serialize a message saying that recovery is

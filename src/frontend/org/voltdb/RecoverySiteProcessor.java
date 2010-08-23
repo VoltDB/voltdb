@@ -38,6 +38,6 @@ public interface RecoverySiteProcessor {
     }
 
     public void handleRecoveryMessage(RecoveryMessage message);
-    public void handleNodeFault(HashSet<Integer> failedNodes, SiteTracker tracker);
+    public void handleSiteFaults(HashSet<Integer> failedSites, SiteTracker tracker);
     public void doRecoveryWork(long currentTxnId);
 }

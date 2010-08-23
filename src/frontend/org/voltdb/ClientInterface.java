@@ -432,13 +432,14 @@ public class ClientInterface implements DumpManager.Dumpable {
             final byte password[] = new byte[20];
             message.get(password);
 
+            CatalogContext context = m_catalogContext.get();
+
             /*
              * Authenticate the user.
              */
-            final AuthSystem.AuthUser user =
-                m_catalogContext.get().authSystem.authenticate(username, password);
+            boolean authenticated = context.authSystem.authenticate(username, password);
 
-            if (user == null) {
+            if (!authenticated) {
                 //Send negative response
                 responseBuffer.put((byte)-1).flip();
                 socket.write(responseBuffer);
@@ -448,6 +449,8 @@ public class ClientInterface implements DumpManager.Dumpable {
                 return null;
             }
 
+            AuthSystem.AuthUser user = context.authSystem.getUser(username);
+
             /*
              * Create an input handler.
              */
@@ -455,7 +458,7 @@ public class ClientInterface implements DumpManager.Dumpable {
             if (service.equalsIgnoreCase("database")) {
                 handler =
                     new ClientInputHandler(
-                            user,
+                            username,
                             socket.socket().getInetAddress().getHostName());
             }
             else {
@@ -522,17 +525,18 @@ public class ClientInterface implements DumpManager.Dumpable {
         private final String m_hostname;
 
         /**
-         * Set of user permissions associated with this connection. Authentication is performed when
-         * the connection is opened and used to selected this permission set.
+         * Must use username to do a lookup via the auth system
+         * rather then caching the AuthUser because the AuthUser
+         * can be invalidated on catalog updates
          */
-        private final AuthSystem.AuthUser m_user;
+        private final String m_username;
 
         /**
          *
          * @param user Set of permissions associated with requests coming from this connection
          */
-        public ClientInputHandler(AuthSystem.AuthUser user, String hostname) {
-            m_user = user;
+        public ClientInputHandler(String username, String hostname) {
+            m_username = username.intern();
             m_hostname = hostname;
         }
 
@@ -784,7 +788,20 @@ public class ClientInterface implements DumpManager.Dumpable {
 
         // Deserialize the client's request and map to a catalog stored procedure
         final StoredProcedureInvocation task = fds.readObject(StoredProcedureInvocation.class);
-        final Procedure catProc = m_catalogContext.get().procedures.get(task.procName);
+        final CatalogContext catalogContext = m_catalogContext.get();
+        final Procedure catProc = catalogContext.procedures.get(task.procName);
+        AuthSystem.AuthUser user = catalogContext.authSystem.getUser(handler.m_username);
+
+        if (user == null) {
+            final ClientResponseImpl errorResponse =
+                new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                       new VoltTable[0], "User " + handler.m_username +
+                                       " has been removed from the system via a catalog update",
+                                       task.clientHandle);
+            authLog.info("User " + handler.m_username + " has been removed from the system via a catalog update");
+            c.writeStream().enqueue(errorResponse);
+            return;
+        }
 
         /*
          * @TODO This ladder stinks. An SPI when deserialized here should be
@@ -795,13 +812,13 @@ public class ClientInterface implements DumpManager.Dumpable {
 
             // AdHoc requires unique permission. Then has to plan in a separate thread.
             if (task.procName.equals("@AdHoc")) {
-                if (!handler.m_user.hasAdhocPermission()) {
+                if (!user.hasAdhocPermission()) {
                     final ClientResponseImpl errorResponse =
                         new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                                                new VoltTable[0], "User does not have @AdHoc permission", task.clientHandle);
                     authLog.l7dlog(Level.INFO,
                                    LogKeys.auth_ClientInterface_LackingPermissionForAdhoc.name(),
-                                   new String[] {handler.m_user.m_name}, null);
+                                   new String[] {user.m_name}, null);
                     c.writeStream().enqueue(errorResponse);
                     return;
                 }
@@ -826,16 +843,16 @@ public class ClientInterface implements DumpManager.Dumpable {
             }
 
             // All other sysprocs require the sysproc permission
-            if (!handler.m_user.hasSystemProcPermission()) {
+            if (!user.hasSystemProcPermission()) {
                 authLog.l7dlog(Level.INFO,
                                LogKeys.auth_ClientInterface_LackingPermissionForSysproc.name(),
-                               new String[] { handler.m_user.m_name, task.procName },
+                               new String[] { user.m_name, task.procName },
                                null);
                 final ClientResponseImpl errorResponse =
                     new ClientResponseImpl(
                                            ClientResponseImpl.UNEXPECTED_FAILURE,
                                            new VoltTable[0],
-                                           "User " + handler.m_user.m_name + " does not have sysproc permission",
+                                           "User " + user.m_name + " does not have sysproc permission",
                                            task.clientHandle);
                 c.writeStream().enqueue(errorResponse);
                 return;
@@ -867,10 +884,10 @@ public class ClientInterface implements DumpManager.Dumpable {
                                                                c);
                 return;
             }
-        } else if (!handler.m_user.hasPermission(catProc)) {
+        } else if (!user.hasPermission(catProc)) {
             authLog.l7dlog(Level.INFO,
                            LogKeys.auth_ClientInterface_LackingPermissionForProcedure.name(),
-                           new String[] { handler.m_user.m_name, task.procName }, null);
+                           new String[] { user.m_name, task.procName }, null);
             final ClientResponseImpl errorResponse =
                 new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                                        new VoltTable[0],

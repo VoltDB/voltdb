@@ -129,7 +129,7 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
 
         if (message.type() == RecoveryMessageType.ScanTuples) {
             m_engine.processRecoveryMessage(message.getMessageData());
-            recoveryLog.info("Received tuple data at site " + m_siteId +
+            recoveryLog.trace("Received tuple data at site " + m_siteId +
                     " for table " + m_tables.get(message.tableId()).m_name);
         } else if (message.type() == RecoveryMessageType.Complete) {
             RecoveryTable table = m_tables.remove(message.tableId());
@@ -267,13 +267,8 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
      * is it should call crash VoltDB.
      */
     @Override
-    public void handleNodeFault(HashSet<Integer> failedNodes,
+    public void handleSiteFaults(HashSet<Integer> failedSites,
             SiteTracker tracker) {
-        HashSet<Integer> failedSites = new HashSet<Integer>();
-        for (Integer failedHost : failedNodes) {
-            failedSites.addAll(tracker.getAllSitesForHost(failedHost));
-        }
-
         for (Map.Entry<Integer, RecoveryTable> entry : m_tables.entrySet()) {
             if (failedSites.contains(entry.getValue().m_sourceSiteId)) {
                 recoveryLog.fatal("Node fault during recovery of Site " + m_siteId +

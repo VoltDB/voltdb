@@ -617,6 +617,8 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
 
     public boolean updateClusterState(String catalogDiffCommands) {
         m_context = VoltDB.instance().getCatalogContext();
+        m_knownFailedSites.removeAll(m_context.siteTracker.getAllLiveSites());
+        m_handledFailedSites.removeAll(m_context.siteTracker.getAllLiveSites());
 
         // make sure the restricted priority queue knows about all of the up initiators
         // for most catalog changes this will do nothing
@@ -1070,16 +1072,16 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
      */
     private void discoverGlobalFaultData(HashSet<NodeFailureFault> failedHosts)
     {
-        HashSet<Integer> failedHostIds = new HashSet<Integer>();
-        for (NodeFailureFault fault : failedHosts) {
-            failedHostIds.add(fault.getHostId());
-        }
-
-        m_knownFailedHosts.addAll(failedHostIds);
-
         // Fix context and associated site tracker first - need
         // an accurate topology to perform discovery.
         m_context = VoltDB.instance().getCatalogContext();
+
+        HashSet<Integer> failedSiteIds = new HashSet<Integer>();
+        for (NodeFailureFault fault : failedHosts) {
+            failedSiteIds.addAll(m_context.siteTracker.getAllSitesForHost(fault.getHostId()));
+        }
+
+        m_knownFailedSites.addAll(failedSiteIds);
 
         int expectedResponses = discoverGlobalFaultData_send();
         long[] commit_and_safe = discoverGlobalFaultData_rcv(expectedResponses);
@@ -1089,29 +1091,29 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         }
 
         /*
-         * Do a little work to identify the newly failed HostIDs and only handle those
+         * Do a little work to identify the newly failed site ids and only handle those
          */
-        HashSet<Integer> newFailedHostIds = new HashSet<Integer>(failedHostIds);
-        newFailedHostIds.removeAll(m_handledFailedHosts);
-        handleNodeFault(newFailedHostIds, commit_and_safe[0], commit_and_safe[1]);
-        m_handledFailedHosts.addAll(failedHostIds);
+        HashSet<Integer> newFailedSiteIds = new HashSet<Integer>(failedSiteIds);
+        newFailedSiteIds.removeAll(m_handledFailedSites);
+        handleSiteFaults(newFailedSiteIds, commit_and_safe[0], commit_and_safe[1]);
+        m_handledFailedSites.addAll(failedSiteIds);
         for (NodeFailureFault fault : failedHosts) {
-            if (newFailedHostIds.contains(fault.getHostId())) {
+            if (newFailedSiteIds.containsAll(m_context.siteTracker.getAllSitesForHost(fault.getHostId()))) {
                 VoltDB.instance().getFaultDistributor().reportFaultHandled(m_faultHandler, fault);
             }
         }
     }
 
     /**
-     * The list of failed hosts we know about. Included with all failure messages
+     * The list of failed sites we know about. Included with all failure messages
      * to identify what the information was used to generate commit points
      */
-    private final HashSet<Integer> m_knownFailedHosts = new HashSet<Integer>();
+    private final HashSet<Integer> m_knownFailedSites = new HashSet<Integer>();
 
     /**
-     * Failed hosts for which agreement has been reached.
+     * Failed sites for which agreement has been reached.
      */
-    private final HashSet<Integer> m_handledFailedHosts = new HashSet<Integer>();
+    private final HashSet<Integer> m_handledFailedSites = new HashSet<Integer>();
 
     /**
      * Store values from older failed nodes. They are repeated with every failure message
@@ -1134,41 +1136,39 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         for (int survivor : survivors) {
             survivorSet.add(survivor);
         }
-        m_recoveryLog.info("Sending fault data " + m_knownFailedHosts.toString() + " to "
+        m_recoveryLog.info("Sending fault data " + m_knownFailedSites.toString() + " to "
                 + survivorSet.toString() + " survivors with lastKnownGloballyCommitedMultiPartTxnId "
                 + lastKnownGloballyCommitedMultiPartTxnId);
         try {
-            for (Integer hostId : m_knownFailedHosts) {
+            for (Integer site : m_knownFailedSites) {
+                Integer hostId = m_context.siteTracker.getHostForSite(site);
                 HashMap<Integer, Long> siteMap = m_newestSafeTransactionForInitiatorLedger.get(hostId);
                 if (siteMap == null) {
                     siteMap = new HashMap<Integer, Long>();
                     m_newestSafeTransactionForInitiatorLedger.put(hostId, siteMap);
                 }
 
-                for (Integer site : m_context.siteTracker.getAllSitesForHost(hostId))
-                {
-                    if (m_context.siteTracker.getSiteForId(site).getIsexec() == false) {
-                        /*
-                         * Check the queue for the data and get it from the ledger if necessary
-                         */
-                        Long txnId = m_transactionQueue.getNewestSafeTransactionForInitiator(site);
-                        if (txnId == null) {
-                            txnId = siteMap.get(site);
-                            assert(txnId != null);
-                        } else {
-                            siteMap.put(site, txnId);
-                        }
-
-                        FailureSiteUpdateMessage srcmsg =
-                            new FailureSiteUpdateMessage(m_siteId,
-                                                         m_knownFailedHosts,
-                                                         site,
-                                                         txnId,
-                                                         lastKnownGloballyCommitedMultiPartTxnId);
-
-                        m_mailbox.send(survivors, 0, srcmsg);
-                        expectedResponses += (survivors.length);
+                if (m_context.siteTracker.getSiteForId(site).getIsexec() == false) {
+                    /*
+                     * Check the queue for the data and get it from the ledger if necessary
+                     */
+                    Long txnId = m_transactionQueue.getNewestSafeTransactionForInitiator(site);
+                    if (txnId == null) {
+                        txnId = siteMap.get(site);
+                        assert(txnId != null);
+                    } else {
+                        siteMap.put(site, txnId);
                     }
+
+                    FailureSiteUpdateMessage srcmsg =
+                        new FailureSiteUpdateMessage(m_siteId,
+                                                     m_knownFailedSites,
+                                                     site,
+                                                     txnId,
+                                                     lastKnownGloballyCommitedMultiPartTxnId);
+
+                    m_mailbox.send(survivors, 0, srcmsg);
+                    expectedResponses += (survivors.length);
                 }
             }
         }
@@ -1211,29 +1211,33 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                  * that the process can restart.
                  */
                 HashSet<NodeFailureFault> faults = ((ExecutionSiteNodeFailureMessage)m).m_failedHosts;
-                HashSet<Integer> newFailedHostIds = new HashSet<Integer>();
+                HashSet<Integer> newFailedSiteIds = new HashSet<Integer>();
                 for (NodeFailureFault fault : faults) {
-                    newFailedHostIds.add(fault.getHostId());
+                    newFailedSiteIds.addAll(m_context.siteTracker.getAllSitesForHost(fault.getHostId()));
                 }
                 m_mailbox.deliverFront(m);
-                m_recoveryLog.info("Detected a concurrent failure from FaultDistributor, new failed hosts "
-                        + newFailedHostIds);
+                m_recoveryLog.info("Detected a concurrent failure from FaultDistributor, new failed sites "
+                        + newFailedSiteIds);
                 return null;
             }
 
             /*
              * If the other surviving host saw a different set of failures
              */
-            if (!m_knownFailedHosts.equals(fm.m_failedHostIds)) {
-                if (!m_knownFailedHosts.containsAll(fm.m_failedHostIds)) {
+            if (!m_knownFailedSites.equals(fm.m_failedSiteIds)) {
+                if (!m_knownFailedSites.containsAll(fm.m_failedSiteIds)) {
                     /*
                      * In this case there is a new failed host we didn't know about. Time to
                      * start the process again from square 1 with knowledge of the new failed hosts
                      * First fail all the ones we didn't know about.
                      */
-                    HashSet<Integer> difference = new HashSet<Integer>(fm.m_failedHostIds);
-                    difference.removeAll(m_knownFailedHosts);
-                    for (Integer hostId : difference) {
+                    HashSet<Integer> difference = new HashSet<Integer>(fm.m_failedSiteIds);
+                    difference.removeAll(m_knownFailedSites);
+                    HashSet<Integer> differenceHosts = new HashSet<Integer>();
+                    for (Integer siteId : difference) {
+                        differenceHosts.add(m_context.siteTracker.getHostForSite(siteId));
+                    }
+                    for (Integer hostId : differenceHosts) {
                         String hostname = String.valueOf(hostId);
                         if (VoltDB.instance() != null) {
                             if (VoltDB.instance().getHostMessenger() != null) {
@@ -1245,7 +1249,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                             reportFault(new NodeFailureFault( hostId, hostname));
                     }
                     m_recoveryLog.info("Detected a concurrent failure from " +
-                            fm.m_sourceSiteId + " with new failed hosts " + difference.toString());
+                            fm.m_sourceSiteId + " with new failed sites " + difference.toString());
                     m_mailbox.deliver(m);
                     /*
                      * Return null and skip handling the fault for now. Will try again
@@ -1258,19 +1262,18 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                      * failed sites. Drop the message. The sender will detect the fault and resend
                      * the message later with the correct information.
                      */
-                    HashSet<Integer> difference = new HashSet<Integer>(m_knownFailedHosts);
-                    difference.removeAll(fm.m_failedHostIds);
+                    HashSet<Integer> difference = new HashSet<Integer>(m_knownFailedSites);
+                    difference.removeAll(fm.m_failedSiteIds);
                     m_recoveryLog.info("Discarding failure message from " +
-                            fm.m_sourceSiteId + " because it was missing failed hosts " + difference.toString());
+                            fm.m_sourceSiteId + " because it was missing failed sites " + difference.toString());
                     continue;
                 }
             }
 
             ++responses;
             m_recoveryLog.info("Received failure message " + responses + " of " + expectedResponses
-                    + " from " + fm.m_sourceSiteId + " for failed sites " + fm.m_failedHostIds +
-                    " with commit point " + fm.m_committedTxnId + " safe txn id " + fm.m_safeTxnId +
-                    " with failed host ids " + fm.m_failedHostIds);
+                    + " from " + fm.m_sourceSiteId + " for failed sites " + fm.m_failedSiteIds +
+                    " with commit point " + fm.m_committedTxnId + " safe txn id " + fm.m_safeTxnId);
             commitPoint =
                 Math.max(commitPoint, fm.m_committedTxnId);
 
@@ -1297,16 +1300,21 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
      * in different orders. UpdateCatalog changes MUST be commutative with
      * handleNodeFault.
      *
-     * @param hostIds Hashset<Integer> of host ids of failed nodes
+     * @param siteIds Hashset<Integer> of host ids of failed nodes
      * @param globalCommitPoint the surviving cluster's greatest committed multi-partition transaction id
      * @param globalInitiationPoint the greatest transaction id acknowledged as globally
      * 2PC to any surviving cluster execution site by the failed initiator.
      *
      */
-    void handleNodeFault(HashSet<Integer> hostIds, long globalMultiPartCommitPoint,
+    void handleSiteFaults(HashSet<Integer> failedSites, long globalMultiPartCommitPoint,
                          long globalInitiationPoint) {
+        HashSet<Integer> failedHosts = new HashSet<Integer>();
+        for (Integer siteId : failedSites) {
+            failedHosts.add(m_context.siteTracker.getHostForSite(siteId));
+        }
+
         StringBuffer sb = new StringBuffer();
-        for (Integer hostId : hostIds) {
+        for (Integer hostId : failedHosts) {
             sb.append(hostId).append(' ');
         }
         if (m_txnlog.isTraceEnabled())
@@ -1322,12 +1330,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         lastKnownGloballyCommitedMultiPartTxnId = globalMultiPartCommitPoint;
 
         // Fix safe transaction scoreboard in transaction queue
-        HashSet<Integer> failedSites = new HashSet<Integer>();
-        for (Integer hostId : hostIds) {
-            failedSites.addAll(m_context.siteTracker.getAllSitesForHost(hostId));
-        }
-
-
         for (Integer i : failedSites)
         {
             if (m_context.siteTracker.getSiteForId(i).getIsexec() == false) {
@@ -1403,7 +1405,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             }
         }
         if (m_recoveryProcessor != null) {
-            m_recoveryProcessor.handleNodeFault( hostIds, m_context.siteTracker);
+            m_recoveryProcessor.handleSiteFaults( failedSites, m_context.siteTracker);
         }
     }
 

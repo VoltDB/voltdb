@@ -586,7 +586,7 @@ public class TestMessaging extends TestCase {
 
         // kill host #2
         // triggers the fault manager
-        msg2.closeForeignHostScoket(msg1.getHostId());
+        msg2.closeForeignHostSocket(msg1.getHostId());
         msg2.shutdown();
         // this is just to wait for the fault manager to kick in
         Thread.sleep(50);

@@ -271,11 +271,11 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         client3.drain();
         assertTrue(callbackSuccess);
 
-        // the old client should still work. This isn't really desirable.. but verify the
-        // expected behavior.
+        // the old client should not work because the user has been removed.
         loadSomeData(client, 100, 10);
         client.drain();
-        assertTrue(callbackSuccess);
+        assertFalse(callbackSuccess);
+        callbackSuccess = true;
     }
 
     public void loadSomeData(Client client, int start, int count) throws IOException, ProcCallException {

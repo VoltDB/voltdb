@@ -59,8 +59,13 @@ public class SiteTracker {
     Map<Integer, ArrayList<Integer>> m_hostsToSites =
         new HashMap<Integer, ArrayList<Integer>>();
 
+    Map<Integer, Integer> m_sitesToHost =
+        new HashMap<Integer, Integer>();
+
     // records the timestamp of the last message sent to each sites
     HashMap<Integer, Long> m_lastHeartbeatTime = new HashMap<Integer, Long>();
+
+    HashSet<Integer> m_liveSiteIds = new HashSet<Integer>();
 
     // scratch value used to compute the out of date sites
     // note: this makes
@@ -82,7 +87,7 @@ public class SiteTracker {
             int siteId = Integer.parseInt(site.getTypeName());
 
             int hostId = Integer.parseInt(site.getHost().getTypeName());
-
+            m_sitesToHost.put(siteId, hostId);
             if (!m_hostsToSites.containsKey(hostId))
             {
                 m_hostsToSites.put(hostId, new ArrayList<Integer>());
@@ -94,12 +99,12 @@ public class SiteTracker {
             {
                 if (site.getIsup())
                 {
+                    m_liveSiteIds.add(siteId);
                     m_liveInitiatorCount++;
                 }
             }
             else
             {
-
                 int partitionId = Integer.parseInt(site.getPartition().getTypeName());
 
                 m_sitesToPartitions.put(siteId, partitionId);
@@ -118,6 +123,7 @@ public class SiteTracker {
                 if (site.getIsup() == true)
                 {
                     m_liveSiteCount++;
+                    m_liveSiteIds.add(siteId);
                     m_partitionsToLiveSites.get(partitionId).add(siteId);
                 }
             }
@@ -130,6 +136,10 @@ public class SiteTracker {
                 m_lastHeartbeatTime.put(siteId, -1L);
             }
         }
+    }
+
+    public HashSet<Integer> getAllLiveSites() {
+        return m_liveSiteIds;
     }
 
     /**
@@ -308,6 +318,16 @@ public class SiteTracker {
     {
         assert m_hostsToSites.containsKey(hostId);
         return m_hostsToSites.get(hostId);
+    }
+
+    /**
+     * Get the host id for a specific site
+     * @param siteid
+     * @return Integer host id for that site
+     */
+    public Integer getHostForSite(Integer siteId) {
+        assert m_sitesToHost.containsKey(siteId);
+        return m_sitesToHost.get(siteId);
     }
 
     /**

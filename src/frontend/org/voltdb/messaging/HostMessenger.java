@@ -430,6 +430,7 @@ public class HostMessenger implements Messenger {
         SocketChannel sock = SocketJoiner.connect(m_localHostId, hostId, addr);
 
         m_tempNewFH = new ForeignHost(this, hostId, sock);
+        m_tempNewFH.sendReadyMessage();
         m_tempNewHostId = hostId;
     }
 
@@ -513,7 +514,7 @@ public class HostMessenger implements Messenger {
      * Kill a foreign host socket by id.
      * @param hostId The id of the foreign host to kill.
      */
-    public void closeForeignHostScoket(int hostId) {
+    public void closeForeignHostSocket(int hostId) {
         for (int i = 0; i < m_foreignHosts.length; i++) {
             ForeignHost host = m_foreignHosts[i];
             if ((host != null) && (host.isUp())) {

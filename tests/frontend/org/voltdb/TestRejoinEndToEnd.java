@@ -60,6 +60,9 @@ public class TestRejoinEndToEnd extends TestCase {
         String simpleSchema =
             "create table blah (" +
             "ival bigint default 0 not null, " +
+            "PRIMARY KEY(ival));\n" +
+            "create table blah_replicated (" +
+            "ival bigint default 0 not null, " +
             "PRIMARY KEY(ival));";
 
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
@@ -75,9 +78,15 @@ public class TestRejoinEndToEnd extends TestCase {
         UserInfo ui = new UserInfo("ry@nlikesthe", "y@nkees", new String[] { "foo" } );
         builder.addUsers(new UserInfo[] { ui } );
 
-        ProcedureInfo[] pi = new ProcedureInfo[2];
-        pi[0] = new ProcedureInfo(new String[] { "foo" }, "Insert", "insert into blah values (?);", null);
-        pi[1] = new ProcedureInfo(new String[] { "foo" }, "InsertSinglePartition", "insert into blah values (?);", "blah.ival:0");
+        ProcedureInfo[] pi = new ProcedureInfo[] {
+            new ProcedureInfo(new String[] { "foo" }, "Insert", "insert into blah values (?);", null),
+            new ProcedureInfo(new String[] { "foo" }, "InsertSinglePartition", "insert into blah values (?);", "blah.ival:0"),
+            new ProcedureInfo(new String[] { "foo" }, "InsertReplicated", "insert into blah_replicated values (?);", null),
+            new ProcedureInfo(new String[] { "foo" }, "SelectBlahSinglePartition", "select * from blah where ival = ?;", "blah.ival:0"),
+            new ProcedureInfo(new String[] { "foo" }, "SelectBlah", "select * from blah where ival = ?;", null),
+            new ProcedureInfo(new String[] { "foo" }, "SelectBlahReplicated", "select * from blah_replicated where ival = ?;", null)
+        };
+
         builder.addProcedures(pi);
         return builder;
     }
@@ -140,7 +149,7 @@ public class TestRejoinEndToEnd extends TestCase {
         HostMessenger host1 = VoltDB.instance().getHostMessenger();
 
         //int host2id = host2.getHostId();
-        host2.closeForeignHostScoket(host1.getHostId());
+        host2.closeForeignHostSocket(host1.getHostId());
         // this is just to wait for the fault manager to kick in
         Thread.sleep(50);
         host2.shutdown();
@@ -338,7 +347,7 @@ public class TestRejoinEndToEnd extends TestCase {
         localServer.start();
         localServer.waitForInitialization();
 
-        Thread.sleep(100);
+        Thread.sleep(5000);
 
         ClientResponse response;
         Client client;
@@ -351,6 +360,8 @@ public class TestRejoinEndToEnd extends TestCase {
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         response = client.callProcedure("Insert", 1);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = client.callProcedure("InsertReplicated", 0);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
         client.close();
 
         client = ClientFactory.createClient();
@@ -359,6 +370,125 @@ public class TestRejoinEndToEnd extends TestCase {
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         response = client.callProcedure("Insert", 3);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        client.close();
+
+        localServer.shutdown();
+        cluster.shutDown();
+    }
+
+    public void testRejoinDataTransfer() throws Exception {
+        VoltProjectBuilder builder = getBuilderForTest();
+        builder.setSecurityEnabled(true);
+
+        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        boolean success = cluster.compile(builder, false);
+        assertTrue(success);
+        copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+        cluster.setHasLocalServer(false);
+
+        cluster.startUp();
+
+        ClientResponse response;
+        Client client;
+
+        client = ClientFactory.createClient();
+        client.createConnection("localhost", "ry@nlikesthe", "y@nkees");
+
+        response = client.callProcedure("InsertSinglePartition", 0);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = client.callProcedure("Insert", 1);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = client.callProcedure("InsertReplicated", 0);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+
+        cluster.shutDownSingleHost(0);
+        Thread.sleep(1000);
+
+        String username = URLEncoder.encode("ry@nlikesthe", "UTF-8");
+        String password = URLEncoder.encode("y@nkees", "UTF-8");
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
+        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
+        config.m_rejoinToHostAndPort = username + ":" + password + "@localhost:21213";
+        ServerThread localServer = new ServerThread(config);
+
+        localServer.start();
+        localServer.waitForInitialization();
+
+        Thread.sleep(2000);
+
+        client.close();
+
+        client = ClientFactory.createClient();
+        client.createConnection("localhost", 21213, "ry@nlikesthe", "y@nkees");
+
+        /*
+         * Check that the recovery data transferred
+         */
+        response = client.callProcedure("SelectBlahSinglePartition", 0);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 0);
+
+        response = client.callProcedure("SelectBlah", 1);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 1);
+
+        response = client.callProcedure("SelectBlahReplicated", 0);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 0);
+
+        /*
+         * Try to insert new data
+         */
+        response = client.callProcedure("InsertSinglePartition", 2);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = client.callProcedure("Insert", 3);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = client.callProcedure("InsertReplicated", 1);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+
+        /*
+         * See that it was inserted
+         */
+        response = client.callProcedure("SelectBlahSinglePartition", 2);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 2
+                );
+        response = client.callProcedure("SelectBlah", 3);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 3);
+
+        response = client.callProcedure("SelectBlahReplicated", 1);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 1);
+
+        /*
+         * Kill one of the old ones (not the recovered partition)
+         */
+        cluster.shutDownSingleHost(0);
+        Thread.sleep(1000);
+
+        client.close();
+
+        client = ClientFactory.createClient();
+        client.createConnection("localhost", 21212, "ry@nlikesthe", "y@nkees");
+
+        /*
+         * See that the cluster is available and the data is still there.
+         */
+        response = client.callProcedure("SelectBlahSinglePartition", 2);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 2);
+
+        response = client.callProcedure("SelectBlah", 3);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 3);
+
+        response = client.callProcedure("SelectBlahReplicated", 1);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 1);
+
         client.close();
 
         localServer.shutdown();

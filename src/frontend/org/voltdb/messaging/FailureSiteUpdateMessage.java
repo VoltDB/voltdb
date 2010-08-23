@@ -26,8 +26,8 @@ public class FailureSiteUpdateMessage extends VoltMessage {
     /** Site id of the messaging-issuing site. */
     public int m_sourceSiteId;
 
-    /** Host id of the failed host */
-    public HashSet<Integer> m_failedHostIds = new HashSet<Integer>();
+    /** Site id of the failed sites */
+    public HashSet<Integer> m_failedSiteIds = new HashSet<Integer>();
 
     /** Initiator id corresponding to the m_safeTxnId. */
     public int m_failedInitiatorId;
@@ -40,13 +40,13 @@ public class FailureSiteUpdateMessage extends VoltMessage {
 
     public FailureSiteUpdateMessage(
             int sourceSiteId,
-            HashSet<Integer> failedHostIds,
+            HashSet<Integer> failedSiteIds,
             int failedInitiatorId,
             long safeTxnId,
             long committedTxnId)
     {
         m_sourceSiteId = sourceSiteId;
-        m_failedHostIds = new HashSet<Integer>(failedHostIds);
+        m_failedSiteIds = new HashSet<Integer>(failedSiteIds);
         m_failedInitiatorId = failedInitiatorId;
         m_safeTxnId = safeTxnId;
         m_committedTxnId = committedTxnId;
@@ -62,7 +62,7 @@ public class FailureSiteUpdateMessage extends VoltMessage {
 
     @Override
     protected void flattenToBuffer(DBBPool pool) {
-        int msgsize = 2 * 4 + 2 * 8 + 1 + 4 + (4 * m_failedHostIds.size()); // 2 ints, 2 longs, 1 byte, 4 byte failed host count + 4 bytes per failed host
+        int msgsize = 2 * 4 + 2 * 8 + 1 + 4 + (4 * m_failedSiteIds.size()); // 2 ints, 2 longs, 1 byte, 4 byte failed host count + 4 bytes per failed host
         if (m_buffer == null) {
             m_container = pool.acquire(HEADER_SIZE + msgsize);
             m_buffer = m_container.b;
@@ -71,8 +71,8 @@ public class FailureSiteUpdateMessage extends VoltMessage {
         m_buffer.position(HEADER_SIZE);
         m_buffer.put(FAILURE_SITE_UPDATE_ID);
         m_buffer.putInt(m_sourceSiteId);
-        m_buffer.putInt(m_failedHostIds.size());
-        for (Integer hostId : m_failedHostIds) {
+        m_buffer.putInt(m_failedSiteIds.size());
+        for (Integer hostId : m_failedSiteIds) {
             m_buffer.putInt(hostId);
         }
         m_buffer.putInt(m_failedInitiatorId);
@@ -87,7 +87,7 @@ public class FailureSiteUpdateMessage extends VoltMessage {
         m_sourceSiteId = m_buffer.getInt();
         int numIds = m_buffer.getInt();
         for (int ii = 0; ii < numIds; ii++) {
-            m_failedHostIds.add(m_buffer.getInt());
+            m_failedSiteIds.add(m_buffer.getInt());
         }
         m_failedInitiatorId = m_buffer.getInt();
         m_safeTxnId = m_buffer.getLong();
@@ -104,7 +104,7 @@ public class FailureSiteUpdateMessage extends VoltMessage {
         sb.append(" for initiator: ");
         sb.append(m_failedInitiatorId);
         sb.append(" for failed hosts: ");
-        for (Integer hostId : m_failedHostIds) {
+        for (Integer hostId : m_failedSiteIds) {
             sb.append(hostId).append(' ');
         }
         sb.append(" safe txn: ");

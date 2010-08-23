@@ -230,7 +230,7 @@ public class AuthSystem {
         for (org.voltdb.catalog.User catalogUser : db.getUsers()) {
             final AuthUser user = new AuthUser( Encoder.hexDecode(catalogUser.getShadowpassword()),
                     catalogUser.getTypeName(), catalogUser.getSysproc(), catalogUser.getAdhoc());
-            m_users.put(user.m_name, user);
+            m_users.put(user.m_name.intern(), user);
             for (org.voltdb.catalog.GroupRef catalogGroupRef : catalogUser.getGroups()) {
                 final org.voltdb.catalog.Group  catalogGroup = catalogGroupRef.getGroup();
                 AuthGroup group = null;
@@ -322,7 +322,34 @@ public class AuthSystem {
      * @param password SHA-1 single hashed version of the users clear text password
      * @return The permission set for the user if authentication succeeds or null if authentication fails.
      */
-    AuthUser authenticate(String username, byte[] password) {
+    boolean authenticate(String username, byte[] password) {
+        if (!m_enabled) {
+            return true;
+        }
+        final AuthUser user = m_users.get(username);
+        if (user == null) {
+            authLogger.l7dlog(Level.INFO, LogKeys.auth_AuthSystem_NoSuchUser.name(), new String[] {username}, null);
+            return false;
+        }
+
+        MessageDigest md = null;
+        try {
+            md = MessageDigest.getInstance("SHA-1");
+        } catch (NoSuchAlgorithmException e) {
+            authLogger.l7dlog(Level.FATAL, LogKeys.auth_AuthSystem_NoSuchAlgorithm.name(), e);
+            VoltDB.crashVoltDB();
+        }
+        byte passwordHash[] = md.digest(password);
+        if (java.util.Arrays.equals(passwordHash, user.m_shadowPassword)) {
+            authLogger.l7dlog(Level.INFO, LogKeys.auth_AuthSystem_AuthenticatedUser.name(), new Object[] {username}, null);
+            return true;
+        } else {
+            authLogger.l7dlog(Level.INFO, LogKeys.auth_AuthSystem_AuthFailedPasswordMistmatch.name(), new String[] {username}, null);
+            return false;
+        }
+    }
+
+    AuthUser getUser(String name) {
         if (!m_enabled) {
             return new AuthUser(null, null, false, false) {
                 @Override
@@ -346,26 +373,6 @@ public class AuthSystem {
                 }
             };
         }
-        final AuthUser user = m_users.get(username);
-        if (user == null) {
-            authLogger.l7dlog(Level.INFO, LogKeys.auth_AuthSystem_NoSuchUser.name(), new String[] {username}, null);
-            return null;
-        }
-
-        MessageDigest md = null;
-        try {
-            md = MessageDigest.getInstance("SHA-1");
-        } catch (NoSuchAlgorithmException e) {
-            authLogger.l7dlog(Level.FATAL, LogKeys.auth_AuthSystem_NoSuchAlgorithm.name(), e);
-            VoltDB.crashVoltDB();
-        }
-        byte passwordHash[] = md.digest(password);
-        if (java.util.Arrays.equals(passwordHash, user.m_shadowPassword)) {
-            authLogger.l7dlog(Level.INFO, LogKeys.auth_AuthSystem_AuthenticatedUser.name(), new Object[] {username}, null);
-            return user;
-        } else {
-            authLogger.l7dlog(Level.INFO, LogKeys.auth_AuthSystem_AuthFailedPasswordMistmatch.name(), new String[] {username}, null);
-            return null;
-        }
+        return m_users.get(name);
     }
 }
