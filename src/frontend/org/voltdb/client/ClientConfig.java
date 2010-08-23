@@ -23,7 +23,7 @@ public class ClientConfig {
 final String m_username;
 final String m_password;
 final ClientStatusListener m_listener;
-int m_expectedOutgoingMessageSize;
+int m_expectedOutgoingMessageSize = 128;
 int m_maxArenaSizes[];
 boolean m_heavyweight;
 StatsUploaderSettings m_statsSettings;
