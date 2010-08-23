@@ -315,13 +315,13 @@ public class SocketJoiner extends Thread {
                 m_hostLog.info("Maximum clock/network skew is " + maxDiffMS + " milliseconds (according to leader)");
             if (command == COMMAND_NTPFAIL) {
                 if (m_hostLog != null)
-                    m_hostLog.info("Maximum clock/network is " + (maxDiffMS*100)/MAX_ACCEPTABLE_TIME_DIFF_IN_MS +
+                    m_hostLog.error("Maximum clock/network is " + (maxDiffMS*100)/MAX_ACCEPTABLE_TIME_DIFF_IN_MS +
                                    "% higher than allowable limit");
                 VoltDB.crashVoltDB();
             }
             if (command == COMMAND_CRCFAIL) {
                 if (m_hostLog != null)
-                    m_hostLog.info("Catalog checksums do not match across cluster");
+                    m_hostLog.error("Catalog checksums do not match across cluster");
                 VoltDB.crashVoltDB();
             }
 
@@ -453,13 +453,13 @@ public class SocketJoiner extends Thread {
             command = in.readInt();
             if (command == COMMAND_NTPFAIL) {
                 if (m_hostLog != null)
-                    m_hostLog.info("Maximum clock/network is " + (maxDiffMS*100)/MAX_ACCEPTABLE_TIME_DIFF_IN_MS +
+                    m_hostLog.error("Maximum clock/network is " + (maxDiffMS*100)/MAX_ACCEPTABLE_TIME_DIFF_IN_MS +
                                    "% higher than allowable limit");
                 VoltDB.crashVoltDB();
             }
             if (command == COMMAND_CRCFAIL) {
                 if (m_hostLog != null)
-                    m_hostLog.info("Catalog checksums do not match across cluster");
+                    m_hostLog.error("Catalog checksums do not match across cluster");
                 VoltDB.crashVoltDB();
                 for (SocketChannel sock : m_sockets.values()) {
                     sock.close();
@@ -560,7 +560,7 @@ public class SocketJoiner extends Thread {
                 m_hostLog.info("Maximum clock/network skew is " + maxDiffMS + " milliseconds (according to rejoined node)");
             if (command == COMMAND_NTPFAIL) {
                 if (m_hostLog != null)
-                    m_hostLog.info("Maximum clock/network is " + (maxDiffMS*100)/MAX_ACCEPTABLE_TIME_DIFF_IN_MS +
+                    m_hostLog.error("Maximum clock/network is " + (maxDiffMS*100)/MAX_ACCEPTABLE_TIME_DIFF_IN_MS +
                                    "% higher than allowable limit");
                 VoltDB.crashVoltDB();
             }
