@@ -134,7 +134,7 @@ final class ClientImpl implements Client {
             if (m_credentialsSet == false) {
                 m_credentialsSet = true;
                 m_createConnectionUsername = username;
-                if (m_hashedPassword != null) {
+                if (hashedPassword != null) {
                     m_hashedPassword = Arrays.copyOf(hashedPassword, hashedPassword.length);
                     m_passwordHashCode = Arrays.hashCode(hashedPassword);
                 }
