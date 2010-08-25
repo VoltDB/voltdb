@@ -1,0 +1,59 @@
+#!/usr/bin/expect -f
+
+### power outlets are 1-indexed and in reverse order
+set outlets " lkjihgfedcba"
+
+if {[string equal -length 5 "volt3" $argv] == 0} {
+    send_user "hudson user is only allowed to power-cycle volt3 machines\n"
+    exit 1
+}
+set host [string index $argv 5]
+set outlet [string first $host $outlets]
+if {$outlet < 1 || [string length $argv] != 6} {
+    send_user "$argv is not a valid volt3x machine\n"
+    exit 1
+}
+
+spawn telnet 10.10.180.130
+
+expect "User Name : "
+send -- "hudson\r"
+expect "Password  : "
+send -- "hudson\r"
+expect "Control Console"
+expect "> " 
+send -- "1\r"
+expect "Device Manager"
+expect "> "
+send -- "2\r"
+expect "Outlet Management"
+expect "> "
+send -- "1\r"
+expect "Outlet Control/Configuration"
+expect "> "
+send -- "${outlet}\r"
+expect "volt3${host}"
+expect "> "
+send -- "3\r" # immediate reboot
+expect "Immediate Reboot"
+expect "Enter 'YES' to continue or <ENTER> to cancel : "
+send -- "YES\r"
+expect "Command successfully issued."
+expect "Press <ENTER> to continue..."
+send -- "\r"
+expect "volt3${host}"
+expect "> "
+send -- \033
+expect "Outlet Control/Configuration"
+expect "> "
+send -- \033
+expect "Outlet Management"
+expect "> "
+send -- \033
+expect "Device Manager"
+expect "> "
+send -- \033
+expect "Control Console"
+expect "> "
+send -- "4\r"
+expect eof
