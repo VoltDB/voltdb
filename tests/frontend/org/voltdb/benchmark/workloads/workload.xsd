@@ -38,29 +38,85 @@
 
   <xs:complexType name="paramType">
     <xs:sequence>
-      <xs:element name="value" minOccurs="1" maxOccurs="1">
-        <xs:complexType>
-          <xs:attribute name="generator" type="generatorType" />
-        </xs:complexType>
-      </xs:element>
+      <xs:choice minOccurs="1" maxOccurs="1">
+        <xs:element name="tinyint" type="tinyintParamType"/>
+        <xs:element name="smallint" type="smallintParamType"/>
+        <xs:element name="integer" type="integerParamType"/>
+        <xs:element name="bigint" type="bigintParamType"/>
+        <xs:element name="float" type="floatParamType"/>
+        <xs:element name="decimal" type="decimalParamType"/>
+        <xs:element name="varchar" type="varcharParamType"/>
+        <xs:element name="timestamp" type="timestampParamType"/>
+      </xs:choice>
+      <xs:choice minOccurs="1" maxOccurs="1">
+        <xs:element name="randomgenerator" type="randomGeneratorType"/>
+        <xs:element name="sequencegenerator" type="sequenceGeneratorType"/>
+        <xs:element name="usergenerator" type="userGeneratorType"/>
+      </xs:choice>
     </xs:sequence>
-    <xs:attribute name="type" type="voltType" />
+    <xs:attribute name="offset" type="xs:short"/>
   </xs:complexType>
 
-  <xs:simpleType name="voltType">
-    <xs:restriction base="xs:string">
-      <xs:enumeration value="TINYINT" />
-      <xs:enumeration value="SHORTINT" />
-      <xs:enumeration value="INTEGER" />
-      <xs:enumeration value="BIGINT" />
-      <xs:enumeration value="FLOAT" />
-      <xs:enumeration value="DECIMAL" />
-      <xs:enumeration value="CHAR" />
-      <xs:enumeration value="CHAR()" />
-      <xs:enumeration value="VARCHAR()" />
-      <xs:enumeration value="TIMESTAMP" />
-    </xs:restriction>
-  </xs:simpleType>
+  <!-- SQL type types -->
+
+  <xs:complexType name="tinyintParamType">
+    <xs:attribute name="min" type="xs:byte" default="-128"/>
+    <xs:attribute name="max" type="xs:byte" default="127"/>
+  </xs:complexType>
+
+  <xs:complexType name="smallintParamType">
+    <xs:attribute name="min" type="xs:short" default="-32768"/>
+    <xs:attribute name="max" type="xs:short" default="32767"/>
+  </xs:complexType>
+
+  <xs:complexType name="integerParamType">
+    <xs:attribute name="min" type="xs:int" default="-2147483648"/>
+    <xs:attribute name="max" type="xs:int" default="2147483647"/>
+  </xs:complexType>
+
+  <xs:complexType name="bigintParamType">
+    <xs:attribute name="min" type="xs:long" default="-9223372036854775808"/>
+    <xs:attribute name="max" type="xs:long" default="9223372036854775807"/>
+  </xs:complexType>
+
+  <xs:complexType name="floatParamType">
+    <!-- stupid XML not supporting scientific notation.  We'll just
+         pick large-ish values here -->
+    <xs:attribute name="min" type="xs:decimal" default="-1700000000000000000000000000000000000000000000000000000000000000"/>
+    <xs:attribute name="max" type="xs:decimal" default="1700000000000000000000000000000000000000000000000000000000000000"/>
+  </xs:complexType>
+
+  <xs:complexType name="decimalParamType">
+    <xs:attribute name="scale" type="xs:int" default="12"/>
+    <xs:attribute name="precision" type="xs:int" default="38"/>
+    <!-- These aren't quite right but meh for now -->
+    <xs:attribute name="min" type="xs:decimal" default="-99999999999999999999999999.999999999999"/>
+    <xs:attribute name="max" type="xs:decimal" default="99999999999999999999999999.999999999999"/>
+  </xs:complexType>
+
+  <xs:complexType name="varcharParamType">
+    <xs:attribute name="length" type="xs:int"/>
+  </xs:complexType>
+
+  <xs:complexType name="timestampParamType">
+    <xs:attribute name="min" type="xs:long" default="-9223372036854775808"/>
+    <xs:attribute name="max" type="xs:long" default="9223372036854775807"/>
+  </xs:complexType>
+
+  <!-- Generator element types -->
+
+  <xs:complexType name="randomGeneratorType">
+    <xs:attribute name="distribution" type="xs:string" default="uniform"/>
+  </xs:complexType>
+
+  <xs:complexType name="sequenceGeneratorType">
+    <xs:attribute name="direction" type="xs:string" default="ascending"/>
+  </xs:complexType>
+
+  <xs:complexType name="userGeneratorType">
+    <xs:attribute name="class" type="xs:anyURI"/>
+    <xs:attribute name="method" type="xs:string"/>
+  </xs:complexType>
 
   <xs:simpleType name="generatorType">
     <xs:restriction base="xs:string">

@@ -1,156 +1,53 @@
 <?xml version="1.0" ?>
 <microbenchmark mbName="MB">
-    <loader loaderName="Loader1">
-        <loaderClass pathName="org.voltdb.benchmark.workloads.RandomLoader" />
-    </loader>
-    <workload wlName="MixedLoad">
-        <procedure procName="Insert" percOfWL="33">
-            <param type="INTEGER">
-                <value generator="random" />
-            </param>
-            <param type="TINYINT">
-                <value generator="random" />
-            </param>
-            <param type="SMALLINT">
-                <value generator="random" />
-            </param>
-            <param type="BIGINT">
-                <value generator="random" />
-            </param>
-            <param type="FLOAT">
-                <value generator="random" />
-            </param>
-            <param type="DECIMAL">
-                <value generator="random" />
-            </param>
-            <param type="TIMESTAMP">
-                <value generator="random" />
-            </param>
-            <param type="VARCHAR(5)">
-                <value generator="random" />
-            </param>
-        </procedure>
-        <procedure procName="Select" percOfWL="34">
-            <param type="SMALLINT">
-                <value generator="random" />
-            </param>
-        </procedure>
-        <procedure procName="Delete" percOfWL="33">
-            <param type="SMALLINT">
-                <value generator="random" />
-            </param>
-        </procedure>
-    </workload>
-    <workload wlName="Inserts">
-        <procedure procName="Insert" percOfWL="100">
-            <param type="INTEGER">
-                <value generator="random" />
-            </param>
-            <param type="TINYINT">
-                <value generator="random" />
-            </param>
-            <param type="SMALLINT">
-                <value generator="random" />
-            </param>
-            <param type="BIGINT">
-                <value generator="random" />
-            </param>
-            <param type="FLOAT">
-                <value generator="random" />
-            </param>
-            <param type="DECIMAL">
-                <value generator="random" />
-            </param>
-            <param type="TIMESTAMP">
-                <value generator="random" />
-            </param>
-            <param type="VARCHAR(5)">
-                <value generator="random" />
-            </param>
-        </procedure>
-    </workload>
-    <workload wlName="Selects">
-        <procedure procName="Select" percOfWL="100">
-            <param type="SMALLINT">
-                <value generator="random" />
-            </param>
-        </procedure>
-    </workload>
-    <workload wlName="Deletes">
-        <procedure procName="Delete" percOfWL="100">
-            <param type="SMALLINT">
-                <value generator="random" />
-            </param>
-        </procedure>
-    </workload>
-    <workload wlName="SelectStrings">
-        <procedure procName="SelectString" percOfWL="100">
-            <param type="SMALLINT">
-                <value generator="random" />
-            </param>
-            <param type="VARCHAR(5)">
-                <value generator="random" />
-            </param>
-        </procedure>
-    </workload>
-    <workload wlName="SelectLongs">
-        <procedure procName="SelectLong" percOfWL="100">
-            <param type="SMALLINT">
-                <value generator="random" />
-            </param>
-            <param type="BIGINT">
-                <value generator="random" />
-            </param>
-        </procedure>
-    </workload>
-    <workload wlName="SelectDecimals">
-        <procedure procName="SelectDecimal" percOfWL="100">
-            <param type="SMALLINT">
-                <value generator="random" />
-            </param>
-            <param type="DECIMAL">
-                <value generator="random" />
-            </param>
-        </procedure>
-    </workload>
-    <workload wlName="SelectTimestamps">
-        <procedure procName="SelectTimestamp" percOfWL="100">
-            <param type="SMALLINT">
-                <value generator="random" />
-            </param>
-            <param type="TIMESTAMP">
-                <value generator="random" />
-            </param>
-        </procedure>
-    </workload>
-    <workload wlName="SelectDoubles">
-        <procedure procName="SelectDouble" percOfWL="100">
-            <param type="SMALLINT">
-                <value generator="random" />
-            </param>
-            <param type="FLOAT">
-                <value generator="random" />
-            </param>
-        </procedure>
-    </workload>
-    <workload wlName="SelectInts">
-        <procedure procName="SelectInt" percOfWL="100">
-            <param type="SMALLINT">
-                <value generator="random" />
-            </param>
-            <param type="INTEGER">
-                <value generator="random" />
-            </param>
-        </procedure>
-    </workload>
-    <workload wlName="SelectBytes">
-        <procedure procName="SelectByte" percOfWL="100">
-            <param type="SMALLINT">
-                <value generator="random" />
-            </param>
-            <param type="TINYINT">
-                <value generator="random" />
-            </param>
-        </procedure>
-    </workload>
+  <loader loaderName="Loader1">
+    <loaderClass pathName="org.voltdb.benchmark.workloads.RandomLoader" />
+  </loader>
+  <workload wlName="MixedLoad">
+    <procedure procName="Insert" percOfWL="33">
+      <param offset="7">
+        <varchar length="5"/>
+      </param>
+    </procedure>
+    <procedure procName="Select" percOfWL="34"/>
+    <procedure procName="Delete" percOfWL="33"/>
+  </workload>
+  <workload wlName="Inserts">
+    <procedure procName="Insert" percOfWL="100">
+      <param offset="7">
+        <varchar length="5"/>
+      </param>
+    </procedure>
+  </workload>
+  <workload wlName="Selects">
+    <procedure procName="Select" percOfWL="100"/>
+  </workload>
+  <workload wlName="Deletes">
+    <procedure procName="Delete" percOfWL="100"/>
+  </workload>
+  <workload wlName="SelectStrings">
+    <procedure procName="SelectString" percOfWL="100">
+      <param offset="1">
+        <varchar length="5"/>
+      </param>
+    </procedure>
+  </workload>
+  <workload wlName="SelectLongs">
+    <procedure procName="SelectLong" percOfWL="100"/>
+  </workload>
+  <workload wlName="SelectDecimals">
+    <procedure procName="SelectDecimal" percOfWL="100"/>
+  </workload>
+  <workload wlName="SelectTimestamps">
+    <procedure procName="SelectTimestamp" percOfWL="100"/>
+  </workload>
+  <workload wlName="SelectDoubles">
+    <procedure procName="SelectDouble" percOfWL="100"/>
+  </workload>
+  <workload wlName="SelectInts">
+    <procedure procName="SelectInt" percOfWL="100"/>
+  </workload>
+  <workload wlName="SelectBytes">
+    <procedure procName="SelectByte" percOfWL="100"/>
+  </workload>
 </microbenchmark>

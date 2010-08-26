@@ -109,6 +109,7 @@ public class BenchmarkController {
 
             while (resultsToRead > 0) {
                 ProcessData.OutputLine line = m_clientPSM.nextBlocking();
+                //System.err.printf("(%s): \"%s\"\n", line.processName, line.message);
                 if (line.stream == ProcessData.Stream.STDERR) {
                     //System.err.printf("(%s): \"%s\"\n", line.processName, line.value);
                     continue;
@@ -187,10 +188,19 @@ public class BenchmarkController {
 
         try {
             m_clientClass = (Class<? extends ClientMain>)Class.forName(m_config.benchmarkClient);
-            //Hackish, client expected to have these field as a static member
-            Field builderClassField = m_clientClass.getField("m_projectBuilderClass");
+            // Allow the project builder class to be overridded from the command line
+            if (config.projectBuilderName == null)
+            {
+                Field builderClassField = m_clientClass.getField("m_projectBuilderClass");
+                m_builderClass = (Class<? extends VoltProjectBuilder>)builderClassField.get(null);
+            }
+            else
+            {
+                m_builderClass =
+                    (Class<? extends VoltProjectBuilder>)Class.forName(config.projectBuilderName);
+            }
+            //Hackish, client expected to have this field as a static member
             Field loaderClassField = m_clientClass.getField("m_loaderClass");
-            m_builderClass = (Class<? extends VoltProjectBuilder>)builderClassField.get(null);
             m_loaderClass = (Class<? extends ClientMain>)loaderClassField.get(null);
         } catch (Exception e) {
             LogKeys logkey = LogKeys.benchmark_BenchmarkController_ErrorDuringReflectionForClient;
@@ -378,6 +388,7 @@ public class BenchmarkController {
             String readyMsg = "Server completed initialization.";
             ProcessData.OutputLine line = m_serverPSM.nextBlocking();
             while(line.message.equals(readyMsg) == false) {
+                //System.err.printf("(%s): \"%s\"\n", line.processName, line.message);
                 line = m_serverPSM.nextBlocking();
             }
         }
@@ -511,6 +522,7 @@ public class BenchmarkController {
         clArgs.add("CHECKTABLES=" + m_config.checkTables);
         clArgs.add("STATSDATABASEURL=" + m_config.statsDatabaseURL);
         clArgs.add("STATSPOLLINTERVAL=" + m_config.interval);
+        clArgs.add("PROJECTBUILDERNAME=" + m_builderClass.getName());
 
         for (InetSocketAddress host : m_config.hosts)
             clArgs.add("HOST=" + host.getHostName() + ":" + host.getPort());
@@ -620,6 +632,12 @@ public class BenchmarkController {
                 // get ready for the next interval
                 nextIntervalTime = m_config.interval * (m_pollIndex.get() + 1) + startTime;
             }
+
+            ProcessData.OutputLine serv_line = m_serverPSM.nextNonBlocking();
+            //if (serv_line != null)
+            //{
+            //    System.err.printf("(%s): \"%s\"\n", serv_line.processName, serv_line.message);
+            //}
 
             // wait some time
             // TODO this should probably be done with Thread.sleep(...), but for now
@@ -798,6 +816,7 @@ public class BenchmarkController {
         String remotePath = "voltbin/";
         String remoteUser = null; // null implies current local username
         String clientClassname = m_tpccClientClassName;
+        String projectBuilderName = null;
         boolean listenForDebugger = false;
         int serverHeapSize = 2048;
         int clientHeapSize = 1024;
@@ -943,6 +962,8 @@ public class BenchmarkController {
                 applicationName = parts[1];
             } else if (parts[0].equals("SUBAPPLICATIONNAME")) {
                 subApplicationName = parts[1];
+            } else if (parts[0].equals("PROJECTBUILDERNAME")) {
+                projectBuilderName = parts[1];
             } else {
                 clientParams.put(parts[0].toLowerCase(), parts[1]);
             }
@@ -1028,7 +1049,8 @@ public class BenchmarkController {
             clientlist[i] = clients.get(i);
 
         // create a config object, mostly for the results uploader at this point
-        BenchmarkConfig config = new BenchmarkConfig(clientClassname, backend, hostlist,
+        BenchmarkConfig config = new BenchmarkConfig(clientClassname, projectBuilderName,
+                                                     backend, hostlist,
                 sitesPerHost, k_factor, clientlist, processesPerClient, interval, duration,
                 remotePath, remoteUser, listenForDebugger, serverHeapSize, clientHeapSize,
                 localmode, useProfile, checkTransaction, checkTables, snapshotPath, snapshotPrefix,

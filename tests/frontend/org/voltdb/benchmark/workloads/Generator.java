@@ -23,26 +23,33 @@
 
 package org.voltdb.benchmark.workloads;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Method;
+import java.net.ConnectException;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Scanner;
+
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Unmarshaller;
 
-import org.voltdb.benchmark.*;
-
-import java.io.*;
-import java.util.*;
-import java.lang.reflect.*;
-
-import java.net.ConnectException;
-
+import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
+import org.voltdb.benchmark.ClientMain;
+import org.voltdb.benchmark.workloads.paramgen.GeneratorFactory;
+import org.voltdb.benchmark.workloads.paramgen.ParamGenerator;
+import org.voltdb.benchmark.workloads.xml.LoaderType;
+import org.voltdb.benchmark.workloads.xml.Microbenchmark;
+import org.voltdb.benchmark.workloads.xml.ParamType;
+import org.voltdb.benchmark.workloads.xml.ProcedureType;
+import org.voltdb.benchmark.workloads.xml.WorkloadType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.VoltProcedure.VoltAbortException;
-
-import org.voltdb.benchmark.workloads.xml.*;
 
 //CLASSPATH=/home/mstarobinets/voltbin/mysql.jar  ant benchmarkcluster -Dclient=org.voltdb.benchmark.workloads.Generator -Dworkload=MixedLoad -Dhostcount=4 -Dclientcount=2 -Dhost1=volt3i -Dhost2=volt3j -Dhost3=volt3k -Dhost4=volt3l -Dclienthost1=volt1 -Dclienthost2=volt4a
 //COMMAND: xjc -p benchmarkGenerator.xml /home/voltdb/mstarobinets/Desktop/Useful/MB/microbenchmark1.xsd -d /home/voltdb/mstarobinets/Desktop/Useful/MB
@@ -53,8 +60,7 @@ public class Generator extends ClientMain
         private final String name;
         private String[] procs;
         private double[] percs;
-        private String[][] paramTypes;
-        private GeneratorType[][] generatorTypes;
+        private ParamGenerator[][] paramGenerators;
         private Object[][] params;
 
         public Workload(String name)
@@ -63,16 +69,25 @@ public class Generator extends ClientMain
         }
     }
 
-    public static class GenericCallback implements ProcedureCallback
+    public class GenericCallback implements ProcedureCallback
     {
+        int m_procIndex;
+
+        public GenericCallback(int procIndex)
+        {
+            m_procIndex = procIndex;
+        }
+
         public void clientCallback(ClientResponse clientResponse)
         {
             //do error checking
+            m_counts[m_procIndex].getAndIncrement();
         }
     }
 
     //Retrieved via reflection by BenchmarkController
-    public static final Class<? extends VoltProjectBuilder> m_projectBuilderClass = ProjectBuilderX.class;
+    public static Class<? extends WorkloadProjectBuilder> m_projectBuilderClass = ProjectBuilderX.class;
+    public static WorkloadProjectBuilder m_projectBuilder = null;
 
     //Retrieved via reflection by BenchmarkController
     //public static final Class<? extends ClientMain> m_loaderClass = anyLoader.class;
@@ -86,32 +101,58 @@ public class Generator extends ClientMain
     private static String xmlFilePath;
     private boolean built;
 
-    private final GenericCallback callback = new GenericCallback();
-
     public Generator(String[] args)
     {
         super(args);
     }
 
+    @SuppressWarnings("unchecked")
     public static void main(String[] args)
     {
         //xmlFilePath = "../workspace/voltdb/tests/frontend/org/voltdb/benchmark/workloads/microbench.xml";
         xmlFilePath = null;
+        workloadToBuild = null;
         for (int i = 0; i < args.length; i++)
+        {
             if (args[i].startsWith("configfile="))
             {
                 //check that path is valid using getXMLFile() method?
                 xmlFilePath = args[i].split("=")[1];
-                break;
             }
-
-        workloadToBuild = null;
-        for (int i = 0; i < args.length; i++)
-            if (args[i].startsWith("workload="))
+            else if (args[i].startsWith("workload="))
             {
                 workloadToBuild = args[i].split("=")[1];
-                break;
             }
+            else if (args[i].startsWith("PROJECTBUILDERNAME="))
+            {
+                String pbName = args[i].split("=")[1];
+                try
+                {
+                    m_projectBuilderClass =
+                        (Class<? extends WorkloadProjectBuilder>)Class.forName(pbName);
+                }
+                catch (ClassNotFoundException e)
+                {
+                    System.err.println("Unable to find VoltProjectBuilder class: " + pbName);
+                    System.exit(-1);
+                }
+            }
+        }
+
+        try
+        {
+            m_projectBuilder = m_projectBuilderClass.newInstance();
+        }
+        catch (InstantiationException e)
+        {
+            e.printStackTrace();
+            System.exit(-1);
+        }
+        catch (IllegalAccessException e)
+        {
+            e.printStackTrace();
+            System.exit(-1);
+        }
 
         ClientMain.main(Generator.class, args, false);
     }
@@ -263,10 +304,20 @@ public class Generator extends ClientMain
     private void callProc(String procName, Object[] params, int procIndex)
     {
         //check procName validity with catch statement
+
+        GenericCallback callback = new GenericCallback(procIndex);
+
         try
         {
-            m_voltClient.callProcedure(callback, procName, params);
-            m_counts[procIndex].getAndIncrement();
+            while (!m_voltClient.callProcedure(callback, procName, params))
+            {
+                try {
+                    m_voltClient.backpressureBarrier();
+                } catch (InterruptedException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+            }
         }
         catch (IOException e)
         {
@@ -410,8 +461,7 @@ public class Generator extends ClientMain
             List<ProcedureType> procList = toBuild.getProcedure();
             myWL.procs = new String[procList.size()];
             myWL.percs = new double[procList.size()];
-            myWL.paramTypes = new String[procList.size()][];
-            myWL.generatorTypes = new GeneratorType[procList.size()][];
+            myWL.paramGenerators = new ParamGenerator[procList.size()][];
             myWL.params = new Object[procList.size()][];
 
             ListIterator<ProcedureType> procLI = procList.listIterator();
@@ -421,20 +471,58 @@ public class Generator extends ClientMain
                 ProcedureType proc = procLI.next();
                 myWL.procs[procIndex] = proc.getProcName();
                 myWL.percs[procIndex] = proc.getPercOfWL().doubleValue();
-                List<ParamType> paramList = proc.getParam();
-                myWL.paramTypes[procIndex] = new String[paramList.size()];
-                myWL.generatorTypes[procIndex] = new GeneratorType[paramList.size()];
-                myWL.params[procIndex] = new Object[paramList.size()];
 
-                ListIterator<ParamType> paramLI = paramList.listIterator();
-                int paramIndex = 0;
-                while (paramLI.hasNext())
+                Class<?> proc_class = null;
+                for (Class<?> clazz : m_projectBuilder.getProcedures())
                 {
-                    ParamType param = paramLI.next();
-                    myWL.paramTypes[procIndex][paramIndex] = param.getType();
-                    myWL.generatorTypes[procIndex][paramIndex] = param.getValue().getGenerator();
+                    if (clazz.getSimpleName().equals(proc.getProcName()))
+                    {
+                        proc_class = clazz;
+                        break;
+                    }
+                }
+                if (proc_class == null)
+                {
+                    System.err.println("Stored Procedure not found: " + proc.getProcName());
+                    System.exit(-1);
+                }
 
-                    paramIndex++;
+                Method run_meth = null;
+                for (Method meth : proc_class.getDeclaredMethods())
+                {
+                    if (meth.getName().equals("run"))
+                    {
+                        run_meth = meth;
+                        break;
+                    }
+                }
+                if (run_meth == null)
+                {
+                    System.err.println("No run method in 'Stored Procedure': " + proc.getProcName());
+                    System.exit(-1);
+                }
+
+                ParamType[] paramList = new ParamType[run_meth.getParameterTypes().length];
+                for (ParamType customParam : proc.getParam())
+                {
+                    if (customParam.getOffset() != null)
+                    {
+                        paramList[customParam.getOffset()] = customParam;
+                    }
+                    else
+                    {
+                        System.err.println("Customizing param specified with no offset: " + customParam);
+                        throw new RuntimeException("Customizing param specified with no offset: " + customParam);
+                    }
+                }
+                myWL.paramGenerators[procIndex] = new ParamGenerator[paramList.length];
+                myWL.params[procIndex] = new Object[paramList.length];
+
+                for (int i = 0; i < run_meth.getParameterTypes().length; i++)
+                {
+                    myWL.paramGenerators[procIndex][i] =
+                        GeneratorFactory.getParamGenerator(run_meth.getParameterTypes()[i],
+                                                           paramList[i]);
                 }
                 procIndex++;
             }
@@ -489,80 +577,10 @@ public class Generator extends ClientMain
     //HOW TO HANDLE ERRORS IN XML FILE WHERE TYPE DOESN'T MATCH
     private void setParams(Workload myWL, int procIndex, int paramIndex)
     {
-        String type = myWL.paramTypes[procIndex][paramIndex];
-        GeneratorType generator = myWL.generatorTypes[procIndex][paramIndex];
+        ParamGenerator generator = myWL.paramGenerators[procIndex][paramIndex];
         Object randVal = null;
 
-        //ADD CHAR() AND VARCHAR() HANDLING
-        if (type.startsWith("VARCHAR("))
-        {
-            int index = type.indexOf(')');
-            String temp = type.substring(8, index);
-            int length = Integer.valueOf(temp);
-            switch (generator)
-            {
-                case RANDOM: randVal = RandomValues.getString(length); break;
-                //case USER: Handle TYPE errors
-            }
-        }
-        else if (type.equals("FLOAT"))
-        {
-            switch (generator)
-            {
-                case RANDOM: randVal = RandomValues.getDouble(); break;
-                //case USER: //
-            }
-        }
-        else if (type.equals("DECIMAL"))
-        {
-            switch (generator)
-            {
-                case RANDOM: randVal = RandomValues.getBigDecimal(); break;
-                //case USER: //
-            }
-        }
-        else if (type.equals("BIGINT"))
-        {
-            switch (generator)
-            {
-                case RANDOM: randVal = RandomValues.getLong(); break;
-                //case USER: //
-            }
-        }
-        else if (type.equals("INTEGER"))
-        {
-            switch (generator)
-            {
-                case RANDOM: randVal = RandomValues.getInt(); break;
-                //case USER: //
-            }
-        }
-        else if (type.equals("SMALLINT"))
-        {
-            switch (generator)
-            {
-                case RANDOM: randVal = RandomValues.getShort(); break;
-                //case USER: //
-            }
-        }
-        else if (type.equals("TINYINT"))
-        {
-            switch (generator)
-            {
-                case RANDOM: randVal = RandomValues.getByte(); break;
-                //case USER: //
-            }
-        }
-        else if (type.equals("TIMESTAMP"))
-        {
-            switch (generator)
-            {
-                case RANDOM: randVal = RandomValues.getTimestamp(); break;
-                //case USER: //
-            }
-        }
-        else //ADD EXCEPTION HANDLING
-            ;
+        randVal = generator.getNextGeneratedValue();
 
         myWL.params[procIndex][paramIndex] = randVal;
     }

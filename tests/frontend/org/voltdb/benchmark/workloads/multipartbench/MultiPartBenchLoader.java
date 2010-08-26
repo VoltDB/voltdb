@@ -21,22 +21,18 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.benchmark.workloads;
+package org.voltdb.benchmark.workloads.multipartbench;
 
 import java.io.IOException;
-
 import java.net.ConnectException;
 import java.net.UnknownHostException;
 
 import org.voltdb.benchmark.workloads.paramgen.RandomValues;
+import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.client.Client;
 
-import java.math.BigDecimal;
-import org.voltdb.types.TimestampType;
-
-public class RandomLoader// implements Loader
+public class MultiPartBenchLoader
 {
     private static class GenericCallback implements ProcedureCallback
     {
@@ -54,35 +50,16 @@ public class RandomLoader// implements Loader
         int numInserts = 100000;
         try
         {
-            int randInt;
-            byte randByte;
-            short randShort;
-            long randLong;
-            double randDouble;
-            BigDecimal randBigDecimal;
-            TimestampType randTimestamp;
             String randString;
             for (int i = 0; i < numInserts; i++)
             {
-                randInt = RandomValues.getInt();
-                randByte = RandomValues.getByte();
-                randShort = RandomValues.getShort();
-                randLong = RandomValues.getLong();
-                randDouble = RandomValues.getDouble();
-                randBigDecimal = RandomValues.getBigDecimal();
-                randTimestamp = RandomValues.getTimestamp();
-                randString = RandomValues.getString(5);
+                randString = RandomValues.getString(10);
 
-                client.callProcedure(   new GenericCallback(),
-                                        "Insert",
-                                        randInt,
-                                        randByte,
-                                        randShort,
-                                        randLong,
-                                        randDouble,
-                                        randBigDecimal,
-                                        randTimestamp,
-                                        randString);
+                client.callProcedure(new GenericCallback(),
+                                     "InsertAccount",
+                                     i,
+                                     randString,
+                                     1000000L);
             }
         }
         catch (UnknownHostException e)

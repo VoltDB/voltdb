@@ -1447,6 +1447,7 @@ BENCHMARKS
         <jvmarg value="-Djava.library.path=${build.dir}/nativelibs" />
         <assertions><disable/></assertions>
         <arg value="CLIENT=${client}" />
+        <arg value="PROJECTBUILDERNAME=${projectbuilder}" />
         <arg value="BACKEND=${backend}" />
         <arg value="HOSTCOUNT=${hostcount}" />
         <arg value="SITESPERHOST=${sitesperhost}"/>

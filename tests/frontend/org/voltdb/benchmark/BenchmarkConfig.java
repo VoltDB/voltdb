@@ -30,6 +30,7 @@ import java.util.Map;
 public class BenchmarkConfig {
 
     public final String benchmarkClient;
+    public final String projectBuilderName;
     public final String backend;
     public final InetSocketAddress[] hosts;
     public final int sitesPerHost;
@@ -61,6 +62,7 @@ public class BenchmarkConfig {
 
     public BenchmarkConfig(
             String benchmarkClient,
+            String projectBuilderName,
             String backend,
             InetSocketAddress[] hosts,
             int sitesPerHost,
@@ -90,6 +92,7 @@ public class BenchmarkConfig {
         ) {
 
         this.benchmarkClient = benchmarkClient;
+        this.projectBuilderName = projectBuilderName;
         this.backend = backend;
         this.hosts = new InetSocketAddress[hosts.length];
         for (int i = 0; i < hosts.length; i++)

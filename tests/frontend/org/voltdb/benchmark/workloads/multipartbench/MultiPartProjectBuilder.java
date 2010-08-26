@@ -21,45 +21,32 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.benchmark.workloads;
+package org.voltdb.benchmark.workloads.multipartbench;
 
 import java.net.URL;
 
-import org.voltdb.benchmark.workloads.procedures.Delete;
-import org.voltdb.benchmark.workloads.procedures.Insert;
-import org.voltdb.benchmark.workloads.procedures.Select;
-import org.voltdb.benchmark.workloads.procedures.SelectAll;
-import org.voltdb.benchmark.workloads.procedures.SelectByte;
-import org.voltdb.benchmark.workloads.procedures.SelectDecimal;
-import org.voltdb.benchmark.workloads.procedures.SelectDouble;
-import org.voltdb.benchmark.workloads.procedures.SelectInt;
-import org.voltdb.benchmark.workloads.procedures.SelectLong;
-import org.voltdb.benchmark.workloads.procedures.SelectString;
-import org.voltdb.benchmark.workloads.procedures.SelectTimestamp;
+import org.voltdb.benchmark.workloads.WorkloadProjectBuilder;
+import org.voltdb.benchmark.workloads.multipartbench.procedures.CreditDebitAccounts;
+import org.voltdb.benchmark.workloads.multipartbench.procedures.InsertAccount;
+import org.voltdb.benchmark.workloads.multipartbench.procedures.TotalBalances;
+import org.voltdb.benchmark.workloads.multipartbench.procedures.UpdateBalance;
 
-public class ProjectBuilderX extends WorkloadProjectBuilder
+public class MultiPartProjectBuilder extends WorkloadProjectBuilder
 {
     public static final Class<?> m_procedures[] = new Class<?>[]
     {
-        Delete.class,
-        Insert.class,
-        Select.class,
-        SelectAll.class,
-        SelectString.class,
-        SelectLong.class,
-        SelectDecimal.class,
-        SelectTimestamp.class,
-        SelectDouble.class,
-        SelectInt.class,
-        SelectByte.class
+        CreditDebitAccounts.class,
+        InsertAccount.class,
+        TotalBalances.class,
+        UpdateBalance.class
     };
 
-    public static final URL m_ddlURL = ProjectBuilderX.class.getResource("MicroBenchmark-ddl.sql");
+    public static final URL m_ddlURL = MultiPartProjectBuilder.class.getResource("MultiPartBench-ddl.sql");
     private static final String m_jarFileName = "catalog.jar";
 
     public static String m_partitioning[][] = new String[][]
     {
-        {"ALL_TYPES", "SHORT_ITEM"}
+        {"FAKE_ACCOUNTS", "ID"}
     };
 
     @Override
@@ -69,7 +56,7 @@ public class ProjectBuilderX extends WorkloadProjectBuilder
         addAllDefaults();
         boolean compile = compile(m_jarFileName, sitesPerHost, length, kFactor, leader);
         if (!compile) {
-            throw new RuntimeException("Bingo project builder failed app compilation.");
+            throw new RuntimeException("Multipart benchmark project builder failed app compilation.");
         }
         return new String[] {m_jarFileName};
     }

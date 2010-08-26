@@ -21,15 +21,61 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.benchmark.workloads;
+package org.voltdb.benchmark.workloads.paramgen;
 
 import java.math.BigDecimal;
+
+import org.voltdb.benchmark.workloads.xml.ParamType;
 import org.voltdb.types.TimestampType;
 import java.util.Random;
 
 public class RandomValues
 {
     private static double coinToss = .5;
+
+    public static Object getRandomValue(Class<?> desiredType)
+    {
+        if (desiredType == String.class)
+        {
+            // XXX-IZZY NEED TO REINTRODUCE LENGTH HERE
+            int length = 100;
+            return getString(length);
+        }
+        else if (desiredType == double.class)
+        {
+            return getDouble();
+        }
+        else if (desiredType == BigDecimal.class)
+        {
+            return getBigDecimal();
+        }
+        else if (desiredType == long.class)
+        {
+            return getLong();
+        }
+        else if (desiredType == int.class)
+        {
+            return getInt();
+        }
+        else if (desiredType == short.class)
+        {
+            return getShort();
+        }
+        else if (desiredType == byte.class)
+        {
+            return getByte();
+        }
+        else if (desiredType == TimestampType.class)
+        {
+            return getTimestamp();
+        }
+        else
+        {
+            System.err.println("UNKNOWN PARAMETER TYPE: " + desiredType.toString());
+            throw new RuntimeException("UNKNOWN PARAMETER TYPE: " + desiredType.toString());
+        }
+
+    }
 
     //improve randomization of length
     public static String getString(int maxLength)
