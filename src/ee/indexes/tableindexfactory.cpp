@@ -78,9 +78,10 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
     VOLT_TRACE("Creating index for %s.\n%s", scheme.get<0>().c_str(), keySchema->debug().c_str());
     const int keySize = keySchema->tupleLength();
 
-    // if too big for our specialized int indexes, kick over to the general ones
-    if (keySize > sizeof(int64_t) * 4)
+    // no int specialization beyond this point
+    if (keySize > sizeof(int64_t) * 4) {
         ints_only = false;
+    }
 
     // a bit of a hack, this should be improved later
     if ((ints_only) && (unique) && (type == ARRAY_INDEX)) {
@@ -143,6 +144,12 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
     }
 
     if (/*(type == BALANCED_TREE_INDEX) &&*/ (unique)) {
+        if (type == HASH_TABLE_INDEX) {
+            VOLT_INFO("Producing a tree index for %s: "
+                      "hash index not currently supported for this index key.\n",
+                      scheme.name.c_str());
+        }
+
         if (keySize <= 4) {
             return new BinaryTreeUniqueIndex<GenericKey<4>, GenericComparator<4>, GenericEqualityChecker<4> >(schemeCopy);
         } else if (keySize <= 8) {
@@ -166,11 +173,17 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
         } else if (keySize <= 256) {
             return new BinaryTreeUniqueIndex<GenericKey<256>, GenericComparator<256>, GenericEqualityChecker<256> >(schemeCopy);
         } else {
-            throwFatalException( "We currently only support generic column indexes with keys 256 bytes or less..." );
+            return new BinaryTreeUniqueIndex<TupleKey, TupleKeyComparator, TupleKeyEqualityChecker>(schemeCopy);
         }
     }
 
     if (/*(type == BALANCED_TREE_INDEX) &&*/ (!unique)) {
+        if (type == HASH_TABLE_INDEX) {
+            VOLT_INFO("Producing a tree index for %s: "
+                      "hash index not currently supported for this index key.\n",
+                      scheme.name.c_str());
+        }
+
         if (keySize <= 4) {
             return new BinaryTreeMultiMapIndex<GenericKey<4>, GenericComparator<4>, GenericEqualityChecker<4> >(schemeCopy);
         } else if (keySize <= 8) {
@@ -194,7 +207,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
         } else if (keySize <= 256) {
             return new BinaryTreeMultiMapIndex<GenericKey<256>, GenericComparator<256>, GenericEqualityChecker<256> >(schemeCopy);
         } else {
-            throwFatalException( "We currently only support generic column indexes with keys 256 bytes or less..." );
+            return new BinaryTreeMultiMapIndex<TupleKey, TupleKeyComparator, TupleKeyEqualityChecker>(schemeCopy);
         }
     }
 
