@@ -132,16 +132,19 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
             if ((catalog_colref->column()->type() != VALUE_TYPE_TINYINT) &&
                 (catalog_colref->column()->type() != VALUE_TYPE_SMALLINT) &&
                 (catalog_colref->column()->type() != VALUE_TYPE_INTEGER) &&
-                (catalog_colref->column()->type() != VALUE_TYPE_BIGINT))
+                (catalog_colref->column()->type() != VALUE_TYPE_BIGINT)) {
                 isIntsOnly = false;
+            }
             index_columns[catalog_colref->index()] = catalog_colref->column()->index();
             column_types[catalog_colref->index()] = (ValueType) catalog_colref->column()->type();
         }
 
         TableIndexScheme index_scheme(catalog_index->name(),
                                       (TableIndexType)catalog_index->type(),
-                                      index_columns, column_types,
-                                      catalog_index->unique(), isIntsOnly,
+                                      index_columns,
+                                      column_types,
+                                      catalog_index->unique(),
+                                      isIntsOnly,
                                       schema);
         index_map[catalog_index->name()] = index_scheme;
     }
