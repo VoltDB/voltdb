@@ -462,12 +462,12 @@ struct GenericHasher : std::unary_function<GenericKey<keySize>, std::size_t>
  * the appropriate columns' values.
  *
  * Note that the index code will create keys in the schema of the
- * the index key. While all TupleKeys resident in the index iteself
+ * the index key. While all TupleKeys resident in the index itself
  * will point to persistent tuples, there are ephemeral TupleKey
  * instances that point to tuples in the index key schema.
  *
  * Pros: supports any combination of columns in a key. Each index
- * key is 16 bytes (a pointer to a tuple and a pointer to the column
+ * key is 24 bytes (a pointer to a tuple and a pointer to the column
  * indices (which map index columns to table columns).
  *
  * Cons: requires an indirection to evaluate a key (must follow the
@@ -532,21 +532,27 @@ class TupleKeyComparator {
         TableTuple rhTuple = rhs.getTupleForComparison();
         NValue lhValue, rhValue;
 
-//         std::cout << std::endl << "TupleKeyComparator: " <<
-//         std::endl << lhTuple.debugNoHeader() <<
-//         std::endl << rhTuple.debugNoHeader() <<
-//         std::endl;
+        //std::cout << std::endl << "TupleKeyComparator: " <<
+        //    std::endl << lhTuple.debugNoHeader() <<
+        //    std::endl << rhTuple.debugNoHeader() <<
+        //    std::endl;
 
         for (int ii=0; ii < m_schema->columnCount(); ++ii) {
             lhValue = lhTuple.getNValue(lhs.columnForIndexColumn(ii));
             rhValue = rhTuple.getNValue(rhs.columnForIndexColumn(ii));
 
-            if (lhValue.compare(rhValue) == VALUE_COMPARE_LESSTHAN) {
+            int comparison = lhValue.compare(rhValue);
+
+            if (comparison == VALUE_COMPARE_LESSTHAN) {
                 // std::cout << " LHS " << lhValue.debug() << " < RHS. " << rhValue.debug() << std::endl;
                 return true;
             }
+            else if (comparison == VALUE_COMPARE_GREATERTHAN) {
+                // std::cout << " LHS " << lhValue.debug() << " > RHS. " << rhValue.debug() << std::endl;
+                return false;
+            }
         }
-        // std::cout << " LHS !< RHS. " << std::endl;
+        // std::cout << " LHS == RHS. " << std::endl;
         return false;
     }
 
