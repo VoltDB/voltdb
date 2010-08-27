@@ -53,7 +53,8 @@ const char *kSmallIntTypecode = "sint";
 const char *kTinyIntTypecode = "tint";
 const char *kFloatTypecode = "float";
 const char *kDecimalTypecode = "dec";
-const char *kStringTypecode = "str";
+const char *kStringTypecode4 = "str4";         // VARCHAR(4)
+const char *kStringTypecode128 = "str128";       // VARCHAR(128)
 
 const char *kInsertSuccess = "is";
 const char *kInsertFailure = "if";
@@ -111,10 +112,20 @@ bool commandLS(voltdb::TableTuple &key)
     //cout << "running ls" << endl;
     //cout << " candidate key : " << key.tupleLength() << " - " << key.debug("") << endl;
     bool result = currentIndex->moveToKey(&key);
-    if (!result) return false;
+    if (!result) {
+        cout << "ls FAIL(moveToKey()) key length: " << key.tupleLength() << endl << key.debug("") << endl;
+        return false;
+    }
     voltdb::TableTuple value = currentIndex->nextValueAtKey();
-    if (value.isNullTuple()) return false;
-    if (!value.equals(key)) return false;
+    if (value.isNullTuple()) {
+        cout << "ls FAIL(isNullTuple()) key length: " << key.tupleLength() << endl << key.debug("") << endl;
+        return false;
+    }
+    if (!value.equals(key)) {
+        cout << "ls FAIL(!equals()) key length: " << key.tupleLength() << key.debug("")
+            << endl << " value length: " << value.tupleLength() << endl << value.debug("") << endl;
+        return false;
+    }
     return true;
 }
 
@@ -122,6 +133,10 @@ bool commandLF(voltdb::TableTuple &key)
 {
     //cout << "running lf" << endl;
     //cout << " candidate key : " << key.tupleLength() << " - " << key.debug("") << endl;
+
+    // this isn't really right: commandLS checks equality but really
+    // the index api shouldn't require an equality check on a missing
+    // key.
     return !commandLS(key);
 }
 
@@ -232,7 +247,7 @@ void setNewCurrent(const char *testName,
         currentIndexes.push_back(index);
     }
 
-    cout << "Ready to simulate run with " << currentIndexes.size() << " indexes" << endl;
+    cout << "Ready to simulate run with " << currentIndexes.size() << " indexes" << " for test " << testName << endl;
 }
 
 void runTest()
@@ -423,9 +438,14 @@ int main(int argc, char **argv)
                     columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DECIMAL));
                     columnAllowNull.push_back(false);
                 }
-                else if (strcmp(typecode, kStringTypecode) == 0) {
+                else if (strcmp(typecode, kStringTypecode4) == 0) {
                     columnTypes.push_back(VALUE_TYPE_VARCHAR);
-                    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_VARCHAR));
+                    columnLengths.push_back(4);
+                    columnAllowNull.push_back(false);
+                }
+                else if (strcmp(typecode, kStringTypecode128) == 0) {
+                    columnTypes.push_back(VALUE_TYPE_VARCHAR);
+                    columnLengths.push_back(128);
                     columnAllowNull.push_back(false);
                 }
                 else {
@@ -454,6 +474,11 @@ int main(int argc, char **argv)
         // parse the exec command and run the loaded test
         else if (strcmp(command, kExecCommand) == 0) {
             runTest();
+            // run until an error occurs. if this is undesired, maybe
+            // introduce an exec-continue command that runs past errors?
+            if (globalFailures > 0) {
+                done = true;
+            }
         }
 
         // parse the done command and quit the test

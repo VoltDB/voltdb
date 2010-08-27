@@ -55,7 +55,7 @@ ls 5,6,7
 ds 5,6,7
 df 8,9,10
 exec
-begin GenericTest MultiGenericTree,MultiGenericHash,UniqueGenericTree,UniqueGenericHash str,bint,bint
+begin GenericTest MultiGenericTree,MultiGenericHash,UniqueGenericTree,UniqueGenericHash str4,bint,bint
 is foo,6,7
 ls foo,6,7
 #us foo,6,7 bar,9,10
