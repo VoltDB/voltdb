@@ -169,7 +169,11 @@ void cleanUp()
     pool.clear();
 }
 
-void setNewCurrent(const char *testName, vector<const char*> indexNames, vector<voltdb::ValueType> columnTypes, vector<int32_t> columnLengths, vector<bool> columnAllowNull)
+void setNewCurrent(const char *testName,
+                   vector<const char*> indexNames,
+                   vector<voltdb::ValueType> columnTypes,
+                   vector<int32_t> columnLengths,
+                   vector<bool> columnAllowNull)
 {
     cleanUp();
 
