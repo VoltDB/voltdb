@@ -69,30 +69,40 @@ public class LocalCluster implements VoltServerConfig {
     // state
     boolean m_compiled = false;
     boolean m_running = false;
-    ArrayList<Process> m_cluster = null;
+    ArrayList<Process> m_cluster = new ArrayList<Process>();
     ArrayList<PipeToFile> m_pipes = null;
     ServerThread m_localServer = null;
 
     // components
     ProcessBuilder m_procBuilder;
+    private int m_debug1Offset;
+    private int m_debug2Offset;
+
+    private final boolean m_debug;
+    private int m_debugPortOffset = 8000;
+
 
     /* class pipes a process's output to a file name.
      * Also watches for "Server completed initialization"
      * in output - the signal of readiness!
      */
-    public static class PipeToFile implements Runnable {
+    public static class PipeToFile extends Thread {
         FileWriter m_writer ;
         InputStream m_input;
         String m_filename;
 
         // set m_witnessReady when the m_token byte sequence is seen.
         AtomicBoolean m_witnessedReady;
-        final int m_token[] = new int[] {'S', 'e', 'r', 'v', 'e', 'r', ' ',
+        final int m_token[];
+        final static int m_initToken[] = new int[] {'S', 'e', 'r', 'v', 'e', 'r', ' ',
                                         'c', 'o', 'm', 'p', 'l', 'e', 't', 'e', 'd', ' ',
                                         'i','n','i','t'};
+        final static int m_rejoinToken[] = new int[] {'R', 'e', 'c', 'o', 'v', 'e', 'r', 'y', ' ',
+                'c', 'o', 'm', 'p', 'l', 'e', 't', 'e'};
 
-        PipeToFile(String filename, InputStream stream) {
+        PipeToFile(String filename, InputStream stream, int token[]) {
             m_witnessedReady = new AtomicBoolean(false);
+            m_token = token;
             m_filename = filename;
             m_input = stream;
             try {
@@ -130,6 +140,7 @@ public class LocalCluster implements VoltServerConfig {
                         else {
                             location = 0;
                         }
+
                         m_writer.write(data);
                         m_writer.flush();
                     }
@@ -138,19 +149,27 @@ public class LocalCluster implements VoltServerConfig {
                     eof = true;
                 }
             }
+            try {
+                m_writer.close();
+            } catch (IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
         }
+
     }
 
     public LocalCluster(String jarFileName, int siteCount,
             int hostCount, int replication, BackendTarget target) {
         this(jarFileName, siteCount,
             hostCount, replication, target,
-            FailureState.ALL_RUNNING);
+            FailureState.ALL_RUNNING, false);
     }
 
     public LocalCluster(String jarFileName, int siteCount,
                         int hostCount, int replication, BackendTarget target,
-                        FailureState failureState)
+                        FailureState failureState,
+                        boolean debug)
     {
         System.out.println("Instantiating LocalCluster for " + jarFileName);
         System.out.println("Sites: " + siteCount + " hosts: " + hostCount
@@ -165,6 +184,8 @@ public class LocalCluster implements VoltServerConfig {
         m_target = target;
         m_hostCount = hostCount;
         m_replication = replication;
+        m_cluster.ensureCapacity(m_hostCount);
+        m_debug = debug;
         String buildDir = System.getenv("VOLTDB_BUILD_DIR");  // via build.xml
         if (buildDir == null)
             m_buildDir = System.getProperty("user.dir") + "/obj/release";
@@ -182,7 +203,6 @@ public class LocalCluster implements VoltServerConfig {
         classPath += ":" + m_buildDir + File.separator + "prod";
 
         // processes of VoltDBs using the compiled jar file.
-        m_cluster = new ArrayList<Process>();
         m_pipes = new ArrayList<PipeToFile>();
         m_procBuilder = new ProcessBuilder("java",
                                            "-Djava.library.path=" + m_buildDir + "/nativelibs",
@@ -203,6 +223,12 @@ public class LocalCluster implements VoltServerConfig {
                                            "-1");
 
         // when we actually append a port value and deployment file, these will be correct
+        m_debug1Offset = m_procBuilder.command().size() - 12;
+        m_debug2Offset = m_procBuilder.command().size() - 11;
+        if (m_debug) {
+            m_procBuilder.command().add(m_debug1Offset, "");
+            m_procBuilder.command().add(m_debug1Offset, "");
+        }
         m_portOffset = m_procBuilder.command().size() - 3;
         m_pathToDeploymentOffset = m_procBuilder.command().size() - 5;
         m_rejoinOffset = m_procBuilder.command().size() - 1;
@@ -262,8 +288,12 @@ public class LocalCluster implements VoltServerConfig {
 
         int oopStartIndex = 0;
 
+        m_pipes.clear();
+        m_cluster.clear();
         // create the in-process server
         if (m_hasLocalServer) {
+            m_cluster.add(null);
+            m_pipes.add(null);
             Configuration config = new Configuration();
             config.m_backend = m_target;
             config.m_noLoadLibVOLTDB = (m_target == BackendTarget.HSQLDB_BACKEND);
@@ -274,45 +304,12 @@ public class LocalCluster implements VoltServerConfig {
 
             m_localServer = new ServerThread(config);
             m_localServer.start();
-
             oopStartIndex++;
         }
 
         // create all the out-of-process servers
         for (int i = oopStartIndex; i < m_hostCount; i++) {
-            try {
-                m_procBuilder.command().set(m_portOffset, String.valueOf(VoltDB.DEFAULT_PORT + i));
-                m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
-                m_procBuilder.command().set(m_rejoinOffset, "");
-
-                Process proc = m_procBuilder.start();
-                m_cluster.add(proc);
-                // write output to obj/release/testoutput/<test name>-n.txt
-                // this may need to be more unique? Also very useful to just
-                // set this to a hardcoded path and use "tail -f" to debug.
-                String testoutputdir = m_buildDir + File.separator + "testoutput";
-                // make sure the directory exists
-                File dir = new File(testoutputdir);
-                if (dir.exists()) {
-                    assert(dir.isDirectory());
-                }
-                else {
-                    boolean status = dir.mkdirs();
-                    assert(status);
-                }
-
-                PipeToFile ptf = new PipeToFile(testoutputdir + File.separator +
-                        getName() + "-" + i + ".txt", proc.getInputStream());
-                m_pipes.add(ptf);
-                Thread t = new Thread(ptf);
-                t.setName("ClusterPipe:" + String.valueOf(i));
-                t.start();
-            }
-            catch (IOException ex) {
-                System.out.println("Failed to start cluster process:" + ex.getMessage());
-                Logger.getLogger(LocalCluster.class.getName()).log(Level.SEVERE, null, ex);
-                assert (false);
-            }
+            startOne(i);
         }
 
         // spin until all the pipes see the magic "Server completed.." string.
@@ -321,6 +318,9 @@ public class LocalCluster implements VoltServerConfig {
             if (logtime) System.out.println("********** pre witness: " + (System.currentTimeMillis() - startTime) + " ms");
             allReady = true;
             for (PipeToFile pipeToFile : m_pipes) {
+                if (pipeToFile == null) {
+                    continue;
+                }
                 if (pipeToFile.m_witnessedReady.get() != true) {
                     try {
                         // wait for explicit notification
@@ -347,7 +347,12 @@ public class LocalCluster implements VoltServerConfig {
         // if supposed to kill a server, it's go time
         if (m_failureState != FailureState.ALL_RUNNING) {
             System.out.println("Killing one cluster member.");
-            Process proc = m_cluster.get(0);
+            int procIndex = 0;
+            if (m_hasLocalServer) {
+                procIndex = 1;
+            }
+
+            Process proc = m_cluster.get(procIndex);
             proc.destroy();
             int retval = 0;
             try {
@@ -355,7 +360,7 @@ public class LocalCluster implements VoltServerConfig {
             } catch (InterruptedException e) {
                 System.out.println("External VoltDB process is acting crazy.");
             } finally {
-                m_cluster.set(0, null);
+                m_cluster.set(procIndex, null);
             }
             // exit code 143 is the forcible shutdown code from .destroy()
             if (retval != 0 && retval != 143) {
@@ -365,65 +370,131 @@ public class LocalCluster implements VoltServerConfig {
 
         // after killing a server, bring it back in recovery mode
         if (m_failureState == FailureState.ONE_RECOVERING) {
-            System.out.println("Adding a cluster member in the recovery state.");
             int hostId = m_hasLocalServer ? 1 : 0;
+            recoverOne(logtime, startTime, hostId);
+        }
+    }
 
-            // port for the new node
-            int portNo = VoltDB.DEFAULT_PORT + hostId;
+    private void startOne(int hostId) {
+        try {
+            m_procBuilder.command().set(m_portOffset, String.valueOf(VoltDB.DEFAULT_PORT + hostId));
+            m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
+            m_procBuilder.command().set(m_rejoinOffset, "");
+            if (m_debug) {
+                m_procBuilder.command().set(m_debug1Offset, "-Xdebug");
+                m_procBuilder.command().set(
+                        m_debug2Offset,
+                        "-agentlib:jdwp=transport=dt_socket,address="
+                        + m_debugPortOffset++ + ",server=y,suspend=n");
+            }
 
-            // port to connect to (not too simple, eh?)
-            int portNoToRejoin = VoltDB.DEFAULT_PORT + hostId + 1;
-            if (m_hasLocalServer) portNoToRejoin = VoltDB.DEFAULT_PORT;
+            Process proc = m_procBuilder.start();
+            m_cluster.add(proc);
+            // write output to obj/release/testoutput/<test name>-n.txt
+            // this may need to be more unique? Also very useful to just
+            // set this to a hardcoded path and use "tail -f" to debug.
+            String testoutputdir = m_buildDir + File.separator + "testoutput";
+            // make sure the directory exists
+            File dir = new File(testoutputdir);
+            if (dir.exists()) {
+                assert(dir.isDirectory());
+            }
+            else {
+                boolean status = dir.mkdirs();
+                assert(status);
+            }
 
-            PipeToFile ptf = null;
+            PipeToFile ptf = new PipeToFile(testoutputdir + File.separator +
+                    getName() + "-" + hostId + ".txt", proc.getInputStream(),
+                    PipeToFile.m_initToken);
+            m_pipes.add(ptf);
+            ptf.setName("ClusterPipe:" + String.valueOf(hostId));
+            ptf.start();
+        }
+        catch (IOException ex) {
+            System.out.println("Failed to start cluster process:" + ex.getMessage());
+            Logger.getLogger(LocalCluster.class.getName()).log(Level.SEVERE, null, ex);
+            assert (false);
+        }
+    }
 
+    public void recoverOne(int hostId, Integer portOffset, String rejoinHost) {
+        recoverOne(false, 0, hostId, portOffset, rejoinHost);
+    }
+
+    private void recoverOne(boolean logtime, long startTime, int hostId) {
+        recoverOne( logtime, startTime, hostId, null, "localhost");
+    }
+
+    private void recoverOne(boolean logtime, long startTime, int hostId, Integer portOffset, String rejoinHost) {
+        System.out.println("Rejoining " + hostId);
+
+        // port for the new node
+        int portNo = VoltDB.DEFAULT_PORT + hostId;
+
+        // port to connect to (not too simple, eh?)
+        int portNoToRejoin = VoltDB.DEFAULT_PORT + hostId + 1;
+        if (m_hasLocalServer) portNoToRejoin = VoltDB.DEFAULT_PORT;
+
+        if (portOffset != null) {
+            portNoToRejoin = VoltDB.DEFAULT_PORT + portOffset;
+        }
+
+        PipeToFile ptf = null;
+
+        try {
+            m_procBuilder.command().set(m_portOffset, String.valueOf(portNo));
+            m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
+            m_procBuilder.command().set(m_rejoinOffset, rejoinHost + ":" + String.valueOf(portNoToRejoin));
+            if (m_debug) {
+                m_procBuilder.command().set(m_debug1Offset, "-Xdebug");
+                m_procBuilder.command().set(
+                        m_debug2Offset,
+                        "-agentlib:jdwp=transport=dt_socket,address="
+                        + m_debugPortOffset++ + ",server=y,suspend=n");
+            }
+
+            Process proc = m_procBuilder.start();
+            // replace the existing dead proc
+            m_cluster.set(hostId, proc);
+            // write output to obj/release/testoutput/<test name>-n.txt
+            // this may need to be more unique? Also very useful to just
+            // set this to a hardcoded path and use "tail -f" to debug.
+            String testoutputdir = m_buildDir + File.separator + "testoutput";
+            // make sure the directory exists
+            File dir = new File(testoutputdir);
+            if (dir.exists()) {
+                assert(dir.isDirectory());
+            }
+            else {
+                boolean status = dir.mkdirs();
+                assert(status);
+            }
+
+            ptf = new PipeToFile(testoutputdir + File.separator +
+                    getName() + "-" + hostId + ".txt", proc.getInputStream(), PipeToFile.m_rejoinToken);
+            m_pipes.set(hostId, ptf);
+            Thread t = new Thread(ptf);
+            t.setName("ClusterPipe:" + String.valueOf(hostId));
+            t.start();
+        }
+        catch (IOException ex) {
+            System.out.println("Failed to start cluster process:" + ex.getMessage());
+            Logger.getLogger(LocalCluster.class.getName()).log(Level.SEVERE, null, ex);
+            assert (false);
+        }
+
+        // wait for the joining site to be ready
+        while (ptf.m_witnessedReady.get() != true) {
+            if (logtime) System.out.println("********** pre witness: " + (System.currentTimeMillis() - startTime) + " ms");
             try {
-                m_procBuilder.command().set(m_portOffset, String.valueOf(portNo));
-                m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
-                m_procBuilder.command().set(m_rejoinOffset, "localhost:" + String.valueOf(portNoToRejoin));
-
-                Process proc = m_procBuilder.start();
-                // replace the existing dead proc
-                m_cluster.set(0, proc);
-                // write output to obj/release/testoutput/<test name>-n.txt
-                // this may need to be more unique? Also very useful to just
-                // set this to a hardcoded path and use "tail -f" to debug.
-                String testoutputdir = m_buildDir + File.separator + "testoutput";
-                // make sure the directory exists
-                File dir = new File(testoutputdir);
-                if (dir.exists()) {
-                    assert(dir.isDirectory());
+                // wait for explicit notification
+                synchronized (ptf) {
+                    ptf.wait();
                 }
-                else {
-                    boolean status = dir.mkdirs();
-                    assert(status);
-                }
-
-                ptf = new PipeToFile(testoutputdir + File.separator +
-                        getName() + "-" + hostId + ".txt", proc.getInputStream());
-                m_pipes.set(0, ptf);
-                Thread t = new Thread(ptf);
-                t.setName("ClusterPipe:" + String.valueOf(hostId));
-                t.start();
             }
-            catch (IOException ex) {
-                System.out.println("Failed to start cluster process:" + ex.getMessage());
+            catch (InterruptedException ex) {
                 Logger.getLogger(LocalCluster.class.getName()).log(Level.SEVERE, null, ex);
-                assert (false);
-            }
-
-            // wait for the joining site to be ready
-            while (ptf.m_witnessedReady.get() != true) {
-                if (logtime) System.out.println("********** pre witness: " + (System.currentTimeMillis() - startTime) + " ms");
-                try {
-                    // wait for explicit notification
-                    synchronized (ptf) {
-                        ptf.wait();
-                    }
-                }
-                catch (InterruptedException ex) {
-                    Logger.getLogger(LocalCluster.class.getName()).log(Level.SEVERE, null, ex);
-                }
             }
         }
     }
@@ -449,7 +520,12 @@ public class LocalCluster implements VoltServerConfig {
         Process proc = m_cluster.get(hostNum);
         if (proc != null)
             proc.destroy();
-        m_cluster.remove(hostNum);
+        m_cluster.set( hostNum, null);
+        PipeToFile ptf = m_pipes.get(hostNum);
+        if (ptf != null) {
+            m_pipes.set(hostNum, null);
+            new File(ptf.m_filename).delete();
+        }
     }
 
     public void shutDownExternal() throws InterruptedException

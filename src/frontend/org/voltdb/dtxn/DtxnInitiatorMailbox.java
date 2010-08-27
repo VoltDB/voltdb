@@ -75,6 +75,10 @@ public class DtxnInitiatorMailbox implements Mailbox
                 }
             }
         }
+
+        @Override
+        public void faultCleared(Set<VoltFault> faults) {
+        }
     }
 
     /** Map of transaction ids to transaction information */

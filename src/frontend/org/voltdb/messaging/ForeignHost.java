@@ -77,6 +77,12 @@ public class ForeignHost {
                 VoltDB.instance().getFaultDistributor().reportFaultHandled(this, fault);
             }
         }
+
+        @Override
+        public void faultCleared(Set<VoltFault> faults) {
+            // TODO Auto-generated method stub
+
+        }
     }
 
     /** ForeignHost's implementation of InputHandler */

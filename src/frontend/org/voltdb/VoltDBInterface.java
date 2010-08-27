@@ -18,6 +18,7 @@ package org.voltdb;
 
 import java.util.ArrayList;
 import java.util.Hashtable;
+import java.util.HashSet;
 
 import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.messaging.HostMessenger;
@@ -74,9 +75,15 @@ public interface VoltDBInterface
      * @param rejoinHostId The host id of the node joining the cluster.
      * @param rejoiningHostname The IP hostname of the joining node.
      * @param portToConnect The port to connect to the joining node on.
+     * @param liveHosts Set of live hosts in the cluster
      * @return Null on success and an error string on failure.
      */
-    public String doRejoinPrepare(long currentTxnId, int rejoinHostId, String rejoiningHostname, int portToConnect);
+    public String doRejoinPrepare(
+            long currentTxnId,
+            int rejoinHostId,
+            String rejoiningHostname,
+            int portToConnect,
+            HashSet<Integer> liveHosts);
 
     /**
      * Either integrate the created forign host for the rejoining node into

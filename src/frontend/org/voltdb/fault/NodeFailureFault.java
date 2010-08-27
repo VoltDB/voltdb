@@ -58,7 +58,7 @@ public class NodeFailureFault extends VoltFault
     public boolean equals(Object other) {
         if (other instanceof NodeFailureFault) {
             NodeFailureFault ofault = (NodeFailureFault)other;
-            if (ofault.getHostId() == m_hostId && ofault.getHostname().equals(m_hostname)) {
+            if (ofault.getHostId() == m_hostId) {
                 return true;
             }
         }
@@ -67,7 +67,7 @@ public class NodeFailureFault extends VoltFault
 
     @Override
     public int hashCode() {
-        return m_hostId + m_hostname.hashCode();
+        return m_hostId;
     }
 
     private int m_hostId;

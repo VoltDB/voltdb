@@ -317,7 +317,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         // CONFIG #5: Local Cluster (of processes) with recovering node
         /////////////////////////////////////////////////////////////
 
-        config = new LocalCluster("sqlfeatures-cluster-rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_RECOVERING);
+        config = new LocalCluster("sqlfeatures-cluster-rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_RECOVERING, false);
         success = config.compile(project);
         assert(success);
         builder.addServerConfig(config);

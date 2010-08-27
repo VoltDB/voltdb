@@ -37,14 +37,19 @@ import java.net.InetSocketAddress;
 import java.net.URLEncoder;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.Random;
+import java.util.ArrayList;
 
 import junit.framework.TestCase;
 
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.SyncCallback;
+import org.voltdb.client.NullCallback;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
@@ -55,6 +60,20 @@ import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.InMemoryJarfile;
 
 public class TestRejoinEndToEnd extends TestCase {
+    private static final String m_username;
+    private static final String m_password;
+    private static final ClientConfig m_cconfig = new ClientConfig("ry@nlikesthe", "y@nkees");
+
+    static {
+        String username = null;
+        String password = null;
+        try {
+        username = URLEncoder.encode( "ry@nlikesthe", "UTF-8");
+        password = URLEncoder.encode( "y@nkees", "UTF-8");
+        } catch (Exception e) {}
+        m_username = username;
+        m_password = password;
+    }
 
     VoltProjectBuilder getBuilderForTest() throws UnsupportedEncodingException {
         String simpleSchema =
@@ -63,7 +82,11 @@ public class TestRejoinEndToEnd extends TestCase {
             "PRIMARY KEY(ival));\n" +
             "create table blah_replicated (" +
             "ival bigint default 0 not null, " +
-            "PRIMARY KEY(ival));";
+            "PRIMARY KEY(ival));" +
+            "create table PARTITIONED (" +
+            "pkey bigint default 0 not null, " +
+            "value bigint default 0 not null, " +
+            "PRIMARY KEY(pkey));";
 
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
         String schemaPath = schemaFile.getPath();
@@ -72,10 +95,11 @@ public class TestRejoinEndToEnd extends TestCase {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addSchema(schemaPath);
         builder.addPartitionInfo("blah", "ival");
+        builder.addPartitionInfo("PARTITIONED", "pkey");
 
         GroupInfo gi = new GroupInfo("foo", true, true);
         builder.addGroups(new GroupInfo[] { gi } );
-        UserInfo ui = new UserInfo("ry@nlikesthe", "y@nkees", new String[] { "foo" } );
+        UserInfo ui = new UserInfo( "ry@nlikesthe", "y@nkees", new String[] { "foo" } );
         builder.addUsers(new UserInfo[] { ui } );
 
         ProcedureInfo[] pi = new ProcedureInfo[] {
@@ -84,7 +108,10 @@ public class TestRejoinEndToEnd extends TestCase {
             new ProcedureInfo(new String[] { "foo" }, "InsertReplicated", "insert into blah_replicated values (?);", null),
             new ProcedureInfo(new String[] { "foo" }, "SelectBlahSinglePartition", "select * from blah where ival = ?;", "blah.ival:0"),
             new ProcedureInfo(new String[] { "foo" }, "SelectBlah", "select * from blah where ival = ?;", null),
-            new ProcedureInfo(new String[] { "foo" }, "SelectBlahReplicated", "select * from blah_replicated where ival = ?;", null)
+            new ProcedureInfo(new String[] { "foo" }, "SelectBlahReplicated", "select * from blah_replicated where ival = ?;", null),
+            new ProcedureInfo(new String[] { "foo" }, "InsertPartitioned", "insert into PARTITIONED values (?, ?);", "PARTITIONED.pkey:0"),
+            new ProcedureInfo(new String[] { "foo" }, "UpdatePartitioned", "update PARTITIONED set value = ? where pkey = ?;", "PARTITIONED.pkey:1"),
+            new ProcedureInfo(new String[] { "foo" }, "SelectPartitioned", "select * from PARTITIONED;", null),
         };
 
         builder.addProcedures(pi);
@@ -298,7 +325,7 @@ public class TestRejoinEndToEnd extends TestCase {
     public void testLocalClusterRecoveringMode() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
 
-        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_FAILURE);
+        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_FAILURE, false);
         boolean success = cluster.compile(builder, false);
         assertTrue(success);
         copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
@@ -309,7 +336,7 @@ public class TestRejoinEndToEnd extends TestCase {
 
         cluster.shutDown();
 
-        cluster = new LocalCluster("rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_RECOVERING);
+        cluster = new LocalCluster("rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_RECOVERING, false);
         success = cluster.compile(builder, false);
         assertTrue(success);
         copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
@@ -335,13 +362,10 @@ public class TestRejoinEndToEnd extends TestCase {
         cluster.shutDownSingleHost(0);
         Thread.sleep(100);
 
-        String username = URLEncoder.encode("ry@nlikesthe", "UTF-8");
-        String password = URLEncoder.encode("y@nkees", "UTF-8");
-
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
-        config.m_rejoinToHostAndPort = username + ":" + password + "@localhost:21213";
+        config.m_rejoinToHostAndPort = m_username + ":" + m_password + "@localhost:21213";
         ServerThread localServer = new ServerThread(config);
 
         localServer.start();
@@ -352,9 +376,9 @@ public class TestRejoinEndToEnd extends TestCase {
         ClientResponse response;
         Client client;
 
-        client = ClientFactory.createClient();
+        client = ClientFactory.createClient(m_cconfig);
 
-        client.createConnection("localhost", "ry@nlikesthe", "y@nkees");
+        client.createConnection("localhost");
 
         response = client.callProcedure("InsertSinglePartition", 0);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
@@ -364,8 +388,8 @@ public class TestRejoinEndToEnd extends TestCase {
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         client.close();
 
-        client = ClientFactory.createClient();
-        client.createConnection("localhost", 21213, "ry@nlikesthe", "y@nkees");
+        client = ClientFactory.createClient(m_cconfig);
+        client.createConnection("localhost", 21213);
         response = client.callProcedure("InsertSinglePartition", 2);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         response = client.callProcedure("Insert", 3);
@@ -391,8 +415,8 @@ public class TestRejoinEndToEnd extends TestCase {
         ClientResponse response;
         Client client;
 
-        client = ClientFactory.createClient();
-        client.createConnection("localhost", "ry@nlikesthe", "y@nkees");
+        client = ClientFactory.createClient(m_cconfig);
+        client.createConnection("localhost");
 
         response = client.callProcedure("InsertSinglePartition", 0);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
@@ -404,13 +428,10 @@ public class TestRejoinEndToEnd extends TestCase {
         cluster.shutDownSingleHost(0);
         Thread.sleep(1000);
 
-        String username = URLEncoder.encode("ry@nlikesthe", "UTF-8");
-        String password = URLEncoder.encode("y@nkees", "UTF-8");
-
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
-        config.m_rejoinToHostAndPort = username + ":" + password + "@localhost:21213";
+        config.m_rejoinToHostAndPort = m_username + ":" + m_password + "@localhost:21213";
         ServerThread localServer = new ServerThread(config);
 
         localServer.start();
@@ -420,8 +441,8 @@ public class TestRejoinEndToEnd extends TestCase {
 
         client.close();
 
-        client = ClientFactory.createClient();
-        client.createConnection("localhost", 21213, "ry@nlikesthe", "y@nkees");
+        client = ClientFactory.createClient(m_cconfig);
+        client.createConnection("localhost", 21213);
 
         /*
          * Check that the recovery data transferred
@@ -471,8 +492,8 @@ public class TestRejoinEndToEnd extends TestCase {
 
         client.close();
 
-        client = ClientFactory.createClient();
-        client.createConnection("localhost", 21212, "ry@nlikesthe", "y@nkees");
+        client = ClientFactory.createClient(m_cconfig);
+        client.createConnection("localhost", 21212);
 
         /*
          * See that the cluster is available and the data is still there.
@@ -492,6 +513,132 @@ public class TestRejoinEndToEnd extends TestCase {
         client.close();
 
         localServer.shutdown();
+        cluster.shutDown();
+    }
+
+    public void testRejoinFuzz() throws Exception {
+        VoltProjectBuilder builder = getBuilderForTest();
+        builder.setSecurityEnabled(true);
+
+        final int numHosts = 10;
+        final int numTuples = 60000;
+        final int kfactor = 4;
+        LocalCluster cluster =
+            new LocalCluster(
+                    "rejoin.jar",
+                    2,
+                    numHosts,
+                    4,
+                    BackendTarget.NATIVE_EE_JNI);
+        boolean success = cluster.compile(builder, false);
+        assertTrue(success);
+        copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+        cluster.setHasLocalServer(false);
+
+        ArrayList<Integer> serverValues = new ArrayList<Integer>();
+        cluster.startUp();
+
+        Client client = ClientFactory.createClient(m_cconfig);
+
+        client.createConnection("localhost");
+
+        Random r = new Random();
+        for (int ii = 0; ii < numTuples; ii++) {
+            int value = r.nextInt(numTuples);
+            serverValues.add(value);
+            client.callProcedure( new ProcedureCallback() {
+
+                @Override
+                public void clientCallback(ClientResponse clientResponse)
+                        throws Exception {
+                    if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                        System.err.println(clientResponse.getStatusString());
+                    }
+                    if (clientResponse.getResults()[0].asScalarLong() != 1) {
+                        System.err.println("Update didn't happen");
+                    }
+                }
+
+            }, "InsertPartitioned", ii, value);
+        }
+        ArrayList<Integer> lastServerValues = new ArrayList<Integer>(serverValues);
+        client.drain();
+        client.close();
+        Random forWhomTheBellTolls = new Random();
+        for (int zz = 0; zz < 10; zz++) {
+            client = ClientFactory.createClient(m_cconfig);
+            client.createConnection("localhost");
+            try {
+                VoltTable results = client.callProcedure( "SelectPartitioned").getResults()[0];
+                while (results.advanceRow()) {
+                    int key = (int)results.getLong(0);
+                    int value = (int)results.getLong(1);
+                    if (serverValues.get(key).intValue() != value) {
+                        System.out.println(
+                                "zz is " + zz + " and server value is " +
+                                value + " and expected was " + serverValues.get(key).intValue() +
+                                " and last time it was " + lastServerValues.get(key).intValue());
+                    }
+                    assertTrue(serverValues.get(key).intValue() == value);
+                }
+                client.close();
+
+                ArrayList<Integer> toKill = new ArrayList<Integer>();
+                while (toKill.size() < kfactor) {
+                    int candidate = forWhomTheBellTolls.nextInt(numHosts);
+                    if (!toKill.contains(candidate)) {
+                        toKill.add(candidate);
+                    }
+                }
+                System.out.println("Killing " + toKill.toString());
+
+                int toConnectTo = forWhomTheBellTolls.nextInt(numHosts);
+                while (toKill.contains(toConnectTo)) {
+                    toConnectTo = forWhomTheBellTolls.nextInt(numHosts);
+                }
+
+                for (Integer uhoh : toKill) {
+                    cluster.shutDownSingleHost(uhoh);
+                }
+
+                int recoverNow = toKill.size() / 2;
+                for (int ii = 0; ii < recoverNow; ii++) {
+                    cluster.recoverOne( toKill.remove(0), toConnectTo, m_username + ":" + m_password + "@localhost");
+                }
+
+                client = ClientFactory.createClient(m_cconfig);
+                client.createConnection("localhost", Client.VOLTDB_SERVER_PORT + toConnectTo);
+                lastServerValues = new ArrayList<Integer>(serverValues);
+                for (int ii = 0; ii < numTuples; ii++) {
+                    int updateKey = r.nextInt(numTuples);
+                    int updateValue = r.nextInt(numTuples);
+                    serverValues.set(updateKey, updateValue);
+                    client.callProcedure( new ProcedureCallback() {
+
+                        @Override
+                        public void clientCallback(ClientResponse clientResponse)
+                                throws Exception {
+                            if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                                System.err.println(clientResponse.getStatusString());
+                            }
+                            if (clientResponse.getResults()[0].asScalarLong() != 1) {
+                                System.err.println("Update didn't happen");
+                            }
+                        }
+
+                    }, "UpdatePartitioned", updateValue, updateKey);
+                }
+
+                for (Integer recover : toKill) {
+                    cluster.recoverOne( recover, toConnectTo, m_username + ":" + m_password + "@localhost");
+                }
+
+                client.drain();
+            } finally {
+                client.close();
+            }
+            System.out.println("Finished iteration " + zz);
+        }
         cluster.shutDown();
     }
 }

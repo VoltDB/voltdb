@@ -31,6 +31,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.HashSet;
+import java.util.ArrayList;
 
 import org.voltdb.VoltDB;
 import org.voltdb.client.ConnectionUtil;
@@ -171,7 +173,14 @@ public class HostMessenger implements Messenger {
             m_initialized = true;
         }
 
-        return new Object[] { m_joiner.m_timestamp, m_joiner.m_addr };
+        ArrayList<Integer> downHosts = new ArrayList<Integer>();
+        for (int ii = 0; ii < (m_foreignHosts.length - 1); ii++) {
+            if (m_foreignHosts[ii] == null && ii != m_localHostId) {
+                downHosts.add(ii);
+            }
+        }
+
+        return new Object[] { m_joiner.m_timestamp, m_joiner.m_addr, downHosts };
     }
 
     public int getHostId() {
@@ -194,7 +203,8 @@ public class HostMessenger implements Messenger {
     }
 
     public String getHostnameForHostID(int hostId) {
-        return m_foreignHosts[hostId].hostname();
+        ForeignHost fh = m_foreignHosts[hostId];
+        return fh == null ? "UNKNOWN" : m_foreignHosts[hostId].hostname();
     }
 
     public void createLocalSite(int siteId) {
@@ -242,7 +252,9 @@ public class HostMessenger implements Messenger {
 
         if (fhost == null)
         {
-            throw new MessagingException("Really shouldn't have gotten here...");
+            throw new MessagingException(
+                    "Attempted to send a message to foreign host with id " +
+                    hostId + " but there is no such host.");
         }
 
         if (!fhost.isUp())
@@ -405,11 +417,32 @@ public class HostMessenger implements Messenger {
      */
     public int findDownHostId() {
         for (int hostId = 0; hostId < m_foreignHosts.length; hostId++) {
+            if (hostId == m_localHostId) {
+                continue;
+            }
             ForeignHost fh = m_foreignHosts[hostId];
-            if ((fh != null) && (fh.isUp() == false))
+            if (fh == null || (fh.isUp() == false))
                 return hostId;
         }
         return -1;
+    }
+
+    /**
+     * Figure out if the given hostid is a down host.
+     * @param hostId The id of the host to check.
+     * @return Whether or not it is known to be down.
+     */
+    public boolean isDownHostId(int hostId) {
+        assert(hostId >= 0);
+        if (m_foreignHosts.length <= hostId) return false;
+        ForeignHost fh = m_foreignHosts[hostId];
+
+        // FH will be null if there has never been a working foreign host with that hostid since this
+        // node joined the cluster
+        if (fh == null)
+            return true;
+
+        return !fh.isUp();
     }
 
     /**
@@ -419,15 +452,15 @@ public class HostMessenger implements Messenger {
      * @param sock A network connection to that host.
      * @throws Exception Throws exceptions on failure.
      */
-    public void rejoinForeignHostPrepare(int hostId, InetSocketAddress addr) throws Exception {
+    public void rejoinForeignHostPrepare(int hostId, InetSocketAddress addr, HashSet<Integer> liveHosts) throws Exception {
         if (hostId < 0)
             throw new Exception("Rejoin HostId can be negative.");
         if (m_foreignHosts.length <= hostId)
             throw new Exception("Rejoin HostId out of expexted range.");
-        if (m_foreignHosts[hostId].isUp())
+        if (m_foreignHosts[hostId] != null && m_foreignHosts[hostId].isUp())
             throw new Exception("Rejoin HostId is not a failed host.");
 
-        SocketChannel sock = SocketJoiner.connect(m_localHostId, hostId, addr);
+        SocketChannel sock = SocketJoiner.connect(m_localHostId, hostId, addr, liveHosts);
 
         m_tempNewFH = new ForeignHost(this, hostId, sock);
         m_tempNewFH.sendReadyMessage();
@@ -460,9 +493,11 @@ public class HostMessenger implements Messenger {
      * This probably isn't strictly necessary, but if more
      * functionality is added, this will be nice to have.
      */
-    public void rejoinForeginHostRollback() {
-        m_tempNewFH.close();
-        m_tempNewFH = null;
+    public void rejoinForeignHostRollback() {
+        if (m_tempNewFH != null) {
+            m_tempNewFH.close();
+            m_tempNewFH = null;
+        }
         m_tempNewHostId = -1;
     }
 
@@ -470,9 +505,7 @@ public class HostMessenger implements Messenger {
     {
         for (ForeignHost host : m_foreignHosts)
         {
-            // the m_foreignHosts array is put together awkwardly.
-            // I'm going to do the null check here to make progress and
-            // revisit later --izzy
+            // null is OK. It means this host never saw this host id up
             if (host != null)
             {
                 host.close();

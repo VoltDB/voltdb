@@ -296,10 +296,11 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
             }
         }
         int partitionId = tracker.getPartitionForSite(siteId);
-        ArrayList<Integer> sourceSites = new ArrayList<Integer>(tracker.getAllSitesForPartition(partitionId));
+        ArrayList<Integer> sourceSites = new ArrayList<Integer>(tracker.getLiveSitesForPartition(partitionId));
         sourceSites.remove(new Integer(siteId));
 
         if (sourceSites.isEmpty()) {
+            recoveryLog.fatal("Could not find a source site for siteId " + siteId + " partition id " + partitionId);
             VoltDB.crashVoltDB();
         }
 

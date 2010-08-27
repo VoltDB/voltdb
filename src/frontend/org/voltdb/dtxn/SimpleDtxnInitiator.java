@@ -370,7 +370,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     }
 
     @Override
-    public synchronized void notifyExecutonSiteRejoin(ArrayList<Integer> executorSiteIds) {
+    public synchronized void notifyExecutionSiteRejoin(ArrayList<Integer> executorSiteIds) {
         for (int executorSiteId : executorSiteIds) {
             m_safetyState.addRejoinedState(executorSiteId);
         }

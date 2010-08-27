@@ -39,6 +39,9 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
     {
         m_faultHandlers =
             new HashMap<FaultType, TreeMap<Integer, List<FaultHandlerData>>>();
+        for (VoltFault.FaultType type : VoltFault.FaultType.values()) {
+            m_knownFaults.put( type, new HashSet<VoltFault>());
+        }
         m_thread = new Thread(this, "Fault Distributor");
         m_thread.setDaemon(true);
         m_thread.start();
@@ -108,10 +111,20 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
      *
      * @param fault The fault which is being reported
      */
+    @Override
     // XXX-FAILURE need more error checking, default handling, and whatnot
     public synchronized void reportFault(VoltFault fault)
     {
         m_pendingFaults.offer(fault);
+        this.notify();
+    }
+
+    /**
+     * Report that the fault condition has been cleared
+     */
+    @Override
+    public synchronized void reportFaultCleared(VoltFault fault) {
+        m_pendingClearedFaults.offer(fault);
         this.notify();
     }
 
@@ -126,15 +139,7 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
      * Check if this fault is a duplicate of a previously reported fault
      */
     private boolean duplicateCheck(VoltFault fault) {
-        HashSet<VoltFault> knownFaults = m_knownFaults.get(fault.getFaultType());
-        if (knownFaults == null) {
-            knownFaults = new HashSet<VoltFault>();
-            m_knownFaults.put(fault.getFaultType(), knownFaults);
-        }
-        if (knownFaults.add(fault)) {
-            return false;
-        }
-        return true;
+        return !m_knownFaults.get(fault.getFaultType()).add(fault);
     }
 
     @Override
@@ -147,8 +152,9 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
     private HashMap<FaultType, TreeMap<Integer, List<FaultHandlerData>>> m_faultHandlers;
     private HashMap<FaultHandler, FaultHandlerData> m_faultHandlersData = new HashMap<FaultHandler, FaultHandlerData> ();
     private HashMap<FaultType, HashSet<VoltFault>> m_knownFaults = new HashMap<FaultType, HashSet<VoltFault>>();
-    private final ArrayDeque<VoltFault> m_pendingFaults = new ArrayDeque<VoltFault>();
-    private final ArrayDeque<HandledFault> m_handledFaults = new ArrayDeque<HandledFault>();
+    private ArrayDeque<VoltFault> m_pendingFaults = new ArrayDeque<VoltFault>();
+    private ArrayDeque<HandledFault> m_handledFaults = new ArrayDeque<HandledFault>();
+    private ArrayDeque<VoltFault> m_pendingClearedFaults = new ArrayDeque<VoltFault>();
     private Thread m_thread;
 
     class FaultHandlerData {
@@ -179,8 +185,11 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
     private void processHandledFaults() {
         ArrayDeque<HandledFault> handledFaults;
         synchronized (this) {
-            handledFaults = new ArrayDeque<HandledFault>(m_handledFaults);
-            m_handledFaults.clear();
+            if (m_handledFaults.isEmpty()) {
+                return;
+            }
+            handledFaults = m_handledFaults;
+            m_handledFaults = new ArrayDeque<HandledFault>();
         }
         while (!handledFaults.isEmpty()) {
             HandledFault hf = handledFaults.poll();
@@ -203,12 +212,13 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
     private void processPendingFaults() {
         ArrayDeque<VoltFault> pendingFaults;
         synchronized (this) {
-            pendingFaults = new ArrayDeque<VoltFault>(m_pendingFaults);
-            m_pendingFaults.clear();
+            if (m_pendingFaults.isEmpty()) {
+                return;
+            }
+            pendingFaults = m_pendingFaults;
+            m_pendingFaults = new ArrayDeque<VoltFault>();
         }
-        if (pendingFaults.isEmpty()) {
-            return;
-        }
+
         HashMap<FaultType, HashSet<VoltFault>> faultsMap  = new HashMap<FaultType, HashSet<VoltFault>>();
         while (!pendingFaults.isEmpty()) {
             VoltFault fault = pendingFaults.poll();
@@ -252,15 +262,60 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
         }
     }
 
+    private void processClearedFaults() {
+        ArrayDeque<VoltFault> pendingClearedFaults;
+        synchronized (this) {
+            if (m_pendingClearedFaults.isEmpty()) {
+                return;
+            }
+            pendingClearedFaults = m_pendingClearedFaults;
+            m_pendingClearedFaults = new ArrayDeque<VoltFault>();
+        }
+
+        HashMap<FaultType, HashSet<VoltFault>> faultsMap  = new HashMap<FaultType, HashSet<VoltFault>>();
+        while (!pendingClearedFaults.isEmpty()) {
+            VoltFault fault = pendingClearedFaults.poll();
+            HashSet<VoltFault> faults = faultsMap.get(fault.getFaultType());
+            if (faults == null) {
+                faults = new HashSet<VoltFault>();
+                faultsMap.put(fault.getFaultType(), faults);
+            }
+            boolean added = faults.add(fault);
+            m_knownFaults.get(fault.getFaultType()).remove(fault);
+            assert(added);
+        }
+
+        for (Map.Entry<FaultType, HashSet<VoltFault>> entry : faultsMap.entrySet()) {
+            TreeMap<Integer, List<FaultHandlerData>> handler_map =
+                m_faultHandlers.get(entry.getKey());
+            if (handler_map == null)
+            {
+                handler_map = m_faultHandlers.get(FaultType.UNKNOWN);
+                if (handler_map == null)
+                {
+                    registerDefaultHandler(new DefaultFaultHandler());
+                    handler_map = m_faultHandlers.get(FaultType.UNKNOWN);
+                }
+            }
+            for (List<FaultHandlerData> handler_list : handler_map.values())
+            {
+                for (FaultHandlerData handlerData : handler_list)
+                {
+                    handlerData.m_handler.faultCleared(entry.getValue());
+                }
+            }
+        }
+    }
+
     @Override
     public void run() {
         try {
             while (true) {
                 processHandledFaults();
                 processPendingFaults();
-                processHandledFaults();
+                processClearedFaults();
                 synchronized (this) {
-                    if (m_pendingFaults.isEmpty() && m_handledFaults.isEmpty()) {
+                    if (m_pendingFaults.isEmpty() && m_handledFaults.isEmpty() && m_pendingClearedFaults.isEmpty()) {
                         try {
                             this.wait();
                         } catch (InterruptedException e) {

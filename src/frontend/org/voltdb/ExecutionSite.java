@@ -106,7 +106,8 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     private VoltLogger m_recoveryLog = new VoltLogger("RECOVERY");
     private static final VoltLogger log = new VoltLogger(ExecutionSite.class.getName());
     private static final VoltLogger hostLog = new VoltLogger("HOST");
-    private static AtomicInteger siteIndexCounter = new AtomicInteger(0);
+    private static final AtomicInteger siteIndexCounter = new AtomicInteger(0);
+    static final AtomicInteger recoveringSiteCount = new AtomicInteger(0);
     private final int siteIndex = siteIndexCounter.getAndIncrement();
     private final ExecutionSiteNodeFailureFaultHandler m_faultHandler =
         new ExecutionSiteNodeFailureFaultHandler();
@@ -294,6 +295,10 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 m_mailbox.deliver(new ExecutionSiteNodeFailureMessage(failedNodes));
             }
         }
+
+        @Override
+        public void faultCleared(Set<VoltFault> faults) {
+        }
     }
 
     private final HashMap<Long, VoltSystemProcedure> m_registeredSysProcPlanFragments =
@@ -374,6 +379,11 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 m_recoveryLog.info(
                         "Destination recovery complete for site " + m_siteId +
                         " partition " + m_context.siteTracker.getPartitionForSite(m_siteId));
+                int remaining = recoveringSiteCount.decrementAndGet();
+                if (remaining == 0) {
+                    m_recoveryLog.info("Recovery complete");
+                    System.out.println("Recovery complete");
+                }
             } else {
                 m_recoveryLog.info("Source recovery complete for site " + m_siteId +
                         " partition " + m_context.siteTracker.getPartitionForSite(m_siteId));
@@ -625,7 +635,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         // for rejoin, it will matter
         int newInitiators = 0;
         for (Site s : m_context.catalog.getClusters().get("cluster").getSites()) {
-            if (s.getIsexec() == false) {
+            if (s.getIsexec() == false && s.getIsup()) {
                 newInitiators += m_transactionQueue.ensureInitiatorIsKnown(Integer.parseInt(s.getTypeName()));
             }
         }
@@ -756,13 +766,17 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                         m_recoveryProcessor.doRecoveryWork(currentTxnState.txnId);
                     }
                     recursableRun(currentTxnState);
-                } else  if (m_recoveryProcessor != null) {
+                } else if (m_recoveryProcessor != null) {
                     /*
                      * If there is no work in the system the minimum safe txnId is used to move
                      * recovery forward. This works because heartbeats will move the minimum safe txnId
                      * up even when there is no work for this partition.
                      */
-                    m_recoveryProcessor.doRecoveryWork(m_transactionQueue.safeToRecover());
+                    assert(m_transactionQueue != null);
+                    Long foo = m_transactionQueue.safeToRecover();
+                    if (foo != null) {
+                        m_recoveryProcessor.doRecoveryWork(foo);
+                    }
                 }
             }
         }
@@ -1150,7 +1164,9 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
 
                 if (m_context.siteTracker.getSiteForId(site).getIsexec() == false) {
                     /*
-                     * Check the queue for the data and get it from the ledger if necessary
+                     * Check the queue for the data and get it from the ledger if necessary.\
+                     * It might not even be in the ledger if the site has been failed
+                     * since recovery of this node began.
                      */
                     Long txnId = m_transactionQueue.getNewestSafeTransactionForInitiator(site);
                     if (txnId == null) {

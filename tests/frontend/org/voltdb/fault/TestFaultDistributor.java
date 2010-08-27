@@ -69,6 +69,12 @@ public class TestFaultDistributor extends TestCase
             }
             m_handledFaults.release();
         }
+
+        @Override
+        public void faultCleared(Set<VoltFault> faults) {
+            // TODO Auto-generated method stub
+
+        }
     }
 
     class OrderTracker

@@ -24,9 +24,9 @@ final String m_username;
 final String m_password;
 final ClientStatusListener m_listener;
 int m_expectedOutgoingMessageSize = 128;
-int m_maxArenaSizes[];
-boolean m_heavyweight;
-StatsUploaderSettings m_statsSettings;
+int m_maxArenaSizes[] = null;
+boolean m_heavyweight = false;
+StatsUploaderSettings m_statsSettings = null;
 
     /**
      * Configuration for a client with no authentication credentials that will

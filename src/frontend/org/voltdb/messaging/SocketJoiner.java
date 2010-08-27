@@ -30,6 +30,7 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Hashtable;
 import java.util.Map.Entry;
+import java.util.HashSet;
 
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
@@ -494,6 +495,7 @@ public class SocketJoiner extends Thread {
         LOG.debug("Starting Coordinator");
 
         try {
+            HashSet<Integer> hostsFound = null;
             while (m_sockets.size() < (m_expectedHosts - 1)) {
                 socket = m_listenerSocket.accept();
                 socket.socket().setTcpNoDelay(true);
@@ -502,8 +504,22 @@ public class SocketJoiner extends Thread {
                 InputStream s = socket.socket().getInputStream();
                 in = new DataInputStream(new BufferedInputStream(s));
                 int hostId = in.readInt();
-
+                int numHosts = in.readInt();
+                HashSet<Integer> hosts = new HashSet<Integer>(numHosts);
+                for (int ii = 0; ii < numHosts; ii++) {
+                    hosts.add(in.readInt());
+                }
+                if (hostsFound == null) {
+                    hostsFound = hosts;
+                    m_expectedHosts = hostsFound.size() + 1;
+                    System.out.println(hostsFound.toString());
+                } else if (!hostsFound.equals(hosts)) {
+                    if (m_hostLog != null)
+                        m_hostLog.error("Inconsistent live host set during rejoin");
+                    VoltDB.crashVoltDB();
+                }
                 m_sockets.put(hostId, socket);
+                System.out.println("Have " + m_sockets.size() + " of " + (m_expectedHosts - 1) + " with hostId " + hostId);
             }
 
             // read the timestamps from all
@@ -543,6 +559,7 @@ public class SocketJoiner extends Thread {
 
             // ensure all hostids are the same
             m_localHostId = readHostIds[0];
+            System.out.println("Selecting host id " + m_localHostId);
             for (i = 1; i < readHostIds.length; i++) {
                 if (readHostIds[i] != m_localHostId) {
                     command = COMMAND_HOSTIDFAIL;
@@ -587,7 +604,11 @@ public class SocketJoiner extends Thread {
      * @return A connected SocketChannel to the re-joining node, or null on failure.
      * @throws Exception
      */
-    static SocketChannel connect(int localHostId, int rejoiningHostId, InetSocketAddress address) throws Exception {
+    static SocketChannel connect(
+            int localHostId,
+            int rejoiningHostId,
+            InetSocketAddress address,
+            HashSet<Integer> liveHosts) throws Exception {
         SocketChannel remoteConnection = null;
         try {
             // open a connection to the re-joining node
@@ -600,6 +621,10 @@ public class SocketJoiner extends Thread {
 
             // write the id of this host
             out.writeInt(localHostId);
+            out.writeInt(liveHosts.size());
+            for (Integer site : liveHosts) {
+                out.writeInt(site);
+            }
             out.flush();
 
             // read in the command to acknowledge connection and to request the time
@@ -628,7 +653,11 @@ public class SocketJoiner extends Thread {
         }
         catch (Exception e) {
             //e.printStackTrace();
-            String msg = String.format("Unable to re-join node. Socket failure with message: " + e.getMessage());
+            String emesg = e.getMessage();
+            if (emesg == null) {
+                emesg = e.getClass().getName();
+            }
+            String msg = String.format("Unable to re-join node. Socket failure with message: " + emesg);
             throw new Exception(msg);
         }
     }

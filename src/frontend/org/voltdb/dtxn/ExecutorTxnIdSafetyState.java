@@ -56,12 +56,16 @@ public class ExecutorTxnIdSafetyState {
         Set<Integer> execSites = tracker.getExecutionSiteIds();
         for (int id : execSites) {
             Site s = tracker.getSiteForId(id);
-            // ignore down sites
-            if (!s.getIsup()) continue;
 
             Partition p = s.getPartition();
             assert(p != null);
             int partitionId = Integer.parseInt(p.getTypeName());
+
+            // note the site to partition mapping, even if down
+            m_stateToPartitionMap.put(id, partitionId);
+
+            // ignore down sites
+            if (!s.getIsup()) continue;
 
             SiteState ss = new SiteState();
             ss.siteId = id;
@@ -91,9 +95,6 @@ public class ExecutorTxnIdSafetyState {
             // link the partition state and site state
             ps.sites.add(ss);
             ss.partition = ps;
-
-            // note the site to partition mapping
-            m_stateToPartitionMap.put(ss.siteId, ps.partitionId);
         }
     }
 

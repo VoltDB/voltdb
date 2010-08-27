@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.HashSet;
 
 import junit.framework.TestCase;
 
@@ -605,7 +606,9 @@ public class TestMessaging extends TestCase {
         // this is just for extra safety
         Thread.sleep(50);
 
-        msg1.rejoinForeignHostPrepare(msg2hostId, new InetSocketAddress(internalPort));
+        HashSet<Integer> liveHosts = new HashSet<Integer>();
+        liveHosts.add(msg1.getHostId());
+        msg1.rejoinForeignHostPrepare(msg2hostId, new InetSocketAddress(internalPort), liveHosts);
         msg1.rejoinForeignHostCommit();
 
         // this timeout is rather lousy, but neither is it exception safe!

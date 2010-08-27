@@ -20,6 +20,7 @@ package org.voltdb.sysprocs;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.HashSet;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
@@ -65,7 +66,12 @@ public class Rejoin extends VoltSystemProcedure {
      * @param portToConnect
      * @return
      */
-    VoltTable phaseOnePrepare(int hostId, int rejoinHostId, String rejoiningHostname, int portToConnect) {
+    VoltTable phaseOnePrepare(
+            int hostId,
+            int rejoinHostId,
+            String rejoiningHostname,
+            int portToConnect,
+            HashSet<Integer> liveHosts) {
         // verify valid hostId
 
         // connect
@@ -74,7 +80,23 @@ public class Rejoin extends VoltSystemProcedure {
                 new ColumnInfo("Error", VoltType.STRING) // string on failure, null on success
         );
 
-        String error = VoltDB.instance().doRejoinPrepare(getTransactionId(), rejoinHostId, rejoiningHostname, portToConnect);
+        String error = null;
+
+        // verify valid hostId
+        VoltDBInterface instance = VoltDB.instance();
+        HostMessenger hm = instance.getHostMessenger();
+        if (hm.isDownHostId(rejoinHostId)) {
+            // connect
+            error = VoltDB.instance().doRejoinPrepare(
+                    getTransactionId(),
+                    rejoinHostId,
+                    rejoiningHostname,
+                    portToConnect,
+                    liveHosts);
+        }
+        else {
+            error = "Unable to find a down node to replace or to agree on which nodes are down. Try again.";
+        }
 
         retval.addRow(hostId, error);
 
@@ -168,8 +190,13 @@ public class Rejoin extends VoltSystemProcedure {
             int rejoinHostId = (Integer) oparams[0];
             String rejoiningHostName = (String) oparams[1];
             int portToConnect = (Integer) oparams[2];
-
-            depResult = phaseOnePrepare(hostId, rejoinHostId, rejoiningHostName, portToConnect);
+            depResult =
+                phaseOnePrepare(
+                        hostId,
+                        rejoinHostId,
+                        rejoiningHostName,
+                        portToConnect,
+                        context.getExecutionSite().m_context.siteTracker.getAllLiveHosts());
             return new DependencyPair(DEP_rejoinAllNodeWork, depResult);
         }
         else if (fragmentId == SysProcFragmentId.PF_rejoinCommit) {
@@ -192,16 +219,16 @@ public class Rejoin extends VoltSystemProcedure {
         }
     }
 
-    public long run(SystemProcedureExecutionContext ctx, String rejoiningHostname, int portToConnect) {
+    public VoltTable[] run(SystemProcedureExecutionContext ctx, String rejoiningHostname, int portToConnect) {
 
         // pick a hostid to replace
-        VoltDBInterface instance = VoltDB.instance();
-        HostMessenger hm = instance.getHostMessenger();
-        int hostId = hm.findDownHostId();
+        HashSet<Integer> downHosts =VoltDB.instance().getCatalogContext().siteTracker.getAllDownHosts();
         // if there are no down hosts from the point of view of this node
-        if (hostId == -1) {
+        if (downHosts.isEmpty()) {
             throw new VoltAbortException("Unable to find down node to replace.");
         }
+        int hostId = downHosts.iterator().next();
+
 
         // start the chain of joining plan fragments
 
@@ -261,12 +288,20 @@ public class Rejoin extends VoltSystemProcedure {
 
         results = executeSysProcPlanFragments(pfs, DEP_rejoinAggregate);
 
+        StringBuilder sb = new StringBuilder();
         assert(results.length == 1);
         if (errorTable.getRowCount() > 0) {
-            // this is a bad situation
+            while (errorTable.advanceRow()) {
+                String s = errorTable.getString(1);
+                if (s != null) {
+                    sb.append(s);
+                    sb.append('\n');
+                }
+            }
+            throw new VoltAbortException(sb.toString());
         }
 
-        return 0;
+        return new VoltTable[0];
     }
 
 }

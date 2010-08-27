@@ -34,4 +34,8 @@ public class DefaultFaultHandler implements FaultHandler
         VoltDB.crashVoltDB();
     }
 
+    @Override
+    public void faultCleared(Set<VoltFault> faults) {
+    }
+
 }

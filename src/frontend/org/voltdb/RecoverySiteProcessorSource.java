@@ -391,6 +391,7 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
      */
     @Override
     public void doRecoveryWork(long nextTxnId) {
+        System.out.println("Doing recovery work");
         /*
          * Send an initiate response to the recovering partition with txnid it should stop at
          * before receiving the recovery data. Pick a txn id that is >= the next txn that
@@ -410,7 +411,7 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
                 throw new RuntimeException(e);
             }
         }
-
+        System.out.println("Doing recovery work 2");
         /*
          * Need to execute more transactions to approach the txn id
          * that we agreed to stop before. The nextTxnId will be a txnId that is for the
@@ -422,6 +423,7 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
             return;
         }
 
+        System.out.println("Doing recovery work 3");
         while (true) {
             while (m_allowedBuffers > 0 && !m_tablesToStream.isEmpty() && !m_buffers.isEmpty()) {
                 /*
@@ -439,6 +441,7 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
                  */
                 RecoveryMessage rm = new RecoveryMessage(container, m_siteId, m_blockIndex++);
 
+                System.out.println("Doing recovery work 4");
                 /*
                  * Set the position to where the EE should serialize its portion of the recovery message.
                  * RecoveryMessage.getHeaderLength() defines the position where the EE portion starts.
@@ -466,7 +469,7 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
                     buffer.limit(buffer.position() + serialized);
                 }
                 assert(rm != null);
-
+                System.out.println("Doing recovery work 5");
                 /*
                  * If the EE encoded a recovery message with the type complete it indicates that there is no
                  * more data for this table. Remove it from the list of tables waiting to be recovered.
@@ -492,7 +495,7 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
                 //before more data should be sent. The complete message is also acked
                 //and is given a block index.
                 m_ackTracker.waitForAcks( rm.blockIndex(), numDestinations);
-
+                System.out.println("Doing recovery work 6");
                 /*
                  * The common case is recovering a single destination. Take the slightly faster no
                  * copy path.

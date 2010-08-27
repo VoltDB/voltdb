@@ -228,7 +228,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
         }
 
         @Override
-        public void notifyExecutonSiteRejoin(ArrayList<Integer> executorSiteIds) {
+        public void notifyExecutionSiteRejoin(ArrayList<Integer> executorSiteIds) {
             // TODO Auto-generated method stub
 
         }

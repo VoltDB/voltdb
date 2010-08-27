@@ -24,6 +24,7 @@ package org.voltdb;
 
 import java.util.ArrayList;
 import java.util.Hashtable;
+import java.util.HashSet;
 
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.catalog.Catalog;
@@ -362,7 +363,7 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public String doRejoinPrepare(long currentTxnId, int rejoinHostId,
-            String rejoiningHostname, int portToConnect) {
+            String rejoiningHostname, int portToConnect, HashSet<Integer> liveHosts) {
         // TODO Auto-generated method stub
         return null;
     }

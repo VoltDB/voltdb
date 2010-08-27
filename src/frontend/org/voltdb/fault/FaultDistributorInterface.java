@@ -38,8 +38,7 @@ public interface FaultDistributorInterface
 
     /**
      * Report that a fault (represented by the fault arg) has occurred.  All
-     * registered FaultHandlers for that type will get called, currently in
-     * no guaranteed order (this will likely change in the future).  Any reported
+     * registered FaultHandlers for that type will get called. Any reported
      * fault for which there is no registered handler will be handled by
      * any registered handlers for the UNKNOWN fault type.  If there is no
      * registered handler for the UNKNOWN fault type, a DefaultFaultHandler will
@@ -57,6 +56,14 @@ public interface FaultDistributorInterface
      * if reportFaultHandled is invoked outside the handler.
      */
     public abstract void reportFaultHandled(FaultHandler handler, VoltFault fault);
+
+    /**
+     * Report that a fault (represented by the fault arg) has cleared.  All
+     * registered FaultHandlers for that type will get called.
+     *
+     * @param fault The fault which is being reported as cleared
+     */
+    public abstract void reportFaultCleared(VoltFault fault);
 
     /**
      * Tell the fault distributor that the server is being shut down.

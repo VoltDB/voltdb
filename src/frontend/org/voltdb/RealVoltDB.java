@@ -31,12 +31,15 @@ import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.net.UnknownHostException;
 import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Hashtable;
+import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.Semaphore;
 
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
@@ -46,6 +49,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.SyncCallback;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.elt.ELTManager;
 import org.voltdb.fault.FaultDistributor;
@@ -81,33 +85,78 @@ public class RealVoltDB implements VoltDBInterface
                 if (fault instanceof NodeFailureFault)
                 {
                     NodeFailureFault node_fault = (NodeFailureFault) fault;
-                    ArrayList<Integer> dead_sites =
-                        VoltDB.instance().getCatalogContext().
-                        siteTracker.getAllSitesForHost(node_fault.getHostId());
-                    Collections.sort(dead_sites);
-                    hostLog.error("Host failed, hostname: " + node_fault.getHostname());
-                    hostLog.error("  Host ID: " + node_fault.getHostId());
-                    hostLog.error("  Removing sites from cluster: " + dead_sites);
-                    StringBuilder sb = new StringBuilder();
-                    for (int site_id : dead_sites)
-                    {
-                        sb.append("set ");
-                        String site_path = VoltDB.instance().getCatalogContext().catalog.
-                                           getClusters().get("cluster").getSites().
-                                           get(Integer.toString(site_id)).getPath();
-                        sb.append(site_path).append(" ").append("isUp false");
-                        sb.append("\n");
-                    }
-                    VoltDB.instance().clusterUpdate(sb.toString());
-                    if (m_catalogContext.siteTracker.getFailedPartitions().size() != 0)
-                    {
-                        hostLog.fatal("Failure of host " + node_fault.getHostId() +
-                                      " has rendered the cluster unviable.  Shutting down...");
-                        VoltDB.crashVoltDB();
-                    }
+                    handleNodeFailureFault(node_fault);
                 }
                 VoltDB.instance().getFaultDistributor().reportFaultHandled(this, fault);
             }
+        }
+
+        private void handleNodeFailureFault(NodeFailureFault node_fault) {
+            ArrayList<Integer> dead_sites =
+                VoltDB.instance().getCatalogContext().
+                siteTracker.getAllSitesForHost(node_fault.getHostId());
+            Collections.sort(dead_sites);
+            hostLog.error("Host failed, hostname: " + node_fault.getHostname());
+            hostLog.error("  Host ID: " + node_fault.getHostId());
+            hostLog.error("  Removing sites from cluster: " + dead_sites);
+            StringBuilder sb = new StringBuilder();
+            for (int site_id : dead_sites)
+            {
+                sb.append("set ");
+                String site_path = VoltDB.instance().getCatalogContext().catalog.
+                                   getClusters().get("cluster").getSites().
+                                   get(Integer.toString(site_id)).getPath();
+                sb.append(site_path).append(" ").append("isUp false");
+                sb.append("\n");
+            }
+            VoltDB.instance().clusterUpdate(sb.toString());
+            if (m_catalogContext.siteTracker.getFailedPartitions().size() != 0)
+            {
+                hostLog.fatal("Failure of host " + node_fault.getHostId() +
+                              " has rendered the cluster unviable.  Shutting down...");
+                VoltDB.crashVoltDB();
+            }
+        }
+
+        @Override
+        public void faultCleared(Set<VoltFault> faults) {
+            for (VoltFault fault : faults) {
+                if (fault instanceof NodeFailureFault) {
+                    m_waitForFaultClear.release();
+                }
+            }
+        }
+
+        private final Semaphore m_waitForFaultClear = new Semaphore(0);
+    }
+
+    static class RejoinCallback implements ProcedureCallback {
+        ClientResponse response;
+
+        @Override
+        public synchronized void clientCallback(ClientResponse clientResponse)
+                throws Exception {
+            response = clientResponse;
+            if (response.getStatus() != ClientResponse.SUCCESS) {
+                hostLog.fatal(response.getStatusString());
+                VoltDB.crashVoltDB();
+            }
+            VoltTable results[] = clientResponse.getResults();
+            if (results.length > 0) {
+                VoltTable errors = results[0];
+                while (errors.advanceRow()) {
+                    hostLog.fatal("Host " + errors.getLong(0) + " error: " + errors.getString(1));
+                }
+                VoltDB.crashVoltDB();
+            }
+            this.notify();
+        }
+
+        public synchronized ClientResponse waitForResponse() throws InterruptedException {
+            while (response == null) {
+                this.wait();
+            }
+            return response;
         }
     }
 
@@ -191,6 +240,8 @@ public class RealVoltDB implements VoltDBInterface
     private final VoltSampler m_sampler = new VoltSampler(10, "sample" + String.valueOf(new Random().nextInt() % 10000) + ".txt");
     private final AtomicBoolean m_hasStartedSampler = new AtomicBoolean(false);
 
+    private final VoltDBNodeFailureFaultHandler m_faultHandler = new VoltDBNodeFailureFaultHandler();
+
     private volatile boolean m_isRunning = false;
 
     // methods accessed via the singleton
@@ -248,7 +299,7 @@ public class RealVoltDB implements VoltDBInterface
             // Install a handler for NODE_FAILURE faults to update the catalog
             // This should be the first handler to run when a node fails
             m_faultManager.registerFaultHandler(FaultType.NODE_FAILURE,
-                                                new VoltDBNodeFailureFaultHandler(),
+                                                m_faultHandler,
                                                 NodeFailureFault.NODE_FAILURE_CATALOG);
 
             // start the dumper thread
@@ -332,10 +383,13 @@ public class RealVoltDB implements VoltDBInterface
 
                 hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_CreatingVoltDB.name(), new Object[] { m_catalogContext.numberOfNodes, leader }, null);
                 m_messenger = new HostMessenger(m_network, leader, m_catalogContext.numberOfNodes, catalogCRC, hostLog);
-                m_instanceId = m_messenger.waitForGroupJoin();
+                Object retval[] = m_messenger.waitForGroupJoin();
+                m_instanceId = new Object[] { retval[0], retval[1] };
             }
             else {
                 initializeForRejoin(config, catalogCRC);
+                ExecutionSite.recoveringSiteCount.set(
+                        m_catalogContext.siteTracker.getLiveExecutionSitesForHost(m_messenger.getHostId()).size());
             }
 
             // Use the host messenger's hostId.
@@ -486,10 +540,11 @@ public class RealVoltDB implements VoltDBInterface
             hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartingNetwork.name(), null);
             m_network.start();
 
+            // tell other booting nodes that this node is ready. Primary purpose is to publish a hostname
+            m_messenger.sendReadyMessage();
+
             // only needs to be done if this is an initial cluster startup, not a rejoin
             if (config.m_rejoinToHostAndPort == null) {
-                // tell other booting nodes that this node is ready
-                m_messenger.sendReadyMessage();
                 // wait for all nodes to be ready
                 m_messenger.waitForAllHostsToBeReady();
             }
@@ -583,29 +638,42 @@ public class RealVoltDB implements VoltDBInterface
 
         Client client = ClientFactory.createClient();
         ClientResponse response = null;
-        SyncCallback scb = new SyncCallback();
+        RejoinCallback rcb = new RejoinCallback() {
+
+        };
         try {
             client.createConnection(rejoinHost, rejoinPort, rejoinUser, rejoinPass);
-            client.callProcedure(scb, "@Rejoin", "localhost", config.m_internalPort);
+            InetSocketAddress inetsockaddr = new InetSocketAddress(rejoinHost, rejoinPort);
+            SocketChannel socket = SocketChannel.open(inetsockaddr);
+            String hostname = socket.socket().getLocalAddress().getCanonicalHostName();
+            socket.close();
+            client.callProcedure(
+                    rcb,
+                    "@Rejoin",
+                    config.m_internalInterface != null ? config.m_internalInterface : hostname,
+                    config.m_internalPort);
         }
         catch (Exception e) {
             hostLog.error("Problem connecting client: " + e.getMessage());
             System.exit(-1);
         }
 
-        m_instanceId = m_messenger.waitForGroupJoin();
-        try {
-            scb.waitForResponse();
-            response = scb.getResponse();
-            client.close();
-            if (response.getStatus() != ClientResponse.SUCCESS) {
-                hostLog.error("Unable to rejoin to cluster with error: " + response.getStatusString());
-                System.exit(-1);
-            }
+        Object retval[] = m_messenger.waitForGroupJoin();
+        m_instanceId = new Object[] { retval[0], retval[1] };
+
+        ArrayList<Integer> downHosts = (ArrayList<Integer>)retval[2];
+        System.out.println("Down hosts are " + downHosts.toString());
+        for (Integer host : downHosts) {
+            m_faultHandler.handleNodeFailureFault(new NodeFailureFault( host, "UNKNOWN"));
         }
-        catch (Exception e) {
-            hostLog.error("Unable to rejoin to cluster with error: " + e.getMessage());
-            System.exit(-1);
+
+        try {
+            //Callback validates response asynchronously. Just wait for the response before continuing.
+            response = rcb.waitForResponse();
+        }
+        catch (InterruptedException e) {
+            hostLog.error("Interrupted while attempting to rejoin cluster");
+            VoltDB.crashVoltDB();
         }
     }
 
@@ -754,7 +822,12 @@ public class RealVoltDB implements VoltDBInterface
      * execution site threads */
     private static Long lastNodeRejoinPrepare_txnId = 0L;
     @Override
-    public synchronized String doRejoinPrepare(long currentTxnId, int rejoinHostId, String rejoiningHostname, int portToConnect)
+    public synchronized String doRejoinPrepare(
+            long currentTxnId,
+            int rejoinHostId,
+            String rejoiningHostname,
+            int portToConnect,
+            HashSet<Integer> liveHosts)
     {
         // another site already did this work.
         if (currentTxnId == lastNodeRejoinPrepare_txnId) {
@@ -763,7 +836,7 @@ public class RealVoltDB implements VoltDBInterface
         else if (currentTxnId < lastNodeRejoinPrepare_txnId) {
             throw new RuntimeException("Trying to rejoin (prepare) with an old transaction.");
         }
-        System.out.printf("Rejoining node with host id: %s at txnid: %d\n", 0, currentTxnId);
+        System.out.printf("Rejoining node with host id: %d at txnid: %d\n", rejoinHostId, currentTxnId);
         lastNodeRejoinPrepare_txnId = currentTxnId;
 
         HostMessenger messenger = getHostMessenger();
@@ -771,11 +844,11 @@ public class RealVoltDB implements VoltDBInterface
         // connect to the joining node, build a foreign host
         InetSocketAddress addr = new InetSocketAddress(rejoiningHostname, portToConnect);
         try {
-            messenger.rejoinForeignHostPrepare(rejoinHostId, addr);
+            messenger.rejoinForeignHostPrepare(rejoinHostId, addr, liveHosts);
             return null;
         } catch (Exception e) {
             //e.printStackTrace();
-            return e.getMessage();
+            return e.getMessage() == null ? e.getClass().getName() : e.getMessage();
         }
     }
 
@@ -792,12 +865,17 @@ public class RealVoltDB implements VoltDBInterface
         else if (currentTxnId < lastNodeRejoinFinish_txnId) {
             throw new RuntimeException("Trying to rejoin (commit/rollback) with an old transaction.");
         }
-
+        System.out.printf("Rejoining commit node with txnid: %d lastNodeRejoinFinish_txnId: %d\n", currentTxnId, lastNodeRejoinFinish_txnId);
         HostMessenger messenger = getHostMessenger();
         if (commit) {
             // put the foreign host into the set of active ones
             HostMessenger.JoiningNodeInfo joinNodeInfo = messenger.rejoinForeignHostCommit();
-
+            m_faultManager.reportFaultCleared(new NodeFailureFault(joinNodeInfo.hostId, joinNodeInfo.hostName));
+            try {
+                m_faultHandler.m_waitForFaultClear.acquire();
+            } catch (InterruptedException e) {
+                VoltDB.crashVoltDB();//shouldn't happen
+            }
             ArrayList<Integer> rejoiningSiteIds = new ArrayList<Integer>();
             ArrayList<Integer> rejoiningExecSiteIds = new ArrayList<Integer>();
             Cluster cluster = m_catalogContext.catalog.getClusters().get("cluster");
@@ -842,14 +920,14 @@ public class RealVoltDB implements VoltDBInterface
             // update the SafteyState in the initiators
             for (ClientInterface ci : m_clientInterfaces) {
                 TransactionInitiator initiator = ci.getInitiator();
-                initiator.notifyExecutonSiteRejoin(rejoiningExecSiteIds);
+                initiator.notifyExecutionSiteRejoin(rejoiningExecSiteIds);
             }
         }
         else {
             // clean up any connections made
-            messenger.rejoinForeginHostRollback();
+            messenger.rejoinForeignHostRollback();
         }
-
+        System.out.printf("Setting lastNodeRejoinFinish_txnId: %d\n", lastNodeRejoinFinish_txnId);
         lastNodeRejoinFinish_txnId = currentTxnId;
 
         return null;

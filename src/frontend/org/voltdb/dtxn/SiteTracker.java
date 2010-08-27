@@ -67,6 +67,10 @@ public class SiteTracker {
 
     HashSet<Integer> m_liveSiteIds = new HashSet<Integer>();
 
+    HashSet<Integer> m_liveHostIds = new HashSet<Integer>();
+
+    HashSet<Integer> m_downHostIds = new HashSet<Integer>();
+
     // scratch value used to compute the out of date sites
     // note: this makes
     int[] m_tempOldSitesScratch = null;
@@ -100,7 +104,10 @@ public class SiteTracker {
                 if (site.getIsup())
                 {
                     m_liveSiteIds.add(siteId);
+                    m_liveHostIds.add(hostId);
                     m_liveInitiatorCount++;
+                } else {
+                    m_downHostIds.add(hostId);
                 }
             }
             else
@@ -125,6 +132,8 @@ public class SiteTracker {
                     m_liveSiteCount++;
                     m_liveSiteIds.add(siteId);
                     m_partitionsToLiveSites.get(partitionId).add(siteId);
+                } else {
+                    m_downHostIds.add(hostId);
                 }
             }
         }
@@ -140,6 +149,14 @@ public class SiteTracker {
 
     public HashSet<Integer> getAllLiveSites() {
         return m_liveSiteIds;
+    }
+
+    public HashSet<Integer> getAllLiveHosts() {
+        return m_liveHostIds;
+    }
+
+    public HashSet<Integer> getAllDownHosts() {
+        return m_downHostIds;
     }
 
     /**
@@ -316,7 +333,11 @@ public class SiteTracker {
      */
     public ArrayList<Integer> getAllSitesForHost(int hostId)
     {
-        assert m_hostsToSites.containsKey(hostId);
+        if (!m_hostsToSites.containsKey(hostId)) {
+            System.out.println("Couldn't find sites for host " + hostId);
+            assert m_hostsToSites.containsKey(hostId);
+        }
+
         return m_hostsToSites.get(hostId);
     }
 

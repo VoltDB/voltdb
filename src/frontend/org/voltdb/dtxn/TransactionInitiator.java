@@ -92,6 +92,6 @@ public abstract class TransactionInitiator {
      * to rejoined sites.
      * @param executorSiteIds The ids of the sites that joined.
      */
-    public abstract void notifyExecutonSiteRejoin(ArrayList<Integer> executorSiteIds);
+    public abstract void notifyExecutionSiteRejoin(ArrayList<Integer> executorSiteIds);
 
 }
