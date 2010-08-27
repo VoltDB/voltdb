@@ -72,7 +72,7 @@ public class AdHoc extends VoltSystemProcedure {
         if (VoltDB.getEEBackendType() == BackendTarget.HSQLDB_BACKEND) {
             // Call HSQLDB
             assert(sql != null);
-            table = hsql.runDML(sql);
+            table = m_hsql.runDML(sql);
         }
         else
         {

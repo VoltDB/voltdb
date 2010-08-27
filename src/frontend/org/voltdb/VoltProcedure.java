@@ -73,12 +73,12 @@ public abstract class VoltProcedure {
     final static Double DOUBLE_NULL = new Double(-1.7976931348623157E+308);
     public static final String ANON_STMT_NAME = "sql";
 
-    protected HsqlBackend hsql;
+    protected HsqlBackend m_hsql;
 
-    final private ProcedureProfiler profiler = new ProcedureProfiler();
+    final private ProcedureProfiler m_profiler = new ProcedureProfiler();
 
     //For runtime statistics collection
-    private ProcedureStatsCollector statsCollector;
+    private ProcedureStatsCollector m_statsCollector;
 
     // package scoped members used by VoltSystemProcedure
     Cluster m_cluster;
@@ -96,14 +96,14 @@ public abstract class VoltProcedure {
     private boolean m_initialized;
 
     // private members reserved exclusively to VoltProcedure
-    private Method procMethod;
-    private Class<?>[] paramTypes;
-    private boolean paramTypeIsPrimitive[];
-    private boolean paramTypeIsArray[];
-    private Class<?> paramTypeComponentType[];
-    private int paramTypesLength;
-    private Procedure catProc;
-    private boolean isNative = true;
+    private Method m_procMethod;
+    private Class<?>[] m_paramTypes;
+    private boolean m_paramTypeIsPrimitive[];
+    private boolean m_paramTypeIsArray[];
+    private Class<?> m_paramTypeComponentType[];
+    private int m_paramTypesLength;
+    private Procedure m_catProc;
+    private boolean m_isNative = true;
     private int m_numberOfPartitions;
 
     // cached fake SQLStmt array for single statement non-java procs
@@ -115,13 +115,13 @@ public abstract class VoltProcedure {
     private Set<Object> m_workloadQueryHandles;
 
     // data copied from EE proc wrapper
-    private final SQLStmt batchQueryStmts[] = new SQLStmt[MAX_BATCH_SIZE];
-    private int batchQueryStmtIndex = 0;
-    private Object[] batchQueryArgs[];
-    private int batchQueryArgsIndex = 0;
-    private final long fragmentIds[] = new long[MAX_BATCH_SIZE];
-    private final int expectedDeps[] = new int[MAX_BATCH_SIZE];
-    private ParameterSet parameterSets[];
+    private final SQLStmt m_batchQueryStmts[] = new SQLStmt[MAX_BATCH_SIZE];
+    private int m_batchQueryStmtIndex = 0;
+    private Object[] m_batchQueryArgs[];
+    private int m_batchQueryArgsIndex = 0;
+    private final long m_fragmentIds[] = new long[MAX_BATCH_SIZE];
+    private final int m_expectedDeps[] = new int[MAX_BATCH_SIZE];
+    private ParameterSet m_parameterSets[];
 
     /**
      * Status code that can be set by stored procedure upon invocation that will be returned with the response.
@@ -130,7 +130,7 @@ public abstract class VoltProcedure {
     private String m_statusString = null;
 
     // data from hsql wrapper
-    private final ArrayList<VoltTable> queryResults = new ArrayList<VoltTable>();
+    private final ArrayList<VoltTable> m_queryResults = new ArrayList<VoltTable>();
 
     // cached txnid-seeded RNG so all calls to getSeededRandomNumberGenerator() for
     // a given call don't re-seed and generate the same number over and over
@@ -161,21 +161,21 @@ public abstract class VoltProcedure {
             m_initialized = true;
         }
 
-        this.catProc = catProc;
-        this.m_site = site;
-        this.isNative = (eeType != BackendTarget.HSQLDB_BACKEND);
-        this.hsql = hsql;
-        this.m_cluster = cluster;
+        m_catProc = catProc;
+        m_site = site;
+        m_isNative = (eeType != BackendTarget.HSQLDB_BACKEND);
+        m_hsql = hsql;
+        m_cluster = cluster;
         m_numberOfPartitions = numberOfPartitions;
-        statsCollector = new ProcedureStatsCollector();
+        m_statsCollector = new ProcedureStatsCollector();
         VoltDB.instance().getStatsAgent().registerStatsSource(
                 SysProcSelector.PROCEDURE,
                 Integer.parseInt(site.getCorrespondingCatalogSite().getTypeName()),
-                statsCollector);
+                m_statsCollector);
 
         // this is a stupid hack to make the EE happy
-        for (int i = 0; i < expectedDeps.length; i++)
-            expectedDeps[i] = 1;
+        for (int i = 0; i < m_expectedDeps.length; i++)
+            m_expectedDeps[i] = 1;
 
         if (catProc.getHasjava()) {
             int tempParamTypesLength = 0;
@@ -202,14 +202,14 @@ public abstract class VoltProcedure {
                     }
                 }
             }
-            paramTypesLength = tempParamTypesLength;
-            procMethod = tempProcMethod;
-            paramTypes = tempParamTypes;
-            paramTypeIsPrimitive = tempParamTypeIsPrimitive;
-            paramTypeIsArray = tempParamTypeIsArray;
-            paramTypeComponentType = tempParamTypeComponentType;
+            m_paramTypesLength = tempParamTypesLength;
+            m_procMethod = tempProcMethod;
+            m_paramTypes = tempParamTypes;
+            m_paramTypeIsPrimitive = tempParamTypeIsPrimitive;
+            m_paramTypeIsArray = tempParamTypeIsArray;
+            m_paramTypeComponentType = tempParamTypeComponentType;
 
-            if (procMethod == null) {
+            if (m_procMethod == null) {
                 log.debug("No good method found in: " + getClass().getName());
             }
 
@@ -249,24 +249,24 @@ public abstract class VoltProcedure {
             initSQLStmt(stmt);
             m_cachedSingleStmt[0] = stmt;
 
-            procMethod = null;
+            m_procMethod = null;
 
-            paramTypesLength = catProc.getParameters().size();
+            m_paramTypesLength = catProc.getParameters().size();
 
-            paramTypes = new Class<?>[paramTypesLength];
-            paramTypeIsPrimitive = new boolean[paramTypesLength];
-            paramTypeIsArray = new boolean[paramTypesLength];
-            paramTypeComponentType = new Class<?>[paramTypesLength];
+            m_paramTypes = new Class<?>[m_paramTypesLength];
+            m_paramTypeIsPrimitive = new boolean[m_paramTypesLength];
+            m_paramTypeIsArray = new boolean[m_paramTypesLength];
+            m_paramTypeComponentType = new Class<?>[m_paramTypesLength];
             for (ProcParameter param : catProc.getParameters()) {
                 VoltType type = VoltType.get((byte) param.getType());
                 if (type == VoltType.INTEGER) type = VoltType.BIGINT;
                 if (type == VoltType.SMALLINT) type = VoltType.BIGINT;
                 if (type == VoltType.TINYINT) type = VoltType.BIGINT;
-                paramTypes[param.getIndex()] = type.classFromType();
-                paramTypeIsPrimitive[param.getIndex()] = paramTypes[param.getIndex()].isPrimitive();
-                paramTypeIsArray[param.getIndex()] = param.getIsarray();
-                assert(paramTypeIsArray[param.getIndex()] == false);
-                paramTypeComponentType[param.getIndex()] = null;
+                m_paramTypes[param.getIndex()] = type.classFromType();
+                m_paramTypeIsPrimitive[param.getIndex()] = m_paramTypes[param.getIndex()].isPrimitive();
+                m_paramTypeIsArray[param.getIndex()] = param.getIsarray();
+                assert(m_paramTypeIsArray[param.getIndex()] == false);
+                m_paramTypeComponentType[param.getIndex()] = null;
             }
         }
     }
@@ -300,31 +300,31 @@ public abstract class VoltProcedure {
         // kill the cache of the rng
         m_cachedRNG = null;
         if (ProcedureProfiler.profilingLevel != ProcedureProfiler.Level.DISABLED) {
-            profiler.startCounter(catProc);
+            m_profiler.startCounter(m_catProc);
         }
-        statsCollector.beginProcedure();
+        m_statsCollector.beginProcedure();
 
         // in case sql was queued but executed
-        batchQueryStmtIndex = 0;
-        batchQueryArgsIndex = 0;
+        m_batchQueryStmtIndex = 0;
+        m_batchQueryArgsIndex = 0;
 
         VoltTable[] results = new VoltTable[0];
         byte status = ClientResponseImpl.SUCCESS;
 
-        if (paramList.length != paramTypesLength) {
-            statsCollector.endProcedure( false, true);
-            String msg = "PROCEDURE " + catProc.getTypeName() + " EXPECTS " + String.valueOf(paramTypesLength) +
+        if (paramList.length != m_paramTypesLength) {
+            m_statsCollector.endProcedure( false, true);
+            String msg = "PROCEDURE " + m_catProc.getTypeName() + " EXPECTS " + String.valueOf(m_paramTypesLength) +
                 " PARAMS, BUT RECEIVED " + String.valueOf(paramList.length);
             status = ClientResponseImpl.GRACEFUL_FAILURE;
             return getErrorResponse(status, msg, null);
         }
 
-        for (int i = 0; i < paramTypesLength; i++) {
+        for (int i = 0; i < m_paramTypesLength; i++) {
             try {
                 paramList[i] = tryToMakeCompatible( i, paramList[i]);
             } catch (Exception e) {
-                statsCollector.endProcedure( false, true);
-                String msg = "PROCEDURE " + catProc.getTypeName() + " TYPE ERROR FOR PARAMETER " + i +
+                m_statsCollector.endProcedure( false, true);
+                String msg = "PROCEDURE " + m_catProc.getTypeName() + " TYPE ERROR FOR PARAMETER " + i +
                         ": " + e.getMessage();
                 status = ClientResponseImpl.GRACEFUL_FAILURE;
                 return getErrorResponse(status, msg, null);
@@ -337,29 +337,29 @@ public abstract class VoltProcedure {
         if ((ProcedureProfiler.profilingLevel == ProcedureProfiler.Level.INTRUSIVE) &&
                 (ProcedureProfiler.workloadTrace != null)) {
             m_workloadQueryHandles = new HashSet<Object>();
-            m_workloadXactHandle = ProcedureProfiler.workloadTrace.startTransaction(this, catProc, paramList);
+            m_workloadXactHandle = ProcedureProfiler.workloadTrace.startTransaction(this, m_catProc, paramList);
         }
 
         ClientResponseImpl retval = null;
         boolean error = false;
         boolean abort = false;
         // run a regular java class
-        if (catProc.getHasjava()) {
+        if (m_catProc.getHasjava()) {
             try {
                 if (log.isTraceEnabled()) {
-                    log.trace("invoking... procMethod=" + procMethod.getName() + ", class=" + getClass().getName());
+                    log.trace("invoking... procMethod=" + m_procMethod.getName() + ", class=" + getClass().getName());
                 }
                 try {
-                    batchQueryArgs = new Object[MAX_BATCH_SIZE][];
-                    parameterSets = new ParameterSet[MAX_BATCH_SIZE];
-                    Object rawResult = procMethod.invoke(this, paramList);
+                    m_batchQueryArgs = new Object[MAX_BATCH_SIZE][];
+                    m_parameterSets = new ParameterSet[MAX_BATCH_SIZE];
+                    Object rawResult = m_procMethod.invoke(this, paramList);
                     results = getResultsFromRawResults(rawResult);
                 } catch (IllegalAccessException e) {
                     // If reflection fails, invoke the same error handling that other exceptions do
                     throw new InvocationTargetException(e);
                 } finally {
-                    batchQueryArgs = null;
-                    parameterSets = null;
+                    m_batchQueryArgs = null;
+                    m_parameterSets = null;
                 }
                 log.trace("invoked");
             }
@@ -373,7 +373,7 @@ public abstract class VoltProcedure {
                     error = true;
                 }
                 if (ex instanceof Error) {
-                    statsCollector.endProcedure( false, true);
+                    m_statsCollector.endProcedure( false, true);
                     throw (Error)ex;
                 }
 
@@ -383,13 +383,13 @@ public abstract class VoltProcedure {
         // single statement only work
         // (this could be made faster, but with less code re-use)
         else {
-            assert(catProc.getStatements().size() == 1);
+            assert(m_catProc.getStatements().size() == 1);
             try {
-                batchQueryArgs = new Object[MAX_BATCH_SIZE][];
-                parameterSets = new ParameterSet[MAX_BATCH_SIZE];
-                if (!isNative) {
+                m_batchQueryArgs = new Object[MAX_BATCH_SIZE][];
+                m_parameterSets = new ParameterSet[MAX_BATCH_SIZE];
+                if (!m_isNative) {
                     // HSQL handling
-                    VoltTable table = hsql.runSQLWithSubstitutions(m_cachedSingleStmt[0], paramList);
+                    VoltTable table = m_hsql.runSQLWithSubstitutions(m_cachedSingleStmt[0], paramList);
                     results = new VoltTable[] { table };
                 }
                 else {
@@ -399,14 +399,14 @@ public abstract class VoltProcedure {
             catch (SerializableException ex) {
                 retval = getErrorResponse(ex);
             } finally {
-                batchQueryArgs = null;
-                parameterSets = null;
+                m_batchQueryArgs = null;
+                m_parameterSets = null;
             }
         }
 
         if (ProcedureProfiler.profilingLevel != ProcedureProfiler.Level.DISABLED)
-            profiler.stopCounter();
-        statsCollector.endProcedure( abort, error);
+            m_profiler.stopCounter();
+        m_statsCollector.endProcedure( abort, error);
 
         // Workload Trace - Stop the transaction trace record.
         if ((ProcedureProfiler.profilingLevel == ProcedureProfiler.Level.INTRUSIVE) &&
@@ -459,8 +459,8 @@ public abstract class VoltProcedure {
         if (param == null || param == VoltType.NULL_STRING ||
             param == VoltType.NULL_DECIMAL)
         {
-            if (paramTypeIsPrimitive[paramTypeIndex]) {
-                VoltType type = VoltType.typeFromClass(paramTypes[paramTypeIndex]);
+            if (m_paramTypeIsPrimitive[paramTypeIndex]) {
+                VoltType type = VoltType.typeFromClass(m_paramTypes[paramTypeIndex]);
                 switch (type) {
                 case TINYINT:
                 case SMALLINT:
@@ -482,13 +482,13 @@ public abstract class VoltProcedure {
         }
 
         Class<?> pclass = param.getClass();
-        boolean slotIsArray = paramTypeIsArray[paramTypeIndex];
+        boolean slotIsArray = m_paramTypeIsArray[paramTypeIndex];
         if (slotIsArray != pclass.isArray())
             throw new Exception("Array / Scalar parameter mismatch");
 
         if (slotIsArray) {
             Class<?> pSubCls = pclass.getComponentType();
-            Class<?> sSubCls = paramTypeComponentType[paramTypeIndex];
+            Class<?> sSubCls = m_paramTypeComponentType[paramTypeIndex];
             if (pSubCls == sSubCls) {
                 return param;
             }
@@ -514,7 +514,7 @@ public abstract class VoltProcedure {
         /*
          * inline tryScalarMakeCompatible so we can save on reflection
          */
-        final Class<?> slot = paramTypes[paramTypeIndex];
+        final Class<?> slot = m_paramTypes[paramTypeIndex];
         if ((slot == long.class) && (pclass == Long.class || pclass == Integer.class || pclass == Short.class || pclass == Byte.class)) return param;
         if ((slot == int.class) && (pclass == Integer.class || pclass == Short.class || pclass == Byte.class)) return param;
         if ((slot == short.class) && (pclass == Short.class || pclass == Byte.class)) return param;
@@ -692,19 +692,19 @@ public abstract class VoltProcedure {
      * @see <a href="#allowable_params">List of allowable parameter types</a>
      */
     public void voltQueueSQL(final SQLStmt stmt, Object... args) {
-        if (!isNative) {
+        if (!m_isNative) {
             //HSQLProcedureWrapper does nothing smart. it just implements this interface with runStatement()
-            VoltTable table = hsql.runSQLWithSubstitutions(stmt, args);
-            queryResults.add(table);
+            VoltTable table = m_hsql.runSQLWithSubstitutions(stmt, args);
+            m_queryResults.add(table);
             return;
         }
 
-        if (batchQueryStmtIndex == batchQueryStmts.length) {
-            throw new RuntimeException("Procedure attempted to queue more than " + batchQueryStmts.length +
+        if (m_batchQueryStmtIndex == m_batchQueryStmts.length) {
+            throw new RuntimeException("Procedure attempted to queue more than " + m_batchQueryStmts.length +
                     " statements in a batch.");
         } else {
-            batchQueryStmts[batchQueryStmtIndex++] = stmt;
-            batchQueryArgs[batchQueryArgsIndex++] = args;
+            m_batchQueryStmts[m_batchQueryStmtIndex++] = stmt;
+            m_batchQueryArgs[m_batchQueryArgsIndex++] = args;
         }
     }
 
@@ -729,22 +729,22 @@ public abstract class VoltProcedure {
      * query {@link org.voltdb.SQLStmt statements}
      */
     public VoltTable[] voltExecuteSQL(boolean isFinalSQL) {
-        if (!isNative) {
-            VoltTable[] batch_results = queryResults.toArray(new VoltTable[queryResults.size()]);
-            queryResults.clear();
+        if (!m_isNative) {
+            VoltTable[] batch_results = m_queryResults.toArray(new VoltTable[m_queryResults.size()]);
+            m_queryResults.clear();
             return batch_results;
         }
 
-        assert (batchQueryStmtIndex == batchQueryArgsIndex);
+        assert (m_batchQueryStmtIndex == m_batchQueryArgsIndex);
 
         // if profiling is turned on, record the sql statements being run
         if (ProcedureProfiler.profilingLevel == ProcedureProfiler.Level.INTRUSIVE) {
             // Workload Trace - Start Query
             if (ProcedureProfiler.workloadTrace != null && m_workloadXactHandle != null) {
                 m_workloadBatchId = ProcedureProfiler.workloadTrace.getNextBatchId(m_workloadXactHandle);
-                for (int i = 0; i < batchQueryStmtIndex; i++) {
+                for (int i = 0; i < m_batchQueryStmtIndex; i++) {
                     Object queryHandle = ProcedureProfiler.workloadTrace.startQuery(
-                            m_workloadXactHandle, batchQueryStmts[i].catStmt, batchQueryArgs[i], m_workloadBatchId);
+                            m_workloadXactHandle, m_batchQueryStmts[i].catStmt, m_batchQueryArgs[i], m_workloadBatchId);
                     m_workloadQueryHandles.add(queryHandle);
                 }
             }
@@ -753,31 +753,31 @@ public abstract class VoltProcedure {
         VoltTable[] retval = null;
 
         if (ProcedureProfiler.profilingLevel == ProcedureProfiler.Level.INTRUSIVE) {
-            retval = executeQueriesInIndividualBatches(batchQueryStmtIndex, batchQueryStmts, batchQueryArgs, isFinalSQL);
+            retval = executeQueriesInIndividualBatches(m_batchQueryStmtIndex, m_batchQueryStmts, m_batchQueryArgs, isFinalSQL);
         }
-        else if (catProc.getSinglepartition() == false) {
+        else if (m_catProc.getSinglepartition() == false) {
             // check for duplicate sql statements
             // if so, do them individually for now
             boolean duplicate = false;
 
-            for (int i = 0; i < batchQueryStmtIndex; i++) {
-                for (int j = i + 1; i < batchQueryStmtIndex; i++) {
-                    if (batchQueryStmts[i] == batchQueryStmts[j])
+            for (int i = 0; i < m_batchQueryStmtIndex; i++) {
+                for (int j = i + 1; i < m_batchQueryStmtIndex; i++) {
+                    if (m_batchQueryStmts[i] == m_batchQueryStmts[j])
                         duplicate = true;
                 }
             }
             if (duplicate) {
                 retval = executeQueriesInIndividualBatches(
-                    batchQueryStmtIndex, batchQueryStmts, batchQueryArgs, isFinalSQL);
+                    m_batchQueryStmtIndex, m_batchQueryStmts, m_batchQueryArgs, isFinalSQL);
             }
             else {
                 retval = executeQueriesInABatch(
-                    batchQueryStmtIndex, batchQueryStmts, batchQueryArgs, isFinalSQL);
+                    m_batchQueryStmtIndex, m_batchQueryStmts, m_batchQueryArgs, isFinalSQL);
             }
         }
         else {
             retval = executeQueriesInABatch(
-                batchQueryStmtIndex, batchQueryStmts, batchQueryArgs, isFinalSQL);
+                m_batchQueryStmtIndex, m_batchQueryStmts, m_batchQueryArgs, isFinalSQL);
         }
 
         // Workload Trace - Stop Query
@@ -792,8 +792,8 @@ public abstract class VoltProcedure {
             }
         }
 
-        batchQueryStmtIndex = 0;
-        batchQueryArgsIndex = 0;
+        m_batchQueryStmtIndex = 0;
+        m_batchQueryArgsIndex = 0;
         return retval;
     }
 
@@ -865,8 +865,8 @@ public abstract class VoltProcedure {
             final int numFrags = stmt.numFragGUIDs;
             final long fragGUIDs[] = stmt.fragGUIDs;
             for (int ii = 0; ii < numFrags; ii++) {
-                fragmentIds[fragmentIdIndex++] = fragGUIDs[ii];
-                parameterSets[parameterSetIndex++] = params;
+                m_fragmentIds[fragmentIdIndex++] = fragGUIDs[ii];
+                m_parameterSets[parameterSetIndex++] = params;
             }
         }
 
@@ -877,12 +877,12 @@ public abstract class VoltProcedure {
         VoltTable[] results = null;
         try {
             results = m_site.executeQueryPlanFragmentsAndGetResults(
-                fragmentIds,
+                m_fragmentIds,
                 fragmentIdIndex,
-                parameterSets,
+                m_parameterSets,
                 parameterSetIndex,
                 m_currentTxnState.txnId,
-                catProc.getReadonly());
+                m_catProc.getReadonly());
         }
         finally {
             ProcedureProfiler.stopStatementCounter();
@@ -994,7 +994,7 @@ public abstract class VoltProcedure {
          * Constructor requires no args because it has access to the enclosing classes members.
          */
         public ProcedureStatsCollector() {
-            super(m_site.getCorrespondingSiteId() + " " + catProc.getClassname(),
+            super(m_site.getCorrespondingSiteId() + " " + m_catProc.getClassname(),
                   m_site.getCorrespondingSiteId(), false);
         }
 
@@ -1043,7 +1043,7 @@ public abstract class VoltProcedure {
             super.updateStatsRow(rowKey, rowValues);
             rowValues[columnNameToIndex.get("PARTITION_ID")] =
                 m_site.getCorrespondingPartitionId();
-            rowValues[columnNameToIndex.get("PROCEDURE")] = catProc.getClassname();
+            rowValues[columnNameToIndex.get("PROCEDURE")] = m_catProc.getClassname();
             long invocations = m_invocations;
             long totalTimedExecutionTime = m_totalTimedExecutionTime;
             long timedInvocations = m_timedInvocations;
@@ -1140,7 +1140,7 @@ public abstract class VoltProcedure {
 
         @Override
         public String toString() {
-            return catProc.getTypeName();
+            return m_catProc.getTypeName();
         }
     }
 
