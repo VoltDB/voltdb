@@ -306,9 +306,10 @@ CTX.THIRD_PARTY_INPUT['json_spirit'] = """
 
 whichtests = os.getenv("EETESTSUITE")
 # input format similar to source, but the executable name is listed
-CTX.TESTS['.'] = """
- harness_test
-"""
+if whichtests ==  "${eetestsuite}":
+    CTX.TESTS['.'] = """
+     harness_test
+    """
 
 if whichtests in ("${eetestsuite}", "catalog"):
     CTX.TESTS['catalog'] = """
