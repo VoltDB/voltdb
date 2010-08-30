@@ -1082,12 +1082,19 @@ class NValue {
         const int result = ::strncmp(left, right, std::min(leftLength, rightLength));
         if (result == 0 && leftLength != rightLength) {
             if (leftLength > rightLength) {
-                return  1;
+                return  VALUE_COMPARE_GREATERTHAN;
             } else {
-                return -1;
+                return VALUE_COMPARE_LESSTHAN;
             }
         }
-        return result;
+        else if (result > 0) {
+            return VALUE_COMPARE_GREATERTHAN;
+        }
+        else if (result < 0) {
+            return VALUE_COMPARE_LESSTHAN;
+        }
+
+        return VALUE_COMPARE_EQUAL;
     }
 
     int compareDecimalValue(const NValue rhs) const {
