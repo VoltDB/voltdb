@@ -88,6 +88,8 @@ vector<int32_t> currentColumnLengths;
 vector<bool> currentColumnAllowNull;
 map<string, voltdb::TableTuple*> tuples;
 vector<char*> pool;
+vector<TupleSchema *> schemaCache;
+vector<TableTuple *> tupleCache;
 int globalFailures = 0;
 
 vector<Command> currentCommands;
@@ -179,9 +181,19 @@ void cleanUp()
     currentColumnAllowNull.clear();
     currentCommands.clear();
 
+    for (int i = 0; i < tupleCache.size(); ++i) {
+        tupleCache[i]->freeObjectColumns();
+        delete tupleCache[i];
+    }
+    tupleCache.clear();
+
     for (int i = 0; i < pool.size(); ++i)
         delete[] pool[i];
     pool.clear();
+
+    for (int i = 0; i < schemaCache.size(); ++i)
+        TupleSchema::freeTupleSchema(schemaCache[i]);
+    schemaCache.clear();
 }
 
 void setNewCurrent(const char *testName,
@@ -197,6 +209,7 @@ void setNewCurrent(const char *testName,
     currentColumnAllowNull = columnAllowNull;
 
     voltdb::TupleSchema *schema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
+    schemaCache.push_back(schema);
     // just pack the indices tightly
     vector<int> columnIndices;
     for (int i = 0; i < (int)columnTypes.size(); i++) {
@@ -321,6 +334,7 @@ voltdb::TableTuple *tupleFromString(char *tupleStr, voltdb::TupleSchema *tupleSc
         return iter->second;
 
     voltdb::TableTuple *tuple = new TableTuple(tupleSchema);
+    tupleCache.push_back(tuple);
     char *data = new char[tuple->tupleLength()];
     pool.push_back(data);
     memset(data, 0, tuple->tupleLength());
@@ -357,7 +371,9 @@ voltdb::TableTuple *tupleFromString(char *tupleStr, voltdb::TupleSchema *tupleSc
                 tuple->setNValue(i, ValueFactory::getDecimalValueFromString(value));
                 break;
             case voltdb::VALUE_TYPE_VARCHAR: {
-                tuple->setNValue(i, ValueFactory::getStringValue(value));
+                NValue nv = ValueFactory::getStringValue(value);
+                tuple->setNValueAllocateForObjectCopies(i, nv, NULL);
+                nv.free();
                 break;
             }
             default:
@@ -506,14 +522,14 @@ int main(int argc, char **argv)
                 exit(-1);
             }
             voltdb::TupleSchema *tupleSchema = voltdb::TupleSchema::createTupleSchema(currentColumnTypes, currentColumnLengths, currentColumnAllowNull, true);
+            schemaCache.push_back(tupleSchema);
             cmd.key = tupleFromString(tuple1, tupleSchema);
             if (tuple2) cmd.key2 = tupleFromString(tuple2, tupleSchema);
-
             currentCommands.push_back(cmd);
         }
 
         line++;
     }
-
+    if (input != &cin) delete input;
     return globalFailures;
 }
