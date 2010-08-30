@@ -57,12 +57,6 @@
 <property name='build.test.dir'              location='${build.dir}/test' />
 <property name='dist.dir'                    location='${build.dir}/dist' />
 <property name='dist.examples.dir'           location='${dist.dir}/examples' />
-<property name='dist.examples.auction.dir'   location='${dist.examples.dir}/auction' />
-<property name='dist.examples.game_of_life.dir' location='${dist.examples.dir}/game_of_life' />
-<property name='dist.examples.key_value.dir' location='${dist.examples.dir}/key_value' />
-<property name='dist.examples.satellite.dir' location='${dist.examples.dir}/satellite' />
-<property name='dist.examples.twitter.dir'   location='${dist.examples.dir}/twitter' />
-<property name='dist.examples.voter.dir'     location='${dist.examples.dir}/voter' />
 <property name='doc.dir'                     location='doc' />
 <property name='src.gpl.dir'                 location='src/frontend' />
 <property name='src.hsqldb.dir'              location='src/hsqldb19b3' />
@@ -1232,56 +1226,27 @@ TEST CASES
     <fail if="junit.failures" message="JUnit had failures" />
 </target>
 
+<macrodef name="samplecheck">
+    <attribute name="app"/>
+    <!-- make sure example application compiles -->
+    <sequential>
+        <ant dir='${dist.examples.dir}/@{app}'
+            inheritAll='false'
+            inheritRefs='false'
+            target='srccompile'
+        />
+    </sequential>
+</macrodef>
+
 <target name="distcheck" depends='dist'
     description="Verify distribution sample applications compile and run.">
 
-    <!-- make sure auction example compiles -->
-    <ant
-        dir='${dist.examples.auction.dir}'
-        inheritAll='false'
-        inheritRefs='false'
-        target='srccompile'
-    />
-
-    <!-- make sure game_of_life example compiles -->
-    <ant
-        dir='${dist.examples.game_of_life.dir}'
-        inheritAll='false'
-        inheritRefs='false'
-        target='srccompile'
-    />
-
-    <!-- make sure key_value example compiles -->
-    <ant
-        dir='${dist.examples.key_value.dir}'
-        inheritAll='false'
-        inheritRefs='false'
-        target='srccompile'
-    />
-
-    <!-- make sure satellite example compiles -->
-    <ant
-        dir='${dist.examples.satellite.dir}'
-        inheritAll='false'
-        inheritRefs='false'
-        target='srccompile'
-    />
-
-    <!-- make sure twitter example compiles -->
-    <ant
-        dir='${dist.examples.twitter.dir}'
-        inheritAll='false'
-        inheritRefs='false'
-        target='srccompile'
-    />
-
-    <!-- make sure voter example compiles -->
-    <ant
-        dir='${dist.examples.voter.dir}'
-        inheritAll='false'
-        inheritRefs='false'
-        target='srccompile'
-    />
+    <samplecheck app="auction" />
+    <samplecheck app="game_of_life" />
+    <samplecheck app="key_value" />
+    <samplecheck app="satellite" />
+    <samplecheck app="twitter" />
+    <samplecheck app="voter" />
 
     <!-- test the generator -->
     <exec dir="${dist.dir}" executable='${dist.dir}/tools/generate'>
