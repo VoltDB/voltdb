@@ -32,7 +32,7 @@ public class Client {
          */
         org.voltdb.client.Client myApp;
         myApp = ClientFactory.createClient();
-        myApp.createConnection("localhost", "program", "password");
+        myApp.createConnection("localhost");
 
         /*
          * Load the database.
