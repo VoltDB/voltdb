@@ -51,8 +51,8 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
     // A list of handled (handler, fault) pairs
     private ArrayDeque<HandledFault> m_handledFaults = new ArrayDeque<HandledFault>();
 
-    // Faults waiting to be cleared
-    private ArrayDeque<VoltFault> m_pendingClearedFaults = new ArrayDeque<VoltFault>();
+    // Faults waiting to be cleared organized by FaultType
+    private HashMap<FaultType, HashSet<VoltFault>> m_pendingClearedFaults  = new HashMap<FaultType, HashSet<VoltFault>>();
 
     // Fault distributer runs in this thread
     private Thread m_thread;
@@ -167,7 +167,13 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
      */
     @Override
     public synchronized void reportFaultCleared(VoltFault fault) {
-        m_pendingClearedFaults.offer(fault);
+        HashSet<VoltFault> faults = m_pendingClearedFaults.get(fault.getFaultType());
+        if (faults == null) {
+            faults = new HashSet<VoltFault>();
+            m_pendingClearedFaults.put(fault.getFaultType(), faults);
+        }
+        boolean added = faults.add(fault);
+        assert(added);
         this.notify();
     }
 
@@ -234,7 +240,7 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
             m_pendingFaults = new ArrayDeque<VoltFault>();
         }
 
-        HashMap<FaultType, HashSet<VoltFault>> faultsMap  = new HashMap<FaultType, HashSet<VoltFault>>();
+        HashMap<FaultType, HashSet<VoltFault>> faultsMap = new HashMap<FaultType, HashSet<VoltFault>>();
         while (!pendingFaults.isEmpty()) {
             VoltFault fault = pendingFaults.poll();
             if (duplicateCheck(fault)) {
@@ -278,31 +284,25 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
     }
 
     private void processClearedFaults() {
-        ArrayDeque<VoltFault> pendingClearedFaults;
+        HashMap<FaultType, HashSet<VoltFault>> pendingClearedFaults;
         synchronized (this) {
             if (m_pendingClearedFaults.isEmpty()) {
                 return;
             }
             pendingClearedFaults = m_pendingClearedFaults;
-            m_pendingClearedFaults = new ArrayDeque<VoltFault>();
+            m_pendingClearedFaults = new HashMap<FaultType, HashSet<VoltFault>>();
         }
 
-        HashMap<FaultType, HashSet<VoltFault>> faultsMap  = new HashMap<FaultType, HashSet<VoltFault>>();
-        while (!pendingClearedFaults.isEmpty()) {
-            VoltFault fault = pendingClearedFaults.poll();
-            HashSet<VoltFault> faults = faultsMap.get(fault.getFaultType());
-            if (faults == null) {
-                faults = new HashSet<VoltFault>();
-                faultsMap.put(fault.getFaultType(), faults);
+        for (Map.Entry<FaultType, HashSet<VoltFault>> entry : pendingClearedFaults.entrySet()) {
+            // Remove the (FaultType, VoltFault) pairs from m_knownFaults
+            HashSet<VoltFault> faults = entry.getValue();
+            for (VoltFault fault : faults) {
+                assert(entry.getKey() == fault.getFaultType());
+                m_knownFaults.get(fault.getFaultType()).remove(fault);
             }
-            boolean added = faults.add(fault);
-            m_knownFaults.get(fault.getFaultType()).remove(fault);
-            assert(added);
-        }
 
-        for (Map.Entry<FaultType, HashSet<VoltFault>> entry : faultsMap.entrySet()) {
-            TreeMap<Integer, List<FaultHandlerData>> handler_map =
-                m_faultHandlers.get(entry.getKey());
+            // Clear the fault from each registered handler
+            TreeMap<Integer, List<FaultHandlerData>> handler_map = m_faultHandlers.get(entry.getKey());
             if (handler_map == null)
             {
                 handler_map = m_faultHandlers.get(FaultType.UNKNOWN);

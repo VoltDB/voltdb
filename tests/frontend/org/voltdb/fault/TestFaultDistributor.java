@@ -22,7 +22,6 @@
  */
 package org.voltdb.fault;
 
-import org.voltdb.VoltDB;
 import org.voltdb.fault.VoltFault.FaultType;
 
 import junit.framework.TestCase;
@@ -38,6 +37,7 @@ public class TestFaultDistributor extends TestCase
         int m_order;
         OrderTracker m_orderTracker;
         Semaphore m_handledFaults = new Semaphore(0);
+        Semaphore m_clearedFaults = new Semaphore(0);
 
         public MockFaultHandler(FaultType type)
         {
@@ -72,8 +72,7 @@ public class TestFaultDistributor extends TestCase
 
         @Override
         public void faultCleared(Set<VoltFault> faults) {
-            // TODO Auto-generated method stub
-
+            m_clearedFaults.release();
         }
     }
 
@@ -177,5 +176,26 @@ public class TestFaultDistributor extends TestCase
         assertTrue(order_tracker.m_goodOrder);
     }
 
-    // threadedness?
+    public void testFaultClearing() throws Exception
+    {
+        FaultDistributor dut = new  FaultDistributor();
+        OrderTracker orderTracker = new OrderTracker(-1);
+        MockFaultHandler mh1 = new MockFaultHandler(FaultType.NODE_FAILURE, 1, orderTracker);
+        MockFaultHandler mh2 = new MockFaultHandler(FaultType.NODE_FAILURE, 1, orderTracker);
+        dut.registerFaultHandler(FaultType.NODE_FAILURE, mh1, 1);
+        dut.registerFaultHandler(FaultType.NODE_FAILURE, mh2, 1);
+        VoltFault theFault = new VoltFault(FaultType.NODE_FAILURE);
+        dut.reportFault(theFault);
+
+        // this is really a race against the other thread. but
+        // will test momentarily that the clear() api is called.
+        // if this fails intermittently at all, will have to (fix
+        // the software) and write a more deterministic test
+        assertEquals(0, mh1.m_clearedFaults.availablePermits());
+        assertEquals(0, mh2.m_clearedFaults.availablePermits());
+
+        dut.reportFaultCleared(theFault);
+        mh1.m_clearedFaults.acquire();
+        mh2.m_clearedFaults.acquire();
+    }
 }
