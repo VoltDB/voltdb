@@ -136,10 +136,9 @@ bool commandLF(voltdb::TableTuple &key)
     //cout << "running lf" << endl;
     //cout << " candidate key : " << key.tupleLength() << " - " << key.debug("") << endl;
 
-    // this isn't really right: commandLS checks equality but really
-    // the index api shouldn't require an equality check on a missing
-    // key.
-    return !commandLS(key);
+    // Don't just call !commandLS(key) here. That does an equality check.
+    // Here, the valid test is for existence, not equality.
+    return !(currentIndex->moveToKey(&key));
 }
 
 bool commandUS(voltdb::TableTuple &oldkey, voltdb::TableTuple &newkey)
@@ -194,6 +193,8 @@ void cleanUp()
     for (int i = 0; i < schemaCache.size(); ++i)
         TupleSchema::freeTupleSchema(schemaCache[i]);
     schemaCache.clear();
+
+    tuples.clear();
 }
 
 void setNewCurrent(const char *testName,
@@ -303,7 +304,7 @@ void runTest()
             }
             if (result) ++successes;
             else {
-                cout << "FAILURE: " << command.op << endl;
+                cout << "(" << successes << "/" << failures << ") new FAILURE: " << command.op << endl;
                 ++failures;
             }
         }
