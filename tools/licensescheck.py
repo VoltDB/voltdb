@@ -12,6 +12,7 @@ prunelist = ('hsqldb19b3',
              'simplejson',
              'projectfile',
              'xml',
+             'helloworld',
              'CSVReader.java')
 
 def verifyLicense(f, content, approvedLicensesJavaC, approvedLicensesPython):
