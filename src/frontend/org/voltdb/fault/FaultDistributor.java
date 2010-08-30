@@ -35,6 +35,49 @@ import org.voltdb.logging.VoltLogger;
 public class FaultDistributor implements FaultDistributorInterface, Runnable
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+
+    // A list of registered handlers for each fault type.
+    private HashMap<FaultType, TreeMap<Integer, List<FaultHandlerData>>> m_faultHandlers;
+
+    // A set of unhandled faults by fault handler
+    private HashMap<FaultHandler, FaultHandlerData> m_faultHandlersData = new HashMap<FaultHandler, FaultHandlerData> ();
+
+    // A list of already-seen faults by fault type
+    private HashMap<FaultType, HashSet<VoltFault>> m_knownFaults = new HashMap<FaultType, HashSet<VoltFault>>();
+
+    // A list of faults that at least one handler has not reported handled.
+    private ArrayDeque<VoltFault> m_pendingFaults = new ArrayDeque<VoltFault>();
+
+    // A list of handled (handler, fault) pairs
+    private ArrayDeque<HandledFault> m_handledFaults = new ArrayDeque<HandledFault>();
+
+    // Faults waiting to be cleared
+    private ArrayDeque<VoltFault> m_pendingClearedFaults = new ArrayDeque<VoltFault>();
+
+    // Fault distributer runs in this thread
+    private Thread m_thread;
+
+    // Pairs a fault handlers to its specific unhandled fault set
+    class FaultHandlerData {
+
+        FaultHandlerData(FaultHandler handler) { m_handler = handler; }
+        FaultHandler m_handler;
+
+        // Faults that have been passed to the handler but not handled
+        HashSet<VoltFault> m_pendingFaults = new HashSet<VoltFault>();
+    }
+
+    // Pairs a fault handler to an instance of a fault
+    class HandledFault {
+        HandledFault(FaultHandler handler, VoltFault fault) {
+            m_handler = handler;
+            m_fault = fault;
+        }
+
+        FaultHandler m_handler;
+        VoltFault m_fault;
+    }
+
     public FaultDistributor()
     {
         m_faultHandlers =
@@ -135,13 +178,6 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
         this.notify();
     }
 
-    /*
-     * Check if this fault is a duplicate of a previously reported fault
-     */
-    private boolean duplicateCheck(VoltFault fault) {
-        return !m_knownFaults.get(fault.getFaultType()).add(fault);
-    }
-
     @Override
     public void shutDown() throws InterruptedException
     {
@@ -149,34 +185,6 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
         m_thread.join();
     }
 
-    private HashMap<FaultType, TreeMap<Integer, List<FaultHandlerData>>> m_faultHandlers;
-    private HashMap<FaultHandler, FaultHandlerData> m_faultHandlersData = new HashMap<FaultHandler, FaultHandlerData> ();
-    private HashMap<FaultType, HashSet<VoltFault>> m_knownFaults = new HashMap<FaultType, HashSet<VoltFault>>();
-    private ArrayDeque<VoltFault> m_pendingFaults = new ArrayDeque<VoltFault>();
-    private ArrayDeque<HandledFault> m_handledFaults = new ArrayDeque<HandledFault>();
-    private ArrayDeque<VoltFault> m_pendingClearedFaults = new ArrayDeque<VoltFault>();
-    private Thread m_thread;
-
-    class FaultHandlerData {
-
-        FaultHandlerData(FaultHandler handler) { m_handler = handler; }
-        FaultHandler m_handler;
-
-        /*
-         * Faults that have been passed to the handler but not handled
-         */
-        HashSet<VoltFault> m_pendingFaults = new HashSet<VoltFault>();
-    }
-
-    class HandledFault {
-        HandledFault(FaultHandler handler, VoltFault fault) {
-            m_handler = handler;
-            m_fault = fault;
-        }
-
-        FaultHandler m_handler;
-        VoltFault m_fault;
-    }
 
     /*
      * Process notifications of faults that have been handled by their handlers. This removes
@@ -203,6 +211,13 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
                 VoltDB.crashVoltDB();
             }
         }
+    }
+
+    /*
+     * Check if this fault is a duplicate of a previously reported fault
+     */
+    private boolean duplicateCheck(VoltFault fault) {
+        return !m_knownFaults.get(fault.getFaultType()).add(fault);
     }
 
     /*
