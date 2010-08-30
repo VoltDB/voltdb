@@ -71,8 +71,12 @@ func (nv BintValue) Abbrev() string {
 type SintValue struct{}
 
 func (nv SintValue) Create() string {
-	val := rand.Intn(0xFFFF) * sign()
-	return fmt.Sprint(val)
+	val := rand.Intn(0x7FFF)
+	signstr := ""
+	if val != 0 && rand.Intn(10) < 5 {
+		signstr = "-"
+	}
+	return fmt.Sprintf("%s%d", signstr, val)
 }
 
 func (nv SintValue) Abbrev() string {
@@ -83,8 +87,12 @@ func (nv SintValue) Abbrev() string {
 type TintValue struct{}
 
 func (nv TintValue) Create() string {
-	val := rand.Intn(0xFF) * sign()
-	return fmt.Sprint(val)
+	val := rand.Intn(0x7F)
+	signstr := ""
+	if val != 0 && rand.Intn(10) < 5 {
+		signstr = "-"
+	}
+	return fmt.Sprintf("%s%d", signstr, val)
 }
 
 func (nv TintValue) Abbrev() string {
@@ -96,11 +104,10 @@ type DecValue struct{}
 
 func (nv DecValue) Create() string {
 	vals := make([]string, 3)
-	lhs := rand.Int63()
-	lhs = lhs * int64(sign())
+	lhs := rand.Int() * sign()
 	vals[0] = fmt.Sprint(lhs)
 	vals[1] = "."
-	vals[2] = fmt.Sprint(rand.Int())
+	vals[2] = fmt.Sprint(rand.Intn(99999999))
 	return strings.Join(vals, "")
 }
 
@@ -198,7 +205,7 @@ func createTuple(schema []NValue) []string {
 
 // Create a reasonable serialization given a schema a tuple
 func tupleKey(schema []NValue, tuple []string) string {
-	parts := make([]string, len(schema) * 2)
+	parts := make([]string, len(schema)*2)
 	pi := 0
 	for si := 0; si < len(schema); si++ {
 		parts[pi], parts[pi+1] = schema[si].Abbrev(), tuple[si]
@@ -259,6 +266,20 @@ func generateUniqueGenericTree(testrun int) {
 	// if commands (reinserting existing keys should fail)
 	for _, v := range tuples {
 		fmt.Printf("if ")
+		printSliceAsList(v)
+	}
+
+	// ds commands (delete success)
+	for _, v := range tuples {
+		fmt.Printf("ds ")
+		printSliceAsList(v)
+	}
+	for _, v := range tuples {
+		fmt.Printf("df ")
+		printSliceAsList(v)
+	}
+	for _, v := range tuples {
+		fmt.Printf("lf ")
 		printSliceAsList(v)
 	}
 
