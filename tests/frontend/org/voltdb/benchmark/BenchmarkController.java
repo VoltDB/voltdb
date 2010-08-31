@@ -396,6 +396,7 @@ public class BenchmarkController {
             // START A SERVER LOCALLY IN-PROCESS
             VoltDB.Configuration localconfig = new VoltDB.Configuration();
             localconfig.m_pathToCatalog = m_jarFileName;
+            localconfig.m_pathToDeployment = m_pathToDeployment;
             m_localserver = new ServerThread(localconfig);
             m_localserver.start();
             m_localserver.waitForInitialization();
