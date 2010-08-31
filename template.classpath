@@ -4,7 +4,6 @@
     <classpathentry kind="src" path="examples/auction/src"/>
     <classpathentry kind="src" path="src/frontend"/>
     <classpathentry kind="src" path="src/hsqldb19b3"/>
-    <classpathentry excluding="edu/mit/net/" kind="src" path="tests/frontend"/>
     <classpathentry kind="src" path="tests/hsqldb"/>
     <classpathentry excluding="ca/" kind="src" path="third_party/java/src"/>
     <classpathentry kind="lib" path="third_party/java/jars/ant_doxygen.jar"/>
