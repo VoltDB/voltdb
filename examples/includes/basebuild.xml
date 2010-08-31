@@ -110,7 +110,6 @@ CONCRETE SHARED TARGETS
      most examples don't include an example of export. -->
 <target name="export">
     <invoke-java classname="org.voltdb.exportclient.ExportToFileClient" >
-      <javac>
         <arg value="--servers"/>
         <arg value="localhost"/>
         <arg value="--type"/>
@@ -121,7 +120,6 @@ CONCRETE SHARED TARGETS
         <arg value="voltdb"/>
         <arg value="--password"/>
         <arg value="demo"/>
-      </javac>
     </invoke-java>
 </target>
 
