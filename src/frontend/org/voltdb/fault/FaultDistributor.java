@@ -60,6 +60,10 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
     // The fault distributor's reference to the VoltDB catalog context.
     private CatalogContext m_catalogContext;
 
+    // If true, concurrent failures of 1/2 or more of the current node set, leaving behind
+    // a durable survivor set will cause the survivors to checkpoint and die.
+    private final boolean m_partitionDetectionEnabled;
+
     // Pairs a fault handlers to its specific unhandled fault set
     class FaultHandlerData {
 
@@ -81,8 +85,23 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
         VoltFault m_fault;
     }
 
-    public FaultDistributor(VoltDBInterface voltdb)
+    /**
+     * Create a FaultDistributor with default fault processing policies
+     * @param voltdb
+     */
+    public FaultDistributor(VoltDBInterface voltdb) {
+        this(voltdb, false);
+    }
+
+    /**
+     * Create a FaultDistributor with specified fault processing policies
+     * @param voltdb
+     * @param enablePartitionDetectionPolicy convert appropriate node failure faults into
+     * partition detection faults
+     */
+    public FaultDistributor(VoltDBInterface voltdb, boolean enablePartitionDetectionPolicy)
     {
+        m_partitionDetectionEnabled = enablePartitionDetectionPolicy;
         m_catalogContext = voltdb.getCatalogContext();
         m_faultHandlers =
             new HashMap<FaultType, TreeMap<Integer, List<FaultHandlerData>>>();
@@ -200,7 +219,7 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
      * Process notifications of faults that have been handled by their handlers. This removes
      * the fault from the set of outstanding faults for that handler.
      */
-    private void processHandledFaults() {
+    void processHandledFaults() {
         ArrayDeque<HandledFault> handledFaults;
         synchronized (this) {
             if (m_handledFaults.isEmpty()) {
@@ -235,7 +254,7 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
      * Dedupe incoming fault reports and then report the new fault along with outstanding faults
      * to any interested fault handlers.
      */
-    private void processPendingFaults() {
+    void processPendingFaults() {
         ArrayDeque<VoltFault> pendingFaults;
         synchronized (this) {
             if (m_pendingFaults.isEmpty()) {
@@ -245,20 +264,16 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
             m_pendingFaults = new ArrayDeque<VoltFault>();
         }
 
-        // hash the pending faults by fault type and update known faults.
-        HashMap<FaultType, HashSet<VoltFault>> newFaults =
-            organizeNewFaults(pendingFaults);
-
         // examine the known faults and the new faults and make policy decisions
-        HashMap<FaultType, HashSet<VoltFault>> policiesMap =
-            makePolicyDecisions(m_knownFaults, newFaults);
+        HashMap<FaultType, HashSet<VoltFault>> postPolicyFaults =
+            makePolicyDecisions(organizeNewFaults(pendingFaults));
 
         // and apply those policies...
-        if (policiesMap.isEmpty()) {
+        if (postPolicyFaults.isEmpty()) {
             return;
         }
 
-        for (Map.Entry<FaultType, HashSet<VoltFault>> entry : newFaults.entrySet()) {
+        for (Map.Entry<FaultType, HashSet<VoltFault>> entry : postPolicyFaults.entrySet()) {
             TreeMap<Integer, List<FaultHandlerData>> handler_map =
                 m_faultHandlers.get(entry.getKey());
             if (handler_map == null)
@@ -312,14 +327,35 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
      * to take.
      */
     private HashMap<FaultType, HashSet<VoltFault>>
-    makePolicyDecisions(HashMap<FaultType, HashSet<VoltFault>> knownFaults,
-                        HashMap<FaultType, HashSet<VoltFault>> newFaults)
+    makePolicyDecisions(HashMap<FaultType, HashSet<VoltFault>> newFaults)
     {
-        /*
-        HashMap<FaultType, HashSet<VoltFault>> policySets =
-            new HashMap<FaultType, HashSet<VoltFault>>();
-        return policySets;
-        */
+        // default policy
+        if (!m_partitionDetectionEnabled) {
+            return newFaults;
+        }
+
+        // if this surviving node is in a survivor set that is <= 1/2
+        // of the previous cluster size, and this survivor set is
+        // durable, then trigger partition detection.
+        if (m_partitionDetectionEnabled) {
+            HashSet<VoltFault> knownnfs = m_knownFaults.get(FaultType.NODE_FAILURE);
+            final int ttlNodeCnt = m_catalogContext.numberOfNodes;
+            final int downNodeCnt = m_catalogContext.siteTracker.getAllDownHosts().size();
+            final int prevSurvivorCnt = ttlNodeCnt - downNodeCnt;
+            final int ttlNodeFaults = knownnfs.size();
+            if (ttlNodeFaults * 2 >= prevSurvivorCnt) {
+                // rewrite the node faults in to partition faults.
+                HashSet<VoltFault> ppdFaults = new HashSet<VoltFault>();
+                HashSet<VoltFault> newnfs = newFaults.get(FaultType.NODE_FAILURE);
+                for (VoltFault nf :  newnfs) {
+                    VoltFault ppd = new ClusterPartitionFault((NodeFailureFault)nf);
+                    ppdFaults.add(ppd);
+                    newFaults.put(FaultType.CLUSTER_PARTITION, ppdFaults);
+                }
+                newFaults.remove(FaultType.NODE_FAILURE);
+            }
+        }
+
         return newFaults;
     }
 
@@ -338,8 +374,13 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
             // Remove the (FaultType, VoltFault) pairs from m_knownFaults
             HashSet<VoltFault> faults = entry.getValue();
             for (VoltFault fault : faults) {
-                assert(entry.getKey() == fault.getFaultType());
-                m_knownFaults.get(fault.getFaultType()).remove(fault);
+                boolean remove = m_knownFaults.get(fault.getFaultType()).remove(fault);
+
+                // A hack. Really want to formalize fault chaining here.
+                if (!remove && fault instanceof ClusterPartitionFault) {
+                    remove = m_knownFaults.get(FaultType.NODE_FAILURE).remove(fault);
+                    assert(remove);
+                }
             }
 
             // Clear the fault from each registered handler

@@ -28,7 +28,7 @@ public class VoltFault
 {
     public enum FaultType
     {
-        UNKNOWN, NODE_FAILURE;
+        UNKNOWN, NODE_FAILURE, CLUSTER_PARTITION;
     }
 
     public VoltFault(FaultType faultType)
@@ -36,16 +36,12 @@ public class VoltFault
         m_faultType = faultType;
     }
 
-    public VoltFault()
-    {
-        m_faultType = FaultType.UNKNOWN;
-    }
-
     public FaultType getFaultType()
     {
         return m_faultType;
     }
 
+    @Override
     public String toString()
     {
         StringBuilder sb = new StringBuilder();

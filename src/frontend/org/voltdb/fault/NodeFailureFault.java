@@ -58,9 +58,11 @@ public class NodeFailureFault extends VoltFault
     public boolean equals(Object other) {
         if (other instanceof NodeFailureFault) {
             NodeFailureFault ofault = (NodeFailureFault)other;
-            if (ofault.getHostId() == m_hostId) {
-                return true;
-            }
+            return ofault.getHostId() == m_hostId;
+        }
+        else if (other instanceof ClusterPartitionFault) {
+            ClusterPartitionFault fault = (ClusterPartitionFault)other;
+            return fault.getCause().getHostId() == m_hostId;
         }
         return false;
     }
