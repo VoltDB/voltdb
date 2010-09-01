@@ -157,6 +157,9 @@ public class TestOutOfProcessPlanning extends TestCase {
         assertNotSame("Stream closed", result.getErrors());
         assertNull(result.getErrors());
 
+        final File jar = new File("testbadddl-oop.jar");
+        jar.delete();
+
         ptKiller.m_shouldStop.set(true);
         try {
             ptKiller.join();
