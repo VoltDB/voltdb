@@ -92,7 +92,10 @@ public class TestInMemoryJarfile extends TestCase {
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();
-        if (m_jarPath != null) assertTrue(m_jarPath.delete());
+        if (m_jarPath != null)
+            assertTrue(m_jarPath.delete());
+        File dupeFile = new File("testout-dupe.jar");
+        dupeFile.delete();
     }
 
     /**
