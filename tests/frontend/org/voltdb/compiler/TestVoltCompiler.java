@@ -48,11 +48,21 @@ import org.voltdb.utils.BuildDirectoryUtils;
 
 public class TestVoltCompiler extends TestCase {
 
-    String tmpfile;
+    String nothing_jar;
+    String testout_jar;
 
     @Override
     public void setUp() {
-        tmpfile = BuildDirectoryUtils.getBuildDirectoryPath() + File.pathSeparator + "nothing.jar";
+        nothing_jar = BuildDirectoryUtils.getBuildDirectoryPath() + File.pathSeparator + "nothing.jar";
+        testout_jar = BuildDirectoryUtils.getBuildDirectoryPath() + File.pathSeparator + "testout.jar";
+    }
+
+    @Override
+    public void tearDown() {
+        File njar = new File(nothing_jar);
+        njar.delete();
+        File tjar = new File(testout_jar);
+        tjar.delete();
     }
 
     public void testBrokenLineParsing() throws IOException {
@@ -92,7 +102,7 @@ public class TestVoltCompiler extends TestCase {
 
         final VoltCompiler compiler = new VoltCompiler();
 
-        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
+        final boolean success = compiler.compile(projectPath, testout_jar, System.out, null);
         assertTrue(success);
     }
 
@@ -161,7 +171,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
 
-    private static ArrayList<Feedback> checkPartitionParam(String ddl, String procedureClass, String table) {
+    private ArrayList<Feedback> checkPartitionParam(String ddl, String procedureClass, String table) {
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl);
         final String schemaPath = schemaFile.getPath();
 
@@ -186,7 +196,7 @@ public class TestVoltCompiler extends TestCase {
 
         final VoltCompiler compiler = new VoltCompiler();
 
-        final boolean success = compiler.compile(projectPath, "testout.jar", null, null);
+        final boolean success = compiler.compile(projectPath, testout_jar, null, null);
         assertFalse(success);
         return compiler.m_errors;
     }
@@ -329,7 +339,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testBadPath() {
         final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compile("invalidnonsense", tmpfile, System.out, null);
+        final boolean success = compiler.compile("invalidnonsense", nothing_jar, System.out, null);
 
         assertFalse(success);
     }
@@ -349,7 +359,7 @@ public class TestVoltCompiler extends TestCase {
 
         final VoltCompiler compiler = new VoltCompiler();
 
-        final boolean success = compiler.compile(path, tmpfile, System.out, null);
+        final boolean success = compiler.compile(path, nothing_jar, System.out, null);
 
         assertFalse(success);
     }
@@ -372,7 +382,7 @@ public class TestVoltCompiler extends TestCase {
         final File xmlFile = VoltProjectBuilder.writeStringToTempFile(simpleXML);
         final String path = xmlFile.getPath();
         final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compile(path, tmpfile, System.out, null);
+        final boolean success = compiler.compile(path, nothing_jar, System.out, null);
         assertFalse(success);
     }
 
@@ -393,7 +403,7 @@ public class TestVoltCompiler extends TestCase {
         final File xmlFile = VoltProjectBuilder.writeStringToTempFile(simpleXML);
         final String path = xmlFile.getPath();
         final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compile(path, tmpfile, System.out, null);
+        final boolean success = compiler.compile(path, nothing_jar, System.out, null);
         assertFalse(success);
     }
 
@@ -415,7 +425,7 @@ public class TestVoltCompiler extends TestCase {
         final File xmlFile = VoltProjectBuilder.writeStringToTempFile(simpleXML);
         final String path = xmlFile.getPath();
         final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compile(path, tmpfile, System.out, null);
+        final boolean success = compiler.compile(path, nothing_jar, System.out, null);
         assertTrue(success);
         assertTrue(compiler.m_catalog.getClusters().get("cluster").getDatabases().get("database") != null);
     }
@@ -472,21 +482,18 @@ public class TestVoltCompiler extends TestCase {
 
         final VoltCompiler compiler = new VoltCompiler();
 
-        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
+        final boolean success = compiler.compile(projectPath, testout_jar, System.out, null);
 
         assertTrue(success);
 
         final Catalog c1 = compiler.getCatalog();
 
-        final String catalogContents = VoltCompiler.readFileFromJarfile("testout.jar", "catalog.txt");
+        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
 
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
 
         assertTrue(c2.serialize().equals(c1.serialize()));
-
-        final File jar = new File("testout.jar");
-        jar.delete();
     }
 
     public void testProcWithBoxedParam() throws IOException {
@@ -513,9 +520,7 @@ public class TestVoltCompiler extends TestCase {
         final String projectPath = projectFile.getPath();
 
         final VoltCompiler compiler = new VoltCompiler();
-
-        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
-
+        final boolean success = compiler.compile(projectPath, testout_jar, System.out, null);
         assertFalse(success);
     }
 
@@ -549,7 +554,7 @@ public class TestVoltCompiler extends TestCase {
 
         final VoltCompiler compiler = new VoltCompiler();
 
-        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
+        final boolean success = compiler.compile(projectPath, testout_jar, System.out, null);
         assertFalse(success);
     }
 
@@ -575,7 +580,7 @@ public class TestVoltCompiler extends TestCase {
 
         final VoltCompiler compiler = new VoltCompiler();
 
-        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
+        final boolean success = compiler.compile(projectPath, testout_jar, System.out, null);
 
         assertFalse(success);
 
@@ -608,8 +613,7 @@ public class TestVoltCompiler extends TestCase {
 
         final VoltCompiler compiler = new VoltCompiler();
 
-        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
-
+        final boolean success = compiler.compile(projectPath, testout_jar, System.out, null);
         assertFalse(success);
     }
 
@@ -639,13 +643,8 @@ public class TestVoltCompiler extends TestCase {
         final String projectPath = projectFile.getPath();
 
         final VoltCompiler compiler = new VoltCompiler();
-
-        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
-
+        final boolean success = compiler.compile(projectPath, testout_jar, System.out, null);
         assertTrue(success);
-
-        final File jar = new File("testout.jar");
-        jar.delete();
     }
 
     public void testSeparateCatalogCompilation() throws IOException {
@@ -679,14 +678,11 @@ public class TestVoltCompiler extends TestCase {
         final Catalog catalog = compiler1.compileCatalog(projectPath);
 
         final String cat1 = catalog.serialize();
-        final boolean success = compiler2.compile(projectPath, "testout.jar", System.out, null);
-        final String cat2 = VoltCompiler.readFileFromJarfile("testout.jar", "catalog.txt");
+        final boolean success = compiler2.compile(projectPath, testout_jar, System.out, null);
+        final String cat2 = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
 
         assertTrue(success);
         assertTrue(cat1.compareTo(cat2) == 0);
-
-        final File jar = new File("testout.jar");
-        jar.delete();
     }
 
     public void testDDLTableTooManyColumns() throws IOException {
@@ -715,7 +711,7 @@ public class TestVoltCompiler extends TestCase {
 
         final VoltCompiler compiler = new VoltCompiler();
 
-        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
+        final boolean success = compiler.compile(projectPath, testout_jar, System.out, null);
         assertFalse(success);
 
         boolean found = false;
@@ -752,14 +748,11 @@ public class TestVoltCompiler extends TestCase {
 
         final VoltCompiler compiler = new VoltCompiler();
 
-        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
+        final boolean success = compiler.compile(projectPath, testout_jar, System.out, null);
         assertTrue(success);
 
-        final String sql = VoltCompiler.readFileFromJarfile("testout.jar", "tpcc-ddl.sql");
+        final String sql = VoltCompiler.readFileFromJarfile(testout_jar, "tpcc-ddl.sql");
         assertNotNull(sql);
-
-        final File jar = new File("testout.jar");
-        jar.delete();
     }
 
     public void testXMLFileWithELEnabled() throws IOException {
@@ -787,7 +780,7 @@ public class TestVoltCompiler extends TestCase {
 
         final VoltCompiler compiler = new VoltCompiler();
 
-        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
+        final boolean success = compiler.compile(projectPath, testout_jar, System.out, null);
 
         assertTrue(success);
 
@@ -795,15 +788,12 @@ public class TestVoltCompiler extends TestCase {
         //System.out.println("PRINTING Catalog 1");
         //System.out.println(c1.serialize());
 
-        final String catalogContents = VoltCompiler.readFileFromJarfile("testout.jar", "catalog.txt");
+        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
 
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
 
         assertTrue(c2.serialize().equals(c1.serialize()));
-
-        final File jar = new File("testout.jar");
-        jar.delete();
     }
 
     public void testOverrideProcInfo() throws IOException {
@@ -834,11 +824,11 @@ public class TestVoltCompiler extends TestCase {
 
         final VoltCompiler compiler = new VoltCompiler();
 
-        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, overrideMap);
+        final boolean success = compiler.compile(projectPath, testout_jar, System.out, overrideMap);
 
         assertTrue(success);
 
-        final String catalogContents = VoltCompiler.readFileFromJarfile("testout.jar", "catalog.txt");
+        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
 
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
@@ -846,9 +836,6 @@ public class TestVoltCompiler extends TestCase {
         final Database db = c2.getClusters().get("cluster").getDatabases().get("database");
         final Procedure addBook = db.getProcedures().get("AddBook");
         assertEquals(true, addBook.getSinglepartition());
-
-        final File jar = new File("testout.jar");
-        jar.delete();
     }
 
     public void testBadStmtProcName() throws IOException {
@@ -872,9 +859,7 @@ public class TestVoltCompiler extends TestCase {
         final String projectPath = projectFile.getPath();
 
         final VoltCompiler compiler = new VoltCompiler();
-
-        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
-
+        final boolean success = compiler.compile(projectPath, testout_jar, System.out, null);
         assertFalse(success);
     }
 
@@ -900,12 +885,8 @@ public class TestVoltCompiler extends TestCase {
 
         final VoltCompiler compiler = new VoltCompiler();
 
-        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
-
+        final boolean success = compiler.compile(projectPath, testout_jar, System.out, null);
         assertTrue(success);
-
-        final File jar = new File("testout.jar");
-        jar.delete();
     }
 
     public void testMaterializedView() throws IOException {
@@ -931,21 +912,13 @@ public class TestVoltCompiler extends TestCase {
         final VoltCompiler compiler = new VoltCompiler();
         // final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
 
-        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
-
+        final boolean success = compiler.compile(projectPath, testout_jar, System.out, null);
         assertTrue(success);
-
         final Catalog c1 = compiler.getCatalog();
-
-        final String catalogContents = VoltCompiler.readFileFromJarfile("testout.jar", "catalog.txt");
-
+        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
-
         assertTrue(c2.serialize().equals(c1.serialize()));
-
-        final File jar = new File("testout.jar");
-        jar.delete();
     }
 
 
@@ -973,7 +946,7 @@ public class TestVoltCompiler extends TestCase {
         projectFile.deleteOnExit();
         final String projectPath = projectFile.getPath();
         final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compile(projectPath, "testout.jar", System.out, null);
+        final boolean success = compiler.compile(projectPath, testout_jar, System.out, null);
         assertEquals(expectSuccess, success);
         return compiler;
     }
