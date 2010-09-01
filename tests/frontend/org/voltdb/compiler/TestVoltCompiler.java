@@ -44,8 +44,16 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.Feedback;
 import org.voltdb.regressionsuites.TestExportSuite;
+import org.voltdb.utils.BuildDirectoryUtils;
 
 public class TestVoltCompiler extends TestCase {
+
+    String tmpfile;
+
+    @Override
+    public void setUp() {
+        tmpfile = BuildDirectoryUtils.getBuildDirectoryPath() + File.pathSeparator + "nothing.jar";
+    }
 
     public void testBrokenLineParsing() throws IOException {
         final String simpleSchema1 =
@@ -321,7 +329,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testBadPath() {
         final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compile("invalidnonsense", "nothing", System.out, null);
+        final boolean success = compiler.compile("invalidnonsense", tmpfile, System.out, null);
 
         assertFalse(success);
     }
@@ -341,7 +349,7 @@ public class TestVoltCompiler extends TestCase {
 
         final VoltCompiler compiler = new VoltCompiler();
 
-        final boolean success = compiler.compile(path, "nothing", System.out, null);
+        final boolean success = compiler.compile(path, tmpfile, System.out, null);
 
         assertFalse(success);
     }
@@ -364,7 +372,7 @@ public class TestVoltCompiler extends TestCase {
         final File xmlFile = VoltProjectBuilder.writeStringToTempFile(simpleXML);
         final String path = xmlFile.getPath();
         final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compile(path, "nothing", System.out, null);
+        final boolean success = compiler.compile(path, tmpfile, System.out, null);
         assertFalse(success);
     }
 
@@ -385,7 +393,7 @@ public class TestVoltCompiler extends TestCase {
         final File xmlFile = VoltProjectBuilder.writeStringToTempFile(simpleXML);
         final String path = xmlFile.getPath();
         final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compile(path, "nothing", System.out, null);
+        final boolean success = compiler.compile(path, tmpfile, System.out, null);
         assertFalse(success);
     }
 
@@ -407,7 +415,7 @@ public class TestVoltCompiler extends TestCase {
         final File xmlFile = VoltProjectBuilder.writeStringToTempFile(simpleXML);
         final String path = xmlFile.getPath();
         final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compile(path, "nothing", System.out, null);
+        final boolean success = compiler.compile(path, tmpfile, System.out, null);
         assertTrue(success);
         assertTrue(compiler.m_catalog.getClusters().get("cluster").getDatabases().get("database") != null);
     }
