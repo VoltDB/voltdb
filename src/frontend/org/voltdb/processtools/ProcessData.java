@@ -47,11 +47,11 @@ public class ProcessData {
         final BufferedReader m_reader;
         final String m_processName;
         final Stream m_stream;
-        final ProgressHandler m_handler;
+        final OutputHandler m_handler;
         final AtomicBoolean m_expectDeath = new AtomicBoolean(false);
 
         StreamWatcher(BufferedReader reader, String processName, Stream stream,
-                      ProgressHandler handler) {
+                      OutputHandler handler) {
             assert(reader != null);
             m_reader = reader;
             m_processName = processName;
@@ -93,7 +93,7 @@ public class ProcessData {
     }
 
     public ProcessData(String processName, String[] cmd, String cwd,
-                       ProgressHandler handler) throws IOException {
+                       OutputHandler handler) throws IOException {
         ProcessBuilder pb = new ProcessBuilder(cmd);
         if (cwd != null)
             pb.directory(new File(cwd));

@@ -32,7 +32,7 @@ public class ProcessSetManager {
     Map<String, ProcessData> m_processes = new HashMap<String, ProcessData>();
     SimpleProgressHandler m_handler = new SimpleProgressHandler(m_output);
 
-    class SimpleProgressHandler implements ProgressHandler {
+    class SimpleProgressHandler implements OutputHandler {
         private final LinkedBlockingQueue<OutputLine> m_output;
 
         public SimpleProgressHandler(LinkedBlockingQueue<OutputLine> output) {

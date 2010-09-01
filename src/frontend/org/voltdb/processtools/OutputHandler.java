@@ -20,11 +20,10 @@ package org.voltdb.processtools;
 import org.voltdb.processtools.ProcessData.OutputLine;
 
 /**
- * Implement this interface to handle progress updates for a process.
- * @author ning
+ * Implement this interface to handle output for a process.
  *
  */
-public interface ProgressHandler {
+public interface OutputHandler {
     /**
      * Called when a new line from standard output or error is available.
      * @param line
