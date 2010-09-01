@@ -143,7 +143,9 @@ public class TestExportSuite extends RegressionSuite {
 
         // add a new table
         final String newCatalogURL = Configuration.getPathToCatalogForTest("elt-ddl-addedtable.jar");
-        final ClientResponse callProcedure = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, null);
+        final String deploymentURL = Configuration.getPathToCatalogForTest("elt-ddl-addedtable.xml");
+        final ClientResponse callProcedure = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL,
+                deploymentURL);
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
 
         // make a new tester and see if it gets the new advertisement!
@@ -178,7 +180,9 @@ public class TestExportSuite extends RegressionSuite {
 
         // now drop the no-nulls table
         final String newCatalogURL = Configuration.getPathToCatalogForTest("elt-ddl-sans-nonulls.jar");
-        final ClientResponse callProcedure = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, null);
+        final String deploymentURL = Configuration.getPathToCatalogForTest("elt-ddl-sans-nonulls.xml");
+        final ClientResponse callProcedure = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL,
+                deploymentURL);
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
 
         // must still be able to verify the elt data.
@@ -709,7 +713,9 @@ public class TestExportSuite extends RegressionSuite {
         project.addPartitionInfo("EXPRESSIONS_NO_NULLS", "PKEY");
         project.addPartitionInfo("JUMBO_ROW", "PKEY");
         project.addProcedures(PROCEDURES2);
-        compile = config.compile(project, true);
+        compile = config.compile(project);
+        TestCatalogUpdateSuite.copyFile(project.getPathToDeployment(),
+                Configuration.getPathToCatalogForTest("elt-ddl-sans-nonulls.xml"));
         assertTrue(compile);
 
         /*
@@ -740,7 +746,9 @@ public class TestExportSuite extends RegressionSuite {
         project.addPartitionInfo("NO_NULLS", "PKEY");
         project.addProcedures(PROCEDURES);
         project.addProcedures(PROCEDURES3);
-        compile = config.compile(project, true);
+        compile = config.compile(project);
+        TestCatalogUpdateSuite.copyFile(project.getPathToDeployment(),
+                Configuration.getPathToCatalogForTest("elt-ddl-addedtable.xml"));
         assertTrue(compile);
 
 

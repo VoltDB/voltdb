@@ -289,22 +289,6 @@ public class VoltCompiler {
      */
     public boolean compile(final String projectFileURL, final String jarOutputPath, final PrintStream output,
                            final Map<String, ProcInfoData> procInfoOverrides) {
-        return compile(projectFileURL, jarOutputPath, output, procInfoOverrides, null);
-    }
-
-    // TODO: remove pathToDeployment after ENG-642 lands
-    /**
-     * Compile with this method to apply deployment settings to the catalog immediately. This is currently only used by
-     * VoltProjectBuilder as a convenience for creating delta catalogs to test catalog updates.
-     *
-     * @param projectFileURL URL of the project file.
-     * @param jarOutputPath The location to put the finished JAR to.
-     * @param output Where to print status/errors to, usually stdout.
-     * @param procInfoOverrides Optional overridden values for procedure annotations.
-     * @param pathToDeployment Path to deployment.xml file.
-     */
-    public boolean compile(final String projectFileURL, final String jarOutputPath, final PrintStream output,
-                           final Map<String, ProcInfoData> procInfoOverrides, final String pathToDeployment) {
         m_hsql = null;
         m_projectFileURL = projectFileURL;
         m_jarOutputPath = jarOutputPath;
@@ -317,14 +301,6 @@ public class VoltCompiler {
         if (catalog == null) {
             compilerLog.error("Catalog compilation failed.");
             return false;
-        }
-
-        // if pathToDeployment is set, bake its changes into the catalog now
-        if (pathToDeployment != null) {
-            if (!CatalogUtil.compileDeployment(catalog, pathToDeployment)) {
-                compilerLog.error("Unable to read from deployment file.");
-                return false;
-            }
         }
 
         // WRITE CATALOG TO JAR HERE

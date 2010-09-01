@@ -69,25 +69,14 @@ public class LocalSingleProcessServer implements VoltServerConfig {
             }
         }
     }
-
     @Override
     public boolean compile(VoltProjectBuilder builder) {
-        return compile(builder, false);
-    }
-
-    // TODO: remove compileDeployment after ENG-642 lands
-    @Override
-    public boolean compile(VoltProjectBuilder builder, boolean compileDeployment) {
         if (m_compiled == true) {
             return true;
         }
 
-        if (compileDeployment) {
-            m_compiled = builder.compile(m_jarFileName, m_siteCount, 1, 0, "localhost", true);
-        } else {
-            m_compiled = builder.compile(m_jarFileName, m_siteCount, 1, 0, "localhost", false);
-            m_pathToDeployment = builder.getPathToDeployment();
-        }
+        m_compiled = builder.compile(m_jarFileName, m_siteCount, 1, 0, "localhost");
+        m_pathToDeployment = builder.getPathToDeployment();
 
         return m_compiled;
     }

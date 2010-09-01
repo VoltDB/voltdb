@@ -393,19 +393,11 @@ public class VoltProjectBuilder {
     public boolean compile(final String jarPath, final int sitesPerHost, final int hostCount, final int replication,
                            final String leaderAddress) {
         VoltCompiler compiler = new VoltCompiler();
-        return compile(compiler, jarPath, sitesPerHost, hostCount, replication, leaderAddress, false);
+        return compile(compiler, jarPath, sitesPerHost, hostCount, replication, leaderAddress);
     }
 
-    public boolean compile(final String jarPath, final int sitesPerHost, final int hostCount, final int replication,
-                           final String leaderAddress, final boolean compileDeployment) {
-        VoltCompiler compiler = new VoltCompiler();
-        return compile(compiler, jarPath, sitesPerHost, hostCount, replication, leaderAddress, compileDeployment);
-    }
-
-    // TODO: remove compileDeployment option after ENG-642 lands
     public boolean compile(final VoltCompiler compiler, final String jarPath, final int sitesPerHost,
-                           final int hostCount, final int replication, final String leaderAddress,
-                           final boolean compileDeployment) {
+                           final int hostCount, final int replication, final String leaderAddress) {
         assert(jarPath != null);
         assert(sitesPerHost >= 1);
         assert(hostCount >= 1);
@@ -471,15 +463,8 @@ public class VoltProjectBuilder {
             writeStringToTempFile(result.getWriter().toString());
         final String projectPath = projectFile.getPath();
 
-        String pathToDeployment = writeDeploymentFile(hostCount, sitesPerHost, leaderAddress, replication);
-        boolean success = false;
-        if (compileDeployment) {
-            success = compiler.compile(projectPath, jarPath, m_compilerDebugPrintStream, m_procInfoOverrides,
-                    pathToDeployment);
-        } else {
-            success = compiler.compile(projectPath, jarPath, m_compilerDebugPrintStream, m_procInfoOverrides);
-            m_pathToDeployment = pathToDeployment;
-        }
+        boolean success = compiler.compile(projectPath, jarPath, m_compilerDebugPrintStream, m_procInfoOverrides);
+        m_pathToDeployment = writeDeploymentFile(hostCount, sitesPerHost, leaderAddress, replication);
 
         return success;
     }

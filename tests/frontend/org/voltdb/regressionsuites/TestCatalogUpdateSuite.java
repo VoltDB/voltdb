@@ -185,8 +185,8 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         loadSomeData(client, 55, 5);
 
         // remove the procedure we just added async
-        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-basewithdeployment.jar");
-        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-basewithdeployment.xml");
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
+        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml");
         callback = new CatTestCallback(ClientResponse.SUCCESS);
         client.callProcedure(callback, "@UpdateApplicationCatalog", newCatalogURL, deploymentURL);
 
@@ -352,8 +352,8 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
 
         // revert to the original schema
-        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-basewithdeployment.jar");
-        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-basewithdeployment.xml");
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
+        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml");
         results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
         assertTrue(results.length == 1);
 
@@ -472,16 +472,6 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         // DELTA CATALOGS FOR TESTING
         /////////////////////////////////////////////////////////////
 
-        // Build a copy of the starting catalog and compile the deployment into it immediately
-        config = new LocalCluster("catalogupdate-cluster-basewithdeployment.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
-        boolean compile = config.compile(project, false);
-        assertTrue(compile);
-        copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-basewithdeployment.xml"));
-
         // As catalogupdate-cluster-base but with security enabled. This requires users and groups..
         GroupInfo groups[] = new GroupInfo[] {new GroupInfo("group1", false, false)};
         UserInfo users[] = new UserInfo[] {new UserInfo("user1", "userpass1", new String[] {"group1"})};
@@ -494,7 +484,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project.addGroups(groups);
         project.addProcedures(procInfo);
         project.setSecurityEnabled(true);
-        compile = config.compile(project, false);
+        boolean compile = config.compile(project);
         assertTrue(compile);
         copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-base-secure.xml"));
 
@@ -506,7 +496,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project.addDefaultPartitioning();
         project.addPartitionInfo("O1", "PKEY");
         project.addProcedures(BASEPROCS_OPROCS);
-        compile = config.compile(project, false);
+        compile = config.compile(project);
         assertTrue(compile);
         copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtables.xml"));
 
@@ -520,7 +510,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
             project.addDefaultPartitioning();
             project.addPartitionInfo("O1", "PKEY");
             project.addProcedures(BASEPROCS_OPROCS);
-            compile = config.compile(project, false);
+            compile = config.compile(project);
             assertTrue(compile);
             copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtableswithmatview.xml"));
         } catch (IOException e) {
@@ -533,7 +523,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project.addDefaultSchema();
         project.addDefaultPartitioning();
         project.addProcedures(EXPANDEDPROCS);
-        compile = config.compile(project, false);
+        compile = config.compile(project);
         assertTrue(compile);
         copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.xml"));
 
@@ -543,7 +533,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project.addDefaultSchema();
         project.addDefaultPartitioning();
         project.addProcedures(CONFLICTPROCS);
-        compile = config.compile(project, false);
+        compile = config.compile(project);
         assertTrue(compile);
         copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-conflict.xml"));
 
@@ -553,7 +543,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project.addDefaultSchema();
         project.addDefaultPartitioning();
         project.addProcedures(SOMANYPROCS);
-        compile = config.compile(project, false);
+        compile = config.compile(project);
         assertTrue(compile);
         copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-many.xml"));
 
