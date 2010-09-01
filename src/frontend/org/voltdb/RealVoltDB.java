@@ -48,7 +48,6 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.SyncCallback;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.elt.ELTManager;
@@ -295,7 +294,7 @@ public class RealVoltDB implements VoltDBInterface
 
             hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
 
-            m_faultManager = new FaultDistributor();
+            m_faultManager = new FaultDistributor(this);
             // Install a handler for NODE_FAILURE faults to update the catalog
             // This should be the first handler to run when a node fails
             m_faultManager.registerFaultHandler(FaultType.NODE_FAILURE,

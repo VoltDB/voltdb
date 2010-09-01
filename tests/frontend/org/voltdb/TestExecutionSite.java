@@ -322,7 +322,7 @@ public class TestExecutionSite extends TestCase {
         m_checker = new ExecutionSiteFuzzChecker();
 
         m_voltdb = new MockVoltDB();
-        m_voltdb.setFaultDistributor(new FaultDistributor());
+        m_voltdb.setFaultDistributor(new FaultDistributor(m_voltdb));
 
         // one host and one initiator per site
         for (int ss=0; ss < siteCount; ss++) {

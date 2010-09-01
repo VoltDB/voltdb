@@ -22,6 +22,7 @@
  */
 package org.voltdb.fault;
 
+import org.voltdb.MockVoltDB;
 import org.voltdb.fault.VoltFault.FaultType;
 
 import junit.framework.TestCase;
@@ -99,7 +100,7 @@ public class TestFaultDistributor extends TestCase
 
     public void testBasicDispatch() throws Exception
     {
-        FaultDistributor dut = new FaultDistributor();
+        FaultDistributor dut = new FaultDistributor(new MockVoltDB());
         MockFaultHandler unk_handler = new MockFaultHandler(FaultType.UNKNOWN);
         MockFaultHandler node_handler = new MockFaultHandler(FaultType.NODE_FAILURE);
         dut.registerFaultHandler(FaultType.UNKNOWN, unk_handler, 1);
@@ -116,7 +117,7 @@ public class TestFaultDistributor extends TestCase
     // multiple handlers for same type
     public void testMultiHandler() throws Exception
     {
-        FaultDistributor dut = new FaultDistributor();
+        FaultDistributor dut = new FaultDistributor(new MockVoltDB());
         MockFaultHandler node_handler1 = new MockFaultHandler(FaultType.NODE_FAILURE);
         dut.registerFaultHandler(FaultType.NODE_FAILURE, node_handler1, 1);
         MockFaultHandler node_handler2 = new MockFaultHandler(FaultType.NODE_FAILURE);
@@ -131,7 +132,7 @@ public class TestFaultDistributor extends TestCase
     // no handler installed for type
     public void testNoHandler() throws Exception
     {
-        FaultDistributor dut = new FaultDistributor();
+        FaultDistributor dut = new FaultDistributor(new MockVoltDB());
         // We lie a little bit here to get the NODE_FAILURE routed to UNKNOWN
         // but still set the checking bool correctly
         MockFaultHandler unk_handler = new MockFaultHandler(FaultType.NODE_FAILURE);
@@ -143,7 +144,7 @@ public class TestFaultDistributor extends TestCase
 
     public void testSingleTypeOrder() throws Exception
     {
-        FaultDistributor dut = new FaultDistributor();
+        FaultDistributor dut = new FaultDistributor(new MockVoltDB());
         OrderTracker order_tracker = new OrderTracker(-1);
         MockFaultHandler node_handler1 =
             new MockFaultHandler(FaultType.NODE_FAILURE, 1, order_tracker);
@@ -178,7 +179,7 @@ public class TestFaultDistributor extends TestCase
 
     public void testFaultClearing() throws Exception
     {
-        FaultDistributor dut = new  FaultDistributor();
+        FaultDistributor dut = new  FaultDistributor(new MockVoltDB());
         OrderTracker orderTracker = new OrderTracker(-1);
         MockFaultHandler mh1 = new MockFaultHandler(FaultType.NODE_FAILURE, 1, orderTracker);
         MockFaultHandler mh2 = new MockFaultHandler(FaultType.NODE_FAILURE, 1, orderTracker);

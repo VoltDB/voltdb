@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-import org.voltdb.VoltDB;
+import org.voltdb.*;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.logging.VoltLogger;
 
@@ -57,6 +57,9 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
     // Fault distributer runs in this thread
     private Thread m_thread;
 
+    // The fault distributor's reference to the VoltDB catalog context.
+    private CatalogContext m_catalogContext;
+
     // Pairs a fault handlers to its specific unhandled fault set
     class FaultHandlerData {
 
@@ -78,8 +81,9 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
         VoltFault m_fault;
     }
 
-    public FaultDistributor()
+    public FaultDistributor(VoltDBInterface voltdb)
     {
+        m_catalogContext = voltdb.getCatalogContext();
         m_faultHandlers =
             new HashMap<FaultType, TreeMap<Integer, List<FaultHandlerData>>>();
         for (VoltFault.FaultType type : VoltFault.FaultType.values()) {
@@ -222,7 +226,8 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
     /*
      * Check if this fault is a duplicate of a previously reported fault
      */
-    private boolean duplicateCheck(VoltFault fault) {
+    private boolean isKnownFault(VoltFault fault) {
+        assert (Thread.currentThread() == m_thread);
         return !m_knownFaults.get(fault.getFaultType()).add(fault);
     }
 
@@ -240,26 +245,20 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
             m_pendingFaults = new ArrayDeque<VoltFault>();
         }
 
-        HashMap<FaultType, HashSet<VoltFault>> faultsMap = new HashMap<FaultType, HashSet<VoltFault>>();
-        while (!pendingFaults.isEmpty()) {
-            VoltFault fault = pendingFaults.poll();
-            if (duplicateCheck(fault)) {
-                continue;
-            }
-            HashSet<VoltFault> faults = faultsMap.get(fault.getFaultType());
-            if (faults == null) {
-                faults = new HashSet<VoltFault>();
-                faultsMap.put(fault.getFaultType(), faults);
-            }
-            boolean added = faults.add(fault);
-            assert(added);
-        }
+        // hash the pending faults by fault type and update known faults.
+        HashMap<FaultType, HashSet<VoltFault>> newFaults =
+            organizeNewFaults(pendingFaults);
 
-        if (faultsMap.isEmpty()) {
+        // examine the known faults and the new faults and make policy decisions
+        HashMap<FaultType, HashSet<VoltFault>> policiesMap =
+            makePolicyDecisions(m_knownFaults, newFaults);
+
+        // and apply those policies...
+        if (policiesMap.isEmpty()) {
             return;
         }
 
-        for (Map.Entry<FaultType, HashSet<VoltFault>> entry : faultsMap.entrySet()) {
+        for (Map.Entry<FaultType, HashSet<VoltFault>> entry : newFaults.entrySet()) {
             TreeMap<Integer, List<FaultHandlerData>> handler_map =
                 m_faultHandlers.get(entry.getKey());
             if (handler_map == null)
@@ -282,6 +281,48 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
             }
         }
     }
+
+
+    /*
+     * Pre-process the pending faults list. Update known faults and return a
+     * map of FaultType -> fault set.
+     */
+    private HashMap<FaultType, HashSet<VoltFault>>
+    organizeNewFaults(ArrayDeque<VoltFault> pendingFaults)
+    {
+        HashMap<FaultType, HashSet<VoltFault>> faultsMap = new HashMap<FaultType, HashSet<VoltFault>>();
+        while (!pendingFaults.isEmpty()) {
+            VoltFault fault = pendingFaults.poll();
+            if (isKnownFault(fault)) {
+                continue;
+            }
+            HashSet<VoltFault> faults = faultsMap.get(fault.getFaultType());
+            if (faults == null) {
+                faults = new HashSet<VoltFault>();
+                faultsMap.put(fault.getFaultType(), faults);
+            }
+            boolean added = faults.add(fault);
+            assert(added);
+        }
+        return faultsMap;
+    }
+
+    /*
+     * Look at the known faults and the new faults and decide what action(s)
+     * to take.
+     */
+    private HashMap<FaultType, HashSet<VoltFault>>
+    makePolicyDecisions(HashMap<FaultType, HashSet<VoltFault>> knownFaults,
+                        HashMap<FaultType, HashSet<VoltFault>> newFaults)
+    {
+        /*
+        HashMap<FaultType, HashSet<VoltFault>> policySets =
+            new HashMap<FaultType, HashSet<VoltFault>>();
+        return policySets;
+        */
+        return newFaults;
+    }
+
 
     private void processClearedFaults() {
         HashMap<FaultType, HashSet<VoltFault>> pendingClearedFaults;

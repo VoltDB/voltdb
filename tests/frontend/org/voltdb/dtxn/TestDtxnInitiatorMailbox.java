@@ -282,7 +282,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
         m_mockVolt.addSite(1, HOST_ID, 0, true);
         m_mockVolt.addSite(0, HOST_ID, 0, true);
         m_mockVolt.addSite(2, HOST_ID, 0, false);
-        m_mockVolt.setFaultDistributor(new FaultDistributor());
+        m_mockVolt.setFaultDistributor(new FaultDistributor(m_mockVolt));
         VoltDB.replaceVoltDBInstanceForTest(m_mockVolt);
     }
 
