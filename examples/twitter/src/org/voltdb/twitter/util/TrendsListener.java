@@ -27,6 +27,7 @@ import java.util.List;
 import twitter4j.Status;
 import twitter4j.StatusDeletionNotice;
 import twitter4j.StatusListener;
+import twitter4j.TwitterException;
 
 public class TrendsListener implements StatusListener {
 
@@ -40,7 +41,21 @@ public class TrendsListener implements StatusListener {
     public void onDeletionNotice(StatusDeletionNotice arg0) {}
 
     @Override
-    public void onException(Exception arg0) {}
+    public void onException(Exception e) {
+        if (e instanceof TwitterException) {
+            if (((TwitterException) e).getStatusCode() == 401) {
+                System.err.println("Invalid Twitter credentials. Did you edit build.xml?");
+            } else {
+                System.err.println("An unknown error occurred:");
+                e.printStackTrace();
+            }
+        } else {
+            System.err.println("An unknown error occurred:");
+            e.printStackTrace();
+        }
+
+        System.exit(-1);
+    }
 
     @Override
     public void onStatus(Status status) {
