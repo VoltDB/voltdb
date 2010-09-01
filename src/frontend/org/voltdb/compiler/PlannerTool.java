@@ -286,7 +286,11 @@ public class PlannerTool {
         // PARSE COMMAND LINE ARGS
         //////////////////////
 
-        m_logfile = new File("plannerlog.txt");
+        String logfile_dir = "";
+        if (System.getenv().get("TEST_DIR") != null) {
+            logfile_dir = System.getenv().get("TEST_DIR") + File.separator;
+        }
+        m_logfile = new File(logfile_dir + "plannerlog.txt");
 
         log("\ngetting started at: " + new Date().toString());
 
