@@ -75,6 +75,7 @@ import junit.framework.TestCase;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
@@ -230,18 +231,21 @@ public class TestJSONInterface extends TestCase {
         String schemaPath = schemaFile.getPath();
         schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
 
+        VoltDB.Configuration config = new VoltDB.Configuration();
+
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addSchema(schemaPath);
         builder.addPartitionInfo("blah", "ival");
         builder.addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);");
         builder.addProcedures(CrazyBlahProc.class);
-        boolean success = builder.compile("json.jar");
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
         assertTrue(success);
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_httpAdminPort = 8095;
-        config.m_pathToCatalog = "json.jar";
+        config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
         config.m_pathToDeployment = builder.getPathToDeployment();
+
+
         ServerThread server = new ServerThread(config);
         server.start();
         server.waitForInitialization();
@@ -385,12 +389,12 @@ public class TestJSONInterface extends TestCase {
         builder.addStmtProcedure("Insert", "insert into HELLOWORLD values (?,?,?);");
         builder.addStmtProcedure("Select", "select * from HELLOWORLD;");
         builder.addProcedures(SelectStarHelloWorld.class);
-        boolean success = builder.compile("json.jar");
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
         assertTrue(success);
 
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_httpAdminPort = 8095;
-        config.m_pathToCatalog = "json.jar";
+        config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
         config.m_pathToDeployment = builder.getPathToDeployment();
         ServerThread server = new ServerThread(config);
         server.start();
@@ -456,12 +460,12 @@ public class TestJSONInterface extends TestCase {
         pi[1] = new ProcedureInfo(new String[] { "foo" }, "Select", "select * from HELLOWORLD;", null);
         builder.addProcedures(pi);
 
-        boolean success = builder.compile("json.jar");
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
         assertTrue(success);
 
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_httpAdminPort = 8095;
-        config.m_pathToCatalog = "json.jar";
+        config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
         config.m_pathToDeployment = builder.getPathToDeployment();
         ServerThread server = new ServerThread(config);
         server.start();
