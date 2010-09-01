@@ -45,6 +45,7 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.CatalogType;
+import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
@@ -416,6 +417,10 @@ public abstract class CatalogUtil {
             return false;
         }
 
+        if (!validateDeployment(catalog, deployment)) {
+            return false;
+        }
+
         // set the cluster info
         setClusterInfo(catalog, deployment.getCluster());
 
@@ -497,6 +502,35 @@ public abstract class CatalogUtil {
             hostLog.error("Error schema validating deployment.xml file. " + e.getMessage());
             return null;
         }
+    }
+
+    /**
+     * Validate the contents of the deployment.xml file. This is for things like making sure users aren't being added to
+     * non-existent groups, not for validating XML syntax.
+     * @param catalog Catalog to be validated against.
+     * @param deployment Reference to root <deployment> element of deployment file to be validated.
+     * @return Returns true if the deployment file is valid.
+     */
+    private static boolean validateDeployment(Catalog catalog, DeploymentType deployment) {
+        Cluster cluster = catalog.getClusters().get("cluster");
+        Database database = cluster.getDatabases().get("database");
+        Set<String> validGroups = new HashSet<String>();
+        for (Group group : database.getGroups()) {
+            validGroups.add(group.getTypeName());
+        }
+
+        for (UsersType.User user : deployment.getUsers().getUser()) {
+            for (String group : user.getGroups().split(",")) {
+                group = group.trim();
+                if (!validGroups.contains(group)) {
+                    hostLog.error("Cannot assign user \"" + user.getName() + "\" to non-existent group \"" + group +
+                            "\"");
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     /**

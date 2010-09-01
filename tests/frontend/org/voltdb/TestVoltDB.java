@@ -24,6 +24,14 @@
 package org.voltdb;
 
 import org.voltdb.VoltDB;
+import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
+import org.voltdb.catalog.Catalog;
+import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
+import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
+import org.voltdb.regressionsuites.LocalSingleProcessServer;
+import org.voltdb.regressionsuites.VoltServerConfig;
+import org.voltdb.utils.CatalogUtil;
+
 import junit.framework.TestCase;
 
 public class TestVoltDB extends TestCase {
@@ -119,6 +127,43 @@ public class TestVoltDB extends TestCase {
         String[] args7 = {"catalog", "teststring3", "deployment", "teststring4"};
         config = new VoltDB.Configuration(args7);
         assertTrue(config.validate());
+    }
+
+    /**
+     * ENG-639: Improve deployment.xml parser error reporting
+     *
+     * This test tries to assign a user in the deployment file to a group that does not exist and asserts that
+     * deployment file compilation fails.
+     */
+    public void testCompileDeployment() {
+        TPCCProjectBuilder project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addDefaultProcedures();
+
+        project.setSecurityEnabled(true);
+        GroupInfo groups[] = new GroupInfo[] {
+                new GroupInfo("foo", false, false),
+                new GroupInfo("blah", false, false)
+        };
+        project.addGroups(groups);
+        UserInfo users[] = new UserInfo[] {
+                new UserInfo("john", "hugg", new String[] {"foo"}),
+                new UserInfo("ryan", "betts", new String[] {"foo", "bar"}),
+                new UserInfo("ariel", "weisberg", new String[] {"bar"})
+        };
+        project.addUsers(users);
+
+        String catalogName = "compile-deployment.jar";
+        VoltServerConfig config = new LocalSingleProcessServer(catalogName, 1, BackendTarget.NONE);
+
+        assertTrue(config.compile(project));
+
+        Catalog catalog = new Catalog();
+        catalog.execute(CatalogUtil.loadCatalogFromJar(catalogName, null));
+
+        // this should fail because group "bar" does not exist
+        assertFalse(CatalogUtil.compileDeployment(catalog, project.getPathToDeployment()));
     }
 
 }
