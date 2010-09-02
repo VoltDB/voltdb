@@ -115,6 +115,7 @@ public class RealVoltDB implements VoltDBInterface
                               " has rendered the cluster unviable.  Shutting down...");
                 VoltDB.crashVoltDB();
             }
+            m_waitForFaultReported.release();
         }
 
         @Override
@@ -126,7 +127,20 @@ public class RealVoltDB implements VoltDBInterface
             }
         }
 
+        /**
+         * When clearing a fault, specifically a rejoining node, wait to make sure it is cleared
+         * before proceeding because proceeding might generate new faults that should
+         * be deduped by the FaultManager.
+         */
         private final Semaphore m_waitForFaultClear = new Semaphore(0);
+
+        /**
+         * When starting up as a rejoining node a fault is reported
+         * for every currently down node. Once this fault is handled
+         * here by RealVoltDB's handler the catalog will be updated.
+         * Then the rest of the system can init with the updated catalog.
+         */
+        private final Semaphore m_waitForFaultReported = new Semaphore(0);
     }
 
     static class RejoinCallback implements ProcedureCallback {
@@ -151,9 +165,14 @@ public class RealVoltDB implements VoltDBInterface
             this.notify();
         }
 
-        public synchronized ClientResponse waitForResponse() throws InterruptedException {
+        public synchronized ClientResponse waitForResponse(int timeout) throws InterruptedException {
+            final long start = System.currentTimeMillis();
             while (response == null) {
-                this.wait();
+                this.wait(timeout);
+                long finish = System.currentTimeMillis();
+                if (finish - start >= timeout) {
+                    return null;
+                }
             }
             return response;
         }
@@ -171,11 +190,18 @@ public class RealVoltDB implements VoltDBInterface
         private final String m_serializedCatalog;
         private volatile ExecutionSite m_siteObj;
         private final boolean m_recovering;
+        private final HashSet<Integer> m_failedHostIds;
 
-        public ExecutionSiteRunner(final int siteId, final CatalogContext context, final String serializedCatalog, boolean recovering) {
+        public ExecutionSiteRunner(
+                final int siteId,
+                final CatalogContext context,
+                final String serializedCatalog,
+                boolean recovering,
+                HashSet<Integer> failedHostIds) {
             m_siteId = siteId;
             m_serializedCatalog = serializedCatalog;
             m_recovering = recovering;
+            m_failedHostIds = failedHostIds;
         }
 
         @Override
@@ -189,7 +215,8 @@ public class RealVoltDB implements VoltDBInterface
                                   m_siteId,
                                   m_serializedCatalog,
                                   null,
-                                  m_recovering);
+                                  m_recovering,
+                                  m_failedHostIds);
             synchronized (this) {
                 m_isSiteCreated = true;
                 this.notifyAll();
@@ -242,6 +269,8 @@ public class RealVoltDB implements VoltDBInterface
     private final VoltDBNodeFailureFaultHandler m_faultHandler = new VoltDBNodeFailureFaultHandler();
 
     private volatile boolean m_isRunning = false;
+
+    private long m_recoveryStartTime = System.currentTimeMillis();
 
     // methods accessed via the singleton
     public void startSampler() {
@@ -364,7 +393,7 @@ public class RealVoltDB implements VoltDBInterface
 
             // Prepare the network socket manager for work
             m_network = new VoltNetwork();
-
+            final HashSet<Integer> downHosts = new HashSet<Integer>();
             if (config.m_rejoinToHostAndPort == null) {
                 // Create the intra-cluster mesh
                 InetAddress leader = null;
@@ -386,7 +415,21 @@ public class RealVoltDB implements VoltDBInterface
                 m_instanceId = new Object[] { retval[0], retval[1] };
             }
             else {
-                initializeForRejoin(config, catalogCRC);
+                downHosts.addAll(initializeForRejoin(config, catalogCRC));
+                /**
+                 * Whatever hosts were reported as being down on rejoin should
+                 * be reported to the fault manager so that the fault can be distributed.
+                 * The execution sites were informed on construction so they don't have
+                 * to go through the agreement process.
+                 */
+                for (Integer downHost : downHosts) {
+                    m_faultManager.reportFault(new NodeFailureFault( downHost, "UNKNOWN"));
+                }
+                try {
+                    m_faultHandler.m_waitForFaultReported.acquire(downHosts.size());
+                } catch (InterruptedException e) {
+                    VoltDB.crashVoltDB();
+                }
                 ExecutionSite.recoveringSiteCount.set(
                         m_catalogContext.siteTracker.getLiveExecutionSitesForHost(m_messenger.getHostId()).size());
             }
@@ -426,7 +469,13 @@ public class RealVoltDB implements VoltDBInterface
                         if (siteForThisThread == null) {
                             siteForThisThread = site;
                         } else {
-                            ExecutionSiteRunner runner = new ExecutionSiteRunner(siteId, m_catalogContext, serializedCatalog, m_recovering);
+                            ExecutionSiteRunner runner =
+                                new ExecutionSiteRunner(
+                                        siteId,
+                                        m_catalogContext,
+                                        serializedCatalog,
+                                        m_recovering,
+                                        downHosts);
                             m_runners.add(runner);
                             Thread runnerThread = new Thread(runner, "Site " + siteId);
                             runnerThread.start();
@@ -448,7 +497,8 @@ public class RealVoltDB implements VoltDBInterface
                                   siteId,
                                   serializedCatalog,
                                   null,
-                                  m_recovering);
+                                  m_recovering,
+                                  downHosts);
             m_localSites.put(Integer.parseInt(siteForThisThread.getTypeName()), siteObj);
             m_currentThreadSite = siteObj;
 
@@ -552,11 +602,12 @@ public class RealVoltDB implements VoltDBInterface
                                                  m_statsManager);
             fivems.start();
 
+
             hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null);
         }
     }
 
-    public void initializeForRejoin(VoltDB.Configuration config, long catalogCRC) {
+    public HashSet<Integer> initializeForRejoin(VoltDB.Configuration config, long catalogCRC) {
      // sensible defaults (sorta)
         String rejoinHostCredentialString = null;
         String rejoinHostAddressString = null;
@@ -657,23 +708,26 @@ public class RealVoltDB implements VoltDBInterface
             System.exit(-1);
         }
 
-        Object retval[] = m_messenger.waitForGroupJoin();
+        Object retval[] = m_messenger.waitForGroupJoin(3000);
         m_instanceId = new Object[] { retval[0], retval[1] };
 
-        ArrayList<Integer> downHosts = (ArrayList<Integer>)retval[2];
+        HashSet<Integer> downHosts = (HashSet<Integer>)retval[2];
         System.out.println("Down hosts are " + downHosts.toString());
-        for (Integer host : downHosts) {
-            m_faultHandler.handleNodeFailureFault(new NodeFailureFault( host, "UNKNOWN"));
-        }
 
         try {
             //Callback validates response asynchronously. Just wait for the response before continuing.
-            response = rcb.waitForResponse();
+            //Timeout because a failure might result in the response not coming.
+            response = rcb.waitForResponse(3000);
+            if (response == null) {
+                hostLog.fatal("Recovering node timed out rejoining");
+                VoltDB.crashVoltDB();
+            }
         }
         catch (InterruptedException e) {
             hostLog.error("Interrupted while attempting to rejoin cluster");
             VoltDB.crashVoltDB();
         }
+        return downHosts;
     }
 
     public void readBuildInfo() {
@@ -1103,5 +1157,11 @@ public class RealVoltDB implements VoltDBInterface
     @Override
     public BackendTarget getBackendTargetType() {
         return m_config.m_backend;
+    }
+
+    @Override
+    public void onRecoveryCompletion() {
+        final long now = System.currentTimeMillis();
+        hostLog.info("Node recovery completed after " + ((now - m_recoveryStartTime) / 1000) + " seconds");
     }
 }

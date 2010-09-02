@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.Semaphore;
+import java.util.ArrayList;
 
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
@@ -128,6 +129,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
 
     private boolean m_recovering = false;
     private boolean m_haveRecoveryPermit = false;
+    private long m_recoveryStartTime = 0;
 
     // Catalog
     public CatalogContext m_context;
@@ -371,6 +373,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     private final Runnable m_onRecoveryCompletion = new Runnable() {
         @Override
         public void run() {
+            final long now = System.currentTimeMillis();
             m_recoveryProcessor = null;
             m_recovering = false;
             if (m_haveRecoveryPermit) {
@@ -378,15 +381,16 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 m_recoveryPermit.release();
                 m_recoveryLog.info(
                         "Destination recovery complete for site " + m_siteId +
-                        " partition " + m_context.siteTracker.getPartitionForSite(m_siteId));
+                        " partition " + m_context.siteTracker.getPartitionForSite(m_siteId) +
+                        " after " + ((now - m_recoveryStartTime) / 1000) + " seconds");
                 int remaining = recoveringSiteCount.decrementAndGet();
                 if (remaining == 0) {
-                    m_recoveryLog.info("Recovery complete");
-                    System.out.println("Recovery complete");
+                    VoltDB.instance().onRecoveryCompletion();
                 }
             } else {
                 m_recoveryLog.info("Source recovery complete for site " + m_siteId +
-                        " partition " + m_context.siteTracker.getPartitionForSite(m_siteId));
+                        " partition " + m_context.siteTracker.getPartitionForSite(m_siteId) +
+                        " after " + ((now - m_recoveryStartTime) / 1000) + " seconds");
             }
         }
     };
@@ -475,17 +479,22 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
                   final int siteId, String serializedCatalog,
                   RestrictedPriorityQueue transactionQueue,
-                  boolean recovering)
+                  boolean recovering,
+                  HashSet<Integer> failedHostIds)
     {
+        hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_Initializing.name(),
+                new Object[] { String.valueOf(siteId) }, null);
+
         m_siteId = siteId;
         String txnlog_name = ExecutionSite.class.getName() + "." + m_siteId;
         m_txnlog = new VoltLogger(txnlog_name);
         m_recovering = recovering;
-
-        hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_Initializing.name(),
-                        new Object[] { String.valueOf(siteId) }, null);
-
         m_context = voltdb.getCatalogContext();
+
+        for (Integer failedHostId : failedHostIds) {
+            m_knownFailedSites.addAll(m_context.siteTracker.getAllSitesForHost(failedHostId));
+        }
+        m_handledFailedSites.addAll(m_knownFailedSites);
 
         VoltDB.instance().getFaultDistributor().
         registerFaultHandler(FaultType.NODE_FAILURE,
@@ -727,6 +736,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                     Long safeTxnId = m_transactionQueue.safeToRecover();
                     if (safeTxnId != null && m_recoveryPermit.tryAcquire()) {
                         m_haveRecoveryPermit = true;
+                        m_recoveryStartTime = System.currentTimeMillis();
                         m_recoveryProcessor =
                             RecoverySiteProcessorDestination.createProcessor(
                                     m_context.database,
@@ -766,13 +776,13 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                         m_recoveryProcessor.doRecoveryWork(currentTxnState.txnId);
                     }
                     recursableRun(currentTxnState);
-                } else if (m_recoveryProcessor != null) {
+                }
+                else if (m_recoveryProcessor != null) {
                     /*
                      * If there is no work in the system the minimum safe txnId is used to move
                      * recovery forward. This works because heartbeats will move the minimum safe txnId
                      * up even when there is no work for this partition.
                      */
-                    assert(m_transactionQueue != null);
                     Long foo = m_transactionQueue.safeToRecover();
                     if (foo != null) {
                         m_recoveryProcessor.doRecoveryWork(foo);
@@ -928,15 +938,10 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
 
             if (ts == null) {
                 if (info.isSinglePartition()) {
-                    if (m_recovering == false) {
-                        ts = new SinglePartitionTxnState(m_mailbox, this, info);
-                    }
-                    else {
-                        ts = new RecoveringSinglePartitionTxnState(m_mailbox, this, info);
-                    }
+                    ts = new SinglePartitionTxnState(m_mailbox, this, info);
                 }
                 else {
-                    ts = new MultiPartitionParticipantTxnState(m_mailbox, this, info, m_recovering);
+                    ts = new MultiPartitionParticipantTxnState(m_mailbox, this, info);
                 }
                 m_transactionQueue.add(ts);
                 m_transactionsById.put(ts.txnId, ts);
@@ -960,7 +965,11 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 assert(m_recoveryProcessor == null);
                 assert(rm.type() == RecoveryMessageType.Initiate);
                 final long recoveringPartitionTxnId = rm.txnId();
-                m_recoveryLog.info("Recovery initiate received at site " + m_siteId + " from site " + rm.sourceSite());
+                m_recoveryStartTime = System.currentTimeMillis();
+                m_recoveryLog.info(
+                        "Recovery initiate received at site " + m_siteId +
+                        " from site " + rm.sourceSite() + " requesting recovery start before txnid " +
+                        recoveringPartitionTxnId);
                 m_recoveryProcessor = RecoverySiteProcessorSource.createProcessor(
                         recoveringPartitionTxnId,
                         rm.sourceSite(),
@@ -1086,6 +1095,12 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
      */
     private void discoverGlobalFaultData(HashSet<NodeFailureFault> failedHosts)
     {
+        //Keep it simple and don't try to recover on the recovering node.
+        if (m_recovering) {
+            m_recoveryLog.fatal("Aborting recovery due to a remote node failure. Retry again.");
+            VoltDB.crashVoltDB();
+        }
+
         // Fix context and associated site tracker first - need
         // an accurate topology to perform discovery.
         m_context = VoltDB.instance().getCatalogContext();
@@ -1094,7 +1109,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         for (NodeFailureFault fault : failedHosts) {
             failedSiteIds.addAll(m_context.siteTracker.getAllSitesForHost(fault.getHostId()));
         }
-
         m_knownFailedSites.addAll(failedSiteIds);
 
         int expectedResponses = discoverGlobalFaultData_send();
@@ -1171,7 +1185,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                     Long txnId = m_transactionQueue.getNewestSafeTransactionForInitiator(site);
                     if (txnId == null) {
                         txnId = siteMap.get(site);
-                        assert(txnId != null);
+                        //assert(txnId != null);
                     } else {
                         siteMap.put(site, txnId);
                     }
@@ -1180,7 +1194,8 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                         new FailureSiteUpdateMessage(m_siteId,
                                                      m_knownFailedSites,
                                                      site,
-                                                     txnId,
+                                                     txnId != null ? txnId : Long.MIN_VALUE,
+                                                     //txnId,
                                                      lastKnownGloballyCommitedMultiPartTxnId);
 
                     m_mailbox.send(survivors, 0, srcmsg);
@@ -1606,7 +1621,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     {
         do
         {
-            if (currentTxnState.doWork()) {
+            if (currentTxnState.doWork(m_recovering)) {
                 if (currentTxnState.needsRollback())
                 {
                     rollbackTransaction(currentTxnState);
@@ -1848,7 +1863,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             // only sneak in single partition work
             if (nextTxn instanceof SinglePartitionTxnState)
             {
-                boolean success = nextTxn.doWork();
+                boolean success = nextTxn.doWork(m_recovering);
                 assert(success);
                 return true;
             }

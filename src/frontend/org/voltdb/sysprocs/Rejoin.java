@@ -50,6 +50,9 @@ public class Rejoin extends VoltSystemProcedure {
     private static final int DEP_rejoinAggregate = (int)
         SysProcFragmentId.PF_rejoinAggregate;
 
+    //Turn on some sleeps to assist in creating interesting failures
+    public static boolean debugFlag = false;
+
     @Override
     public void init(int numberOfPartitions, SiteProcedureConnection site,
             Procedure catProc, BackendTarget eeType, HsqlBackend hsql, Cluster cluster) {
@@ -80,6 +83,14 @@ public class Rejoin extends VoltSystemProcedure {
                 new ColumnInfo("Error", VoltType.STRING) // string on failure, null on success
         );
 
+        if (debugFlag) {
+            try {
+                Thread.sleep(250);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+
         String error = null;
 
         // verify valid hostId
@@ -100,6 +111,13 @@ public class Rejoin extends VoltSystemProcedure {
 
         retval.addRow(hostId, error);
 
+        if (debugFlag) {
+            try {
+                Thread.sleep(250);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
         return retval;
     }
 
@@ -127,6 +145,14 @@ public class Rejoin extends VoltSystemProcedure {
                 new ColumnInfo("HostId", VoltType.INTEGER),
                 new ColumnInfo("Error", VoltType.STRING) // string on failure, null on success
         );
+
+        if (debugFlag) {
+            try {
+                Thread.sleep(250);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
 
         ArrayList<Integer> rejoiningSiteIds = new ArrayList<Integer>();
         ArrayList<Integer> rejoiningExecSiteIds = new ArrayList<Integer>();
@@ -161,6 +187,14 @@ public class Rejoin extends VoltSystemProcedure {
 
         retval.addRow(Integer.parseInt(context.getSite().getTypeName()), error);
 
+        if (debugFlag) {
+            try {
+                Thread.sleep(250);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+
         return retval;
     }
 
@@ -170,7 +204,21 @@ public class Rejoin extends VoltSystemProcedure {
                 new ColumnInfo("Error", VoltType.STRING) // string on failure, null on success
         );
 
+        if (debugFlag) {
+            try {
+                Thread.sleep(250);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
         String error = VoltDB.instance().doRejoinCommitOrRollback(getTransactionId(), false);
+        if (debugFlag) {
+            try {
+                Thread.sleep(250);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
 
         retval.addRow(hostId, error);
         return retval;

@@ -97,7 +97,7 @@ public abstract class TransactionState implements Comparable<TransactionState> {
 
     public abstract boolean hasTransactionalWork();
 
-    public abstract boolean doWork();
+    public abstract boolean doWork(boolean recovering);
 
     public boolean shouldResumeProcedure() {
         return false;
@@ -195,5 +195,4 @@ public abstract class TransactionState implements Comparable<TransactionState> {
      * @param failedSites list of execution and initiator sites that have failed
      */
     public abstract void handleSiteFaults(HashSet<Integer> failedSites);
-
 }

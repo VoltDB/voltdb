@@ -19,8 +19,11 @@ package org.voltdb.dtxn;
 
 import java.util.HashSet;
 
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExecutionSite;
 import org.voltdb.TransactionIdManager;
+import org.voltdb.VoltTable;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
@@ -71,7 +74,10 @@ public class SinglePartitionTxnState extends TransactionState {
     }
 
     @Override
-    public boolean doWork() {
+    public boolean doWork(boolean recovering) {
+        if (recovering) {
+            return doWorkRecovering();
+        }
         if (!m_done) {
             m_site.beginNewTxn(this);
             InitiateResponseMessage response = m_site.processInitiateTask(this, m_task);
@@ -84,6 +90,30 @@ public class SinglePartitionTxnState extends TransactionState {
             } catch (MessagingException e) {
                 throw new RuntimeException(e);
             }
+            m_done = true;
+        }
+        return m_done;
+    }
+
+    private boolean doWorkRecovering() {
+        if (!m_done) {
+            InitiateResponseMessage response = new InitiateResponseMessage(m_task);
+
+            // add an empty dummy response
+            response.setResults(new ClientResponseImpl(
+                    ClientResponse.SUCCESS,
+                    new VoltTable[0],
+                    null));
+
+            // this tells the initiator that the response is a dummy
+            response.setRecovering(true);
+
+            try {
+                m_mbox.send(initiatorSiteId, 0, response);
+            } catch (MessagingException e) {
+                throw new RuntimeException(e);
+            }
+
             m_done = true;
         }
         return m_done;

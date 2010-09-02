@@ -129,4 +129,9 @@ public interface VoltDBInterface
      * @return true if the VoltDB is running.
      */
     public boolean isRunning();
+
+    /**
+     * Notify RealVoltDB that recovery is complete
+     */
+    void onRecoveryCompletion();
 }

@@ -378,7 +378,15 @@ public class TestExecutionSite extends TestCase {
         for (int ss=0; ss < siteCount; ++ss) {
             m_mboxes[ss] = new RussianRouletteMailbox( ss );
             m_rpqs[ss] = new RestrictedPriorityARRR(getInitiatorIds(), ss, m_mboxes[ss]);
-            m_sites[ss] = new ExecutionSite(m_voltdb, m_mboxes[ss], ss, null, m_rpqs[ss], false);
+            m_sites[ss] =
+                new ExecutionSite(
+                        m_voltdb,
+                        m_mboxes[ss],
+                        ss,
+                        null,
+                        m_rpqs[ss],
+                        false,
+                        new HashSet<Integer>());
             registerMailbox(ss, m_mboxes[ss]);
         }
     }
@@ -780,14 +788,14 @@ public class TestExecutionSite extends TestCase {
             new InitiateTaskMessage(getInitiatorIdForSiteId(0), 0, 1000, readOnly, singlePartition, tx1_spi, Long.MAX_VALUE);
 
         final MultiPartitionParticipantTxnState tx1_1 =
-            new MultiPartitionParticipantTxnState(m_mboxes[0], m_sites[0], tx1_mn_1, false);
+            new MultiPartitionParticipantTxnState(m_mboxes[0], m_sites[0], tx1_mn_1);
 
         // site 2 is a participant
         final MultiPartitionParticipantMessage tx1_mn_2 =
             new MultiPartitionParticipantMessage(getInitiatorIdForSiteId(0), 0, 1000, readOnly);
 
         final MultiPartitionParticipantTxnState tx1_2 =
-            new MultiPartitionParticipantTxnState(m_mboxes[1], m_sites[1], tx1_mn_2, false);
+            new MultiPartitionParticipantTxnState(m_mboxes[1], m_sites[1], tx1_mn_2);
 
         // pre-conditions
         int callcheck = MockMPVoltProcedure.m_called;
@@ -900,14 +908,14 @@ public class TestExecutionSite extends TestCase {
             new InitiateTaskMessage(getInitiatorIdForSiteId(0), 0, txnid, readOnly, singlePartition, tx1_spi, Long.MAX_VALUE);
 
         final MultiPartitionParticipantTxnState tx1_1 =
-            new MultiPartitionParticipantTxnState(m_mboxes[0], m_sites[0], tx1_mn_1, false);
+            new MultiPartitionParticipantTxnState(m_mboxes[0], m_sites[0], tx1_mn_1);
 
         // site 2 is a participant
         final MultiPartitionParticipantMessage tx1_mn_2 =
             new MultiPartitionParticipantMessage(getInitiatorIdForSiteId(0), 0, txnid, readOnly);
 
         final MultiPartitionParticipantTxnState tx1_2 =
-            new MultiPartitionParticipantTxnState(m_mboxes[1], m_sites[1], tx1_mn_2, false);
+            new MultiPartitionParticipantTxnState(m_mboxes[1], m_sites[1], tx1_mn_2);
 
         // pre-conditions
         int callcheck = MockMPVoltProcedure.m_called;
@@ -956,7 +964,7 @@ public class TestExecutionSite extends TestCase {
         InitiateTaskMessage mn = new InitiateTaskMessage(-1, -1, -1, false, false, spi, Long.MIN_VALUE);
 
         MultiPartitionParticipantTxnState ts =
-            new MultiPartitionParticipantTxnState(m_mboxes[0], m_sites[0], mn, false);
+            new MultiPartitionParticipantTxnState(m_mboxes[0], m_sites[0], mn);
 
         // fail middle and last site
         HashSet<Integer> failedSites = new HashSet<Integer>();
@@ -972,7 +980,7 @@ public class TestExecutionSite extends TestCase {
         assertEquals(4, dumpContents.nonCoordinatingSites[0]);
 
         // fail first site
-        ts = new MultiPartitionParticipantTxnState(m_mboxes[0], m_sites[0], mn, false);
+        ts = new MultiPartitionParticipantTxnState(m_mboxes[0], m_sites[0], mn);
         failedSites.clear();
         failedSites.add(1);
         ts.handleSiteFaults(failedSites);
@@ -988,7 +996,7 @@ public class TestExecutionSite extends TestCase {
         assertEquals(8, dumpContents.nonCoordinatingSites[6]);
 
         // fail site that isn't a non-coordinator site
-        ts = new MultiPartitionParticipantTxnState(m_mboxes[0], m_sites[0], mn, false);
+        ts = new MultiPartitionParticipantTxnState(m_mboxes[0], m_sites[0], mn);
         failedSites.clear();
         failedSites.add(9);
         failedSites.add(10);
@@ -1025,7 +1033,7 @@ public class TestExecutionSite extends TestCase {
                                     readOnly, singlePartition, tx1_spi, Long.MAX_VALUE);
 
         final MultiPartitionParticipantTxnState tx1_1 =
-            new MultiPartitionParticipantTxnState(m_mboxes[0], m_sites[0], tx1_mn_1, false);
+            new MultiPartitionParticipantTxnState(m_mboxes[0], m_sites[0], tx1_mn_1);
 
         // Site 2 won't exist; we'll claim it fails.
 

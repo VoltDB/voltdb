@@ -139,13 +139,21 @@ public class HostMessenger implements Messenger {
     }
 
     public synchronized Object[] waitForGroupJoin() {
+         return waitForGroupJoin(Integer.MAX_VALUE);
+    }
+
+    public synchronized Object[] waitForGroupJoin(int timeout) {
         // no-op if called from another thread after the first init
         if (!m_initialized) {
 
             try {
-                m_joiner.join();
+                m_joiner.join(timeout);
                 if (!m_joiner.getSuccess()) {
                     throw new RuntimeException("The joiner thread was not successful");
+                }
+                //timeout
+                if (m_joiner.isAlive()) {
+                    VoltDB.crashVoltDB();
                 }
             } catch (InterruptedException e) {
                 e.printStackTrace();
@@ -173,7 +181,7 @@ public class HostMessenger implements Messenger {
             m_initialized = true;
         }
 
-        ArrayList<Integer> downHosts = new ArrayList<Integer>();
+        HashSet<Integer> downHosts = new HashSet<Integer>();
         for (int ii = 0; ii < (m_foreignHosts.length - 1); ii++) {
             if (m_foreignHosts[ii] == null && ii != m_localHostId) {
                 downHosts.add(ii);

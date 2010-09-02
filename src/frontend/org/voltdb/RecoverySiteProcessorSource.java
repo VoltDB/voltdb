@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.ArrayDeque;
 
 import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.RecoveryMessage;
@@ -47,6 +48,10 @@ import org.voltdb.utils.Pair;
  *
  */
 public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
+
+    static {
+        new VoltLogger("RECOVERY").setLevel(Level.TRACE);
+    }
 
     /** Number of buffers to use */
     static final int m_numBuffers = 3;
@@ -391,7 +396,7 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
      */
     @Override
     public void doRecoveryWork(long nextTxnId) {
-        System.out.println("Doing recovery work");
+
         /*
          * Send an initiate response to the recovering partition with txnid it should stop at
          * before receiving the recovery data. Pick a txn id that is >= the next txn that
@@ -400,6 +405,9 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
          * the priority queue is empty.
          */
         if (!m_sentInitiateResponse) {
+            recoveryLog.trace(
+                    "Sending recovery initiate response from " + m_siteId +
+                    " before txnId " + nextTxnId + " to site " + m_destinationSiteId);
             m_sentInitiateResponse = true;
             m_stopBeforeTxnId = Math.max(nextTxnId, m_destinationStoppedBeforeTxnId);
             ByteBuffer buf = ByteBuffer.allocate(2048);
@@ -411,7 +419,7 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
                 throw new RuntimeException(e);
             }
         }
-        System.out.println("Doing recovery work 2");
+
         /*
          * Need to execute more transactions to approach the txn id
          * that we agreed to stop before. The nextTxnId will be a txnId that is for the
@@ -422,8 +430,8 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
         if (nextTxnId < m_stopBeforeTxnId) {
             return;
         }
-
-        System.out.println("Doing recovery work 3");
+        recoveryLog.trace(
+                "Starting recovery of " + m_destinationSiteId + " work before txnId " + nextTxnId);
         while (true) {
             while (m_allowedBuffers > 0 && !m_tablesToStream.isEmpty() && !m_buffers.isEmpty()) {
                 /*
@@ -441,7 +449,6 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
                  */
                 RecoveryMessage rm = new RecoveryMessage(container, m_siteId, m_blockIndex++);
 
-                System.out.println("Doing recovery work 4");
                 /*
                  * Set the position to where the EE should serialize its portion of the recovery message.
                  * RecoveryMessage.getHeaderLength() defines the position where the EE portion starts.
@@ -469,7 +476,7 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
                     buffer.limit(buffer.position() + serialized);
                 }
                 assert(rm != null);
-                System.out.println("Doing recovery work 5");
+
                 /*
                  * If the EE encoded a recovery message with the type complete it indicates that there is no
                  * more data for this table. Remove it from the list of tables waiting to be recovered.
@@ -495,7 +502,7 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
                 //before more data should be sent. The complete message is also acked
                 //and is given a block index.
                 m_ackTracker.waitForAcks( rm.blockIndex(), numDestinations);
-                System.out.println("Doing recovery work 6");
+
                 /*
                  * The common case is recovering a single destination. Take the slightly faster no
                  * copy path.

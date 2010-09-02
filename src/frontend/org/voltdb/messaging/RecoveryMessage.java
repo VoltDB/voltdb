@@ -124,7 +124,7 @@ public class RecoveryMessage extends VoltMessage {
     }
 
     public long txnId() {
-        return m_buffer.getInt(txnIdOffset);
+        return m_buffer.getLong(txnIdOffset);
     }
 
     public byte[] getMessageData() {

@@ -23,6 +23,7 @@ import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.jni.ExecutionEngine;
+import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
@@ -115,6 +116,10 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
         }
     }
 
+    static {
+        new VoltLogger("RECOVERY").setLevel(Level.TRACE);
+    }
+
     /**
      * Process acks that are sent by recovering sites
      */
@@ -163,6 +168,10 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
         if (txnId < m_stopBeforeTxnId) {
             return;
         }
+
+        recoveryLog.trace(
+                "Starting recovery before txnid " + txnId +
+                " for site " + m_siteId + " from " + m_sourceSiteId);
 
         m_recoveryBegan = true;
         for (RecoveryMessage rm : m_buffered) {
@@ -232,6 +241,9 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
         ByteBuffer buf = ByteBuffer.allocate(2048);
         BBContainer container = DBBPool.wrapBB(buf);
         RecoveryMessage recoveryMessage = new RecoveryMessage(container, m_siteId, txnId);
+        recoveryLog.trace(
+                "Sending recovery initiate request before txnid " + txnId +
+                " from site " + m_siteId + " to " + m_sourceSiteId);
         try {
             m_mailbox.send( m_sourceSiteId, 0, recoveryMessage);
         } catch (MessagingException e) {

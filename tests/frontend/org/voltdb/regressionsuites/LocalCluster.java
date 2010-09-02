@@ -97,8 +97,14 @@ public class LocalCluster implements VoltServerConfig {
         final static int m_initToken[] = new int[] {'S', 'e', 'r', 'v', 'e', 'r', ' ',
                                         'c', 'o', 'm', 'p', 'l', 'e', 't', 'e', 'd', ' ',
                                         'i','n','i','t'};
-        final static int m_rejoinToken[] = new int[] {'R', 'e', 'c', 'o', 'v', 'e', 'r', 'y', ' ',
-                'c', 'o', 'm', 'p', 'l', 'e', 't', 'e'};
+        final static int m_rejoinToken[] = new int[] {
+            'N', 'o', 'd', 'e', ' ',
+            'r', 'e', 'c', 'o', 'v', 'e', 'r', 'y', ' ',
+            'c', 'o', 'm', 'p', 'l', 'e', 't', 'e'};
+
+        long m_initTime;
+
+        private boolean m_eof = false;
 
         PipeToFile(String filename, InputStream stream, int token[]) {
             m_witnessedReady = new AtomicBoolean(false);
@@ -119,12 +125,13 @@ public class LocalCluster implements VoltServerConfig {
             assert(m_writer != null);
             assert(m_input != null);
             int location = 0;
-            boolean eof = false;
-            while (!eof) {
+            int initLocation = 0;
+            boolean initLocationFound = false;
+            while (!m_eof) {
                 try {
                     int data = m_input.read();
                     if (data == -1) {
-                        eof = true;
+                        m_eof = true;
                     }
                     else {
                         // look for a sequence of letters matching the server ready token.
@@ -141,13 +148,28 @@ public class LocalCluster implements VoltServerConfig {
                             location = 0;
                         }
 
+                        // look for a sequence of letters matching the server ready token.
+                        if (!initLocationFound && m_initToken[initLocation] == data) {
+                            initLocation++;
+                            if (initLocation == m_initToken.length) {
+                                initLocationFound = true;
+                                m_initTime = System.currentTimeMillis();
+                            }
+                        }
+                        else {
+                            initLocation = 0;
+                        }
+
                         m_writer.write(data);
                         m_writer.flush();
                     }
                 }
                 catch (IOException ex) {
-                    eof = true;
+                    m_eof = true;
                 }
+            }
+            synchronized (this) {
+                notify();
             }
             try {
                 m_writer.close();
@@ -248,6 +270,11 @@ public class LocalCluster implements VoltServerConfig {
     public void setHasLocalServer(boolean hasLocalServer) {
         m_hasLocalServer = hasLocalServer;
     }
+
+    public void setMaxHeap(int megabytes) {
+        m_procBuilder.command().set(4, "-Xmx" + megabytes + "m");
+    }
+
 
     @Override
     public boolean compile(VoltProjectBuilder builder) {
@@ -408,15 +435,15 @@ public class LocalCluster implements VoltServerConfig {
         }
     }
 
-    public void recoverOne(int hostId, Integer portOffset, String rejoinHost) {
-        recoverOne(false, 0, hostId, portOffset, rejoinHost);
+    public boolean recoverOne(int hostId, Integer portOffset, String rejoinHost) {
+        return recoverOne(false, 0, hostId, portOffset, rejoinHost);
     }
 
-    private void recoverOne(boolean logtime, long startTime, int hostId) {
-        recoverOne( logtime, startTime, hostId, null, "localhost");
+    private boolean recoverOne(boolean logtime, long startTime, int hostId) {
+        return recoverOne( logtime, startTime, hostId, null, "localhost");
     }
 
-    private void recoverOne(boolean logtime, long startTime, int hostId, Integer portOffset, String rejoinHost) {
+    private boolean recoverOne(boolean logtime, long startTime, int hostId, Integer portOffset, String rejoinHost) {
         System.out.println("Rejoining " + hostId);
 
         // port for the new node
@@ -431,7 +458,7 @@ public class LocalCluster implements VoltServerConfig {
         }
 
         PipeToFile ptf = null;
-
+        long start = 0;
         try {
             m_procBuilder.command().set(m_portOffset, String.valueOf(portNo));
             m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
@@ -445,8 +472,8 @@ public class LocalCluster implements VoltServerConfig {
             }
 
             Process proc = m_procBuilder.start();
-            // replace the existing dead proc
-            m_cluster.set(hostId, proc);
+            start = System.currentTimeMillis();
+
             // write output to obj/release/testoutput/<test name>-n.txt
             // this may need to be more unique? Also very useful to just
             // set this to a hardcoded path and use "tail -f" to debug.
@@ -463,7 +490,11 @@ public class LocalCluster implements VoltServerConfig {
 
             ptf = new PipeToFile(testoutputdir + File.separator +
                     getName() + "-" + hostId + ".txt", proc.getInputStream(), PipeToFile.m_rejoinToken);
-            m_pipes.set(hostId, ptf);
+            synchronized (this) {
+                m_pipes.set(hostId, ptf);
+                // replace the existing dead proc
+                m_cluster.set(hostId, proc);
+            }
             Thread t = new Thread(ptf);
             t.setName("ClusterPipe:" + String.valueOf(hostId));
             t.start();
@@ -475,7 +506,7 @@ public class LocalCluster implements VoltServerConfig {
         }
 
         // wait for the joining site to be ready
-        while (ptf.m_witnessedReady.get() != true) {
+        while (ptf.m_witnessedReady.get() != true && !ptf.m_eof) {
             if (logtime) System.out.println("********** pre witness: " + (System.currentTimeMillis() - startTime) + " ms");
             try {
                 // wait for explicit notification
@@ -486,6 +517,16 @@ public class LocalCluster implements VoltServerConfig {
             catch (InterruptedException ex) {
                 Logger.getLogger(LocalCluster.class.getName()).log(Level.SEVERE, null, ex);
             }
+        }
+        if (ptf.m_witnessedReady.get()) {
+            long finish = System.currentTimeMillis();
+            System.out.println(
+                    "Took " + (finish - start) +
+                    " milliseconds, time from init was " + (finish - ptf.m_initTime));
+            return true;
+        } else {
+            System.out.println("Recovering process exited before recovery completed");
+            return false;
         }
     }
 
@@ -507,13 +548,18 @@ public class LocalCluster implements VoltServerConfig {
 
     public void shutDownSingleHost(int hostNum)
     {
-        Process proc = m_cluster.get(hostNum);
+        Process proc = null;
+        PipeToFile ptf = null;
+        synchronized (this) {
+           proc = m_cluster.get(hostNum);
+           ptf = m_pipes.get(hostNum);
+           m_cluster.set( hostNum, null);
+           m_pipes.set(hostNum, null);
+        }
+
         if (proc != null)
             proc.destroy();
-        m_cluster.set( hostNum, null);
-        PipeToFile ptf = m_pipes.get(hostNum);
         if (ptf != null) {
-            m_pipes.set(hostNum, null);
             new File(ptf.m_filename).delete();
         }
     }

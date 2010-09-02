@@ -336,10 +336,17 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
     }
 
     /**
-     * Returns true if it is safe to recover. Need to have heard from every initiator before recovery
-     * so that there is a safe txnid at which recovery can take place where the site knows about all work
-     * it will need to apply to the data is receives from the source partition once the data has been streamed.
-     * @return
+     * Determine if it is safe to recover and if it is, what txnid it is safe to recover at.
+     * Recovery is initiated by the recovering source partition. It can't be initiated until the recovering
+     * partition has heard from every initiator. This is because it is not possible to pick a point
+     * in the global txn ordering for the recovery to start at where all subsequent procedure invocations
+     * that need to be applied after recovery are available unless every initiator has been heard from.
+     *
+     * Once the initiators have all been heard from it is necessary to pick the lowest txnid possible for all pending
+     * work. This means taking the min of the newest candidate transaction | the txnid of the next txn in the queue.
+     *
+     * The newest candidate transaction is used if there are no pending txns so recovery can start when
+     * the system is idle.
      */
     public Long safeToRecover() {
         boolean safe = true;
@@ -351,7 +358,12 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
         if (!safe) {
             return null;
         } else {
-            return m_newestCandidateTransaction;
+            TransactionState next = super.peek();
+            if (next == null) {
+                return m_newestCandidateTransaction;
+            } else {
+                return Math.min( m_newestCandidateTransaction, next.txnId);
+            }
         }
     }
 }

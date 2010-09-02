@@ -21,6 +21,8 @@ import java.util.HashSet;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.messaging.RecoveryMessage;
 import org.voltdb.messaging.VoltMessage;
+import org.voltdb.logging.Level;
+import org.voltdb.logging.VoltLogger;
 
 /**
  * Base class for functionality used during recovery. Derived classes implement
@@ -28,7 +30,6 @@ import org.voltdb.messaging.VoltMessage;
  *
  */
 public interface RecoverySiteProcessor {
-
     /**
      * doRecoveryWork loops on receiving messages. This interface is invoked
      * to handle non recovery messages.

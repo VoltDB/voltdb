@@ -28,13 +28,13 @@ import org.voltdb.messaging.TransactionInfoBaseMessage;
 
 public class RecoveringSinglePartitionTxnState extends SinglePartitionTxnState {
 
-    public RecoveringSinglePartitionTxnState(Mailbox mbox, ExecutionSite site, TransactionInfoBaseMessage task) {
+    private RecoveringSinglePartitionTxnState(Mailbox mbox, ExecutionSite site, TransactionInfoBaseMessage task) {
         super(mbox, site, task);
         // TODO Auto-generated constructor stub
     }
 
     @Override
-    public boolean doWork() {
+    public boolean doWork(boolean recovering) {
         if (!m_done) {
             InitiateResponseMessage response = new InitiateResponseMessage(m_task);
 

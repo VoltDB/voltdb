@@ -39,6 +39,8 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Random;
 import java.util.ArrayList;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import junit.framework.TestCase;
 
@@ -47,6 +49,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcedureCallback;
@@ -86,6 +89,11 @@ public class TestRejoinEndToEnd extends TestCase {
             "create table PARTITIONED (" +
             "pkey bigint default 0 not null, " +
             "value bigint default 0 not null, " +
+            "PRIMARY KEY(pkey));" +
+            "create table PARTITIONED_LARGE (" +
+            "pkey bigint default 0 not null, " +
+            "value bigint default 0 not null, " +
+            "data VARCHAR(512) default null," +
             "PRIMARY KEY(pkey));";
 
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
@@ -96,6 +104,7 @@ public class TestRejoinEndToEnd extends TestCase {
         builder.addSchema(schemaPath);
         builder.addPartitionInfo("blah", "ival");
         builder.addPartitionInfo("PARTITIONED", "pkey");
+        builder.addPartitionInfo("PARTITIONED_LARGE", "pkey");
 
         GroupInfo gi = new GroupInfo("foo", true, true);
         builder.addGroups(new GroupInfo[] { gi } );
@@ -112,6 +121,7 @@ public class TestRejoinEndToEnd extends TestCase {
             new ProcedureInfo(new String[] { "foo" }, "InsertPartitioned", "insert into PARTITIONED values (?, ?);", "PARTITIONED.pkey:0"),
             new ProcedureInfo(new String[] { "foo" }, "UpdatePartitioned", "update PARTITIONED set value = ? where pkey = ?;", "PARTITIONED.pkey:1"),
             new ProcedureInfo(new String[] { "foo" }, "SelectPartitioned", "select * from PARTITIONED;", null),
+            new ProcedureInfo(new String[] { "foo" }, "InsertPartitionedLarge", "insert into PARTITIONED_LARGE values (?, ?, ?);", "PARTITIONED_LARGE.pkey:0")
         };
 
         builder.addProcedures(pi);
@@ -516,6 +526,10 @@ public class TestRejoinEndToEnd extends TestCase {
         cluster.shutDown();
     }
 
+    /*
+     * Load some stuff, kill some stuff, rejoin some stuff, update some stuff, rejoin some stuff, drain,
+     * verify the updates occurred. Lather, rinse, and repeat.
+     */
     public void testRejoinFuzz() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setSecurityEnabled(true);
@@ -523,27 +537,32 @@ public class TestRejoinEndToEnd extends TestCase {
         final int numHosts = 10;
         final int numTuples = 60000;
         final int kfactor = 4;
-        LocalCluster cluster =
+        final LocalCluster cluster =
             new LocalCluster(
                     "rejoin.jar",
                     2,
                     numHosts,
-                    4,
-                    BackendTarget.NATIVE_EE_JNI);
-        boolean success = cluster.compile(builder);
+                    kfactor,
+                    BackendTarget.NATIVE_EE_JNI,
+                    LocalCluster.FailureState.ALL_RUNNING,
+                    true);
+        cluster.setMaxHeap(1024);
+        boolean success = cluster.compile(builder, false);
         assertTrue(success);
         copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
         cluster.setHasLocalServer(false);
 
-        ArrayList<Integer> serverValues = new ArrayList<Integer>();
+        final ArrayList<Integer> serverValues = new ArrayList<Integer>();
         cluster.startUp();
 
         Client client = ClientFactory.createClient(m_cconfig);
 
         client.createConnection("localhost");
 
-        Random r = new Random();
+        final Random r = new Random();
+        final Semaphore rateLimit = new Semaphore(25);
         for (int ii = 0; ii < numTuples; ii++) {
+            rateLimit.acquire();
             int value = r.nextInt(numTuples);
             serverValues.add(value);
             client.callProcedure( new ProcedureCallback() {
@@ -553,10 +572,13 @@ public class TestRejoinEndToEnd extends TestCase {
                         throws Exception {
                     if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
                         System.err.println(clientResponse.getStatusString());
+                        return;
                     }
                     if (clientResponse.getResults()[0].asScalarLong() != 1) {
                         System.err.println("Update didn't happen");
+                        return;
                     }
+                    rateLimit.release();
                 }
 
             }, "InsertPartitioned", ii, value);
@@ -565,80 +587,285 @@ public class TestRejoinEndToEnd extends TestCase {
         client.drain();
         client.close();
         Random forWhomTheBellTolls = new Random();
-        for (int zz = 0; zz < 10; zz++) {
+        int toConnectToTemp = 0;
+        Thread lastRejoinThread = null;
+        for (int zz = 0; zz < 5; zz++) {
             client = ClientFactory.createClient(m_cconfig);
-            client.createConnection("localhost");
-            try {
-                VoltTable results = client.callProcedure( "SelectPartitioned").getResults()[0];
-                while (results.advanceRow()) {
-                    int key = (int)results.getLong(0);
-                    int value = (int)results.getLong(1);
-                    if (serverValues.get(key).intValue() != value) {
-                        System.out.println(
-                                "zz is " + zz + " and server value is " +
-                                value + " and expected was " + serverValues.get(key).intValue() +
-                                " and last time it was " + lastServerValues.get(key).intValue());
+            client.createConnection("localhost", Client.VOLTDB_SERVER_PORT + toConnectToTemp);
+            VoltTable results = client.callProcedure( "SelectPartitioned").getResults()[0];
+            while (results.advanceRow()) {
+                int key = (int)results.getLong(0);
+                int value = (int)results.getLong(1);
+                if (serverValues.get(key).intValue() != value) {
+                    System.out.println(
+                            "zz is " + zz + " and server value is " +
+                            value + " and expected was " + serverValues.get(key).intValue() +
+                            " and last time it was " + lastServerValues.get(key).intValue());
+                }
+                assertTrue(serverValues.get(key).intValue() == value);
+            }
+            client.close();
+            if (lastRejoinThread != null) {
+                lastRejoinThread.join();
+            }
+
+            final ArrayList<Integer> toKillFirst = new ArrayList<Integer>();
+            final ArrayList<Integer> toKillDuringRecovery = new ArrayList<Integer>();
+            while (toKillFirst.size() < kfactor / 2) {
+                int candidate = forWhomTheBellTolls.nextInt(numHosts);
+                if (!toKillFirst.contains(candidate)) {
+                    toKillFirst.add(candidate);
+                }
+            }
+            while (toKillDuringRecovery.size() < kfactor / 2) {
+                int candidate = forWhomTheBellTolls.nextInt(numHosts);
+                if (!toKillFirst.contains(candidate) && !toKillDuringRecovery.contains(candidate)) {
+                    toKillDuringRecovery.add(candidate);
+                }
+            }
+            System.out.println("Killing " + toKillFirst.toString() + toKillDuringRecovery.toString());
+
+            toConnectToTemp = forWhomTheBellTolls.nextInt(numHosts);
+            while (toKillFirst.contains(toConnectToTemp) || toKillDuringRecovery.contains(toConnectToTemp)) {
+                toConnectToTemp = forWhomTheBellTolls.nextInt(numHosts);
+            }
+            final int toConnectTo = toConnectToTemp;
+
+            for (Integer uhoh : toKillFirst) {
+                cluster.shutDownSingleHost(uhoh);
+            }
+
+            Thread recoveryThread = new Thread() {
+                @Override
+                public void run() {
+                    for (Integer dead : toKillFirst) {
+                        while (!cluster.recoverOne( dead, toConnectTo, m_username + ":" + m_password + "@localhost")) {};
                     }
-                    assertTrue(serverValues.get(key).intValue() == value);
                 }
-                client.close();
+            };
 
-                ArrayList<Integer> toKill = new ArrayList<Integer>();
-                while (toKill.size() < kfactor) {
-                    int candidate = forWhomTheBellTolls.nextInt(numHosts);
-                    if (!toKill.contains(candidate)) {
-                        toKill.add(candidate);
+            Thread killerThread = new Thread() {
+                @Override
+                public void run() {
+                    Random r = new Random();
+                    for (Integer toKill : toKillDuringRecovery) {
+                        try {
+                            Thread.sleep(r.nextInt(2000));
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        cluster.shutDownSingleHost(toKill);
                     }
                 }
-                System.out.println("Killing " + toKill.toString());
+            };
 
-                int toConnectTo = forWhomTheBellTolls.nextInt(numHosts);
-                while (toKill.contains(toConnectTo)) {
-                    toConnectTo = forWhomTheBellTolls.nextInt(numHosts);
-                }
+            client = ClientFactory.createClient(m_cconfig);
+            final Client clientRef = client;
+            client.createConnection("localhost", Client.VOLTDB_SERVER_PORT + toConnectTo);
+            lastServerValues = new ArrayList<Integer>(serverValues);
+            final AtomicBoolean shouldContinue = new AtomicBoolean(true);
+            final Thread loadThread = new Thread() {
+                @Override
+                public void run() {
+                    try {
+                        while (shouldContinue.get()) {
+                            for (int ii = 0; ii < numTuples && shouldContinue.get(); ii++) {
+                                    rateLimit.acquire();
+                                    int updateKey = r.nextInt(numTuples);
+                                    int updateValue = r.nextInt(numTuples);
+                                    serverValues.set(updateKey, updateValue);
+                                    clientRef.callProcedure( new ProcedureCallback() {
 
-                for (Integer uhoh : toKill) {
-                    cluster.shutDownSingleHost(uhoh);
-                }
+                                        @Override
+                                        public void clientCallback(ClientResponse clientResponse)
+                                                throws Exception {
+                                            if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                                                System.err.println(clientResponse.getStatusString());
+                                                return;
+                                            }
+                                            if (clientResponse.getResults()[0].asScalarLong() != 1) {
+                                                System.err.println("Update didn't happen");
+                                            }
+                                            rateLimit.release();
+                                        }
 
-                int recoverNow = toKill.size() / 2;
-                for (int ii = 0; ii < recoverNow; ii++) {
-                    cluster.recoverOne( toKill.remove(0), toConnectTo, m_username + ":" + m_password + "@localhost");
-                }
+                                    }, "UpdatePartitioned", updateValue, updateKey);
 
-                client = ClientFactory.createClient(m_cconfig);
-                client.createConnection("localhost", Client.VOLTDB_SERVER_PORT + toConnectTo);
-                lastServerValues = new ArrayList<Integer>(serverValues);
-                for (int ii = 0; ii < numTuples; ii++) {
-                    int updateKey = r.nextInt(numTuples);
-                    int updateValue = r.nextInt(numTuples);
-                    serverValues.set(updateKey, updateValue);
-                    client.callProcedure( new ProcedureCallback() {
-
-                        @Override
-                        public void clientCallback(ClientResponse clientResponse)
-                                throws Exception {
-                            if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                                System.err.println(clientResponse.getStatusString());
-                            }
-                            if (clientResponse.getResults()[0].asScalarLong() != 1) {
-                                System.err.println("Update didn't happen");
                             }
                         }
-
-                    }, "UpdatePartitioned", updateValue, updateKey);
+                        clientRef.drain();
+                        clientRef.close();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
                 }
+            };
 
-                for (Integer recover : toKill) {
-                    cluster.recoverOne( recover, toConnectTo, m_username + ":" + m_password + "@localhost");
+            /*
+             * This version doesn't work. It causes concurrent failures during the rejoin sysproc
+             * that aren't handled correctly
+             */
+            loadThread.start();
+            killerThread.start();
+            recoveryThread.start();
+
+            recoveryThread.join();
+            killerThread.join();
+
+//            loadThread.start();
+//            recoveryThread.start();
+//            recoveryThread.join();
+//            killerThread.start();
+//            killerThread.join();
+
+            shouldContinue.set(false);
+            loadThread.join();
+
+            lastRejoinThread = new Thread() {
+                @Override
+                public void run() {
+                    try {
+                        for (Integer recover : toKillDuringRecovery) {
+                            while (!cluster.recoverOne( recover, toConnectTo, m_username + ":" + m_password + "@localhost")) {}
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
                 }
-
-                client.drain();
-            } finally {
-                client.close();
-            }
+            };
+            lastRejoinThread.start();
             System.out.println("Finished iteration " + zz);
         }
+        lastRejoinThread.join();
         cluster.shutDown();
     }
+
+    /*
+     * Load a whole lot of stuff, kill some stuff, rejoin some stuff, and then kill some more stuff during the rejoin
+     * Commented this test out because I don't see what it adds. It was going to be the same as the other fuzz test
+     * just with more data, but loading the data is slow. Might work better with some large varchar fields.
+     * Then the problem becomes validating and updating the data.
+     */
+//    public void testRejoinFuzz2ElectricBoogaloo() throws Exception {
+//        VoltProjectBuilder builder = getBuilderForTest();
+//        builder.setSecurityEnabled(true);
+//
+//        final int numHosts = 6;
+//        final int numTuples = 204800 * 10;//about 100 megs per
+//        //final int numTuples = 0;
+//        final int kfactor = 2;
+//        final LocalCluster cluster =
+//            new LocalCluster(
+//                    "rejoin.jar",
+//                    1,
+//                    numHosts,
+//                    kfactor,
+//                    BackendTarget.NATIVE_EE_JNI);
+//        cluster.setMaxHeap(256);
+//        boolean success = cluster.compile(builder, false);
+//        assertTrue(success);
+//        copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+//        cluster.setHasLocalServer(false);
+//
+//        cluster.startUp();
+//
+//        Client client = ClientFactory.createClient(m_cconfig);
+//
+//        client.createConnection("localhost");
+//
+//        Random r = new Random();
+//        StringBuilder sb = new StringBuilder(512);
+//        for (int ii = 0; ii < 512; ii++) {
+//            sb.append((char)(34 + r.nextInt(90)));
+//        }
+//        String theString = sb.toString();
+//
+//        final Semaphore rateLimit = new Semaphore(3000);
+//        for (int ii = 0; ii < numTuples; ii++) {
+//            rateLimit.acquire();
+//            int value = r.nextInt(numTuples);
+//            client.callProcedure( new ProcedureCallback() {
+//
+//                @Override
+//                public void clientCallback(ClientResponse clientResponse)
+//                        throws Exception {
+//                    if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+//                        System.err.println(clientResponse.getStatusString());
+//                        return;
+//                    }
+//                    if (clientResponse.getResults()[0].asScalarLong() != 1) {
+//                        System.err.println("Update didn't happen");
+//                        return;
+//                    }
+//                    rateLimit.release();
+//                }
+//
+//            }, "InsertPartitionedLarge", ii, value, theString);
+//        }
+//        client.drain();
+//        client.close();
+//        Random forWhomTheBellTolls = new Random();
+//        for (int zz = 0; zz < 100; zz++) {
+//            final ArrayList<Integer> toKillFirst = new ArrayList<Integer>();
+//            final ArrayList<Integer> toKillDuringRecovery = new ArrayList<Integer>();
+//            while (toKillFirst.size() < kfactor / 2) {
+//                int candidate = forWhomTheBellTolls.nextInt(numHosts);
+//                if (!toKillFirst.contains(candidate)) {
+//                    toKillFirst.add(candidate);
+//                }
+//            }
+//            while (toKillDuringRecovery.size() < kfactor / 2) {
+//                int candidate = forWhomTheBellTolls.nextInt(numHosts);
+//                if (!toKillFirst.contains(candidate) && !toKillDuringRecovery.contains(candidate)) {
+//                    toKillDuringRecovery.add(candidate);
+//                }
+//            }
+//            System.out.println("Killing " + toKillFirst.toString() + toKillDuringRecovery.toString());
+//
+//            int toConnectToTemp = forWhomTheBellTolls.nextInt(numHosts);
+//            while (toKillFirst.contains(toConnectToTemp) || toKillDuringRecovery.contains(toConnectToTemp)) {
+//                toConnectToTemp = forWhomTheBellTolls.nextInt(numHosts);
+//            }
+//            final int toConnectTo = toConnectToTemp;
+//
+//            for (Integer uhoh : toKillFirst) {
+//                cluster.shutDownSingleHost(uhoh);
+//            }
+//
+//            Thread recoveryThread = new Thread() {
+//                @Override
+//                public void run() {
+//                    for (Integer dead : toKillFirst) {
+//                        while (!cluster.recoverOne( dead, toConnectTo, m_username + ":" + m_password + "@localhost")){}
+//                    }
+//                }
+//            };
+//
+//            Thread killerThread = new Thread() {
+//                @Override
+//                public void run() {
+//                    Random r = new Random();
+//                    for (Integer toKill : toKillDuringRecovery) {
+//                        try {
+//                            Thread.sleep(r.nextInt(5000));
+//                        } catch (InterruptedException e) {
+//                            e.printStackTrace();
+//                        }
+//                        cluster.shutDownSingleHost(toKill);
+//                    }
+//                }
+//            };
+//
+//            recoveryThread.start();
+//            killerThread.start();
+//            recoveryThread.join();
+//            killerThread.join();
+//
+//            for (Integer recoverNow : toKillDuringRecovery) {
+//                cluster.recoverOne( recoverNow, toConnectTo, m_username + ":" + m_password + "@localhost");
+//            }
+//            System.out.println("Finished iteration " + zz);
+//        }
+//        cluster.shutDown();
+//    }
 }

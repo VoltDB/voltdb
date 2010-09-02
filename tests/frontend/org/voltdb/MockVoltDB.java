@@ -368,4 +368,10 @@ public class MockVoltDB implements VoltDBInterface
         return null;
     }
 
+    @Override
+    public void onRecoveryCompletion() {
+        // TODO Auto-generated method stub
+
+    }
+
 }

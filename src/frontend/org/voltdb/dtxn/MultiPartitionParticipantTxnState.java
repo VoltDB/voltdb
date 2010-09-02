@@ -50,7 +50,6 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     protected int[] m_nonCoordinatingSites;
     protected boolean m_shouldResumeProcedure = false;
     protected boolean m_hasStartedWork = false;
-    protected boolean m_recovering = false;
     protected HashMap<Integer, WorkUnit> m_missingDependencies = null;
     protected ArrayList<WorkUnit> m_stackFrameDropWUs = null;
     protected Map<Integer, List<VoltTable>> m_previousStackFrameDropDependencies = null;
@@ -70,14 +69,12 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     }
 
     public MultiPartitionParticipantTxnState(Mailbox mbox, ExecutionSite site,
-                                             TransactionInfoBaseMessage notice,
-                                             boolean recovering)
+                                             TransactionInfoBaseMessage notice)
     {
         super(mbox, site, notice);
         m_siteId = site.getSiteId();
         m_nonCoordinatingSites = null;
         m_isCoordinator = false;
-        m_recovering = recovering;
         if (notice instanceof InitiateTaskMessage)
         {
             m_isCoordinator = true;
@@ -149,12 +146,17 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         return has_transactional_work;
     }
 
+    private boolean m_startedWhileRecovering;
+
     @Override
-    public boolean doWork() {
+    public boolean doWork(boolean recovering) {
         if (!m_hasStartedWork) {
             m_site.beginNewTxn(this);
             m_hasStartedWork = true;
+            m_startedWhileRecovering = recovering;
         }
+
+        assert(m_startedWhileRecovering == recovering);
 
         if (m_done) {
             return true;
@@ -186,7 +188,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                 initiateProcedure((InitiateTaskMessage) payload);
             }
             else if (payload instanceof FragmentTaskMessage) {
-                if (m_recovering && (wu.nonTransactional == false)) {
+                if (recovering && (wu.nonTransactional == false)) {
                     processRecoveringFragmentWork((FragmentTaskMessage) payload, wu.getDependencies());
                 }
                 else {
