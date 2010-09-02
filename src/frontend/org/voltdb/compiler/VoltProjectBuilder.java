@@ -709,34 +709,28 @@ public class VoltProjectBuilder {
         deployment.appendChild(cluster);
 
         // <users>
-        final Element users = doc.createElement("users");
-        deployment.appendChild(users);
+        Element users = null;
+        if (m_users.size() > 0) {
+            users = doc.createElement("users");
+            deployment.appendChild(users);
+        }
 
         // <user>
-        if (m_users.isEmpty()) {
+        for (final UserInfo info : m_users) {
             final Element user = doc.createElement("user");
-            user.setAttribute("name", "default");
-            user.setAttribute("groups", "default");
-            user.setAttribute("password", "");
-            users.appendChild(user);
-        }
-        else {
-            for (final UserInfo info : m_users) {
-                final Element user = doc.createElement("user");
-                user.setAttribute("name", info.name);
-                user.setAttribute("password", info.password);
-                // build up user/@groups. This attribute must be redesigned
-                if (info.groups.length > 0) {
-                    final StringBuilder groups = new StringBuilder();
-                    for (final String group : info.groups) {
-                        if (groups.length() > 0)
-                            groups.append(",");
-                        groups.append(group);
-                    }
-                    user.setAttribute("groups", groups.toString());
+            user.setAttribute("name", info.name);
+            user.setAttribute("password", info.password);
+            // build up user/@groups. This attribute must be redesigned
+            if (info.groups.length > 0) {
+                final StringBuilder groups = new StringBuilder();
+                for (final String group : info.groups) {
+                    if (groups.length() > 0)
+                        groups.append(",");
+                    groups.append(group);
                 }
-                users.appendChild(user);
+                user.setAttribute("groups", groups.toString());
             }
+            users.appendChild(user);
         }
 
         // boilerplate to write this DOM object to file.

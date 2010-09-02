@@ -136,7 +136,7 @@ public class TestVoltDB extends TestCase {
      * This test tries to assign a user in the deployment file to a group that does not exist and asserts that
      * deployment file compilation fails.
      */
-    public void testCompileDeployment() {
+    public void testCompileDeploymentAddUserToNonExistentGroup() {
         TPCCProjectBuilder project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
@@ -168,6 +168,41 @@ public class TestVoltDB extends TestCase {
 
         // this should fail because group "bar" does not exist
         assertFalse("Deployment file shouldn't have been able to validate",
+                CatalogUtil.compileDeployment(catalog,project.getPathToDeployment()));
+    }
+
+    /**
+     * ENG-720: NullPointerException when trying to start server with no users
+     *
+     * This tests makes sure deployment validation passes when there are no users.
+     */
+    public void testCompileDeploymentNoUsers() {
+        TPCCProjectBuilder project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addDefaultProcedures();
+
+        project.setSecurityEnabled(true);
+        GroupInfo groups[] = new GroupInfo[] {
+                new GroupInfo("foo", false, false),
+                new GroupInfo("blah", false, false)
+        };
+        project.addGroups(groups);
+        UserInfo users[] = new UserInfo[] {};
+        project.addUsers(users);
+
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+        String jarName = "compile-deployment.jar";
+        String catalogJar = testDir + File.separator + jarName;
+        assertTrue("Project failed to compile", project.compile(catalogJar));
+
+        String serializedCatalog = CatalogUtil.loadCatalogFromJar(catalogJar, null);
+        assertNotNull("Error loading catalog from jar", serializedCatalog);
+
+        Catalog catalog = new Catalog();
+        catalog.execute(serializedCatalog);
+
+        assertTrue("Deployment file should have been able to validate",
                 CatalogUtil.compileDeployment(catalog,project.getPathToDeployment()));
     }
 

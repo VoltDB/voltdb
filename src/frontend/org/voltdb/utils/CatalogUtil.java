@@ -512,6 +512,10 @@ public abstract class CatalogUtil {
      * @return Returns true if the deployment file is valid.
      */
     private static boolean validateDeployment(Catalog catalog, DeploymentType deployment) {
+        if (deployment.getUsers() == null) {
+            return true;
+        }
+
         Cluster cluster = catalog.getClusters().get("cluster");
         Database database = cluster.getDatabases().get("database");
         Set<String> validGroups = new HashSet<String>();
