@@ -14,10 +14,14 @@ These attributes can be adjusted by modifying the arguments to the "client" targ
 
   *** Note *** that you MUST change the username and password to your own valid credentials for this application to work.
 
-Additionally, a second client target "cull" can be run that will periodically delete old hashtags. This too has customizable parameters:
+A second client target "cull" can be run that will periodically delete old hashtags. This too has customizable parameters:
 
   - The retention range in hours.
   - The frequency with which to perform the delete in hours.
+
+Finally, you can connect this app with Hadoop. Use the "hadoop-el" target to export hashtags from VoltDB to HDFS. It uses HDFS's append API, so make sure append is enabled in your Hadoop configuration. Every minute, the export client will roll over to a new file in HDFS.
+
+With the hashtags sitting in HDFS, you can now run a Hadoop MapReduce job over them. Use the "hadoop-mr" target to compile the MR job and run it. After a minute or two, depending on how many input files were created by the export client, the job will complete and you can view its output in HDFS.
 
 ant targets
 -----------
@@ -29,6 +33,10 @@ ant server          : start the server
 ant client          : start the client
 
 ant cull            : start the cull process
+
+ant hadoop-el       : start the (VoltDB -> HDFS) EL client
+
+ant hadoop-mr       : run the Hadoop MapReduce job
 
 ant catalog         : build the catalog
 

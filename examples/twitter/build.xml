@@ -1,8 +1,11 @@
 <?xml version="1.0" ?>
 <project default="default" name="twitter build file">
 
-<property name="TwitterUsername" value="Set_to_your_username"/>
-<property name="TwitterPassword" value="Set_to_your_password"/>
+<property name="TwitterUsername" value="edmazur3"/>
+<property name="TwitterPassword" value="sa809fsa90as8fsag"/>
+<property name="hdfs.path" value="/user/${user.name}/twitter" />
+<property name="hadoop" value="${user.home}/hadoop/hadoop-0.20.2/bin/hadoop" />
+<property name="jar" value="hashtag-count.jar" />
 
 <import file="../includes/basebuild.xml"/>
 
@@ -15,6 +18,8 @@
     <fileset refid="additional.classpath"/>
     <fileset id="additional.classpath" dir='.' >
       <include name='twitter4j-core-*.jar' />
+      <include name="hadoop-*-core.jar" />
+      <include name="commons-logging-api-*.jar" />
     </fileset>
 </path>
 
@@ -36,6 +41,30 @@
         <arg value="1" />                                   <!-- how often to cull tweets (in hours) -->
         <arg value="localhost" />                           <!-- comma separated list of volt servers to connect to -->
     </invoke-java>
+</target>
+
+<target name="hadoop-el" description="Start the EL client.">
+    <invoke-java classname="org.voltdb.twitter.hadoop.hdfs.ExportToHDFSClient">
+        <arg value="${hdfs.path}/input" />
+        <arg value="localhost" />
+    </invoke-java>
+</target>
+    
+<!-- could be refactored to only include the relevant classes -->
+<target name="hadoop-jar" depends="srccompile" description="Compile the JAR to be used by Hadoop.">
+    <jar destfile="${jar}" basedir="obj">
+        <manifest>
+            <attribute name="Main-Class" value="org.voltdb.twitter.hadoop.mr.JobRunner" />
+        </manifest>
+    </jar>
+</target>
+
+<target name="hadoop-mr" depends="hadoop-jar" description="Run the MapReduce job.">
+    <exec executable="${hadoop}" failonerror="true">
+        <arg line="jar ${jar}" />
+        <arg line="-D mapred.reduce.tasks=1" />
+        <arg value="${hdfs.path}" />
+    </exec>
 </target>
 
 </project>

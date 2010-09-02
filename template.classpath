@@ -8,6 +8,8 @@
     <classpathentry kind="src" path="examples/satellite"/>
     <classpathentry kind="src" path="examples/twitter/src"/>
     <classpathentry kind="lib" path="examples/twitter/twitter4j-core-2.1.2.jar"/>
+    <classpathentry kind="lib" path="examples/twitter/commons-logging-api-1.0.4.jar"/>
+    <classpathentry kind="lib" path="examples/twitter/hadoop-0.20.2-core.jar"/>
     <classpathentry kind="src" path="examples/voter/src"/>
     <classpathentry kind="src" path="src/frontend"/>
     <classpathentry kind="src" path="src/hsqldb19b3"/>
