@@ -41,4 +41,5 @@ public interface RecoverySiteProcessor {
     public void handleRecoveryMessage(RecoveryMessage message);
     public void handleSiteFaults(HashSet<Integer> failedSites, SiteTracker tracker);
     public void doRecoveryWork(long currentTxnId);
+    public long bytesTransferred();
 }

@@ -1160,8 +1160,12 @@ public class RealVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void onRecoveryCompletion() {
+    public void onRecoveryCompletion(double transferred) {
         final long now = System.currentTimeMillis();
-        hostLog.info("Node recovery completed after " + ((now - m_recoveryStartTime) / 1000) + " seconds");
+        final long delta = ((now - m_recoveryStartTime) / 1000);
+        final double megabytesPerSecond = ((now - m_recoveryStartTime) / 1000.0);
+        hostLog.info(
+                "Node recovery completed after " + delta + " seconds at a rate of " +
+                megabytesPerSecond + " megabytes/sec");
     }
 }

@@ -133,5 +133,5 @@ public interface VoltDBInterface
     /**
      * Notify RealVoltDB that recovery is complete
      */
-    void onRecoveryCompletion();
+    void onRecoveryCompletion(double transferred);
 }

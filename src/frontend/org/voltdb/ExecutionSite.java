@@ -130,6 +130,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     private boolean m_recovering = false;
     private boolean m_haveRecoveryPermit = false;
     private long m_recoveryStartTime = 0;
+    private long m_recoveryBytesTransferred = 0;
 
     // Catalog
     public CatalogContext m_context;
@@ -374,6 +375,10 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         @Override
         public void run() {
             final long now = System.currentTimeMillis();
+            final long transferred = m_recoveryProcessor.bytesTransferred();
+            m_recoveryBytesTransferred += transferred;
+            final double megabytes = transferred / (1024 * 1024);
+            final double megabytesPerSecond = megabytes / ((now - m_recoveryStartTime) / 1000.0);
             m_recoveryProcessor = null;
             m_recovering = false;
             if (m_haveRecoveryPermit) {
@@ -382,15 +387,17 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 m_recoveryLog.info(
                         "Destination recovery complete for site " + m_siteId +
                         " partition " + m_context.siteTracker.getPartitionForSite(m_siteId) +
-                        " after " + ((now - m_recoveryStartTime) / 1000) + " seconds");
+                        " after " + ((now - m_recoveryStartTime) / 1000) + " seconds " +
+                        " at a rate of " + megabytesPerSecond + " megabytes/sec");
                 int remaining = recoveringSiteCount.decrementAndGet();
                 if (remaining == 0) {
-                    VoltDB.instance().onRecoveryCompletion();
+                    VoltDB.instance().onRecoveryCompletion(m_recoveryBytesTransferred);
                 }
             } else {
                 m_recoveryLog.info("Source recovery complete for site " + m_siteId +
                         " partition " + m_context.siteTracker.getPartitionForSite(m_siteId) +
-                        " after " + ((now - m_recoveryStartTime) / 1000) + " seconds");
+                        " after " + ((now - m_recoveryStartTime) / 1000) + " seconds" +
+                        " at a rate of " + megabytesPerSecond + " megabytes/sec");
             }
         }
     };

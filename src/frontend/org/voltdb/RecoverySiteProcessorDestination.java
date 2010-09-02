@@ -87,6 +87,8 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
 
     private final ArrayList<RecoveryMessage> m_buffered = new ArrayList<RecoveryMessage>();
 
+    private long m_bytesReceived = 0;
+
     /**
      * Data about a table that is being used as a source for a recovery stream.
      * Includes the id of the table as well as the name for human readability.
@@ -133,7 +135,9 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
         }
 
         if (message.type() == RecoveryMessageType.ScanTuples) {
-            m_engine.processRecoveryMessage(message.getMessageData());
+            byte data[] = message.getMessageData();
+            m_bytesReceived += data.length;
+            m_engine.processRecoveryMessage(data);
             recoveryLog.trace("Received tuple data at site " + m_siteId +
                     " for table " + m_tables.get(message.tableId()).m_name);
         } else if (message.type() == RecoveryMessageType.Complete) {
@@ -329,5 +333,10 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
                 siteId,
                 onCompletion,
                 messageHandler);
+    }
+
+    @Override
+    public long bytesTransferred() {
+        return m_bytesReceived;
     }
 }

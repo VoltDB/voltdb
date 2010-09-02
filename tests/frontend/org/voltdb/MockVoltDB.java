@@ -369,7 +369,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void onRecoveryCompletion() {
+    public void onRecoveryCompletion(double transferred) {
         // TODO Auto-generated method stub
 
     }

@@ -142,6 +142,8 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
 
     private final MessageHandler m_messageHandler;
 
+    private long m_bytesSent = 0;
+
     /**
      * Keep track of how many times a block has been acked and how many acks are expected
      */
@@ -475,6 +477,7 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
                     //Set the limit based on how much data the EE serialized past that position.
                     buffer.limit(buffer.position() + serialized);
                 }
+                m_bytesSent += buffer.remaining();
                 assert(rm != null);
 
                 /*
@@ -623,5 +626,10 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
                 messageHandler);
 
         return source;
+    }
+
+    @Override
+    public long bytesTransferred() {
+        return m_bytesSent;
     }
 }
