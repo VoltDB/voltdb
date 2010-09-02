@@ -546,7 +546,7 @@ public class TestRejoinEndToEnd extends TestCase {
                     BackendTarget.NATIVE_EE_JNI,
                     LocalCluster.FailureState.ALL_RUNNING,
                     true);
-        cluster.setMaxHeap(1024);
+        cluster.setMaxHeap(256);
         boolean success = cluster.compile(builder);
         assertTrue(success);
         copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
