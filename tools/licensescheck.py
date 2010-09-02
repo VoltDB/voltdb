@@ -11,6 +11,7 @@ prunelist = ('hsqldb19b3',
              'xml2',
              'simplejson',
              'projectfile',
+             'deploymentfile',
              'xml',
              'helloworld',
              'CSVReader.java')
