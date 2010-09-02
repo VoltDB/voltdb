@@ -174,7 +174,7 @@ public class TestVoltDB extends TestCase {
     /**
      * ENG-720: NullPointerException when trying to start server with no users
      *
-     * This tests makes sure deployment validation passes when there are no users.
+     * This test makes sure deployment validation passes when there are no users.
      */
     public void testCompileDeploymentNoUsers() {
         TPCCProjectBuilder project = new TPCCProjectBuilder();
