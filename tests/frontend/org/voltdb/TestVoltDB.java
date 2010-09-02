@@ -23,13 +23,14 @@
 
 package org.voltdb;
 
+import java.io.File;
+
 import org.voltdb.VoltDB;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
-import org.voltdb.regressionsuites.LocalSingleProcessServer;
-import org.voltdb.regressionsuites.VoltServerConfig;
+import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 
 import junit.framework.TestCase;
@@ -154,16 +155,20 @@ public class TestVoltDB extends TestCase {
         };
         project.addUsers(users);
 
-        String catalogName = "compile-deployment.jar";
-        VoltServerConfig config = new LocalSingleProcessServer(catalogName, 1, BackendTarget.NONE);
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+        String jarName = "compile-deployment.jar";
+        String catalogJar = testDir + File.separator + jarName;
+        assertTrue("Project failed to compile", project.compile(catalogJar));
 
-        assertTrue(config.compile(project));
+        String serializedCatalog = CatalogUtil.loadCatalogFromJar(catalogJar, null);
+        assertNotNull("Error loading catalog from jar", serializedCatalog);
 
         Catalog catalog = new Catalog();
-        catalog.execute(CatalogUtil.loadCatalogFromJar(catalogName, null));
+        catalog.execute(serializedCatalog);
 
         // this should fail because group "bar" does not exist
-        assertFalse(CatalogUtil.compileDeployment(catalog, project.getPathToDeployment()));
+        assertFalse("Deployment file shouldn't have been able to validate",
+                CatalogUtil.compileDeployment(catalog,project.getPathToDeployment()));
     }
 
 }
