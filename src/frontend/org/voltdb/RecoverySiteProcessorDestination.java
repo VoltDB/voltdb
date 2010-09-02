@@ -116,9 +116,9 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
         }
     }
 
-    static {
-        new VoltLogger("RECOVERY").setLevel(Level.TRACE);
-    }
+//    static {
+//        new VoltLogger("RECOVERY").setLevel(Level.TRACE);
+//    }
 
     /**
      * Process acks that are sent by recovering sites

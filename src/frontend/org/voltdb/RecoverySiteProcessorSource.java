@@ -49,9 +49,9 @@ import org.voltdb.utils.Pair;
  */
 public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
 
-    static {
-        new VoltLogger("RECOVERY").setLevel(Level.TRACE);
-    }
+//    static {
+//        new VoltLogger("RECOVERY").setLevel(Level.TRACE);
+//    }
 
     /** Number of buffers to use */
     static final int m_numBuffers = 3;

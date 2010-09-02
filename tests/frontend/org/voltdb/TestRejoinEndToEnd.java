@@ -547,7 +547,7 @@ public class TestRejoinEndToEnd extends TestCase {
                     LocalCluster.FailureState.ALL_RUNNING,
                     true);
         cluster.setMaxHeap(1024);
-        boolean success = cluster.compile(builder, false);
+        boolean success = cluster.compile(builder);
         assertTrue(success);
         copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
         cluster.setHasLocalServer(false);
