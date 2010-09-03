@@ -751,7 +751,7 @@ public class TestRejoinEndToEnd extends TestCase {
 //        builder.setSecurityEnabled(true);
 //
 //        final int numHosts = 6;
-//        final int numTuples = 204800 * 10;//about 100 megs per
+//        final int numTuples = 204800 * 6;//about 100 megs per
 //        //final int numTuples = 0;
 //        final int kfactor = 2;
 //        final LocalCluster cluster =
@@ -762,7 +762,7 @@ public class TestRejoinEndToEnd extends TestCase {
 //                    kfactor,
 //                    BackendTarget.NATIVE_EE_JNI);
 //        cluster.setMaxHeap(256);
-//        boolean success = cluster.compile(builder, false);
+//        boolean success = cluster.compile(builder);
 //        assertTrue(success);
 //        copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
 //        cluster.setHasLocalServer(false);

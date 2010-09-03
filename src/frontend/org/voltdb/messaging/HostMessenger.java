@@ -149,7 +149,9 @@ public class HostMessenger implements Messenger {
             try {
                 m_joiner.join(timeout);
                 if (!m_joiner.getSuccess()) {
-                    throw new RuntimeException("The joiner thread was not successful");
+                    new VoltLogger("HOST").
+                        fatal("The joiner thread was not successful");
+                    VoltDB.crashVoltDB();
                 }
                 //timeout
                 if (m_joiner.isAlive()) {
