@@ -11,7 +11,6 @@
         </procedures>
         <partitions>
             <partition table='hashtags' column='hashtag' />
-            <partition table='partitioner' column='gotoall' />
         </partitions>
         <exports>
             <connector class="org.voltdb.elt.processors.RawProcessor" enabled="true">
