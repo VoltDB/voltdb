@@ -368,8 +368,8 @@ DISTRIBUTION
         <arg line="-c '/usr/bin/objcopy --add-gnu-debuglink=voltdb-${dist.version}.sym libvoltdb-${dist.version}.so'" />
     </exec>
 
-    <!-- populate top level README by copying and renaming user_guide -->
-    <copy tofile="${dist.dir}/README" file="doc/user_guide"/>
+    <!-- populate top level README by copying and renaming README.dist -->
+    <copy tofile="${dist.dir}/README" file="doc/README.dist"/>
 
     <!-- populate examples top level README -->
     <copy tofile="${dist.dir}/examples/README" file="examples/README"/>
@@ -404,8 +404,8 @@ DISTRIBUTION
     </chmod>
 
     <!-- copy licenses -->
-    <copy todir="${dist.dir}" file="COPYING"/>
-    <copy todir="${dist.dir}/voltdb" file="COPYING"/>
+    <copy todir="${dist.dir}" file="LICENSE"/>
+    <copy todir="${dist.dir}/voltdb" file="LICENSE"/>
 
     <!-- create an archive for distribution -->
     <tar destfile="${build.dir}/voltdb-temp.tar" >
