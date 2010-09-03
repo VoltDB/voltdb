@@ -524,6 +524,9 @@ public abstract class CatalogUtil {
         }
 
         for (UsersType.User user : deployment.getUsers().getUser()) {
+            if (user.getGroups() == null)
+                continue;
+
             for (String group : user.getGroups().split(",")) {
                 group = group.trim();
                 if (!validGroups.contains(group)) {
