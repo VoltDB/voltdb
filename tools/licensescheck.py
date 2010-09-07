@@ -1,4 +1,12 @@
+#!/usr/bin/python
+
 import os, sys, re
+
+# Path to eng checkout root directory. To use this as a git pre-commit
+# hook, copy this script to .git/hooks/pre-commit, set basepath as the
+# absolute path to your volt checkout and set ascommithook to true.
+basepath = "../"
+ascommithook = False
 
 prunelist = ('hsqldb19b3',
              'hsqldb',
@@ -115,32 +123,32 @@ def processAllFiles(d, approvedLicensesJavaC, approvedLicensesPython):
 
 
 
-testLicenses =   ['approved_licenses/mit_x11_hstore_and_voltdb.txt',
-                  'approved_licenses/mit_x11_evanjones_and_voltdb.txt',
-                  'approved_licenses/mit_x11_michaelmccanna_and_voltdb.txt',
-                  'approved_licenses/mit_x11_voltdb.txt']
+testLicenses =   [basepath + 'tools/approved_licenses/mit_x11_hstore_and_voltdb.txt',
+                  basepath + 'tools/approved_licenses/mit_x11_evanjones_and_voltdb.txt',
+                  basepath + 'tools/approved_licenses/mit_x11_michaelmccanna_and_voltdb.txt',
+                  basepath + 'tools/approved_licenses/mit_x11_voltdb.txt']
 
-srcLicenses =    ['approved_licenses/gpl3_hstore_and_voltdb.txt',
-                  'approved_licenses/gpl3_evanjones_and_voltdb.txt',
-                  'approved_licenses/gpl3_nanohttpd_and_voltdb.txt',
-                  'approved_licenses/gpl3_base64_and_voltdb.txt',
-                  'approved_licenses/gpl3_voltdb.txt']
+srcLicenses =    [basepath + 'tools/approved_licenses/gpl3_hstore_and_voltdb.txt',
+                  basepath + 'tools/approved_licenses/gpl3_evanjones_and_voltdb.txt',
+                  basepath + 'tools/approved_licenses/gpl3_nanohttpd_and_voltdb.txt',
+                  basepath + 'tools/approved_licenses/gpl3_base64_and_voltdb.txt',
+                  basepath + 'tools/approved_licenses/gpl3_voltdb.txt']
 
-testLicensesPy = ['approved_licenses/mit_x11_voltdb_python.txt']
+testLicensesPy = [basepath + 'tools/approved_licenses/mit_x11_voltdb_python.txt']
 
-srcLicensesPy =  ['approved_licenses/gpl3_voltdb_python.txt']
+srcLicensesPy =  [basepath + 'tools/approved_licenses/gpl3_voltdb_python.txt']
 
 
 errcount = 0
-errcount += processAllFiles("../src",
+errcount += processAllFiles(basepath + "src",
                             tuple([readFile(f) for f in srcLicenses]),
                             tuple([readFile(f) for f in srcLicensesPy]))
 
-errcount += processAllFiles("../tests",
+errcount += processAllFiles(basepath + "tests",
                             tuple([readFile(f) for f in testLicenses]),
                             tuple([readFile(f) for f in testLicensesPy]))
 
-errcount += processAllFiles("../examples",
+errcount += processAllFiles(basepath + "examples",
                             tuple([readFile(f) for f in testLicenses]),
                             tuple([readFile(f) for f in testLicensesPy]))
 
@@ -149,29 +157,29 @@ if errcount == 0:
 else:
     print "FAILURE. Found %d license text or whitespace errors." % errcount
 
-
 # run through any other source the caller wants checked
 # assumes a single valid license in $repo/tools/approved_licenses/license.txt
 # "${voltpro}" is the build.xml property - can be seen as a literal if the
 # property is not set.
-for arg in sys.argv[1:]:
-    if arg != "${voltpro}":
-        print "Checking additional repository: " + arg;
-        proLicenses = ["../" + arg + '/tools/approved_licenses/license.txt']
-        proLicensesPy = ["../" + arg + '/tools/approved_licenses/license_python.txt']
-        errcount = 0
-        errcount += processAllFiles("../" + arg + "/src/",
-                                    tuple([readFile(f) for f in proLicenses]),
-                                    tuple([readFile(f) for f in proLicensesPy]))
+if not ascommithook:
+    for arg in sys.argv[1:]:
+        if arg != "${voltpro}":
+            print "Checking additional repository: " + arg;
+            proLicenses = ["../" + arg + '/tools/approved_licenses/license.txt']
+            proLicensesPy = ["../" + arg + '/tools/approved_licenses/license_python.txt']
+            errcount = 0
+            errcount += processAllFiles("../" + arg + "/src/",
+                                        tuple([readFile(f) for f in proLicenses]),
+                                        tuple([readFile(f) for f in proLicensesPy]))
 
-        errcount += processAllFiles("../" + arg + "/tests/",
-                                    tuple([readFile(f) for f in proLicenses]),
-                                    tuple([readFile(f) for f in proLicensesPy]))
+            errcount += processAllFiles("../" + arg + "/tests/",
+                                        tuple([readFile(f) for f in proLicenses]),
+                                        tuple([readFile(f) for f in proLicensesPy]))
 
-        if errcount == 0:
-            print "SUCCESS. Found 0 license text errors, 0 files containing tabs or trailing whitespace."
-        else:
-            print "FAILURE (%s). Found %d license text or whitespace errors." % (arg, errcount)
+            if errcount == 0:
+                print "SUCCESS. Found 0 license text errors, 0 files containing tabs or trailing whitespace."
+            else:
+                print "FAILURE (%s). Found %d license text or whitespace errors." % (arg, errcount)
 
 
 
