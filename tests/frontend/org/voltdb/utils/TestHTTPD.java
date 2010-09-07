@@ -28,20 +28,33 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.util.Properties;
 
 import junit.framework.TestCase;
 
 public class TestHTTPD extends TestCase {
 
+    static class DumbHTTPD extends NanoHTTPD {
+        public DumbHTTPD(int port) throws IOException {
+            super(port);
+        }
+
+        @Override
+        public Response serve(String uri, String method, Properties header,
+                Properties parms) {
+            return null;
+        }
+    }
+
     public void testSimpleWithQuit() throws IOException {
-        NanoHTTPD server = new NanoHTTPD(9999);
+        NanoHTTPD server = new DumbHTTPD(9999);
         assertTrue(server.myServerSocket != null);
         assertTrue(server.myTcpPort == 9999);
         assertTrue(server.myThread != null);
         assertTrue(server.myThread.isAlive());
-        server.shutdown(true);
+        server.stop(true);
         assertFalse(server.myThread.isAlive());
-        server.shutdown(true);
+        server.stop(true);
     }
 
     public void testSingleFileServer() throws IOException {
@@ -61,7 +74,7 @@ public class TestHTTPD extends TestCase {
         is.read(data2);
         assertTrue(data2[777] == data[777]);
 
-        server.shutdown(true);
+        server.stop(true);
     }
 
 }

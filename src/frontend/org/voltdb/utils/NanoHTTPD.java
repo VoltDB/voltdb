@@ -19,29 +19,30 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /*
-Copyright (c) 2001,2005-2008 Jarno Elonen <elonen@iki.fi>
+Copyright (C) 2001,2005-2010 by Jarno Elonen <elonen@iki.fi>
 
 Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-    * Redistributions of source code must retain the above copyright
-      notice, this list of conditions and the following disclaimer.
-    * Redistributions in binary form must reproduce the above copyright
-      notice, this list of conditions and the following disclaimer in the
-      documentation and/or other materials provided with the distribution.
-    * Neither the name of the <organization> nor the
-      names of its contributors may be used to endorse or promote products
-      derived from this software without specific prior written permission.
+modification, are permitted provided that the following conditions
+are met:
 
-THIS SOFTWARE IS PROVIDED BY THE AUTHOR ''AS IS'' AND ANY
-EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
-DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+Redistributions of source code must retain the above copyright notice,
+this list of conditions and the following disclaimer. Redistributions in
+binary form must reproduce the above copyright notice, this list of
+conditions and the following disclaimer in the documentation and/or other
+materials provided with the distribution. The name of the author may not
+be used to endorse or promote products derived from this software without
+specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 package org.voltdb.utils;
@@ -49,7 +50,6 @@ package org.voltdb.utils;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -59,7 +59,6 @@ import java.io.UnsupportedEncodingException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URLDecoder;
-import java.net.URLEncoder;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.Hashtable;
@@ -71,8 +70,8 @@ import java.util.TimeZone;
 /**
  * A simple, tiny, nicely embeddable HTTP 1.0 server in Java
  *
- * <p> NanoHTTPD version 1.11,
- * Copyright &copy; 2001,2005-2008 Jarno Elonen (elonen@iki.fi, http://iki.fi/elonen/)
+ * <p> NanoHTTPD version 1.14,
+ * Copyright &copy; 2001,2005-2010 Jarno Elonen (elonen@iki.fi, http://iki.fi/elonen/)
  *
  * <p><b>Features + limitations: </b><ul>
  *
@@ -106,7 +105,7 @@ import java.util.TimeZone;
  * See the end of the source file for distribution license
  * (Modified BSD licence)
  */
-public class NanoHTTPD
+public abstract class NanoHTTPD
 {
     // ==================================================
     // API parts
@@ -115,36 +114,13 @@ public class NanoHTTPD
     /**
      * Override this to customize the server.<p>
      *
-     * (By default, this delegates to serveFile() and allows directory listing.)
-     *
      * @parm uri    Percent-decoded URI without parameters, for example "/index.cgi"
      * @parm method "GET", "POST" etc.
      * @parm parms  Parsed, percent decoded parameters from URI and, in case of POST, data.
      * @parm header Header entries, percent decoded
      * @return HTTP response, see class Response for details
      */
-    @SuppressWarnings("rawtypes")
-    public Response serve( String uri, String method, Properties header, Properties parms )
-    {
-        System.out.println( method + " '" + uri + "' " );
-
-        Enumeration e = header.propertyNames();
-        while ( e.hasMoreElements())
-        {
-            String value = (String)e.nextElement();
-            System.out.println( "  HDR: '" + value + "' = '" +
-                                header.getProperty( value ) + "'" );
-        }
-        e = parms.propertyNames();
-        while ( e.hasMoreElements())
-        {
-            String value = (String)e.nextElement();
-            System.out.println( "  PRM: '" + value + "' = '" +
-                                parms.getProperty( value ) + "'" );
-        }
-
-        return serveFile( uri, header, new File("."), true );
-    }
+    public abstract Response serve(String uri, String method, Properties header, Properties parms);
 
     /**
      * HTTP response.
@@ -233,7 +209,7 @@ public class NanoHTTPD
     public static final String
         MIME_PLAINTEXT = "text/plain; charset=utf-8",
         MIME_HTML = "text/html; charset=utf-8",
-        MIME_DEFAULT_BINARY = "application/octet-stream";
+        MIME_DEFAULT_BINARY = "application/octet-stream; charset=utf-8";
 
     // ==================================================
     // Socket & server code
@@ -246,7 +222,6 @@ public class NanoHTTPD
     public NanoHTTPD( int port ) throws IOException
     {
         myTcpPort = port;
-
         myServerSocket = new ServerSocket( myTcpPort );
         myThread = new Thread( new Runnable()
             {
@@ -260,32 +235,25 @@ public class NanoHTTPD
                     catch ( IOException ioe )
                     {}
                 }
-            }, "NanoHTTPD");
+            });
         myThread.setDaemon( true );
         myThread.start();
     }
 
-    @Override
-    protected void finalize() throws Throwable {
-        super.finalize();
-        shutdown(false);
-    }
-
-    public void shutdown(boolean blocking) {
-        if (myThread == null) return;
-        try {
-            if (myThread.isAlive()) {
-                if (myServerSocket != null)
-                    myServerSocket.close();
-                if (blocking)
-                    myThread.join();
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
+    /**
+     * Stops the server.
+     */
+    public void stop(boolean blocking)
+    {
+        try
+        {
+            myServerSocket.close();
+            if (blocking)
+                myThread.join();
         }
+        catch ( IOException ioe ) {}
+        catch ( InterruptedException e ) {}
     }
-
-
 
     /**
      * Handles one session, i.e. parses the HTTP request
@@ -310,7 +278,9 @@ public class NanoHTTPD
                 BufferedReader in = new BufferedReader( new InputStreamReader( is ));
 
                 // Read the request line
-                StringTokenizer st = new StringTokenizer( in.readLine());
+                String inLine = in.readLine();
+                if (inLine == null) return;
+                StringTokenizer st = new StringTokenizer( inLine );
                 if ( !st.hasMoreTokens())
                     sendError( HTTP_BADREQUEST, "BAD REQUEST: Syntax error. Usage: GET /example/file.html" );
 
@@ -327,7 +297,7 @@ public class NanoHTTPD
                 if ( qmi >= 0 )
                 {
                     decodeParms( uri.substring( qmi+1 ), parms );
-                    uri = URLDecoder.decode( uri.substring( 0, qmi ), "UTF-8");
+                    uri = URLDecoder.decode(uri.substring( 0, qmi ), "UTF-8");
                 }
                 else uri = URLDecoder.decode(uri, "UTF-8");
 
@@ -399,7 +369,9 @@ public class NanoHTTPD
         /**
          * Decodes parameters in percent-encoded URI-format
          * ( e.g. "name=Jack%20Daniels&pass=Single%20Malt" ) and
-         * adds them to given Properties.
+         * adds them to given Properties. NOTE: this doesn't support multiple
+         * identical keys due to the simplicity of Properties -- if you need multiples,
+         * you might want to replace the Properties with a Hastable of Vectors or such.
          * @throws UnsupportedEncodingException
          */
         private void decodeParms( String parms, Properties p )
@@ -419,9 +391,8 @@ public class NanoHTTPD
                                URLDecoder.decode( e.substring( sep+1 ), "UTF-8"));
                 }
             }
-            catch( Exception e )
-            {
-                sendError( HTTP_BADREQUEST, "BAD REQUEST: Bad percent-encoding." );
+            catch (Exception e) {
+                sendError( HTTP_BADREQUEST, "BAD REQUEST: Bad URL encoding." );
             }
         }
 
@@ -438,7 +409,6 @@ public class NanoHTTPD
         /**
          * Sends given response to the socket.
          */
-        @SuppressWarnings("rawtypes")
         private void sendResponse( String status, String mime, Properties header, InputStream data )
         {
             try
@@ -458,10 +428,10 @@ public class NanoHTTPD
 
                 if ( header != null )
                 {
-                    Enumeration e = header.keys();
+                    Enumeration<Object> e = header.keys();
                     while ( e.hasMoreElements())
                     {
-                        String key = (String)e.nextElement();
+                        String key = (String) e.nextElement();
                         String value = header.getProperty( key );
                         pw.print( key + ": " + value + "\r\n");
                     }
@@ -496,177 +466,9 @@ public class NanoHTTPD
         private Socket mySocket;
     };
 
-    /**
-     * URL-encodes everything between "/"-characters.
-     * Encodes spaces as '%20' instead of '+'.
-     */
-    @SuppressWarnings("deprecation")
-    private String encodeUri( String uri )
-    {
-        String newUri = "";
-        StringTokenizer st = new StringTokenizer( uri, "/ ", true );
-        while ( st.hasMoreTokens())
-        {
-            String tok = st.nextToken();
-            if ( tok.equals( "/" ))
-                newUri += "/";
-            else if ( tok.equals( " " ))
-                newUri += "%20";
-            else
-            {
-                newUri += URLEncoder.encode( tok );
-                // For Java 1.4 you'll want to use this instead:
-                // try { newUri += URLEncoder.encode( tok, "UTF-8" ); } catch ( UnsupportedEncodingException uee )
-            }
-        }
-        return newUri;
-    }
-
-    final int myTcpPort;
+    int myTcpPort;
     final ServerSocket myServerSocket;
-    final Thread myThread;
-
-    // ==================================================
-    // File server code
-    // ==================================================
-
-    /**
-     * Serves file from homeDir and its' subdirectories (only).
-     * Uses only URI, ignores all headers and HTTP parameters.
-     */
-    public Response serveFile( String uri, Properties header, File homeDir,
-                               boolean allowDirectoryListing )
-    {
-        // Make sure we won't die of an exception later
-        if ( !homeDir.isDirectory())
-            return new Response( HTTP_INTERNALERROR, MIME_PLAINTEXT,
-                                 "INTERNAL ERRROR: serveFile(): given homeDir is not a directory." );
-
-        // Remove URL arguments
-        uri = uri.trim().replace( File.separatorChar, '/' );
-        if ( uri.indexOf( '?' ) >= 0 )
-            uri = uri.substring(0, uri.indexOf( '?' ));
-
-        // Prohibit getting out of current directory
-        if ( uri.startsWith( ".." ) || uri.endsWith( ".." ) || uri.indexOf( "../" ) >= 0 )
-            return new Response( HTTP_FORBIDDEN, MIME_PLAINTEXT,
-                                 "FORBIDDEN: Won't serve ../ for security reasons." );
-
-        File f = new File( homeDir, uri );
-        if ( !f.exists())
-            return new Response( HTTP_NOTFOUND, MIME_PLAINTEXT,
-                                 "Error 404, file not found." );
-
-        // List the directory, if necessary
-        if ( f.isDirectory())
-        {
-            // Browsers get confused without '/' after the
-            // directory, send a redirect.
-            if ( !uri.endsWith( "/" ))
-            {
-                uri += "/";
-                Response r = new Response( HTTP_REDIRECT, MIME_HTML,
-                                           "<html><body>Redirected: <a href=\"" + uri + "\">" +
-                                           uri + "</a></body></html>");
-                r.addHeader( "Location", uri );
-                return r;
-            }
-
-            // First try index.html and index.htm
-            if ( new File( f, "index.html" ).exists())
-                f = new File( homeDir, uri + "/index.html" );
-            else if ( new File( f, "index.htm" ).exists())
-                f = new File( homeDir, uri + "/index.htm" );
-
-            // No index file, list the directory
-            else if ( allowDirectoryListing )
-            {
-                String[] files = f.list();
-                String msg = "<html><body><h1>Directory " + uri + "</h1><br/>";
-
-                if ( uri.length() > 1 )
-                {
-                    String u = uri.substring( 0, uri.length()-1 );
-                    int slash = u.lastIndexOf( '/' );
-                    if ( slash >= 0 && slash  < u.length())
-                        msg += "<b><a href=\"" + uri.substring(0, slash+1) + "\">..</a></b><br/>";
-                }
-
-                for ( int i=0; i<files.length; ++i )
-                {
-                    File curFile = new File( f, files[i] );
-                    boolean dir = curFile.isDirectory();
-                    if ( dir )
-                    {
-                        msg += "<b>";
-                        files[i] += "/";
-                    }
-
-                    msg += "<a href=\"" + encodeUri( uri + files[i] ) + "\">" +
-                           files[i] + "</a>";
-
-                    // Show file size
-                    if ( curFile.isFile())
-                    {
-                        long len = curFile.length();
-                        msg += " &nbsp;<font size=2>(";
-                        if ( len < 1024 )
-                            msg += curFile.length() + " bytes";
-                        else if ( len < 1024 * 1024 )
-                            msg += curFile.length()/1024 + "." + (curFile.length()%1024/10%100) + " KB";
-                        else
-                            msg += curFile.length()/(1024*1024) + "." + curFile.length()%(1024*1024)/10%100 + " MB";
-
-                        msg += ")</font>";
-                    }
-                    msg += "<br/>";
-                    if ( dir ) msg += "</b>";
-                }
-                return new Response( HTTP_OK, MIME_HTML, msg );
-            }
-            else
-            {
-                return new Response( HTTP_FORBIDDEN, MIME_PLAINTEXT,
-                                 "FORBIDDEN: No directory listing." );
-            }
-        }
-
-        try
-        {
-            // Get MIME type from file name extension, if possible
-            String mime = mimeFromExtention(f);
-
-            // Support (simple) skipping:
-            long startFrom = 0;
-            String range = header.getProperty( "Range" );
-            if ( range != null )
-            {
-                if ( range.startsWith( "bytes=" ))
-                {
-                    range = range.substring( "bytes=".length());
-                    int minus = range.indexOf( '-' );
-                    if ( minus > 0 )
-                        range = range.substring( 0, minus );
-                    try {
-                        startFrom = Long.parseLong( range );
-                    }
-                    catch ( NumberFormatException nfe ) {}
-                }
-            }
-
-            FileInputStream fis = new FileInputStream( f );
-            fis.skip( startFrom );
-            Response r = new Response( HTTP_OK, mime, fis );
-            r.addHeader( "Content-length", "" + (f.length() - startFrom));
-            r.addHeader( "Content-range", "" + startFrom + "-" +
-                        (f.length()-1) + "/" + f.length());
-            return r;
-        }
-        catch( IOException ioe )
-        {
-            return new Response( HTTP_FORBIDDEN, MIME_PLAINTEXT, "FORBIDDEN: Reading file failed." );
-        }
-    }
+    Thread myThread;
 
     public static String mimeFromExtention(File f) throws IOException {
         String mime = null;

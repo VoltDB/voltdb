@@ -34,12 +34,12 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Hashtable;
 import java.util.HashSet;
+import java.util.Hashtable;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
@@ -799,7 +799,7 @@ public class RealVoltDB implements VoltDBInterface
             }
 
             // shutdown the web monitoring
-            m_adminListener.shutdown(true);
+            m_adminListener.stop(true);
 
             // shut down the client interface
             for (ClientInterface ci : m_clientInterfaces) {
