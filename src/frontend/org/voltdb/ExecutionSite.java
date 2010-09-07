@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.Semaphore;
-import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
@@ -45,7 +44,6 @@ import org.voltdb.client.ConnectionUtil;
 import org.voltdb.debugstate.ExecutorContext;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
-import org.voltdb.dtxn.RecoveringSinglePartitionTxnState;
 import org.voltdb.dtxn.RestrictedPriorityQueue;
 import org.voltdb.dtxn.RestrictedPriorityQueue.QueueState;
 import org.voltdb.dtxn.SinglePartitionTxnState;
@@ -408,6 +406,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     public void tick() {
         // invoke native ee tick if at least one second has passed
         final long time = EstTime.currentTimeMillis();
+        final long prevLastTickTime = lastTickTime;
         if ((time - lastTickTime) >= 1000) {
             if ((lastTickTime != 0) && (ee != null)) {
                 ee.tick(time, lastCommittedTxnId);
@@ -426,7 +425,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
          * relatively up-to-date.
          */
         if (m_tableStats != null
-                && (time - lastTickTime) >= StatsManager.POLL_INTERVAL * 2) {
+            && (time - prevLastTickTime) >= StatsManager.POLL_INTERVAL * 2) {
             CatalogMap<Table> tables = m_context.database.getTables();
             int[] tableIds = new int[tables.size()];
             int i = 0;
