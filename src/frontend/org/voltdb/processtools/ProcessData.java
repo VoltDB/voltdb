@@ -85,9 +85,9 @@ public class ProcessData {
                         final long now = (System.currentTimeMillis() / 1000) - 1256158053;
                         System.out.println("(" + now + ")" + m_processName + ": " + line);
                     }
+                } else {
+                    return;
                 }
-                else
-                    Thread.yield();
             }
         }
     }
