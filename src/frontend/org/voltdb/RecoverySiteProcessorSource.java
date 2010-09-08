@@ -149,6 +149,7 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
      */
     private static class AckTracker {
         private final HashMap<Integer, Integer> m_acks = new HashMap<Integer, Integer>();
+        private boolean m_ignoreAcks = false;
 
         private void waitForAcks(int blockIndex, int acksExpected) {
             assert(!m_acks.containsKey(blockIndex));
@@ -167,12 +168,23 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
             return false;
         }
 
+        /*
+         * Don't bother expecting acks to come. Invoked by handle failure
+         * when the destination fails.
+         */
+        private void ignoreAcks() {
+            m_ignoreAcks = true;
+        }
+
         @SuppressWarnings("unused")
         private void handleNodeFault(HashSet<Integer> failedNodes, SiteTracker tracker) {
             throw new UnsupportedOperationException();
         }
 
         public boolean hasOutstanding() {
+            if (m_ignoreAcks) {
+                return false;
+            }
             return !m_acks.isEmpty();
         }
     }
@@ -227,6 +239,8 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
             destinationSite = table.m_destinationIds[0];
         }
         if (failedSites.contains(destinationSite)) {
+            recoveryLog.error("Failing recovery of " + destinationSite + " at source site " + m_siteId);
+            m_ackTracker.ignoreAcks();
             final BBContainer origin = org.voltdb.utils.DBBPool.allocateDirect(m_bufferLength);
             try {
                 long bufferAddress = 0;
@@ -241,6 +255,7 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
                 handleFailure(buffer);
             } finally {
                 origin.discard();
+                m_onCompletion.run();
             }
         }
     }

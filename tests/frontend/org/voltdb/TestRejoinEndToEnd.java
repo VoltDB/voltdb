@@ -545,7 +545,7 @@ public class TestRejoinEndToEnd extends TestCase {
                     kfactor,
                     BackendTarget.NATIVE_EE_JNI,
                     LocalCluster.FailureState.ALL_RUNNING,
-                    true);
+                    false);
         cluster.setMaxHeap(256);
         boolean success = cluster.compile(builder);
         assertTrue(success);
@@ -742,130 +742,132 @@ public class TestRejoinEndToEnd extends TestCase {
 
     /*
      * Load a whole lot of stuff, kill some stuff, rejoin some stuff, and then kill some more stuff during the rejoin
-     * Commented this test out because I don't see what it adds. It was going to be the same as the other fuzz test
-     * just with more data, but loading the data is slow. Might work better with some large varchar fields.
-     * Then the problem becomes validating and updating the data.
+     * This test doesn't validate data because it would be too slow. It has uncovered some bugs that occur
+     * when a failure is concurrent with the recovery processors work. It is quite slow due to the loading,
+     * but it is worth having.
      */
-//    public void testRejoinFuzz2ElectricBoogaloo() throws Exception {
-//        VoltProjectBuilder builder = getBuilderForTest();
-//        builder.setSecurityEnabled(true);
-//
-//        final int numHosts = 6;
-//        final int numTuples = 204800 * 6;//about 100 megs per
-//        //final int numTuples = 0;
-//        final int kfactor = 2;
-//        final LocalCluster cluster =
-//            new LocalCluster(
-//                    "rejoin.jar",
-//                    1,
-//                    numHosts,
-//                    kfactor,
-//                    BackendTarget.NATIVE_EE_JNI);
-//        cluster.setMaxHeap(256);
-//        boolean success = cluster.compile(builder);
-//        assertTrue(success);
-//        copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
-//        cluster.setHasLocalServer(false);
-//
-//        cluster.startUp();
-//
-//        Client client = ClientFactory.createClient(m_cconfig);
-//
-//        client.createConnection("localhost");
-//
-//        Random r = new Random();
-//        StringBuilder sb = new StringBuilder(512);
-//        for (int ii = 0; ii < 512; ii++) {
-//            sb.append((char)(34 + r.nextInt(90)));
-//        }
-//        String theString = sb.toString();
-//
-//        final Semaphore rateLimit = new Semaphore(3000);
-//        for (int ii = 0; ii < numTuples; ii++) {
-//            rateLimit.acquire();
-//            int value = r.nextInt(numTuples);
-//            client.callProcedure( new ProcedureCallback() {
-//
-//                @Override
-//                public void clientCallback(ClientResponse clientResponse)
-//                        throws Exception {
-//                    if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-//                        System.err.println(clientResponse.getStatusString());
-//                        return;
-//                    }
-//                    if (clientResponse.getResults()[0].asScalarLong() != 1) {
-//                        System.err.println("Update didn't happen");
-//                        return;
-//                    }
-//                    rateLimit.release();
-//                }
-//
-//            }, "InsertPartitionedLarge", ii, value, theString);
-//        }
-//        client.drain();
-//        client.close();
-//        Random forWhomTheBellTolls = new Random();
-//        for (int zz = 0; zz < 100; zz++) {
-//            final ArrayList<Integer> toKillFirst = new ArrayList<Integer>();
-//            final ArrayList<Integer> toKillDuringRecovery = new ArrayList<Integer>();
-//            while (toKillFirst.size() < kfactor / 2) {
-//                int candidate = forWhomTheBellTolls.nextInt(numHosts);
-//                if (!toKillFirst.contains(candidate)) {
-//                    toKillFirst.add(candidate);
-//                }
-//            }
-//            while (toKillDuringRecovery.size() < kfactor / 2) {
-//                int candidate = forWhomTheBellTolls.nextInt(numHosts);
-//                if (!toKillFirst.contains(candidate) && !toKillDuringRecovery.contains(candidate)) {
-//                    toKillDuringRecovery.add(candidate);
-//                }
-//            }
-//            System.out.println("Killing " + toKillFirst.toString() + toKillDuringRecovery.toString());
-//
-//            int toConnectToTemp = forWhomTheBellTolls.nextInt(numHosts);
-//            while (toKillFirst.contains(toConnectToTemp) || toKillDuringRecovery.contains(toConnectToTemp)) {
-//                toConnectToTemp = forWhomTheBellTolls.nextInt(numHosts);
-//            }
-//            final int toConnectTo = toConnectToTemp;
-//
-//            for (Integer uhoh : toKillFirst) {
-//                cluster.shutDownSingleHost(uhoh);
-//            }
-//
-//            Thread recoveryThread = new Thread() {
-//                @Override
-//                public void run() {
-//                    for (Integer dead : toKillFirst) {
-//                        while (!cluster.recoverOne( dead, toConnectTo, m_username + ":" + m_password + "@localhost")){}
-//                    }
-//                }
-//            };
-//
-//            Thread killerThread = new Thread() {
-//                @Override
-//                public void run() {
-//                    Random r = new Random();
-//                    for (Integer toKill : toKillDuringRecovery) {
-//                        try {
-//                            Thread.sleep(r.nextInt(5000));
-//                        } catch (InterruptedException e) {
-//                            e.printStackTrace();
-//                        }
-//                        cluster.shutDownSingleHost(toKill);
-//                    }
-//                }
-//            };
-//
-//            recoveryThread.start();
-//            killerThread.start();
-//            recoveryThread.join();
-//            killerThread.join();
-//
-//            for (Integer recoverNow : toKillDuringRecovery) {
-//                cluster.recoverOne( recoverNow, toConnectTo, m_username + ":" + m_password + "@localhost");
-//            }
-//            System.out.println("Finished iteration " + zz);
-//        }
-//        cluster.shutDown();
-//    }
+    public void testRejoinFuzz2ElectricBoogaloo() throws Exception {
+        VoltProjectBuilder builder = getBuilderForTest();
+        builder.setSecurityEnabled(true);
+
+        final int numHosts = 6;
+        final int numTuples = 204800 * 6;//about 100 megs per
+        //final int numTuples = 0;
+        final int kfactor = 2;
+        final LocalCluster cluster =
+            new LocalCluster(
+                    "rejoin.jar",
+                    1,
+                    numHosts,
+                    kfactor,
+                    BackendTarget.NATIVE_EE_JNI,
+                    LocalCluster.FailureState.ALL_RUNNING,
+                    false);
+        cluster.setMaxHeap(256);
+        boolean success = cluster.compile(builder);
+        assertTrue(success);
+        copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+        cluster.setHasLocalServer(false);
+
+        cluster.startUp();
+
+        Client client = ClientFactory.createClient(m_cconfig);
+
+        client.createConnection("localhost");
+
+        Random r = new Random();
+        StringBuilder sb = new StringBuilder(512);
+        for (int ii = 0; ii < 512; ii++) {
+            sb.append((char)(34 + r.nextInt(90)));
+        }
+        String theString = sb.toString();
+
+        final Semaphore rateLimit = new Semaphore(3000);
+        for (int ii = 0; ii < numTuples; ii++) {
+            rateLimit.acquire();
+            int value = r.nextInt(numTuples);
+            client.callProcedure( new ProcedureCallback() {
+
+                @Override
+                public void clientCallback(ClientResponse clientResponse)
+                        throws Exception {
+                    if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                        System.err.println(clientResponse.getStatusString());
+                        return;
+                    }
+                    if (clientResponse.getResults()[0].asScalarLong() != 1) {
+                        System.err.println("Update didn't happen");
+                        return;
+                    }
+                    rateLimit.release();
+                }
+
+            }, "InsertPartitionedLarge", ii, value, theString);
+        }
+        client.drain();
+        client.close();
+        Random forWhomTheBellTolls = new Random();
+        for (int zz = 0; zz < 5; zz++) {
+            final ArrayList<Integer> toKillFirst = new ArrayList<Integer>();
+            final ArrayList<Integer> toKillDuringRecovery = new ArrayList<Integer>();
+            while (toKillFirst.size() < kfactor / 2) {
+                int candidate = forWhomTheBellTolls.nextInt(numHosts);
+                if (!toKillFirst.contains(candidate)) {
+                    toKillFirst.add(candidate);
+                }
+            }
+            while (toKillDuringRecovery.size() < kfactor / 2) {
+                int candidate = forWhomTheBellTolls.nextInt(numHosts);
+                if (!toKillFirst.contains(candidate) && !toKillDuringRecovery.contains(candidate)) {
+                    toKillDuringRecovery.add(candidate);
+                }
+            }
+            System.out.println("Killing " + toKillFirst.toString() + toKillDuringRecovery.toString());
+
+            int toConnectToTemp = forWhomTheBellTolls.nextInt(numHosts);
+            while (toKillFirst.contains(toConnectToTemp) || toKillDuringRecovery.contains(toConnectToTemp)) {
+                toConnectToTemp = forWhomTheBellTolls.nextInt(numHosts);
+            }
+            final int toConnectTo = toConnectToTemp;
+
+            for (Integer uhoh : toKillFirst) {
+                cluster.shutDownSingleHost(uhoh);
+            }
+
+            Thread recoveryThread = new Thread() {
+                @Override
+                public void run() {
+                    for (Integer dead : toKillFirst) {
+                        while (!cluster.recoverOne( dead, toConnectTo, m_username + ":" + m_password + "@localhost")){}
+                    }
+                }
+            };
+
+            Thread killerThread = new Thread() {
+                @Override
+                public void run() {
+                    Random r = new Random();
+                    for (Integer toKill : toKillDuringRecovery) {
+                        try {
+                            Thread.sleep(r.nextInt(5000));
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        cluster.shutDownSingleHost(toKill);
+                    }
+                }
+            };
+
+            recoveryThread.start();
+            killerThread.start();
+            recoveryThread.join();
+            killerThread.join();
+
+            for (Integer recoverNow : toKillDuringRecovery) {
+                cluster.recoverOne( recoverNow, toConnectTo, m_username + ":" + m_password + "@localhost");
+            }
+            System.out.println("Finished iteration " + zz);
+        }
+        cluster.shutDown();
+    }
 }

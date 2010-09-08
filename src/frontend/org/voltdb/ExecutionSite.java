@@ -972,7 +972,15 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             } else {
                 assert(!m_recovering);
                 assert(m_recoveryProcessor == null);
-                assert(rm.type() == RecoveryMessageType.Initiate);
+                assert(rm.type() == RecoveryMessageType.Initiate || rm.type() == RecoveryMessageType.Ack);
+                /*
+                 * If the destination fails it is possible for an ack to be
+                 * delivered after the processor failed the recovery. If an
+                 * ack is received here it should just be discarded.
+                 */
+                if (RecoveryMessageType.Ack == rm.type()) {
+                    return;
+                }
                 final long recoveringPartitionTxnId = rm.txnId();
                 m_recoveryStartTime = System.currentTimeMillis();
                 m_recoveryLog.info(
