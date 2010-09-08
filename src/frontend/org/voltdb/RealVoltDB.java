@@ -450,6 +450,21 @@ public class RealVoltDB implements VoltDBInterface
             m_siteThreads = new Hashtable<Integer, Thread>();
             m_runners = new ArrayList<ExecutionSiteRunner>();
 
+            if (config.m_backend.isIPC) {
+                int eeCount = 0;
+                for (Site site : m_catalogContext.siteTracker.getUpSites()) {
+                    if (site.getIsexec() &&
+                            myHostId == Integer.parseInt(site.getHost().getTypeName())) {
+                        eeCount++;
+                    }
+                }
+                if (config.m_ipcPorts.size() != eeCount) {
+                    hostLog.fatal("Specified an IPC backend but only supplied " + config.m_ipcPorts.size() +
+                            " backend ports when " + eeCount + " are required");
+                    System.exit(-1);
+                }
+            }
+
             /*
              * Create execution sites runners (and threads) for all exec sites except the first one.
              * This allows the sites to be set up in the thread that will end up running them.
@@ -612,7 +627,8 @@ public class RealVoltDB implements VoltDBInterface
         String rejoinHostCredentialString = null;
         String rejoinHostAddressString = null;
 
-        int rejoinPort = config.m_internalPort;
+        //Client interface port of node that will receive @Rejoin invocation
+        int rejoinPort = config.m_port;
         String rejoinHost = null;
         String rejoinUser = null;
         String rejoinPass = null;
@@ -700,7 +716,7 @@ public class RealVoltDB implements VoltDBInterface
             client.callProcedure(
                     rcb,
                     "@Rejoin",
-                    config.m_internalInterface != null ? config.m_internalInterface : hostname,
+                    config.m_internalInterface.isEmpty() ? hostname : config.m_internalInterface,
                     config.m_internalPort);
         }
         catch (Exception e) {

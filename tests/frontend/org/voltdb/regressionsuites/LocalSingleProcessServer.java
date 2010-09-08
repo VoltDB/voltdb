@@ -46,6 +46,7 @@ public class LocalSingleProcessServer implements VoltServerConfig {
     ServerThread m_server = null;
     boolean m_compiled = false;
     protected String m_pathToDeployment;
+    private final ArrayList<EEProcess> m_siteProcesses = new ArrayList<EEProcess>();
 
     public LocalSingleProcessServer(String jarFileName, int siteCount,
                                     BackendTarget target)
@@ -67,6 +68,9 @@ public class LocalSingleProcessServer implements VoltServerConfig {
             } else {
                 m_target = target;
             }
+        }
+        for (int ii = 0; ii < siteCount; ii++) {
+            m_siteProcesses.add(new EEProcess(m_target, "LocalSingleProcessServer_site_" + ii + ".log"));
         }
     }
     @Override
@@ -113,16 +117,20 @@ public class LocalSingleProcessServer implements VoltServerConfig {
     }
 
     @Override
-    public List<String> shutDown() throws InterruptedException {
+    public void shutDown() throws InterruptedException {
         m_server.shutdown();
+        for (EEProcess proc : m_siteProcesses) {
+            proc.waitForShutdown();
+        }
         if (m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
-            if (!ExecutionEngineIPC.m_valgrindErrors.isEmpty()) {
-                ArrayList<String> retval = new ArrayList<String>(ExecutionEngineIPC.m_valgrindErrors);
-                ExecutionEngineIPC.m_valgrindErrors.clear();
-                return retval;
+            if (!EEProcess.m_valgrindErrors.isEmpty()) {
+                String failString = "";
+                for (final String error : EEProcess.m_valgrindErrors) {
+                    failString = failString + "\n" +  error;
+                }
+                org.junit.Assert.fail(failString);
             }
         }
-        return null;
     }
 
     @Override
@@ -134,6 +142,11 @@ public class LocalSingleProcessServer implements VoltServerConfig {
         config.m_pathToCatalog = m_jarFileName;
         config.m_profilingLevel = ProcedureProfiler.Level.DISABLED;
         config.m_pathToDeployment = m_pathToDeployment;
+
+        config.m_ipcPorts = java.util.Collections.synchronizedList(new ArrayList<Integer>());
+        for (EEProcess proc : m_siteProcesses) {
+            config.m_ipcPorts.add(proc.port());
+        }
 
         m_server = new ServerThread(config);
         m_server.start();

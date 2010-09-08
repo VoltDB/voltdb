@@ -257,6 +257,23 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         }
     }
 
+    /**
+     * Generated when a snapshot buffer is discarded. Reminds the EE thread
+     * that there is probably more snapshot work to do.
+     */
+    static class PotentialSnapshotWorkMessage extends VoltMessage
+    {
+        @Override
+        protected void flattenToBuffer(DBBPool pool) {} // can be empty if only used locally
+        @Override
+        protected void initFromBuffer() {} // can be empty if only used locally
+
+        @Override
+        public byte getSubject() {
+            return Subject.DEFAULT.getId();
+        }
+    }
+
     // This message is used locally to get the currently active TransactionState
     // to check whether or not its WorkUnit's dependencies have been satisfied.
     // Necessary after handling a node failure.
@@ -540,7 +557,13 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             (transactionQueue != null) ? transactionQueue : initializeTransactionQueue(siteId);
 
         loadProceduresFromCatalog(voltdb.getBackendTargetType());
-        m_snapshotter = new SnapshotSiteProcessor();
+        m_snapshotter = new SnapshotSiteProcessor(new Runnable() {
+            @Override
+            public void run() {
+                m_mailbox.deliver(new PotentialSnapshotWorkMessage());
+            }
+        });
+
         final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
         m_starvationTracker = new StarvationTracker(String.valueOf(getCorrespondingSiteId()), getCorrespondingSiteId());
         statsAgent.registerStatsSource(SysProcSelector.STARVATION,
@@ -628,7 +651,8 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                             Integer.valueOf(site.getPartition().getTypeName()),
                             Integer.valueOf(site.getHost().getTypeName()),
                             hostname,
-                            target);
+                            target,
+                            VoltDB.instance().getConfig().m_ipcPorts.remove(0));
                 eeTemp.loadCatalog(serializedCatalog);
                 lastTickTime = EstTime.currentTimeMillis();
                 eeTemp.tick( lastTickTime, 0);
@@ -1053,6 +1077,8 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 ELTInternalMessage mbp = new ELTInternalMessage(eltm.m_sb, response);
                 ELTManager.instance().queueMessage(mbp);
             }
+        } else if (message instanceof PotentialSnapshotWorkMessage) {
+            m_snapshotter.doSnapshotWork(ee);
         }
         else {
             hostLog.l7dlog(Level.FATAL, LogKeys.org_voltdb_dtxn_SimpleDtxnConnection_UnkownMessageClass.name(),
@@ -1246,7 +1272,13 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         long safeInitPoint = Long.MIN_VALUE;
         java.util.ArrayList<FailureSiteUpdateMessage> messages = new java.util.ArrayList<FailureSiteUpdateMessage>();
         do {
-            VoltMessage m = m_mailbox.recvBlocking(new Subject[] { Subject.FAILURE, Subject.FAILURE_SITE_UPDATE });
+            VoltMessage m = m_mailbox.recvBlocking(new Subject[] { Subject.FAILURE, Subject.FAILURE_SITE_UPDATE }, 5);
+            //Invoke tick periodically to ensure that the last snapshot continues in the event that the failure
+            //process does not complete
+            if (m == null) {
+                tick();
+                continue;
+            }
             FailureSiteUpdateMessage fm = null;
 
             if (m.getSubject() == Subject.FAILURE_SITE_UPDATE.getId()) {

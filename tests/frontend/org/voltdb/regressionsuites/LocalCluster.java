@@ -75,8 +75,14 @@ public class LocalCluster implements VoltServerConfig {
 
     // components
     ProcessBuilder m_procBuilder;
-    private int m_debug1Offset;
-    private int m_debug2Offset;
+    private int m_debugOffset1;
+    private int m_debugOffset2;
+
+    private int m_ipcPortOffset1;
+    private int m_ipcPortOffset2;
+    private int m_ipcPortOffset3;
+
+    private final ArrayList<ArrayList<EEProcess>> m_eeProcs = new ArrayList<ArrayList<EEProcess>>();
 
     private final boolean m_debug;
     private int m_debugPortOffset = 8000;
@@ -201,9 +207,27 @@ public class LocalCluster implements VoltServerConfig {
         assert (siteCount > 0);
         assert (hostCount > 0);
         assert (replication >= 0);
+
+        final String buildType = System.getenv().get("BUILD");
+//        if (buildType == null) {
+        /*
+         * Disable memcheck with localcluster for now since it doesn't pass.
+         */
+            m_target = target;
+//        } else {
+//            if (buildType.startsWith("memcheck")) {
+//                if (target.equals(BackendTarget.NATIVE_EE_JNI)) {
+//                    m_target = BackendTarget.NATIVE_EE_VALGRIND_IPC;
+//                } else {
+//                    m_target = target;//For memcheck
+//                }
+//            } else {
+//                m_target = target;
+//            }
+//        }
+
         m_jarFileName = VoltDB.Configuration.getPathToCatalogForTest(jarFileName);
         m_siteCount = siteCount;
-        m_target = target;
         m_hostCount = hostCount;
         m_replication = replication;
         m_cluster.ensureCapacity(m_hostCount);
@@ -245,15 +269,24 @@ public class LocalCluster implements VoltServerConfig {
                                            "-1");
 
         // when we actually append a port value and deployment file, these will be correct
-        m_debug1Offset = m_procBuilder.command().size() - 12;
-        m_debug2Offset = m_procBuilder.command().size() - 11;
+        m_debugOffset1 = m_procBuilder.command().size() - 12;
+        m_debugOffset2 = m_procBuilder.command().size() - 11;
         if (m_debug) {
-            m_procBuilder.command().add(m_debug1Offset, "");
-            m_procBuilder.command().add(m_debug1Offset, "");
+            m_procBuilder.command().add(m_debugOffset1, "");
+            m_procBuilder.command().add(m_debugOffset1, "");
         }
         m_portOffset = m_procBuilder.command().size() - 3;
         m_pathToDeploymentOffset = m_procBuilder.command().size() - 5;
         m_rejoinOffset = m_procBuilder.command().size() - 1;
+
+        if (m_target.isIPC) {
+            m_procBuilder.command().add("");
+            m_ipcPortOffset1 = m_procBuilder.command().size() - 1;
+            m_procBuilder.command().add("");
+            m_ipcPortOffset2 = m_procBuilder.command().size() - 1;
+            m_procBuilder.command().add("");
+            m_ipcPortOffset3 = m_procBuilder.command().size() - 1;
+        }
 
         for (String s : m_procBuilder.command()) {
             System.out.println(s);
@@ -305,6 +338,15 @@ public class LocalCluster implements VoltServerConfig {
 
         int oopStartIndex = 0;
 
+        for (int ii = 0; ii < m_hostCount; ii++) {
+            ArrayList<EEProcess> procs = new ArrayList<EEProcess>();
+            m_eeProcs.add(procs);
+            for (int zz = 0; zz < m_siteCount; zz++) {
+                String logfile = "LocalCluster_host_" + ii + "_site" + zz + ".log";
+                procs.add(new EEProcess(m_target, logfile));
+            }
+        }
+
         m_pipes.clear();
         m_cluster.clear();
         // create the in-process server
@@ -318,6 +360,11 @@ public class LocalCluster implements VoltServerConfig {
             config.m_pathToDeployment = m_pathToDeployment;
             config.m_profilingLevel = ProcedureProfiler.Level.DISABLED;
             config.m_port = VoltDB.DEFAULT_PORT;
+            ArrayList<Integer> ports = new ArrayList<Integer>();
+            for (EEProcess proc : m_eeProcs.get(0)) {
+                ports.add(proc.port());
+            }
+            config.m_ipcPorts = java.util.Collections.synchronizedList(ports);
 
             m_localServer = new ServerThread(config);
             m_localServer.start();
@@ -354,6 +401,9 @@ public class LocalCluster implements VoltServerConfig {
             }
         } while (allReady == false);
         if (logtime) System.out.println("********** post witness: " + (System.currentTimeMillis() - startTime) + " ms");
+        if (!allReady) {
+            throw new RuntimeException("Not all processes became ready");
+        }
 
         // Finally, make sure the local server thread is running and wait if it is not.
         if (m_hasLocalServer)
@@ -374,6 +424,9 @@ public class LocalCluster implements VoltServerConfig {
             int retval = 0;
             try {
                 retval = proc.waitFor();
+                for (EEProcess eeproc : m_eeProcs.get(procIndex)) {
+                    eeproc.waitForShutdown();
+                }
             } catch (InterruptedException e) {
                 System.out.println("External VoltDB process is acting crazy.");
             } finally {
@@ -398,11 +451,24 @@ public class LocalCluster implements VoltServerConfig {
             m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
             m_procBuilder.command().set(m_rejoinOffset, "");
             if (m_debug) {
-                m_procBuilder.command().set(m_debug1Offset, "-Xdebug");
+                m_procBuilder.command().set(m_debugOffset1, "-Xdebug");
                 m_procBuilder.command().set(
-                        m_debug2Offset,
+                        m_debugOffset2,
                         "-agentlib:jdwp=transport=dt_socket,address="
                         + m_debugPortOffset++ + ",server=y,suspend=n");
+            }
+            if (m_target.isIPC) {
+                m_procBuilder.command().set(m_ipcPortOffset1, "ipcports");
+                String portString = "";
+                for (EEProcess proc : m_eeProcs.get(hostId)) {
+                    if (portString.isEmpty()) {
+                        portString += Integer.valueOf(proc.port());
+                    } else {
+                        portString += "," + Integer.valueOf(proc.port());
+                    }
+                }
+                m_procBuilder.command().set(m_ipcPortOffset2, portString);
+                m_procBuilder.command().set(m_ipcPortOffset3, "valgrind");
             }
 
             Process proc = m_procBuilder.start();
@@ -457,6 +523,35 @@ public class LocalCluster implements VoltServerConfig {
             portNoToRejoin = VoltDB.DEFAULT_PORT + portOffset;
         }
 
+        ArrayList<EEProcess> eeProcs = m_eeProcs.get(hostId);
+        for (EEProcess proc : eeProcs) {
+            try {
+                proc.waitForShutdown();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        eeProcs.clear();
+
+        for (int ii = 0; ii < m_siteCount; ii++) {
+            String logfile = "LocalCluster_host_" + hostId + "_site" + ii + ".log";
+            eeProcs.add(new EEProcess(m_target, logfile));
+        }
+
+        if (m_target.isIPC) {
+            m_procBuilder.command().set(m_ipcPortOffset1, "ipcports");
+            String portString = "";
+            for (EEProcess proc : m_eeProcs.get(hostId)) {
+                if (portString.isEmpty()) {
+                    portString += Integer.valueOf(proc.port());
+                } else {
+                    portString += "," + Integer.valueOf(proc.port());
+                }
+            }
+            m_procBuilder.command().set(m_ipcPortOffset2, portString);
+            m_procBuilder.command().set(m_ipcPortOffset3, "valgrind");
+        }
+
         PipeToFile ptf = null;
         long start = 0;
         try {
@@ -464,9 +559,9 @@ public class LocalCluster implements VoltServerConfig {
             m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
             m_procBuilder.command().set(m_rejoinOffset, rejoinHost + ":" + String.valueOf(portNoToRejoin));
             if (m_debug) {
-                m_procBuilder.command().set(m_debug1Offset, "-Xdebug");
+                m_procBuilder.command().set(m_debugOffset1, "-Xdebug");
                 m_procBuilder.command().set(
-                        m_debug2Offset,
+                        m_debugOffset2,
                         "-agentlib:jdwp=transport=dt_socket,address="
                         + m_debugPortOffset++ + ",server=y,suspend=n");
             }
@@ -526,12 +621,17 @@ public class LocalCluster implements VoltServerConfig {
             return true;
         } else {
             System.out.println("Recovering process exited before recovery completed");
+            try {
+                silentShutdownSingleHost(hostId, true);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
             return false;
         }
     }
 
     @Override
-    synchronized public List<String> shutDown() throws InterruptedException {
+    synchronized public void shutDown() throws InterruptedException {
         // there are couple of ways to shutdown. sysproc @kill could be
         // issued to listener. this would require that the test didn't
         // break the cluster somehow.  Or ... just old fashioned kill?
@@ -542,19 +642,24 @@ public class LocalCluster implements VoltServerConfig {
             m_running = false;
         }
         shutDownExternal();
-
-        return null;
     }
 
-    public void shutDownSingleHost(int hostNum)
+    public void shutDownSingleHost(int hostNum) throws InterruptedException
     {
+        System.out.println("Shutting down " + hostNum);
+        silentShutdownSingleHost(hostNum, false);
+    }
+
+    private void silentShutdownSingleHost(int hostNum, boolean forceKillEEProcs) throws InterruptedException {
         Process proc = null;
         PipeToFile ptf = null;
+        ArrayList<EEProcess> procs = null;
         synchronized (this) {
            proc = m_cluster.get(hostNum);
            ptf = m_pipes.get(hostNum);
            m_cluster.set( hostNum, null);
            m_pipes.set(hostNum, null);
+           procs = m_eeProcs.get(hostNum);
         }
 
         if (proc != null)
@@ -562,9 +667,21 @@ public class LocalCluster implements VoltServerConfig {
         if (ptf != null) {
             new File(ptf.m_filename).delete();
         }
+
+        for (EEProcess eeproc : procs) {
+            if (forceKillEEProcs) {
+                eeproc.destroy();
+            }
+            eeproc.waitForShutdown();
+        }
+        procs.clear();
     }
 
-    public void shutDownExternal() throws InterruptedException
+    public void shutDownExternal() throws InterruptedException {
+        shutDownExternal(false);
+    }
+
+    public void shutDownExternal(boolean forceKillEEProcs) throws InterruptedException
     {
         if (m_cluster != null) {
             for (Process proc : m_cluster) {
@@ -581,6 +698,22 @@ public class LocalCluster implements VoltServerConfig {
         }
 
         if (m_cluster != null) m_cluster.clear();
+
+        for (ArrayList<EEProcess> procs : m_eeProcs) {
+            for (EEProcess proc : procs) {
+                proc.waitForShutdown();
+            }
+        }
+
+        if (m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
+            if (!EEProcess.m_valgrindErrors.isEmpty()) {
+                String failString = "";
+                for (final String error : EEProcess.m_valgrindErrors) {
+                    failString = failString + "\n" + error;
+                }
+                org.junit.Assert.fail(failString);
+            }
+        }
     }
 
     @Override
@@ -625,7 +758,7 @@ public class LocalCluster implements VoltServerConfig {
         @Override
         public void run() {
             try {
-                shutDownExternal();
+                shutDownExternal(true);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }

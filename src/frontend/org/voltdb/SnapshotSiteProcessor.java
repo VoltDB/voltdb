@@ -85,6 +85,12 @@ public class SnapshotSiteProcessor {
     private ArrayList<Thread> m_snapshotTargetTerminators = null;
 
     /**
+     * When a buffer is returned to the pool this is invoked to ensure the EE wakes up
+     * and does any potential snapshot work with that buffer
+     */
+    private final Runnable m_onPotentialSnapshotWork;
+
+    /**
      * A class identifying a table that should be snapshotted as well as the destination
      * for the resulting tuple blocks
      */
@@ -111,7 +117,8 @@ public class SnapshotSiteProcessor {
         }
     }
 
-    SnapshotSiteProcessor() {
+    SnapshotSiteProcessor(Runnable onPotentialSnapshotWork) {
+        m_onPotentialSnapshotWork = onPotentialSnapshotWork;
         initializeBufferPool();
     }
 
@@ -135,6 +142,7 @@ public class SnapshotSiteProcessor {
                 @Override
                 public void discard() {
                     m_availableSnapshotBuffers.offer(this);
+                    m_onPotentialSnapshotWork.run();
                 }
             });
         }

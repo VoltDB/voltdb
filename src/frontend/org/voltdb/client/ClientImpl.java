@@ -26,6 +26,7 @@ import java.util.logging.Logger;
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.DBBPool.BBContainer;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  *  A client that connects to one or more nodes in a VoltCluster
@@ -54,6 +55,15 @@ final class ClientImpl implements Client {
      */
     private final String m_username;
     private final String m_password;
+
+    /**
+     * These threads belong to the network thread pool
+     * that invokes callbacks. These threads are "blessed"
+     * and should never experience backpressure. This ensures that the
+     * network thread pool doesn't block when queuing procedures from
+     * a callback.
+     */
+    private final CopyOnWriteArrayList<Long> m_blessedThreadIds = new CopyOnWriteArrayList<Long>();
 
     /****************************************************
                         Public API
@@ -121,6 +131,7 @@ final class ClientImpl implements Client {
         if (listener != null) {
             m_distributer.addClientStatusListener(listener);
         }
+        m_blessedThreadIds.addAll(m_distributer.getThreadIds());
     }
 
     private boolean verifyCredentialsAreAlwaysTheSame(String username, byte[] hashedPassword) {
@@ -289,7 +300,11 @@ final class ClientImpl implements Client {
             new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
 
         if (m_blockingQueue) {
-            while (!m_distributer.queue(invocation, callback, expectedSerializedSize, false)) {
+            while (!m_distributer.queue(
+                    invocation,
+                    callback,
+                    expectedSerializedSize,
+                    m_blessedThreadIds.contains(Thread.currentThread().getId()))) {
                 try {
                     backpressureBarrier();
                 } catch (InterruptedException e) {
@@ -298,7 +313,11 @@ final class ClientImpl implements Client {
             }
             return true;
         } else {
-            return m_distributer.queue(invocation, callback, expectedSerializedSize, false);
+            return m_distributer.queue(
+                    invocation,
+                    callback,
+                    expectedSerializedSize,
+                    m_blessedThreadIds.contains(Thread.currentThread().getId()));
         }
     }
 

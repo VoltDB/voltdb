@@ -51,7 +51,7 @@ public class Rejoin extends VoltSystemProcedure {
         SysProcFragmentId.PF_rejoinAggregate;
 
     //Turn on some sleeps to assist in creating interesting failures
-    public static boolean debugFlag = false;
+    public static boolean debugFlag = true;
 
     @Override
     public void init(int numberOfPartitions, SiteProcedureConnection site,

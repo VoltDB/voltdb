@@ -1065,43 +1065,54 @@ void VoltDBIPC::setupSigHandler(void) const {
 
 int main(int argc, char **argv) {
     const int pid = getpid();
-    printf("==%d==", pid);
+    printf("==%d==\n", pid);
     fflush(stdout);
     int sock = -1;
     int fd = -1;
     /* max message size that can be read from java */
     int max_ipc_message_size = (1024 * 1024 * 2);
 
-    int port = 21214;
-    if (argc == 2)
-        port = atoi(argv[1]);
+    int port = 0;
 
-    if (argc == 2)
-        printf("Attempting to bind to port %d which was passed in as %s\n", port, argv[1]);
+    if (argc == 2) {
+        printf("Binding to a specific socket is no longer supported\n");
+        exit(-1);
+    }
 
     struct sockaddr_in address;
     address.sin_family = AF_INET;
     address.sin_port = htons(port);
     address.sin_addr.s_addr = INADDR_ANY;
 
+
     // read args which presumably configure VoltDBIPC
 
     // and set up an accept socket.
     if ((sock = socket(AF_INET,SOCK_STREAM, 0)) < 0) {
         printf("Failed to create socket.\n");
-        exit(-1);
+        exit(-2);
     }
 
     if ((bind(sock, (struct sockaddr*) (&address), sizeof(struct sockaddr_in))) != 0) {
         printf("Failed to bind socket.\n");
-        exit(-2);
+        exit(-3);
     }
+
+    socklen_t address_len = sizeof(struct sockaddr_in);
+    if (getsockname( sock, reinterpret_cast<sockaddr*>(&address), &address_len)) {
+        printf("Failed to find socket address\n");
+        exit(-4);
+    }
+
+    port = ntohs(address.sin_port);
+    printf("==%d==\n", port);
+    fflush(stdout);
 
     if ((listen(sock, 1)) != 0) {
         printf("Failed to listen on socket.\n");
-        exit(-3);
+        exit(-5);
     }
-    printf("listening\nPort %d\n", port);
+    printf("listening\n");
     fflush(stdout);
 
     struct sockaddr_in client_addr;
@@ -1109,7 +1120,7 @@ int main(int argc, char **argv) {
     fd = accept(sock, (struct sockaddr*) (&client_addr), &addr_size);
     if (fd < 0) {
         printf("Failed to accept socket.\n");
-        exit(-4);
+        exit(-6);
     }
 
     int flag = 1;
@@ -1126,7 +1137,6 @@ int main(int argc, char **argv) {
 
     // instantiate voltdbipc to interface to EE.
     VoltDBIPC *voltipc = new VoltDBIPC(fd);
-
     int more = 1;
     while (more) {
         size_t bytesread = 0;

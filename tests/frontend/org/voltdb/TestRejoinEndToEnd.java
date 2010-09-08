@@ -288,6 +288,7 @@ public class TestRejoinEndToEnd extends TestCase {
         context.localServer.shutdown();
         context.localServer.join();
 
+        client.close();
         // this means there is nothing else to try
         return failType != DONT_FAIL;
     }
@@ -320,6 +321,7 @@ public class TestRejoinEndToEnd extends TestCase {
         ClientResponse response = scb.getResponse();
         assertTrue(response.getStatusString().contains("Unable to find down node"));
 
+        client.close();
         localServer.shutdown();
         localServer.join();
     }
@@ -497,7 +499,7 @@ public class TestRejoinEndToEnd extends TestCase {
         /*
          * Kill one of the old ones (not the recovered partition)
          */
-        cluster.shutDownSingleHost(0);
+        cluster.shutDownSingleHost(1);
         Thread.sleep(1000);
 
         client.close();
@@ -535,7 +537,6 @@ public class TestRejoinEndToEnd extends TestCase {
         builder.setSecurityEnabled(true);
 
         final int numHosts = 10;
-        final int numTuples = 60000;
         final int kfactor = 4;
         final LocalCluster cluster =
             new LocalCluster(
@@ -545,8 +546,9 @@ public class TestRejoinEndToEnd extends TestCase {
                     kfactor,
                     BackendTarget.NATIVE_EE_JNI,
                     LocalCluster.FailureState.ALL_RUNNING,
-                    false);
+                    true);
         cluster.setMaxHeap(256);
+        final int numTuples = cluster.isValgrind() ? 10000 : 60000;
         boolean success = cluster.compile(builder);
         assertTrue(success);
         copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
@@ -635,7 +637,7 @@ public class TestRejoinEndToEnd extends TestCase {
                 cluster.shutDownSingleHost(uhoh);
             }
 
-            Thread recoveryThread = new Thread() {
+            Thread recoveryThread = new Thread("Recovery thread") {
                 @Override
                 public void run() {
                     for (Integer dead : toKillFirst) {
@@ -644,17 +646,20 @@ public class TestRejoinEndToEnd extends TestCase {
                 }
             };
 
-            Thread killerThread = new Thread() {
+            final java.util.concurrent.atomic.AtomicBoolean killerFail =
+                new java.util.concurrent.atomic.AtomicBoolean(false);
+            Thread killerThread = new Thread("Killer thread") {
                 @Override
                 public void run() {
-                    Random r = new Random();
-                    for (Integer toKill : toKillDuringRecovery) {
-                        try {
+                    try {
+                        Random r = new Random();
+                        for (Integer toKill : toKillDuringRecovery) {
                             Thread.sleep(r.nextInt(2000));
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
+                            cluster.shutDownSingleHost(toKill);
                         }
-                        cluster.shutDownSingleHost(toKill);
+                    } catch (Exception e) {
+                        killerFail.set(true);
+                        e.printStackTrace();
                     }
                 }
             };
@@ -664,7 +669,7 @@ public class TestRejoinEndToEnd extends TestCase {
             client.createConnection("localhost", Client.VOLTDB_SERVER_PORT + toConnectTo);
             lastServerValues = new ArrayList<Integer>(serverValues);
             final AtomicBoolean shouldContinue = new AtomicBoolean(true);
-            final Thread loadThread = new Thread() {
+            final Thread loadThread = new Thread("Load thread") {
                 @Override
                 public void run() {
                     try {
@@ -718,10 +723,14 @@ public class TestRejoinEndToEnd extends TestCase {
 //            killerThread.start();
 //            killerThread.join();
 
+            if (killerFail.get()) {
+                fail("Exception in killer thread");
+            }
+
             shouldContinue.set(false);
             loadThread.join();
 
-            lastRejoinThread = new Thread() {
+            lastRejoinThread = new Thread("Last rejoin thread") {
                 @Override
                 public void run() {
                     try {
@@ -843,17 +852,20 @@ public class TestRejoinEndToEnd extends TestCase {
                 }
             };
 
+            final java.util.concurrent.atomic.AtomicBoolean killerFail =
+                new java.util.concurrent.atomic.AtomicBoolean(false);
             Thread killerThread = new Thread() {
                 @Override
                 public void run() {
-                    Random r = new Random();
-                    for (Integer toKill : toKillDuringRecovery) {
-                        try {
-                            Thread.sleep(r.nextInt(5000));
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
+                    try {
+                        Random r = new Random();
+                        for (Integer toKill : toKillDuringRecovery) {
+                                Thread.sleep(r.nextInt(5000));
+                            cluster.shutDownSingleHost(toKill);
                         }
-                        cluster.shutDownSingleHost(toKill);
+                    } catch (Exception e) {
+                        killerFail.set(true);
+                        e.printStackTrace();
                     }
                 }
             };
@@ -862,6 +874,10 @@ public class TestRejoinEndToEnd extends TestCase {
             killerThread.start();
             recoveryThread.join();
             killerThread.join();
+
+            if (killerFail.get()) {
+                fail("Exception in killer thread");
+            }
 
             for (Integer recoverNow : toKillDuringRecovery) {
                 cluster.recoverOne( recoverNow, toConnectTo, m_username + ":" + m_password + "@localhost");

@@ -29,11 +29,12 @@ package org.voltdb;
  *
  */
 public enum BackendTarget {
-    NATIVE_EE_JNI("jni"),
-    NATIVE_EE_IPC("ipc"),
-    NATIVE_EE_VALGRIND_IPC("valgrind_ipc"),
-    HSQLDB_BACKEND("hsqldb"),
-    NONE("none");
-    private BackendTarget(String display) { this.display = display; }
+    NATIVE_EE_JNI("jni", false),
+    NATIVE_EE_IPC("ipc", true),
+    NATIVE_EE_VALGRIND_IPC("valgrind_ipc", true),
+    HSQLDB_BACKEND("hsqldb", false),
+    NONE("none", false);
+    private BackendTarget(String display, boolean isIPC) { this.display = display; this.isIPC = isIPC; }
     public final String display;
+    public final boolean isIPC;
 }

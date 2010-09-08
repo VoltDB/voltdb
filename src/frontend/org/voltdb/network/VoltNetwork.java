@@ -602,4 +602,13 @@ import org.voltdb.utils.Pair;
                                 totalMessagesWritten }));
         return retval;
     }
+
+    public ArrayList<Long> getThreadIds() {
+        ArrayList<Long> ids = new ArrayList<Long>();
+        ids.add(Thread.currentThread().getId());
+        for (WeakReference<Thread> ref : m_networkThreads) {
+            ids.add(ref.get().getId());
+        }
+        return ids;
+    }
 }

@@ -75,14 +75,7 @@ public class RegressionSuite extends TestCase {
      */
     @Override
     public void tearDown() throws Exception {
-        final List<String> valgrindErrors = m_config.shutDown();
-        if (valgrindErrors != null) {
-            String failString = "";
-            for (final String error : valgrindErrors) {
-                failString = failString + error;
-            }
-            fail(failString);
-        }
+        m_config.shutDown();
         for (final Client c : m_clients) {
             c.close();
         }

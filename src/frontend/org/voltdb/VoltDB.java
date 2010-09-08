@@ -20,6 +20,9 @@ package org.voltdb;
 import java.io.File;
 import java.util.Map;
 import java.util.TimeZone;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
 
 import org.voltdb.logging.VoltLogger;
 
@@ -56,6 +59,8 @@ public class VoltDB {
 
     /** Encapsulates VoltDB configuration parameters */
     public static class Configuration {
+
+        public List<Integer> m_ipcPorts = Collections.synchronizedList(new LinkedList<Integer>());
 
         private static final VoltLogger hostLog = new VoltLogger("HOST");
 
@@ -201,6 +206,12 @@ public class VoltDB {
                     m_pathToDeployment = args[++i];
                 } else if (arg.equalsIgnoreCase("useWatchdogs")) {
                     m_useWatchdogs = true;
+                } else if (arg.equalsIgnoreCase("ipcports")) {
+                    String portList = args[++i];
+                    String ports[] = portList.split(",");
+                    for (String port : ports) {
+                        m_ipcPorts.add(Integer.valueOf(port));
+                    }
                 } else {
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
                     usage();
@@ -224,6 +235,14 @@ public class VoltDB {
             } else if (m_pathToCatalog.equals("")) {
                 isValid = false;
                 hostLog.fatal("The catalog file location is empty.");
+            }
+
+            if (m_backend.isIPC) {
+                if (m_ipcPorts.isEmpty()) {
+                    isValid = false;
+                    hostLog.fatal("Specified an IPC backend but did not supply a , " +
+                            " separated list of ports via ipcports param");
+                }
             }
 
             // require deployment file location

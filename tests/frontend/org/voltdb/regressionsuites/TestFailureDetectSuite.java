@@ -34,7 +34,7 @@ import org.voltdb_testprocs.regressionsuites.replication.SelectEmptyTable;
 public class TestFailureDetectSuite extends RegressionSuite
 {
     public void testMultiPartitionTxnAfterFailure()
-    throws IOException, ProcCallException
+    throws Exception
     {
         Client client = getClient();
         VoltTable[] results = client.callProcedure("InsertMultiPart", 1,
@@ -53,7 +53,7 @@ public class TestFailureDetectSuite extends RegressionSuite
     }
 
     public void testSinglePartitionTxnAfterFailure()
-    throws IOException, ProcCallException
+    throws Exception
     {
         Client client = getClient();
         VoltTable[] results = client.callProcedure("InsertSinglePart", 1,

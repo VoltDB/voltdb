@@ -825,4 +825,8 @@ class Distributer {
     public String getBuildString() {
         return m_buildString;
     }
+
+    public ArrayList<Long> getThreadIds() {
+        return m_network.getThreadIds();
+    }
 }
