@@ -21,7 +21,6 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.util.Properties;
 
 /**
  * Given a single file, make it available at a generated URL
@@ -45,7 +44,7 @@ public class SingleFileHTTPServer extends NanoHTTPD {
     }
 
     @Override
-    public Response serve(String uri, String method, Properties header, Properties parms) {
+    public Response processRequest(Request request) throws Exception {
         assert(m_data != null);
         assert(m_mime != null);
         ByteArrayInputStream bis = new ByteArrayInputStream(m_data);

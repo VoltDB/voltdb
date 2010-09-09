@@ -28,7 +28,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
-import java.util.Properties;
 
 import junit.framework.TestCase;
 
@@ -40,8 +39,7 @@ public class TestHTTPD extends TestCase {
         }
 
         @Override
-        public Response serve(String uri, String method, Properties header,
-                Properties parms) {
+        public Response processRequest(Request request) throws Exception {
             return null;
         }
     }
@@ -50,10 +48,12 @@ public class TestHTTPD extends TestCase {
         NanoHTTPD server = new DumbHTTPD(9999);
         assertTrue(server.myServerSocket != null);
         assertTrue(server.myTcpPort == 9999);
-        assertTrue(server.myThread != null);
-        assertTrue(server.myThread.isAlive());
+        assertTrue(server.serverThread != null);
+        assertTrue(server.serverThread.isAlive());
         server.stop(true);
-        assertFalse(server.myThread.isAlive());
+        assertFalse(server.serverThread.isAlive());
+        for (NanoHTTPD.HTTPWorkerThread worker : server.threadPool)
+            assertFalse(worker.isAlive());
         server.stop(true);
     }
 

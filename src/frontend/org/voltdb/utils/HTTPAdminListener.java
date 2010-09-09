@@ -18,7 +18,6 @@
 package org.voltdb.utils;
 
 import java.io.IOException;
-import java.util.Properties;
 
 import org.voltdb.CatalogContext;
 import org.voltdb.HTTPClientInterface;
@@ -33,11 +32,11 @@ public class HTTPAdminListener extends NanoHTTPD {
     }
 
     @Override
-    public Response serve(String uri, String method, Properties header, Properties parms) {
+    public Response processRequest(Request request) throws Exception {
 
         // kick over to the HTTP/JSON interface
-        if (uri.contains("/api/1.0/")) {
-            String msg = httpClientInterface.process(uri, method, header, parms);
+        if (request.uri.contains("/api/1.0/")) {
+            String msg = httpClientInterface.process(request.uri, request.method, request.header, request.parms);
             return new NanoHTTPD.Response(HTTP_OK, MIME_PLAINTEXT, msg);
         }
 

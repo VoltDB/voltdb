@@ -66,6 +66,7 @@ import java.util.Locale;
 import java.util.Properties;
 import java.util.StringTokenizer;
 import java.util.TimeZone;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * A simple, tiny, nicely embeddable HTTP 1.0 server in Java
@@ -93,34 +94,43 @@ import java.util.TimeZone;
  *    <li> All header names are converted lowercase so they don't vary between browsers/clients </li>
  *
  * </ul>
- *
- * <p><b>Ways to use: </b><ul>
- *
- *    <li> Run as a standalone app, serves files from current directory and shows requests</li>
- *    <li> Subclass serve() and embed to your own program </li>
- *    <li> Call serveFile() from serve() with your own base directory </li>
- *
- * </ul>
- *
- * See the end of the source file for distribution license
- * (Modified BSD licence)
  */
-public abstract class NanoHTTPD
-{
+public abstract class NanoHTTPD {
+
+    final static int THREADPOOL_SIZE = 3;
+
+    int myTcpPort;
+    final ServerSocket myServerSocket;
+    Thread serverThread;
+    HTTPWorkerThread threadPool[] = new HTTPWorkerThread[THREADPOOL_SIZE];
+    LinkedBlockingQueue<Work> workQueue = new LinkedBlockingQueue<Work>();
+
+    class Work {
+        Socket socket = null;
+        Response response = null;
+        boolean shouldDie = false;
+    }
+
     // ==================================================
     // API parts
     // ==================================================
 
-    /**
-     * Override this to customize the server.<p>
-     *
-     * @parm uri    Percent-decoded URI without parameters, for example "/index.cgi"
-     * @parm method "GET", "POST" etc.
-     * @parm parms  Parsed, percent decoded parameters from URI and, in case of POST, data.
-     * @parm header Header entries, percent decoded
-     * @return HTTP response, see class Response for details
-     */
-    public abstract Response serve(String uri, String method, Properties header, Properties parms);
+    public class Request {
+        final public String uri;
+        final public String method;
+        final public Properties header;
+        final public Properties parms;
+
+        final Socket socket;
+
+        Request(String uri, String method, Properties header, Properties parms, Socket socket) {
+            this.uri = uri;
+            this.method = method;
+            this.header = header;
+            this.parms = parms;
+            this.socket = socket;
+        }
+    }
 
     /**
      * HTTP response.
@@ -128,19 +138,25 @@ public abstract class NanoHTTPD
      */
     public class Response
     {
+        /** HTTP status code after processing, e.g. "200 OK", HTTP_OK */
+        public final String status;
+
+        /** MIME type of content, e.g. "text/html" */
+        public final String mimeType;
+
+        /** Data of the response, may be null. */
+        public final InputStream data;
+
         /**
-         * Default constructor: response = HTTP_OK, data = mime = 'null'
+         * Headers for the HTTP response. Use addHeader()
+         * to add lines.
          */
-        public Response()
-        {
-            this.status = HTTP_OK;
-        }
+        public final Properties header = new Properties();
 
         /**
          * Basic constructor.
          */
-        public Response( String status, String mimeType, InputStream data )
-        {
+        public Response(String status, String mimeType, InputStream data) {
             this.status = status;
             this.mimeType = mimeType;
             this.data = data;
@@ -150,8 +166,7 @@ public abstract class NanoHTTPD
          * Convenience method that makes an InputStream out of
          * given text.
          */
-        public Response( String status, String mimeType, String txt )
-        {
+        public Response(String status, String mimeType, String txt) {
             this.status = status;
             this.mimeType = mimeType;
             try {
@@ -164,31 +179,34 @@ public abstract class NanoHTTPD
         /**
          * Adds given line to the header.
          */
-        public void addHeader( String name, String value )
-        {
-            header.put( name, value );
+        public void addHeader(String name, String value) {
+            header.put(name, value);
         }
+    }
 
-        /**
-         * HTTP status code after processing, e.g. "200 OK", HTTP_OK
-         */
-        public String status;
+    /**
+     * Override this to customize the server.<p>
+     *
+     * @parm uri    Percent-decoded URI without parameters, for example "/index.cgi"
+     * @parm method "GET", "POST" etc.
+     * @parm parms  Parsed, percent decoded parameters from URI and, in case of POST, data.
+     * @parm header Header entries, percent decoded
+     * @return HTTP response, see class Response for details or null if request will asynchronously complete.
+     */
+    public abstract Response processRequest(Request request) throws Exception;
 
-        /**
-         * MIME type of content, e.g. "text/html"
-         */
-        public String mimeType;
+    public void completeRequest(Request request, Response response) {
+        assert(request != null);
+        assert(response != null);
 
-        /**
-         * Data of the response, may be null.
-         */
-        public InputStream data;
-
-        /**
-         * Headers for the HTTP response. Use addHeader()
-         * to add lines.
-         */
-        public Properties header = new Properties();
+        Work w = new Work();
+        w.socket = request.socket;
+        w.response = response;
+        try {
+            workQueue.put(w);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 
     /**
@@ -221,23 +239,31 @@ public abstract class NanoHTTPD
      */
     public NanoHTTPD( int port ) throws IOException
     {
+        for (int i = 0; i < threadPool.length; i++) {
+            threadPool[i] = new HTTPWorkerThread();
+            threadPool[i].start();
+        }
+
         myTcpPort = port;
         myServerSocket = new ServerSocket( myTcpPort );
-        myThread = new Thread( new Runnable()
+        serverThread = new Thread( new Runnable()
             {
                 public void run()
                 {
                     try
                     {
-                        while( true )
-                            new HTTPSession( myServerSocket.accept());
+                        while( true ) {
+                            Work w = new Work();
+                            w.socket = myServerSocket.accept();
+                            workQueue.add(w);
+                        }
                     }
                     catch ( IOException ioe )
                     {}
                 }
             });
-        myThread.setDaemon( true );
-        myThread.start();
+        serverThread.setDaemon( true );
+        serverThread.start();
     }
 
     /**
@@ -248,32 +274,60 @@ public abstract class NanoHTTPD
         try
         {
             myServerSocket.close();
-            if (blocking)
-                myThread.join();
+            for (int i = 0; i < threadPool.length; i++) {
+                Work w = new Work();
+                w.shouldDie = true;
+                workQueue.put(w);
+            }
+            if (blocking) {
+                serverThread.join();
+                for (HTTPWorkerThread worker : threadPool) {
+                    worker.join();
+                }
+            }
         }
         catch ( IOException ioe ) {}
         catch ( InterruptedException e ) {}
     }
 
-    /**
-     * Handles one session, i.e. parses the HTTP request
-     * and returns the response.
-     */
-    private class HTTPSession implements Runnable
-    {
-        public HTTPSession( Socket s )
-        {
-            mySocket = s;
-            Thread t = new Thread( this );
-            t.setDaemon( true );
-            t.start();
+    class HTTPWorkerThread extends Thread {
+
+        @Override
+        public void run() {
+            while(true) {
+                Work work = null;
+                try {
+                    work = workQueue.take();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                if (work == null)
+                    continue;
+
+                if (work.shouldDie) {
+                    assert(work.socket == null);
+                    assert(work.response == null);
+                    return;
+                }
+
+                if (work.response == null) {
+                    assert(work.socket != null);
+                    handleNewSocket(work.socket);
+                }
+                else {
+                    sendResponse(work.socket,
+                                 work.response.status,
+                                 work.response.mimeType,
+                                 work.response.header,
+                                 work.response.data);
+                }
+            }
         }
 
-        public void run()
-        {
+        void handleNewSocket(Socket socket) {
             try
             {
-                InputStream is = mySocket.getInputStream();
+                InputStream is = socket.getInputStream();
                 if ( is == null) return;
                 BufferedReader in = new BufferedReader( new InputStreamReader( is ));
 
@@ -282,12 +336,12 @@ public abstract class NanoHTTPD
                 if (inLine == null) return;
                 StringTokenizer st = new StringTokenizer( inLine );
                 if ( !st.hasMoreTokens())
-                    sendError( HTTP_BADREQUEST, "BAD REQUEST: Syntax error. Usage: GET /example/file.html" );
+                    sendError(socket, HTTP_BADREQUEST, "BAD REQUEST: Syntax error. Usage: GET /example/file.html" );
 
                 String method = st.nextToken();
 
                 if ( !st.hasMoreTokens())
-                    sendError( HTTP_BADREQUEST, "BAD REQUEST: Missing URI. Usage: GET /example/file.html" );
+                    sendError(socket, HTTP_BADREQUEST, "BAD REQUEST: Missing URI. Usage: GET /example/file.html" );
 
                 String uri = st.nextToken();
 
@@ -296,7 +350,7 @@ public abstract class NanoHTTPD
                 int qmi = uri.indexOf( '?' );
                 if ( qmi >= 0 )
                 {
-                    decodeParms( uri.substring( qmi+1 ), parms );
+                    decodeParms(socket, uri.substring( qmi+1 ), parms );
                     uri = URLDecoder.decode(uri.substring( 0, qmi ), "UTF-8");
                 }
                 else uri = URLDecoder.decode(uri, "UTF-8");
@@ -340,15 +394,18 @@ public abstract class NanoHTTPD
                             read = in.read(buf);
                     }
                     postLine = postLine.trim();
-                    decodeParms( postLine, parms );
+                    decodeParms(socket, postLine, parms );
                 }
 
-                // Ok, now do the serve()
-                Response r = serve( uri, method, header, parms );
-                if ( r == null )
-                    sendError( HTTP_INTERNALERROR, "SERVER INTERNAL ERROR: Serve() returned a null response." );
-                else
-                    sendResponse( r.status, r.mimeType, r.header, r.data );
+                // Ok, now do the processRequest()
+                try {
+                    Response r = processRequest(new Request(uri, method, header, parms, socket));
+                    if (r != null)
+                        sendResponse(socket, r.status, r.mimeType, r.header, r.data);
+                }
+                catch (Exception e) {
+                    sendError(socket, HTTP_INTERNALERROR, "SERVER INTERNAL ERROR: processRequest() threw an exception." );
+                }
 
                 in.close();
             }
@@ -356,7 +413,7 @@ public abstract class NanoHTTPD
             {
                 try
                 {
-                    sendError( HTTP_INTERNALERROR, "SERVER INTERNAL ERROR: IOException: " + ioe.getMessage());
+                    sendError(socket, HTTP_INTERNALERROR, "SERVER INTERNAL ERROR: IOException: " + ioe.getMessage());
                 }
                 catch ( Throwable t ) {}
             }
@@ -374,9 +431,7 @@ public abstract class NanoHTTPD
          * you might want to replace the Properties with a Hastable of Vectors or such.
          * @throws UnsupportedEncodingException
          */
-        private void decodeParms( String parms, Properties p )
-            throws InterruptedException
-        {
+        private void decodeParms(Socket socket, String parms, Properties p ) throws InterruptedException {
             if ( parms == null )
                 return;
 
@@ -392,7 +447,7 @@ public abstract class NanoHTTPD
                 }
             }
             catch (Exception e) {
-                sendError( HTTP_BADREQUEST, "BAD REQUEST: Bad URL encoding." );
+                sendError(socket, HTTP_BADREQUEST, "BAD REQUEST: Bad URL encoding." );
             }
         }
 
@@ -400,23 +455,22 @@ public abstract class NanoHTTPD
          * Returns an error message as a HTTP response and
          * throws InterruptedException to stop furhter request processing.
          */
-        private void sendError( String status, String msg ) throws InterruptedException
-        {
-            sendResponse( status, MIME_PLAINTEXT, null, new ByteArrayInputStream( msg.getBytes()));
+        private void sendError(Socket socket, String status, String msg) throws InterruptedException {
+            sendResponse(socket, status, MIME_PLAINTEXT, null, new ByteArrayInputStream( msg.getBytes()));
             throw new InterruptedException();
         }
 
         /**
          * Sends given response to the socket.
          */
-        private void sendResponse( String status, String mime, Properties header, InputStream data )
+        private void sendResponse(Socket socket, String status, String mime, Properties header, InputStream data)
         {
             try
             {
                 if ( status == null )
                     throw new Error( "sendResponse(): Status can't be null." );
 
-                OutputStream out = mySocket.getOutputStream();
+                OutputStream out = socket.getOutputStream();
                 PrintWriter pw = new PrintWriter( out );
                 pw.print("HTTP/1.0 " + status + " \r\n");
 
@@ -459,16 +513,11 @@ public abstract class NanoHTTPD
             catch( IOException ioe )
             {
                 // Couldn't write? No can do.
-                try { mySocket.close(); } catch( Throwable t ) {}
+                try { socket.close(); } catch( Throwable t ) {}
             }
         }
 
-        private Socket mySocket;
-    };
-
-    int myTcpPort;
-    final ServerSocket myServerSocket;
-    Thread myThread;
+    }
 
     public static String mimeFromExtention(File f) throws IOException {
         String mime = null;
