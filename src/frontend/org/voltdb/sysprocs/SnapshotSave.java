@@ -113,7 +113,7 @@ public class SnapshotSave extends VoltSystemProcedure
             final String file_nonce = (String) params.toArray()[1];
             final long startTime = (Long)params.toArray()[2];
             byte block = (Byte)params.toArray()[3];
-            return createSnapshotTargets(file_path, file_nonce, block, startTime, context, hostname);
+            return startSnapshotting(file_path, file_nonce, block, startTime, context, hostname);
         }
         else if (fragmentId == SysProcFragmentId.PF_createSnapshotTargetsResults)
         {
@@ -244,35 +244,23 @@ public class SnapshotSave extends VoltSystemProcedure
         }
     }
 
-    private DependencyPair createSnapshotTargets(String file_path, String file_nonce, byte block,
+    private DependencyPair startSnapshotting(String file_path, String file_nonce, byte block,
             long startTime, SystemProcedureExecutionContext context, String hostname)
     {
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = constructNodeResultsTable();
+
+        // One site wins the race to create the snapshot targets, populating
+        // m_taskListsForSites for the other sites and creating an appropriate
+        // number of snapshot permits
         if (SnapshotSiteProcessor.m_snapshotCreateSetupPermit.tryAcquire()) {
             createSetup(file_path, file_nonce, startTime, context, hostname, result);
         }
-        try {
-            SnapshotSiteProcessor.m_snapshotPermits.acquire();
-        } catch (Exception e) {
-            result.addRow(Integer.parseInt(context.getSite().getHost().getTypeName()),
-                    hostname,
-                    "",
-                    "FAILURE",
-                    e.toString());
-            return new DependencyPair( DEP_createSnapshotTargets, result);
-        } finally {
-            /*
-             * The last thread to acquire a snapshot permit has to be the one
-             * to release the setup permit to ensure that a thread
-             * doesn't come late and think it is supposed to do the setup work
-             */
-            synchronized (SnapshotSiteProcessor.m_snapshotPermits) {
-                if (SnapshotSiteProcessor.m_snapshotPermits.availablePermits() == 0 &&
-                        SnapshotSiteProcessor.m_snapshotCreateSetupPermit.availablePermits() == 0) {
-                    SnapshotSiteProcessor.m_snapshotCreateSetupPermit.release();
-                }
-            }
+
+        // All sites wait for a permit to start their individual snapshot tasks
+        DependencyPair error = acquireSnapshotPermit(context, hostname, result);
+        if (error != null) {
+            return error;
         }
 
         synchronized (m_taskListsForSites) {
@@ -324,6 +312,33 @@ public class SnapshotSave extends VoltSystemProcedure
         }
 
         return new DependencyPair( DEP_createSnapshotTargets, result);
+    }
+
+    private DependencyPair acquireSnapshotPermit(SystemProcedureExecutionContext context,
+            String hostname, final VoltTable result) {
+        try {
+            SnapshotSiteProcessor.m_snapshotPermits.acquire();
+        } catch (Exception e) {
+            result.addRow(Integer.parseInt(context.getSite().getHost().getTypeName()),
+                    hostname,
+                    "",
+                    "FAILURE",
+                    e.toString());
+            return new DependencyPair( DEP_createSnapshotTargets, result);
+        } finally {
+            /*
+             * The last thread to acquire a snapshot permit has to be the one
+             * to release the setup permit to ensure that a thread
+             * doesn't come late and think it is supposed to do the setup work
+             */
+            synchronized (SnapshotSiteProcessor.m_snapshotPermits) {
+                if (SnapshotSiteProcessor.m_snapshotPermits.availablePermits() == 0 &&
+                        SnapshotSiteProcessor.m_snapshotCreateSetupPermit.availablePermits() == 0) {
+                    SnapshotSiteProcessor.m_snapshotCreateSetupPermit.release();
+                }
+            }
+        }
+        return null;
     }
 
     private void createSetup(String file_path, String file_nonce,

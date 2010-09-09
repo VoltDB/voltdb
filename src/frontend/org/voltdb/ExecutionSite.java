@@ -1563,9 +1563,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
 
 
     /*
-     *
      *  SiteConnection Interface (VoltProcedure -> ExecutionSite)
-     *
      */
 
     @Override
