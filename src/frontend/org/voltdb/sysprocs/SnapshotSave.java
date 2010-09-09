@@ -28,7 +28,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltdb.BackendTarget;
@@ -58,7 +57,6 @@ import org.voltdb.utils.CatalogUtil;
 public class SnapshotSave extends VoltSystemProcedure
 {
     private static final VoltLogger TRACE_LOG = new VoltLogger(SnapshotSave.class.getName());
-
     private static final VoltLogger HOST_LOG = new VoltLogger("HOST");
 
     private static final int DEP_saveTest = (int)
@@ -70,15 +68,7 @@ public class SnapshotSave extends VoltSystemProcedure
     private static final int DEP_createSnapshotTargetsResults = (int)
         SysProcFragmentId.PF_createSnapshotTargetsResults;
 
-    /**
-     * Ensure the first thread to run the fragment does the creation
-     * of the targets and the distribution of the work.
-     */
-    private static final Semaphore m_snapshotCreateSetupPermit = new Semaphore(1);
-    /**
-     * Only proceed once permits are available after setup completes
-     */
-    private static Semaphore m_snapshotPermits = new Semaphore(0);
+
     private static final LinkedList<Deque<SnapshotTableTask>>
         m_taskListsForSites = new LinkedList<Deque<SnapshotTableTask>>();
 
@@ -259,8 +249,89 @@ public class SnapshotSave extends VoltSystemProcedure
     {
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = constructNodeResultsTable();
-        final int numLocalSites = VoltDB.instance().getLocalSites().values().size();
-        if ( m_snapshotCreateSetupPermit.tryAcquire()) {
+        if (SnapshotSiteProcessor.m_snapshotCreateSetupPermit.tryAcquire()) {
+            createSetup(file_path, file_nonce, startTime, context, hostname, result);
+        }
+        try {
+            SnapshotSiteProcessor.m_snapshotPermits.acquire();
+        } catch (Exception e) {
+            result.addRow(Integer.parseInt(context.getSite().getHost().getTypeName()),
+                    hostname,
+                    "",
+                    "FAILURE",
+                    e.toString());
+            return new DependencyPair( DEP_createSnapshotTargets, result);
+        } finally {
+            /*
+             * The last thread to acquire a snapshot permit has to be the one
+             * to release the setup permit to ensure that a thread
+             * doesn't come late and think it is supposed to do the setup work
+             */
+            synchronized (SnapshotSiteProcessor.m_snapshotPermits) {
+                if (SnapshotSiteProcessor.m_snapshotPermits.availablePermits() == 0 &&
+                        SnapshotSiteProcessor.m_snapshotCreateSetupPermit.availablePermits() == 0) {
+                    SnapshotSiteProcessor.m_snapshotCreateSetupPermit.release();
+                }
+            }
+        }
+
+        synchronized (m_taskListsForSites) {
+            final Deque<SnapshotTableTask> m_taskList = m_taskListsForSites.poll();
+            if (m_taskList == null) {
+                return new DependencyPair( DEP_createSnapshotTargets, result);
+            } else {
+                if (m_taskListsForSites.isEmpty()) {
+                    assert(SnapshotSiteProcessor.m_snapshotCreateSetupPermit.availablePermits() == 1);
+                    assert(SnapshotSiteProcessor.m_snapshotPermits.availablePermits() == 0);
+                }
+                assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() > 0);
+                context.getExecutionSite().initiateSnapshots(m_taskList);
+            }
+        }
+
+        if (block != 0) {
+            HashSet<Exception> failures = null;
+            String status = "SUCCESS";
+            String err = "";
+            try {
+                failures = context.getExecutionSite().completeSnapshotWork();
+            } catch (InterruptedException e) {
+                status = "FAILURE";
+                err = e.toString();
+            }
+            final VoltTable blockingResult = constructPartitionResultsTable();
+
+            if (failures.isEmpty()) {
+                blockingResult.addRow(
+                        Integer.parseInt(context.getSite().getHost().getTypeName()),
+                        hostname,
+                        Integer.parseInt(context.getSite().getTypeName()),
+                        status,
+                        err);
+            } else {
+                status = "FAILURE";
+                for (Exception e : failures) {
+                    err = e.toString();
+                }
+                blockingResult.addRow(
+                        Integer.parseInt(context.getSite().getHost().getTypeName()),
+                        hostname,
+                        Integer.parseInt(context.getSite().getTypeName()),
+                        status,
+                        err);
+            }
+            return new DependencyPair( DEP_createSnapshotTargets, blockingResult);
+        }
+
+        return new DependencyPair( DEP_createSnapshotTargets, result);
+    }
+
+    private void createSetup(String file_path, String file_nonce,
+            long startTime, SystemProcedureExecutionContext context,
+            String hostname, final VoltTable result) {
+        {
+            final int numLocalSites = VoltDB.instance().getLocalSites().values().size();
+
             /*
              * Used to close targets on failure
              */
@@ -430,82 +501,9 @@ public class SnapshotSave extends VoltSystemProcedure
                         "RESULTED IN Exception: \n" + sw.toString());
                 HOST_LOG.error(ex);
             } finally {
-                m_snapshotPermits.release(numLocalSites);
+                SnapshotSiteProcessor.m_snapshotPermits.release(numLocalSites);
             }
         }
-
-        try {
-            m_snapshotPermits.acquire();
-        } catch (Exception e) {
-            result.addRow(Integer.parseInt(context.getSite().getHost().getTypeName()),
-                    hostname,
-                    "",
-                    "FAILURE",
-                    e.toString());
-            return new DependencyPair( DEP_createSnapshotTargets, result);
-        } finally {
-            /*
-             * The last thread to acquire a snapshot permit has to be the one
-             * to release the setup permit to ensure that a thread
-             * doesn't come late and think it is supposed to do the setup work
-             */
-            synchronized (m_snapshotPermits) {
-                if (m_snapshotPermits.availablePermits() == 0 &&
-                        m_snapshotCreateSetupPermit.availablePermits() == 0) {
-                    m_snapshotCreateSetupPermit.release();
-                }
-            }
-        }
-
-        synchronized (m_taskListsForSites) {
-            final Deque<SnapshotTableTask> m_taskList = m_taskListsForSites.poll();
-            if (m_taskList == null) {
-                return new DependencyPair( DEP_createSnapshotTargets, result);
-            } else {
-                if (m_taskListsForSites.isEmpty()) {
-                    assert(m_snapshotCreateSetupPermit.availablePermits() == 1);
-                    assert(m_snapshotPermits.availablePermits() == 0);
-                }
-                assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() > 0);
-                context.getExecutionSite().initiateSnapshots(m_taskList);
-            }
-        }
-
-        if (block != 0) {
-            HashSet<Exception> failures = null;
-            String status = "SUCCESS";
-            String err = "";
-            try {
-                failures = context.getExecutionSite().completeSnapshotWork();
-            } catch (InterruptedException e) {
-                status = "FAILURE";
-                err = e.toString();
-            }
-            final VoltTable blockingResult = constructPartitionResultsTable();
-
-            if (failures.isEmpty()) {
-                blockingResult.addRow(
-                        Integer.parseInt(context.getSite().getHost().getTypeName()),
-                        hostname,
-                        Integer.parseInt(context.getSite().getTypeName()),
-                        status,
-                        err);
-            } else {
-                status = "FAILURE";
-                for (Exception e : failures) {
-                    err = e.toString();
-                }
-                blockingResult.addRow(
-                        Integer.parseInt(context.getSite().getHost().getTypeName()),
-                        hostname,
-                        Integer.parseInt(context.getSite().getTypeName()),
-                        status,
-                        err);
-            }
-            return new DependencyPair( DEP_createSnapshotTargets, blockingResult);
-        }
-
-        return new DependencyPair( DEP_createSnapshotTargets, result);
     }
 
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
