@@ -64,15 +64,16 @@ public class RecoveryMessage extends VoltMessage {
 
     /**
      * Constructor for constructing an ack to a recovery message.
-     * Reuses the buffer from the message.
      */
-    public RecoveryMessage(RecoveryMessage message, int siteId) {
+    public RecoveryMessage(int siteId, int blockIndex) {
         m_subject = Subject.DEFAULT.getId();
-        m_container = message.m_container;
-        m_buffer = message.m_container.b;
-        m_buffer.putInt(sourceSiteOffset, siteId);
-        m_buffer.put(typeOffset, (byte)RecoveryMessageType.Ack.ordinal());
-        m_buffer.limit(typeOffset + 1);
+        m_container = DBBPool.wrapBB(ByteBuffer.allocate(typeOffset + 1));
+        m_buffer = m_container.b;
+        m_buffer.put(HEADER_SIZE, RECOVERY_ID);
+        m_buffer.putInt( sourceSiteOffset, siteId);
+        m_buffer.putInt( blockIndexOffset, blockIndex);
+        m_buffer.put( typeOffset, (byte)RecoveryMessageType.Ack.ordinal());
+        m_buffer.limit( typeOffset + 1);
     }
 
     /**
@@ -127,12 +128,10 @@ public class RecoveryMessage extends VoltMessage {
         return m_buffer.getLong(txnIdOffset);
     }
 
-    public byte[] getMessageData() {
+    public void getMessageData(ByteBuffer out) {
         m_buffer.position(getHeaderLength());
-        ByteBuffer slice = m_buffer.slice();
-        byte bytes[] = new byte[slice.remaining()];
-        slice.get(bytes);
-        return bytes;
+        out.put(m_buffer);
+        out.flip();
     }
 
     /**

@@ -150,10 +150,7 @@ public class TestExecutionEngine extends TestCase {
             int serialized = sourceEngine.tableStreamSerializeMore( container, WAREHOUSE_TABLEID, TableStreamType.RECOVERY);
             assertTrue(serialized > 0);
             container.b.limit(serialized);
-            byte data[] = new byte[serialized];
-            container.b.get(data);
-            container.b.clear();
-            destinationEngine.processRecoveryMessage(data);
+            destinationEngine.processRecoveryMessage( container.b, container.address);
 
 
             serialized = sourceEngine.tableStreamSerializeMore( container, WAREHOUSE_TABLEID, TableStreamType.RECOVERY);
@@ -167,10 +164,7 @@ public class TestExecutionEngine extends TestCase {
             serialized = sourceEngine.tableStreamSerializeMore( container, STOCK_TABLEID, TableStreamType.RECOVERY);
             assertTrue(serialized > 0);
             container.b.limit(serialized);
-            data = new byte[serialized];
-            container.b.get(data);
-            container.b.clear();
-            destinationEngine.processRecoveryMessage(data);
+            destinationEngine.processRecoveryMessage( container.b, container.address);
 
 
             serialized = sourceEngine.tableStreamSerializeMore( container, STOCK_TABLEID, TableStreamType.RECOVERY);

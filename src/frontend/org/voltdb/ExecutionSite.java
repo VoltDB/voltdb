@@ -124,7 +124,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
      * The permit is only acquired by recovering partitions and not the source
      * partitions.
      */
-    private static final Semaphore m_recoveryPermit = new Semaphore(1);
+    private static final Semaphore m_recoveryPermit = new Semaphore(Integer.MAX_VALUE);
 
     private boolean m_recovering = false;
     private boolean m_haveRecoveryPermit = false;

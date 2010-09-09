@@ -89,6 +89,12 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
 
     private long m_bytesReceived = 0;
 
+    private long m_timeSpentHandlingData = 0;
+
+    private final ByteBuffer m_buffer = ByteBuffer.allocateDirect(RecoverySiteProcessorSource.m_bufferLength);
+
+    private final long m_bufferPointer = DBBPool.getBufferAddress(m_buffer);
+
     /**
      * Data about a table that is being used as a source for a recovery stream.
      * Includes the id of the table as well as the name for human readability.
@@ -134,10 +140,23 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
             return;
         }
 
+        int sourceSite = message.sourceSite();
+        RecoveryMessage ack = new RecoveryMessage(m_siteId, message.blockIndex());
+        try {
+            m_mailbox.send( sourceSite, 0, ack);
+        } catch (MessagingException e) {
+            // Continuing to propagate this horrible exception
+            throw new RuntimeException(e);
+        }
+
         if (message.type() == RecoveryMessageType.ScanTuples) {
-            byte data[] = message.getMessageData();
-            m_bytesReceived += data.length;
-            m_engine.processRecoveryMessage(data);
+            m_buffer.clear();
+            message.getMessageData(m_buffer);
+            m_bytesReceived += m_buffer.remaining();
+            long startTime = System.currentTimeMillis();
+            m_engine.processRecoveryMessage( m_buffer, m_bufferPointer);
+            long endTime = System.currentTimeMillis();
+            m_timeSpentHandlingData += endTime - startTime;
             recoveryLog.trace("Received tuple data at site " + m_siteId +
                     " for table " + m_tables.get(message.tableId()).m_name);
         } else if (message.type() == RecoveryMessageType.Complete) {
@@ -147,14 +166,6 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
         } else {
             System.out.println(message.type());
             VoltDB.crashVoltDB();
-        }
-        int sourceSite = message.sourceSite();
-        RecoveryMessage ack = new RecoveryMessage( message, m_siteId);
-        try {
-            m_mailbox.send( sourceSite, 0, ack);
-        } catch (MessagingException e) {
-            // Continuing to propagate this horrible exception
-            throw new RuntimeException(e);
         }
     }
 
@@ -194,8 +205,8 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
             } else {
                 Thread.yield();
             }
-
             if (m_tables.isEmpty()) {
+                recoveryLog.info("Processor spent " + (m_timeSpentHandlingData / 1000.0) + " seconds handling data");
                 m_onCompletion.run();
                 return;
             }

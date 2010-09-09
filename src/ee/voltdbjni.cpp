@@ -1051,34 +1051,22 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeELTA
     return 0;
 }
 
-class ArrayGuard {
-public:
-    ArrayGuard(JNIEnv *env, jbyteArray array, jbyte *data) : m_env(env), m_array(array), m_data(data) {}
-    ~ArrayGuard() {
-        m_env->ReleaseByteArrayElements( m_array, m_data, JNI_ABORT);
-    }
-    JNIEnv *m_env;
-    jbyteArray m_array;
-    jbyte *m_data;
-};
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    nativeProcessRecoveryMessage
- * Signature: (J[B)V
+ * Signature: (JJI)V
  */
 SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeProcessRecoveryMessage
-  (JNIEnv *env, jobject obj, jlong engine_ptr, jbyteArray messageBytes) {
+  (JNIEnv *env, jobject obj, jlong engine_ptr, jlong buffer_ptr, jint remaining) {
     VOLT_DEBUG("nativeProcessRecoveryMessage in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-    jbyte *data = env->GetByteArrayElements( messageBytes, NULL);
-    jsize messageLength = env->GetArrayLength(messageBytes);
-    ArrayGuard guard(env, messageBytes, data);
+    char *data = reinterpret_cast<char*>(buffer_ptr);
     try {
         if (data == NULL) {
             throwFatalException("Failed to get byte array elements of recovery message");
         }
-        ReferenceSerializeInput input(data, messageLength);
+        ReferenceSerializeInput input(data, remaining);
         RecoveryProtoMsg message(&input);
         return engine->processRecoveryMessage(&message);
     } catch (FatalException e) {

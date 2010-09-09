@@ -144,6 +144,8 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
 
     private long m_bytesSent = 0;
 
+    private long m_timeSpentSerializing = 0;
+
     /**
      * Keep track of how many times a block has been acked and how many acks are expected
      */
@@ -395,6 +397,7 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
                  * Recovery is really complete so run the handler
                  */
                 if (m_allowedBuffers == m_numBuffers && m_tablesToStream.isEmpty()) {
+                    recoveryLog.info("Processor spent " + (m_timeSpentSerializing / 1000.0) + " seconds serializing");
                     m_onCompletion.run();
                 }
             }
@@ -477,7 +480,11 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
                 /*
                  * Ask the engine to serialize more data.
                  */
+                long startSerializing = System.currentTimeMillis();
                 int serialized = m_engine.tableStreamSerializeMore(container, table.m_tableId, TableStreamType.RECOVERY);
+                long endSerializing = System.currentTimeMillis();
+                m_timeSpentSerializing += endSerializing - startSerializing;
+
                 recoveryLog.trace("Serialized " + serialized + " for table " + table.m_name);
                 if (serialized <= 0) {
                     /*

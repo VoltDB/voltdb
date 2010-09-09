@@ -205,7 +205,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void processRecoveryMessage(byte[] message) {
+    public void processRecoveryMessage( java.nio.ByteBuffer buffer, long pointer) {
         // TODO Auto-generated method stub
 
     }

@@ -1183,12 +1183,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public void processRecoveryMessage(byte[] message) {
+    public void processRecoveryMessage( ByteBuffer buffer, long pointer) {
         try {
             m_data.clear();
             m_data.putInt(Commands.RecoveryMessage.m_id);
-            m_data.putInt(message.length);
-            m_data.put(message);
+            m_data.putInt(buffer.remaining());
+            m_data.put(buffer);
 
             m_data.flip();
             m_connection.write();
