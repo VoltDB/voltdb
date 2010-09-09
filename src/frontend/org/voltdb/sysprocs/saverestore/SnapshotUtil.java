@@ -103,7 +103,6 @@ public class SnapshotUtil {
      * Retrieve a list of tables from a digest. Doesn't return the snapshot time
      * value that is stashed in the digest file.
      * @param f
-     * @return
      * @throws Exception
      */
     public static Pair<Long, List<String>> retrieveRelevantTableNamesAndTime(File f) throws Exception {

@@ -531,10 +531,6 @@ public class ClientInterface implements DumpManager.Dumpable {
          */
         private final String m_username;
 
-        /**
-         *
-         * @param user Set of permissions associated with requests coming from this connection
-         */
         public ClientInputHandler(String username, String hostname) {
             m_username = username.intern();
             m_hostname = hostname;
