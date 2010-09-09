@@ -103,7 +103,11 @@ public class SnapshotSave extends VoltSystemProcedure
         String hostname = ConnectionUtil.getHostnameOrAddress();
         if (fragmentId == SysProcFragmentId.PF_saveTest)
         {
-            return saveTest(params, context, hostname);
+            assert(params.toArray()[0] != null);
+            assert(params.toArray()[1] != null);
+            String file_path = (String) params.toArray()[0];
+            String file_nonce = (String) params.toArray()[1];
+            return saveTest(file_path, file_nonce, context, hostname);
         }
         else if (fragmentId == SysProcFragmentId.PF_saveTestResults)
         {
@@ -162,13 +166,9 @@ public class SnapshotSave extends VoltSystemProcedure
         }
     }
 
-    private DependencyPair saveTest(ParameterSet params,
+    private DependencyPair saveTest(String file_path, String file_nonce,
             SystemProcedureExecutionContext context, String hostname) {
         {
-            assert(params.toArray()[0] != null);
-            assert(params.toArray()[1] != null);
-            String file_path = (String) params.toArray()[0];
-            String file_nonce = (String) params.toArray()[1];
             VoltTable result = constructNodeResultsTable();
             // Choose the lowest site ID on this host to do the file scan
             // All other sites should just return empty results tables.
