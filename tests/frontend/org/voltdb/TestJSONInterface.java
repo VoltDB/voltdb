@@ -113,12 +113,16 @@ public class TestJSONInterface extends TestCase {
         URL jsonAPIURL = new URL("http://localhost:8095/api/1.0/");
 
         HttpURLConnection conn = (HttpURLConnection) jsonAPIURL.openConnection();
-        conn.setDoOutput(true);
-
         conn.setRequestMethod("POST");
+        conn.setDoOutput(true);
+        conn.connect();
+
         OutputStreamWriter out = new OutputStreamWriter(conn.getOutputStream());
         out.write(varString);
+        out.flush();
         out.close();
+        out = null;
+        conn.getOutputStream().close();
 
         BufferedReader in = null;
         try {
@@ -144,12 +148,20 @@ public class TestJSONInterface extends TestCase {
             decodedString.append(line);
         }
         in.close();
+        in = null;
         // get result code
         int responseCode = conn.getResponseCode();
 
         String response = decodedString.toString();
 
         assertEquals(200, responseCode);
+
+        conn.getInputStream().close();
+        conn.disconnect();
+        conn = null;
+
+        //System.err.println(response);
+
         return response;
     }
 

@@ -32,6 +32,8 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.util.concurrent.atomic.AtomicLong;
 
+import junit.framework.TestCase;
+
 import org.voltdb.ParameterSet;
 import org.voltdb.ServerThread;
 import org.voltdb.TestJSONInterface;
@@ -42,7 +44,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 
-public class HTTPDBenchmark {
+public class HTTPDBenchmark extends TestCase {
 
     public static class Server extends NanoHTTPD {
 
@@ -150,18 +152,18 @@ public class HTTPDBenchmark {
         s = null;
     }
 
-    public void testSimple() throws Exception {
+    /*public void testSimple() throws Exception {
         final int ITERATIONS = 100;
 
         // benchmark trivial case
         //runBenchmark(8095, ITERATIONS, 10, 0, 100);
         //runBenchmark(8095, ITERATIONS, 10, 5, 100);
         runBenchmark(8095, ITERATIONS, 20, 10, 1000);
-    }
+    }*/
 
     static AtomicLong threadsOutstanding = new AtomicLong(0);
 
-    public void testThreadCreation() {
+    /*public void testThreadCreation() {
         final int ITERATIONS = 1000;
         final int OUTSTANDING = 100;
 
@@ -179,7 +181,7 @@ public class HTTPDBenchmark {
         double seconds = (finish - start) / (1000d * 1000d * 1000d);
         double rate = ITERATIONS / seconds;
         System.out.printf("Simple bench did %.2f iterations / sec.\n", rate);
-    }
+    }*/
 
     class dumbThread extends Thread {
         @Override
@@ -245,14 +247,16 @@ public class HTTPDBenchmark {
         final ParameterSet pset = new ParameterSet();
         final int m_iterations;
         public long totalExecTime = 0;
+        final int m_id;
 
-        public JSONClient(int iterations) {
+        public JSONClient(int clientId, int iterations) {
+            m_id = clientId;
             m_iterations = iterations;
         }
 
         @Override
         public void run() {
-            for (int i = 0; i < m_iterations; i++)
+            for (int i = 0; i < m_iterations; i++) {
                 try {
                     long start = System.nanoTime();
                     String jsonResponse = TestJSONInterface.callProcOverJSON("Select", pset, null, null);
@@ -263,15 +267,20 @@ public class HTTPDBenchmark {
                     e.printStackTrace();
                     System.exit(-1);
                 }
+                if (i % 100 == 0) {
+                    System.out.printf("Client %03d has done %7d/%7d and is %2d%% complete.\n", m_id, i, m_iterations, (int) (m_iterations / (i * 100.0)));
+                    System.gc();
+                }
+            }
         }
     }
 
-    public void testJSON(int clientCount, int iterations) throws Exception {
+    public void JSONBench(int clientCount, int iterations) throws Exception {
         ServerThread server = startup();
 
         JSONClient[] clients = new JSONClient[clientCount];
         for (int i = 0; i < clientCount; i++)
-            clients[i] = new JSONClient(iterations);
+            clients[i] = new JSONClient(i, iterations);
 
         long execTime = 0;
 
@@ -297,16 +306,24 @@ public class HTTPDBenchmark {
         server.join();
     }
 
-
-
+    public void testJSON() {
+        try {
+            //b.testSimple();
+            //b.testThreadCreation();
+            JSONBench(2, 20000);
+        } catch (Exception e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+    }
 
     public static void main(String args[]) {
         HTTPDBenchmark b = new HTTPDBenchmark();
 
         try {
-            b.testSimple();
-            b.testThreadCreation();
-            b.testJSON(20, 1000);
+            //b.testSimple();
+            //b.testThreadCreation();
+            b.JSONBench(2, 20000);
         } catch (Exception e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
