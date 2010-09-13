@@ -485,7 +485,7 @@ JAR BUILDING
         <fileset dir="."><include name="buildstring.txt"/></fileset>
         <manifest>
             <section name="Credits">
-                <attribute name="Author" value="VoltDB LLC" />
+                <attribute name="Author" value="VoltDB Inc." />
             </section>
             <section name="Shared">
                 <attribute
@@ -507,7 +507,7 @@ JAR BUILDING
         <fileset dir="."><include name="buildstring.txt"/></fileset>
         <manifest>
             <section name="Credits">
-                <attribute name="Author" value="VoltDB LLC" />
+                <attribute name="Author" value="VoltDB Inc." />
             </section>
             <section name="Shared">
                 <attribute
@@ -551,7 +551,7 @@ JAR BUILDING
         <fileset dir="."><include name="buildstring.txt"/></fileset>
         <manifest>
             <section name="Credits">
-                <attribute name="Author" value="VoltDB LLC" />
+                <attribute name="Author" value="VoltDB Inc." />
             </section>
             <section name="Shared">
                 <attribute
