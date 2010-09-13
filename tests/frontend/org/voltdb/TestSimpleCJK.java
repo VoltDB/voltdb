@@ -106,7 +106,7 @@ public class TestSimpleCJK extends TestCase {
         ServerThread server = startup();
 
         Client client = ClientFactory.createClient();
-        client.createConnection("localhost", null, null);
+        client.createConnection("localhost");
 
         ClientResponse response1;
         response1 = client.callProcedure("Insert",
@@ -135,7 +135,7 @@ public class TestSimpleCJK extends TestCase {
         Response response2;
 
         pset.setParameters();
-        responseJSON = TestJSONInterface.callProcOverJSON("Select", pset, null, null);
+        responseJSON = TestJSONInterface.callProcOverJSON("Select", pset, null, null, false);
         System.out.println(responseJSON);
         response2 = TestJSONInterface.responseFromJSON(responseJSON);
         assertTrue(response2.status == ClientResponse.SUCCESS);
@@ -173,14 +173,14 @@ public class TestSimpleCJK extends TestCase {
 
         // Call insert
         pset.setParameters(POORLY_TRANSLATED_CHINESE, POORLY_TRANSLATED_JAPANESE, POORLY_TRANSLATED_KOREAN);
-        responseJSON = TestJSONInterface.callProcOverJSON("Insert", pset, null, null);
+        responseJSON = TestJSONInterface.callProcOverJSON("Insert", pset, null, null, false);
         System.out.println(responseJSON);
         response = TestJSONInterface.responseFromJSON(responseJSON);
         assertTrue(response.status == ClientResponse.SUCCESS);
 
         // Call select
         pset.setParameters();
-        responseJSON = TestJSONInterface.callProcOverJSON("Select", pset, null, null);
+        responseJSON = TestJSONInterface.callProcOverJSON("Select", pset, null, null, false);
         System.out.println(responseJSON);
         response = TestJSONInterface.responseFromJSON(responseJSON);
         assertTrue(response.status == ClientResponse.SUCCESS);
@@ -203,7 +203,7 @@ public class TestSimpleCJK extends TestCase {
         assertEquals(0, k.compareTo(POORLY_TRANSLATED_KOREAN));
 
         Client client = ClientFactory.createClient();
-        client.createConnection("localhost", null, null);
+        client.createConnection("localhost");
 
         ClientResponse response1;
         response1 = client.callProcedure("Select");

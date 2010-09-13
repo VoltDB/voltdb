@@ -17,6 +17,9 @@
 
 package org.voltdb;
 
+import java.io.UnsupportedEncodingException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Properties;
 
 import org.voltdb.client.AuthenticatedConnectionCache;
@@ -28,7 +31,16 @@ import org.voltdb.utils.Encoder;
 public class HTTPClientInterface {
 
     AuthenticatedConnectionCache m_connections = null;
+    MessageDigest m_md = null;
     static final int CACHE_TARGET_SIZE = 10;
+
+    public HTTPClientInterface() {
+        try {
+            m_md = MessageDigest.getInstance("SHA-1");
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("JVM doesn't support SHA-1 hashing. Please use a supported JVM", e);
+        }
+    }
 
     public String process(String uri, String method, Properties header, Properties parms) {
         String msg;
@@ -43,26 +55,38 @@ public class HTTPClientInterface {
 
             String username = parms.getProperty("User");
             String password = parms.getProperty("Password");
+            String hashedPassword = parms.getProperty("Hashedpassword");
             String procName = parms.getProperty("Procedure");
             String params = parms.getProperty("Parameters");
 
-            // Password must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded)
-            byte[] hashedPassword = null;
+            // The SHA-1 hash of the password
+            byte[] hashedPasswordBytes = null;
+
             if (password != null) {
-                if (password.length() != 40) {
-                    throw new Exception("Password must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded).");
-                }
                 try {
-                    hashedPassword = Encoder.hexDecode(password);
-                }
-                catch (Exception e) {
-                    throw new Exception("Password must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded).");
+                    hashedPasswordBytes = m_md.digest(password.getBytes("UTF-8"));
+                } catch (UnsupportedEncodingException e) {
+                    throw new RuntimeException("JVM doesn't support UTF-8. Please use a supported JVM", e);
                 }
             }
-            assert((hashedPassword == null) || (hashedPassword.length == 20));
+            // note that HTTP Var "Hashedpassword" has a higher priority
+            // Hashedassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded)
+            if (hashedPassword != null) {
+                if (hashedPassword.length() != 40) {
+                    throw new Exception("Hashedpassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded).");
+                }
+                try {
+                    hashedPasswordBytes = Encoder.hexDecode(hashedPassword);
+                }
+                catch (Exception e) {
+                    throw new Exception("Hashedpassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded).");
+                }
+            }
+
+            assert((hashedPasswordBytes == null) || (hashedPasswordBytes.length == 20));
 
             // get a connection to localhost from the pool
-            client = m_connections.getClient(username, hashedPassword);
+            client = m_connections.getClient(username, hashedPasswordBytes);
 
             SyncCallback scb = new SyncCallback();
             boolean success;

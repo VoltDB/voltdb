@@ -165,7 +165,7 @@ public class TestJSONInterface extends TestCase {
         return response;
     }
 
-    public static String getPasswordForHTTPVar(String password) {
+    public static String getHashedPasswordForHTTPVar(String password) {
         assert(password != null);
 
         MessageDigest md = null;
@@ -186,7 +186,7 @@ public class TestJSONInterface extends TestCase {
         return retval;
     }
 
-    public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password) throws Exception {
+    public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash) throws Exception {
         // Call insert
         String paramsInJSON = pset.toJSONString();
         //System.out.println(paramsInJSON);
@@ -196,7 +196,10 @@ public class TestJSONInterface extends TestCase {
         if (username != null)
             params.put("User", username);
         if (password != null) {
-            params.put("Password", getPasswordForHTTPVar(password));
+            if (preHash)
+                params.put("Hashedpassword", getHashedPasswordForHTTPVar(password));
+            else
+                params.put("Password", password);
         }
 
         String varString = getHTTPVarString(params);
@@ -268,13 +271,13 @@ public class TestJSONInterface extends TestCase {
 
         // Call insert
         pset.setParameters(1, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
-        responseJSON = callProcOverJSON("Insert", pset, null, null);
+        responseJSON = callProcOverJSON("Insert", pset, null, null, false);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
         assertTrue(response.status == ClientResponse.SUCCESS);
 
         // Call insert again (with failure expected)
-        responseJSON = callProcOverJSON("Insert", pset, null, null);
+        responseJSON = callProcOverJSON("Insert", pset, null, null, false);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
         assertTrue(response.status != ClientResponse.SUCCESS);
@@ -288,7 +291,7 @@ public class TestJSONInterface extends TestCase {
                            new BigDecimal[] {},
                            new TimestampType(System.currentTimeMillis()));
 
-        responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null);
+        responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null, false);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
         assertTrue(response.status == ClientResponse.SUCCESS);
@@ -315,7 +318,7 @@ public class TestJSONInterface extends TestCase {
                 new BigDecimal[] {},
                 ts.toString());
 
-        responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null);
+        responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null, false);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
         assertTrue(response.status == ClientResponse.SUCCESS);
@@ -329,7 +332,7 @@ public class TestJSONInterface extends TestCase {
                 new BigDecimal[] {},
                 new TimestampType(System.currentTimeMillis()));
 
-        responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null);
+        responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null, false);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
         assertFalse(response.status == ClientResponse.SUCCESS);
@@ -343,7 +346,7 @@ public class TestJSONInterface extends TestCase {
                 new BigDecimal[] {},
                 new TimestampType(System.currentTimeMillis()));
 
-        responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null);
+        responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null, false);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
         assertFalse(response.status == ClientResponse.SUCCESS);
@@ -357,7 +360,7 @@ public class TestJSONInterface extends TestCase {
                 new BigDecimal[] {},
                 new TimestampType(System.currentTimeMillis()));
 
-        responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null);
+        responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null, false);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
         System.out.println(response.statusString);
@@ -372,7 +375,7 @@ public class TestJSONInterface extends TestCase {
                 new BigDecimal[] {},
                 null);
 
-        responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null);
+        responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null, false);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
         System.out.println(response.statusString);
@@ -422,13 +425,13 @@ public class TestJSONInterface extends TestCase {
         String test2 = new String(test1);
 
         ParameterSet pset = new ParameterSet();
-        response = callProcOverJSON("Select", pset, null, null);
+        response = callProcOverJSON("Select", pset, null, null, false);
         System.out.println(response);
         System.out.println(test2);
         r = responseFromJSON(response);
         assertEquals(1, r.status);
 
-        response = callProcOverJSON("SelectStarHelloWorld", pset, null, null);
+        response = callProcOverJSON("SelectStarHelloWorld", pset, null, null, false);
         r = responseFromJSON(response);
         assertEquals(1, r.status);
         assertTrue(response.contains(test2));
@@ -487,7 +490,7 @@ public class TestJSONInterface extends TestCase {
         for (UserInfo u : ui) {
             ParameterSet pset = new ParameterSet();
             pset.setParameters(u.name, u.password, u.name);
-            String response = callProcOverJSON("Insert", pset, u.name, u.password);
+            String response = callProcOverJSON("Insert", pset, u.name, u.password, true);
             Response r = responseFromJSON(response);
             assertEquals(ClientResponse.SUCCESS, r.status);
         }
@@ -495,7 +498,7 @@ public class TestJSONInterface extends TestCase {
         for (UserInfo u : ui) {
             ParameterSet pset = new ParameterSet();
             pset.setParameters(u.name + "-X", u.password + "-X", u.name + "-X");
-            String response = callProcOverJSON("Insert", pset, u.name, u.password);
+            String response = callProcOverJSON("Insert", pset, u.name, u.password, false);
             Response r = responseFromJSON(response);
             assertEquals(ClientResponse.SUCCESS, r.status);
         }
@@ -504,8 +507,11 @@ public class TestJSONInterface extends TestCase {
         UserInfo u = ui[0];
         ParameterSet pset = new ParameterSet();
         pset.setParameters(u.name + "-X1", u.password + "-X1", u.name + "-X1");
-        String response = callProcOverJSON("Insert", pset, u.name, "ick");
+        String response = callProcOverJSON("Insert", pset, u.name, "ick", true);
         Response r = responseFromJSON(response);
+        assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
+        response = callProcOverJSON("Insert", pset, u.name, "ick", false);
+        r = responseFromJSON(response);
         assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
 
         // test malformed auth (too short hash)
