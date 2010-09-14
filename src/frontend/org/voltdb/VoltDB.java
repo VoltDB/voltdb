@@ -18,11 +18,11 @@
 package org.voltdb;
 
 import java.io.File;
-import java.util.Map;
-import java.util.TimeZone;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.TimeZone;
 
 import org.voltdb.logging.VoltLogger;
 
@@ -96,9 +96,6 @@ public class VoltDB {
 
         /** interface to use for backchannel comm (default: any) */
         public String m_internalInterface = DEFAULT_INTERNAL_INTERFACE;
-
-        /** port number to run the http admin and json interface on */
-        public int m_httpAdminPort = 8080;
 
         /** information used to rejoin this new node to a cluster */
         public String m_rejoinToHostAndPort = null;
@@ -175,13 +172,6 @@ public class VoltDB {
                 }
                 else if (arg.startsWith("internalinterface ")) {
                     m_internalInterface = arg.substring("internalinterface ".length()).trim();
-                }
-
-                else if (arg.equals("httpadminport")) {
-                    m_httpAdminPort = Integer.parseInt(args[++i]);
-                }
-                else if (arg.startsWith("httpadminport ")) {
-                    m_httpAdminPort = Integer.parseInt(arg.substring("httpadminport ".length()));
                 }
 
                 else if (arg.equals("rejoinhost")) {

@@ -34,6 +34,7 @@
     <xsd:sequence>
       <xsd:element name="cluster" minOccurs="1" maxOccurs="1" type="clusterType"/>
       <xsd:element name="users" minOccurs="0" maxOccurs="1" type="usersType"/>
+      <xsd:element name="httpd" minOccurs="0" maxOccurs="1" type="httpdType"/>
     </xsd:sequence>
   </xsd:complexType>
 
@@ -56,6 +57,18 @@
         </xsd:complexType>
       </xsd:element>
     </xsd:sequence>
+  </xsd:complexType>
+  
+  <!-- <httpd> -->
+  <xsd:complexType name="httpdType">
+    <xsd:sequence>
+      <xsd:element name="jsonapi" minOccurs="0" maxOccurs="1">
+        <xsd:complexType>
+          <xsd:attribute name="enabled" type="xsd:string" use="required"/>
+        </xsd:complexType>
+      </xsd:element>
+    </xsd:sequence>
+    <xsd:attribute name="port" type="xsd:int" use="optional" default="0"/>
   </xsd:complexType>
 
 </xsd:schema>

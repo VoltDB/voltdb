@@ -337,20 +337,6 @@ public class RealVoltDB implements VoltDBInterface
             readBuildInfo();
             m_config = config;
 
-            // start the admin console
-            int port;
-            for (port = config.m_httpAdminPort; true; port++) {
-                try {
-                    m_adminListener = new HTTPAdminListener(port);
-                    break;
-                } catch (IOException e1) {}
-            }
-            if (port == 8081)
-                hostLog.info("HTTP admin console unable to bind to port 8080");
-            else if (port > 8081)
-                hostLog.info("HTTP admin console unable to bind to ports 8080 through " + (port - 1));
-            hostLog.info("HTTP admin console listening on port " + port);
-
             // Initialize the catalog and some common shortcuts
             if (m_config.m_pathToCatalog.startsWith("http")) {
                 hostLog.info("Loading application catalog jarfile from " + m_config.m_pathToCatalog);
@@ -390,6 +376,36 @@ public class RealVoltDB implements VoltDBInterface
 
             // Initialize the complex partitioning scheme
             TheHashinator.initialize(catalog);
+
+            // start the httpd dashboard/jsonapi
+            int port = m_catalogContext.cluster.getHttpdportno();
+            boolean jsonEnabled = m_catalogContext.cluster.getJsonapi();
+
+            // if not set by the user, just find a free port
+            if (port == 0) {
+                // if not set by the user, start at 8080
+                port = 8080;
+
+                for (; true; port++) {
+                    try {
+                        m_adminListener = new HTTPAdminListener(jsonEnabled, port);
+                        break;
+                    } catch (IOException e1) {}
+                }
+                if (port == 8081)
+                    hostLog.info("HTTP admin console unable to bind to port 8080");
+                else if (port > 8081)
+                    hostLog.info("HTTP admin console unable to bind to ports 8080 through " + (port - 1));
+                hostLog.info("HTTP admin console listening on port " + port);
+            }
+            else {
+                try {
+                    m_adminListener = new HTTPAdminListener(jsonEnabled, port);
+                    hostLog.info("HTTP admin console listening on port " + port);
+                } catch (IOException e1) {
+                    hostLog.info("HTTP admin console unable to bind to port " + port);
+                }
+            }
 
             // Prepare the network socket manager for work
             m_network = new VoltNetwork();

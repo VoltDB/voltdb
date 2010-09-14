@@ -222,11 +222,11 @@ public class HTTPDBenchmark extends TestCase {
         builder.addPartitionInfo("dummy", "sval1");
         builder.addStmtProcedure("Insert", "insert into dummy values (?,?,?);");
         builder.addStmtProcedure("Select", "select * from dummy;");
+        builder.setHTTPDPort(8095);
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("jsonperf.jar"), 1, 1, 0, "localhost");
         assert(success);
 
         VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_httpAdminPort = 8095;
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("jsonperf.jar");
         config.m_pathToDeployment = builder.getPathToDeployment();
         ServerThread server = new ServerThread(config);

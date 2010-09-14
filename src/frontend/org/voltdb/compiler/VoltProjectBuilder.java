@@ -179,6 +179,9 @@ public class VoltProjectBuilder {
     private boolean m_elenabled;      // true if enabled; false if disabled
     List<String> m_elAuthGroups;      // authorized groups
 
+    int m_httpdPortNo = 0; // zero defaults to first open port >= 8080
+    boolean m_jsonApiEnabled = true;
+
     BackendTarget m_target = BackendTarget.NATIVE_EE_JNI;
     PrintStream m_compilerDebugPrintStream = null;
     boolean m_securityEnabled = false;
@@ -333,6 +336,14 @@ public class VoltProjectBuilder {
     public void addPartitionInfo(final String tableName, final String partitionColumnName) {
         assert(m_partitionInfos.containsKey(tableName) == false);
         m_partitionInfos.put(tableName, partitionColumnName);
+    }
+
+    public void setHTTPDPort(int port) {
+        m_httpdPortNo = port;
+    }
+
+    public void setJSONAPIEnabled(final boolean enabled) {
+        m_jsonApiEnabled = enabled;
     }
 
     public void setSecurityEnabled(final boolean enabled) {
@@ -732,6 +743,14 @@ public class VoltProjectBuilder {
             }
             users.appendChild(user);
         }
+
+        // <httpd>
+        final Element httpd = doc.createElement("httpd");
+        httpd.setAttribute("port", new Integer(m_httpdPortNo).toString());
+        final Element jsonapi = doc.createElement("jsonapi");
+        jsonapi.setAttribute("enabled", new Boolean(m_jsonApiEnabled).toString());
+        httpd.appendChild(jsonapi);
+        deployment.appendChild(httpd);
 
         // boilerplate to write this DOM object to file.
         StreamResult result;

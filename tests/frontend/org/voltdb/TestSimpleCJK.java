@@ -88,11 +88,11 @@ public class TestSimpleCJK extends TestCase {
         builder.addPartitionInfo("cjk", "sval1");
         builder.addStmtProcedure("Insert", "insert into cjk values (?,?,?);");
         builder.addStmtProcedure("Select", "select * from cjk;");
+        builder.setHTTPDPort(8095);
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("cjk.jar"), 1, 1, 0, "localhost");
         assertTrue(success);
 
         VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_httpAdminPort = 8095;
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("cjk.jar");
         config.m_pathToDeployment = builder.getPathToDeployment();
         ServerThread server = new ServerThread(config);

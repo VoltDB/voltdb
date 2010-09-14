@@ -109,7 +109,7 @@ public class TestJSONInterface extends TestCase {
         return s;
     }
 
-    public static String callProcOverJSONRaw(String varString) throws Exception {
+    public static String callProcOverJSONRaw(String varString, int expectedCode) throws Exception {
         URL jsonAPIURL = new URL("http://localhost:8095/api/1.0/");
 
         HttpURLConnection conn = (HttpURLConnection) jsonAPIURL.openConnection();
@@ -154,7 +154,7 @@ public class TestJSONInterface extends TestCase {
 
         String response = decodedString.toString();
 
-        assertEquals(200, responseCode);
+        assertEquals(expectedCode, responseCode);
 
         conn.getInputStream().close();
         conn.disconnect();
@@ -187,6 +187,10 @@ public class TestJSONInterface extends TestCase {
     }
 
     public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash) throws Exception {
+        return callProcOverJSON(procName, pset, username, password, preHash, 200 /* HTTP_OK */);
+    }
+
+    public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, int expectedCode) throws Exception {
         // Call insert
         String paramsInJSON = pset.toJSONString();
         //System.out.println(paramsInJSON);
@@ -206,7 +210,7 @@ public class TestJSONInterface extends TestCase {
 
         varString = getHTTPVarString(params);
 
-        return callProcOverJSONRaw(varString);
+        return callProcOverJSONRaw(varString, expectedCode);
     }
 
     public static Response responseFromJSON(String jsonStr) throws JSONException, IOException {
@@ -253,10 +257,10 @@ public class TestJSONInterface extends TestCase {
         builder.addPartitionInfo("blah", "ival");
         builder.addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);");
         builder.addProcedures(CrazyBlahProc.class);
+        builder.setHTTPDPort(8095);
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
         assertTrue(success);
 
-        config.m_httpAdminPort = 8095;
         config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
         config.m_pathToDeployment = builder.getPathToDeployment();
 
@@ -404,18 +408,18 @@ public class TestJSONInterface extends TestCase {
         builder.addStmtProcedure("Insert", "insert into HELLOWORLD values (?,?,?);");
         builder.addStmtProcedure("Select", "select * from HELLOWORLD;");
         builder.addProcedures(SelectStarHelloWorld.class);
+        builder.setHTTPDPort(8095);
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
         assertTrue(success);
 
         VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_httpAdminPort = 8095;
         config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
         config.m_pathToDeployment = builder.getPathToDeployment();
         ServerThread server = new ServerThread(config);
         server.start();
         server.waitForInitialization();
 
-        String response = callProcOverJSONRaw(japaneseTestVarStrings);
+        String response = callProcOverJSONRaw(japaneseTestVarStrings, 200);
         Response r = responseFromJSON(response);
         assertEquals(1, r.status);
 
@@ -475,11 +479,12 @@ public class TestJSONInterface extends TestCase {
         pi[1] = new ProcedureInfo(new String[] { "foo" }, "Select", "select * from HELLOWORLD;", null);
         builder.addProcedures(pi);
 
+        builder.setHTTPDPort(8095);
+
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
         assertTrue(success);
 
         VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_httpAdminPort = 8095;
         config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
         config.m_pathToDeployment = builder.getPathToDeployment();
         ServerThread server = new ServerThread(config);
@@ -524,7 +529,7 @@ public class TestJSONInterface extends TestCase {
         params.put("User", u.name);
         params.put("Password", Encoder.hexEncode(new byte[] {1,2,3}));
         String varString = getHTTPVarString(params);
-        response = callProcOverJSONRaw(varString);
+        response = callProcOverJSONRaw(varString, 200);
         r = responseFromJSON(response);
         assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
 
@@ -538,9 +543,56 @@ public class TestJSONInterface extends TestCase {
         params.put("User", u.name);
         params.put("Password", "abcdefghiabcdefghiabcdefghiabcdefghi");
         varString = getHTTPVarString(params);
-        response = callProcOverJSONRaw(varString);
+        response = callProcOverJSONRaw(varString, 200);
         r = responseFromJSON(response);
         assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
+
+        server.shutdown();
+        server.join();
+    }
+
+    public void testJSONDisabled() throws Exception {
+        String simpleSchema =
+            "CREATE TABLE HELLOWORLD (\n" +
+            "    HELLO VARCHAR(15),\n" +
+            "    WORLD VARCHAR(15),\n" +
+            "    DIALECT VARCHAR(15) NOT NULL,\n" +
+            "    PRIMARY KEY (DIALECT)\n" +
+            ");";
+
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+        String schemaPath = schemaFile.getPath();
+        schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addSchema(schemaPath);
+        builder.addPartitionInfo("HELLOWORLD", "DIALECT");
+
+        builder.addStmtProcedure("Insert", "insert into HELLOWORLD values (?,?,?);");
+
+        builder.setHTTPDPort(8095);
+        builder.setJSONAPIEnabled(false);
+
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+        assertTrue(success);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+        config.m_pathToDeployment = builder.getPathToDeployment();
+        ServerThread server = new ServerThread(config);
+        server.start();
+        server.waitForInitialization();
+
+        // test not enabled
+        ParameterSet pset = new ParameterSet();
+        pset.setParameters("foo", "bar", "foobar");
+        try {
+            callProcOverJSON("Insert", pset, null, null, false, 403 /* HTTP_FORBIDDEN */);
+        }
+        catch (Exception e) {
+            // make sure failed due to permissions on http
+            assertTrue(e.getMessage().contains("403"));
+        }
 
         server.shutdown();
         server.join();

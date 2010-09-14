@@ -60,6 +60,7 @@ import org.voltdb.compiler.ClusterCompiler;
 import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
@@ -427,6 +428,9 @@ public abstract class CatalogUtil {
         // set the users info
         setUsersInfo(catalog, deployment.getUsers());
 
+        // set the HTTPD info
+        setHTTPDInfo(catalog, deployment.getHttpd());
+
         return true;
     }
 
@@ -593,6 +597,21 @@ public abstract class CatalogUtil {
                 }
             }
         }
+    }
+
+    private static void setHTTPDInfo(Catalog catalog, HttpdType httpd) {
+        Cluster cluster = catalog.getClusters().get("cluster");
+
+        // set the port for httpd
+        cluster.setHttpdportno(httpd.getPort());
+
+        HttpdType.Jsonapi jsonapi = httpd.getJsonapi();
+        // if the json api info is avaliable, use it
+        if (jsonapi != null)
+            cluster.setJsonapi(jsonapi.getEnabled().equalsIgnoreCase("true"));
+        // otherwise default to enabled for now
+        else
+            cluster.setJsonapi(true);
     }
 
     /** Read a hashed password from password. */

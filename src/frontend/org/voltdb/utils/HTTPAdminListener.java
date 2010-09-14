@@ -26,9 +26,11 @@ import org.voltdb.VoltDB;
 public class HTTPAdminListener extends NanoHTTPD {
 
     HTTPClientInterface httpClientInterface = new HTTPClientInterface();
+    final boolean m_jsonEnabled;
 
-    public HTTPAdminListener(int port) throws IOException {
+    public HTTPAdminListener(boolean jsonEnabled, int port) throws IOException {
         super(port);
+        m_jsonEnabled = jsonEnabled;
     }
 
     @Override
@@ -36,9 +38,14 @@ public class HTTPAdminListener extends NanoHTTPD {
 
         // kick over to the HTTP/JSON interface
         if (request.uri.contains("/api/1.0/")) {
-            String msg = httpClientInterface.process(request.uri, request.method, request.header, request.parms);
-            //String msg = "{\"status\":1,\"appstatus\":-128,\"statusstring\":null,\"appstatusstring\":null,\"exception\":null,\"results\":[{\"status\":-128,\"schema\":[{\"name\":\"SVAL1\",\"type\":9},{\"name\":\"SVAL2\",\"type\":9},{\"name\":\"SVAL3\",\"type\":9}],\"data\":[[\"FOO\",\"BAR\",\"BOO\"]]}]}";
-            return new NanoHTTPD.Response(HTTP_OK, MIME_PLAINTEXT, msg);
+            if (m_jsonEnabled) {
+                String msg = httpClientInterface.process(request.uri, request.method, request.header, request.parms);
+                //String msg = "{\"status\":1,\"appstatus\":-128,\"statusstring\":null,\"appstatusstring\":null,\"exception\":null,\"results\":[{\"status\":-128,\"schema\":[{\"name\":\"SVAL1\",\"type\":9},{\"name\":\"SVAL2\",\"type\":9},{\"name\":\"SVAL3\",\"type\":9}],\"data\":[[\"FOO\",\"BAR\",\"BOO\"]]}]}";
+                return new NanoHTTPD.Response(HTTP_OK, MIME_PLAINTEXT, msg);
+            }
+            else {
+                return new NanoHTTPD.Response(HTTP_FORBIDDEN, MIME_PLAINTEXT, "JSON API IS CURRENTLY DISABLED");
+            }
         }
 
         // code for debugging
