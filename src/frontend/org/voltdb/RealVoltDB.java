@@ -741,8 +741,15 @@ public class RealVoltDB implements VoltDBInterface
         }
 
         Object retval[] = m_messenger.waitForGroupJoin(3000);
+
+        m_catalogContext = new CatalogContext(
+                m_catalogContext.catalog,
+                m_catalogContext.pathToCatalogJar,
+                m_messenger.getDiscoveredCatalogVersion());
+
         m_instanceId = new Object[] { retval[0], retval[1] };
 
+        @SuppressWarnings("unchecked")
         HashSet<Integer> downHosts = (HashSet<Integer>)retval[2];
         System.out.println("Down hosts are " + downHosts.toString());
 
@@ -929,7 +936,7 @@ public class RealVoltDB implements VoltDBInterface
         // connect to the joining node, build a foreign host
         InetSocketAddress addr = new InetSocketAddress(rejoiningHostname, portToConnect);
         try {
-            messenger.rejoinForeignHostPrepare(rejoinHostId, addr, liveHosts);
+            messenger.rejoinForeignHostPrepare(rejoinHostId, addr, liveHosts, m_catalogContext.catalogVersion);
             return null;
         } catch (Exception e) {
             //e.printStackTrace();
@@ -1068,7 +1075,7 @@ public class RealVoltDB implements VoltDBInterface
 
             // 0. update the global context
             lastCatalogUpdate_txnId = currentTxnId;
-            m_catalogContext = m_catalogContext.update(newCatalogURL, diffCommands);
+            m_catalogContext = m_catalogContext.update(newCatalogURL, diffCommands, true);
 
             // 1. update the elt manager.
             ELTManager.instance().updateCatalog(m_catalogContext);
@@ -1086,7 +1093,7 @@ public class RealVoltDB implements VoltDBInterface
         synchronized(m_catalogUpdateLock)
         {
             m_catalogContext = m_catalogContext.update(CatalogContext.NO_PATH,
-                                                       diffCommands);
+                                                       diffCommands, false);
         }
 
         for (ClientInterface ci : m_clientInterfaces)

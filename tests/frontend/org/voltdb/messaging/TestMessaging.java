@@ -29,12 +29,12 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
+import java.util.HashSet;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.HashSet;
 
 import junit.framework.TestCase;
 
@@ -608,7 +608,7 @@ public class TestMessaging extends TestCase {
 
         HashSet<Integer> liveHosts = new HashSet<Integer>();
         liveHosts.add(msg1.getHostId());
-        msg1.rejoinForeignHostPrepare(msg2hostId, new InetSocketAddress(internalPort), liveHosts);
+        msg1.rejoinForeignHostPrepare(msg2hostId, new InetSocketAddress(internalPort), liveHosts, 1);
         msg1.rejoinForeignHostCommit();
 
         // this timeout is rather lousy, but neither is it exception safe!

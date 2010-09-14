@@ -45,6 +45,7 @@ public class CatalogContext {
     public final int numberOfNodes;
     public final SiteTracker siteTracker;
     public final int catalogVersion;
+    public final String pathToCatalogJar;
 
     // PRIVATE
     //private final String m_path;
@@ -54,6 +55,7 @@ public class CatalogContext {
         // check the heck out of the given params in this immutable class
         assert(catalog != null);
         assert(pathToCatalogJar != null);
+        this.pathToCatalogJar = pathToCatalogJar;
         if (catalog == null)
             throw new RuntimeException("Can't create CatalogContext with null catalog.");
         if (pathToCatalogJar == null)
@@ -95,10 +97,11 @@ public class CatalogContext {
         catalogVersion = version;
     }
 
-    public CatalogContext update(String pathToNewJar, String diffCommands) {
+    public CatalogContext update(String pathToNewJar, String diffCommands, boolean incrementVersion) {
         Catalog newCatalog = catalog.deepCopy();
         newCatalog.execute(diffCommands);
-        CatalogContext retval = new CatalogContext(newCatalog, pathToNewJar, catalogVersion + 1);
+        int incValue = incrementVersion ? 1 : 0;
+        CatalogContext retval = new CatalogContext(newCatalog, pathToNewJar, catalogVersion + incValue);
         return retval;
     }
 

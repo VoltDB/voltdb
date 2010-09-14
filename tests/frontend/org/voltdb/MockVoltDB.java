@@ -23,8 +23,8 @@
 package org.voltdb;
 
 import java.util.ArrayList;
-import java.util.Hashtable;
 import java.util.HashSet;
+import java.util.Hashtable;
 
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.catalog.Catalog;
@@ -345,7 +345,7 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public void clusterUpdate(String diffCommands) {
         m_context = m_context.update(CatalogContext.NO_PATH,
-                                     diffCommands);
+                                     diffCommands, false);
     }
 
     @Override

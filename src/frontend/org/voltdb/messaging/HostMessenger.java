@@ -25,14 +25,13 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Map.Entry;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.HashSet;
-import java.util.ArrayList;
 
 import org.voltdb.VoltDB;
 import org.voltdb.client.ConnectionUtil;
@@ -136,6 +135,10 @@ public class HostMessenger implements Messenger {
      */
     public VoltNetwork getNetwork() {
         return m_network;
+    }
+
+    public int getDiscoveredCatalogVersion() {
+        return m_joiner.getDiscoveredCatalogVersionId();
     }
 
     public synchronized Object[] waitForGroupJoin() {
@@ -462,7 +465,10 @@ public class HostMessenger implements Messenger {
      * @param sock A network connection to that host.
      * @throws Exception Throws exceptions on failure.
      */
-    public void rejoinForeignHostPrepare(int hostId, InetSocketAddress addr, HashSet<Integer> liveHosts) throws Exception {
+    public void rejoinForeignHostPrepare(int hostId,
+                                         InetSocketAddress addr,
+                                         HashSet<Integer> liveHosts,
+                                         int catalogVersionNumber) throws Exception {
         if (hostId < 0)
             throw new Exception("Rejoin HostId can be negative.");
         if (m_foreignHosts.length <= hostId)
@@ -470,7 +476,8 @@ public class HostMessenger implements Messenger {
         if (m_foreignHosts[hostId] != null && m_foreignHosts[hostId].isUp())
             throw new Exception("Rejoin HostId is not a failed host.");
 
-        SocketChannel sock = SocketJoiner.connect(m_localHostId, hostId, addr, liveHosts);
+        SocketChannel sock = SocketJoiner.connect(
+                m_localHostId, hostId, addr, liveHosts, catalogVersionNumber);
 
         m_tempNewFH = new ForeignHost(this, hostId, sock);
         m_tempNewFH.sendReadyMessage();

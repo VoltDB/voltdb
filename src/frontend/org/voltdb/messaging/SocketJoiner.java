@@ -28,9 +28,9 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Map.Entry;
-import java.util.HashSet;
 
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
@@ -58,6 +58,7 @@ public class SocketJoiner extends Thread {
     static final int COMMAND_NTPFAIL = 5;
     static final int COMMAND_CRCFAIL = 6;
     static final int COMMAND_HOSTIDFAIL = 7;
+    static final int COMMAND_CATVERFAIL = 8;
     static final int RESPONSE_LISTENING = 0;
     static final int RESPONSE_CONNECTED = 1;
     static final int MAX_ACCEPTABLE_TIME_DIFF_IN_MS = 100;
@@ -73,6 +74,7 @@ public class SocketJoiner extends Thread {
     long m_timestamp;//Part of instanceId
     Integer m_addr;
     long m_catalogCRC;
+    int m_discoveredCatalogVersion = 0;
 
     // from configuation data
     int m_internalPort;
@@ -486,6 +488,9 @@ public class SocketJoiner extends Thread {
         }
     }
 
+    /**
+     * @return Catalog version number.
+     */
     private void runJoinExisting() {
         m_timestamp = System.currentTimeMillis();
         SocketChannel socket = null;
@@ -526,6 +531,7 @@ public class SocketJoiner extends Thread {
 
             long difftimes[] = new long[m_expectedHosts - 1];
             int readHostIds[] = new int[m_expectedHosts - 1];
+            int catalogVersions[] = new int[m_expectedHosts - 1];
             for (Entry<Integer, SocketChannel> e : m_sockets.entrySet()) {
                 out = getOutputForHost(e.getKey());
 
@@ -540,6 +546,7 @@ public class SocketJoiner extends Thread {
                 readHostIds[i] = in.readInt();
                 long timestamp = in.readLong();
                 difftimes[i] = System.currentTimeMillis() - timestamp;
+                catalogVersions[i] = in.readInt();
                 i++;
             }
 
@@ -563,6 +570,14 @@ public class SocketJoiner extends Thread {
             for (i = 1; i < readHostIds.length; i++) {
                 if (readHostIds[i] != m_localHostId) {
                     command = COMMAND_HOSTIDFAIL;
+                }
+            }
+
+            // ensure all catalog versions are the same
+            m_discoveredCatalogVersion = catalogVersions[0];
+            for (int version : catalogVersions) {
+                if (version != m_discoveredCatalogVersion) {
+                    command = COMMAND_CATVERFAIL;
                 }
             }
 
@@ -608,7 +623,8 @@ public class SocketJoiner extends Thread {
             int localHostId,
             int rejoiningHostId,
             InetSocketAddress address,
-            HashSet<Integer> liveHosts) throws Exception {
+            HashSet<Integer> liveHosts,
+            int catalogVersionNumber) throws Exception {
         SocketChannel remoteConnection = null;
         try {
             // open a connection to the re-joining node
@@ -634,10 +650,14 @@ public class SocketJoiner extends Thread {
 
             // write the id of the new host
             out.writeInt(rejoiningHostId);
-            out.flush();
 
             // write the current time so the re-join node can measure skew
             out.writeLong(System.currentTimeMillis());
+
+            // write catalog version number
+            out.writeInt(catalogVersionNumber);
+
+            // flush these 3 writes
             out.flush();
 
             // read the confirmation command
@@ -664,6 +684,10 @@ public class SocketJoiner extends Thread {
 
     int getLocalHostId() {
         return m_localHostId;
+    }
+
+    int getDiscoveredCatalogVersionId() {
+        return m_discoveredCatalogVersion;
     }
 
     Hashtable<Integer, SocketChannel> getHostsAndSockets() {
