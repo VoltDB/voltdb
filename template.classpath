@@ -23,6 +23,27 @@
     <classpathentry kind="lib" path="third_party/java/jars/emma.jar"/>
     <classpathentry kind="lib" path="third_party/java/jars/junit-4.8.2.jar"/>
     <classpathentry kind="lib" path="third_party/java/jars/japex.jar"/>
+    <classpathentry kind="lib" path="third_party/java/jars/jetty-ajp-7.1.6.v20100715.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/jetty-annotations-7.1.6.v20100715.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/jetty-client-7.1.6.v20100715.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/jetty-continuation-7.1.6.v20100715.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/jetty-deploy-7.1.6.v20100715.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/jetty-http-7.1.6.v20100715.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/jetty-io-7.1.6.v20100715.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/jetty-jmx-7.1.6.v20100715.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/jetty-jndi-7.1.6.v20100715.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/jetty-plus-7.1.6.v20100715.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/jetty-policy-7.1.6.v20100715.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/jetty-rewrite-7.1.6.v20100715.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/jetty-security-7.1.6.v20100715.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/jetty-server-7.1.6.v20100715.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/jetty-servlet-7.1.6.v20100715.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/jetty-servlets-7.1.6.v20100715.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/jetty-util-7.1.6.v20100715.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/jetty-webapp-7.1.6.v20100715.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/jetty-websocket-7.1.6.v20100715.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/jetty-xml-7.1.6.v20100715.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/servlet-api-2.5.jar"/>
     <classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER">
         <attributes>
             <!-- Update the directory value to reflect

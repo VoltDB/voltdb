@@ -85,7 +85,7 @@ public class AuthenticatedConnectionCache {
             try {
                 if (m_unauthCient == null) {
                     m_unauthCient = (ClientImpl) ClientFactory.createClient();
-                    m_unauthCient.createConnection(m_hostname, m_port, null, null);
+                    m_unauthCient.createConnection(m_hostname, m_port);
                 }
             }
             catch (IOException e) {

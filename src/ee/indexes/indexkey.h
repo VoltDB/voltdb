@@ -477,6 +477,12 @@ struct GenericHasher : std::unary_function<GenericKey<keySize>, std::size_t>
  */
 class TupleKey {
   public:
+    inline TupleKey() {
+        m_columnIndices = NULL;
+        m_keyTuple = NULL;
+        m_keyTupleSchema = NULL;
+    }
+
     // Set a key from a key-schema tuple.
     inline void setFromKey(const TableTuple *tuple) {
         assert(tuple);

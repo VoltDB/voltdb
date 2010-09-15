@@ -20,8 +20,8 @@ package org.voltdb;
 import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Properties;
 
+import org.eclipse.jetty.server.Request;
 import org.voltdb.client.AuthenticatedConnectionCache;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
@@ -42,7 +42,7 @@ public class HTTPClientInterface {
         }
     }
 
-    public String process(String uri, String method, Properties header, Properties parms) {
+    public String process(Request request) {
         String msg;
 
         Client client = null;
@@ -53,11 +53,11 @@ public class HTTPClientInterface {
                 m_connections = new AuthenticatedConnectionCache(10, "localhost", port);
             }
 
-            String username = parms.getProperty("User");
-            String password = parms.getProperty("Password");
-            String hashedPassword = parms.getProperty("Hashedpassword");
-            String procName = parms.getProperty("Procedure");
-            String params = parms.getProperty("Parameters");
+            String username = request.getParameter("User");
+            String password = request.getParameter("Password");
+            String hashedPassword = request.getParameter("Hashedpassword");
+            String procName = request.getParameter("Procedure");
+            String params = request.getParameter("Parameters");
 
             // The SHA-1 hash of the password
             byte[] hashedPasswordBytes = null;
@@ -108,6 +108,7 @@ public class HTTPClientInterface {
             msg = rimpl.toJSONString();
         }
         catch (Exception e) {
+            e.printStackTrace();
             msg = e.getMessage();
             ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
             //e.printStackTrace();

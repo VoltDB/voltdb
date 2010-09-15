@@ -391,7 +391,7 @@ public class RealVoltDB implements VoltDBInterface
                     try {
                         m_adminListener = new HTTPAdminListener(jsonEnabled, port);
                         break;
-                    } catch (IOException e1) {}
+                    } catch (Exception e1) {}
                 }
                 if (port == 8081)
                     hostLog.info("HTTP admin console unable to bind to port 8080");
@@ -403,7 +403,7 @@ public class RealVoltDB implements VoltDBInterface
                 try {
                     m_adminListener = new HTTPAdminListener(jsonEnabled, port);
                     hostLog.info("HTTP admin console listening on port " + port);
-                } catch (IOException e1) {
+                } catch (Exception e1) {
                     hostLog.info("HTTP admin console unable to bind to port " + port);
                 }
             }
@@ -840,8 +840,9 @@ public class RealVoltDB implements VoltDBInterface
                 m_sampler.join();
             }
 
-            // shutdown the web monitoring
-            m_adminListener.stop(true);
+            // shutdown the web monitoring / json
+            if (m_adminListener != null)
+                m_adminListener.stop();
 
             // shut down the client interface
             for (ClientInterface ci : m_clientInterfaces) {

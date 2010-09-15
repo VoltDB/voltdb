@@ -32,8 +32,15 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.util.concurrent.atomic.AtomicLong;
 
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
 import junit.framework.TestCase;
 
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.server.nio.SelectChannelConnector;
 import org.voltdb.ParameterSet;
 import org.voltdb.ServerThread;
 import org.voltdb.TestJSONInterface;
@@ -46,14 +53,13 @@ import org.voltdb.compiler.VoltProjectBuilder;
 
 public class HTTPDBenchmark extends TestCase {
 
-    public static class Server extends NanoHTTPD {
+    public static class JettyHandler extends AbstractHandler {
 
         final int m_delay;
         final int m_responseSize;
         final String m_response;
 
-        public Server(int port, int delay, int responseSize) throws IOException {
-            super(port);
+        public JettyHandler(int delay, int responseSize) throws IOException {
             m_delay = delay;
             m_responseSize = responseSize;
             String responseTemp = "";
@@ -63,16 +69,25 @@ public class HTTPDBenchmark extends TestCase {
         }
 
         @Override
-        public Response processRequest(Request request) throws Exception {
+        public void handle(String target,
+                org.eclipse.jetty.server.Request baseRequest,
+                HttpServletRequest request,
+                HttpServletResponse response)
+                throws IOException, ServletException {
+
             if (m_delay > 0)
                 try {
                     Thread.sleep(m_delay);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
-                    return null;
+                    throw new ServletException("Unable to sleep()");
                 }
-            return new Response(NanoHTTPD.HTTP_OK, NanoHTTPD.MIME_PLAINTEXT, m_response);
+            response.setContentType("text/html;charset=utf-8");
+            response.setStatus(HttpServletResponse.SC_OK);
+            baseRequest.setHandled(true);
+            response.getWriter().print(m_response);
         }
+
     }
 
     public static String callHTTP(int port) throws Exception {
@@ -127,9 +142,16 @@ public class HTTPDBenchmark extends TestCase {
         }
     }
 
-    void runBenchmark(int port, int iterations, int clientCount, int delay, int responseSize) throws Exception {
+    void runJettyBenchmark(int port, int iterations, int clientCount, int delay, int responseSize) throws Exception {
         System.gc();
-        Server s = new Server(port, delay, responseSize);
+        Server s = new Server();
+        SelectChannelConnector connector = new SelectChannelConnector();
+        connector.setPort(port);
+        s.addConnector(connector);
+
+        s.setHandler(new JettyHandler(delay, responseSize));
+        s.start();
+
         HTTPClient[] clients = new HTTPClient[clientCount];
         for (int i = 0; i < clientCount; i++) {
             clients[i] = new HTTPClient(iterations, port);
@@ -148,18 +170,21 @@ public class HTTPDBenchmark extends TestCase {
         double rate = (iterations * clientCount) / seconds;
         System.out.printf("Simple bench did %.2f iterations / sec.\n", rate);
 
-        s.stop(true);
+        s.stop();
+        s.join();
         s = null;
     }
 
-    /*public void testSimple() throws Exception {
-        final int ITERATIONS = 100;
+    public void testSimple() throws Exception {
+        final int ITERATIONS = 1000;
 
         // benchmark trivial case
         //runBenchmark(8095, ITERATIONS, 10, 0, 100);
         //runBenchmark(8095, ITERATIONS, 10, 5, 100);
-        runBenchmark(8095, ITERATIONS, 20, 10, 1000);
-    }*/
+
+        //runNanoBenchmark(8095, ITERATIONS, 20, 0, 1000);
+        runJettyBenchmark(8095, ITERATIONS, 20, 10, 1000);
+    }
 
     static AtomicLong threadsOutstanding = new AtomicLong(0);
 
@@ -277,6 +302,7 @@ public class HTTPDBenchmark extends TestCase {
 
     public void JSONBench(int clientCount, int iterations) throws Exception {
         ServerThread server = startup();
+        Thread.sleep(1000);
 
         JSONClient[] clients = new JSONClient[clientCount];
         for (int i = 0; i < clientCount; i++)
@@ -323,7 +349,7 @@ public class HTTPDBenchmark extends TestCase {
         try {
             //b.testSimple();
             //b.testThreadCreation();
-            b.JSONBench(2, 20000);
+            b.JSONBench(8, 4000);
         } catch (Exception e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
