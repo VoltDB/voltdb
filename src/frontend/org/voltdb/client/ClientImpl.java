@@ -22,6 +22,7 @@ import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
+import java.util.concurrent.Semaphore;
 
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.FastSerializer;
@@ -69,38 +70,9 @@ final class ClientImpl implements Client {
                         Public API
      ****************************************************/
 
-    /**
-     * Clients may queue a wide variety of messages and a lot of them
-     * so give them a large max arena size.
-     */
-    private static final int m_defaultMaxArenaSize = 134217728;
-    private volatile boolean m_isShutdown = false;
+    private final Semaphore m_maxOutstanding = new Semaphore(0);
 
-    /** Create a new client without any initial connections. */
-    ClientImpl() {
-        this( 128, new int[] {
-                m_defaultMaxArenaSize,//16
-                m_defaultMaxArenaSize,//32
-                m_defaultMaxArenaSize,//64
-                m_defaultMaxArenaSize,//128
-                m_defaultMaxArenaSize,//256
-                m_defaultMaxArenaSize,//512
-                m_defaultMaxArenaSize,//1024
-                m_defaultMaxArenaSize,//2048
-                m_defaultMaxArenaSize,//4096
-                m_defaultMaxArenaSize,//8192
-                m_defaultMaxArenaSize,//16384
-                m_defaultMaxArenaSize,//32768
-                m_defaultMaxArenaSize,//65536
-                m_defaultMaxArenaSize,//131072
-                m_defaultMaxArenaSize//262144
-        },
-        false,
-        null,
-        "",
-        "",
-        null);
-    }
+    private volatile boolean m_isShutdown = false;
 
     /**
      * Create a new client without any initial connections.
@@ -111,26 +83,21 @@ final class ClientImpl implements Client {
      * @param maxArenaSizes Maximum size arenas in the memory pool should grow to
      * @param heavyweight Whether to use multiple or a single thread
      */
-    ClientImpl(
-            int expectedOutgoingMessageSize,
-            int maxArenaSizes[],
-            boolean heavyweight,
-            StatsUploaderSettings statsSettings,
-            String username,
-            String password,
-            ClientStatusListener listener) {
-        m_expectedOutgoingMessageSize = expectedOutgoingMessageSize;
+    ClientImpl(ClientConfig config) {
+        m_expectedOutgoingMessageSize = config.m_expectedOutgoingMessageSize;
         m_distributer = new Distributer(
-                expectedOutgoingMessageSize,
-                maxArenaSizes,
-                heavyweight,
-                statsSettings);
+                config.m_expectedOutgoingMessageSize,
+                config.m_maxArenaSizes,
+                config.m_heavyweight,
+                config.m_statsSettings);
         m_distributer.addClientStatusListener(new CSL());
-        m_username = username;
-        m_password = password;
-        if (listener != null) {
-            m_distributer.addClientStatusListener(listener);
+        m_username = config.m_username;
+        m_password = config.m_password;
+        if (config.m_listener != null) {
+            m_distributer.addClientStatusListener(config.m_listener);
         }
+        assert(config.m_maxOutstandingTxns > 0);
+        m_maxOutstanding.release(config.m_maxOutstandingTxns);
         m_blessedThreadIds.addAll(m_distributer.getThreadIds());
     }
 
@@ -298,13 +265,30 @@ final class ClientImpl implements Client {
         }
         ProcedureInvocation invocation =
             new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
+        //Blessed threads (the ones that invoke callbacks) are not subject to backpressure
+        boolean isBlessed = m_blessedThreadIds.contains(Thread.currentThread().getId());
+        try {
+            m_maxOutstanding.acquire();
+        } catch (InterruptedException e) {
+            throw new java.io.InterruptedIOException(e.toString());
+        }
+        final ProcedureCallback userCallback = callback;
+        ProcedureCallback callbackToReturnPermit = new ProcedureCallback() {
 
+            @Override
+            public void clientCallback(ClientResponse clientResponse)
+                    throws Exception {
+                m_maxOutstanding.release();
+                userCallback.clientCallback(clientResponse);
+            }
+
+        };
         if (m_blockingQueue) {
             while (!m_distributer.queue(
                     invocation,
-                    callback,
+                    callbackToReturnPermit,
                     expectedSerializedSize,
-                    m_blessedThreadIds.contains(Thread.currentThread().getId()))) {
+                    isBlessed)) {
                 try {
                     backpressureBarrier();
                 } catch (InterruptedException e) {
@@ -315,9 +299,9 @@ final class ClientImpl implements Client {
         } else {
             return m_distributer.queue(
                     invocation,
-                    callback,
+                    callbackToReturnPermit,
                     expectedSerializedSize,
-                    m_blessedThreadIds.contains(Thread.currentThread().getId()));
+                    isBlessed);
         }
     }
 

@@ -858,12 +858,14 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeToggl
     VoltDBEngine *engine = castToEngine(engine_ptr);
     updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
     if (engine) {
-        /*if (toggle) {
-            ProfilerStart("/tmp/gprof.prof");
-        }
-        else {
-            ProfilerStop();
-        }*/
+//        if (toggle) {
+//            ProfilerStart("/tmp/gprof.prof");
+//            ProfilerDisable();
+//        }
+//        else {
+//            ProfilerStop();
+//            ProfilerFlush();
+//        }
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
 
     }
@@ -1054,14 +1056,15 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeELTA
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    nativeProcessRecoveryMessage
- * Signature: (JJI)V
+ * Signature: (JJII)V
  */
 SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeProcessRecoveryMessage
-  (JNIEnv *env, jobject obj, jlong engine_ptr, jlong buffer_ptr, jint remaining) {
+  (JNIEnv *env, jobject obj, jlong engine_ptr, jlong buffer_ptr, jint offset, jint remaining) {
+    //ProfilerEnable();
     VOLT_DEBUG("nativeProcessRecoveryMessage in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-    char *data = reinterpret_cast<char*>(buffer_ptr);
+    char *data = reinterpret_cast<char*>(buffer_ptr) + offset;
     try {
         if (data == NULL) {
             throwFatalException("Failed to get byte array elements of recovery message");
@@ -1072,6 +1075,7 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeProce
     } catch (FatalException e) {
         topend->crashVoltDB(e);
     }
+    //ProfilerDisable();
 }
 
 /*

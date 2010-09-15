@@ -46,7 +46,8 @@
 #ifndef BINARYTREEUNIQUEINDEX_H_
 #define BINARYTREEUNIQUEINDEX_H_
 
-#include <map>
+//#include <map>
+#include "stx/btree_map.h"
 #include <iostream>
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
@@ -63,7 +64,8 @@ class BinaryTreeUniqueIndex : public TableIndex
 {
     friend class TableIndexFactory;
 
-    typedef std::map<KeyType, const void*, KeyComparator> MapType;
+    //typedef std::map<KeyType, const void*, KeyComparator> MapType;
+    typedef stx::btree_map<KeyType, const void*, KeyComparator> MapType;
 
 public:
 
@@ -257,11 +259,7 @@ protected:
     inline bool deleteEntryPrivate(const KeyType &key)
     {
         ++m_deletes;
-        typename MapType::iterator mapiter = m_entries.find(key);
-        if (mapiter == m_entries.end())
-            return false; //key not exists
-        m_entries.erase(mapiter);
-        return true; //deleted
+        return m_entries.erase(key);
     }
 
     MapType m_entries;

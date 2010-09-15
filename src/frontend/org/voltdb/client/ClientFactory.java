@@ -50,14 +50,12 @@ public abstract class ClientFactory {
             boolean heavyweight,
             StatsUploaderSettings statsSettings) {
         final int cores = Runtime.getRuntime().availableProcessors();
-        return new ClientImpl(
-                expectedOutgoingMessageSize,
-                maxArenaSizes,
-                cores > 4 ? heavyweight : false,
-                statsSettings,
-                null,
-                null,
-                null);
+        ClientConfig config = new ClientConfig();
+        config.setExpectedOutgoingMessageSize(expectedOutgoingMessageSize);
+        config.setMaxArenaSizes(maxArenaSizes);
+        config.setHeavyweight(heavyweight);
+        config.setStatsUploaderSettings(statsSettings);
+        return new ClientImpl(config);
     }
 
     /**
@@ -67,7 +65,7 @@ public abstract class ClientFactory {
      * @return Newly constructed {@link Client}
      */
     public static Client createClient() {
-        return new ClientImpl();
+        return new ClientImpl(new ClientConfig());
     }
 
     /**
@@ -79,14 +77,6 @@ public abstract class ClientFactory {
      * @return A configured client
      */
     public static Client createClient(ClientConfig config) {
-        final int cores = Runtime.getRuntime().availableProcessors();
-        return new ClientImpl(
-                config.m_expectedOutgoingMessageSize,
-                config.m_maxArenaSizes,
-                cores > 4 ? config.m_heavyweight : false,
-                config.m_statsSettings,
-                config.m_username,
-                config.m_password,
-                config.m_listener);
+        return new ClientImpl(config);
     }
 }

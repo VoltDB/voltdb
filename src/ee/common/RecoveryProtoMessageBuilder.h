@@ -49,6 +49,8 @@ public:
     RecoveryProtoMsgBuilder(
             const RecoveryMsgType type,
             CatalogId tableId,
+            uint32_t totalTupleCount,//Number of tuples in table overall
+                                    //Not the number in this message. Used to size hash tables.
             ReferenceSerializeOutput *out,
             TupleSerializer *serializer,
             const TupleSchema *schema);

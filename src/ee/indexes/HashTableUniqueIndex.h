@@ -128,6 +128,11 @@ public:
         m_match.move(NULL);
         return retval;
     }
+
+    virtual void ensureCapacity(uint32_t capacity) {
+        m_entries.rehash(capacity * 2);
+    }
+
     size_t getSize() const { return m_entries.size(); }
     std::string getTypeName() const { return "HashTableUniqueIndex"; };
 
@@ -144,7 +149,7 @@ protected:
         m_eq(m_keySchema)
     {
         m_match = TableTuple(m_tupleSchema);
-        m_entries.max_load_factor(.5f);
+        m_entries.max_load_factor(.75f);
         //m_entries.rehash(200000);
     }
 

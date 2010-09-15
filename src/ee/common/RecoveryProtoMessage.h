@@ -61,6 +61,11 @@ public:
 
     CatalogId tableId();
 
+    /*
+     * Number of tuples in the entire table (not just this message)
+     */
+    uint32_t totalTupleCount();
+
     ReferenceSerializeInput* stream();
 
 private:
@@ -84,6 +89,8 @@ private:
      * CatalogId of the table this recovery message is for
      */
     CatalogId m_tableId;
+
+    uint32_t m_totalTupleCount;
 };
 }
 #endif //RECOVERY_PROTO_MESSAGE_

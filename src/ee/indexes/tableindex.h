@@ -306,6 +306,8 @@ public:
     virtual std::string debug() const;
     virtual std::string getTypeName() const = 0;
 
+    virtual void ensureCapacity(uint32_t capacity) {}
+
     // print out info about lookup usage
     virtual void printReport();
 

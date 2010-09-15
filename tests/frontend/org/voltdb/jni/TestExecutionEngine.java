@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.concurrent.atomic.AtomicReference;
 import java.nio.ByteBuffer;
+import java.nio.channels.*;
 
 import org.voltdb.SysProcSelector;
 import org.voltdb.VoltDB;
@@ -223,22 +224,28 @@ public class TestExecutionEngine extends TestCase {
         Thread sourceThread = new Thread("Source thread") {
             @Override
             public void run() {
-                VoltMessage message = sourceMailbox.recvBlocking();
-                assertTrue(message != null);
-                assertTrue(message instanceof RecoveryMessage);
-                RecoveryMessage rm = (RecoveryMessage)message;
-
-                final RecoverySiteProcessorSource sourceProcessor =
-                    new RecoverySiteProcessorSource(
-                            rm.txnId(),
-                            rm.sourceSite(),
-                            tablesAndDestinations,
-                            sourceEngine,
-                            sourceMailbox,
-                            sourceId,
-                            onSourceCompletion,
-                            mh);
-                sourceProcessor.doRecoveryWork(0);
+                try {
+                    VoltMessage message = sourceMailbox.recvBlocking();
+                    assertTrue(message != null);
+                    assertTrue(message instanceof RecoveryMessage);
+                    RecoveryMessage rm = (RecoveryMessage)message;
+                    SocketChannel sc = RecoverySiteProcessorSource.createRecoveryConnection(rm.address(), rm.port());
+                    final RecoverySiteProcessorSource sourceProcessor =
+                        new RecoverySiteProcessorSource(
+                                rm.txnId(),
+                                rm.sourceSite(),
+                                tablesAndDestinations,
+                                sourceEngine,
+                                sourceMailbox,
+                                sourceId,
+                                onSourceCompletion,
+                                mh,
+                                sc);
+                    sourceProcessor.doRecoveryWork(0);
+                } catch (java.io.IOException e) {
+                    e.printStackTrace();
+                    return;
+                }
             }
         };
         sourceThread.start();
@@ -274,19 +281,8 @@ public class TestExecutionEngine extends TestCase {
                  * and discard the buffer so it is returned to the source
                  */
                 destinationProcess.doRecoveryWork(-1);
-                destinationProcess.m_recoveryBegan = true;
-                int ii = 0;
-                while (!destinationCompleted.get()) {
-                    VoltMessage message = destinationMailbox.recvBlocking();
-                    assertTrue(message != null);
-                    assertTrue(message instanceof RecoveryMessage);
-                    destinationProcess.handleRecoveryMessage((RecoveryMessage)message);
-                    message.discard();
-                    ii++;
-                    if (ii == 4) {
-                        destinationProcess.doRecoveryWork(0);
-                    }
-                }
+                destinationProcess.doRecoveryWork(0);
+                assert(destinationCompleted.get());
             }
         };
         destinationThread.start();

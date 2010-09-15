@@ -525,7 +525,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     @Override
     public void processRecoveryMessage( ByteBuffer buffer, long bufferPointer) {
-        nativeProcessRecoveryMessage( pointer, bufferPointer, buffer.remaining());
+        nativeProcessRecoveryMessage( pointer, bufferPointer, buffer.position(), buffer.remaining());
     }
 
     @Override

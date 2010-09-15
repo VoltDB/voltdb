@@ -20,13 +20,37 @@ package org.voltdb.client;
  * Container for configuration settings for a Client
  */
 public class ClientConfig {
-final String m_username;
-final String m_password;
-final ClientStatusListener m_listener;
-int m_expectedOutgoingMessageSize = 128;
-int m_maxArenaSizes[] = null;
-boolean m_heavyweight = false;
-StatsUploaderSettings m_statsSettings = null;
+
+    /**
+     * Clients may queue a wide variety of messages and a lot of them
+     * so give them a large max arena size.
+     */
+    private static final int m_defaultMaxArenaSize = 134217728;
+
+    final String m_username;
+    final String m_password;
+    final ClientStatusListener m_listener;
+    int m_expectedOutgoingMessageSize = 128;
+    int m_maxArenaSizes[] = new int[] {
+            m_defaultMaxArenaSize,//16
+            m_defaultMaxArenaSize,//32
+            m_defaultMaxArenaSize,//64
+            m_defaultMaxArenaSize,//128
+            m_defaultMaxArenaSize,//256
+            m_defaultMaxArenaSize,//512
+            m_defaultMaxArenaSize,//1024
+            m_defaultMaxArenaSize,//2048
+            m_defaultMaxArenaSize,//4096
+            m_defaultMaxArenaSize,//8192
+            m_defaultMaxArenaSize,//16384
+            m_defaultMaxArenaSize,//32768
+            m_defaultMaxArenaSize,//65536
+            m_defaultMaxArenaSize,//131072
+            m_defaultMaxArenaSize//262144
+    };
+    boolean m_heavyweight = false;
+    int m_maxOutstandingTxns = 1000;
+    StatsUploaderSettings m_statsSettings = null;
 
     /**
      * Configuration for a client with no authentication credentials that will
@@ -82,7 +106,8 @@ StatsUploaderSettings m_statsSettings = null;
      * 10-gig E
      */
     public void setHeavyweight(boolean heavyweight) {
-        m_heavyweight = heavyweight;
+        final int cores = Runtime.getRuntime().availableProcessors();
+        m_heavyweight = cores > 4 ? heavyweight : false;
     }
 
     /**
@@ -101,5 +126,19 @@ StatsUploaderSettings m_statsSettings = null;
      */
     public void setStatsUploaderSettings(StatsUploaderSettings statsSettings) {
         m_statsSettings = statsSettings;
+    }
+
+    /**
+     * Set the maximum number of outstanding requests that will be submitted before
+     * blocking. Similar to the number of concurrent connections in a traditional synchronous API.
+     * Defaults to 2k.
+     * @param maxOutstanding
+     */
+    public void setMaxOutstandingTxns(int maxOutstanding) {
+        if (maxOutstanding < 1) {
+            throw new IllegalArgumentException(
+                    "Max outstanding must be greater than 0, " + maxOutstanding + " was specified");
+        }
+        m_maxOutstandingTxns = maxOutstanding;
     }
 }

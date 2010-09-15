@@ -46,7 +46,15 @@ bool RecoveryContext::nextMessage(ReferenceSerializeOutput *out) {
         return false;
     }
     DefaultTupleSerializer serializer;
-    RecoveryProtoMsgBuilder message( m_recoveryPhase, m_tableId, out, &m_serializer, m_table->schema());
+    //Use allocated tuple count to size stuff at the other end
+    uint32_t allocatedTupleCount = static_cast<uint32_t>(m_table->allocatedTupleCount());
+    RecoveryProtoMsgBuilder message(
+            m_recoveryPhase,
+            m_tableId,
+            allocatedTupleCount,
+            out,
+            &m_serializer,
+            m_table->schema());
     TableTuple tuple(m_table->schema());
     while (message.canAddMoreTuples() && m_iterator.next(tuple)) {
         message.addTuple(tuple);

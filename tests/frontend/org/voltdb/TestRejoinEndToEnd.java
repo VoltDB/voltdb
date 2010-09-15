@@ -546,7 +546,7 @@ public class TestRejoinEndToEnd extends TestCase {
                     kfactor,
                     BackendTarget.NATIVE_EE_JNI,
                     LocalCluster.FailureState.ALL_RUNNING,
-                    true);
+                    false);
         cluster.setMaxHeap(256);
         final int numTuples = cluster.isValgrind() ? 10000 : 60000;
         boolean success = cluster.compile(builder);
@@ -591,6 +591,7 @@ public class TestRejoinEndToEnd extends TestCase {
         Random forWhomTheBellTolls = new Random();
         int toConnectToTemp = 0;
         Thread lastRejoinThread = null;
+        final java.util.concurrent.atomic.AtomicBoolean haveFailed = new AtomicBoolean(false);
         for (int zz = 0; zz < 5; zz++) {
             client = ClientFactory.createClient(m_cconfig);
             client.createConnection("localhost", Client.VOLTDB_SERVER_PORT + toConnectToTemp);
@@ -641,7 +642,17 @@ public class TestRejoinEndToEnd extends TestCase {
                 @Override
                 public void run() {
                     for (Integer dead : toKillFirst) {
-                        while (!cluster.recoverOne( dead, toConnectTo, m_username + ":" + m_password + "@localhost")) {};
+                        int attempts = 0;
+                        while (true) {
+                            if (attempts == 6) {
+                                haveFailed.set(true);
+                                break;
+                            }
+                            if (cluster.recoverOne( dead, toConnectTo, m_username + ":" + m_password + "@localhost")) {
+                                break;
+                            }
+                            attempts++;
+                        }
                     }
                 }
             };
@@ -735,7 +746,17 @@ public class TestRejoinEndToEnd extends TestCase {
                 public void run() {
                     try {
                         for (Integer recover : toKillDuringRecovery) {
-                            while (!cluster.recoverOne( recover, toConnectTo, m_username + ":" + m_password + "@localhost")) {}
+                            int attempts = 0;
+                            while (true) {
+                                if (attempts == 6) {
+                                    haveFailed.set(true);
+                                    break;
+                                }
+                                if (cluster.recoverOne( recover, toConnectTo, m_username + ":" + m_password + "@localhost")) {
+                                    break;
+                                }
+                                attempts++;
+                            }
                         }
                     } catch (Exception e) {
                         e.printStackTrace();
@@ -747,6 +768,7 @@ public class TestRejoinEndToEnd extends TestCase {
         }
         lastRejoinThread.join();
         cluster.shutDown();
+        assertFalse(haveFailed.get());
     }
 
     /*
@@ -791,7 +813,7 @@ public class TestRejoinEndToEnd extends TestCase {
         }
         String theString = sb.toString();
 
-        final Semaphore rateLimit = new Semaphore(3000);
+        final Semaphore rateLimit = new Semaphore(1000);
         for (int ii = 0; ii < numTuples; ii++) {
             rateLimit.acquire();
             int value = r.nextInt(numTuples);
@@ -815,6 +837,7 @@ public class TestRejoinEndToEnd extends TestCase {
         }
         client.drain();
         client.close();
+        final java.util.concurrent.atomic.AtomicBoolean haveFailed = new AtomicBoolean(false);
         Random forWhomTheBellTolls = new Random();
         for (int zz = 0; zz < 5; zz++) {
             final ArrayList<Integer> toKillFirst = new ArrayList<Integer>();
@@ -847,7 +870,17 @@ public class TestRejoinEndToEnd extends TestCase {
                 @Override
                 public void run() {
                     for (Integer dead : toKillFirst) {
-                        while (!cluster.recoverOne( dead, toConnectTo, m_username + ":" + m_password + "@localhost")){}
+                        int attempts = 0;
+                        while (true) {
+                            if (attempts == 6) {
+                                haveFailed.set(true);
+                                break;
+                            }
+                            if (cluster.recoverOne( dead, toConnectTo, m_username + ":" + m_password + "@localhost")) {
+                                break;
+                            }
+                            attempts++;
+                        }
                     }
                 }
             };
@@ -880,10 +913,21 @@ public class TestRejoinEndToEnd extends TestCase {
             }
 
             for (Integer recoverNow : toKillDuringRecovery) {
-                cluster.recoverOne( recoverNow, toConnectTo, m_username + ":" + m_password + "@localhost");
+                int attempts = 0;
+                while (true) {
+                    if (attempts == 6) {
+                        haveFailed.set(true);
+                        break;
+                    }
+                    if (cluster.recoverOne( recoverNow, toConnectTo, m_username + ":" + m_password + "@localhost")) {
+                        break;
+                    }
+                    attempts++;
+                }
             }
             System.out.println("Finished iteration " + zz);
         }
         cluster.shutDown();
+        assertFalse(haveFailed.get());
     }
 }

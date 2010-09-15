@@ -48,6 +48,7 @@ import org.voltdb.logging.VoltLogger;
 public class SocketJoiner extends Thread {
 
     private static final VoltLogger LOG = new VoltLogger(SocketJoiner.class.getName());
+    private static final VoltLogger recoveryLog = new VoltLogger("RECOVERY");
     //static final int BASE_PORT = 3021;
     static final int COORD_HOSTID = 0;
     static final int COMMAND_NONE = 0;
@@ -492,7 +493,6 @@ public class SocketJoiner extends Thread {
      * @return Catalog version number.
      */
     private void runJoinExisting() {
-        m_timestamp = System.currentTimeMillis();
         SocketChannel socket = null;
         DataInputStream in = null;
         DataOutputStream out = null;
@@ -509,6 +509,8 @@ public class SocketJoiner extends Thread {
                 InputStream s = socket.socket().getInputStream();
                 in = new DataInputStream(new BufferedInputStream(s));
                 int hostId = in.readInt();
+                m_timestamp = in.readLong();
+                m_addr = in.readInt();
                 int numHosts = in.readInt();
                 HashSet<Integer> hosts = new HashSet<Integer>(numHosts);
                 for (int ii = 0; ii < numHosts; ii++) {
@@ -519,12 +521,11 @@ public class SocketJoiner extends Thread {
                     m_expectedHosts = hostsFound.size() + 1;
                     System.out.println(hostsFound.toString());
                 } else if (!hostsFound.equals(hosts)) {
-                    if (m_hostLog != null)
-                        m_hostLog.error("Inconsistent live host set during rejoin");
+                    recoveryLog.fatal("Inconsistent live host set during rejoin");
                     VoltDB.crashVoltDB();
                 }
                 m_sockets.put(hostId, socket);
-                System.out.println("Have " + m_sockets.size() + " of " + (m_expectedHosts - 1) + " with hostId " + hostId);
+                recoveryLog.info("Have " + m_sockets.size() + " of " + (m_expectedHosts - 1) + " with hostId " + hostId);
             }
 
             // read the timestamps from all
@@ -566,7 +567,7 @@ public class SocketJoiner extends Thread {
 
             // ensure all hostids are the same
             m_localHostId = readHostIds[0];
-            System.out.println("Selecting host id " + m_localHostId);
+            recoveryLog.info("Selecting host id " + m_localHostId);
             for (i = 1; i < readHostIds.length; i++) {
                 if (readHostIds[i] != m_localHostId) {
                     command = COMMAND_HOSTIDFAIL;
@@ -637,6 +638,9 @@ public class SocketJoiner extends Thread {
 
             // write the id of this host
             out.writeInt(localHostId);
+            Object instanceId[] = VoltDB.instance().getInstanceId();
+            out.writeLong((Long)instanceId[0]);
+            out.writeInt((Integer)instanceId[1]);
             out.writeInt(liveHosts.size());
             for (Integer site : liveHosts) {
                 out.writeInt(site);

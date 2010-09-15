@@ -813,6 +813,12 @@ void PersistentTable::nextRecoveryMessage(ReferenceSerializeOutput *out) {
 void PersistentTable::processRecoveryMessage(RecoveryProtoMsg* message, Pool *pool, bool allowELT) {
     switch (message->msgType()) {
     case voltdb::RECOVERY_MSG_TYPE_SCAN_TUPLES: {
+        if (activeTupleCount() == 0) {
+            uint32_t tupleCount = message->totalTupleCount();
+            for (int i = 0; i < m_indexCount; i++) {
+                m_indexes[i]->ensureCapacity(tupleCount);
+            }
+        }
         loadTuplesFromNoHeader( allowELT, *message->stream(), pool);
         break;
     }

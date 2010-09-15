@@ -76,9 +76,6 @@ public class HostMessenger implements Messenger {
     ForeignHost m_tempNewFH = null;
     int m_tempNewHostId = -1;
 
-    long m_joinerTimestamp;
-    int m_joinerAddress;
-
     public class JoiningNodeInfo {
         public String hostName;
         public int hostId;

@@ -408,6 +408,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                         " at a rate of " + megabytesPerSecond + " megabytes/sec");
                 int remaining = recoveringSiteCount.decrementAndGet();
                 if (remaining == 0) {
+                    ee.toggleProfiler(0);
                     VoltDB.instance().onRecoveryCompletion(bytesTransferredTotal);
                 }
             } else {
@@ -988,40 +989,26 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             }
         } else if (message instanceof RecoveryMessage) {
             RecoveryMessage rm = (RecoveryMessage)message;
-            if (m_recovering) {
-                assert(m_recoveryProcessor != null);
+            if (rm.recoveryMessagesAvailable()) {
+                return;
             }
-            if (m_recoveryProcessor != null) {
-                m_recoveryProcessor.handleRecoveryMessage(rm);
-            } else {
-                assert(!m_recovering);
-                assert(m_recoveryProcessor == null);
-                assert(rm.type() == RecoveryMessageType.Initiate || rm.type() == RecoveryMessageType.Ack);
-                /*
-                 * If the destination fails it is possible for an ack to be
-                 * delivered after the processor failed the recovery. If an
-                 * ack is received here it should just be discarded.
-                 */
-                if (RecoveryMessageType.Ack == rm.type()) {
-                    return;
-                }
-                final long recoveringPartitionTxnId = rm.txnId();
-                m_recoveryStartTime = System.currentTimeMillis();
-                m_recoveryLog.info(
-                        "Recovery initiate received at site " + m_siteId +
-                        " from site " + rm.sourceSite() + " requesting recovery start before txnid " +
-                        recoveringPartitionTxnId);
-                m_recoveryProcessor = RecoverySiteProcessorSource.createProcessor(
-                        recoveringPartitionTxnId,
-                        rm.sourceSite(),
-                        m_context.database,
-                        m_context.siteTracker,
-                        ee,
-                        m_mailbox,
-                        m_siteId,
-                        m_onRecoveryCompletion,
-                        m_messageHandler);
-            }
+            assert(!m_recovering);
+            assert(m_recoveryProcessor == null);
+            final long recoveringPartitionTxnId = rm.txnId();
+            m_recoveryStartTime = System.currentTimeMillis();
+            m_recoveryLog.info(
+                    "Recovery initiate received at site " + m_siteId +
+                    " from site " + rm.sourceSite() + " requesting recovery start before txnid " +
+                    recoveringPartitionTxnId);
+            m_recoveryProcessor = RecoverySiteProcessorSource.createProcessor(
+                    rm,
+                    m_context.database,
+                    m_context.siteTracker,
+                    ee,
+                    m_mailbox,
+                    m_siteId,
+                    m_onRecoveryCompletion,
+                    m_messageHandler);
         }
         else if (message instanceof FragmentResponseMessage) {
             FragmentResponseMessage response = (FragmentResponseMessage)message;

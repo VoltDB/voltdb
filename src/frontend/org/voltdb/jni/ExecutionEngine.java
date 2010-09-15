@@ -598,7 +598,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param pointer Pointer to an engine instance
      * @param message Recovery message to load
      */
-    protected native void nativeProcessRecoveryMessage(long pointer, long message, int length);
+    protected native void nativeProcessRecoveryMessage(long pointer, long message, int offset, int length);
 
     /**
      * Calculate a hash code for a table.

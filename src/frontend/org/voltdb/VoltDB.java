@@ -103,6 +103,15 @@ public class VoltDB {
         public boolean listenForDumpRequests = false;
 
         /**
+         * At rejoin time an interface will be selected. It will be the
+         * internal interface specified on the command line. If none is specified
+         * then the interface that the system selects for connecting to
+         * the pre-existing node is used. It is then stored here
+         * so it can be used for receiving connections by RecoverySiteDestinationProcessor
+         */
+        public String m_selectedRejoinInterface = null;
+
+        /**
          * Whether or not adhoc queries should generate debugging output
          */
         public boolean m_quietAdhoc = false;

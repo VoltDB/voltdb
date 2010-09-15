@@ -28,6 +28,7 @@ namespace voltdb {
 RecoveryProtoMsgBuilder::RecoveryProtoMsgBuilder(
         const RecoveryMsgType type,
         CatalogId tableId,
+        uint32_t totalTupleCount,
         ReferenceSerializeOutput *out,
         TupleSerializer *serializer,
         const TupleSchema *schema) :
@@ -36,6 +37,7 @@ RecoveryProtoMsgBuilder::RecoveryProtoMsgBuilder(
     assert(m_out);
     m_out->writeByte(static_cast<int8_t>(type));
     m_out->writeInt(tableId);
+    m_out->writeInt(*reinterpret_cast<int32_t*>(&totalTupleCount));
     m_tupleCountPosition = m_out->reserveBytes(sizeof(int32_t));
 }
 

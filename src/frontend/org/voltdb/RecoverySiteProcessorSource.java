@@ -17,9 +17,17 @@
 package org.voltdb;
 
 import java.nio.ByteBuffer;
+import java.nio.channels.*;
+import java.net.*;
+import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.nio.channels.AsynchronousCloseException;
+import java.io.EOFException;
 
 import java.util.HashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -29,7 +37,6 @@ import java.util.ArrayDeque;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
-import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.RecoveryMessage;
 import org.voltdb.messaging.RecoveryMessageType;
 import org.voltdb.messaging.VoltMessage;
@@ -47,31 +54,24 @@ import org.voltdb.utils.Pair;
  * to some remote partitions. This class is only used on the partition that is a source of recovery data.
  *
  */
-public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
+public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
 
-//    static {
-//        new VoltLogger("RECOVERY").setLevel(Level.TRACE);
-//    }
+    static {
+        //new VoltLogger("RECOVERY").setLevel(Level.TRACE);
+    }
 
-    /** Number of buffers to use */
-    static final int m_numBuffers = 3;
+    /*
+     * Some offsets for where data is serialized from/to
+     * with the length prefix at the front
+     */
+    final int siteIdOffset = 4;
+    final int blockIndexOffset = siteIdOffset + 4;
+    final int messageTypeOffset = blockIndexOffset + 4;
+
+
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger recoveryLog = new VoltLogger("RECOVERY");
-
-    /**
-     * Pick a buffer length that is big enough to store at least one of the largest size tuple supported
-     * in the system (2 megabytes). Add a fudge factor for metadata.
-     */
-    public static final int m_bufferLength = (1024 * 1024 * 2) + Short.MAX_VALUE;
-
-    /**
-     * Keep track of the origin for each buffer so that they can be freed individually
-     * as the each thread with ownership of the buffer discard them post recovery complettion.
-     */
-    private final HashMap<BBContainer, BBContainer> m_bufferToOriginMap = new HashMap<BBContainer, BBContainer>();
-    private final ConcurrentLinkedQueue<BBContainer> m_buffers
-                                                                            = new ConcurrentLinkedQueue<BBContainer>();
 
     /**
      * List of tables that need to be streamed
@@ -105,21 +105,12 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
      * This limits the rate at which buffers are generated to ensure that the remote partitions can keep
      * up.
      */
-    private int m_allowedBuffers = m_numBuffers;
-
-    /**
-     * After the last table has been streamed the buffers should be returned to the global pool
-     * This is set to true while the RecoverySiteProcessorSource lock is held
-     * and any already returned buffers are then returned to the global pool. Buffers
-     * that have not been returned also check this value while the lock is held
-     * to ensure that they are returned to the global pool as well.
-     */
-    private boolean m_recoveryComplete = false;
+    private final AtomicInteger m_allowedBuffers = new AtomicInteger(m_numBuffers);
 
     /**
      * What to do when all recovery data has been sent
      */
-    private final Runnable m_onCompletion;
+    private Runnable m_onCompletion;
 
     /**
      * Transaction the remote partition stopped at (without executing it) before
@@ -128,6 +119,8 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
     private long m_destinationStoppedBeforeTxnId = Long.MAX_VALUE;
 
     private final int m_destinationSiteId;
+
+    private final SocketChannel m_sc;
 
     /*
      * Only send the response to the initiate request once in doRecoveryWork
@@ -144,7 +137,99 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
 
     private long m_bytesSent = 0;
 
-    private long m_timeSpentSerializing = 0;
+    private AtomicLong m_timeSpentSerializing = new AtomicLong();
+
+    private volatile boolean m_ioclosed = false;
+
+    private final LinkedBlockingQueue<BBContainer> m_outgoing = new LinkedBlockingQueue<BBContainer>();
+
+    private final Thread m_outThread = new Thread() {
+        @Override
+        public void run() {
+            try {
+                while (true) {
+                    BBContainer message = m_outgoing.take();
+                    try {
+                        while (message.b.hasRemaining()) {
+                            m_sc.write(message.b);
+                        }
+                    } catch (IOException e) {
+                        recoveryLog.error("Error writing recovery message", e);
+                    } finally {
+                        message.discard();
+                    }
+                }
+            } catch (InterruptedException e) {
+                return;
+            }
+        }
+    };
+
+    private final Thread m_inThread = new Thread() {
+        @Override
+        public void run() {
+            try {
+                while (true) {
+                    ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
+                    while (lengthBuffer.hasRemaining()) {
+                        int read = m_sc.read(lengthBuffer);
+                        if (read == -1) {
+                            return;
+                        }
+                    }
+                    lengthBuffer.flip();
+
+                    ByteBuffer messageBuffer = ByteBuffer.allocate(lengthBuffer.getInt());
+                    while(messageBuffer.hasRemaining()) {
+                        int read = m_sc.read(messageBuffer);
+                        if (read == -1) {
+                            return;
+                        }
+                    }
+                    messageBuffer.flip();
+                    messageBuffer.getInt();
+                    final int blockIndex = messageBuffer.getInt();
+                    if (m_ackTracker.ackReceived(blockIndex)) {
+                        m_allowedBuffers.incrementAndGet();
+
+                        /*
+                         * All recovery messages have been acked by the remote partition.
+                         * Recovery is really complete so run the handler
+                         */
+                        if (m_allowedBuffers.get() == m_numBuffers && m_tablesToStream.isEmpty()) {
+                            recoveryLog.info("Processor spent " +
+                                    (m_timeSpentSerializing.get() / 1000.0) + " seconds serializing");
+                            synchronized (RecoverySiteProcessorSource.this) {
+                                if (m_onCompletion != null) {
+                                    m_onCompletion.run();
+                                    closeIO();
+                                    m_onCompletion = null;
+                                }
+                            }
+                        } else {
+                            //Notify that a new buffer is available
+                            m_mailbox.deliver(new RecoveryMessage());
+                        }
+                    }
+                }
+            } catch (IOException e) {
+                if (m_ioclosed) {
+                    return;
+                }
+                recoveryLog.error("Error reading a message from a recovery stream", e);
+            }
+        }
+    };
+
+    private void closeIO() {
+        m_ioclosed = true;
+        m_outThread.interrupt();
+        m_inThread.interrupt();
+        try {
+            m_sc.close();
+        } catch (IOException e) {
+        }
+    }
 
     /**
      * Keep track of how many times a block has been acked and how many acks are expected
@@ -153,19 +238,21 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
         private final HashMap<Integer, Integer> m_acks = new HashMap<Integer, Integer>();
         private boolean m_ignoreAcks = false;
 
-        private void waitForAcks(int blockIndex, int acksExpected) {
+        private synchronized void waitForAcks(int blockIndex, int acksExpected) {
             assert(!m_acks.containsKey(blockIndex));
             m_acks.put(blockIndex, acksExpected);
         }
 
-        private boolean ackReceived(int blockIndex) {
+        private synchronized boolean ackReceived(int blockIndex) {
             assert(m_acks.containsKey(blockIndex));
             int acksRemaining = m_acks.get(blockIndex);
             acksRemaining--;
             if (acksRemaining == 0) {
+                recoveryLog.trace("Ack received for block " + blockIndex);
                 m_acks.remove(blockIndex);
                 return true;
             }
+            recoveryLog.trace("Ack received for block " + blockIndex + " with " + acksRemaining + " remaining");
             m_acks.put(blockIndex, acksRemaining);
             return false;
         }
@@ -174,20 +261,21 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
          * Don't bother expecting acks to come. Invoked by handle failure
          * when the destination fails.
          */
-        private void ignoreAcks() {
+        private synchronized void ignoreAcks() {
             m_ignoreAcks = true;
         }
 
-        @SuppressWarnings("unused")
-        private void handleNodeFault(HashSet<Integer> failedNodes, SiteTracker tracker) {
-            throw new UnsupportedOperationException();
-        }
 
-        public boolean hasOutstanding() {
+        private synchronized boolean hasOutstanding() {
             if (m_ignoreAcks) {
                 return false;
             }
             return !m_acks.isEmpty();
+        }
+
+        @SuppressWarnings("unused")
+        private synchronized void handleNodeFault(HashSet<Integer> failedNodes, SiteTracker tracker) {
+            throw new UnsupportedOperationException();
         }
     }
 
@@ -258,6 +346,7 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
             } finally {
                 origin.discard();
                 m_onCompletion.run();
+                closeIO();
             }
         }
     }
@@ -271,18 +360,11 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
         while (!m_tablesToStream.isEmpty()) {
             ByteBuffer buffer = container.b;
             /*
-             * Constructor will set the Java portion of the message that contains
-             * the return address (siteId) as well as blockIndex (for acks), and the message id
-             * (so that Java knows what class to use to deserialize the message).
-             */
-            RecoveryMessage rm = new RecoveryMessage(container, m_siteId, m_blockIndex++);
-
-            /*
              * Set the position to where the EE should serialize its portion of the recovery message.
              * RecoveryMessage.getHeaderLength() defines the position where the EE portion starts.
              */
             buffer.clear();
-            buffer.position(RecoveryMessage.getHeaderLength());
+            buffer.position(messageTypeOffset);
             RecoveryTable table = m_tablesToStream.peek();
 
             /*
@@ -303,9 +385,9 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
                 //Set the limit based on how much data the EE serialized past that position.
                 buffer.limit(buffer.position() + serialized);
             }
-            assert(rm != null);
 
-            if (rm.type() == RecoveryMessageType.Complete) {
+            RecoveryMessageType type = RecoveryMessageType.values()[buffer.get(messageTypeOffset)];
+            if (type == RecoveryMessageType.Complete) {
                 m_tablesToStream.clear();
             }
         }
@@ -326,7 +408,10 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
             Mailbox mailbox,
             final int siteId,
             Runnable onCompletion,
-            MessageHandler messageHandler) {
+            MessageHandler messageHandler,
+            SocketChannel sc) throws IOException {
+        super();
+        m_sc = sc;
         m_mailbox = mailbox;
         m_engine = engine;
         m_siteId = siteId;
@@ -350,60 +435,8 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
                     + table.m_name + " and failed");
             VoltDB.crashVoltDB();
         }
-        initializeBufferPool();
-
-    }
-
-    void initializeBufferPool() {
-        for (int ii = 0; ii < m_numBuffers; ii++) {
-            final BBContainer origin = org.voltdb.utils.DBBPool.allocateDirect(m_bufferLength);
-            long bufferAddress = 0;
-            if (VoltDB.getLoadLibVOLTDB()) {
-                bufferAddress = org.voltdb.utils.DBBPool.getBufferAddress(origin.b);
-            }
-            final BBContainer buffer = new BBContainer(origin.b, bufferAddress) {
-                /**
-                 * This method is careful to check if recovery is complete and if it is,
-                 * return the buffer to the global pool via its origin rather then returning it to this
-                 * pool where it will be leaked.
-                 */
-                @Override
-                public void discard() {
-                    synchronized (this) {
-                        if (m_recoveryComplete) {
-                            m_bufferToOriginMap.remove(this).discard();
-                            return;
-                        }
-                    }
-                    m_buffers.offer(this);
-                }
-            };
-            m_bufferToOriginMap.put(buffer, origin);
-            m_buffers.offer(buffer);
-        }
-    }
-
-    /**
-     * Process acks that are sent by recovering sites
-     */
-    @Override
-    public void handleRecoveryMessage(RecoveryMessage message) {
-        assert(message.type() == RecoveryMessageType.Ack || message.type() == RecoveryMessageType.Initiate);
-        if (message.type() == RecoveryMessageType.Ack) {
-            if (m_ackTracker.ackReceived(message.blockIndex())) {
-                m_allowedBuffers++;
-                /*
-                 * All recovery messages have been acked by the remote partition.
-                 * Recovery is really complete so run the handler
-                 */
-                if (m_allowedBuffers == m_numBuffers && m_tablesToStream.isEmpty()) {
-                    recoveryLog.info("Processor spent " + (m_timeSpentSerializing / 1000.0) + " seconds serializing");
-                    m_onCompletion.run();
-                }
-            }
-        } else {
-            VoltDB.crashVoltDB();
-        }
+        m_outThread.start();
+        m_inThread.start();
     }
 
     /**
@@ -416,7 +449,6 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
      */
     @Override
     public void doRecoveryWork(long nextTxnId) {
-
         /*
          * Send an initiate response to the recovering partition with txnid it should stop at
          * before receiving the recovery data. Pick a txn id that is >= the next txn that
@@ -430,14 +462,13 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
                     " before txnId " + nextTxnId + " to site " + m_destinationSiteId);
             m_sentInitiateResponse = true;
             m_stopBeforeTxnId = Math.max(nextTxnId, m_destinationStoppedBeforeTxnId);
-            ByteBuffer buf = ByteBuffer.allocate(2048);
+            ByteBuffer buf = ByteBuffer.allocate(16);
             BBContainer cont = DBBPool.wrapBB(buf);
-            RecoveryMessage response = new RecoveryMessage(cont, m_siteId, m_stopBeforeTxnId);
-            try {
-                m_mailbox.send( m_destinationSiteId, 0, response);
-            } catch (MessagingException e) {
-                throw new RuntimeException(e);
-            }
+            buf.putInt(12);
+            buf.putInt(m_siteId);
+            buf.putLong(m_stopBeforeTxnId);
+            buf.flip();
+            m_outgoing.offer(cont);
         }
 
         /*
@@ -453,28 +484,26 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
         recoveryLog.trace(
                 "Starting recovery of " + m_destinationSiteId + " work before txnId " + nextTxnId);
         while (true) {
-            while (m_allowedBuffers > 0 && !m_tablesToStream.isEmpty() && !m_buffers.isEmpty()) {
+            while (m_allowedBuffers.get() > 0 && !m_tablesToStream.isEmpty() && !m_buffers.isEmpty()) {
                 /*
                  * Retrieve a buffer from the pool and decrement the number of buffers we are allowed
                  * to send.
                  */
-                m_allowedBuffers--;
+                m_allowedBuffers.decrementAndGet();
                 BBContainer container = m_buffers.poll();
                 ByteBuffer buffer = container.b;
 
                 /*
-                 * Constructor will set the Java portion of the message that contains
-                 * the return address (siteId) as well as blockIndex (for acks), and the message id
-                 * (so that Java knows what class to use to deserialize the message).
-                 */
-                RecoveryMessage rm = new RecoveryMessage(container, m_siteId, m_blockIndex++);
-
-                /*
-                 * Set the position to where the EE should serialize its portion of the recovery message.
-                 * RecoveryMessage.getHeaderLength() defines the position where the EE portion starts.
+                 * Set the Java portion of the message that contains
+                 * the source (siteId) as well as blockIndex (for acks)
+                 * Leave room for the length prefix. The end position
+                 * is where the EE will start serializing data
                  */
                 buffer.clear();
-                buffer.position(RecoveryMessage.getHeaderLength());
+                buffer.position(4);
+                buffer.putInt(m_siteId);
+                buffer.putInt(m_blockIndex++);
+
                 RecoveryTable table = m_tablesToStream.peek();
 
                 /*
@@ -483,7 +512,7 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
                 long startSerializing = System.currentTimeMillis();
                 int serialized = m_engine.tableStreamSerializeMore(container, table.m_tableId, TableStreamType.RECOVERY);
                 long endSerializing = System.currentTimeMillis();
-                m_timeSpentSerializing += endSerializing - startSerializing;
+                m_timeSpentSerializing.addAndGet(endSerializing - startSerializing);
 
                 recoveryLog.trace("Serialized " + serialized + " for table " + table.m_name);
                 if (serialized <= 0) {
@@ -498,10 +527,12 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
                     //Position should be unchanged from when tableStreamSerializeMore was called.
                     //Set the limit based on how much data the EE serialized past that position.
                     buffer.limit(buffer.position() + serialized);
+                    buffer.putInt(0, buffer.limit() - 4);
+                    buffer.position(0);
                 }
                 m_bytesSent += buffer.remaining();
-                assert(rm != null);
 
+                RecoveryMessageType type = RecoveryMessageType.values()[buffer.get(messageTypeOffset)];
                 /*
                  * If the EE encoded a recovery message with the type complete it indicates that there is no
                  * more data for this table. Remove it from the list of tables waiting to be recovered.
@@ -509,7 +540,7 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
                  * This message still needs to be forwarded to the destinations so they know not
                  * to expect more data for that table.
                  */
-                if (rm.type() == RecoveryMessageType.Complete) {
+                if (type == RecoveryMessageType.Complete) {
                     m_tablesToStream.poll();
                     RecoveryTable nextTable = m_tablesToStream.peek();
                     if (nextTable != null) {
@@ -526,32 +557,9 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
                 //Record that we are expecting this number of acks for this block
                 //before more data should be sent. The complete message is also acked
                 //and is given a block index.
-                m_ackTracker.waitForAcks( rm.blockIndex(), numDestinations);
+                m_ackTracker.waitForAcks( buffer.getInt(blockIndexOffset), numDestinations);
 
-                /*
-                 * The common case is recovering a single destination. Take the slightly faster no
-                 * copy path.
-                 */
-                if (numDestinations == 1) {
-                    try {
-                        m_mailbox.send(table.m_destinationIds[0], 0, rm);
-                    } catch (MessagingException e) {
-                        // Continuing to propagate this horrible exception
-                        throw new RuntimeException(e);
-                    }
-                } else {
-                    /*
-                     * This path is broken right now because this version of send will not discard
-                     * the message and thus leaks the buffer. We don't plan on using it anyways so no biggie.
-                     */
-                    VoltDB.crashVoltDB();
-    //                try {
-    //                    m_mailbox.send(table.m_destinationIdsArray, 0, rm);
-    //                } catch (MessagingException e) {
-    //                    // Continuing to propagate this horrible exception
-    //                    throw new RuntimeException(e);
-    //                }
-                }
+                m_outgoing.offer(container);
             }
 
             if (m_tablesToStream.isEmpty()) {
@@ -571,6 +579,22 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
                 }
                 if (!m_ackTracker.hasOutstanding()) {
                     return;
+                } else {
+                    try {
+                        m_inThread.join(5000);
+                    } catch (InterruptedException e) {
+                    }
+                    //Make sure that the last ack is processed and onCompletion is ru
+                    synchronized (this) {
+                        if (m_inThread.isAlive()) {
+                            if (m_onCompletion != null) {
+                                recoveryLog.error("Timed out waiting for acks for the last few recovery messages");
+                                m_onCompletion.run();
+                                m_onCompletion = null;
+                                closeIO();
+                            }
+                        }
+                    }
                 }
             }
 
@@ -578,22 +602,23 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
              * Process mailbox messages as part of this loop. Hand off non-recovery messages to
              * the ES provided handler
              */
-            VoltMessage message = m_mailbox.recv();
+            VoltMessage message = m_mailbox.recvBlocking();
             if (message != null) {
                 if (message instanceof RecoveryMessage) {
-                    handleRecoveryMessage((RecoveryMessage)message);
+                    RecoveryMessage rm = (RecoveryMessage)message;
+                    if (!rm.recoveryMessagesAvailable()) {
+                        recoveryLog.error("Received a recovery initiate request from " + rm.sourceSite() +
+                                " while a recovery was already in progress. Ignoring it.");
+                    }
                 } else {
                     m_messageHandler.handleMessage(message);
                 }
-            } else {
-                Thread.yield();
             }
         }
     }
 
     public static RecoverySiteProcessorSource createProcessor(
-            long destinationTxnId,
-            int destinationSiteId,
+            RecoveryMessage rm,
             Database db,
             SiteTracker tracker,
             ExecutionEngine engine,
@@ -601,6 +626,7 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
             final int siteId,
             Runnable onCompletion,
             MessageHandler messageHandler) {
+        final int destinationSiteId = rm.sourceSite();
         /*
          * First make sure the recovering partition didn't go down before this message was received.
          * Return null so no recovery work is done.
@@ -637,17 +663,36 @@ public class RecoverySiteProcessorSource implements RecoverySiteProcessor {
             destinations.add(destinationSiteId);
         }
 
-        RecoverySiteProcessorSource source = new RecoverySiteProcessorSource(
-                destinationTxnId,
-                destinationSiteId,
-                tableToDestinationSite,
-                engine,
-                mailbox,
-                siteId,
-                onCompletion,
-                messageHandler);
 
+        RecoverySiteProcessorSource source = null;
+        try {
+            SocketChannel sc = createRecoveryConnection(rm.address(), rm.port());
+
+            final long destinationTxnId = rm.txnId();
+            source = new RecoverySiteProcessorSource(
+                    destinationTxnId,
+                    destinationSiteId,
+                    tableToDestinationSite,
+                    engine,
+                    mailbox,
+                    siteId,
+                    onCompletion,
+                    messageHandler,
+                    sc);
+        } catch (IOException e) {
+            recoveryLog.error("Unable to create recovery connection, aborting", e);
+            return null;
+        }
         return source;
+    }
+
+    public static SocketChannel createRecoveryConnection(byte address[], int port) throws IOException {
+        InetAddress inetAddr = InetAddress.getByAddress(address);
+        InetSocketAddress inetSockAddr = new InetSocketAddress(inetAddr, port);
+        SocketChannel sc = SocketChannel.open(inetSockAddr);
+        sc.configureBlocking(true);
+        sc.socket().setTcpNoDelay(true);
+        return sc;
     }
 
     @Override

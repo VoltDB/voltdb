@@ -18,6 +18,14 @@ package org.voltdb;
 
 import java.nio.ByteBuffer;
 import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.Semaphore;
+import java.nio.channels.*;
+import java.net.*;
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.InterruptedIOException;
 
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
@@ -39,7 +47,17 @@ import org.voltdb.utils.CatalogUtil;
  * the execution engine directly. Uses the ExecutionSites thread to do work via the doRecoveryWork method
  * that is invoked by ExecutionSite.run().
  */
-public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
+public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
+
+    /*
+     * Some offsets for where data is serialized to/from
+     * without the length prefix at the front
+     */
+    final int siteIdOffset = 0;
+    final int blockIndexOffset = siteIdOffset + 4;
+    final int messageTypeOffset = blockIndexOffset + 4;
+    final int tableIdOffset = messageTypeOffset + 1;
+
     private static final VoltLogger recoveryLog = new VoltLogger("RECOVERY");
 
     /**
@@ -72,28 +90,90 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
      */
     private long m_stopBeforeTxnId;
 
+    private final Semaphore m_toggleProfiling = new Semaphore(0);
+
     private final MessageHandler m_messageHandler;
 
     private final int m_sourceSiteId;
 
     private boolean m_sentInitiate = false;
 
-
-    /*
-     * Recovery messages received before the appropriate txn has been committed
-     * are buffered and then played back in doRecoveryWork
-     */
-    public boolean m_recoveryBegan = false;
-
-    private final ArrayList<RecoveryMessage> m_buffered = new ArrayList<RecoveryMessage>();
-
     private long m_bytesReceived = 0;
 
     private long m_timeSpentHandlingData = 0;
 
-    private final ByteBuffer m_buffer = ByteBuffer.allocateDirect(RecoverySiteProcessorSource.m_bufferLength);
+    private SocketChannel m_sc;
 
-    private final long m_bufferPointer = DBBPool.getBufferAddress(m_buffer);
+    private final LinkedBlockingQueue<BBContainer> m_incoming = new LinkedBlockingQueue<BBContainer>();
+
+    private IODaemon m_iodaemon;
+
+    private class IODaemon {
+
+        private final SocketChannel m_sc;
+        private volatile boolean closed = false;
+        private final Thread m_inThread = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    while (true) {
+                        ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
+                        while (lengthBuffer.hasRemaining()) {
+                            int read = m_sc.read(lengthBuffer);
+                            if (read == -1) {
+                                throw new EOFException();
+                            }
+                        }
+                        lengthBuffer.flip();
+
+                        BBContainer container = m_buffers.take();
+                        boolean success = false;
+                        try {
+                            ByteBuffer messageBuffer = container.b;
+                            messageBuffer.clear();
+                            messageBuffer.limit(lengthBuffer.getInt());
+                            while(messageBuffer.hasRemaining()) {
+                                int read = m_sc.read(messageBuffer);
+                                if (read == -1) {
+                                    throw new EOFException();
+                                }
+                            }
+                            messageBuffer.flip();
+                            recoveryLog.trace("Received message");
+                            m_incoming.offer(container);
+                            m_mailbox.deliver(new RecoveryMessage());
+                            success = true;
+                        } finally {
+                            if (!success) {
+                                container.discard();
+                            }
+                        }
+                    }
+                } catch (IOException e) {
+                    if (closed) {
+                        return;
+                    }
+                    recoveryLog.error("Error reading a message from a recovery stream", e);
+                } catch (InterruptedException e) {
+                    return;
+                }
+            }
+        };
+
+        public IODaemon(SocketChannel sc) throws IOException {
+            m_sc = sc;
+            m_inThread.start();
+        }
+
+        public void close() {
+            closed = true;
+            m_inThread.interrupt();
+            try {
+                m_sc.close();
+            } catch (IOException e) {
+            }
+        }
+    }
 
     /**
      * Data about a table that is being used as a source for a recovery stream.
@@ -124,49 +204,56 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
         }
     }
 
-//    static {
-//        new VoltLogger("RECOVERY").setLevel(Level.TRACE);
-//    }
+    static {
+        //new VoltLogger("RECOVERY").setLevel(Level.TRACE);
+    }
 
-    /**
-     * Process acks that are sent by recovering sites
-     */
-    @Override
-    public void handleRecoveryMessage(RecoveryMessage message) {
-        assert(message.type() == RecoveryMessageType.ScanTuples ||
-                message.type() == RecoveryMessageType.Complete);
-        if (!m_recoveryBegan) {
-            m_buffered.add(message);
-            return;
-        }
-
-        int sourceSite = message.sourceSite();
-        RecoveryMessage ack = new RecoveryMessage(m_siteId, message.blockIndex());
-        try {
-            m_mailbox.send( sourceSite, 0, ack);
-        } catch (MessagingException e) {
-            // Continuing to propagate this horrible exception
-            throw new RuntimeException(e);
-        }
-
-        if (message.type() == RecoveryMessageType.ScanTuples) {
-            m_buffer.clear();
-            message.getMessageData(m_buffer);
-            m_bytesReceived += m_buffer.remaining();
+    public void handleRecoveryMessage(ByteBuffer message, long pointer) {
+        RecoveryMessageType type = RecoveryMessageType.values()[message.get(messageTypeOffset)];
+        assert(type == RecoveryMessageType.ScanTuples ||
+                type == RecoveryMessageType.Complete);
+        message.getInt(siteIdOffset);
+        final int blockIndex = message.getInt(blockIndexOffset);
+        final int tableId = message.getInt(tableIdOffset);
+        ByteBuffer ackMessage = ByteBuffer.allocate(12);
+        ackMessage.putInt( 8);
+        ackMessage.putInt( m_siteId);
+        ackMessage.putInt( blockIndex);
+        ackMessage.flip();
+        if (type == RecoveryMessageType.ScanTuples) {
+            if (m_toggleProfiling.tryAcquire()) {
+                m_engine.toggleProfiler(1);
+            }
+            m_bytesReceived += message.remaining();
             long startTime = System.currentTimeMillis();
-            m_engine.processRecoveryMessage( m_buffer, m_bufferPointer);
+            message.position(messageTypeOffset);
+            m_engine.processRecoveryMessage( message, pointer);
             long endTime = System.currentTimeMillis();
             m_timeSpentHandlingData += endTime - startTime;
             recoveryLog.trace("Received tuple data at site " + m_siteId +
-                    " for table " + m_tables.get(message.tableId()).m_name);
-        } else if (message.type() == RecoveryMessageType.Complete) {
-            RecoveryTable table = m_tables.remove(message.tableId());
+                    " for table " + m_tables.get(tableId).m_name);
+        } else if (type == RecoveryMessageType.Complete) {
+            RecoveryTable table = m_tables.remove(tableId);
             recoveryLog.info("Received completion message at site " + m_siteId +
                     " for table " + table.m_name);
         } else {
-            System.out.println(message.type());
+            recoveryLog.fatal("Received an unexpect message of type " + type);
             VoltDB.crashVoltDB();
         }
+        while(ackMessage.hasRemaining()) {
+            int written = 0;
+            try {
+                written = m_sc.write(ackMessage);
+            } catch (IOException e) {
+                recoveryLog.fatal("Unable to write ack message", e);
+                VoltDB.crashVoltDB();
+            }
+            if (written == -1) {
+                recoveryLog.fatal("Unable to write ack message");
+                VoltDB.crashVoltDB();
+            }
+        }
+        recoveryLog.trace("Writing ack for block " + blockIndex + " from " + m_siteId);
     }
 
     /**
@@ -177,7 +264,12 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
     public void doRecoveryWork(long txnId) {
         if (!m_sentInitiate) {
             m_sentInitiate = true;
-            sendInitiateMessage(txnId);
+            try {
+                sendInitiateMessage(txnId);
+            } catch (IOException e) {
+                recoveryLog.fatal("Error sending initiate message", e);
+                VoltDB.crashVoltDB();
+            }
         }
 
         if (txnId < m_stopBeforeTxnId) {
@@ -188,27 +280,42 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
                 "Starting recovery before txnid " + txnId +
                 " for site " + m_siteId + " from " + m_sourceSiteId);
 
-        m_recoveryBegan = true;
-        for (RecoveryMessage rm : m_buffered) {
-            handleRecoveryMessage(rm);
-        }
-        m_buffered.clear();
 
         while (true) {
-            VoltMessage message = m_mailbox.recv();
+            BBContainer container = null;
+            while ((container = m_incoming.poll()) != null) {
+                try {
+                    handleRecoveryMessage(container.b, container.address);
+                } finally {
+                    container.discard();
+                }
+            }
+
+            if (m_tables.isEmpty()) {
+                synchronized (this) {
+                    m_recoveryComplete = true;
+                    BBContainer buffer = null;
+                    while ((buffer = m_buffers.poll()) != null) {
+                        m_bufferToOriginMap.remove(buffer).discard();
+                    }
+                }
+                recoveryLog.info("Processor spent " + (m_timeSpentHandlingData / 1000.0) + " seconds handling data");
+                m_onCompletion.run();
+                m_iodaemon.close();
+                return;
+            }
+
+            VoltMessage message = m_mailbox.recvBlocking();
             if (message != null) {
                 if (message instanceof RecoveryMessage) {
-                    handleRecoveryMessage((RecoveryMessage)message);
+                    RecoveryMessage rm = (RecoveryMessage)message;
+                    if (!rm.recoveryMessagesAvailable()) {
+                        recoveryLog.error("Received a recovery initiate request from " + rm.sourceSite() +
+                                " while a recovery was already in progress. Ignoring it.");
+                    }
                 } else {
                     m_messageHandler.handleMessage(message);
                 }
-            } else {
-                Thread.yield();
-            }
-            if (m_tables.isEmpty()) {
-                recoveryLog.info("Processor spent " + (m_timeSpentHandlingData / 1000.0) + " seconds handling data");
-                m_onCompletion.run();
-                return;
             }
         }
     }
@@ -226,6 +333,7 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
             final int siteId,
             Runnable onCompletion,
             MessageHandler messageHandler) {
+        super();
         m_mailbox = mailbox;
         m_engine = engine;
         m_siteId = siteId;
@@ -252,10 +360,16 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
      * failures can be delivered to this processor while waiting
      * for a response to the initiate message
      */
-    public void sendInitiateMessage(long txnId) {
+    public void sendInitiateMessage(long txnId) throws IOException {
+        ServerSocketChannel ssc = ServerSocketChannel.open();
+        InetAddress addr = InetAddress.getByName(VoltDB.instance().getConfig().m_selectedRejoinInterface);
+        InetSocketAddress sockAddr = new InetSocketAddress( addr, 0);
+        ssc.socket().bind(sockAddr);
+        final int port = ssc.socket().getLocalPort();
+        final byte address[] = ssc.socket().getInetAddress().getAddress();
         ByteBuffer buf = ByteBuffer.allocate(2048);
         BBContainer container = DBBPool.wrapBB(buf);
-        RecoveryMessage recoveryMessage = new RecoveryMessage(container, m_siteId, txnId);
+        RecoveryMessage recoveryMessage = new RecoveryMessage(container, m_siteId, txnId, address, port);
         recoveryLog.trace(
                 "Sending recovery initiate request before txnid " + txnId +
                 " from site " + m_siteId + " to " + m_sourceSiteId);
@@ -265,28 +379,44 @@ public class RecoverySiteProcessorDestination implements RecoverySiteProcessor {
             throw new RuntimeException(e);
         }
 
-        while (true) {
-            VoltMessage message = m_mailbox.recv();
-            if (message != null) {
-                if (message instanceof RecoveryMessage) {
-                    RecoveryMessage rm = (RecoveryMessage)message;
-                    if (rm.type() == RecoveryMessageType.Initiate) {
-                        m_stopBeforeTxnId = rm.txnId();
-                        recoveryLog.info("Recovery initiate ack received at site " + m_siteId + " from site " +
-                                rm.sourceSite() + " will sync after txnId " + rm.txnId());
-                        return;
-                    } else {
-                        VoltDB.crashVoltDB();
-                    }
-                    return;
-                } else {
-                    m_messageHandler.handleMessage(message);
-                }
-                continue;
-            } else {
-                Thread.yield();
+        ssc.socket().setSoTimeout(5000);
+        try {
+            m_sc = ssc.accept();
+        } catch (IOException e) {
+            if (e instanceof java.net.SocketTimeoutException) {
+                recoveryLog.fatal("Timed out waiting for connection from source partition", e);
+                VoltDB.crashVoltDB();
             }
         }
+        m_sc.configureBlocking(true);
+        m_sc.socket().setTcpNoDelay(true);
+
+        ByteBuffer messageLength = ByteBuffer.allocate(4);
+        while (messageLength.hasRemaining()) {
+            int read = m_sc.read(messageLength);
+            if (read == -1) {
+                throw new EOFException();
+            }
+        }
+        messageLength.flip();
+
+        ByteBuffer response = ByteBuffer.allocate(messageLength.getInt());
+        while (response.hasRemaining()) {
+            int read = m_sc.read(response);
+            if (read == -1) {
+                throw new EOFException();
+            }
+        }
+        response.flip();
+
+        final int sourceSite = response.getInt();
+        m_stopBeforeTxnId = response.getLong();
+        recoveryLog.info("Recovery initiate ack received at site " + m_siteId + " from site " +
+                sourceSite + " will sync after txnId " + m_stopBeforeTxnId);
+        m_iodaemon = new IODaemon(m_sc);
+        ssc.close();
+
+        return;
     }
 
     /*

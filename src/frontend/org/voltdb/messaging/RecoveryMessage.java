@@ -34,46 +34,26 @@ import org.voltdb.utils.DBBPool.BBContainer;
 public class RecoveryMessage extends VoltMessage {
 
     /** Empty constructor for de-serialization */
-    RecoveryMessage() {
+    public RecoveryMessage() {
         m_subject = Subject.DEFAULT.getId();
+        m_recoveryMessagesAvailable = true;
     }
 
-    private static final int sourceSiteOffset = HEADER_SIZE + 1;
-    private static final int blockIndexOffset = sourceSiteOffset + 4;
-    private static final int typeOffset = blockIndexOffset + 4;
-    private static final int tableIdOffset = typeOffset + 1;
+    private static final int sourceSiteIdOffset = HEADER_SIZE + 1;
+    private static final int txnIdOffset = sourceSiteIdOffset + 4;
 
-    /*
-     * Offsets for a RecoveryMessageType.Initiate response
-     */
-    private static final int txnIdOffset = typeOffset + 1;
+    private static final int addressOffset = txnIdOffset + 8;
+    private static final int portOffset = addressOffset + 4;
 
     /**
-     * Constructor takes a ByteBuffer that already has enough space for the header and
-     * already contains the recovery message as serialized by the EE. The limit has been
-     * set appropriately.
+     * Reuse this message to indicate that an ack was received and it is a good idea to wake up
+     * and do more work. The noarg constructor sets this to true so it can be delivered directly to the mailbox
+     * by an IO thread. initFromBuffer sets it to false so that other messages don't get mixed up.
      */
-    public RecoveryMessage(BBContainer container, int siteId, int blockIndex) {
-        m_subject = Subject.DEFAULT.getId();
-        m_container = container;
-        m_buffer = container.b;
-        m_buffer.put(HEADER_SIZE, RECOVERY_ID);
-        m_buffer.putInt(sourceSiteOffset, siteId);
-        m_buffer.putInt(blockIndexOffset, blockIndex);
-    }
+    private boolean m_recoveryMessagesAvailable;
 
-    /**
-     * Constructor for constructing an ack to a recovery message.
-     */
-    public RecoveryMessage(int siteId, int blockIndex) {
-        m_subject = Subject.DEFAULT.getId();
-        m_container = DBBPool.wrapBB(ByteBuffer.allocate(typeOffset + 1));
-        m_buffer = m_container.b;
-        m_buffer.put(HEADER_SIZE, RECOVERY_ID);
-        m_buffer.putInt( sourceSiteOffset, siteId);
-        m_buffer.putInt( blockIndexOffset, blockIndex);
-        m_buffer.put( typeOffset, (byte)RecoveryMessageType.Ack.ordinal());
-        m_buffer.limit( typeOffset + 1);
+    public boolean recoveryMessagesAvailable() {
+        return m_recoveryMessagesAvailable;
     }
 
     /**
@@ -90,63 +70,45 @@ public class RecoveryMessage extends VoltMessage {
      * decided to stop after before syncing so that the recovering partition can start executing stored procedures
      * at the correct txnId.
      */
-    public RecoveryMessage(BBContainer container, int siteId, long txnId) {
+    public RecoveryMessage(BBContainer container, int sourceSiteId, long txnId, byte address[], int port) {
         m_subject = Subject.DEFAULT.getId();
         m_container = container;
         m_buffer = container.b;
         m_buffer.put(HEADER_SIZE, RECOVERY_ID);
-        m_buffer.putInt(sourceSiteOffset, siteId);
-        m_buffer.put(typeOffset, (byte)RecoveryMessageType.Initiate.ordinal());
+        m_buffer.putInt( sourceSiteIdOffset, sourceSiteId);
         m_buffer.putLong(txnIdOffset, txnId);
-        m_buffer.limit(txnIdOffset + 8);
+        m_buffer.position(addressOffset);
+        m_buffer.put(address);
+        m_buffer.putInt(portOffset, port);
+        m_buffer.limit(portOffset + 4);
+        m_recoveryMessagesAvailable = false;
     }
 
     @Override
     protected void flattenToBuffer(final DBBPool pool) throws IOException {
-        /*
-         * Nothing to do. Everything was already serialized in the source EE
-         */
-    }
-
-    public int sourceSite() {
-        return m_buffer.getInt(sourceSiteOffset);
-    }
-
-    public int blockIndex() {
-        return m_buffer.getInt(blockIndexOffset);
-    }
-
-    public RecoveryMessageType type() {
-        return RecoveryMessageType.values()[m_buffer.get(typeOffset)];
-    }
-
-    public int tableId() {
-        return m_buffer.getInt(tableIdOffset);//tableId is after recovery message type
     }
 
     public long txnId() {
         return m_buffer.getLong(txnIdOffset);
     }
 
-    public void getMessageData(ByteBuffer out) {
-        m_buffer.position(getHeaderLength());
-        out.put(m_buffer);
-        out.flip();
+    public int sourceSite() {
+        return m_buffer.getInt(sourceSiteIdOffset);
     }
 
-    /**
-     * This is the header that isn't part of the recovery message. It contains the message id
-     * used to pick this class for deserializing the incoming message
-     */
-    public static int getHeaderLength() {
-        return typeOffset;//position where the EE will serialize the type of the message
+    public byte[] address() {
+        byte address[] = new byte[4];
+        m_buffer.position(addressOffset);
+        m_buffer.get(address);
+        return address;
+    }
+
+    public int port() {
+        return m_buffer.getInt(portOffset);
     }
 
     @Override
     protected void initFromBuffer() {
-        /*
-         * Nothing to do here either. Everything will be
-         * deserialized in the destination EE.
-         */
+        m_recoveryMessagesAvailable = false;
     }
 }

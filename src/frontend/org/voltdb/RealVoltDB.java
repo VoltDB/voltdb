@@ -74,6 +74,7 @@ public class RealVoltDB implements VoltDBInterface
 {
     private static final VoltLogger log = new VoltLogger(VoltDB.class.getName());
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger recoveryLog = new VoltLogger("RECOVERY");
 
     private class VoltDBNodeFailureFaultHandler implements FaultHandler
     {
@@ -729,15 +730,17 @@ public class RealVoltDB implements VoltDBInterface
             SocketChannel socket = SocketChannel.open(inetsockaddr);
             String hostname = socket.socket().getLocalAddress().getCanonicalHostName();
             socket.close();
+            config.m_selectedRejoinInterface =
+                config.m_internalInterface.isEmpty() ? hostname : config.m_internalInterface;
             client.callProcedure(
                     rcb,
                     "@Rejoin",
-                    config.m_internalInterface.isEmpty() ? hostname : config.m_internalInterface,
+                    config.m_selectedRejoinInterface,
                     config.m_internalPort);
         }
         catch (Exception e) {
-            hostLog.error("Problem connecting client: " + e.getMessage());
-            System.exit(-1);
+            recoveryLog.fatal("Problem connecting client: " + e.getMessage());
+            VoltDB.crashVoltDB();
         }
 
         Object retval[] = m_messenger.waitForGroupJoin(3000);
@@ -751,19 +754,19 @@ public class RealVoltDB implements VoltDBInterface
 
         @SuppressWarnings("unchecked")
         HashSet<Integer> downHosts = (HashSet<Integer>)retval[2];
-        System.out.println("Down hosts are " + downHosts.toString());
+        recoveryLog.info("Down hosts are " + downHosts.toString());
 
         try {
             //Callback validates response asynchronously. Just wait for the response before continuing.
             //Timeout because a failure might result in the response not coming.
             response = rcb.waitForResponse(3000);
             if (response == null) {
-                hostLog.fatal("Recovering node timed out rejoining");
+                recoveryLog.fatal("Recovering node timed out rejoining");
                 VoltDB.crashVoltDB();
             }
         }
         catch (InterruptedException e) {
-            hostLog.error("Interrupted while attempting to rejoin cluster");
+            recoveryLog.fatal("Interrupted while attempting to rejoin cluster");
             VoltDB.crashVoltDB();
         }
         return downHosts;

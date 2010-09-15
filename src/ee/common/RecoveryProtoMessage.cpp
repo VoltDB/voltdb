@@ -27,9 +27,11 @@ namespace voltdb {
  */
 RecoveryProtoMsg::RecoveryProtoMsg(ReferenceSerializeInput *in) :
         m_in(in),  m_type(static_cast<RecoveryMsgType>(in->readByte())),
-        m_tableId(in->readInt()){
+        m_tableId(in->readInt()) {
     assert(m_in);
     assert(m_type != RECOVERY_MSG_TYPE_SCAN_COMPLETE);
+    int32_t totalTupleCount = in->readInt();
+    m_totalTupleCount = *reinterpret_cast<uint32_t*>(&totalTupleCount);
 }
 
 /*
@@ -44,6 +46,10 @@ RecoveryMsgType RecoveryProtoMsg::msgType() {
  */
 CatalogId RecoveryProtoMsg::tableId() {
     return m_tableId;
+}
+
+uint32_t RecoveryProtoMsg::totalTupleCount() {
+    return m_totalTupleCount;
 }
 
 ReferenceSerializeInput* RecoveryProtoMsg::stream() {
