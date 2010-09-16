@@ -394,7 +394,7 @@ public abstract class ProcedureCompiler {
 
         int paramCount = procedure.getParameters().size();
         if ((paramIndex < 0) || (paramIndex >= paramCount)) {
-            String msg = "PartitionInfo specifies invalid column for procedure: " + procedure.getClassname();
+            String msg = "PartitionInfo specifies invalid parameter index for procedure: " + procedure.getClassname();
             throw compiler.new VoltCompilerException(msg);
         }
 
@@ -417,16 +417,28 @@ public abstract class ProcedureCompiler {
         for (Table table : tables) {
             if (table.getTypeName().equalsIgnoreCase(tableName)) {
                 CatalogMap<Column> columns = table.getColumns();
+                Column partitionColumn = table.getPartitioncolumn();
+                if (partitionColumn == null) {
+                    String msg = "PartitionInfo for procedure " + procedure.getClassname() + " refers to a replicated table (no partition column).";
+                    throw compiler.new VoltCompilerException(msg);
+                }
+
                 for (Column column : columns) {
                     if (column.getTypeName().equalsIgnoreCase(columnName)) {
-                        procedure.setPartitioncolumn(column);
-                        return;
+                        if (partitionColumn.getTypeName().equals(column.getTypeName())) {
+                            procedure.setPartitioncolumn(column);
+                            return;
+                        }
+                        else {
+                            String msg = "PartitionInfo for procedure " + procedure.getClassname() + " refers to a column in schema which is not a partition key.";
+                            throw compiler.new VoltCompilerException(msg);
+                        }
                     }
                 }
             }
         }
 
-        String msg = "Unable to locate partition column in PartitionInfo for procedure: " + procedure.getClassname();
+        String msg = "PartitionInfo for procedure " + procedure.getClassname() + " refers to a column in schema which can't be found.";
         throw compiler.new VoltCompilerException(msg);
     }
 }
