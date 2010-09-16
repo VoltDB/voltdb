@@ -470,6 +470,9 @@ JAR BUILDING
         <fileset dir="${build.prod.dir}" defaultexcludes="yes" >
             <include name="org/voltdb/**" />
             <include name="org/hsqldb_voltpatches/**" />
+            <include name="org/eclipse/jetty_voltpatches/**" />
+            <include name="javax/servlet_voltpatches/**" />
+            <include name="org/hsqldb_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
         </fileset>
         <fileset dir="${build.test.dir}" defaultexcludes="yes" >
@@ -535,6 +538,8 @@ JAR BUILDING
         <fileset dir="${build.prod.dir}" defaultexcludes="yes" >
             <include name="org/voltdb/**" />
             <include name="org/hsqldb_voltpatches/**" />
+            <include name="org/eclipse/jetty_voltpatches/**" />
+            <include name="javax/servlet_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
         </fileset>
         <fileset dir="${build.test.dir}" defaultexcludes="no" >
@@ -601,7 +606,7 @@ JAVA COMPILATION
             <include name="*"/>
         </fileset>
     </copy>
-    
+
     <copy todir='${build.prod.dir}/javax/servlet_voltpatches/resources'>
         <fileset dir="${src.jetty.dir}/javax/servlet_voltpatches/resources">
             <include name="*"/>
