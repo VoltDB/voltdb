@@ -600,18 +600,24 @@ public abstract class CatalogUtil {
     }
 
     private static void setHTTPDInfo(Catalog catalog, HttpdType httpd) {
+        // defaults
+        int httpdPort = 0;
+        boolean jsonEnabled = true;
+
         Cluster cluster = catalog.getClusters().get("cluster");
 
-        // set the port for httpd
-        cluster.setHttpdportno(httpd.getPort());
+        // if the httpd info is available, use it
+        if (httpd != null) {
+           httpdPort = httpd.getPort();
+           // if the json api info is available, use it
+           HttpdType.Jsonapi jsonapi = httpd.getJsonapi();
+           if (jsonapi != null)
+               jsonEnabled = jsonapi.getEnabled().equalsIgnoreCase("true");
+        }
 
-        HttpdType.Jsonapi jsonapi = httpd.getJsonapi();
-        // if the json api info is avaliable, use it
-        if (jsonapi != null)
-            cluster.setJsonapi(jsonapi.getEnabled().equalsIgnoreCase("true"));
-        // otherwise default to enabled for now
-        else
-            cluster.setJsonapi(true);
+        // set the catalog info
+        cluster.setHttpdportno(httpdPort);
+        cluster.setJsonapi(jsonEnabled);
     }
 
     /** Read a hashed password from password. */
