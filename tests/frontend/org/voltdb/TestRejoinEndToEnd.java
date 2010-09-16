@@ -545,7 +545,7 @@ public class TestRejoinEndToEnd extends TestCase {
                     BackendTarget.NATIVE_EE_JNI,
                     LocalCluster.FailureState.ALL_RUNNING,
                     false);
-        cluster.setMaxHeap(256);
+        cluster.setMaxHeap(64);
         final int numTuples = cluster.isValgrind() ? 10000 : 60000;
         boolean success = cluster.compile(builder);
         assertTrue(success);
@@ -778,9 +778,9 @@ public class TestRejoinEndToEnd extends TestCase {
     public void testRejoinFuzz2ElectricBoogaloo() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setSecurityEnabled(true);
-
-        final int numHosts = 6;
-        final int numTuples = 204800 * 6;//about 100 megs per
+        int processors = Runtime.getRuntime().availableProcessors();
+        final int numHosts = processors >= 8 ? 6 : 3;
+        final int numTuples = 204800 * (processors >= 8 ? 6 : 1);//about 100 megs per
         //final int numTuples = 0;
         final int kfactor = 2;
         final LocalCluster cluster =
@@ -792,7 +792,7 @@ public class TestRejoinEndToEnd extends TestCase {
                     BackendTarget.NATIVE_EE_JNI,
                     LocalCluster.FailureState.ALL_RUNNING,
                     false);
-        cluster.setMaxHeap(256);
+        cluster.setMaxHeap(64);
         boolean success = cluster.compile(builder);
         assertTrue(success);
         copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));

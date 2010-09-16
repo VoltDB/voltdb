@@ -254,7 +254,8 @@ public class LocalCluster implements VoltServerConfig {
                                            "-Djava.library.path=" + m_buildDir + "/nativelibs",
                                            "-Dlog4j.configuration=log.xml",
                                            "-ea",
-                                           "-Xmx2048m",
+                                           "-XX:MaxDirectMemorySize=2g",
+                                           "-Xmx2g",
                                            "-XX:+HeapDumpOnOutOfMemoryError",
                                            "-classpath",
                                            classPath,
@@ -305,7 +306,7 @@ public class LocalCluster implements VoltServerConfig {
     }
 
     public void setMaxHeap(int megabytes) {
-        m_procBuilder.command().set(4, "-Xmx" + megabytes + "m");
+        m_procBuilder.command().set(5, "-Xmx" + megabytes + "m");
     }
 
 

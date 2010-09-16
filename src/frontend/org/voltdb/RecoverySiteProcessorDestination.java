@@ -362,6 +362,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
      */
     public void sendInitiateMessage(long txnId) throws IOException {
         ServerSocketChannel ssc = ServerSocketChannel.open();
+        ssc.configureBlocking(false);
         InetAddress addr = InetAddress.getByName(VoltDB.instance().getConfig().m_selectedRejoinInterface);
         InetSocketAddress sockAddr = new InetSocketAddress( addr, 0);
         ssc.socket().bind(sockAddr);
@@ -379,14 +380,20 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
             throw new RuntimeException(e);
         }
 
-        ssc.socket().setSoTimeout(5000);
-        try {
-            m_sc = ssc.accept();
-        } catch (IOException e) {
-            if (e instanceof java.net.SocketTimeoutException) {
-                recoveryLog.fatal("Timed out waiting for connection from source partition", e);
-                VoltDB.crashVoltDB();
+        final long startTime = System.currentTimeMillis();
+        while (System.currentTimeMillis() - startTime < 5000) {
+            try {
+                m_sc = ssc.accept();
+                if (m_sc != null) {
+                    break;
+                }
+            } catch (IOException e) {
+                ssc.close();
             }
+        }
+        if (m_sc == null) {
+            recoveryLog.fatal("Timed out waiting for connection from source partition");
+            VoltDB.crashVoltDB();
         }
         m_sc.configureBlocking(true);
         m_sc.socket().setTcpNoDelay(true);
