@@ -19,14 +19,14 @@ package org.voltdb.utils;
 
 import java.io.IOException;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import javax.servlet_voltpatches.ServletException;
+import javax.servlet_voltpatches.http.HttpServletRequest;
+import javax.servlet_voltpatches.http.HttpServletResponse;
 
-import org.eclipse.jetty.server.Request;
-import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.server.handler.AbstractHandler;
-import org.eclipse.jetty.server.nio.SelectChannelConnector;
+import org.eclipse.jetty_voltpatches.server.Request;
+import org.eclipse.jetty_voltpatches.server.Server;
+import org.eclipse.jetty_voltpatches.server.bio.SocketConnector;
+import org.eclipse.jetty_voltpatches.server.handler.AbstractHandler;
 import org.voltdb.CatalogContext;
 import org.voltdb.HTTPClientInterface;
 import org.voltdb.VoltDB;
@@ -50,11 +50,13 @@ public class HTTPAdminListener {
             if (baseRequest.getRequestURI().contains("/api/1.0/")) {
                 response.setContentType("text/plain;charset=utf-8");
                 if (m_jsonEnabled) {
-                    String msg = httpClientInterface.process(baseRequest);
-                    //String msg = "{\"status\":1,\"appstatus\":-128,\"statusstring\":null,\"appstatusstring\":null,\"exception\":null,\"results\":[{\"status\":-128,\"schema\":[{\"name\":\"SVAL1\",\"type\":9},{\"name\":\"SVAL2\",\"type\":9},{\"name\":\"SVAL3\",\"type\":9}],\"data\":[[\"FOO\",\"BAR\",\"BOO\"]]}]}";
+                    httpClientInterface.process(baseRequest, response);
+
+                    // used for perf testing of the http interface
+                    /*String msg = "{\"status\":1,\"appstatus\":-128,\"statusstring\":null,\"appstatusstring\":null,\"exception\":null,\"results\":[{\"status\":-128,\"schema\":[{\"name\":\"SVAL1\",\"type\":9},{\"name\":\"SVAL2\",\"type\":9},{\"name\":\"SVAL3\",\"type\":9}],\"data\":[[\"FOO\",\"BAR\",\"BOO\"]]}]}";
                     response.setStatus(HttpServletResponse.SC_OK);
                     baseRequest.setHandled(true);
-                    response.getWriter().print(msg);
+                    response.getWriter().print(msg);*/
                 }
                 else {
                     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
@@ -100,7 +102,10 @@ public class HTTPAdminListener {
 
     public HTTPAdminListener(boolean jsonEnabled, int port) throws Exception {
         try {
-            SelectChannelConnector connector = new SelectChannelConnector();
+            // The socket channel connector seems to be faster for our use
+            //SelectChannelConnector connector = new SelectChannelConnector();
+            SocketConnector connector = new SocketConnector();
+
             connector.setPort(port);
             connector.setName("VoltDB-HTTPD");
             m_server.addConnector(connector);

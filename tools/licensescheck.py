@@ -10,6 +10,7 @@ ascommithook = False
 
 prunelist = ('hsqldb19b3',
              'hsqldb',
+             'jetty716',
              'proj_gen',
              'jni_md.h',
              'jni.h',

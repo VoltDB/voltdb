@@ -17,15 +17,20 @@
 
 package org.voltdb;
 
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
-import org.eclipse.jetty.server.Request;
+import javax.servlet_voltpatches.http.HttpServletResponse;
+
+import org.eclipse.jetty_voltpatches.continuation.Continuation;
+import org.eclipse.jetty_voltpatches.continuation.ContinuationSupport;
+import org.eclipse.jetty_voltpatches.server.Request;
 import org.voltdb.client.AuthenticatedConnectionCache;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.SyncCallback;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.utils.Encoder;
 
 public class HTTPClientInterface {
@@ -33,6 +38,32 @@ public class HTTPClientInterface {
     AuthenticatedConnectionCache m_connections = null;
     MessageDigest m_md = null;
     static final int CACHE_TARGET_SIZE = 10;
+
+    class JSONProcCallback implements ProcedureCallback {
+
+        Request m_request;
+        final Continuation m_continuation;
+
+        public JSONProcCallback(Request request, Continuation continuation) {
+            assert(request != null);
+            assert(continuation != null);
+
+            m_request = request;
+            m_continuation = continuation;
+        }
+
+        @Override
+        public void clientCallback(ClientResponse clientResponse) throws Exception {
+            ClientResponseImpl rimpl = (ClientResponseImpl) clientResponse;
+            String msg = rimpl.toJSONString();
+
+            HttpServletResponse response = (HttpServletResponse) m_continuation.getServletResponse();
+            response.setStatus(HttpServletResponse.SC_OK);
+            m_request.setHandled(true);
+            response.getWriter().print(msg);
+            m_continuation.complete();
+        }
+    }
 
     public HTTPClientInterface() {
         try {
@@ -42,10 +73,13 @@ public class HTTPClientInterface {
         }
     }
 
-    public String process(Request request) {
+    public void process(Request request, HttpServletResponse response) {
         String msg;
 
         Client client = null;
+
+        Continuation continuation = ContinuationSupport.getContinuation(request);
+        continuation.suspend(response);
 
         try {
             if (m_connections == null) {
@@ -88,24 +122,19 @@ public class HTTPClientInterface {
             // get a connection to localhost from the pool
             client = m_connections.getClient(username, hashedPasswordBytes);
 
-            SyncCallback scb = new SyncCallback();
+            JSONProcCallback cb = new JSONProcCallback(request, continuation);
             boolean success;
 
             if (params != null) {
                 ParameterSet paramSet = ParameterSet.fromJSONString(params);
-                success =  client.callProcedure(scb, procName, paramSet.toArray());
+                success =  client.callProcedure(cb, procName, paramSet.toArray());
             }
             else {
-                success = client.callProcedure(scb, procName);
+                success = client.callProcedure(cb, procName);
             }
             if (!success) {
                 throw new Exception("Server is not accepting work at this time.");
             }
-
-            scb.waitForResponse();
-
-            ClientResponseImpl rimpl = (ClientResponseImpl) scb.getResponse();
-            msg = rimpl.toJSONString();
         }
         catch (Exception e) {
             e.printStackTrace();
@@ -113,6 +142,12 @@ public class HTTPClientInterface {
             ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
             //e.printStackTrace();
             msg = rimpl.toJSONString();
+            response.setStatus(HttpServletResponse.SC_OK);
+            request.setHandled(true);
+            try {
+                response.getWriter().print(msg);
+                continuation.complete();
+            } catch (IOException e1) {}
         }
         finally {
             if (client != null) {
@@ -120,7 +155,5 @@ public class HTTPClientInterface {
                 m_connections.releaseClient(client);
             }
         }
-
-        return msg;
     }
 }

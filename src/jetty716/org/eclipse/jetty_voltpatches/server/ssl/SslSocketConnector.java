@@ -1,0 +1,683 @@
+// ========================================================================
+// Copyright (c) 2000-2009 Mort Bay Consulting Pty. Ltd.
+// ------------------------------------------------------------------------
+// All rights reserved. This program and the accompanying materials
+// are made available under the terms of the Eclipse Public License v1.0
+// and Apache License v2.0 which accompanies this distribution.
+// The Eclipse Public License is available at 
+// http://www.eclipse.org/legal/epl-v10.html
+// The Apache License v2.0 is available at
+// http://www.opensource.org/licenses/apache2.0.php
+// You may elect to redistribute this code under either of these licenses. 
+// ========================================================================
+
+package org.eclipse.jetty_voltpatches.server.ssl;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.security.KeyStore;
+import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import javax.net.ssl.HandshakeCompletedEvent;
+import javax.net.ssl.HandshakeCompletedListener;
+import javax.net.ssl.KeyManager;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLException;
+import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLServerSocketFactory;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
+
+import org.eclipse.jetty_voltpatches.http.HttpSchemes;
+import org.eclipse.jetty_voltpatches.http.security.Password;
+import org.eclipse.jetty_voltpatches.io.EndPoint;
+import org.eclipse.jetty_voltpatches.io.bio.SocketEndPoint;
+import org.eclipse.jetty_voltpatches.server.Request;
+import org.eclipse.jetty_voltpatches.server.bio.SocketConnector;
+import org.eclipse.jetty_voltpatches.util.log.Log;
+import org.eclipse.jetty_voltpatches.util.resource.Resource;
+
+/* ------------------------------------------------------------ */
+/**
+ * SSL Socket Connector.
+ * 
+ * This specialization of SocketConnector is an abstract listener that can be used as the basis for a
+ * specific JSSE listener.
+ * 
+ * The original of this class was heavily based on the work from Court Demas, which in turn is 
+ * based on the work from Forge Research. Since JSSE, this class has evolved significantly from
+ * that early work.
+ * 
+ * @org.apache.xbean.XBean element="sslSocketConnector" description="Creates an ssl socket connector"
+ *
+ * 
+ */
+public class SslSocketConnector extends SocketConnector  implements SslConnector
+{
+    /** Default value for the cipher Suites. */
+    private String _excludeCipherSuites[] = null;
+    /** Default value for the included cipher Suites. */
+    private String _includeCipherSuites[]=null;
+    
+    /** Default value for the keystore location path. */
+    private String _keystorePath=DEFAULT_KEYSTORE ;
+    private String _keystoreType = "JKS"; // type of the key store
+    
+    /** Set to true if we require client certificate authentication. */
+    private boolean _needClientAuth = false;
+    private transient Password _password;
+    private transient Password _keyPassword;
+    private transient Password _trustPassword;
+    private String _protocol= "TLS";
+    private String _provider;
+    private String _secureRandomAlgorithm; // cert algorithm
+    private String _sslKeyManagerFactoryAlgorithm = DEFAULT_KEYSTORE_ALGORITHM;
+    private String _sslTrustManagerFactoryAlgorithm = DEFAULT_TRUSTSTORE_ALGORITHM;
+    private String _truststorePath;
+    private String _truststoreType = "JKS"; // type of the key store
+
+    /** Set to true if we would like client certificate authentication. */
+    private boolean _wantClientAuth = false;
+    private int _handshakeTimeout = 0; //0 means use maxIdleTime
+    
+    private SSLContext _context;
+    private boolean _allowRenegotiate =false;
+
+
+    /* ------------------------------------------------------------ */
+    /**
+     * Constructor.
+     */
+    public SslSocketConnector()
+    {
+        super();
+    }
+
+    /* ------------------------------------------------------------ */
+    /**
+     * @return True if SSL re-negotiation is allowed (default false)
+     */
+    public boolean isAllowRenegotiate()
+    {
+        return _allowRenegotiate;
+    }
+
+    /* ------------------------------------------------------------ */
+    /**
+     * Set if SSL re-negotiation is allowed. CVE-2009-3555 discovered
+     * a vulnerability in SSL/TLS with re-negotiation.  If your JVM
+     * does not have CVE-2009-3555 fixed, then re-negotiation should 
+     * not be allowed.
+     * @param allowRenegotiate true if re-negotiation is allowed (default false)
+     */
+    public void setAllowRenegotiate(boolean allowRenegotiate)
+    {
+        _allowRenegotiate = allowRenegotiate;
+    }
+
+    /* ------------------------------------------------------------ */
+    @Override
+    public void accept(int acceptorID)
+        throws IOException, InterruptedException
+    {   
+        Socket socket = _serverSocket.accept();
+        configure(socket);
+        
+        ConnectorEndPoint connection=new SslConnectorEndPoint(socket);
+        connection.dispatch();
+    }
+    
+    /* ------------------------------------------------------------ */
+    @Override
+    protected void configure(Socket socket)
+        throws IOException
+    {   
+        super.configure(socket);
+    }
+
+    /* ------------------------------------------------------------ */
+    protected SSLContext createSSLContext() throws Exception
+    {
+        KeyManager[] keyManagers = getKeyManagers();
+        TrustManager[] trustManagers = getTrustManagers();
+        SecureRandom secureRandom = _secureRandomAlgorithm==null?null:SecureRandom.getInstance(_secureRandomAlgorithm);
+        SSLContext context = _provider==null?SSLContext.getInstance(_protocol):SSLContext.getInstance(_protocol, _provider);
+        context.init(keyManagers, trustManagers, secureRandom);
+        return context;
+    }
+    
+    /* ------------------------------------------------------------ */
+    protected SSLServerSocketFactory createFactory() 
+        throws Exception
+    {
+        if (_context==null)
+            _context=createSSLContext();
+        
+        return _context.getServerSocketFactory();
+    }
+    
+
+    /* ------------------------------------------------------------ */
+    protected KeyManager[] getKeyManagers() throws Exception
+    {
+        KeyStore keyStore = getKeyStore(_keystorePath, _keystoreType, _password==null?null:_password.toString());
+        
+        KeyManagerFactory keyManagerFactory=KeyManagerFactory.getInstance(_sslKeyManagerFactoryAlgorithm);
+        keyManagerFactory.init(keyStore,_keyPassword==null?(_password==null?null:_password.toString().toCharArray()):_keyPassword.toString().toCharArray());
+        return keyManagerFactory.getKeyManagers();
+    }
+    
+    protected TrustManager[] getTrustManagers() throws Exception
+    {        
+        if (_truststorePath==null)
+        {
+            _truststorePath=_keystorePath;
+            _truststoreType=_keystoreType;
+            //TODO is this right? it wasn't in the code before refactoring
+            _trustPassword = _password;
+            _sslTrustManagerFactoryAlgorithm = _sslKeyManagerFactoryAlgorithm;
+        }
+        KeyStore trustStore = getKeyStore(_truststorePath, _truststoreType, _trustPassword==null?null:_trustPassword.toString());
+
+        TrustManagerFactory trustManagerFactory=TrustManagerFactory.getInstance(_sslTrustManagerFactoryAlgorithm);
+        trustManagerFactory.init(trustStore);
+        return trustManagerFactory.getTrustManagers();
+    }
+    
+    protected KeyStore getKeyStore(String keystorePath, String keystoreType, String keystorePassword) throws Exception
+    {
+        KeyStore keystore;
+        InputStream keystoreInputStream = null;
+        try
+        {
+            if (keystorePath!=null)
+                keystoreInputStream = Resource.newResource(keystorePath).getInputStream();
+            keystore=KeyStore.getInstance(keystoreType);
+            keystore.load(keystoreInputStream,keystorePassword==null?null:keystorePassword.toString().toCharArray());
+            return keystore;
+        }
+        finally
+        {
+            if (keystoreInputStream != null)
+                keystoreInputStream.close();
+        }
+    }
+
+    /* ------------------------------------------------------------ */
+    /**
+     * Allow the Listener a chance to customise the request. before the server does its stuff. <br>
+     * This allows the required attributes to be set for SSL requests. <br>
+     * The requirements of the Servlet specs are:
+     * <ul>
+     * <li> an attribute named "javax.servlet_voltpatches.request.ssl_id" of type String (since Spec 3.0).</li>
+     * <li> an attribute named "javax.servlet_voltpatches.request.cipher_suite" of type String.</li>
+     * <li> an attribute named "javax.servlet_voltpatches.request.key_size" of type Integer.</li>
+     * <li> an attribute named "javax.servlet_voltpatches.request.X509Certificate" of type
+     * java.security.cert.X509Certificate[]. This is an array of objects of type X509Certificate,
+     * the order of this array is defined as being in ascending order of trust. The first
+     * certificate in the chain is the one set by the client, the next is the one used to
+     * authenticate the first, and so on. </li>
+     * </ul>
+     * 
+     * @param endpoint The Socket the request arrived on. 
+     *        This should be a {@link SocketEndPoint} wrapping a {@link SSLSocket}.
+     * @param request HttpRequest to be customised.
+     */
+    @Override
+    public void customize(EndPoint endpoint, Request request)
+        throws IOException
+    {
+        super.customize(endpoint, request);
+        request.setScheme(HttpSchemes.HTTPS);
+        
+        SocketEndPoint socket_end_point = (SocketEndPoint)endpoint;
+        SSLSocket sslSocket = (SSLSocket)socket_end_point.getTransport();
+        SSLSession sslSession = sslSocket.getSession();
+
+        SslCertificates.customize(sslSession,endpoint,request);
+    }
+
+    /* ------------------------------------------------------------ */    
+    public String[] getExcludeCipherSuites() {
+        return _excludeCipherSuites;
+    }
+    
+    /* ------------------------------------------------------------ */
+    public String[] getIncludeCipherSuites()
+    {
+        return _includeCipherSuites;
+    }
+
+    /* ------------------------------------------------------------ */
+    public String getKeystore()
+    {
+        return _keystorePath;
+    }
+
+    /* ------------------------------------------------------------ */
+    public String getKeystoreType() 
+    {
+        return (_keystoreType);
+    }
+
+    /* ------------------------------------------------------------ */
+    public boolean getNeedClientAuth()
+    {
+        return _needClientAuth;
+    }
+
+    /* ------------------------------------------------------------ */
+    public String getProtocol() 
+    {
+        return _protocol;
+    }
+
+    /* ------------------------------------------------------------ */
+    public String getProvider() {
+    return _provider;
+    }
+
+    /* ------------------------------------------------------------ */
+    public String getSecureRandomAlgorithm() 
+    {
+        return (this._secureRandomAlgorithm);
+    }
+
+    /* ------------------------------------------------------------ */
+    public String getSslKeyManagerFactoryAlgorithm() 
+    {
+        return (this._sslKeyManagerFactoryAlgorithm);
+    }
+
+    /* ------------------------------------------------------------ */
+    public String getSslTrustManagerFactoryAlgorithm() 
+    {
+        return (this._sslTrustManagerFactoryAlgorithm);
+    }
+
+    /* ------------------------------------------------------------ */
+    public String getTruststore()
+    {
+        return _truststorePath;
+    }
+
+    /* ------------------------------------------------------------ */
+    public String getTruststoreType()
+    {
+        return _truststoreType;
+    }
+
+    /* ------------------------------------------------------------ */
+    public boolean getWantClientAuth()
+    {
+        return _wantClientAuth;
+    }
+
+    /* ------------------------------------------------------------ */
+    /**
+     * By default, we're confidential, given we speak SSL. But, if we've been told about an
+     * confidential port, and said port is not our port, then we're not. This allows separation of
+     * listeners providing INTEGRAL versus CONFIDENTIAL constraints, such as one SSL listener
+     * configured to require client certs providing CONFIDENTIAL, whereas another SSL listener not
+     * requiring client certs providing mere INTEGRAL constraints.
+     */
+    @Override
+    public boolean isConfidential(Request request)
+    {
+        final int confidentialPort = getConfidentialPort();
+        return confidentialPort == 0 || confidentialPort == request.getServerPort();
+    }
+    
+    /* ------------------------------------------------------------ */
+    /**
+     * By default, we're integral, given we speak SSL. But, if we've been told about an integral
+     * port, and said port is not our port, then we're not. This allows separation of listeners
+     * providing INTEGRAL versus CONFIDENTIAL constraints, such as one SSL listener configured to
+     * require client certs providing CONFIDENTIAL, whereas another SSL listener not requiring
+     * client certs providing mere INTEGRAL constraints.
+     */
+    @Override
+    public boolean isIntegral(Request request)
+    {
+        final int integralPort = getIntegralPort();
+        return integralPort == 0 || integralPort == request.getServerPort();
+    }
+    
+    /* ------------------------------------------------------------ */
+    /**
+     * @param host The host name that this server should listen on
+     * @param port the port that this server should listen on 
+     * @param backlog See {@link ServerSocket#bind(java.net.SocketAddress, int)}
+     * @return A new {@link ServerSocket socket object} bound to the supplied address with all other
+     * settings as per the current configuration of this connector. 
+     * @see #setWantClientAuth(boolean)
+     * @see #setNeedClientAuth(boolean)
+     * @exception IOException
+     */
+
+    /* ------------------------------------------------------------ */
+    @Override
+    protected ServerSocket newServerSocket(String host, int port,int backlog) throws IOException
+    {
+        SSLServerSocketFactory factory = null;
+        SSLServerSocket socket = null;
+
+        try
+        {
+            factory = createFactory();
+
+            socket = (SSLServerSocket) (host==null?
+                            factory.createServerSocket(port,backlog):
+                            factory.createServerSocket(port,backlog,InetAddress.getByName(host)));
+
+            if (_wantClientAuth)
+                socket.setWantClientAuth(_wantClientAuth);
+            if (_needClientAuth)
+                socket.setNeedClientAuth(_needClientAuth);
+
+            if ((_excludeCipherSuites!=null&&_excludeCipherSuites.length>0)
+                    || (_includeCipherSuites!=null&&_includeCipherSuites.length>0))
+            {
+                List<String> includedCSList;
+                if (_includeCipherSuites!=null)
+                {
+                    includedCSList = Arrays.asList(_includeCipherSuites);
+                } else {
+                    includedCSList = new ArrayList<String>();
+                }
+                List<String> excludedCSList;
+                if (_excludeCipherSuites!=null)
+                {
+                    excludedCSList = Arrays.asList(_excludeCipherSuites);
+                } else {
+                    excludedCSList = new ArrayList<String>();
+                }
+                String[] enabledCipherSuites = socket.getEnabledCipherSuites();
+                List<String> enabledCSList = new ArrayList<String>(Arrays.asList(enabledCipherSuites));
+                
+                String[] supportedCipherSuites = socket.getSupportedCipherSuites();
+                List<String> supportedCSList = Arrays.asList(supportedCipherSuites);
+                
+                for (String cipherName : includedCSList)
+                {
+                    if ((!enabledCSList.contains(cipherName))
+                            && supportedCSList.contains(cipherName))
+                    {
+                        enabledCSList.add(cipherName);
+                    }
+                }
+
+                for (String cipherName : excludedCSList)
+                {
+                    if (enabledCSList.contains(cipherName))
+                    {
+                        enabledCSList.remove(cipherName);
+                    }
+                }
+                enabledCipherSuites = enabledCSList.toArray(new String[enabledCSList.size()]);
+
+                socket.setEnabledCipherSuites(enabledCipherSuites);
+            }
+            
+        }
+        catch (IOException e)
+        {
+            throw e;
+        }
+        catch (Exception e)
+        {
+            Log.warn(e.toString());
+            Log.debug(e);
+            throw new IOException("!JsseListener: " + e);
+        }
+        return socket;
+    }
+
+    /* ------------------------------------------------------------ */
+    /** 
+     * 
+     */
+    public void setExcludeCipherSuites(String[] cipherSuites) {
+        this._excludeCipherSuites = cipherSuites;
+    }
+
+    /* ------------------------------------------------------------ */
+    public void setIncludeCipherSuites(String[] cipherSuites)
+    {
+        this._includeCipherSuites=cipherSuites;
+    }
+
+    /* ------------------------------------------------------------ */
+    public void setKeyPassword(String password)
+    {
+        _keyPassword = Password.getPassword(KEYPASSWORD_PROPERTY,password,null);
+    }
+
+    /* ------------------------------------------------------------ */
+    /**
+     * @param keystore The resource path to the keystore, or null for built in keystores.
+     */
+    public void setKeystore(String keystore)
+    {
+        _keystorePath = keystore;
+    }
+
+    /* ------------------------------------------------------------ */
+    public void setKeystoreType(String keystoreType) 
+    {
+        _keystoreType = keystoreType;
+    }
+
+    /* ------------------------------------------------------------ */
+    /**
+     * Set the value of the needClientAuth property
+     * 
+     * @param needClientAuth true iff we require client certificate authentication.
+     */
+    public void setNeedClientAuth(boolean needClientAuth)
+    {
+        _needClientAuth = needClientAuth;
+    }
+    
+    /* ------------------------------------------------------------ */
+    public void setPassword(String password)
+    {
+        _password = Password.getPassword(PASSWORD_PROPERTY,password,null);
+    }
+    
+    /* ------------------------------------------------------------ */
+    public void setTrustPassword(String password)
+    {
+        _trustPassword = Password.getPassword(PASSWORD_PROPERTY,password,null);
+    }
+
+    /* ------------------------------------------------------------ */
+    public void setProtocol(String protocol) 
+    {
+        _protocol = protocol;
+    }
+
+    /* ------------------------------------------------------------ */
+    public void setProvider(String _provider) {
+    this._provider = _provider;
+    }
+
+    /* ------------------------------------------------------------ */
+    public void setSecureRandomAlgorithm(String algorithm) 
+    {
+        this._secureRandomAlgorithm = algorithm;
+    }
+
+    /* ------------------------------------------------------------ */
+    public void setSslKeyManagerFactoryAlgorithm(String algorithm) 
+    {
+        this._sslKeyManagerFactoryAlgorithm = algorithm;
+    }
+    
+    /* ------------------------------------------------------------ */
+    public void setSslTrustManagerFactoryAlgorithm(String algorithm) 
+    {
+        this._sslTrustManagerFactoryAlgorithm = algorithm;
+    }
+
+
+    public void setTruststore(String truststore)
+    {
+        _truststorePath = truststore;
+    }
+    
+
+    public void setTruststoreType(String truststoreType)
+    {
+        _truststoreType = truststoreType;
+    }
+    
+    public void setSslContext(SSLContext sslContext)
+    {
+        _context = sslContext;
+    }
+
+    /* ------------------------------------------------------------ */
+    /**
+     * @see org.eclipse.jetty_voltpatches.server.ssl.SslConnector#setSslContext(javax.net.ssl.SSLContext)
+     */
+    public SSLContext getSslContext()
+    {
+        try
+        {
+            if (_context == null)
+                _context=createSSLContext();
+        }
+        catch(Exception e)
+        {
+            throw new RuntimeException(e);
+        }
+         
+        return _context;
+    }
+
+    /* ------------------------------------------------------------ */
+    /**
+     * Set the value of the _wantClientAuth property. This property is used 
+     * internally when opening server sockets.
+     * 
+     * @param wantClientAuth true if we want client certificate authentication.
+     * @see SSLServerSocket#setWantClientAuth
+     */
+    public void setWantClientAuth(boolean wantClientAuth)
+    {
+        _wantClientAuth = wantClientAuth;
+    }
+
+    /* ------------------------------------------------------------ */
+    /**
+     * Set the time in milliseconds for so_timeout during ssl handshaking
+     * @param msec a non-zero value will be used to set so_timeout during
+     * ssl handshakes. A zero value means the maxIdleTime is used instead.
+     */
+    public void setHandshakeTimeout (int msec)
+    {
+        _handshakeTimeout = msec;
+    }
+    
+
+    /* ------------------------------------------------------------ */
+    public int getHandshakeTimeout ()
+    {
+        return _handshakeTimeout;
+    }
+
+    /* ------------------------------------------------------------ */
+    public class SslConnectorEndPoint extends ConnectorEndPoint
+    {
+        public SslConnectorEndPoint(Socket socket) throws IOException
+        {
+            super(socket);
+        }
+        
+        @Override
+        public void shutdownOutput() throws IOException
+        {
+        }
+        
+        @Override
+        public void run()
+        {
+            try
+            {
+                int handshakeTimeout = getHandshakeTimeout();
+                int oldTimeout = _socket.getSoTimeout();
+                if (handshakeTimeout > 0)            
+                    _socket.setSoTimeout(handshakeTimeout);
+
+                final SSLSocket ssl=(SSLSocket)_socket;
+                ssl.addHandshakeCompletedListener(new HandshakeCompletedListener()
+                {
+                    boolean handshook=false;
+                    public void handshakeCompleted(HandshakeCompletedEvent event)
+                    {
+                        if (handshook)
+                        {
+                            if (!_allowRenegotiate)
+                            {
+                                Log.warn("SSL renegotiate denied: "+ssl);
+                                try{ssl.close();}catch(IOException e){Log.warn(e);}
+                            }
+                        }
+                        else
+                            handshook=true;
+                    }
+                });
+                ssl.startHandshake();
+
+                if (handshakeTimeout>0)
+                    _socket.setSoTimeout(oldTimeout);
+
+                super.run();
+            }
+            catch (SSLException e)
+            {
+                Log.debug(e); 
+                try{close();}
+                catch(IOException e2){Log.ignore(e2);}
+            }
+            catch (IOException e)
+            {
+                Log.debug(e);
+                try{close();}
+                catch(IOException e2){Log.ignore(e2);}
+            } 
+        }
+    }
+
+    /* ------------------------------------------------------------ */
+    /**
+     * Unsupported.
+     * 
+     * TODO: we should remove this as it is no longer an overridden method from SslConnector (like it was in the past)
+     */
+    public String getAlgorithm()
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    /* ------------------------------------------------------------ */
+    /**
+     * Unsupported.
+     * 
+     * TODO: we should remove this as it is no longer an overridden method from SslConnector (like it was in the past)
+     */
+    public void setAlgorithm(String algorithm)
+    {
+        throw new UnsupportedOperationException();
+    }
+}
