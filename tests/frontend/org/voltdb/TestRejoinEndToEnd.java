@@ -37,8 +37,8 @@ import java.net.InetSocketAddress;
 import java.net.URLEncoder;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.Random;
 import java.util.ArrayList;
+import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -46,13 +46,11 @@ import junit.framework.TestCase;
 
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientConfig;
+import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.NoConnectionsException;
-import org.voltdb.client.SyncCallback;
-import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
@@ -535,8 +533,8 @@ public class TestRejoinEndToEnd extends TestCase {
     public void testRejoinFuzz() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setSecurityEnabled(true);
-
-        final int numHosts = 10;
+        int processors = Runtime.getRuntime().availableProcessors();
+        final int numHosts = processors >= 8 ? 10 : 5;
         final int kfactor = 4;
         final LocalCluster cluster =
             new LocalCluster(
