@@ -336,7 +336,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         config = new LocalSingleProcessServer("matview-twosites.jar", 2, BackendTarget.NATIVE_EE_JNI);
 
         // build the jarfile (note the reuse of the TPCC project)
-        config.compile(project);
+        boolean compile = config.compile(project);
+        assertTrue(compile);
 
         // add this config to the set of tests to run
         builder.addServerConfig(config);
@@ -346,13 +347,15 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         config = new LocalSingleProcessServer("matview-hsql.jar", 1, BackendTarget.HSQLDB_BACKEND);
-        config.compile(project);
+        boolean compile2 = config.compile(project);
+        assertTrue(compile2);
         builder.addServerConfig(config);
 
         // Cluster
         config = new LocalCluster("matview-cluster.jar", 2, 2,
                                   1, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
+        boolean compile3 = config.compile(project);
+        assertTrue(compile3);
         builder.addServerConfig(config);
 
         return builder;

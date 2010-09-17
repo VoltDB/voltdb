@@ -26,7 +26,7 @@ package org.voltdb_testprocs.regressionsuites.matviewprocs;
 import org.voltdb.*;
 
 @ProcInfo (
-    partitionInfo = "PEOPLE.ID: 0",
+    partitionInfo = "PEOPLE.PARTITION: 0",
     singlePartition = true
 )
 public class AggAges extends VoltProcedure {
