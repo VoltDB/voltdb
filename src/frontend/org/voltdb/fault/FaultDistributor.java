@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import org.voltdb.*;
+import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.logging.VoltLogger;
 
@@ -71,7 +72,7 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
         FaultHandler m_handler;
 
         // Faults that have been passed to the handler but not handled
-        HashSet<VoltFault> m_pendingFaults = new HashSet<VoltFault>();
+        HashSet<VoltFault> m_handlersPendingFaults = new HashSet<VoltFault>();
     }
 
     // Pairs a fault handler to an instance of a fault
@@ -90,7 +91,8 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
      * @param voltdb
      */
     public FaultDistributor(VoltDBInterface voltdb) {
-        this(voltdb, false);
+        this(voltdb,
+             voltdb.getCatalogContext().cluster.getNetworkpartition());
     }
 
     /**
@@ -115,41 +117,54 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
 
     /**
      * Register a FaultHandler object to be notified when FaultType type occurs.
-     *
-     * @param type The FaultType in which the caller is interested
-     * @param handler The FaultHandler object which the caller wants called back
-     *        when the the specified type occurs
      * @param order Where in the calling sequence of fault handlers this
      *        handler should appear.  Lower values will be called first; multiple
      *        handlers can have the same value but there is no guarantee of
      *        the order in which they will be called
+     * @param handler The FaultHandler object which the caller wants called back
+     *        when the the specified type occurs
+     * @param types The FaultType in which the caller is interested
      */
-    public synchronized void registerFaultHandler(FaultType type,
+    public synchronized void registerFaultHandler(int order,
                                                   FaultHandler handler,
-                                                  int order)
+                                                  FaultType... types)
     {
-        TreeMap<Integer, List<FaultHandlerData>> handler_map =
-            m_faultHandlers.get(type);
-        List<FaultHandlerData> handler_list = null;
-        if (handler_map == null)
-        {
-            handler_map = new TreeMap<Integer, List<FaultHandlerData>>();
-            m_faultHandlers.put(type, handler_map);
-            handler_list = new ArrayList<FaultHandlerData>();
-            handler_map.put(order, handler_list);
-        }
-        else
-        {
-            handler_list = handler_map.get(order);
-            if (handler_list == null)
+        FaultType[] typeArray = types;
+        for (FaultType type : typeArray) {
+            TreeMap<Integer, List<FaultHandlerData>> handler_map = m_faultHandlers.get(type);
+            List<FaultHandlerData> handler_list = null;
+            // first handler for this fault type?
+            if (handler_map == null)
             {
+                handler_map = new TreeMap<Integer, List<FaultHandlerData>>();
+                m_faultHandlers.put(type, handler_map);
                 handler_list = new ArrayList<FaultHandlerData>();
                 handler_map.put(order, handler_list);
             }
+            else
+            {
+                handler_list = handler_map.get(order);
+                if (handler_list == null)
+                {
+                    handler_list = new ArrayList<FaultHandlerData>();
+                    handler_map.put(order, handler_list);
+                }
+            }
+
+            // first fault type for this handler?
+            FaultHandlerData data = m_faultHandlersData.get(handler);
+            if (data == null) {
+                data = new FaultHandlerData(handler);
+                m_faultHandlersData.put(handler, data);
+            }
+
+            // handler map now has entry for this fault type
+            // and handler_list is the list of handlers for this fault type
+            // so add the new handler to the list, associated to the
+            // corresponding fault handler data.
+            handler_list.add(data);
+
         }
-        FaultHandlerData data = new FaultHandlerData(handler);
-        handler_list.add(data);
-        m_faultHandlersData.put(handler, data);
     }
 
     /**
@@ -161,7 +176,7 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
     {
         // semi-arbitrarily large enough priority value so that
         // the default handler is last
-        registerFaultHandler(FaultType.UNKNOWN, handler, 1000);
+        registerFaultHandler(1000, handler, FaultType.UNKNOWN);
     }
 
     /**
@@ -234,7 +249,7 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
                 hostLog.fatal("A handled fault was reported for a handler that is not registered");
                 VoltDB.crashVoltDB();
             }
-            boolean removed = m_faultHandlersData.get(hf.m_handler).m_pendingFaults.remove(hf.m_fault);
+            boolean removed = m_faultHandlersData.get(hf.m_handler).m_handlersPendingFaults.remove(hf.m_fault);
             if (!removed) {
                 hostLog.fatal("A handled fault was reported that was not pending for the provided handler");
                 VoltDB.crashVoltDB();
@@ -289,8 +304,8 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
             {
                 for (FaultHandlerData handlerData : handler_list)
                 {
-                    if (handlerData.m_pendingFaults.addAll(entry.getValue())) {
-                        handlerData.m_handler.faultOccured(handlerData.m_pendingFaults);
+                    if (handlerData.m_handlersPendingFaults.addAll(entry.getValue())) {
+                        handlerData.m_handler.faultOccured(handlerData.m_handlersPendingFaults);
                     }
                 }
             }
@@ -329,6 +344,8 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
     private HashMap<FaultType, HashSet<VoltFault>>
     makePolicyDecisions(HashMap<FaultType, HashSet<VoltFault>> newFaults)
     {
+        SiteTracker tracker = m_catalogContext.siteTracker;
+
         // default policy
         if (!m_partitionDetectionEnabled) {
             return newFaults;
@@ -336,22 +353,39 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
 
         // if this surviving node is in a survivor set that is <= 1/2
         // of the previous cluster size, and this survivor set is
-        // durable, then trigger partition detection.
+        // durable, then trigger partition detection by rewriting the
+        // node faults in to cluster partition faults
         if (m_partitionDetectionEnabled) {
             HashSet<VoltFault> knownnfs = m_knownFaults.get(FaultType.NODE_FAILURE);
-            final int ttlNodeCnt = m_catalogContext.numberOfNodes;
-            final int downNodeCnt = m_catalogContext.siteTracker.getAllDownHosts().size();
-            final int prevSurvivorCnt = ttlNodeCnt - downNodeCnt;
+            final int prevSurvivorCnt = tracker.getAllLiveHosts().size();
             final int ttlNodeFaults = knownnfs.size();
-            if (ttlNodeFaults * 2 >= prevSurvivorCnt) {
+            boolean blessedSet = true;
+
+            // exact 50-50 splits. The lowest survivor host doesn't trigger PPD
+            // if the blessed host is in the failure set, this set is not blessed.
+            if (ttlNodeFaults * 2 == prevSurvivorCnt) {
+                Integer blessedHost = tracker.getHostForSite(tracker.getLowestLiveNonExecSiteId());
+                for (VoltFault fault : knownnfs) {
+                    if (fault instanceof NodeFailureFault) {
+                        NodeFailureFault nf = (NodeFailureFault)fault;
+                        if (nf.getHostId() == blessedHost) {
+                            blessedSet = false;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Evaluate the PPD trigger condition: not blessed or a strict minority
+            if (!blessedSet || (ttlNodeFaults * 2 > prevSurvivorCnt)) {
                 // rewrite the node faults in to partition faults.
                 HashSet<VoltFault> ppdFaults = new HashSet<VoltFault>();
                 HashSet<VoltFault> newnfs = newFaults.get(FaultType.NODE_FAILURE);
                 for (VoltFault nf :  newnfs) {
                     VoltFault ppd = new ClusterPartitionFault((NodeFailureFault)nf);
                     ppdFaults.add(ppd);
-                    newFaults.put(FaultType.CLUSTER_PARTITION, ppdFaults);
                 }
+                newFaults.put(FaultType.CLUSTER_PARTITION, ppdFaults);
                 newFaults.remove(FaultType.NODE_FAILURE);
             }
         }
@@ -376,7 +410,9 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
             for (VoltFault fault : faults) {
                 boolean remove = m_knownFaults.get(fault.getFaultType()).remove(fault);
 
-                // A hack. Really want to formalize fault chaining here.
+                // It's possible the cluster fault was originally known as a node-fault.
+                // HACK - really want a better fault equivalence rather than having
+                // all of these sets organized by fault type
                 if (!remove && fault instanceof ClusterPartitionFault) {
                     remove = m_knownFaults.get(FaultType.NODE_FAILURE).remove(fault);
                     assert(remove);
@@ -422,6 +458,7 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
                 }
             }
         } catch (Exception e) {
+            e.printStackTrace();
             hostLog.fatal("", e);
             VoltDB.crashVoltDB();
         }

@@ -30,7 +30,6 @@ import org.voltdb.ProcedureProfiler;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.jni.ExecutionEngineIPC;
 
 /**
  * Implementation of a VoltServerConfig for the simplest case:
@@ -82,6 +81,22 @@ public class LocalSingleProcessServer implements VoltServerConfig {
         m_compiled = builder.compile(m_jarFileName, m_siteCount, 1, 0, "localhost");
         m_pathToDeployment = builder.getPathToDeployment();
 
+        return m_compiled;
+    }
+
+    @Override
+    public boolean compileWithPartitiondDetection(VoltProjectBuilder builder, String ppdPath,  String ppdPrefix) {
+        // this doesn't really make a lot of sense, in that you can't partition a single node,
+        // but I suppose it is still feasible user configuration
+        int hostCount = 1;
+        int replication = 0;
+
+        if (m_compiled) {
+            return true;
+        }
+        m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication, "localhost",
+                                     true, ppdPath, ppdPrefix);
+        m_pathToDeployment = builder.getPathToDeployment();
         return m_compiled;
     }
 

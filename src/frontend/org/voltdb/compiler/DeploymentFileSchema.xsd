@@ -25,50 +25,67 @@
 
   -->
 
-<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
             elementFormDefault="unqualified">
 
   <!-- <deployment> -->
-  <xsd:element name="deployment" type="deploymentType"/>
-  <xsd:complexType name="deploymentType">
-    <xsd:sequence>
-      <xsd:element name="cluster" minOccurs="1" maxOccurs="1" type="clusterType"/>
-      <xsd:element name="users" minOccurs="0" maxOccurs="1" type="usersType"/>
-      <xsd:element name="httpd" minOccurs="0" maxOccurs="1" type="httpdType"/>
-    </xsd:sequence>
-  </xsd:complexType>
+  <xs:element name="deployment" type="deploymentType"/>
+  <xs:complexType name="deploymentType">
+    <xs:all>
+      <xs:element name="cluster" minOccurs="1" maxOccurs="1" type="clusterType"/>
+      <xs:element name="users" minOccurs="0" maxOccurs="1" type="usersType"/>
+      <xs:element name="httpd" minOccurs="0" maxOccurs="1" type="httpdType"/>
+    </xs:all>
+  </xs:complexType>
 
   <!-- <cluster> -->
-  <xsd:complexType name="clusterType">
-    <xsd:attribute name="hostcount" type="xsd:int" use="required"/>
-    <xsd:attribute name="sitesperhost" type="xsd:int" use="required"/>
-    <xsd:attribute name="leader" type="xsd:string" use="required"/>
-    <xsd:attribute name="kfactor" type="xsd:int" use="optional" default="0"/>
-  </xsd:complexType>
+  <xs:complexType name="clusterType">
+    <xs:all>
+        <xs:element name="partition-detection" minOccurs="0" type="partitionDetectionType"/>
+    </xs:all>
+    <xs:attribute name="hostcount" type="xs:int" use="required"/>
+    <xs:attribute name="sitesperhost" type="xs:int" use="required"/>
+    <xs:attribute name="leader" type="xs:string" use="required"/>
+    <xs:attribute name="kfactor" type="xs:int" use="optional" default="0"/>
+  </xs:complexType>
+
+  <!-- <partition-detection>/<snapshot> -->
+  <xs:complexType name="partitionDetectionType">
+      <xs:all>
+          <xs:element name="snapshot" minOccurs="1" maxOccurs="1">
+             <xs:complexType>
+                 <xs:attribute name="prefix" type="xs:string" use="required"/>
+                 <xs:attribute name="path" type="xs:string" use="required"/>
+             </xs:complexType>
+          </xs:element>
+      </xs:all>
+      <xs:attribute name="enabled" type="xs:boolean" default="false"/>
+   </xs:complexType>
+
 
   <!-- <users> -->
-  <xsd:complexType name="usersType">
-    <xsd:sequence>
-      <xsd:element name="user" minOccurs="1" maxOccurs="unbounded">
-        <xsd:complexType>
-          <xsd:attribute name="name" type="xsd:string" use="required"/>
-          <xsd:attribute name="groups" type="xsd:string" />
-          <xsd:attribute name="password" type="xsd:string" use="required"/>
-        </xsd:complexType>
-      </xsd:element>
-    </xsd:sequence>
-  </xsd:complexType>
-  
-  <!-- <httpd> -->
-  <xsd:complexType name="httpdType">
-    <xsd:sequence>
-      <xsd:element name="jsonapi" minOccurs="0" maxOccurs="1">
-        <xsd:complexType>
-          <xsd:attribute name="enabled" type="xsd:string" use="required"/>
-        </xsd:complexType>
-      </xsd:element>
-    </xsd:sequence>
-    <xsd:attribute name="port" type="xsd:int" use="optional" default="0"/>
-  </xsd:complexType>
+  <xs:complexType name="usersType">
+    <xs:sequence>
+      <xs:element name="user" minOccurs="1" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:attribute name="name" type="xs:string" use="required"/>
+          <xs:attribute name="groups" type="xs:string" />
+          <xs:attribute name="password" type="xs:string" use="required"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
 
-</xsd:schema>
+  <!-- <httpd> -->
+  <xs:complexType name="httpdType">
+    <xs:sequence>
+      <xs:element name="jsonapi" minOccurs="0" maxOccurs="1">
+        <xs:complexType>
+          <xs:attribute name="enabled" type="xs:string" use="required"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+    <xs:attribute name="port" type="xs:int" use="optional" default="0"/>
+  </xs:complexType>
+
+</xs:schema>

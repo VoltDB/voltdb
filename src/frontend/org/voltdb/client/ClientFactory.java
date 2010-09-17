@@ -32,13 +32,13 @@ public abstract class ClientFactory {
      * @param heavyweight If set to true the Client API will use multiple threads in order to be able
      * to saturate bonded gigabit connections. Only set to true if you have at least 2 bonded links
      * and intend to saturate them using this client instance. When set to false it can still saturate a gigabit
-     * connection. Arena sizes are ignored when heavyweight is set. This is ignored on systems with < 4 cores.
+     * connection. Arena sizes are ignored when heavy-weight is set. This is ignored on systems with < 4 cores.
      * @param statsSettings Settings for uploading statistical information via JDBC. Can be null in which
-     * case stats will not be uploaded.
+     * case statistics will not be uploaded.
      * @return Newly constructed {@link Client}
      * @see Client
      * @deprecated As of 1.2. Since no username or password is specified when creating the client
-     * it is neccessary to supply one when creating each connection and that makes it possible to connect
+     * it is necessary to supply one when creating each connection and that makes it possible to connect
      * with more than one set of credentials. When invoking procedures there is no way of knowing which set
      * of credentials is being used. createConnection will generate an error if you attempt to createConnections
      * with differing credentials.
@@ -60,8 +60,8 @@ public abstract class ClientFactory {
 
     /**
      * Create a {@link Client} with no connections. The Client will be optimized to send stored procedure invocations
-     * that are 128 bytes in size. Authentictation will use a blank username and password unless
-     * you use the deprecated createConnection methods.
+     * that are 128 bytes in size. Authentication will use a blank username and password unless
+     * you use the @deprecated createConnection methods.
      * @return Newly constructed {@link Client}
      */
     public static Client createClient() {
@@ -69,11 +69,11 @@ public abstract class ClientFactory {
     }
 
     /**
-     * Recommended method for creating a client. Using a config object ensures
+     * Recommended method for creating a client. Using a ClientConfig object ensures
      * that a client application is isolated from changes to the configuration options.
      * Authentication credentials are provided at construction time with this method
      * instead of when invoking createConnection.
-     * @param config A config object specifying what type of client to create
+     * @param config A ClientConfig object specifying what type of client to create
      * @return A configured client
      */
     public static Client createClient(ClientConfig config) {

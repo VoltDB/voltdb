@@ -18,10 +18,7 @@
 package org.voltdb;
 
 import java.io.IOException;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Deque;
-import java.util.HashSet;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -41,19 +38,26 @@ public class SnapshotSiteProcessor {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     /** Global count of execution sites on this node performing snapshot */
-    public static final AtomicInteger ExecutionSitesCurrentlySnapshotting = new AtomicInteger(-1);
+    public static final AtomicInteger ExecutionSitesCurrentlySnapshotting =
+        new AtomicInteger(-1);
 
     /**
      * Ensure the first thread to run the fragment does the creation
      * of the targets and the distribution of the work.
      */
-    public static final Semaphore m_snapshotCreateSetupPermit = new Semaphore(1);
+    public static final Semaphore m_snapshotCreateSetupPermit =
+        new Semaphore(1);
 
     /**
      * Only proceed once permits are available after setup completes
      */
     public static Semaphore m_snapshotPermits = new Semaphore(0);
 
+    /**
+     * Global collection populated by snapshot creator, poll'd by individual sites
+     */
+    public static final LinkedList<Deque<SnapshotTableTask>> m_taskListsForSites =
+        new LinkedList<Deque<SnapshotTableTask>>();
 
 
     /** Number of snapshot buffers to keep */

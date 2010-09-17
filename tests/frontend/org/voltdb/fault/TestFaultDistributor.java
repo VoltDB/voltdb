@@ -104,8 +104,8 @@ public class TestFaultDistributor extends TestCase
         FaultDistributor dut = new FaultDistributor(new MockVoltDB());
         MockFaultHandler unk_handler = new MockFaultHandler(FaultType.UNKNOWN);
         MockFaultHandler node_handler = new MockFaultHandler(FaultType.NODE_FAILURE);
-        dut.registerFaultHandler(FaultType.UNKNOWN, unk_handler, 1);
-        dut.registerFaultHandler(FaultType.NODE_FAILURE, node_handler, 1);
+        dut.registerFaultHandler(1, unk_handler, FaultType.UNKNOWN);
+        dut.registerFaultHandler(1, node_handler, FaultType.NODE_FAILURE);
         dut.reportFault(new VoltFault(FaultType.UNKNOWN));
         unk_handler.m_handledFaults.acquire();
         assertTrue(unk_handler.m_gotFault);
@@ -120,9 +120,9 @@ public class TestFaultDistributor extends TestCase
     {
         FaultDistributor dut = new FaultDistributor(new MockVoltDB());
         MockFaultHandler node_handler1 = new MockFaultHandler(FaultType.NODE_FAILURE);
-        dut.registerFaultHandler(FaultType.NODE_FAILURE, node_handler1, 1);
+        dut.registerFaultHandler(1, node_handler1, FaultType.NODE_FAILURE);
         MockFaultHandler node_handler2 = new MockFaultHandler(FaultType.NODE_FAILURE);
-        dut.registerFaultHandler(FaultType.NODE_FAILURE, node_handler2, 1);
+        dut.registerFaultHandler(1, node_handler2, FaultType.NODE_FAILURE);
         dut.reportFault(new VoltFault(FaultType.NODE_FAILURE));
         node_handler1.m_handledFaults.acquire();
         node_handler2.m_handledFaults.acquire();
@@ -161,12 +161,12 @@ public class TestFaultDistributor extends TestCase
             new MockFaultHandler(FaultType.NODE_FAILURE, 7, order_tracker);
         // register handlers in non-sequential order to avoid getting lucky
         // with insertion order
-        dut.registerFaultHandler(FaultType.NODE_FAILURE, node_handler7, 7);
-        dut.registerFaultHandler(FaultType.NODE_FAILURE, node_handler2a, 2);
-        dut.registerFaultHandler(FaultType.NODE_FAILURE, node_handler5, 5);
-        dut.registerFaultHandler(FaultType.NODE_FAILURE, node_handler1, 1);
-        dut.registerFaultHandler(FaultType.NODE_FAILURE, node_handler5a, 5);
-        dut.registerFaultHandler(FaultType.NODE_FAILURE, node_handler2, 2);
+        dut.registerFaultHandler(7, node_handler7, FaultType.NODE_FAILURE);
+        dut.registerFaultHandler(2, node_handler2a, FaultType.NODE_FAILURE);
+        dut.registerFaultHandler(5, node_handler5, FaultType.NODE_FAILURE);
+        dut.registerFaultHandler(1, node_handler1, FaultType.NODE_FAILURE);
+        dut.registerFaultHandler(5, node_handler5a, FaultType.NODE_FAILURE);
+        dut.registerFaultHandler(2, node_handler2, FaultType.NODE_FAILURE);
         dut.reportFault(new VoltFault(FaultType.NODE_FAILURE));
         node_handler7.m_handledFaults.acquire();
         assertTrue(node_handler1.m_gotFault);
@@ -184,8 +184,8 @@ public class TestFaultDistributor extends TestCase
         OrderTracker orderTracker = new OrderTracker(-1);
         MockFaultHandler mh1 = new MockFaultHandler(FaultType.NODE_FAILURE, 1, orderTracker);
         MockFaultHandler mh2 = new MockFaultHandler(FaultType.NODE_FAILURE, 1, orderTracker);
-        dut.registerFaultHandler(FaultType.NODE_FAILURE, mh1, 1);
-        dut.registerFaultHandler(FaultType.NODE_FAILURE, mh2, 1);
+        dut.registerFaultHandler(1, mh1, FaultType.NODE_FAILURE);
+        dut.registerFaultHandler(1, mh2, FaultType.NODE_FAILURE);
         VoltFault theFault = new VoltFault(FaultType.NODE_FAILURE);
         dut.reportFault(theFault);
 
@@ -204,16 +204,23 @@ public class TestFaultDistributor extends TestCase
     // trigger PPD
     public void testPartitionDetectionTrigger() throws Exception
     {
+        // need to add live sites and generate a context for mock functionality
         MockVoltDB voltdb = new MockVoltDB();
+        voltdb.addPartition(1);
         voltdb.addHost(0);
+        voltdb.addSite(100, 0, 1, true);
+        voltdb.addSite(1000, 0, 1, false);
         voltdb.addHost(1);
+        voltdb.addSite(101, 0, 1, true);
+        voltdb.addSite(1010, 0, 1, false);
+        voltdb.getCatalogContext();
 
         // enable possible partition detection (PPD)
         FaultDistributor dut = new FaultDistributor(voltdb, true);
         MockFaultHandler nodeFaultHdlr = new MockFaultHandler(FaultType.NODE_FAILURE);
         MockFaultHandler clusterPartHdlr = new MockFaultHandler(FaultType.CLUSTER_PARTITION);
-        dut.registerFaultHandler(FaultType.NODE_FAILURE, nodeFaultHdlr, 1);
-        dut.registerFaultHandler(FaultType.CLUSTER_PARTITION, clusterPartHdlr, 2);
+        dut.registerFaultHandler(1, nodeFaultHdlr, FaultType.NODE_FAILURE);
+        dut.registerFaultHandler(2, clusterPartHdlr, FaultType.CLUSTER_PARTITION);
 
         // verify node fault was promoted to cluster partition fault
         dut.reportFault(new NodeFailureFault(0, "hostname"));
@@ -237,17 +244,26 @@ public class TestFaultDistributor extends TestCase
     // do not trigger PPD
     public void testPartitionDetectionNoTrigger() throws Exception
     {
+        // need to add live sites and generate a context for mock functionality
         MockVoltDB voltdb = new MockVoltDB();
+        voltdb.addPartition(1);
         voltdb.addHost(0);
+        voltdb.addSite(100, 0, 1, true);
+        voltdb.addSite(1000, 0, 1, false);
         voltdb.addHost(1);
-        voltdb.addHost(3);
+        voltdb.addSite(101, 1, 1, true);
+        voltdb.addSite(1010, 1, 1, false);
+        voltdb.addHost(2);
+        voltdb.addSite(102, 2, 1, true);
+        voltdb.addSite(1020, 2, 1, false);
+        voltdb.getCatalogContext();
 
         // enable possible partition detection (PPD)
         FaultDistributor dut = new FaultDistributor(voltdb, true);
         MockFaultHandler nodeFaultHdlr = new MockFaultHandler(FaultType.NODE_FAILURE);
         MockFaultHandler clusterPartHdlr = new MockFaultHandler(FaultType.CLUSTER_PARTITION);
-        dut.registerFaultHandler(FaultType.NODE_FAILURE, nodeFaultHdlr, 1);
-        dut.registerFaultHandler(FaultType.CLUSTER_PARTITION, clusterPartHdlr, 2);
+        dut.registerFaultHandler(1, nodeFaultHdlr, FaultType.NODE_FAILURE);
+        dut.registerFaultHandler(2, clusterPartHdlr, FaultType.CLUSTER_PARTITION);
 
         // verify node fault was not promoted to cluster partition fault
         dut.reportFault(new NodeFailureFault(0, "hostname"));

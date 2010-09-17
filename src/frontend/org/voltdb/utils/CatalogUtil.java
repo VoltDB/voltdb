@@ -42,26 +42,11 @@ import javax.xml.validation.SchemaFactory;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.CatalogType;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Column;
-import org.voltdb.catalog.ColumnRef;
-import org.voltdb.catalog.Constraint;
-import org.voltdb.catalog.ConstraintRef;
-import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Group;
-import org.voltdb.catalog.GroupRef;
-import org.voltdb.catalog.Index;
-import org.voltdb.catalog.PlanFragment;
-import org.voltdb.catalog.Table;
+import org.voltdb.catalog.*;
 import org.voltdb.compiler.ClusterCompiler;
 import org.voltdb.compiler.ClusterConfig;
-import org.voltdb.compiler.deploymentfile.ClusterType;
-import org.voltdb.compiler.deploymentfile.DeploymentType;
-import org.voltdb.compiler.deploymentfile.HttpdType;
-import org.voltdb.compiler.deploymentfile.UsersType;
+import org.voltdb.compiler.deploymentfile.*;
+import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.types.ConstraintType;
@@ -407,7 +392,7 @@ public abstract class CatalogUtil {
     /**
      * Parse the deployment.xml file and add its data into the catalog.
      * @param catalog Catalog to be updated.
-     * @param pathToDeployment Path to the deployment.xml file.
+     * @param deploymentURL Path to the deployment.xml file.
      */
     public static boolean compileDeployment(Catalog catalog, String deploymentURL) {
         DeploymentType deployment = parseDeployment(deploymentURL);
@@ -563,6 +548,19 @@ public abstract class CatalogUtil {
             hostLog.error(config.getErrorMsg());
         } else {
             ClusterCompiler.compile(catalog, config);
+            // copy partition detection configuration from xml to catalog
+            Cluster catCluster = catalog.getClusters().get("cluster");
+            if (cluster.getPartitionDetection() != null && cluster.getPartitionDetection().isEnabled()) {
+                catCluster.setNetworkpartition(true);
+                CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
+                SnapshotSchedule sched = faultsnapshots.add(FaultType.CLUSTER_PARTITION.toString());
+                sched.setPrefix(cluster.getPartitionDetection().getSnapshot().getPrefix());
+                sched.setPath(cluster.getPartitionDetection().getSnapshot().getPath());
+            }
+            else {
+                catCluster.setNetworkpartition(false);
+            }
+
         }
     }
 

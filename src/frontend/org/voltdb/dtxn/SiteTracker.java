@@ -180,14 +180,10 @@ public class SiteTracker {
      */
     public int getLowestLiveNonExecSiteId()
     {
-        int lowestNonExecSiteId = -1;
+        int lowestNonExecSiteId = Integer.MAX_VALUE;
         for (Site site : getUpSites()) {
             if (!site.getIsexec()) {
-                if (lowestNonExecSiteId == -1) {
-                    lowestNonExecSiteId = Integer.parseInt(site.getTypeName());
-                } else {
-                    lowestNonExecSiteId = Math.min(lowestNonExecSiteId, Integer.parseInt(site.getTypeName()));
-                }
+                lowestNonExecSiteId = Math.min(lowestNonExecSiteId, Integer.parseInt(site.getTypeName()));
             }
         }
         return lowestNonExecSiteId;

@@ -23,18 +23,17 @@ public interface FaultDistributorInterface
 
     /**
      * Register a FaultHandler object to be notified when FaultType type occurs.
-     *
-     * @param type The FaultType in which the caller is interested
-     * @param handler The FaultHandler object which the caller wants called back
-     *        when the the specified type occurs
      * @param order Where in the calling sequence of fault handlers this
      *        handler should appear.  Lower values will be called first; multiple
      *        handlers can have the same value but there is no guarantee of
      *        the order in which they will be called
+     * @param handler The FaultHandler object which the caller wants called back
+     *        when the the specified type occurs
+     * @param types The FaultType in which the caller is interested
      */
-    public abstract void registerFaultHandler(FaultType type,
+    public abstract void registerFaultHandler(int order,
                                               FaultHandler handler,
-                                              int order);
+                                              FaultType... types);
 
     /**
      * Report that a fault (represented by the fault arg) has occurred.  All

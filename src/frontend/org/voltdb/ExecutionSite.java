@@ -33,12 +33,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
 import org.voltdb.VoltProcedure.VoltAbortException;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.Site;
-import org.voltdb.catalog.Table;
+import org.voltdb.catalog.*;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.debugstate.ExecutorContext;
@@ -57,9 +52,7 @@ import org.voltdb.elt.processors.RawProcessor.ELTInternalMessage;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.exceptions.SerializableException;
-import org.voltdb.fault.FaultHandler;
-import org.voltdb.fault.NodeFailureFault;
-import org.voltdb.fault.VoltFault;
+import org.voltdb.fault.*;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineIPC;
@@ -237,12 +230,37 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         }
     }
 
+    // This message is used to start a local snapshot. The snapshot
+    // is *not* automatically coordinated across the full node set.
+    // That must be arranged separately.
+    static class ExecutionSiteLocalSnapshotMessage extends VoltMessage
+    {
+        @Override
+        protected void flattenToBuffer(DBBPool pool) {
+            // can be empty if only used locally
+        }
+
+        @Override
+        protected void initFromBuffer() {
+            // can be empty if only used locally
+        }
+
+        @Override
+        public byte getSubject() {
+            return Subject.FAILURE.getId();
+        }
+    }
+
     // This message is used locally to schedule a node failure event's
     // required  processing at an execution site.
     static class ExecutionSiteNodeFailureMessage extends VoltMessage
     {
+        final boolean m_partitionDetection;
         final HashSet<NodeFailureFault> m_failedHosts;
-        ExecutionSiteNodeFailureMessage(HashSet<NodeFailureFault> failedHosts) {
+        ExecutionSiteNodeFailureMessage(HashSet<NodeFailureFault> failedHosts,
+                                        boolean partitionDetection)
+        {
+            m_partitionDetection = partitionDetection;
             m_failedHosts = failedHosts;
         }
 
@@ -299,19 +317,23 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             if (m_shouldContinue == false) {
                 return;
             }
-
+            boolean partitionDetection = false;
             HashSet<NodeFailureFault> failedNodes = new HashSet<NodeFailureFault>();
             for (VoltFault fault : faults) {
                 if (fault instanceof NodeFailureFault)
                 {
                     NodeFailureFault node_fault = (NodeFailureFault)fault;
                     failedNodes.add(node_fault);
+                } else if (fault instanceof ClusterPartitionFault) {
+                    ClusterPartitionFault cpf = (ClusterPartitionFault)fault;
+                    failedNodes.add(cpf.getCause());
+                    partitionDetection = true;
                 } else {
                     VoltDB.instance().getFaultDistributor().reportFaultHandled(this, fault);
                 }
             }
             if (!failedNodes.isEmpty()) {
-                m_mailbox.deliver(new ExecutionSiteNodeFailureMessage(failedNodes));
+                m_mailbox.deliver(new ExecutionSiteNodeFailureMessage(failedNodes, partitionDetection));
             }
         }
 
@@ -366,7 +388,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 }
                 finished = true;
             } catch (final InterruptedException e) {
-                System.out.println("Interrupted while shutting down. Trying again.");
                 e.printStackTrace();
             }
         }
@@ -524,9 +545,9 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         m_handledFailedSites.addAll(m_knownFailedSites);
 
         VoltDB.instance().getFaultDistributor().
-        registerFaultHandler(FaultType.NODE_FAILURE,
+        registerFaultHandler(NodeFailureFault.NODE_FAILURE_EXECUTION_SITE,
                              m_faultHandler,
-                             NodeFailureFault.NODE_FAILURE_EXECUTION_SITE);
+                             FaultType.NODE_FAILURE, FaultType.CLUSTER_PARTITION);
 
         if (voltdb.getBackendTargetType() == BackendTarget.NONE) {
             ee = new MockExecutionEngine();
@@ -852,7 +873,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 }
             }
             if (currentTxnState != null) {
-                //System.out.println("ExecutionSite " + getSiteId() + " running txnid " + currentTxnState.txnId);
                 recursableRun(currentTxnState);
             }
         }
@@ -1038,7 +1058,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 DumpManager.putDump(m_dumpId, m_currentDumpTimestamp, true, getDumpContents());
         }
         else if (message instanceof ExecutionSiteNodeFailureMessage) {
-            discoverGlobalFaultData(((ExecutionSiteNodeFailureMessage)message).m_failedHosts);
+            discoverGlobalFaultData((ExecutionSiteNodeFailureMessage)message);
         }
         else if (message instanceof CheckTxnStateCompletionMessage) {
             long txn_id = ((CheckTxnStateCompletionMessage)message).m_txnId;
@@ -1066,6 +1086,19 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             }
         } else if (message instanceof PotentialSnapshotWorkMessage) {
             m_snapshotter.doSnapshotWork(ee);
+        }
+        else if (message instanceof ExecutionSiteLocalSnapshotMessage) {
+            hostLog.info("Received ExecutionSiteLocalSnapshotMessage. Initiating local snapshot");
+            SnapshotSchedule schedule = m_context.cluster.getFaultsnapshots().
+                get(FaultType.CLUSTER_PARTITION.toString());
+            SnapshotSaveAPI saveAPI = new SnapshotSaveAPI();
+            saveAPI.startSnapshotting(schedule.getPath(),
+                                      schedule.getPrefix(),
+                                      (byte) 0x1,
+                                      lastCommittedTxnId,
+                                      m_systemProcedureContext,
+                                      ConnectionUtil.getHostnameOrAddress());
+            VoltDB.crashVoltDB();
         }
         else {
             hostLog.l7dlog(Level.FATAL, LogKeys.org_voltdb_dtxn_SimpleDtxnConnection_UnkownMessageClass.name(),
@@ -1123,20 +1156,21 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
      *
      * @param failedHostId the host id of the failed node.
      */
-    private void discoverGlobalFaultData(HashSet<NodeFailureFault> failedHosts)
+    private void discoverGlobalFaultData(ExecutionSiteNodeFailureMessage message)
     {
         //Keep it simple and don't try to recover on the recovering node.
         if (m_recovering) {
             m_recoveryLog.fatal("Aborting recovery due to a remote node failure. Retry again.");
             VoltDB.crashVoltDB();
         }
+        HashSet<NodeFailureFault> failures = message.m_failedHosts;
 
         // Fix context and associated site tracker first - need
         // an accurate topology to perform discovery.
         m_context = VoltDB.instance().getCatalogContext();
 
         HashSet<Integer> failedSiteIds = new HashSet<Integer>();
-        for (NodeFailureFault fault : failedHosts) {
+        for (NodeFailureFault fault : failures) {
             failedSiteIds.addAll(m_context.siteTracker.getAllSitesForHost(fault.getHostId()));
         }
         m_knownFailedSites.addAll(failedSiteIds);
@@ -1147,17 +1181,26 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         if (commit_and_safe == null) {
             return;
         }
-
         /*
+         * Agreed on a fault set. Do the work of patching up the execution site.
          * Do a little work to identify the newly failed site ids and only handle those
          */
         HashSet<Integer> newFailedSiteIds = new HashSet<Integer>(failedSiteIds);
         newFailedSiteIds.removeAll(m_handledFailedSites);
-        handleSiteFaults(newFailedSiteIds, commit_and_safe[0], commit_and_safe[1]);
+        handleSiteFaults(message.m_partitionDetection,
+                         newFailedSiteIds,
+                         commit_and_safe[0],
+                         commit_and_safe[1]);
         m_handledFailedSites.addAll(failedSiteIds);
-        for (NodeFailureFault fault : failedHosts) {
+        for (NodeFailureFault fault : failures) {
             if (newFailedSiteIds.containsAll(m_context.siteTracker.getAllSitesForHost(fault.getHostId()))) {
-                VoltDB.instance().getFaultDistributor().reportFaultHandled(m_faultHandler, fault);
+                if (message.m_partitionDetection) {
+                    VoltDB.instance().getFaultDistributor().
+                        reportFaultHandled(m_faultHandler, new ClusterPartitionFault(fault));
+                } else {
+                    VoltDB.instance().getFaultDistributor().
+                        reportFaultHandled(m_faultHandler, fault);
+                }
             }
         }
     }
@@ -1238,6 +1281,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             e.printStackTrace();
             VoltDB.crashVoltDB();
         }
+        m_recoveryLog.info("Sent fault data. Expecting " + expectedResponses + " responses.");
         return expectedResponses;
     }
 
@@ -1366,6 +1410,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
      * Different sites can process UpdateCatalog sysproc and handleNodeFault()
      * in different orders. UpdateCatalog changes MUST be commutative with
      * handleNodeFault.
+     * @param partitionDetected
      *
      * @param siteIds Hashset<Integer> of host ids of failed nodes
      * @param globalCommitPoint the surviving cluster's greatest committed multi-partition transaction id
@@ -1373,8 +1418,11 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
      * 2PC to any surviving cluster execution site by the failed initiator.
      *
      */
-    void handleSiteFaults(HashSet<Integer> failedSites, long globalMultiPartCommitPoint,
-                         long globalInitiationPoint) {
+    void handleSiteFaults(boolean partitionDetected,
+            HashSet<Integer> failedSites,
+            long globalMultiPartCommitPoint,
+            long globalInitiationPoint)
+    {
         HashSet<Integer> failedHosts = new HashSet<Integer>();
         for (Integer siteId : failedSites) {
             failedHosts.add(m_context.siteTracker.getHostForSite(siteId));
@@ -1395,6 +1443,17 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                     + globalInitiationPoint);
         }
         lastKnownGloballyCommitedMultiPartTxnId = globalMultiPartCommitPoint;
+
+        // If possibly partitioned, run through the safe initiated transaction and stall
+        if (partitionDetected) {
+            m_recoveryLog.info("Scheduling snapshot after txnId " + globalInitiationPoint +
+                               " for cluster partition fault. Current commit point: " + this.lastCommittedTxnId);
+            m_transactionQueue.makeRoadBlock(
+                globalInitiationPoint,
+                QueueState.BLOCKED_CLOSED,
+                new ExecutionSiteLocalSnapshotMessage());
+        }
+
 
         // Fix safe transaction scoreboard in transaction queue
         for (Integer i : failedSites)

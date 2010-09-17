@@ -41,7 +41,10 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.zip.CRC32;
 
-import org.voltdb.catalog.Table;
+import org.voltdb.VoltDB;
+import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltdb.catalog.*;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Pair;
 import org.voltdb.utils.DBBPool.BBContainer;
 
@@ -361,7 +364,6 @@ public class SnapshotUtil {
      * Returns a detailed report and a boolean indicating whether the snapshot can be successfully loaded
      * @param snapshotTime
      * @param snapshot
-     * @return
      */
     public static Pair<Boolean, String> generateSnapshotReport(Long snapshotTime, Snapshot snapshot) {
         CharArrayWriter caw = new CharArrayWriter();
@@ -591,7 +593,6 @@ public class SnapshotUtil {
      * @param table
      * @param fileNonce
      * @param hostId
-     * @return
      */
     public static final String constructFilenameForTable(Table table,
                                                          String fileNonce,
@@ -609,13 +610,55 @@ public class SnapshotUtil {
         return filename_builder.toString();
     }
 
+    public static final File constructFileForTable(Table table,
+            String filePath,
+            String fileNonce,
+            String hostId)
+    {
+        return new File(filePath, SnapshotUtil.constructFilenameForTable(
+            table, fileNonce, hostId));
+    }
+
     /**
      * Generates the digest filename for the given nonce.
      * @param nonce
-     * @return
      */
     public static final String constructDigestFilenameForNonce(String nonce) {
         return (nonce + ".digest");
     }
 
+    public static final List<Table> getTablesToSave(Database database)
+    {
+        CatalogMap<Table> all_tables = database.getTables();
+        ArrayList<Table> my_tables = new ArrayList<Table>();
+        for (Table table : all_tables)
+        {
+            // Make a list of all non-materialized, non-export only tables
+            if ((table.getMaterializer() != null) ||
+                    (CatalogUtil.isTableExportOnly(database, table)))
+            {
+                continue;
+            }
+            my_tables.add(table);
+        }
+        return my_tables;
+    }
+
+    public static final int[] getPartitionsOnHost(
+            SystemProcedureExecutionContext c, Host h) {
+        final ArrayList<Partition> results = new ArrayList<Partition>();
+        for (final Site s : VoltDB.instance().getCatalogContext().siteTracker.getUpSites()) {
+            if (s.getHost().getTypeName().equals(h.getTypeName())) {
+                if (s.getPartition() != null) {
+                    results.add(s.getPartition());
+                }
+            }
+        }
+        final int retval[] = new int[results.size()];
+        int ii = 0;
+        for (final Partition p : results) {
+            retval[ii++] = Integer.parseInt(p.getTypeName());
+        }
+        return retval;
+    }
 }

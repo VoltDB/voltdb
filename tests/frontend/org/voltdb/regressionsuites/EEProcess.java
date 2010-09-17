@@ -58,237 +58,229 @@ public class EEProcess {
             .synchronizedList(new ArrayList<String>());
 
     EEProcess(final BackendTarget target, String logfile) {
-        /*
-         * String ee_exec_path = System.getenv("EEIPC_PATH"); if (ee_exec_path
-         * != null) { try { eeProcess = Runtime.getRuntime().exec("valgrind " +
-         * ee_exec_path + " > ~aweisberg/valgrind_out 2>&1 "); } catch
-         * (IOException e) { throw new RuntimeException(e); } try {
-         * Thread.sleep(1000); } catch (InterruptedException e) { // TODO
-         * Auto-generated catch block e.printStackTrace(); } }
-         */
-         if (target.isIPC) {
-            if (verbose) {
-                System.out.println("Running " + target);
-            }
-            final ArrayList<String> args = new ArrayList<String>();
-            final String voltdbIPCPath = System.getenv("VOLTDBIPC_PATH");
-            args.add("valgrind");
-            args.add("--leak-check=full");
-            args.add("--show-reachable=yes");
-            args.add("--num-callers=32");
-            args.add("--error-exitcode=-1");
-            /*
-             * VOLTDBIPC_PATH is set as part of the regression suites and ant
-             * check In that scenario junit will handle logging of Valgrind
-             * output. stdout and stderr is forwarded from the backend.
-             */
-            if (voltdbIPCPath == null) {
-                args.add("--quiet");
-                args.add("--log-file=" + logfile);
-            }
-            args.add(voltdbIPCPath == null ? "./voltdbipc" : voltdbIPCPath);
-
-            final ProcessBuilder pb = new ProcessBuilder(args);
-            //pb.redirectErrorStream(true);
-
-            try {
-                m_eeProcess = pb.start();
-                final Process p = m_eeProcess;
-                Runtime.getRuntime().addShutdownHook(new Thread() {
-                    @Override
-                    public void run() {
-                        p.destroy();
-                    }
-                });
-            } catch (final IOException e) {
-                e.printStackTrace();
-                VoltDB.crashVoltDB();
-            }
-
-            final BufferedReader stderr = new BufferedReader(new InputStreamReader(
-                    m_eeProcess.getErrorStream()));
-
-            /*
-             * This block attempts to read the PID and then waits for the
-             * listening message indicating that the IPC EE is ready to accept a
-             * connection on a socket
-             */
-            final BufferedReader stdout = new BufferedReader(new InputStreamReader(
-                    m_eeProcess.getInputStream()));
-            try {
-                boolean failure = false;
-                String pidString = stdout.readLine();
-                if (pidString == null) {
-                    failure = true;
-                } else {
-                    if (verbose) {
-                      System.out.println("PID string \"" + pidString + "\"");
-                    }
-                    pidString = pidString.substring(2);
-                    pidString = pidString.substring(0, pidString.indexOf("="));
-                    m_eePID = pidString;
-                }
-
-                String portString = stdout.readLine();
-                if (portString == null) {
-                    failure = true;
-                } else {
-                    if (verbose) {
-                      System.out.println("Port string \"" + portString + "\"");
-                    }
-                    portString = portString.substring(2);
-                    portString = portString.substring(0,
-                            portString.indexOf("="));
-                    m_port = Integer.valueOf(portString);
-                }
-
-                while (true) {
-                    String line = null;
-                    if (!failure) {
-                        line = stdout.readLine();
-                    }
-                    if (line != null && !failure) {
-                        if (verbose) {
-                          System.out.println("[ipc=" + m_eePID + "]:::" + line);
-                        }
-                        if (line.contains("listening")) {
-                            break;
-                        } else {
-                            continue;
-                        }
-                    } else {
-                        while ((line = stderr.readLine()) != null) {
-                            if (verbose) {
-                                System.err.println(line);
-                            }
-                        }
-                        try {
-                            m_eeProcess.waitFor();
-                        } catch (final InterruptedException e) {
-                            // TODO Auto-generated catch block
-                            e.printStackTrace();
-                        }
-                        System.out.println("[ipc=" + m_eePID
-                                + "] Returned end of stream and exit value "
-                                + m_eeProcess.exitValue());
-                        VoltDB.crashVoltDB();
-                    }
-                }
-            } catch (final IOException e) {
-                e.printStackTrace();
-                return;
-            }
-
-            /*
-             * Create a thread to parse Valgrind's output and populdate
-             * m_valgrindErrors with errors.
-             */
-            final Process p = m_eeProcess;
-            m_stdoutParser = new Thread() {
-                @Override
-                public void run() {
-                    while (true) {
-                        try {
-                            final String line = stdout.readLine();
-                            if (line != null) {
-                                if (verbose) {
-                                    System.out.println("[ipc=" + p.hashCode()
-                                            + "]:::" + line);
-                                }
-                            } else {
-                                try {
-                                    p.waitFor();
-                                } catch (final InterruptedException e) {
-                                    e.printStackTrace();
-                                }
-                                if (verbose) {
-                                    System.out
-                                            .println("[ipc="
-                                                    + m_eePID
-                                                    + "] Returned end of stream and exit value "
-                                                    + p.exitValue());
-                                }
-                                if (!m_allHeapBlocksFreed) {
-                                    m_valgrindErrors
-                                            .add("Not all heap blocks were freed");
-                                }
-                                return;
-                            }
-                        } catch (final IOException e) {
-                            e.printStackTrace();
-                            return;
-                        }
-                    }
-                }
-            };
-
-            m_stderrParser = new Thread() {
-                @Override
-                public void run() {
-                    while (true) {
-                        try {
-                            final String line = stderr.readLine();
-                            if (line != null) {
-                                if (verbose) {
-                                    System.err.println("[ipc=" + p.hashCode()
-                                            + "]:::" + line);
-                                }
-                                if (line.startsWith("==" + m_eePID + "==")) {
-                                    processValgrindOutput(line);
-                                }
-                            } else {
-                                try {
-                                    p.waitFor();
-                                } catch (final InterruptedException e) {
-                                    e.printStackTrace();
-                                }
-                                if (verbose) {
-                                    System.out
-                                            .println("[ipc="
-                                                    + m_eePID
-                                                    + "] Returned end of stream and exit value "
-                                                    + p.exitValue());
-                                }
-                                if (!m_allHeapBlocksFreed) {
-                                    m_valgrindErrors
-                                            .add("Not all heap blocks were freed");
-                                }
-                                return;
-                            }
-                        } catch (final IOException e) {
-                            e.printStackTrace();
-                            return;
-                        }
-                    }
-                }
-
-                private void processValgrindOutput(final String line) {
-                    final String errorLineString = "ERROR SUMMARY: ";
-                    final String heapBlocksFreedString = "All heap blocks were freed";
-                    /*
-                     * An indirect way of making sure Valgrind reports no error
-                     * memory accesses
-                     */
-                    if (line.contains(errorLineString)) {
-                        final int index = line.indexOf(errorLineString)
-                                + errorLineString.length();
-                        final char errorNumChar = line.charAt(index);
-                        if (!(errorNumChar == '0')) {
-                            m_valgrindErrors.add(line);
-                        }
-                    } else if (line.contains(heapBlocksFreedString)) {
-                        m_allHeapBlocksFreed = true;
-                    }
-                }
-            };
-
-            m_stdoutParser.setDaemon(false);
-            m_stdoutParser.start();
-            m_stderrParser.setDaemon(false);
-            m_stderrParser.start();
-        } else {
+        if (!target.isIPC) {
             return;
         }
+
+        if (verbose) {
+            System.out.println("Running " + target);
+        }
+        final ArrayList<String> args = new ArrayList<String>();
+        final String voltdbIPCPath = System.getenv("VOLTDBIPC_PATH");
+        args.add("valgrind");
+        args.add("--leak-check=full");
+        args.add("--show-reachable=yes");
+        args.add("--num-callers=32");
+        args.add("--error-exitcode=-1");
+        /*
+         * VOLTDBIPC_PATH is set as part of the regression suites and ant
+         * check In that scenario junit will handle logging of Valgrind
+         * output. stdout and stderr is forwarded from the backend.
+         */
+        if (voltdbIPCPath == null) {
+            args.add("--quiet");
+            args.add("--log-file=" + logfile);
+        }
+        args.add(voltdbIPCPath == null ? "./voltdbipc" : voltdbIPCPath);
+
+        final ProcessBuilder pb = new ProcessBuilder(args);
+        //pb.redirectErrorStream(true);
+
+        try {
+            m_eeProcess = pb.start();
+            final Process p = m_eeProcess;
+            Runtime.getRuntime().addShutdownHook(new Thread() {
+                @Override
+                public void run() {
+                    p.destroy();
+                }
+            });
+        } catch (final IOException e) {
+            e.printStackTrace();
+            VoltDB.crashVoltDB();
+        }
+
+        final BufferedReader stderr = new BufferedReader(new InputStreamReader(
+                                                                               m_eeProcess.getErrorStream()));
+
+        /*
+         * This block attempts to read the PID and then waits for the
+         * listening message indicating that the IPC EE is ready to accept a
+         * connection on a socket
+         */
+        final BufferedReader stdout = new BufferedReader(new InputStreamReader(
+                                                                               m_eeProcess.getInputStream()));
+        try {
+            boolean failure = false;
+            String pidString = stdout.readLine();
+            if (pidString == null) {
+                failure = true;
+            } else {
+                if (verbose) {
+                    System.out.println("PID string \"" + pidString + "\"");
+                }
+                pidString = pidString.substring(2);
+                pidString = pidString.substring(0, pidString.indexOf("="));
+                m_eePID = pidString;
+            }
+
+            String portString = stdout.readLine();
+            if (portString == null) {
+                failure = true;
+            } else {
+                if (verbose) {
+                    System.out.println("Port string \"" + portString + "\"");
+                }
+                portString = portString.substring(2);
+                portString = portString.substring(0,
+                                                  portString.indexOf("="));
+                m_port = Integer.valueOf(portString);
+            }
+
+            while (true) {
+                String line = null;
+                if (!failure) {
+                    line = stdout.readLine();
+                }
+                if (line != null && !failure) {
+                    if (verbose) {
+                        System.out.println("[ipc=" + m_eePID + "]:::" + line);
+                    }
+                    if (line.contains("listening")) {
+                        break;
+                    } else {
+                        continue;
+                    }
+                } else {
+                    while ((line = stderr.readLine()) != null) {
+                        if (verbose) {
+                            System.err.println(line);
+                        }
+                    }
+                    try {
+                        m_eeProcess.waitFor();
+                    } catch (final InterruptedException e) {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    }
+                    System.out.println("[ipc=" + m_eePID
+                                       + "] Returned end of stream and exit value "
+                                       + m_eeProcess.exitValue());
+                    VoltDB.crashVoltDB();
+                }
+            }
+        } catch (final IOException e) {
+            e.printStackTrace();
+            return;
+        }
+
+        /*
+         * Create a thread to parse Valgrind's output and populdate
+         * m_valgrindErrors with errors.
+         */
+        final Process p = m_eeProcess;
+        m_stdoutParser = new Thread() {
+            @Override
+            public void run() {
+                while (true) {
+                    try {
+                        final String line = stdout.readLine();
+                        if (line != null) {
+                            if (verbose) {
+                                System.out.println("[ipc=" + p.hashCode()
+                                                   + "]:::" + line);
+                            }
+                        } else {
+                            try {
+                                p.waitFor();
+                            } catch (final InterruptedException e) {
+                                e.printStackTrace();
+                            }
+                            if (verbose) {
+                                System.out
+                                .println("[ipc="
+                                         + m_eePID
+                                         + "] Returned end of stream and exit value "
+                                         + p.exitValue());
+                            }
+                            if (!m_allHeapBlocksFreed) {
+                                m_valgrindErrors
+                                .add("Not all heap blocks were freed");
+                            }
+                            return;
+                        }
+                    } catch (final IOException e) {
+                        e.printStackTrace();
+                        return;
+                    }
+                }
+            }
+        };
+
+        m_stderrParser = new Thread() {
+            @Override
+            public void run() {
+                while (true) {
+                    try {
+                        final String line = stderr.readLine();
+                        if (line != null) {
+                            if (verbose) {
+                                System.err.println("[ipc=" + p.hashCode()
+                                                   + "]:::" + line);
+                            }
+                            if (line.startsWith("==" + m_eePID + "==")) {
+                                processValgrindOutput(line);
+                            }
+                        } else {
+                            try {
+                                p.waitFor();
+                            } catch (final InterruptedException e) {
+                                e.printStackTrace();
+                            }
+                            if (verbose) {
+                                System.out
+                                .println("[ipc="
+                                         + m_eePID
+                                         + "] Returned end of stream and exit value "
+                                         + p.exitValue());
+                            }
+                            if (!m_allHeapBlocksFreed) {
+                                m_valgrindErrors
+                                .add("Not all heap blocks were freed");
+                            }
+                            return;
+                        }
+                    } catch (final IOException e) {
+                        e.printStackTrace();
+                        return;
+                    }
+                }
+            }
+
+            private void processValgrindOutput(final String line) {
+                final String errorLineString = "ERROR SUMMARY: ";
+                final String heapBlocksFreedString = "All heap blocks were freed";
+                /*
+                 * An indirect way of making sure Valgrind reports no error
+                 * memory accesses
+                 */
+                if (line.contains(errorLineString)) {
+                    final int index = line.indexOf(errorLineString)
+                    + errorLineString.length();
+                    final char errorNumChar = line.charAt(index);
+                    if (!(errorNumChar == '0')) {
+                        m_valgrindErrors.add(line);
+                    }
+                } else if (line.contains(heapBlocksFreedString)) {
+                    m_allHeapBlocksFreed = true;
+                }
+            }
+        };
+
+        m_stdoutParser.setDaemon(false);
+        m_stdoutParser.start();
+        m_stderrParser.setDaemon(false);
+        m_stderrParser.start();
     }
 
     public void destroy() {

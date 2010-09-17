@@ -86,4 +86,7 @@ public interface VoltServerConfig {
      * @return Is the underlying instance of VoltDB running IPC with Valgrind?
      */
     public boolean isValgrind();
+
+    boolean compileWithPartitiondDetection(VoltProjectBuilder builder,
+            String ppdPath, String ppdPrefix);
 }

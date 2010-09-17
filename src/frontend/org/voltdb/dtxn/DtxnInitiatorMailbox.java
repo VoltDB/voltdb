@@ -25,9 +25,7 @@ import java.util.Set;
 
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
-import org.voltdb.fault.FaultHandler;
-import org.voltdb.fault.NodeFailureFault;
-import org.voltdb.fault.VoltFault;
+import org.voltdb.fault.*;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.messaging.HeartbeatResponseMessage;
 import org.voltdb.messaging.HostMessenger;
@@ -59,9 +57,15 @@ public class DtxnInitiatorMailbox implements Mailbox
         {
             synchronized (m_initiator) {
                 for (VoltFault fault : faults) {
-                    if (fault instanceof NodeFailureFault)
+                    if (fault instanceof NodeFailureFault || fault instanceof ClusterPartitionFault)
                     {
-                        NodeFailureFault node_fault = (NodeFailureFault) fault;
+                        NodeFailureFault node_fault;
+                        if (fault instanceof NodeFailureFault) {
+                            node_fault = (NodeFailureFault)fault;
+                        }
+                        else {
+                            node_fault = ((ClusterPartitionFault)fault).getCause();
+                        }
                         ArrayList<Integer> dead_sites =
                             VoltDB.instance().getCatalogContext().siteTracker.
                             getAllSitesForHost(node_fault.getHostId());
@@ -117,9 +121,9 @@ public class DtxnInitiatorMailbox implements Mailbox
         VoltDB.instance().getFaultDistributor().
         // For Node failure, the initiators need to be ordered after the catalog
         // but before everything else (to prevent any new work for bad sites)
-        registerFaultHandler(FaultType.NODE_FAILURE,
+        registerFaultHandler(NodeFailureFault.NODE_FAILURE_INITIATOR,
                              new InitiatorNodeFailureFaultHandler(),
-                             NodeFailureFault.NODE_FAILURE_INITIATOR);
+                             FaultType.NODE_FAILURE, FaultType.CLUSTER_PARTITION);
     }
 
     public void setInitiator(TransactionInitiator initiator) {

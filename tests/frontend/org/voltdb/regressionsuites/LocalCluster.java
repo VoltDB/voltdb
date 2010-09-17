@@ -22,10 +22,7 @@
  */
 package org.voltdb.regressionsuites;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -93,30 +90,26 @@ public class LocalCluster implements VoltServerConfig {
      * in output - the signal of readiness!
      */
     public static class PipeToFile extends Thread {
+        final static String m_initToken = "Server completed init";
+        final static String m_rejoinToken = "Node recovery complete";
+        final static String m_initiatorID = "INITIALIZING INITIATOR ID:";
+
         FileWriter m_writer ;
-        InputStream m_input;
+        BufferedReader m_input;
         String m_filename;
 
         // set m_witnessReady when the m_token byte sequence is seen.
         AtomicBoolean m_witnessedReady;
-        final int m_token[];
-        final static int m_initToken[] = new int[] {'S', 'e', 'r', 'v', 'e', 'r', ' ',
-                                        'c', 'o', 'm', 'p', 'l', 'e', 't', 'e', 'd', ' ',
-                                        'i','n','i','t'};
-        final static int m_rejoinToken[] = new int[] {
-            'N', 'o', 'd', 'e', ' ',
-            'r', 'e', 'c', 'o', 'v', 'e', 'r', 'y', ' ',
-            'c', 'o', 'm', 'p', 'l', 'e', 't', 'e'};
-
+        final String m_token;
+        int m_hostId = Integer.MAX_VALUE;
         long m_initTime;
-
         private boolean m_eof = false;
 
-        PipeToFile(String filename, InputStream stream, int token[]) {
+        PipeToFile(String filename, InputStream stream, String token) {
             m_witnessedReady = new AtomicBoolean(false);
             m_token = token;
             m_filename = filename;
-            m_input = stream;
+            m_input = new BufferedReader(new InputStreamReader(stream));
             try {
                 m_writer = new FileWriter(filename);
             }
@@ -126,49 +119,49 @@ public class LocalCluster implements VoltServerConfig {
             }
         }
 
+        public int getHostId() {
+            synchronized(this) {
+                return m_hostId;
+            }
+        }
         @Override
         public void run() {
             assert(m_writer != null);
             assert(m_input != null);
-            int location = 0;
-            int initLocation = 0;
             boolean initLocationFound = false;
             while (!m_eof) {
                 try {
-                    int data = m_input.read();
-                    if (data == -1) {
+                    String data = m_input.readLine();
+                    if (data == null) {
                         m_eof = true;
+                        continue;
                     }
-                    else {
-                        // look for a sequence of letters matching the server ready token.
-                        if (!m_witnessedReady.get() && m_token[location] == data) {
-                            location++;
-                            if (location == m_token.length) {
-                                synchronized (this) {
-                                    m_witnessedReady.set(true);
-                                    this.notifyAll();
-                                }
-                            }
-                        }
-                        else {
-                            location = 0;
-                        }
 
-                        // look for a sequence of letters matching the server ready token.
-                        if (!initLocationFound && m_initToken[initLocation] == data) {
-                            initLocation++;
-                            if (initLocation == m_initToken.length) {
-                                initLocationFound = true;
-                                m_initTime = System.currentTimeMillis();
-                            }
+                    // look for the non-exec site id
+                    if (data.contains(m_initiatorID)) {
+                        // INITIALIZING INITIATOR ID: 1, SITEID: 0
+                        String[] split = data.split(" ");
+                        synchronized(this) {
+                            m_hostId = Integer.parseInt(split[split.length - 1]);
                         }
-                        else {
-                            initLocation = 0;
-                        }
-
-                        m_writer.write(data);
-                        m_writer.flush();
                     }
+
+                    // look for a sequence of letters matching the server ready token.
+                    if (!m_witnessedReady.get() && data.contains(m_token)) {
+                        synchronized (this) {
+                            m_witnessedReady.set(true);
+                            this.notifyAll();
+                        }
+                    }
+
+                    // look for a sequence of letters matching the server ready token.
+                    if (!initLocationFound && data.contains(m_initToken)) {
+                        initLocationFound = true;
+                        m_initTime = System.currentTimeMillis();
+                    }
+
+                    m_writer.write(data + "\n");
+                    m_writer.flush();
                 }
                 catch (IOException ex) {
                     m_eof = true;
@@ -208,8 +201,8 @@ public class LocalCluster implements VoltServerConfig {
         assert (hostCount > 0);
         assert (replication >= 0);
 
-        final String buildType = System.getenv().get("BUILD");
-//        if (buildType == null) {
+//      final String buildType = System.getenv().get("BUILD");
+//      if (buildType == null) {
         /*
          * Disable memcheck with localcluster for now since it doesn't pass.
          */
@@ -320,6 +313,17 @@ public class LocalCluster implements VoltServerConfig {
         m_compiled = builder.compile(m_jarFileName, m_siteCount, m_hostCount, m_replication, "localhost");
         m_pathToDeployment = builder.getPathToDeployment();
 
+        return m_compiled;
+    }
+
+    @Override
+    public boolean compileWithPartitiondDetection(VoltProjectBuilder builder, String ppdPath,  String ppdPrefix) {
+        if (m_compiled) {
+            return true;
+        }
+        m_compiled = builder.compile(m_jarFileName, m_siteCount, m_hostCount, m_replication, "localhost",
+                                     true, ppdPath, ppdPrefix);
+        m_pathToDeployment = builder.getPathToDeployment();
         return m_compiled;
     }
 
@@ -664,11 +668,13 @@ public class LocalCluster implements VoltServerConfig {
            procs = m_eeProcs.get(hostNum);
         }
 
-        if (proc != null)
+        if (proc != null) {
             proc.destroy();
-        if (ptf != null) {
-            new File(ptf.m_filename).delete();
         }
+
+        // if (ptf != null) {
+        //     new File(ptf.m_filename).delete();
+        // }
 
         for (EEProcess eeproc : procs) {
             if (forceKillEEProcs) {
@@ -744,6 +750,35 @@ public class LocalCluster implements VoltServerConfig {
     public int getNodeCount()
     {
         return m_hostCount;
+    }
+
+    public boolean areAllNonLocalProcessesDead() {
+        for (Process proc : m_cluster){
+            try {
+                if (proc != null) {
+                    proc.exitValue();
+                }
+            }
+            catch (IllegalThreadStateException ex) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public int getBlessedPartitionDetectionProcId() {
+        int currMin = Integer.MAX_VALUE;
+        int currMinIdx = 0;
+        for (int i = 0; i < m_pipes.size(); i++) {
+            PipeToFile p = m_pipes.get(i);
+            System.out.println("Index " + i + " had hostid: " + p.getHostId());
+            if (p.getHostId() < currMin) {
+                currMin = p.getHostId();
+                currMinIdx = i;
+                System.out.println("Setting index: " + i + " to blessed.");
+            }
+        }
+        return currMinIdx;
     }
 
     @Override

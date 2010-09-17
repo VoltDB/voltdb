@@ -450,7 +450,6 @@ public class TestPlansGroupBySuite extends RegressionSuite {
      * group by D1_NAME, D2_NAME
      * @throws InterruptedException
      */
-    @SuppressWarnings("unchecked")
     public void testDistributedSumGroupMultiJoin() throws IOException,
     ProcCallException, InterruptedException {
         VoltTable vt;
@@ -509,7 +508,6 @@ public class TestPlansGroupBySuite extends RegressionSuite {
      * group by D1_NAME, D2_NAME
      * @throws InterruptedException
      */
-    @SuppressWarnings("unchecked")
     public void testDistributedSumGroupMultiJoinOneDim() throws IOException,
     ProcCallException, InterruptedException {
         VoltTable vt;
@@ -648,14 +646,10 @@ public class TestPlansGroupBySuite extends RegressionSuite {
         return builder;
     }
 
-    @SuppressWarnings("rawtypes")
-    public class VRowComparator<T> implements Comparator {
-
+    public class VRowComparator<T> implements Comparator<VoltTableRow>
+    {
         @Override
-        public int compare(Object arg0, Object arg1) {
-            VoltTableRow r1 = (VoltTableRow)arg0;
-            VoltTableRow r2 = (VoltTableRow)arg1;
-
+        public int compare(VoltTableRow r1, VoltTableRow r2) {
             String r1d1 = (String) r1.get(0, VoltType.STRING);
             String r1d2 = (String) r1.get(1, VoltType.STRING);
             String r2d1 = (String) r2.get(0, VoltType.STRING);

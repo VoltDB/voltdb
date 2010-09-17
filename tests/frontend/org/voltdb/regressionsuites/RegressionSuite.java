@@ -121,6 +121,7 @@ public class RegressionSuite extends TestCase {
      * @return A VoltClient instance connected to the server driven by the
      * VoltServerConfig instance.
      */
+    @SuppressWarnings("deprecation")
     public Client getClient() throws IOException {
         final List<String> listeners = m_config.getListenerAddresses();
         final Random r = new Random();

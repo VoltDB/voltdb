@@ -18,17 +18,20 @@
 package org.voltdb.dtxn;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.Map.Entry;
 import java.util.PriorityQueue;
 
-import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltDB;
 import org.voltdb.debugstate.ExecutorContext;
 import org.voltdb.debugstate.ExecutorContext.ExecutorTxnState;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.HeartbeatResponseMessage;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
+import org.voltdb.messaging.VoltMessage;
 
 /**
  * <p>Extends a PriorityQueue such that is only stores transaction state
@@ -44,12 +47,14 @@ import org.voltdb.messaging.MessagingException;
  */
 public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
     private static final long serialVersionUID = 1L;
+    private VoltLogger m_recoveryLog = new VoltLogger("RECOVERY");
 
     public enum QueueState {
         UNBLOCKED,
         BLOCKED_EMPTY,
         BLOCKED_ORDERING,
-        BLOCKED_SAFETY;
+        BLOCKED_SAFETY,
+        BLOCKED_CLOSED;    // terminal state.
     }
 
     class LastInitiatorData {
@@ -63,11 +68,59 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
     }
 
     final LinkedHashMap<Integer, LastInitiatorData> m_initiatorData = new LinkedHashMap<Integer, LastInitiatorData>();
+    final LinkedList<RoadBlock> m_roadblocks = new LinkedList<RoadBlock>();
+
+    /**
+     * A future transaction point at which RPQ must send an action
+     * message and stall indefinitely.
+     */
+    static class RoadBlock implements Comparable<RoadBlock> {
+        final long m_transactionId;
+        final QueueState m_reason;
+        final VoltMessage m_action;
+
+        RoadBlock(long id, QueueState reason, VoltMessage action) {
+            m_transactionId = id;
+            m_reason = reason;
+            m_action = action;
+        }
+
+        @Override
+        public int compareTo(RoadBlock o) {
+            if (m_transactionId < o.m_transactionId) {
+                return -1;
+            } else if (m_transactionId > o.m_transactionId) {
+                return 1;
+            }
+            return 0;
+        }
+    }
+
+    public void makeRoadBlock(long blockAfter, QueueState blockReason, VoltMessage action) {
+        RoadBlock roadblock = new RoadBlock(blockAfter, blockReason, action);
+        m_roadblocks.add(roadblock);
+        Collections.sort(m_roadblocks);
+    }
+
+    QueueState checkRoadBlock(long txnId) {
+        // System.out.println("Checking roadblock with txnId: " + txnId);
+        RoadBlock roadblock = m_roadblocks.peek();
+        if (roadblock != null && roadblock.m_transactionId < txnId) {
+            roadblock = m_roadblocks.poll();
+            m_recoveryLog.info("Delivering roadblock action: " +
+                               roadblock.m_action + " for txnId: " +
+                               roadblock.m_transactionId);
+            if (roadblock.m_action != null) {
+                m_mailbox.deliverFront(roadblock.m_action);
+            }
+            return roadblock.m_reason;
+        }
+        return QueueState.UNBLOCKED;
+    }
 
     long m_newestCandidateTransaction = -1;
     final int m_siteId;
     long m_txnsPopped = 0;
-    long m_lastTxnPopped = 0;
     QueueState m_state = QueueState.BLOCKED_EMPTY;
     final Mailbox m_mailbox;
 
@@ -89,14 +142,12 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
     @Override
     public TransactionState poll() {
         TransactionState retval = null;
+        updateQueueState();
         if (m_state == QueueState.UNBLOCKED) {
-            assert(checkQueueState() == QueueState.UNBLOCKED);
             retval = super.poll();
-            assert(retval != null);
             m_txnsPopped++;
-            m_lastTxnPopped = retval.txnId;
-            // call this again to check
-            checkQueueState();
+            // not BLOCKED_EMPTY
+            assert(retval != null);
         }
         return retval;
     }
@@ -107,9 +158,10 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
     @Override
     public TransactionState peek() {
         TransactionState retval = null;
+        updateQueueState();
         if (m_state == QueueState.UNBLOCKED) {
-            assert(checkQueueState() == QueueState.UNBLOCKED);
             retval = super.peek();
+            // not BLOCKED_EMPTY
             assert(retval != null);
         }
         return retval;
@@ -125,14 +177,14 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
         }
         boolean retval = super.add(txnState);
         // update the queue state
-        if (retval) checkQueueState();
+        if (retval) updateQueueState();
         return retval;
     }
 
     @Override
     public boolean remove(Object txnState) {
         boolean retval = super.remove(txnState);
-        checkQueueState();
+        updateQueueState();
         return retval;
     }
 
@@ -142,26 +194,16 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
      */
     public long noteTransactionRecievedAndReturnLastSeen(int initiatorSiteId, long txnId, boolean isHeartbeat, long lastSafeTxnIdFromInitiator)
     {
-        //VLog.log("Site %d got heartbeat message from initiator %d with txnid/safeid: %d/%d",
-        //        m_siteId, initiatorSiteId, txnId, lastSafeTxnIdFromInitiator);
+//        System.out.printf("Site %d got heartbeat message from initiator %d with txnid/safeid: %d/%d\n",
+//               m_siteId, initiatorSiteId, txnId, lastSafeTxnIdFromInitiator);
 
         // this doesn't exclude dummy txnid but is also a sanity check
         assert(txnId != 0);
 
         // Drop old data from already-failed initiators.
-        if (m_initiatorData.containsKey(initiatorSiteId) == false)
+        if (m_initiatorData.containsKey(initiatorSiteId) == false) {
+            System.out.println("Dropping data from failed initiatorSiteId: " + initiatorSiteId);
             return DtxnConstants.DUMMY_LAST_SEEN_TXN_ID;
-
-        // we've decided that this can happen, and it's fine... just ignore it
-        if (m_lastTxnPopped > txnId) {
-            StringBuilder msg = new StringBuilder();
-            msg.append("Txn ordering deadlock (QUEUE) at site ").append(m_siteId).append(":\n");
-            msg.append("   txn ").append(m_lastTxnPopped).append(" (");
-            msg.append(TransactionIdManager.toString(m_lastTxnPopped)).append(" HB: ?) before\n");
-            msg.append("   txn ").append(txnId).append(" (");
-            msg.append(TransactionIdManager.toString(txnId)).append(" HB:");
-            msg.append(isHeartbeat).append(").\n");
-            System.err.print(msg.toString());
         }
 
         // update the latest transaction for the specified initiator
@@ -183,7 +225,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
         m_newestCandidateTransaction = min;
 
         // this will update the state of the queue if needed
-        checkQueueState();
+        updateQueueState();
 
         // return the last seen id for the originating initiator
         return lid.m_lastSeenTxnId;
@@ -277,14 +319,33 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
 
     long m_blockTime = 0;
 
-    QueueState checkQueueState() {
+    QueueState updateQueueState() {
         QueueState newState = QueueState.UNBLOCKED;
         TransactionState ts = super.peek();
         LastInitiatorData lid = null;
-        if (ts == null) {
+
+        // Check terminal states (currently only BLOCKED_CLOSED)
+        // and handle an empty queue first.
+        if (m_state == QueueState.BLOCKED_CLOSED) {
+            newState = m_state;
+        }
+        else if (ts == null) {
             newState = QueueState.BLOCKED_EMPTY;
         }
-        else {
+
+        // If still unblocked, check roadblocks. Note that heartbeats
+        // can drive an empty queue to the BLOCKED_CLOSED state, too.
+        if (newState == QueueState.UNBLOCKED) {
+            newState = checkRoadBlock(ts.txnId);
+        }
+        else if (newState == QueueState.BLOCKED_EMPTY) {
+            QueueState checkRoadBlock = checkRoadBlock(m_newestCandidateTransaction);
+            if (checkRoadBlock == QueueState.BLOCKED_CLOSED)
+                newState = checkRoadBlock;
+        }
+
+        // No roadblocks, not empty - verify order and safety
+        if (newState == QueueState.UNBLOCKED) {
             if (ts.txnId > m_newestCandidateTransaction) {
                 newState = QueueState.BLOCKED_ORDERING;
             }
@@ -296,20 +357,19 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
                 }
             }
         }
-        if (newState != m_state) {
-            // THIS CODE IS HERE TO HANDLE A STATE CHANGE
-            //VLog.log("RPQ State for site id %d is now %s", m_siteId, newState.name());
 
-            // note if we get non-empty but blocked
-            if ((newState == QueueState.BLOCKED_ORDERING) || (newState == QueueState.BLOCKED_SAFETY)) {
+        // Execute state changes
+        if (newState != m_state) {
+            // Count millis spent non-empty but blocked
+            if ((newState == QueueState.BLOCKED_ORDERING) ||
+                (newState == QueueState.BLOCKED_SAFETY))
+            {
                 m_blockTime = System.currentTimeMillis();
             }
 
-            if ((m_state == QueueState.BLOCKED_ORDERING) || (m_state == QueueState.BLOCKED_SAFETY)) {
-                assert(m_state != QueueState.BLOCKED_EMPTY);
-            }
-
-            // if now blocked, send a heartbeat response
+            // Send a heartbeat response on blocked safety transitions
+            // This side-effect is a little broken. It results in extra
+            // heartbeat responses in some paths.
             if (newState == QueueState.BLOCKED_SAFETY) {
                 assert(ts != null);
                 assert(lid != null);
@@ -318,6 +378,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
 
             m_state = newState;
         }
+
         return m_state;
     }
 

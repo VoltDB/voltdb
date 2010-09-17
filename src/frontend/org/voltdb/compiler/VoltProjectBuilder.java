@@ -404,11 +404,23 @@ public class VoltProjectBuilder {
     public boolean compile(final String jarPath, final int sitesPerHost, final int hostCount, final int replication,
                            final String leaderAddress) {
         VoltCompiler compiler = new VoltCompiler();
-        return compile(compiler, jarPath, sitesPerHost, hostCount, replication, leaderAddress);
+        return compile(compiler, jarPath, sitesPerHost, hostCount, replication, leaderAddress,
+                       false, "none", "none");
+    }
+
+    public boolean compile(
+            final String jarPath, final int sitesPerHost,
+            final int hostCount, final int replication, final String leaderAddress,
+            final boolean ppdEnabled, final String ppdPath, final String ppdPrefix)
+    {
+        VoltCompiler compiler = new VoltCompiler();
+        return compile(compiler, jarPath, sitesPerHost, hostCount, replication, leaderAddress,
+                       ppdEnabled, ppdPath, ppdPrefix);
     }
 
     public boolean compile(final VoltCompiler compiler, final String jarPath, final int sitesPerHost,
-                           final int hostCount, final int replication, final String leaderAddress) {
+                           final int hostCount, final int replication, final String leaderAddress,
+                           final boolean ppdEnabled, final String ppdPath, final String ppdPrefix) {
         assert(jarPath != null);
         assert(sitesPerHost >= 1);
         assert(hostCount >= 1);
@@ -475,7 +487,7 @@ public class VoltProjectBuilder {
         final String projectPath = projectFile.getPath();
 
         boolean success = compiler.compile(projectPath, jarPath, m_compilerDebugPrintStream, m_procInfoOverrides);
-        m_pathToDeployment = writeDeploymentFile(hostCount, sitesPerHost, leaderAddress, replication);
+        m_pathToDeployment = writeDeploymentFile(hostCount, sitesPerHost, leaderAddress, replication, ppdEnabled, ppdPath, ppdPrefix);
 
         return success;
     }
@@ -693,7 +705,8 @@ public class VoltProjectBuilder {
      * @param kFactor Replication factor.
      * @return Returns the path the temporary file was written to.
      */
-    private String writeDeploymentFile(int hostCount, int sitesPerHost, String leader, int kFactor) {
+    private String writeDeploymentFile(int hostCount, int sitesPerHost, String leader, int kFactor,
+            boolean ppdEnabled, String ppdPath, String ppdPrefix) {
         DocumentBuilderFactory docFactory;
         DocumentBuilder docBuilder;
         Document doc;
@@ -718,6 +731,17 @@ public class VoltProjectBuilder {
         cluster.setAttribute("leader", leader);
         cluster.setAttribute("kfactor", new Integer(kFactor).toString());
         deployment.appendChild(cluster);
+
+        // <cluster>/<partition-detection>/<snapshot>
+        if (ppdEnabled) {
+            final Element ppd = doc.createElement("partition-detection");
+            cluster.appendChild(ppd);
+            ppd.setAttribute("enabled", "true");
+            final Element ss = doc.createElement("snapshot");
+            ss.setAttribute("path", ppdPath);
+            ss.setAttribute("prefix", ppdPrefix);
+            ppd.appendChild(ss);
+        }
 
         // <users>
         Element users = null;
