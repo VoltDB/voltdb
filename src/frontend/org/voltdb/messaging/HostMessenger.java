@@ -109,7 +109,7 @@ public class HostMessenger implements Messenger {
         m_expectedHosts = expectedHosts;
         m_hostsToWaitFor.set(expectedHosts);
         m_network = network;
-        m_joiner = new SocketJoiner(acceptor, expectedHosts, hostLog);
+        m_joiner = new SocketJoiner(acceptor, expectedHosts, catalogCRC, hostLog);
         m_joiner.start();
 
         m_foreignHosts = new ForeignHost[expectedHosts + 1];
@@ -464,6 +464,7 @@ public class HostMessenger implements Messenger {
      */
     public void rejoinForeignHostPrepare(int hostId,
                                          InetSocketAddress addr,
+                                         long catalogCRC,
                                          HashSet<Integer> liveHosts,
                                          int catalogVersionNumber) throws Exception {
         if (hostId < 0)
@@ -474,7 +475,7 @@ public class HostMessenger implements Messenger {
             throw new Exception("Rejoin HostId is not a failed host.");
 
         SocketChannel sock = SocketJoiner.connect(
-                m_localHostId, hostId, addr, liveHosts, catalogVersionNumber);
+                m_localHostId, hostId, addr, catalogCRC, liveHosts, catalogVersionNumber);
 
         m_tempNewFH = new ForeignHost(this, hostId, sock);
         m_tempNewFH.sendReadyMessage();

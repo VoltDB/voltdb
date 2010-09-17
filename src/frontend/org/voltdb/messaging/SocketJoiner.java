@@ -116,10 +116,11 @@ public class SocketJoiner extends Thread {
         m_catalogCRC = catalogCRC;
     }
 
-    public SocketJoiner(ServerSocketChannel acceptor, int expectedHosts, VoltLogger hostLog) {
+    public SocketJoiner(ServerSocketChannel acceptor, int expectedHosts, long catalogCRC, VoltLogger hostLog) {
         m_listenerSocket = acceptor;
         m_expectedHosts = expectedHosts;
         m_hostLog = hostLog;
+        m_catalogCRC = catalogCRC;
         m_addr = ByteBuffer.wrap(acceptor.socket().getInetAddress().getAddress()).getInt();
     }
 
@@ -532,6 +533,7 @@ public class SocketJoiner extends Thread {
 
             long difftimes[] = new long[m_expectedHosts - 1];
             int readHostIds[] = new int[m_expectedHosts - 1];
+            long othercrcs[] = new long[m_expectedHosts - 1];
             int catalogVersions[] = new int[m_expectedHosts - 1];
             for (Entry<Integer, SocketChannel> e : m_sockets.entrySet()) {
                 out = getOutputForHost(e.getKey());
@@ -545,6 +547,7 @@ public class SocketJoiner extends Thread {
                 in = getInputForHost(e.getKey());
 
                 readHostIds[i] = in.readInt();
+                othercrcs[i] = in.readLong();
                 long timestamp = in.readLong();
                 difftimes[i] = System.currentTimeMillis() - timestamp;
                 catalogVersions[i] = in.readInt();
@@ -571,6 +574,13 @@ public class SocketJoiner extends Thread {
             for (i = 1; i < readHostIds.length; i++) {
                 if (readHostIds[i] != m_localHostId) {
                     command = COMMAND_HOSTIDFAIL;
+                }
+            }
+
+            // figure out if any catalogs are not identical
+            for (long crc : othercrcs) {
+                if (crc != m_catalogCRC) {
+                    command = COMMAND_CRCFAIL;
                 }
             }
 
@@ -624,6 +634,7 @@ public class SocketJoiner extends Thread {
             int localHostId,
             int rejoiningHostId,
             InetSocketAddress address,
+            long catalogCRC,
             HashSet<Integer> liveHosts,
             int catalogVersionNumber) throws Exception {
         SocketChannel remoteConnection = null;
@@ -654,6 +665,9 @@ public class SocketJoiner extends Thread {
 
             // write the id of the new host
             out.writeInt(rejoiningHostId);
+
+            // write catalog crc
+            out.writeLong(catalogCRC);
 
             // write the current time so the re-join node can measure skew
             out.writeLong(System.currentTimeMillis());

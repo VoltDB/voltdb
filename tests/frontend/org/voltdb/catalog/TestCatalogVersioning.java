@@ -115,7 +115,7 @@ public class TestCatalogVersioning extends TestCase {
         String addTableFoo = "add /clusters[cluster]/databases[database] tables FOO";
         String addTableBar = "add /clusters[cluster]/databases[database] tables BAR";
 
-        CatalogContext context = new CatalogContext(catalog, CatalogContext.NO_PATH, 0);
+        CatalogContext context = new CatalogContext(catalog, CatalogContext.NO_PATH, 0, 0);
 
         CatalogContext foocontext = context.update(CatalogContext.NO_PATH, addTableFoo, true);
         assertTrue(context != foocontext);

@@ -306,7 +306,7 @@ public class TestRejoinEndToEnd extends TestCase {
         localServer.waitForInitialization();
 
         Client client = ClientFactory.createClient();
-        client.createConnection("localhost", null, null);
+        client.createConnection("localhost");
 
         SyncCallback scb = new SyncCallback();
         success = false;

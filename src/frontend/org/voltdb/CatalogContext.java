@@ -46,12 +46,13 @@ public class CatalogContext {
     public final SiteTracker siteTracker;
     public final int catalogVersion;
     public final String pathToCatalogJar;
+    public final long catalogCRC;
 
     // PRIVATE
     //private final String m_path;
     private final InMemoryJarfile m_jarfile;
 
-    public CatalogContext(Catalog catalog, String pathToCatalogJar, int version) {
+    public CatalogContext(Catalog catalog, String pathToCatalogJar, int version, long prevCRC) {
         // check the heck out of the given params in this immutable class
         assert(catalog != null);
         assert(pathToCatalogJar != null);
@@ -62,15 +63,27 @@ public class CatalogContext {
             throw new RuntimeException("Can't create CatalogContext with null jar path.");
 
         //m_path = pathToCatalogJar;
-        if (pathToCatalogJar.startsWith(NO_PATH) == false)
+        long tempCRC = 0;
+        if (pathToCatalogJar.startsWith(NO_PATH) == false) {
             try {
                 m_jarfile = new InMemoryJarfile(pathToCatalogJar);
+                tempCRC = m_jarfile.getCRC();
             }
             catch (Exception e) {
                 throw new RuntimeException(e);
             }
-        else
+            catalogCRC = tempCRC;
+        }
+        else {
             m_jarfile = null;
+            catalogCRC = prevCRC;
+        }
+
+        if (catalogCRC == 0) {
+            @SuppressWarnings("unused")
+            int x = 5;
+        }
+
         this.catalog = catalog;
         cluster = catalog.getClusters().get("cluster");
         database = cluster.getDatabases().get("database");
@@ -101,7 +114,7 @@ public class CatalogContext {
         Catalog newCatalog = catalog.deepCopy();
         newCatalog.execute(diffCommands);
         int incValue = incrementVersion ? 1 : 0;
-        CatalogContext retval = new CatalogContext(newCatalog, pathToNewJar, catalogVersion + incValue);
+        CatalogContext retval = new CatalogContext(newCatalog, pathToNewJar, catalogVersion + incValue, catalogCRC);
         return retval;
     }
 

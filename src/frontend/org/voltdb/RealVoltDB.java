@@ -66,7 +66,6 @@ import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.HTTPAdminListener;
-import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltSampler;
 
@@ -351,15 +350,6 @@ public class RealVoltDB implements VoltDBInterface
             if ((serializedCatalog == null) || (serializedCatalog.length() == 0))
                 VoltDB.crashVoltDB();
 
-            // get a CRC for the jarfile to check if everyone has the same one
-            long catalogCRC = 0;
-            try {
-                InMemoryJarfile inMemJar = new InMemoryJarfile(m_config.m_pathToCatalog);
-                catalogCRC = inMemJar.getCRC();
-            } catch (IOException e1) {
-                VoltDB.crashVoltDB();
-            }
-
             /* N.B. node recovery requires discovering the current catalog version. */
             final int catalogVersion = 0;
             Catalog catalog = new Catalog();
@@ -371,7 +361,7 @@ public class RealVoltDB implements VoltDBInterface
 
             serializedCatalog = catalog.serialize();
 
-            m_catalogContext = new CatalogContext(catalog, m_config.m_pathToCatalog, catalogVersion);
+            m_catalogContext = new CatalogContext(catalog, m_config.m_pathToCatalog, catalogVersion, -1);
             final SnapshotSchedule schedule =
                 m_catalogContext.database.getSnapshotschedule().get("default");
 
@@ -427,12 +417,12 @@ public class RealVoltDB implements VoltDBInterface
                 }
 
                 hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_CreatingVoltDB.name(), new Object[] { m_catalogContext.numberOfNodes, leader }, null);
-                m_messenger = new HostMessenger(m_network, leader, m_catalogContext.numberOfNodes, catalogCRC, hostLog);
+                m_messenger = new HostMessenger(m_network, leader, m_catalogContext.numberOfNodes, m_catalogContext.catalogCRC, hostLog);
                 Object retval[] = m_messenger.waitForGroupJoin();
                 m_instanceId = new Object[] { retval[0], retval[1] };
             }
             else {
-                downHosts.addAll(initializeForRejoin(config, catalogCRC));
+                downHosts.addAll(initializeForRejoin(config, m_catalogContext.catalogCRC));
                 /**
                  * Whatever hosts were reported as being down on rejoin should
                  * be reported to the fault manager so that the fault can be distributed.
@@ -748,7 +738,8 @@ public class RealVoltDB implements VoltDBInterface
         m_catalogContext = new CatalogContext(
                 m_catalogContext.catalog,
                 m_catalogContext.pathToCatalogJar,
-                m_messenger.getDiscoveredCatalogVersion());
+                m_messenger.getDiscoveredCatalogVersion(),
+                0);
 
         m_instanceId = new Object[] { retval[0], retval[1] };
 
@@ -940,7 +931,7 @@ public class RealVoltDB implements VoltDBInterface
         // connect to the joining node, build a foreign host
         InetSocketAddress addr = new InetSocketAddress(rejoiningHostname, portToConnect);
         try {
-            messenger.rejoinForeignHostPrepare(rejoinHostId, addr, liveHosts, m_catalogContext.catalogVersion);
+            messenger.rejoinForeignHostPrepare(rejoinHostId, addr, m_catalogContext.catalogCRC, liveHosts, m_catalogContext.catalogVersion);
             return null;
         } catch (Exception e) {
             //e.printStackTrace();
