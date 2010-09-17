@@ -390,6 +390,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
             } catch (IOException e) {
                 ssc.close();
             }
+            Thread.yield();
         }
         if (m_sc == null) {
             recoveryLog.fatal("Timed out waiting for connection from source partition");

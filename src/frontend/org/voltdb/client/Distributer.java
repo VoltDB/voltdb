@@ -365,7 +365,7 @@ class Distributer {
         }
 
         private int m_queuedBytes = 0;
-        private final int m_maxQueuedBytes = 2097152;
+        private final int m_maxQueuedBytes = 262144;
 
         @Override
         public boolean queue(int bytes) {

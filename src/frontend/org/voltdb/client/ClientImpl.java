@@ -55,7 +55,7 @@ final class ClientImpl implements Client {
      * Username and password as set by the constructor.
      */
     private final String m_username;
-    private final String m_password;
+    private final byte m_passwordHash[];
 
     /**
      * These threads belong to the network thread pool
@@ -92,7 +92,7 @@ final class ClientImpl implements Client {
                 config.m_statsSettings);
         m_distributer.addClientStatusListener(new CSL());
         m_username = config.m_username;
-        m_password = config.m_password;
+        m_passwordHash = ConnectionUtil.getHashedPassword(config.m_password);
         if (config.m_listener != null) {
             m_distributer.addClientStatusListener(config.m_listener);
         }
@@ -267,14 +267,15 @@ final class ClientImpl implements Client {
             new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
         //Blessed threads (the ones that invoke callbacks) are not subject to backpressure
         boolean isBlessed = m_blessedThreadIds.contains(Thread.currentThread().getId());
-        try {
-            m_maxOutstanding.acquire();
-        } catch (InterruptedException e) {
-            throw new java.io.InterruptedIOException(e.toString());
+        if (!isBlessed) {
+            try {
+                m_maxOutstanding.acquire();
+            } catch (InterruptedException e) {
+                throw new java.io.InterruptedIOException(e.toString());
+            }
         }
         final ProcedureCallback userCallback = callback;
         ProcedureCallback callbackToReturnPermit = new ProcedureCallback() {
-
             @Override
             public void clientCallback(ClientResponse clientResponse)
                     throws Exception {
@@ -438,7 +439,7 @@ final class ClientImpl implements Client {
             throw new IllegalStateException("Attempted to use createConnection(String host) " +
                     "with a client that wasn't constructed with a username and password specified");
         }
-        createConnection( host, Client.VOLTDB_SERVER_PORT, m_username, m_password);
+        createConnectionWithHashedCredentials( host, Client.VOLTDB_SERVER_PORT, m_username, m_passwordHash);
     }
 
     @Override
@@ -447,6 +448,6 @@ final class ClientImpl implements Client {
             throw new IllegalStateException("Attempted to use createConnection(String host) " +
                     "with a client that wasn't constructed with a username and password specified");
         }
-        createConnection( host, port, m_username, m_password);
+        createConnectionWithHashedCredentials( host, port, m_username, m_passwordHash);
     }
 }
