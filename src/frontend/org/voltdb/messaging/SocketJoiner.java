@@ -56,13 +56,16 @@ public class SocketJoiner extends Thread {
     static final int COMMAND_LISTEN = 2;  // followed by hostId
     static final int COMMAND_COMPLETE = 3;
     static final int COMMAND_SENDTIME_AND_CRC = 4;
-    static final int COMMAND_NTPFAIL = 5;
-    static final int COMMAND_CRCFAIL = 6;
-    static final int COMMAND_HOSTIDFAIL = 7;
-    static final int COMMAND_CATVERFAIL = 8;
+    static final int COMMAND_JOINFAIL = 5;
     static final int RESPONSE_LISTENING = 0;
     static final int RESPONSE_CONNECTED = 1;
     static final int MAX_ACCEPTABLE_TIME_DIFF_IN_MS = 100;
+
+    static final int NTP_FAILURE = 1;
+    static final int CRC_FAILURE = 2;
+    static final int HOSTID_FAILURE = 4;
+    static final int CATVER_FAILURE = 8;
+
     static final int PING = 333;
     InetAddress m_coordIp = null;
     int m_localHostId;
@@ -289,7 +292,6 @@ public class SocketJoiner extends Thread {
             }
 
             // figure out how bad the skew is and if it's acceptable
-            int command = COMMAND_COMPLETE;
             long minimumDiff = 0;
             long maximumDiff = 0;
             for (long diff : difftimes) {
@@ -298,35 +300,45 @@ public class SocketJoiner extends Thread {
                 if (diff < minimumDiff)
                     minimumDiff = diff;
             }
+
+            int errors = 0;
+
             long maxDiffMS = maximumDiff - minimumDiff;
             if (maxDiffMS > MAX_ACCEPTABLE_TIME_DIFF_IN_MS)
-                command = COMMAND_NTPFAIL;
+                errors |= NTP_FAILURE;
 
             // figure out if any catalogs are not identical
             for (long crc : othercrcs) {
                 if (crc != m_catalogCRC) {
-                    command = COMMAND_CRCFAIL;
+                    errors |= CRC_FAILURE;
                 }
             }
 
             for (int hostId = 1; hostId < m_expectedHosts; hostId++) {
                 out = getOutputForHost(hostId);
                 out.writeLong(maxDiffMS);
-                out.writeInt(command);
+                if (errors == 0) {
+                    out.writeInt(COMMAND_COMPLETE);
+                }
+                else {
+                    out.writeInt(COMMAND_JOINFAIL);
+                    out.writeInt(errors);
+                }
                 out.flush();
             }
 
             if (m_hostLog != null)
                 m_hostLog.info("Maximum clock/network skew is " + maxDiffMS + " milliseconds (according to leader)");
-            if (command == COMMAND_NTPFAIL) {
+            if ((errors & NTP_FAILURE) != 0) {
                 if (m_hostLog != null)
                     m_hostLog.error("Maximum clock/network is " + (maxDiffMS*100)/MAX_ACCEPTABLE_TIME_DIFF_IN_MS +
                                    "% higher than allowable limit");
-                VoltDB.crashVoltDB();
             }
-            if (command == COMMAND_CRCFAIL) {
+            if ((errors & CRC_FAILURE) != 0) {
                 if (m_hostLog != null)
                     m_hostLog.error("Catalog checksums do not match across cluster");
+            }
+            if (errors != 0) {
                 VoltDB.crashVoltDB();
             }
 
@@ -456,20 +468,19 @@ public class SocketJoiner extends Thread {
             if (m_hostLog != null)
                 m_hostLog.info("Maximum clock/network skew is " + maxDiffMS + " milliseconds (according to leader)");
             command = in.readInt();
-            if (command == COMMAND_NTPFAIL) {
-                if (m_hostLog != null)
-                    m_hostLog.error("Maximum clock/network is " + (maxDiffMS*100)/MAX_ACCEPTABLE_TIME_DIFF_IN_MS +
-                                   "% higher than allowable limit");
-                VoltDB.crashVoltDB();
-            }
-            if (command == COMMAND_CRCFAIL) {
-                if (m_hostLog != null)
-                    m_hostLog.error("Catalog checksums do not match across cluster");
-                VoltDB.crashVoltDB();
-                for (SocketChannel sock : m_sockets.values()) {
-                    sock.close();
+            if (command == COMMAND_JOINFAIL) {
+                int errors = in.readInt();
+
+                if ((errors & NTP_FAILURE) != 0) {
+                    if (m_hostLog != null)
+                        m_hostLog.error("Maximum clock/network is " + (maxDiffMS*100)/MAX_ACCEPTABLE_TIME_DIFF_IN_MS +
+                                       "% higher than allowable limit");
                 }
-                return;
+                if ((errors & CRC_FAILURE) != 0) {
+                    if (m_hostLog != null)
+                        m_hostLog.error("Catalog checksums do not match across cluster");
+                }
+                VoltDB.crashVoltDB();
             }
             assert(command == COMMAND_COMPLETE);
         }
@@ -554,8 +565,9 @@ public class SocketJoiner extends Thread {
                 i++;
             }
 
+            int errors = 0;
+
             // figure out how bad the skew is and if it's acceptable
-            int command = COMMAND_COMPLETE;
             long minimumDiff = 0;
             long maximumDiff = 0;
             for (long diff : difftimes) {
@@ -566,21 +578,21 @@ public class SocketJoiner extends Thread {
             }
             long maxDiffMS = maximumDiff - minimumDiff;
             if (maxDiffMS > MAX_ACCEPTABLE_TIME_DIFF_IN_MS)
-                command = COMMAND_NTPFAIL;
+                errors |= NTP_FAILURE;
 
             // ensure all hostids are the same
             m_localHostId = readHostIds[0];
             recoveryLog.info("Selecting host id " + m_localHostId);
             for (i = 1; i < readHostIds.length; i++) {
                 if (readHostIds[i] != m_localHostId) {
-                    command = COMMAND_HOSTIDFAIL;
+                    errors |= HOSTID_FAILURE;
                 }
             }
 
             // figure out if any catalogs are not identical
             for (long crc : othercrcs) {
                 if (crc != m_catalogCRC) {
-                    command = COMMAND_CRCFAIL;
+                    errors |= CRC_FAILURE;
                 }
             }
 
@@ -588,23 +600,47 @@ public class SocketJoiner extends Thread {
             m_discoveredCatalogVersion = catalogVersions[0];
             for (int version : catalogVersions) {
                 if (version != m_discoveredCatalogVersion) {
-                    command = COMMAND_CATVERFAIL;
+                    errors |= CATVER_FAILURE;
                 }
             }
 
             for (Entry<Integer, SocketChannel> e : m_sockets.entrySet()) {
                 out = getOutputForHost(e.getKey());
                 out.writeLong(maxDiffMS);
-                out.writeInt(command);
+                if (errors == 0) {
+                    out.writeInt(COMMAND_COMPLETE);
+                }
+                else {
+                    out.writeInt(COMMAND_JOINFAIL);
+                    out.writeInt(errors);
+                }
                 out.flush();
             }
 
             if (m_hostLog != null)
                 m_hostLog.info("Maximum clock/network skew is " + maxDiffMS + " milliseconds (according to rejoined node)");
-            if (command == COMMAND_NTPFAIL) {
+            if ((errors & NTP_FAILURE) != 0) {
                 if (m_hostLog != null)
                     m_hostLog.error("Maximum clock/network is " + (maxDiffMS*100)/MAX_ACCEPTABLE_TIME_DIFF_IN_MS +
                                    "% higher than allowable limit");
+            }
+            if ((errors & CRC_FAILURE) != 0) {
+                if (m_hostLog != null)
+                    m_hostLog.error("Catalog checksums do not match across cluster");
+            }
+            if ((errors & HOSTID_FAILURE) != 0) {
+                if (m_hostLog != null) {
+                    m_hostLog.error("Cluster nodes didn't agree on a host id for the rejoining node.");
+                    m_hostLog.error("This is likely a bug in VoltDB and you should contact the VoltDB team.");
+                }
+            }
+            if ((errors & CATVER_FAILURE) != 0) {
+                if (m_hostLog != null) {
+                    m_hostLog.error("Cluster nodes didn't agree on all catalog metadata.");
+                    m_hostLog.error("This is likely a bug in VoltDB and you should contact the VoltDB team.");
+                }
+            }
+            if (errors != 0) {
                 VoltDB.crashVoltDB();
             }
         }
@@ -685,7 +721,24 @@ public class SocketJoiner extends Thread {
             if (command == COMMAND_COMPLETE)
                 return remoteConnection;
             else {
-                String msg = String.format("Unable to re-join node. Error No. %d.", command);
+                int errors = in.readInt();
+                String msg = "";
+
+                if ((errors & NTP_FAILURE) != 0) {
+                    msg += String.format("Maximum clock/network is " + (maxDiffMS*100)/MAX_ACCEPTABLE_TIME_DIFF_IN_MS +
+                                       "% higher than allowable limit.\n");
+                }
+                if ((errors & CRC_FAILURE) != 0) {
+                    msg += String.format("Catalog checksums do not match across cluster.\n");
+                }
+                if ((errors & HOSTID_FAILURE) != 0) {
+                    msg += String.format("Cluster nodes didn't agree on a host id for the rejoining node.\n");
+                    msg += String.format("This is likely a bug in VoltDB and you should contact the VoltDB team.\n");
+                }
+                if ((errors & CATVER_FAILURE) != 0) {
+                    msg += String.format("Cluster nodes didn't agree on all catalog metadata.\n");
+                    msg += String.format("This is likely a bug in VoltDB and you should contact the VoltDB team.\n");
+                }
                 throw new Exception(msg);
             }
         }
