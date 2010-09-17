@@ -61,6 +61,10 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     private volatile IOException m_writeException = null;
     private volatile long m_bytesWritten = 0;
 
+    private static final long m_maxBytesWrittenBetweenSync = (1024 * 1024) * 256;
+    private long m_bytesWrittenSinceLastSync = 0;
+    private long m_lastSyncTime = 0;
+
     /*
      * Accept a single write even though simulating a full disk is enabled;
      */
@@ -197,14 +201,20 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         m_es.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
+                final long now = System.currentTimeMillis();
+                if (now - m_lastSyncTime < 10000 || m_bytesWrittenSinceLastSync == 0) {
+                    return;
+                }
                 try {
                     m_fos.getFD().sync();
                 } catch (IOException e) {
                     m_writeException = e;
-                    hostLog.error("Error while attempting to sync snapshot data for file " , e);
+                    hostLog.error("Error while attempting to sync snapshot data for file "  + m_file, e);
                     m_writeFailed = true;
                     throw new RuntimeException(e);
                 }
+                m_lastSyncTime = System.currentTimeMillis();
+                m_bytesWrittenSinceLastSync = 0;
             }
         }, 10000, 10, TimeUnit.SECONDS);
     }
@@ -258,11 +268,18 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                         }
                     }
                     while (tupleData.b.hasRemaining()) {
-                        m_bytesWritten += m_channel.write(tupleData.b);
+                        final long written = m_channel.write(tupleData.b);
+                        m_bytesWritten += written;
+                        m_bytesWrittenSinceLastSync += written;
+                    }
+                    if (m_bytesWrittenSinceLastSync >= m_maxBytesWrittenBetweenSync) {
+                        m_fos.getFD().sync();
+                        m_bytesWrittenSinceLastSync = 0;
+                        m_lastSyncTime = System.currentTimeMillis();
                     }
                 } catch (IOException e) {
                     m_writeException = e;
-                    hostLog.error("Error while attempting to write snapshot data to disk", e);
+                    hostLog.error("Error while attempting to write snapshot data to file " + m_file, e);
                     m_writeFailed = true;
                     throw e;
                 } finally {
