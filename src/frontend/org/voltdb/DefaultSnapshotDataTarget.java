@@ -24,7 +24,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
@@ -42,11 +42,10 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     public static volatile boolean m_simulateFullDiskWritingHeader = false;
     public static volatile boolean m_simulateFullDiskWritingChunk = false;
 
-    private final File m_file;
     private final FileChannel m_channel;
     private final FileOutputStream m_fos;
     private static final VoltLogger hostLog = new VoltLogger("HOST");
-    private final ScheduledExecutorService m_es;
+    private final ExecutorService m_es;
     private Runnable m_onCloseHandler = null;
 
     /*
@@ -107,12 +106,11 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             final long createTime,
             int version[]
             ) throws IOException {
-        String hostname = ConnectionUtil.getHostnameOrAddress();
-        m_file = file;
+        String hostname = ConnectionUtil.getHostnameOrAddress();;
         m_tableName = tableName;
         m_fos = new FileOutputStream(file);
         m_channel = m_fos.getChannel();
-        m_es = Executors.newScheduledThreadPool(1, new ThreadFactory() {
+        m_es = Executors.newSingleThreadExecutor(new ThreadFactory() {
             @Override
             public Thread newThread(Runnable r) {
 
@@ -193,20 +191,6 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             m_es.shutdown();
             throw m_writeException;
         }
-
-        m_es.scheduleAtFixedRate(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    m_fos.getFD().sync();
-                } catch (IOException e) {
-                    m_writeException = e;
-                    hostLog.error("Error while attempting to sync snapshot data for file " , e);
-                    m_writeFailed = true;
-                    throw new RuntimeException(e);
-                }
-            }
-        }, 2000, 2, TimeUnit.SECONDS);
     }
 
     @Override
