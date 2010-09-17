@@ -559,7 +559,7 @@ public class TestCatalogDiffs extends TestCase {
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
-        builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
+        builder.addStmtProcedure("the_requisite_procedure", "select * from A;");
         builder.compile(testDir + File.separator + "addpart1.jar");
         Catalog catOriginal = catalogForJar(testDir +  File.separator + "addpart1.jar");
 
