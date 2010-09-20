@@ -5,6 +5,7 @@ import java.io.IOException;
 // VoltTable is VoltDB's table representation.
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
+import org.voltdb.client.ClientConfig;
 
 // Procedures are invoked by class name. Import them to
 // allow access to the class name programmatically.
@@ -147,9 +148,11 @@ public class Client {
         // an org.voltdb.client.Client instance connected to the database running on
         // the specified IP address, in this case 127.0.0.1. The
         // database always runs on TCP/IP port 21212.
-        final org.voltdb.client.Client voltclient = org.voltdb.client.ClientFactory.createClient();
+        final ClientConfig clientConfig = new ClientConfig("program", "none");
+        final org.voltdb.client.Client voltclient =
+            org.voltdb.client.ClientFactory.createClient(clientConfig);
         try {
-            voltclient.createConnection("localhost", "program", "none");
+            voltclient.createConnection("localhost");
         }
         catch (IOException e) {
             e.printStackTrace();
