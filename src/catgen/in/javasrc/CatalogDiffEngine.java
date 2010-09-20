@@ -50,6 +50,10 @@ public class CatalogDiffEngine {
         return m_supported;
     }
 
+    public String errors() {
+        return m_errors.toString();
+    }
+
     /**
      * @return true if the CatalogType can be dynamically added and removed
      * from a running system.
