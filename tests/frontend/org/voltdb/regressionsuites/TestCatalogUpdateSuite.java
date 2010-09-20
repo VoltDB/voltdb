@@ -35,14 +35,20 @@ import java.util.concurrent.atomic.AtomicInteger;
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.VoltDB.Configuration;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.benchmark.tpcc.procedures.InsertNewOrder;
 import org.voltdb.catalog.LoadCatalogToString;
-import org.voltdb.client.*;
-import org.voltdb.compiler.VoltProjectBuilder.*;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
+import org.voltdb.client.ProcedureCallback;
+import org.voltdb.client.SyncCallback;
+import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
+import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
+import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.types.TimestampType;
 
 /**
@@ -290,7 +296,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         URL url = LoadCatalogToString.class.getResource("catalog.txt");
         String newCatalogURL = URLDecoder.decode(url.getPath(), "UTF-8");
         try {
-            client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, null);
+            client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, "foobar");
             fail();
         }
         catch (Exception e) {
