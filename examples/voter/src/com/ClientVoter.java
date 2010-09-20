@@ -28,16 +28,17 @@
 
 package com;
 
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureCallback;
-import org.voltdb.client.ClientFactory;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltTableRow;
-import org.voltdb.client.NoConnectionsException;
-import org.voltdb.client.ProcCallException;
+import java.io.IOException;
 import java.util.concurrent.locks.ReentrantLock;
 
-import java.io.IOException;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltTableRow;
+import org.voltdb.client.ClientConfig;
+import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcCallException;
+import org.voltdb.client.ProcedureCallback;
 
 public class ClientVoter {
     public static long min_execution_milliseconds = 999999999l;
@@ -150,7 +151,8 @@ public class ClientVoter {
         long last_millisecond = System.currentTimeMillis();
         long this_millisecond = System.currentTimeMillis();
 
-        final org.voltdb.client.Client voltclient = ClientFactory.createClient();
+        ClientConfig config = new ClientConfig("program", "none");
+        final org.voltdb.client.Client voltclient = ClientFactory.createClient(config);
 
         String[] voltServers = serverList.split(",");
 
@@ -159,7 +161,7 @@ public class ClientVoter {
                 thisServer = thisServer.trim();
                 System.out.printf("Connecting to server: '%s'\n",thisServer);
 
-                voltclient.createConnection(thisServer, "program", "none");
+                voltclient.createConnection(thisServer);
             } catch (IOException e) {
                 e.printStackTrace();
                 System.exit(-1);

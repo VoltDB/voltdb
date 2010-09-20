@@ -29,6 +29,7 @@ import java.util.Random;
 
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 
 /**
@@ -161,8 +162,9 @@ public class Client {
         // create a second client handle for this second thread
         org.voltdb.client.Client client = null;
         try {
-            client = ClientFactory.createClient();
-            client.createConnection("localhost", "program", "pass");
+            ClientConfig config = new ClientConfig("program", "pass");
+            client = ClientFactory.createClient(config);
+            client.createConnection("localhost");
         } catch (java.io.IOException e) {
             e.printStackTrace();
             System.exit(-1);
@@ -230,8 +232,9 @@ public class Client {
         // connect to VoltDB server
         org.voltdb.client.Client client = null;
         try {
-            client = ClientFactory.createClient();
-            client.createConnection("localhost", "program", "pass");
+            ClientConfig config = new ClientConfig("program", "pass");
+            client = ClientFactory.createClient(config);
+            client.createConnection("localhost");
         } catch (java.io.IOException e) {
             e.printStackTrace();
             System.exit(-1);

@@ -49,7 +49,7 @@ public abstract class ClientFactory {
             int maxArenaSizes[],
             boolean heavyweight,
             StatsUploaderSettings statsSettings) {
-        final int cores = Runtime.getRuntime().availableProcessors();
+        //final int cores = Runtime.getRuntime().availableProcessors();
         ClientConfig config = new ClientConfig();
         config.setExpectedOutgoingMessageSize(expectedOutgoingMessageSize);
         config.setMaxArenaSizes(maxArenaSizes);

@@ -20,7 +20,10 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
 package game.gui;
+
+import game.db.DB;
 
 import java.awt.Color;
 import java.awt.Font;
@@ -28,8 +31,6 @@ import java.awt.Font;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.WindowConstants;
-
-import game.db.*;
 
 public class GUI extends JFrame
 {

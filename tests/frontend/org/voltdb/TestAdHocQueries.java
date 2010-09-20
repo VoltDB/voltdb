@@ -24,14 +24,16 @@
 package org.voltdb;
 
 import java.io.IOException;
-import org.voltdb.VoltDB.Configuration;
-import org.voltdb.ProcedureProfiler.Level;
-import org.voltdb.client.ProcCallException;
-import org.voltdb.client.Client;
-import org.voltdb.client.ClientFactory;
-import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 
 import junit.framework.TestCase;
+
+import org.voltdb.ProcedureProfiler.Level;
+import org.voltdb.VoltDB.Configuration;
+import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
+import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ProcCallException;
 
 public class TestAdHocQueries extends TestCase {
 
@@ -55,8 +57,9 @@ public class TestAdHocQueries extends TestCase {
         server.waitForInitialization();
 
         // do the test
-        Client client = ClientFactory.createClient();
-        client.createConnection("localhost", "program", "password");
+        ClientConfig clientConfig = new ClientConfig("program", "password");
+        Client client = ClientFactory.createClient(clientConfig);
+        client.createConnection("localhost");
 
         VoltTable modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (1, 1, 1);").getResults()[0];
         assertTrue(modCount.getRowCount() == 1);

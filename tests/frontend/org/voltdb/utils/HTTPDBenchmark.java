@@ -284,7 +284,7 @@ public class HTTPDBenchmark extends TestCase {
             for (int i = 0; i < m_iterations; i++) {
                 try {
                     long start = System.nanoTime();
-                    String jsonResponse = TestJSONInterface.callProcOverJSON("Select", pset, null, null, false);
+                    /*String jsonResponse =*/ TestJSONInterface.callProcOverJSON("Select", pset, null, null, false);
                     long stop = System.nanoTime();
                     totalExecTime += stop - start;
                     //System.out.println(jsonResponse);

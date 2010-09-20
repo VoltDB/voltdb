@@ -20,25 +20,31 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
 package game.db;
 
-import java.io.IOException;
-import java.net.UnknownHostException;
-import java.net.ConnectException;
+import game.procedures.GetGeneration;
+import game.procedures.GetIDs;
+import game.procedures.GetRowCol;
+import game.procedures.IsOccupied;
+import game.procedures.Occupy;
+import game.procedures.SetIDs;
+import game.procedures.SetRowCol;
+import game.procedures.UpdateGeneration;
 
-// VoltTable is VoltDB's table representation.
+import java.io.IOException;
+import java.net.ConnectException;
+import java.net.UnknownHostException;
+
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcCallException;
 import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
-
-// Procedures are invoked by class name. Import them to
-// allow access to the class name programmatically.
-import game.procedures.*;
 
 public class DB
 {
@@ -57,7 +63,8 @@ public class DB
     public DB(String clientName, String[] hosts)
     {
         System.out.println(clientName + " client started");
-        client = ClientFactory.createClient();
+        ClientConfig config = new ClientConfig("program", "none");
+        client = ClientFactory.createClient(config);
         connect(hosts);
     }
 
@@ -214,7 +221,7 @@ public class DB
         {
             for (String host : hosts)
                 if (!host.equals(""))
-                    client.createConnection(host, "program", "none");
+                    client.createConnection(host);
         }
         catch (UnknownHostException e)
         {

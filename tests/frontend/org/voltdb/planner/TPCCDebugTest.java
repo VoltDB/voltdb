@@ -25,17 +25,20 @@ package org.voltdb.planner;
 
 import java.io.File;
 import java.io.IOException;
+
+import junit.framework.TestCase;
+
 import org.voltdb.BackendTarget;
-import org.voltdb.client.Client;
-import org.voltdb.client.ClientFactory;
-import org.voltdb.VoltTable;
 import org.voltdb.ServerThread;
-import org.voltdb.client.ProcCallException;
+import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.Constants;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.benchmark.tpcc.procedures.ByteBuilder;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
+import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.utils.BuildDirectoryUtils;
-import junit.framework.TestCase;
 
 public class TPCCDebugTest extends TestCase {
     protected Client client;
@@ -78,9 +81,10 @@ public class TPCCDebugTest extends TestCase {
         server.start();
         server.waitForInitialization();
 
-        client = ClientFactory.createClient();
+        ClientConfig clientConfig = new ClientConfig("program", "none");
+        client = ClientFactory.createClient(clientConfig);
         // connect
-        client.createConnection("localhost", "program", "none");
+        client.createConnection("localhost");
     }
 
     public void waitUntilDone() throws InterruptedException {

@@ -28,25 +28,20 @@
 
 package com;
 
-import org.voltdb.client.Client;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureCallback;
-import org.voltdb.client.ClientFactory;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.util.Arrays;
+import java.util.Date;
+
 import org.voltdb.VoltTable;
-import org.voltdb.VoltTableRow;
+import org.voltdb.client.ClientConfig;
+import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.utils.Encoder;
-
-import java.util.ArrayList;
-import java.util.*;
-import java.io.IOException;
-import java.io.FileOutputStream;
-import java.io.PrintStream;
-import java.io.UnsupportedEncodingException;
-import java.lang.Enum;
-
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.logging.VoltLogger;
+import org.voltdb.utils.Encoder;
 
 public class ClientKV {
     public enum spName { GET, PUT };
@@ -102,11 +97,11 @@ public class ClientKV {
                             m_logger.info("Get Miss, key = " + cbKeyValue);
                         } else {
                             byte[] baGetValue = clientResponse.getResults()[0].fetchRow(0).getStringAsBytes(0);
-                            get_value_compressed_bytes += (long) baGetValue.length;
+                            get_value_compressed_bytes += baGetValue.length;
 
                             if (behavior == Behavior.NONE) {
                                 //if NOT bas64 encoding or compressing
-                                get_value_uncompressed_bytes += (long) baGetValue.length;
+                                get_value_uncompressed_bytes += baGetValue.length;
                             } else if (behavior == Behavior.BASE64) {
                                 // if NOT using compression
                                 get_value_uncompressed_bytes += Encoder.decodeBase64ToBytes(baGetValue).length;
@@ -128,7 +123,7 @@ public class ClientKV {
         }
 
         protected void pClientCallback(VoltTable[] vtResults, int clientRoundtrip) {
-            long execution_time = (long) clientRoundtrip;
+            long execution_time = clientRoundtrip;
 
             tot_executions_latency++;
             tot_execution_milliseconds += execution_time;
@@ -151,19 +146,18 @@ public class ClientKV {
     }
 
     public static void main(String args[]) {
-        boolean backPressure = false;
-        long transactions_per_second = (long) Long.valueOf(args[0]);
+        long transactions_per_second = Long.valueOf(args[0]);
         long transactions_per_milli = transactions_per_second / 1000l;
-        long client_feedback_interval_secs = (long) Long.valueOf(args[1]);
-        long test_duration_secs = (long) Long.valueOf(args[2]);
-        long lag_latency_seconds = (long) Long.valueOf(args[3]);
+        long client_feedback_interval_secs = Long.valueOf(args[1]);
+        long test_duration_secs = Long.valueOf(args[2]);
+        long lag_latency_seconds = Long.valueOf(args[3]);
         long lag_latency_millis = lag_latency_seconds * 1000l;
         String serverList = args[4];
-        int key_size = (int) Integer.valueOf(args[5]);
-        int min_value_size = (int) Integer.valueOf(args[6]);
-        int max_value_size = (int) Integer.valueOf(args[7]);
-        long initial_size = (long) Long.valueOf(args[8]);
-        int percent_gets = (int) Integer.valueOf(args[9]);
+        int key_size = Integer.valueOf(args[5]);
+        int min_value_size = Integer.valueOf(args[6]);
+        int max_value_size = Integer.valueOf(args[7]);
+        long initial_size = Long.valueOf(args[8]);
+        int percent_gets = Integer.valueOf(args[9]);
         final int behavior_type = Integer.valueOf(args[10]);
 
         long thisOutstanding = 0;
@@ -195,7 +189,8 @@ public class ClientKV {
         long last_millisecond = System.currentTimeMillis();
         long this_millisecond = System.currentTimeMillis();
 
-        final org.voltdb.client.Client voltclient = ClientFactory.createClient();
+        ClientConfig config = new ClientConfig("program", "none");
+        final org.voltdb.client.Client voltclient = ClientFactory.createClient(config);
 
         String[] voltServers = serverList.split(",");
 
@@ -203,7 +198,7 @@ public class ClientKV {
             try {
                 thisServer = thisServer.trim();
                 m_logger.info(String.format("Connecting to server: %s",thisServer));
-                voltclient.createConnection(thisServer, "program", "none");
+                voltclient.createConnection(thisServer);
             } catch (IOException e) {
                 m_logger.error(e.toString());
                 System.exit(-1);
@@ -227,7 +222,6 @@ public class ClientKV {
         for (int i=0; i < sb.capacity(); i++) {
             sb.append('x');
         }
-        String strGenericKey = sb.toString();
 
         String this_key;
 
@@ -295,8 +289,8 @@ public class ClientKV {
                     System.exit(-1);
                 }
 
-                put_value_uncompressed_bytes += (long) baThisValue.length;
-                put_value_compressed_bytes += (long) this_value.length;
+                put_value_uncompressed_bytes += baThisValue.length;
+                put_value_compressed_bytes += this_value.length;
 
                 try {
                     voltclient.callProcedure(new AsyncCallback(spName.PUT, this_key), "Put", this_key, this_value);
@@ -334,8 +328,6 @@ public class ClientKV {
                         }
                         thisOutstanding = num_puts - tot_executions;
 
-                        long runTimeMillis = endTime - startTime;
-
                         double percentComplete = ((double) num_puts / (double) initial_size) * 100;
                         if (percentComplete > 100.0) {
                             percentComplete = 100.0;
@@ -352,15 +344,15 @@ public class ClientKV {
                         if (vtRowCount > 0) {
                             bytesRead = vtIOStats.fetchRow(vtRowCount-1).getLong(9);
                             bytesWritten = vtIOStats.fetchRow(vtRowCount-1).getLong(11);
-                            readMBPerSecond = ((double) bytesRead / 1024.0 / 1024.0) / (double) client_feedback_interval_secs;
-                            writeMBPerSecond = ((double) bytesWritten / 1024.0 / 1024.0) / (double) client_feedback_interval_secs;
+                            readMBPerSecond = (bytesRead / 1024.0 / 1024.0) / client_feedback_interval_secs;
+                            writeMBPerSecond = (bytesWritten / 1024.0 / 1024.0) / client_feedback_interval_secs;
                         } else {
                             readMBPerSecond = -1.0;
                             writeMBPerSecond = -1.0;
                         }
 
                         String currentDate = new Date().toString();
-                        m_logger.info(String.format("[%s] %.3f%% Complete | SP Calls: %,d at %,.2f SP/sec | outstanding = %d (%d) | min = %d | max = %d | avg = %.2f | Client MB in/out = %,.3f / %,.3f",currentDate, percentComplete, num_puts, (num_puts / elapsedTimeSec2), thisOutstanding,(thisOutstanding - lastOutstanding), min_execution_milliseconds, max_execution_milliseconds, (double) ((double) tot_execution_milliseconds / (double) tot_executions_latency),readMBPerSecond,writeMBPerSecond));
+                        m_logger.info(String.format("[%s] %.3f%% Complete | SP Calls: %,d at %,.2f SP/sec | outstanding = %d (%d) | min = %d | max = %d | avg = %.2f | Client MB in/out = %,.3f / %,.3f",currentDate, percentComplete, num_puts, (num_puts / elapsedTimeSec2), thisOutstanding,(thisOutstanding - lastOutstanding), min_execution_milliseconds, max_execution_milliseconds, ((double) tot_execution_milliseconds / (double) tot_executions_latency),readMBPerSecond,writeMBPerSecond));
 
                         lastOutstanding = thisOutstanding;
                     }
@@ -397,7 +389,7 @@ public class ClientKV {
             m_logger.info(String.format(" -     PUTS per second = %,.2f",num_puts / elapsedTimeSec));
             m_logger.info(String.format(" - PUTS Uncompressed Bytes / Compressed Bytes / Compressed Size / Avg Value Size Bytes = %,d / %,d / %,.2f%% / %,.2f",put_value_uncompressed_bytes,put_value_compressed_bytes,((double) put_value_compressed_bytes / (double) put_value_uncompressed_bytes) * 100.0, (double) put_value_uncompressed_bytes / (double) num_puts));
             m_logger.info(String.format(" - GETS Uncompressed Bytes / Compressed Bytes / Compressed Size / Avg Value Size Bytes = %,d / %,d / %,.2f%% / %,.2f",get_value_uncompressed_bytes,get_value_compressed_bytes,((double) get_value_compressed_bytes / (double) get_value_uncompressed_bytes) * 100.0, (double) get_value_uncompressed_bytes / (double) num_gets));
-            m_logger.info(String.format(" - Average Latency = %.2f ms",(double) ((double) tot_execution_milliseconds / (double) tot_executions_latency)));
+            m_logger.info(String.format(" - Average Latency = %.2f ms",((double) tot_execution_milliseconds / (double) tot_executions_latency)));
             m_logger.info(String.format(" -   Latency   0ms -  25ms = %,d",latency_counter[0]));
             m_logger.info(String.format(" -   Latency  25ms -  50ms = %,d",latency_counter[1]));
             m_logger.info(String.format(" -   Latency  50ms -  75ms = %,d",latency_counter[2]));
@@ -452,7 +444,7 @@ public class ClientKV {
             // determine if this is a get or a put
             int getTest = rand.nextInt(99)+1;
 
-            long current_key = (long) ((rand.nextDouble() * (double) initial_size) + 1);
+            long current_key = (long) ((rand.nextDouble() * initial_size) + 1);
 
             if (getTest <= percent_gets) {
                 // do a get
@@ -486,8 +478,8 @@ public class ClientKV {
                     System.exit(-1);
                 }
 
-                put_value_uncompressed_bytes += (long) baThisValuePut.length;
-                put_value_compressed_bytes += (long) this_value.length;
+                put_value_uncompressed_bytes += baThisValuePut.length;
+                put_value_compressed_bytes += this_value.length;
 
                 try {
                     voltclient.callProcedure(new AsyncCallback(spName.PUT, this_key), "Put", this_key, this_value);
@@ -544,15 +536,15 @@ public class ClientKV {
                     if (vtRowCount > 0) {
                         bytesRead = vtIOStats.fetchRow(vtRowCount-1).getLong(9);
                         bytesWritten = vtIOStats.fetchRow(vtRowCount-1).getLong(11);
-                        readMBPerSecond = ((double) bytesRead / 1024.0 / 1024.0) / (double) client_feedback_interval_secs;
-                        writeMBPerSecond = ((double) bytesWritten / 1024.0 / 1024.0) / (double) client_feedback_interval_secs;
+                        readMBPerSecond = (bytesRead / 1024.0 / 1024.0) / client_feedback_interval_secs;
+                        writeMBPerSecond = (bytesWritten / 1024.0 / 1024.0) / client_feedback_interval_secs;
                     } else {
                         readMBPerSecond = -1.0;
                         writeMBPerSecond = -1.0;
                     }
 
                     String currentDate = new Date().toString();
-                    m_logger.info(String.format("[%s] %.3f%% Complete | SP Calls: %,d at %,.2f SP/sec | outstanding = %d (%d) | min = %d | max = %d | avg = %.2f | Client MB in/out = %,.3f / %,.3f",currentDate, percentComplete, num_sp_calls, (num_sp_calls / elapsedTimeSec2), thisOutstanding,(thisOutstanding - lastOutstanding), min_execution_milliseconds, max_execution_milliseconds, (double) ((double) tot_execution_milliseconds / (double) tot_executions_latency), readMBPerSecond, writeMBPerSecond));
+                    m_logger.info(String.format("[%s] %.3f%% Complete | SP Calls: %,d at %,.2f SP/sec | outstanding = %d (%d) | min = %d | max = %d | avg = %.2f | Client MB in/out = %,.3f / %,.3f",currentDate, percentComplete, num_sp_calls, (num_sp_calls / elapsedTimeSec2), thisOutstanding,(thisOutstanding - lastOutstanding), min_execution_milliseconds, max_execution_milliseconds, ((double) tot_execution_milliseconds / (double) tot_executions_latency), readMBPerSecond, writeMBPerSecond));
 
                     lastOutstanding = thisOutstanding;
                 }
@@ -589,7 +581,7 @@ public class ClientKV {
         m_logger.info(String.format(" -     PUTS per second = %,.2f",num_puts / elapsedTimeSec));
         m_logger.info(String.format(" - PUTS Uncompressed Bytes / Compressed Bytes / Compressed Size / Avg Value Size Bytes = %,d / %,d / %,.2f%% / %,.2f",put_value_uncompressed_bytes,put_value_compressed_bytes,((double) put_value_compressed_bytes / (double) put_value_uncompressed_bytes) * 100.0, (double) put_value_uncompressed_bytes / (double) num_puts));
         m_logger.info(String.format(" - GETS Uncompressed Bytes / Compressed Bytes / Compressed Size / Avg Value Size Bytes = %,d / %,d / %,.2f%% / %,.2f",get_value_uncompressed_bytes,get_value_compressed_bytes,((double) get_value_compressed_bytes / (double) get_value_uncompressed_bytes) * 100.0, (double) get_value_uncompressed_bytes / (double) num_gets));
-        m_logger.info(String.format(" - Average Latency = %.2f ms",(double) ((double) tot_execution_milliseconds / (double) tot_executions_latency)));
+        m_logger.info(String.format(" - Average Latency = %.2f ms",((double) tot_execution_milliseconds / (double) tot_executions_latency)));
         m_logger.info(String.format(" -   Latency   0ms -  25ms = %,d",latency_counter[0]));
         m_logger.info(String.format(" -   Latency  25ms -  50ms = %,d",latency_counter[1]));
         m_logger.info(String.format(" -   Latency  50ms -  75ms = %,d",latency_counter[2]));

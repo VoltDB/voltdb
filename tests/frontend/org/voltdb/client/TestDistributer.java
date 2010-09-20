@@ -377,7 +377,7 @@ public class TestDistributer extends TestCase {
             volt.start();
 
             Client clt = ClientFactory.createClient();
-            clt.createConnection("localhost", "", "");
+            clt.createConnection("localhost");
 
             // this call blocks for a result!
             clt.callProcedure("Foo", new Integer(1));

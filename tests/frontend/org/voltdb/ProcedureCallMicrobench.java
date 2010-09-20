@@ -30,9 +30,10 @@ import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import org.voltdb.BackendTarget;
+
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 
 public class ProcedureCallMicrobench {
@@ -71,10 +72,12 @@ public class ProcedureCallMicrobench {
                 final String name = varmode == 0 ? "EmptyProcedure"
                         : "MultivariateEmptyProcedure";
                 final Runner runner = varmode == 0 ? new Runner() {
+                    @Override
                     public void run(Client client) throws Exception {
                         client.callProcedure(name, 0L);
                     }
                 } : new Runner() {
+                    @Override
                     public void run(Client client) throws Exception {
                         client.callProcedure(name, 0L, 0L, 0L,
                                 "String c_first", "String c_middle",
@@ -88,9 +91,9 @@ public class ProcedureCallMicrobench {
 
                 // trigger classloading a couple times
                 {
-                    Client client = ClientFactory.createClient();
-                    client.createConnection("localhost",
-                            "program", "none");
+                    ClientConfig config = new ClientConfig("program", "none");
+                    Client client = ClientFactory.createClient(config);
+                    client.createConnection("localhost");
                     for (int i = 0; i < 10000; i++)
                         client.callProcedure("EmptyProcedure", 0L);
                 }
@@ -106,9 +109,9 @@ public class ProcedureCallMicrobench {
                     futures.add(executor.submit(new Callable<Integer>() {
                         public Integer call() {
                             try {
-                                Client client = ClientFactory.createClient();
-                                client.createConnection(
-                                        "localhost", "program", "none");
+                                ClientConfig config = new ClientConfig("program", "none");
+                                Client client = ClientFactory.createClient(config);
+                                client.createConnection("localhost");
 
                                 int count = 0;
                                 barrier.await();

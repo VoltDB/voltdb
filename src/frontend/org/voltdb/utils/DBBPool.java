@@ -695,6 +695,7 @@ public final class DBBPool {
      * to assign to m_arenas
      * @return
      */
+    @SuppressWarnings("all")
     private final Arena[] initDBBPool() {
         poolLocation.fillInStackTrace();
         assert(((MAX_ALLOCATION_SIZE & (MAX_ALLOCATION_SIZE -1)) == 0));

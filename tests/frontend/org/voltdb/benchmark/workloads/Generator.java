@@ -31,7 +31,6 @@ import java.net.ConnectException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
-import java.util.Scanner;
 
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
@@ -206,7 +205,8 @@ public class Generator extends ClientMain
         }
     }
 
-    private long getTotalTime()
+    // This wasn't used. Can be deleted?
+    /*private long getTotalTime()
     {
         long nanoTime = 0;
 
@@ -299,7 +299,7 @@ public class Generator extends ClientMain
         }
 
         return nanoTime;
-    }
+    }*/
 
     private void callProc(String procName, Object[] params, int procIndex)
     {
@@ -585,7 +585,8 @@ public class Generator extends ClientMain
         myWL.params[procIndex][paramIndex] = randVal;
     }
 
-    private File getXMLFile()
+    // Why was this not used?
+    /*private File getXMLFile()
     {
         String pathName = "";
         File file = null;
@@ -603,7 +604,7 @@ public class Generator extends ClientMain
 
         System.err.println("XML file found.");
         return file;
-    }
+    }*/
 
     private Microbenchmark unmarshal(File xmlFile)
     {

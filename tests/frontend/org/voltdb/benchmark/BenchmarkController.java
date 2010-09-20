@@ -37,8 +37,8 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -47,6 +47,7 @@ import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.benchmark.BenchmarkResults.Result;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
@@ -571,8 +572,7 @@ public class BenchmarkController {
         Client client = ClientFactory.createClient();
         try {
             client.createConnection(m_config.hosts[0].getHostName(),
-                                    m_config.hosts[0].getPort(),
-                                    "", "");
+                                    m_config.hosts[0].getPort());
             NullCallback cb = new NullCallback();
             client.callProcedure(cb, "@Shutdown");
         } catch (NoConnectionsException e) {
@@ -634,7 +634,7 @@ public class BenchmarkController {
                 nextIntervalTime = m_config.interval * (m_pollIndex.get() + 1) + startTime;
             }
 
-            ProcessData.OutputLine serv_line = m_serverPSM.nextNonBlocking();
+            /*ProcessData.OutputLine serv_line =*/ m_serverPSM.nextNonBlocking();
             //if (serv_line != null)
             //{
             //    System.err.printf("(%s): \"%s\"\n", serv_line.processName, serv_line.message);
@@ -737,11 +737,11 @@ public class BenchmarkController {
 
     /** Call dump on each of the servers */
     public void tryDumpAll() {
-        Client dumpClient = ClientFactory.createClient();
+        ClientConfig clientConfig = new ClientConfig("program", "password");
+        Client dumpClient = ClientFactory.createClient(clientConfig);
         for (InetSocketAddress host : m_config.hosts) {
             try {
-                dumpClient.createConnection(host.getHostName(), host.getPort(),
-                                            "program", "password");
+                dumpClient.createConnection(host.getHostName(), host.getPort());
                 dumpClient.callProcedure("@dump");
             } catch (UnknownHostException e) {
                 e.printStackTrace();

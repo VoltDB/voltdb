@@ -29,9 +29,9 @@ import java.util.Calendar;
 import java.util.Date;
 
 import org.voltdb.VoltTable;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcedureCallback;
 
 public class ClientInsert {
@@ -133,7 +133,8 @@ public class ClientInsert {
 
         AsyncCallback callBack = new AsyncCallback();
 
-        final org.voltdb.client.Client voltclient = ClientFactory.createClient();
+        ClientConfig clientConfig = new ClientConfig("program", "none");
+        final org.voltdb.client.Client voltclient = ClientFactory.createClient(clientConfig);
 
         String[] voltServers = serverList.split(",");
 
@@ -141,7 +142,7 @@ public class ClientInsert {
             try {
                 System.out.printf("Connecting to server: %s\n",thisServer);
 
-                voltclient.createConnection(thisServer, "program", "none");
+                voltclient.createConnection(thisServer);
             } catch (IOException e) {
                 e.printStackTrace();
                 System.exit(-1);

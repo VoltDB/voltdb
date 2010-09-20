@@ -17,11 +17,13 @@
 
 package org.voltdb;
 
-import java.io.File;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileReader;
 
-import org.voltdb.client.*;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
+import org.voltdb.client.ClientFactory;
 
 /**
  * A utility class that can be invoked from the command line to connect
@@ -35,7 +37,7 @@ public class UpdateLogging {
         String configFilePath = null;
         String username = "";
         String password = "";
-        final Client client = ClientFactory.createClient();
+
         // scan the inputs once to read everything but host names
         for (String arg : args) {
             String[] parts = arg.split("=",2);
@@ -57,7 +59,9 @@ public class UpdateLogging {
             }
         }
 
-        client.createConnection( host, username, password);
+        ClientConfig config = new ClientConfig(username, password);
+        final Client client = ClientFactory.createClient(config);
+        client.createConnection(host);
 
         File configFile = new File(configFilePath);
 

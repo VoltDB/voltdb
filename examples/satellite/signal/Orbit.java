@@ -20,10 +20,10 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
 package signal;
 
-import java.util.*;
-import signal.Constants;
+import java.util.Random;
 
 /*
  * Each instance of Orbit represents a single satellite.

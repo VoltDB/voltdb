@@ -31,6 +31,7 @@ import java.sql.Types;
 import java.util.ArrayList;
 
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 
 /**
@@ -257,13 +258,12 @@ public class ClusterMonitor {
         }
 
         m_pollInterval = pollInterval;
-        m_client = ClientFactory.createClient();
+        ClientConfig clientConfig = new ClientConfig(voltUsername, voltPassword);
+        m_client = ClientFactory.createClient(clientConfig);
         int successfulConnections = 0;
         for (InetSocketAddress host : voltHosts) {
             try {
-                m_client.createConnection(host.getHostName(),
-                                          host.getPort(),
-                                          voltUsername, voltPassword);
+                m_client.createConnection(host.getHostName());
                 successfulConnections++;
             } catch (IOException e) {
                 e.printStackTrace();

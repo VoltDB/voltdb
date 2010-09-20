@@ -22,7 +22,12 @@
  */
 package org.voltdb.regressionsuites;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -658,12 +663,12 @@ public class LocalCluster implements VoltServerConfig {
 
     private void silentShutdownSingleHost(int hostNum, boolean forceKillEEProcs) throws InterruptedException {
         Process proc = null;
-        PipeToFile ptf = null;
+        //PipeToFile ptf = null;
         ArrayList<EEProcess> procs = null;
         synchronized (this) {
            proc = m_cluster.get(hostNum);
-           ptf = m_pipes.get(hostNum);
-           m_cluster.set( hostNum, null);
+           //ptf = m_pipes.get(hostNum);
+           m_cluster.set(hostNum, null);
            m_pipes.set(hostNum, null);
            procs = m_eeProcs.get(hostNum);
         }

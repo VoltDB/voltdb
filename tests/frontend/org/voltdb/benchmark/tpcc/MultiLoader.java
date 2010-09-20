@@ -55,19 +55,19 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.Iterator;
+import java.util.concurrent.Semaphore;
+
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltdb.types.TimestampType;
 import org.voltdb.benchmark.ClientMain;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcCallException;
-import org.voltdb.client.SyncCallback;
 import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
-import java.util.concurrent.Semaphore;
+import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Pair;
 
 /** TPC-C database loader. Note: The methods order id parameters from "top level" to "low level"

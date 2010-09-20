@@ -36,6 +36,7 @@ import org.voltdb.VoltProcedure;
 import org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched;
 import org.voltdb.benchmark.tpcc.procedures.ResetWarehouse;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.utils.BuildDirectoryUtils;
@@ -66,8 +67,9 @@ public class ResetTestMain {
         ServerThread server = new ServerThread(catalog,  BackendTarget.NATIVE_EE_JNI);
         server.start();
         server.waitForInitialization();
-        Client client = ClientFactory.createClient();
-        client.createConnection("localhost", "program", "none");
+        ClientConfig clientConfig = new ClientConfig("program", "none");
+        Client client = ClientFactory.createClient(clientConfig);
+        client.createConnection("localhost");
 
         Date generationDateTime = new Date();
         long tm = System.currentTimeMillis();

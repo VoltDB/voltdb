@@ -20,10 +20,11 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
 package game.drivers;
 
-import game.db.*;
-import game.gui.*;
+import game.db.DB;
+import game.gui.GUI;
 
 public class GUIDriver
 {

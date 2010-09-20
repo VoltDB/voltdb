@@ -20,9 +20,12 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
 package game.procedures;
 
-import org.voltdb.*;
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
 
 @ProcInfo
 (
@@ -42,7 +45,7 @@ public class SetRowCol extends VoltProcedure
     {
         voltQueueSQL(SQLinsert, pk, numRows, numCols, generation);
 
-        VoltTable[] tables = voltExecuteSQL();
+        voltExecuteSQL();
         //assert correctness
         return 1;
     }

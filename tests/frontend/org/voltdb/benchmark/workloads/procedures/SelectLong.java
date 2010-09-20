@@ -22,8 +22,10 @@
  */
 package org.voltdb.benchmark.workloads.procedures;
 
-import org.voltdb.*;
-import org.voltdb.VoltProcedure.VoltAbortException;
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
 @ProcInfo
 (

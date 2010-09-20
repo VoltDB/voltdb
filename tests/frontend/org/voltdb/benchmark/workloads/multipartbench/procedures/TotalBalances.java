@@ -23,8 +23,10 @@
 
 package org.voltdb.benchmark.workloads.multipartbench.procedures;
 
-import org.voltdb.*;
-import org.voltdb.types.*;
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
 @ProcInfo
 (

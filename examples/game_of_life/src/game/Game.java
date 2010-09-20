@@ -20,13 +20,13 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
 package game;
 
-import java.util.*;
-import java.awt.Color;
-import java.awt.Graphics;
-import game.gui.*;
-import game.db.*;
+import game.db.DB;
+
+import java.util.LinkedList;
+import java.util.ListIterator;
 
 public class Game
 {
@@ -113,13 +113,6 @@ public class Game
         }
 
         return neighborIDs;
-    }
-
-    //not used, but meant to automatically evolve numGenerations generations
-    private void evolve(int numGenerations)
-    {
-        for (int i = 0; i < numGenerations; i++)
-            evolve();
     }
 
     //advances the board by one generation

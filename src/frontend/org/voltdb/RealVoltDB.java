@@ -46,12 +46,18 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Site;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.elt.ELTManager;
-import org.voltdb.fault.*;
+import org.voltdb.fault.ClusterPartitionFault;
+import org.voltdb.fault.FaultDistributor;
+import org.voltdb.fault.FaultDistributorInterface;
+import org.voltdb.fault.FaultHandler;
+import org.voltdb.fault.NodeFailureFault;
+import org.voltdb.fault.VoltFault;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
@@ -713,13 +719,14 @@ public class RealVoltDB implements VoltDBInterface
             System.exit(-1);
         }
 
-        Client client = ClientFactory.createClient();
+        ClientConfig clientConfig = new ClientConfig(rejoinUser, rejoinPass);
+        Client client = ClientFactory.createClient(clientConfig);
         ClientResponse response = null;
         RejoinCallback rcb = new RejoinCallback() {
 
         };
         try {
-            client.createConnection(rejoinHost, rejoinPort, rejoinUser, rejoinPass);
+            client.createConnection(rejoinHost, rejoinPort);
             InetSocketAddress inetsockaddr = new InetSocketAddress(rejoinHost, rejoinPort);
             SocketChannel socket = SocketChannel.open(inetsockaddr);
             String hostname = socket.socket().getLocalAddress().getCanonicalHostName();

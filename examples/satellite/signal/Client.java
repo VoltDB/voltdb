@@ -20,13 +20,18 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
 package signal;
 
 import java.io.IOException;
-import java.util.*;
-import procedures.*;
-import org.voltdb.*;
+import java.util.ArrayList;
+
+import org.voltdb.VoltTable;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
+
+import procedures.AddSatellite;
+import procedures.UpdateLocation;
 
 
 public class Client {
@@ -39,7 +44,8 @@ public class Client {
     static double maxoffset = 180;
     static ArrayList<Orbit> sat = new ArrayList<Orbit>(20);
     final static String validcountries = "/usa/france/brazil/china/india/";
-    final static org.voltdb.client.Client db = ClientFactory.createClient();
+    final static ClientConfig config = new ClientConfig("signal", "wernher");
+    final static org.voltdb.client.Client db = ClientFactory.createClient(config);
 
     /**
      * @param args
@@ -159,7 +165,7 @@ public class Client {
         boolean started = false;
         while (!started) {
             try {
-                db.createConnection("localhost", "signal", "wernher");
+                db.createConnection("localhost");
                 started = true;
             }
             catch (java.net.ConnectException e) {

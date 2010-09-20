@@ -20,24 +20,33 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
 package tracker;
-import java.awt.*;
+
+import java.awt.BorderLayout;
+import java.awt.Container;
+import java.awt.Dimension;
 import java.io.IOException;
 
-import javax.swing.*;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
 
-import org.voltdb.*;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltTableRow;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.NoConnectionsException;
 
-import procedures.*;
+import procedures.GetLocationData;
+import procedures.GetSatelliteData;
 
 public class UserInterface {
 
     static JFrame frame;
     static JLabel label;
     static Board board;
-    final static org.voltdb.client.Client db = ClientFactory.createClient();
+    final static ClientConfig config = new ClientConfig("tracker", "vonbraun");
+    final static org.voltdb.client.Client db = ClientFactory.createClient(config);
 
     // Create a constructor method, where the UI is constructed.
     public static void main(String args[]){
@@ -171,7 +180,7 @@ public class UserInterface {
         boolean started = false;
         while (!started) {
             try {
-                db.createConnection("localhost", "tracker", "vonbraun");
+                db.createConnection("localhost");
                 started = true;
             }
             catch (java.net.ConnectException e) {

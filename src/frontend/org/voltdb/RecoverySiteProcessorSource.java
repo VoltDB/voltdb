@@ -16,37 +16,33 @@
  */
 package org.voltdb;
 
-import java.nio.ByteBuffer;
-import java.nio.channels.*;
-import java.net.*;
 import java.io.IOException;
-import java.io.InterruptedIOException;
-import java.nio.channels.AsynchronousCloseException;
-import java.io.EOFException;
-
-import java.util.HashMap;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.ArrayDeque;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
-import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.logging.Level;
-import org.voltdb.logging.VoltLogger;
-import org.voltdb.messaging.RecoveryMessage;
-import org.voltdb.messaging.RecoveryMessageType;
-import org.voltdb.messaging.VoltMessage;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.messaging.Mailbox;
 import org.voltdb.jni.ExecutionEngine;
+import org.voltdb.logging.VoltLogger;
+import org.voltdb.messaging.Mailbox;
+import org.voltdb.messaging.RecoveryMessage;
+import org.voltdb.messaging.RecoveryMessageType;
+import org.voltdb.messaging.VoltMessage;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.DBBPool;
+import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.Pair;
 
 /**

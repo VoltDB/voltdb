@@ -30,6 +30,7 @@ import java.util.Date;
 
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
@@ -63,7 +64,8 @@ public class ClientMover {
         int intCounter;
         long longCounter;
 
-        final org.voltdb.client.Client voltclient = ClientFactory.createClient();
+        ClientConfig clientConfig = new ClientConfig("program", "none");
+        final org.voltdb.client.Client voltclient = ClientFactory.createClient(clientConfig);
 
         String[] voltServers = serverList.split(",");
 
@@ -71,7 +73,7 @@ public class ClientMover {
             try {
                 System.out.printf("Connecting to server: %s\n",thisServer);
 
-                voltclient.createConnection(thisServer, "program", "none");
+                voltclient.createConnection(thisServer);
             } catch (IOException e) {
                 e.printStackTrace();
                 System.exit(-1);

@@ -20,15 +20,15 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
 package game.gui;
 
+import game.db.DB;
+
 import java.awt.Dimension;
-import java.awt.Font;
 import java.awt.Graphics;
 
 import javax.swing.JPanel;
-
-import game.db.*;
 
 public class GUIPanel extends JPanel
 {

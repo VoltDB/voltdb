@@ -23,29 +23,28 @@
 
 package org.voltdb.jni;
 
-import junit.framework.TestCase;
-
+import java.nio.channels.SocketChannel;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.concurrent.atomic.AtomicReference;
-import java.nio.ByteBuffer;
-import java.nio.channels.*;
 
-import org.voltdb.SysProcSelector;
-import org.voltdb.VoltDB;
+import junit.framework.TestCase;
+
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
-import org.voltdb.RecoverySiteProcessorSource;
 import org.voltdb.RecoverySiteProcessorDestination;
+import org.voltdb.RecoverySiteProcessorSource;
+import org.voltdb.SysProcSelector;
+import org.voltdb.TableStreamType;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.LoadCatalogToString;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.messaging.MockMailbox;
+import org.voltdb.messaging.RecoveryMessage;
 import org.voltdb.messaging.RecoveryMessageType;
 import org.voltdb.messaging.VoltMessage;
-import org.voltdb.messaging.RecoveryMessage;
-import org.voltdb.messaging.MockMailbox;
-import org.voltdb.TableStreamType;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.Pair;

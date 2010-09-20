@@ -28,28 +28,27 @@
 
 package com;
 
-import org.voltdb.client.Client;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureCallback;
-import org.voltdb.client.ClientFactory;
-import org.voltdb.client.NullCallback;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltTableRow;
-import org.voltdb.logging.VoltLogger;
-import org.voltdb.client.NoConnectionsException;
-import org.voltdb.client.ProcCallException;
-import org.voltdb.utils.Encoder;
-
-import java.util.*;
 import java.io.IOException;
 import java.io.InterruptedIOException;
-import java.io.FileOutputStream;
-import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
-import java.lang.Enum;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.Random;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicLong;
+
+import org.voltdb.VoltTable;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
+import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcCallException;
+import org.voltdb.client.ProcedureCallback;
+import org.voltdb.logging.VoltLogger;
+import org.voltdb.utils.Encoder;
 
 
 public class ClientThreadedKV {
@@ -72,7 +71,8 @@ public class ClientThreadedKV {
 
     public static final VoltLogger m_logger = new VoltLogger(ClientThreadedKV.class.getName());
 
-    private static final Client voltclient = ClientFactory.createClient();
+    private static final ClientConfig config = new ClientConfig("program", "none");
+    private static final Client voltclient = ClientFactory.createClient(config);
 
     private static final ConcurrentLinkedQueue<byte[]> valuesPendingDecompression =
                                                                                     new ConcurrentLinkedQueue<byte[]>();
@@ -334,7 +334,7 @@ public class ClientThreadedKV {
             try {
                 thisServer = thisServer.trim();
                 m_logger.info(String.format("Connecting to server: %s",thisServer));
-                voltclient.createConnection(thisServer, "program", "none");
+                voltclient.createConnection(thisServer);
             } catch (IOException e) {
                 m_logger.error(e.toString());
                 System.exit(-1);
@@ -468,8 +468,6 @@ public class ClientThreadedKV {
                             tot_executions_latency = 1;
                         }
                         thisOutstanding = num_puts - tot_executions;
-
-                        long runTimeMillis = endTime - startTime;
 
                         double percentComplete = ((double) num_puts / (double) initial_size) * 100;
                         if (percentComplete > 100.0) {

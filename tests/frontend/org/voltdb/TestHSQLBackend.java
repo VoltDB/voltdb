@@ -31,6 +31,7 @@ import junit.framework.TestCase;
 
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.utils.BuildDirectoryUtils;
@@ -149,8 +150,9 @@ public class TestHSQLBackend extends TestCase {
         server.waitForInitialization();
 
         // run the test
-        Client client = ClientFactory.createClient();
-        client.createConnection("localhost", "program", "none");
+        ClientConfig clientConfig = new ClientConfig("program", "none");
+        Client client = ClientFactory.createClient(clientConfig);
+        client.createConnection("localhost");
 
         // call the insert procedure
         VoltTable[] results = client.callProcedure("InsertHistory", 5, 5, 5, 5, 5, 100000L, 2.5, "nada").getResults();

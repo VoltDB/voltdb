@@ -25,11 +25,14 @@ package org.voltdb;
 
 import java.io.File;
 import java.io.IOException;
+
+import junit.framework.TestCase;
+
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.utils.BuildDirectoryUtils;
-import junit.framework.TestCase;
 
 public class MilestoneOneExecutionTest extends TestCase {
 
@@ -67,8 +70,9 @@ public class MilestoneOneExecutionTest extends TestCase {
         server.waitForInitialization();
 
         // run the test
-        client = ClientFactory.createClient();
-        client.createConnection("localhost", "program", "none");
+        ClientConfig config = new ClientConfig("program", "none");
+        client = ClientFactory.createClient(config);
+        client.createConnection("localhost");
     }
 
     @Override

@@ -17,19 +17,13 @@
 
 package org.voltdb.jni;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.UnsupportedEncodingException;
 import java.io.EOFException;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -39,7 +33,7 @@ import org.voltdb.ExecutionSite;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SysProcSelector;
-import org.voltdb.VoltDB;
+import org.voltdb.TableStreamType;
 import org.voltdb.VoltTable;
 import org.voltdb.elt.ELTProtoMessage;
 import org.voltdb.exceptions.EEException;
@@ -47,7 +41,6 @@ import org.voltdb.exceptions.SerializableException;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.TableStreamType;
 
 
 /* Serializes data over a connection that presumably is being read

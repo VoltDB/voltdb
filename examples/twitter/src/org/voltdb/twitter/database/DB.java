@@ -30,6 +30,7 @@ import java.util.List;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
@@ -45,10 +46,11 @@ public class DB {
     private Client client;
 
     public DB(List<String> servers) {
-        client = ClientFactory.createClient();
+        ClientConfig config = new ClientConfig("program", "none");
+        client = ClientFactory.createClient(config);
         for (String server : servers) {
             try {
-                client.createConnection(server, "program", "none");
+                client.createConnection(server);
             } catch (UnknownHostException e) {
                 e.printStackTrace();
                 System.exit(-1);

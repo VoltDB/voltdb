@@ -25,9 +25,7 @@ package org.voltdb.benchmark.workloads.paramgen;
 
 import java.math.BigDecimal;
 
-import org.voltdb.benchmark.workloads.xml.ParamType;
 import org.voltdb.types.TimestampType;
-import java.util.Random;
 
 public class RandomValues
 {
@@ -121,7 +119,7 @@ public class RandomValues
     {
         long randomLong = (long)(Math.random() * Long.MAX_VALUE);
         if (Math.random() < coinToss)
-            return (long)(randomLong - Long.MAX_VALUE);
+            return (randomLong - Long.MAX_VALUE);
         else
             return randomLong;
     }
@@ -130,16 +128,16 @@ public class RandomValues
     {
         int randomInt = (int)(Math.random() * Integer.MAX_VALUE);
         if (Math.random() < coinToss)
-            return (int)(randomInt - Integer.MAX_VALUE);
+            return (randomInt - Integer.MAX_VALUE);
         else
             return randomInt;
     }
 
     public static double getDouble()
     {
-        double randomDouble = (double)(Math.random() * Double.MAX_VALUE);
+        double randomDouble = (Math.random() * Double.MAX_VALUE);
         if (Math.random() < coinToss)
-            return (double)(randomDouble - Double.MAX_VALUE);
+            return (randomDouble - Double.MAX_VALUE);
         else
             return randomDouble;
     }

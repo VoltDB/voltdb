@@ -211,7 +211,7 @@ public class TestRejoinEndToEnd extends TestCase {
         Context context = getServerReadyToReceiveNewNode();
 
         Client client = ClientFactory.createClient();
-        client.createConnection("localhost", null, null);
+        client.createConnection("localhost");
 
         ServerSocketChannel listener = null;
         if (failType != FAIL_NO_OPEN_SOCKET) {

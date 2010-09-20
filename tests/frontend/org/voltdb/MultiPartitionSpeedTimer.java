@@ -27,15 +27,21 @@ import java.io.IOException;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.util.concurrent.atomic.AtomicLong;
+
+import junit.framework.TestCase;
+
 import org.voltdb.benchmark.overhead.OverheadClient;
 import org.voltdb.benchmark.overhead.procedures.measureOverhead;
 import org.voltdb.benchmark.overhead.procedures.measureOverheadMultipartition;
-import org.voltdb.client.*;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
+import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalSingleProcessServer;
 import org.voltdb.regressionsuites.VoltServerConfig;
-
-import junit.framework.TestCase;
 
 public class MultiPartitionSpeedTimer extends TestCase {
 
@@ -132,8 +138,9 @@ public class MultiPartitionSpeedTimer extends TestCase {
         // get a client
         String listener = m_config.getListenerAddresses().get(0);
 
-        m_client = ClientFactory.createClient();
-        m_client.createConnection(listener, "user", "pass");
+        ClientConfig config = new ClientConfig("user", "pass");
+        m_client = ClientFactory.createClient(config);
+        m_client.createConnection(listener);
 
         runATest(totalCount, i);
 

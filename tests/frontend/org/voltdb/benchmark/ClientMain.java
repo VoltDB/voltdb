@@ -42,6 +42,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.benchmark.Verification.Expression;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ConnectionUtil;
@@ -50,9 +51,9 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.StatsUploaderSettings;
 import org.voltdb.processtools.SSHTools;
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
+import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.Pair;
 import org.voltdb.utils.VoltSampler;
-import org.voltdb.utils.DBBPool.BBContainer;
 
 /**
  * Base class for clients that will work with the multi-host multi-process
@@ -481,12 +482,13 @@ public abstract class ClientMain {
                 statsSettings = null;
             }
         }
+        ClientConfig clientConfig = new ClientConfig(username, password);
+        clientConfig.setExpectedOutgoingMessageSize(getExpectedOutgoingMessageSize());
+        clientConfig.setHeavyweight(useHeavyweightClient());
+        clientConfig.setStatsUploaderSettings(statsSettings);
+
         m_voltClient =
-            ClientFactory.createClient(
-                getExpectedOutgoingMessageSize(),
-                null,
-                useHeavyweightClient(),
-                statsSettings);
+            ClientFactory.createClient(clientConfig);
 
         m_id = id;
         m_exitOnCompletion = exitOnCompletion;
@@ -594,7 +596,7 @@ public abstract class ClientMain {
 
     private void createConnection(final String hostname, int port)
         throws UnknownHostException, IOException {
-        m_voltClient.createConnection(hostname, port, m_username, m_password);
+        m_voltClient.createConnection(hostname, port);
     }
 
     private boolean checkConstraints(String procName, ClientResponse response) {
@@ -718,8 +720,11 @@ public abstract class ClientMain {
     protected boolean checkTables() {
         String dir = "/tmp";
         String nonce = "data_verification";
-        Client client = ClientFactory.createClient(getExpectedOutgoingMessageSize(), null,
-                                                   false, null);
+        ClientConfig clientConfig = new ClientConfig(m_username, m_password);
+        clientConfig.setExpectedOutgoingMessageSize(getExpectedOutgoingMessageSize());
+        clientConfig.setHeavyweight(false);
+
+        Client client = ClientFactory.createClient(clientConfig);
         // Host ID to IP mappings
         LinkedHashMap<Integer, String> hostMappings = new LinkedHashMap<Integer, String>();
         /*
@@ -737,7 +742,7 @@ public abstract class ClientMain {
             boolean keepTrying = true;
             VoltTable[] response = null;
 
-            client.createConnection(m_host, m_username, m_password);
+            client.createConnection(m_host);
             // Only initiate the snapshot if it's the first client
             while (m_id == 0) {
                 // Take a snapshot of the database. This call is blocking.

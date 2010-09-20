@@ -18,7 +18,6 @@
 package org.voltdb.messaging;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
