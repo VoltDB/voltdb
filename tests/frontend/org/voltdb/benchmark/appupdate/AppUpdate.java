@@ -40,33 +40,32 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.NotImplementedException;
 
 /**
- * This benchmark uses three tables: A, B, FK.  Table FK is replicated and maps an int and a string
- * to a payload. InsertA does a lookup on payload using the int and inserts the corresponding payload into A.
- * InsertB does a lookup in FK of the payload using the string and inserts the corresponding payload into B.
- * Concurrently with this workload, with some small probability, an UpdateApplicationCatalog procedure
- * is run to change at random to a catalog defining A, B, or both A and B.
+ * This benchmark uses three tables: A, B, FK. Table FK is replicated and maps
+ * an int and a string to a payload. InsertA does a lookup on payload using the
+ * int and inserts the corresponding payload into A. InsertB does a lookup in FK
+ * of the payload using the string and inserts the corresponding payload into B.
+ * Concurrently with this workload, with some small probability, an
+ * UpdateApplicationCatalog procedure is run to change at random to a catalog
+ * defining A, B, or both A and B.
  *
- *  Consequently, lots of calls to InsertA and InsertB should fail. This failure is expected and is
- *  counted. Likewise, some number of catalog updates will fail - they will diff v. an out of date
- *  catalog and be caught by the  ExecutionSite as stale. These are also counted.
+ * Consequently, lots of calls to InsertA and InsertB should fail. This failure
+ * is expected and is counted. Likewise, some number of catalog updates will
+ * fail - they will diff v. an out of date catalog and be caught by the
+ * ExecutionSite as stale. These are also counted.
  *
- *  Note that this is an insert only workload. The system will run out of memory unless tables are
- *  correctly dropped as a consequence of a catalog update.
+ * Note that this is an insert only workload. The system will run out of memory
+ * unless tables are correctly dropped as a consequence of a catalog update.
  *
- *  Finally, the payload lookup scheme estalishes a foreign key constraint between A and FK and
- *  B and FK. This is validated by the checkTransaction constraint benchmark feature, which uses
- *  snapshots.
+ * Finally, the payload lookup scheme estalishes a foreign key constraint
+ * between A and FK and B and FK. This is validated by the checkTransaction
+ * constraint benchmark feature, which uses snapshots.
  *
- *  This test could/should be extended to include:
- *      * export only tables
- *      * export clients
- *      * drops of replicated tables
- *      * multi-partition workload (maybe UpdatePayload).
- *      * AdHoc (see ENG-635)
+ * This test could/should be extended to include: * export only tables * export
+ * clients * drops of replicated tables * multi-partition workload (maybe
+ * UpdatePayload). * AdHoc (see ENG-635)
  */
 
-public class AppUpdate extends ClientMain
-{
+public class AppUpdate extends ClientMain {
     // Data read via reflection by BenchmarkController
     public static final Class<? extends VoltProjectBuilder> m_projectBuilderClass = AppUpdateProjectBuilder.class;
     public static final Class<? extends ClientMain> m_loaderClass = null;
@@ -86,6 +85,7 @@ public class AppUpdate extends ClientMain
         private Transaction(String name) {
             this.name = name;
         }
+
         public final String name;
     }
 
@@ -93,19 +93,19 @@ public class AppUpdate extends ClientMain
      * Project builder for app update.
      */
     public static class AppUpdateProjectBuilder extends VoltProjectBuilder {
+
         public AppUpdateProjectBuilder() {
         }
 
         /**
-         * Produce 3 catalogs for table A and table B in the combinations
-         * of (A), (B) and (A,B).
+         * Produce 3 catalogs for table A and table B in the combinations of
+         * (A), (B) and (A,B).
          */
         @Override
-        public String[] compileAllCatalogs(
-                int sitesPerHost, int length, int kFactor, String leader)
-        {
-            String tableA  = "CREATE TABLE A (PID INTEGER NOT NULL, I INTEGER, PAYLOAD VARCHAR(128));";
-            String tableB  = "CREATE TABLE B (PID INTEGER NOT NULL, S VARCHAR(6), PAYLOAD VARCHAR(128));";
+        public String[] compileAllCatalogs(int sitesPerHost, int length,
+                int kFactor, String leader) {
+            String tableA = "CREATE TABLE A (PID INTEGER NOT NULL, I INTEGER, PAYLOAD VARCHAR(128));";
+            String tableB = "CREATE TABLE B (PID INTEGER NOT NULL, S VARCHAR(6), PAYLOAD VARCHAR(128));";
             String tableFK = "CREATE TABLE FK (I INTEGER, S VARCHAR(6), PAYLOAD VARCHAR(128));";
 
             String loadSQL = "INSERT INTO FK VALUES (?,?,?);";
@@ -117,8 +117,10 @@ public class AppUpdate extends ClientMain
                 pba.addLiteralSchema(tableA);
                 pba.addLiteralSchema(tableFK);
                 pba.addPartitionInfo("A", "PID");
-                if (!pba.compile(Transaction.CatalogA.name, sitesPerHost, length, kFactor, leader)) {
-                    throw new RuntimeException("AppUpdate project builder failed app compilation (a).");
+                if (!pba.compile(Transaction.CatalogA.name, sitesPerHost,
+                        length, kFactor, leader)) {
+                    throw new RuntimeException(
+                            "AppUpdate project builder failed app compilation (a).");
                 }
 
                 VoltProjectBuilder pbb = new VoltProjectBuilder();
@@ -126,12 +128,14 @@ public class AppUpdate extends ClientMain
                 pbb.addStmtProcedure(Transaction.Load.name, loadSQL);
                 pbb.addLiteralSchema(tableB);
                 pbb.addLiteralSchema(tableFK);
-                pbb.addPartitionInfo("B","PID");
-                if (!pbb.compile(Transaction.CatalogB.name, sitesPerHost, length, kFactor, leader)) {
-                    throw new RuntimeException("AppUpdate project builder failed app compilation (b)");
+                pbb.addPartitionInfo("B", "PID");
+                if (!pbb.compile(Transaction.CatalogB.name, sitesPerHost,
+                        length, kFactor, leader)) {
+                    throw new RuntimeException(
+                            "AppUpdate project builder failed app compilation (b)");
                 }
 
-                VoltProjectBuilder pb = new VoltProjectBuilder();
+                VoltProjectBuilder pb = this; // new VoltProjectBuilder();
                 pb.addProcedures(InsertA.class, InsertB.class);
                 pb.addStmtProcedure(Transaction.Load.name, loadSQL);
                 pb.addLiteralSchema(tableA);
@@ -140,21 +144,24 @@ public class AppUpdate extends ClientMain
                 pb.addPartitionInfo("A", "PID");
                 pb.addPartitionInfo("B", "PID");
 
-                if (!pb.compile(Transaction.CatalogAB.name, sitesPerHost, length, kFactor, leader)) {
-                    throw new RuntimeException("AppUpdate project builder failed app compilation (ab)");
+                if (!pb.compile(Transaction.CatalogAB.name, sitesPerHost,
+                        length, kFactor, leader)) {
+                    throw new RuntimeException(
+                            "AppUpdate project builder failed app compilation (ab)");
                 }
+
+            } catch (IOException e) {
+                throw new RuntimeException(
+                        "AppUpdate project builder failed app compilation (io)");
             }
-            catch (IOException e) {
-                throw new RuntimeException("AppUpdate project builder failed app compilation (io)");
-            }
-            return new String[] {Transaction.CatalogAB.name,
-                                 Transaction.CatalogA.name,
-                                 Transaction.CatalogB.name};
+            return new String[] { Transaction.CatalogAB.name,
+                    Transaction.CatalogA.name, Transaction.CatalogB.name };
         }
 
         @Override
         public void addAllDefaults() {
-            throw new NotImplementedException("Not implemented for AppUpdate Project Builder.");
+            throw new NotImplementedException(
+                    "Not implemented for AppUpdate Project Builder.");
         }
     }
 
@@ -170,28 +177,34 @@ public class AppUpdate extends ClientMain
             if (clientResponse.getStatus() == ClientResponse.CONNECTION_LOST) {
                 return;
             }
+
             if (!checkTransaction(t.name, clientResponse, false, false)) {
                 if (clientResponse.getStatusString() != null) {
-                    if (clientResponse.getStatusString().contains("Procedure InsertA was not found"))
+                    if (clientResponse.getStatusString().contains("Procedure InsertA was not found")) {
                         m_counts[Transaction.InsertAFail.ordinal()].incrementAndGet();
-                    else if (clientResponse.getStatusString().contains("Procedure InsertB was not found"))
+                    }
+                    else if (clientResponse.getStatusString().contains("Procedure InsertB was not found")) {
                         m_counts[Transaction.InsertBFail.ordinal()].incrementAndGet();
+                    }
                     else if (clientResponse.getStatusString().contains("Trying to update main catalog context with diff commands generated for an out-of date catalog."))
+                    {
                         if (t == Transaction.CatalogA)
                             m_counts[Transaction.CatalogAFail.ordinal()].incrementAndGet();
                         else if (t == Transaction.CatalogB)
                             m_counts[Transaction.CatalogBFail.ordinal()].incrementAndGet();
                         else if (t == Transaction.CatalogAB)
                             m_counts[Transaction.CatalogABFail.ordinal()].incrementAndGet();
-                    return;
+                        else
+                            throw new RuntimeException("Unexpected failure: " + clientResponse.getStatusString());
+                    }
+                    else {
+                        throw new RuntimeException("Error. Unexpected failure from harness: " + clientResponse.getStatus());
+                    }
                 }
+
                 if (clientResponse.getException() != null) {
                     clientResponse.getException().printStackTrace();
                 }
-                if (clientResponse.getStatusString() != null) {
-                    System.err.println(clientResponse.getStatusString());
-                }
-                throw new RuntimeException("Error. Unexpected failure from harness.");
             }
             else {
                 m_counts[t.ordinal()].incrementAndGet();
@@ -229,7 +242,6 @@ public class AppUpdate extends ClientMain
         return "Client";
     }
 
-
     @Override
     protected void runLoop() throws IOException, InterruptedException {
         while (true) {
@@ -238,11 +250,10 @@ public class AppUpdate extends ClientMain
         }
     }
 
-
-    Random m_rand = new Random();       // generates all random numbers
-    int tuplesLoaded = 0;               // number of tuples loaded
-    int nextA = 0;                      // next A.PID
-    int nextB = 0;                      // next B.PID
+    Random m_rand = new Random(); // generates all random numbers
+    int tuplesLoaded = 0; // number of tuples loaded
+    int nextA = 0; // next A.PID
+    int nextB = 0; // next B.PID
 
     // need 10,000 unique strings for 10,000 unique ints.
     // seems pretty straightforward
@@ -252,36 +263,41 @@ public class AppUpdate extends ClientMain
 
     // Need 128 byte string
     String getPayload(int fkrow) {
-        String[] subs = {"BAT", "CAT", "DAT", "EAT", "FAT", "GAT", "HAT",
-                         "MAT", "NAT", "PAT", "RAT", "SAT", "TAT", "VAT"};
+        String[] subs = { "BAT", "CAT", "DAT", "EAT", "FAT", "GAT", "HAT",
+                "MAT", "NAT", "PAT", "RAT", "SAT", "TAT", "VAT" };
         StringBuilder sb = new StringBuilder();
-        for (int i=0; i < 40; i++) {
+        for (int i = 0; i < 40; i++) {
             sb.append(subs[m_rand.nextInt(13)]);
         }
         return sb.toString();
     }
 
-    boolean updateToCatalog(int catalog) throws NoConnectionsException, IOException {
-        // 0 = ab,  1 = a, 2 = b
+    boolean updateToCatalog(int catalog) throws NoConnectionsException,
+            IOException {
+        // 0 = ab, 1 = a, 2 = b
         // allowed to update to current catalog (no change)
         Transaction nextCatalog;
         switch (catalog) {
-            case 0:
-                nextCatalog = Transaction.CatalogAB;
-                break;
-            case 1:
-                nextCatalog = Transaction.CatalogA;
-                break;
-            case 2:
-                nextCatalog = Transaction.CatalogB;
-                break;
-            default:
-                throw new UnsupportedOperationException("Invalid catalog update requested");
+        case 0:
+            nextCatalog = Transaction.CatalogAB;
+            break;
+        case 1:
+            nextCatalog = Transaction.CatalogA;
+            break;
+        case 2:
+            nextCatalog = Transaction.CatalogB;
+            break;
+        default:
+            throw new UnsupportedOperationException(
+                    "Invalid catalog update requested");
         }
-        // System.err.println("Updating to catalog " + nextCatalog.name);
-        return m_voltClient.callProcedure(
-                  new AppUpdateCallback(nextCatalog),
-                  "@UpdateApplicationCatalog", nextCatalog.name, null);
+
+        System.err.println("Updating to catalog name: " + nextCatalog.name
+                + " using deployment file: "
+                + m_deploymentFilePath);
+
+        return m_voltClient.callProcedure(new AppUpdateCallback(nextCatalog),
+                "@UpdateApplicationCatalog", nextCatalog.name, m_deploymentFilePath);
     }
 
     @Override
@@ -289,19 +305,20 @@ public class AppUpdate extends ClientMain
         boolean queued = false;
         // loading
         if (tuplesLoaded < 10000) {
-            queued = m_voltClient.callProcedure(
-                new AppUpdateCallback(Transaction.Load), "Load",
-                tuplesLoaded,
-                getStringKey(tuplesLoaded),
-                getPayload(tuplesLoaded));
+            queued = m_voltClient.callProcedure(new AppUpdateCallback(
+                    Transaction.Load), "Load", tuplesLoaded,
+                    getStringKey(tuplesLoaded), getPayload(tuplesLoaded));
 
             if (queued) {
                 tuplesLoaded += 1;
+                if (tuplesLoaded % 1000 == 0) {
+                    System.err.println("Loaded: " + tuplesLoaded);
+                }
             }
         }
 
         // change catalogs with a probability of 0.01%
-        else if (m_rand.nextInt(100000) < 10) {
+        else if (m_rand.nextInt(1000) < 10) {
             checkTables();
             queued = updateToCatalog(m_rand.nextInt(1000) % 3);
         }
@@ -310,18 +327,16 @@ public class AppUpdate extends ClientMain
         else if (m_rand.nextInt(100) < 50) {
             // need a key for the payload lookup
             int key = m_rand.nextInt(tuplesLoaded);
-            queued = m_voltClient.callProcedure(
-                new AppUpdateCallback(Transaction.InsertA), "InsertA",
-                nextA++, key);
+            queued = m_voltClient.callProcedure(new AppUpdateCallback(
+                    Transaction.InsertA), "InsertA", nextA++, key);
         }
 
         // 50% inserts to B
         else {
             // need a string for the payload lookup
             String key = getStringKey(m_rand.nextInt(tuplesLoaded));
-            queued = m_voltClient.callProcedure(
-                new AppUpdateCallback(Transaction.InsertB), "InsertB",
-                nextB++, key);
+            queued = m_voltClient.callProcedure(new AppUpdateCallback(
+                    Transaction.InsertB), "InsertB", nextB++, key);
         }
 
         return queued;
@@ -331,7 +346,6 @@ public class AppUpdate extends ClientMain
         ClientMain.main(AppUpdate.class, args, false);
         System.err.println("Exiting AppUpdate.");
     }
-
 
     private static class ForeignKeyConstraints extends ForeignKeyConstraintBase {
 
@@ -351,26 +365,25 @@ public class AppUpdate extends ClientMain
                 final int int_index = row.getColumnIndex("I");
                 final int str_index = row.getColumnIndex("S");
                 final int pay_index = row.getColumnIndex("PAYLOAD");
-                intLookup.put((Integer)row.get(int_index, VoltType.INTEGER),
-                              (String)row.get(pay_index, VoltType.STRING));
-                strLookup.put((String)row.get(str_index, VoltType.STRING),
-                              (String)row.get(pay_index, VoltType.STRING));
+                intLookup.put((Integer) row.get(int_index, VoltType.INTEGER),
+                        (String) row.get(pay_index, VoltType.STRING));
+                strLookup.put((String) row.get(str_index, VoltType.STRING),
+                        (String) row.get(pay_index, VoltType.STRING));
                 return true;
-            }
-            else if (m_table.equalsIgnoreCase("A")) {
+            } else if (m_table.equalsIgnoreCase("A")) {
                 final int int_index = row.getColumnIndex("I");
                 final int pay_index = row.getColumnIndex("PAYLOAD");
 
-                Integer int_value = (Integer)row.get(int_index, VoltType.INTEGER);
-                String pay_value = (String)row.get(pay_index, VoltType.STRING);
+                Integer int_value = (Integer) row.get(int_index,
+                        VoltType.INTEGER);
+                String pay_value = (String) row.get(pay_index, VoltType.STRING);
                 return intLookup.get(int_value).equals(pay_value);
-            }
-            else if (m_table.equalsIgnoreCase("B")) {
+            } else if (m_table.equalsIgnoreCase("B")) {
                 final int str_index = row.getColumnIndex("S");
                 final int pay_index = row.getColumnIndex("PAYLOAD");
 
-                String str_value = (String)row.get(str_index, VoltType.STRING);
-                String pay_value = (String)row.get(pay_index, VoltType.STRING);
+                String str_value = (String) row.get(str_index, VoltType.STRING);
+                String pay_value = (String) row.get(pay_index, VoltType.STRING);
                 return strLookup.get(str_value).equals(pay_value);
             }
             return false;
@@ -384,6 +397,5 @@ public class AppUpdate extends ClientMain
         addTableConstraint("A", new ForeignKeyConstraints("A"));
         addTableConstraint("B", new ForeignKeyConstraints("B"));
     }
-
 
 }
