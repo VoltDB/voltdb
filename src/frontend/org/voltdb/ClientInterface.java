@@ -58,12 +58,12 @@ import org.voltdb.network.QueueMonitor;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.network.VoltProtocolHandler;
 import org.voltdb.network.WriteStream;
-import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.EstTime;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.Pair;
+import org.voltdb.utils.DBBPool.BBContainer;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -857,8 +857,10 @@ public class ClientInterface implements DumpManager.Dumpable {
             // Updating a catalog needs to divert to the catalog processing thread
             if (task.procName.equals("@UpdateApplicationCatalog")) {
                 task.buildParameterSet();
-                // user only provides catalog URL.
-                if (task.params.m_params.length != 2) {
+                if (task.params.m_params.length != 2 ||
+                    task.params.m_params[0] == null ||
+                    task.params.m_params[1] == null)
+                {
                     final ClientResponseImpl errorResponse =
                         new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                                                new VoltTable[0],
