@@ -37,8 +37,8 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
+import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -112,7 +112,7 @@ public class BenchmarkController {
                 ProcessData.OutputLine line = m_clientPSM.nextBlocking();
                 //System.err.printf("(%s): \"%s\"\n", line.processName, line.message);
                 if (line.stream == ProcessData.Stream.STDERR) {
-                    //System.err.printf("(%s): \"%s\"\n", line.processName, line.value);
+                    // System.err.printf("(%s): \"%s\"\n", line.processName, line.message);
                     continue;
                 }
 
@@ -525,6 +525,9 @@ public class BenchmarkController {
         clArgs.add("STATSDATABASEURL=" + m_config.statsDatabaseURL);
         clArgs.add("STATSPOLLINTERVAL=" + m_config.interval);
         clArgs.add("PROJECTBUILDERNAME=" + m_builderClass.getName());
+
+        // path to deployment file on the server
+        clArgs.add("DEPLOYMENTFILEPATH=" + new File(m_pathToDeployment).getName());
 
         for (InetSocketAddress host : m_config.hosts)
             clArgs.add("HOST=" + host.getHostName() + ":" + host.getPort());

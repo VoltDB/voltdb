@@ -51,9 +51,9 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.StatsUploaderSettings;
 import org.voltdb.processtools.SSHTools;
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
-import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.Pair;
 import org.voltdb.utils.VoltSampler;
+import org.voltdb.utils.DBBPool.BBContainer;
 
 /**
  * Base class for clients that will work with the multi-host multi-process
@@ -122,6 +122,8 @@ public abstract class ClientMain {
     protected final String m_countDisplayNames[];
 
     protected final int m_id;
+
+    protected final String m_deploymentFilePath;
 
     private final boolean m_exitOnCompletion;
 
@@ -396,6 +398,7 @@ public abstract class ClientMain {
         m_counts = null;
         m_countDisplayNames = null;
         m_checkTransaction = 0;
+        m_deploymentFilePath = null;
         m_checkTables = false;
         m_constraints = new LinkedHashMap<Pair<String, Integer>, Expression>();
     }
@@ -427,6 +430,7 @@ public abstract class ClientMain {
         float checkTransaction = 0;
         boolean checkTables = false;
         String statsDatabaseURL = null;
+        String deploymentFilePath = null;
         int statsPollInterval = 10000;
 
         // scan the inputs once to read everything but host names
@@ -465,6 +469,9 @@ public abstract class ClientMain {
             } else if (parts[0].equals("STATSPOLLINTERVAL")) {
                 statsPollInterval = Integer.parseInt(parts[1]);
             }
+            else if (parts[0].equals("DEPLOYMENTFILEPATH")) {
+                deploymentFilePath = parts[1];
+            }
         }
         StatsUploaderSettings statsSettings = null;
         if (statsDatabaseURL != null) {
@@ -496,6 +503,7 @@ public abstract class ClientMain {
         m_password = password;
         m_txnRate = transactionRate;
         m_txnsPerMillisecond = transactionRate / 1000.0;
+        m_deploymentFilePath = deploymentFilePath;
 
         // report any errors that occurred before the client was instantiated
         if (state != ControlState.PREPARING)
