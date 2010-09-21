@@ -24,7 +24,6 @@
     <classpathentry kind="lib" path="third_party/java/jars/emma.jar"/>
     <classpathentry kind="lib" path="third_party/java/jars/junit-4.8.2.jar"/>
     <classpathentry kind="lib" path="third_party/java/jars/japex.jar"/>
-    <classpathentry kind="lib" path="third_party/java/jars/jetty-ajp-7.1.6.v20100715.jar"/>
     <classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER">
         <attributes>
             <!-- Update the directory value to reflect
