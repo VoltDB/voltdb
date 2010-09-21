@@ -65,7 +65,7 @@ public interface SiteProcedureConnection {
             String databaseName,
             String tableName,
             VoltTable data,
-            int allowELT)
+            int allowExport)
     throws VoltAbortException;
 
 

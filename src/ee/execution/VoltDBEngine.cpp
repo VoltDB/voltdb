@@ -515,7 +515,7 @@ bool VoltDBEngine::loadCatalog(const string &catalogPayload) {
         m_database->connectors().get("0")->enabled())
     {
         VOLT_DEBUG("EL enabled.");
-        m_executorContext->m_eltEnabled = true;
+        m_executorContext->m_exportEnabled = true;
         m_isELEnabled = true;
     }
 
@@ -654,7 +654,7 @@ VoltDBEngine::updateCatalog(const string &catalogPayload, int catalogVersion)
 }
 
 bool
-VoltDBEngine::loadTable(bool allowELT, int32_t tableId,
+VoltDBEngine::loadTable(bool allowExport, int32_t tableId,
                              ReferenceSerializeInput &serializeIn,
                              int64_t txnId, int64_t lastCommittedTxnId)
 {
@@ -678,7 +678,7 @@ VoltDBEngine::loadTable(bool allowELT, int32_t tableId,
     }
 
     try {
-        table->loadTuplesFrom(allowELT, serializeIn);
+        table->loadTuplesFrom(allowExport, serializeIn);
     } catch (SerializableEEException e) {
         throwFatalException("%s", e.message().c_str());
     }
@@ -964,7 +964,7 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedTxnId) {
     }
 }
 
-/** For now, bring the ELT system to a steady state with no buffers with content */
+/** For now, bring the Export system to a steady state with no buffers with content */
 void VoltDBEngine::quiesce(int64_t lastCommittedTxnId) {
     m_executorContext->setupForQuiesce(lastCommittedTxnId);
     typedef pair<int64_t, Table*> TablePair;
@@ -1201,8 +1201,9 @@ void VoltDBEngine::processRecoveryMessage(RecoveryProtoMsg *message) {
 }
 
 long
-VoltDBEngine::eltAction(bool ackAction, bool pollAction, bool resetAction,
-                        int64_t ackOffset, int64_t tableId)
+VoltDBEngine::exportAction(bool ackAction, bool pollAction, bool resetAction,
+                           bool infoAction, bool syncAction,
+                           int64_t ackOffset, int64_t tableId)
 {
     map<int64_t, Table*>::iterator pos = m_exportingTables.find(tableId);
 
@@ -1221,7 +1222,7 @@ VoltDBEngine::eltAction(bool ackAction, bool pollAction, bool resetAction,
 
     // perform any releases before polls.
     if (ackOffset > 0) {
-        if (!table_for_el->releaseEltBytes(ackOffset)) {
+        if (!table_for_el->releaseExportBytes(ackOffset)) {
             return -1;
         }
     }
@@ -1231,8 +1232,8 @@ VoltDBEngine::eltAction(bool ackAction, bool pollAction, bool resetAction,
         table_for_el->resetPollMarker();
     }
 
-    // ack was successful.  Get the next buffer of committed ELT bytes
-    StreamBlock* block = table_for_el->getCommittedEltBytes();
+    // ack was successful.  Get the next buffer of committed Export bytes
+    StreamBlock* block = table_for_el->getCommittedExportBytes();
     if (block == NULL) {
         return -1;
     }
@@ -1242,7 +1243,7 @@ VoltDBEngine::eltAction(bool ackAction, bool pollAction, bool resetAction,
 
     // if the block isn't empty, copy it into the query results buffer
     // if the block is empty, check if it is a dropped table finishing
-    // elt. These tables appear in the export list but not in the
+    // export. These tables appear in the export list but not in the
     // current tables list.
     if (block->unreleasedSize() != 0) {
         m_resultOutput.writeBytes(block->dataPtr(), block->unreleasedSize());

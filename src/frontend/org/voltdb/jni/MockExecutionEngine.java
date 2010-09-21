@@ -23,13 +23,13 @@ import java.util.Random;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.SysProcSelector;
+import org.voltdb.TableStreamType;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltdb.elt.ELTProtoMessage;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
+import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.TableStreamType;
 
 public class MockExecutionEngine extends ExecutionEngine {
 
@@ -133,7 +133,7 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     public void loadTable(final int tableId, final VoltTable table, final long txnId,
-        final long lastCommittedTxnId, final long undoToken, final boolean allowELT)
+        final long lastCommittedTxnId, final long undoToken, final boolean allowExport)
     throws EEException
     {
         // TODO Auto-generated method stub
@@ -198,8 +198,9 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public ELTProtoMessage eltAction(boolean ackAction, boolean pollAction,
-            boolean resetAction, long ackOffset, int partitionId, long mTableId) {
+    public ExportProtoMessage exportAction(boolean ackAction, boolean pollAction,
+            boolean resetAction, boolean infoAction, boolean syncAction,
+            long ackOffset, int partitionId, long mTableId) {
         // TODO Auto-generated method stub
         return null;
     }

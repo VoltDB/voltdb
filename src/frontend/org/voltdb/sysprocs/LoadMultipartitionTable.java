@@ -20,8 +20,18 @@ package org.voltdb.sysprocs;
 import java.util.HashMap;
 import java.util.List;
 
-import org.voltdb.*;
+import org.voltdb.BackendTarget;
+import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltdb.HsqlBackend;
+import org.voltdb.ParameterSet;
+import org.voltdb.ProcInfo;
+import org.voltdb.SiteProcedureConnection;
+import org.voltdb.TheHashinator;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltSystemProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
@@ -105,15 +115,15 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
      * @param table
      *            A VoltTable with schema matching tableName containing data to
      *            load.
-     * @param allowELT
-     *            If equal to 1, and ELT is enabled for tableName, the loaded
-     *            data is passed through the EL process. If 0, ELT is ignored
-     *            for this operation even if ELT is enabled for tableName.
+     * @param allowExport
+     *            If equal to 1, and Export is enabled for tableName, the loaded
+     *            data is passed through the EL process. If 0, Export is ignored
+     *            for this operation even if Export is enabled for tableName.
      * @return {@link org.voltdb.VoltSystemProcedure#STATUS_SCHEMA}
      * @throws VoltAbortException
      */
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
-            String tableName, VoltTable table, int allowELT)
+            String tableName, VoltTable table, int allowExport)
             throws VoltAbortException {
         VoltTable[] results;
         SynthesizedPlanFragment pfs[];
@@ -138,7 +148,7 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
             pfs[1].inputDepIds = new int[] {};
             pfs[1].multipartition = true;
             ParameterSet params = new ParameterSet();
-            params.setParameters(tableName, table, allowELT);
+            params.setParameters(tableName, table, allowExport);
             pfs[1].parameters = params;
 
             // create a work unit to aggregate the results.
@@ -193,7 +203,7 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
                 int site_id = Integer.valueOf(site.getTypeName());
                 int partition = VoltDB.instance().getCatalogContext().siteTracker.getPartitionForSite(site_id);
                 params.setParameters(tableName, partitionedTables[partition],
-                                     allowELT);
+                                     allowExport);
                 pfs[site_index] = new SynthesizedPlanFragment();
                 pfs[site_index].fragmentId = SysProcFragmentId.PF_distribute;
                 pfs[site_index].outputDepId = DEP_distribute;

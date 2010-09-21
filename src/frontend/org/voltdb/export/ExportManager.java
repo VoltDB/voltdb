@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.elt;
+package org.voltdb.export;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -29,7 +29,7 @@ import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.elt.processors.RawProcessor.ELTInternalMessage;
+import org.voltdb.export.processors.RawProcessor.ExportInternalMessage;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.network.InputHandler;
@@ -38,21 +38,21 @@ import org.voltdb.utils.LogKeys;
 /**
  * Bridges the connection to an OLAP system and the buffers passed
  * between the OLAP connection and the execution engine. Each processor
- * implements ELTDataProcessor interface. The processors are passed one
- * or more ELTDataSources. The sources map, currently, 1:1 with ELT
- * enabled tables. The ELTDataSource has poll() and ack() methods that
- * processors may use to pull and acknowledge as processed, EE ELT data.
- * Data passed to processors is wrapped in ELTDataBlocks which in turn
+ * implements ExportDataProcessor interface. The processors are passed one
+ * or more ExportDataSources. The sources map, currently, 1:1 with Export
+ * enabled tables. The ExportDataSource has poll() and ack() methods that
+ * processors may use to pull and acknowledge as processed, EE Export data.
+ * Data passed to processors is wrapped in ExportDataBlocks which in turn
  * wrap a BBContainer.
  *
  * Processors are loaded by reflection based on configuration in project.xml.
  */
-public class ELTManager
+public class ExportManager
 {
     /**
      * Processors also log using this facility.
      */
-    private static final VoltLogger eltLog = new VoltLogger("ELT");
+    private static final VoltLogger exportLog = new VoltLogger("Export");
 
     /**
      * Thrown if the initial setup of the loader fails
@@ -74,35 +74,35 @@ public class ELTManager
      * Supporting multiple loaders mainly involves reference counting
      * the EE data blocks and bookkeeping ACKs from processors.
      */
-    ArrayDeque<ELTDataProcessor> m_processors = new ArrayDeque<ELTDataProcessor>();
+    ArrayDeque<ExportDataProcessor> m_processors = new ArrayDeque<ExportDataProcessor>();
 
     /**
      * Existing datasources that have been advertised to processors
      */
-    TreeSet<ELTDataSource> m_dataSources = new TreeSet<ELTDataSource>();
+    TreeSet<ExportDataSource> m_dataSources = new TreeSet<ExportDataSource>();
 
-    /** Obtain the global ELTManager via its instance() method */
-    private static ELTManager m_self;
+    /** Obtain the global ExportManager via its instance() method */
+    private static ExportManager m_self;
     private final int m_hostId;
 
     /**
-     * Construct ELTManager using catalog.
+     * Construct ExportManager using catalog.
      * @param myHostId
      * @param catalogContext
-     * @throws ELTManager.SetupException
+     * @throws ExportManager.SetupException
      */
     public static synchronized void initialize(int myHostId, CatalogContext catalogContext)
-        throws ELTManager.SetupException
+        throws ExportManager.SetupException
     {
-        ELTManager tmp = new ELTManager(myHostId, catalogContext);
+        ExportManager tmp = new ExportManager(myHostId, catalogContext);
         m_self = tmp;
     }
 
     /**
-     * Get the global instance of the ELTManager.
-     * @return The global single instance of the ELTManager.
+     * Get the global instance of the ExportManager.
+     * @return The global single instance of the ExportManager.
      */
-    public static ELTManager instance() {
+    public static ExportManager instance() {
         assert (m_self != null);
         return m_self;
     }
@@ -111,8 +111,8 @@ public class ELTManager
      * Read the catalog to setup manager and loader(s)
      * @param siteTracker
      */
-    private ELTManager(int myHostId, CatalogContext catalogContext)
-    throws ELTManager.SetupException
+    private ExportManager(int myHostId, CatalogContext catalogContext)
+    throws ExportManager.SetupException
     {
         m_hostId = myHostId;
 
@@ -125,27 +125,27 @@ public class ELTManager
         }
 
         if (conn.getEnabled() == false) {
-            eltLog.info("Export is disabled by user configuration.");
+            exportLog.info("Export is disabled by user configuration.");
             return;
         }
 
         final String elloader = conn.getLoaderclass();
         try {
-            eltLog.info("Creating connector " + elloader);
-            ELTDataProcessor newProcessor = null;
+            exportLog.info("Creating connector " + elloader);
+            ExportDataProcessor newProcessor = null;
             final Class<?> loaderClass = Class.forName(elloader);
-            newProcessor = (ELTDataProcessor)loaderClass.newInstance();
-            newProcessor.addLogger(eltLog);
+            newProcessor = (ExportDataProcessor)loaderClass.newInstance();
+            newProcessor.addLogger(exportLog);
             addTableInfos(catalogContext, conn, newProcessor);
             newProcessor.readyForData();
             m_processors.add(newProcessor);
         }
         catch (final ClassNotFoundException e) {
-            eltLog.l7dlog( Level.ERROR, LogKeys.elt_ELTManager_NoLoaderExtensions.name(), e);
-            throw new ELTManager.SetupException(e.getMessage());
+            exportLog.l7dlog( Level.ERROR, LogKeys.export_ExportManager_NoLoaderExtensions.name(), e);
+            throw new ExportManager.SetupException(e.getMessage());
         }
         catch (final Exception e) {
-            throw new ELTManager.SetupException(e.getMessage());
+            throw new ExportManager.SetupException(e.getMessage());
         }
     }
 
@@ -155,13 +155,13 @@ public class ELTManager
         final Database db = cluster.getDatabases().get("database");
         final Connector conn= db.getConnectors().get("0");
 
-        for (ELTDataProcessor processor : m_processors) {
+        for (ExportDataProcessor processor : m_processors) {
             addTableInfos(catalogContext, conn, processor);
         }
     }
 
     private void addTableInfos(CatalogContext catalogContext,
-            final Connector conn, ELTDataProcessor processor)
+            final Connector conn, ExportDataProcessor processor)
     {
         Iterator<ConnectorTableInfo> tableInfoIt = conn.getTableinfo().iterator();
         while (tableInfoIt.hasNext()) {
@@ -173,7 +173,7 @@ public class ELTManager
 
 
     // silly helper to add datasources for a table catalog object
-    private void addDataSources(ELTDataProcessor newProcessor,
+    private void addDataSources(ExportDataProcessor newProcessor,
             Table table, int hostId, CatalogContext catalogContext)
     {
         SiteTracker siteTracker = catalogContext.siteTracker;
@@ -186,7 +186,7 @@ public class ELTManager
 
         for (Integer site : sites) {
 
-            ELTDataSource eltDataSource = new ELTDataSource("database",
+            ExportDataSource exportDataSource = new ExportDataSource("database",
                               table.getTypeName(),
                               table.getIsreplicated(),
                               siteTracker.getPartitionForSite(site),
@@ -194,9 +194,9 @@ public class ELTManager
                               delegateId,
                               table.getColumns());
 
-            if (!m_dataSources.contains(eltDataSource)) {
-                m_dataSources.add(eltDataSource);
-                newProcessor.addDataSource(eltDataSource);
+            if (!m_dataSources.contains(exportDataSource)) {
+                m_dataSources.add(exportDataSource);
+                newProcessor.addDataSource(exportDataSource);
             }
         }
     }
@@ -205,14 +205,14 @@ public class ELTManager
      * Add a message to the processor "mailbox".
      * @param mbp
      */
-    public void queueMessage(ELTInternalMessage mbp) {
+    public void queueMessage(ExportInternalMessage mbp) {
         // TODO: supporting multiple processors requires slicing the
         // data buffer so each processor gets a readonly buffer.
         m_processors.getFirst().queueMessage(mbp);
     }
 
     public void shutdown() {
-        for (ELTDataProcessor p : m_processors) {
+        for (ExportDataProcessor p : m_processors) {
             p.shutdown();
         }
 
@@ -224,7 +224,7 @@ public class ELTManager
      */
     public InputHandler createInputHandler(String service) {
         InputHandler handler = null;
-        for (ELTDataProcessor p : m_processors) {
+        for (ExportDataProcessor p : m_processors) {
             handler = p.createInputHandler(service);
             if (handler != null) {
                 return handler;
@@ -240,7 +240,7 @@ public class ELTManager
      * @return classname responsible for service
      */
     public String getConnectorForService(String service) {
-        for (ELTDataProcessor p : m_processors) {
+        for (ExportDataProcessor p : m_processors) {
             if (p.isConnectorForService(service)) {
                 return p.getClass().getCanonicalName();
             }

@@ -184,15 +184,15 @@ TEST_F(StreamedTableTest, BaseCase) {
     // poll from the table and make sure we get "stuff", releasing as
     // we go.  This just makes sure we don't fail catastrophically and
     // that things are basically as we expect.
-    StreamBlock* block = m_table->getCommittedEltBytes();
+    StreamBlock* block = m_table->getCommittedExportBytes();
     int64_t uso = block->uso();
     EXPECT_EQ(uso, 0);
     size_t offset = block->offset();
     EXPECT_TRUE(offset != 0);
     while (block->offset() > 0)
     {
-        m_table->releaseEltBytes(uso);
-        block = m_table->getCommittedEltBytes();
+        m_table->releaseExportBytes(uso);
+        block = m_table->getCommittedExportBytes();
         uso = block->uso();
         EXPECT_EQ(uso, offset);
         offset += block->offset();

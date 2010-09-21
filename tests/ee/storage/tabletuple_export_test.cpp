@@ -26,13 +26,13 @@
 #include "common/TupleSchema.h"
 #include "common/ValueFactory.hpp"
 #include "common/serializeio.h"
-#include "common/ELTSerializeIo.h"
+#include "common/ExportSerializeIo.h"
 
 #include <cstdlib>
 
 using namespace voltdb;
 
-class TableTupleELTTest : public Test {
+class TableTupleExportTest : public Test {
 
   protected:
     // some utility functions to verify
@@ -52,7 +52,7 @@ class TableTupleELTTest : public Test {
         columnAllowNull.push_back(allownull);
     }
 
-    TableTupleELTTest() {
+    TableTupleExportTest() {
         bool allownull = true;
 
         // note that maxELSize() cares about the string tuple offsets..
@@ -78,7 +78,7 @@ class TableTupleELTTest : public Test {
             columnTypes, columnLengths, columnAllowNull, true /* allow inlined strs */);
     }
 
-    ~TableTupleELTTest() {
+    ~TableTupleExportTest() {
         TupleSchema::freeTupleSchema(m_schema);
     }
 
@@ -87,7 +87,7 @@ class TableTupleELTTest : public Test {
 
 // helper to make a schema, a tuple and calculate EL size
 size_t
-TableTupleELTTest::maxElSize(std::vector<uint16_t> &keep_offsets,
+TableTupleExportTest::maxElSize(std::vector<uint16_t> &keep_offsets,
                              bool useNullStrings)
 {
     TableTuple *tt;
@@ -98,7 +98,7 @@ TableTupleELTTest::maxElSize(std::vector<uint16_t> &keep_offsets,
     tt = new TableTuple(buf, ts);
 
     // if the tuple includes strings, add some content
-    // assuming all ELT tuples were allocated for persistent
+    // assuming all Export tuples were allocated for persistent
     // storage and choosing set* api accordingly here.
     if (ts->columnCount() > 6) {
         NValue nv = ValueFactory::getStringValue("ABCDEabcde"); // 10 char
@@ -120,7 +120,7 @@ TableTupleELTTest::maxElSize(std::vector<uint16_t> &keep_offsets,
     }
 
     // The function under test!
-    size_t sz = tt->maxELTSerializationSize();
+    size_t sz = tt->maxExportSerializationSize();
 
     // and cleanup
     tt->freeObjectColumns();
@@ -133,7 +133,7 @@ TableTupleELTTest::maxElSize(std::vector<uint16_t> &keep_offsets,
 /*
  * Verify that the max tuple size returns expected result
  */
-TEST_F(TableTupleELTTest, maxELTSerSize_tiny) {
+TEST_F(TableTupleExportTest, maxExportSerSize_tiny) {
 
     // create a schema by selecting a column from the super-set.
     size_t sz = 0;
@@ -184,7 +184,7 @@ TEST_F(TableTupleELTTest, maxELTSerSize_tiny) {
 /*
  * Verify that the max tuple size returns expected result using null strings
  */
-TEST_F(TableTupleELTTest, maxELTSerSize_withNulls) {
+TEST_F(TableTupleExportTest, maxExportSerSize_withNulls) {
 
     // create a schema by selecting a column from the super-set.
     size_t sz = 0;
@@ -234,7 +234,7 @@ TEST_F(TableTupleELTTest, maxELTSerSize_withNulls) {
 
 // helper to make a schema, a tuple and serialize to a buffer
 size_t
-TableTupleELTTest::serElSize(std::vector<uint16_t> &keep_offsets,
+TableTupleExportTest::serElSize(std::vector<uint16_t> &keep_offsets,
                              uint8_t *nullArray, char *dataPtr, bool nulls)
 {
     TableTuple *tt;
@@ -244,7 +244,7 @@ TableTupleELTTest::serElSize(std::vector<uint16_t> &keep_offsets,
     ts = TupleSchema::createTupleSchema(m_schema, keep_offsets);
     tt = new TableTuple(buf, ts);
 
-    // assuming all ELT tuples were allocated for persistent
+    // assuming all Export tuples were allocated for persistent
     // storage and choosing set* api accordingly here.
 
     switch (ts->columnCount()) {
@@ -314,8 +314,8 @@ TableTupleELTTest::serElSize(std::vector<uint16_t> &keep_offsets,
     }
 
     // The function under test!
-    ELTSerializeOutput io(dataPtr, 2048);
-    tt->serializeToELT(io, 0, nullArray);
+    ExportSerializeOutput io(dataPtr, 2048);
+    tt->serializeToExport(io, 0, nullArray);
 
     // and cleanup
     tt->freeObjectColumns();
@@ -326,9 +326,9 @@ TableTupleELTTest::serElSize(std::vector<uint16_t> &keep_offsets,
 
 // helper to verify the data that was serialized to the buffer
 void
-TableTupleELTTest::verSer(int cnt, char *data)
+TableTupleExportTest::verSer(int cnt, char *data)
 {
-    ELTSerializeInput sin(data, 2048);
+    ExportSerializeInput sin(data, 2048);
 
     if (cnt-- >= 0)
     {
@@ -402,7 +402,7 @@ TableTupleELTTest::verSer(int cnt, char *data)
 /*
  * Verify that tuple serialization produces expected content
  */
-TEST_F(TableTupleELTTest, serToELT)
+TEST_F(TableTupleExportTest, serToExport)
 {
     uint8_t nulls[1] = {0};
     char data[2048];
@@ -473,7 +473,7 @@ TEST_F(TableTupleELTTest, serToELT)
 
 
 /* verify serialization of nulls */
-TEST_F(TableTupleELTTest, serWithNulls)
+TEST_F(TableTupleExportTest, serWithNulls)
 {
 
     uint8_t nulls[1] = {0};

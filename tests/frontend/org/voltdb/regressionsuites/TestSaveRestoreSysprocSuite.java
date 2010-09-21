@@ -39,9 +39,9 @@ import org.voltdb.BackendTarget;
 import org.voltdb.DefaultSnapshotDataTarget;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
-import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
@@ -61,7 +61,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
     private static final String TMPDIR = "/tmp";
     private static final String TESTNONCE = "testnonce";
-    private static final int ALLOWELT = 0;
+    private static final int ALLOWEXPORT = 0;
 
     public TestSaveRestoreSysprocSuite(String name) {
         super(name);
@@ -247,11 +247,11 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                                   VoltTable table)
     {
         VoltTable[] results = null;
-        int allowELT = 0;
+        int allowExport = 0;
         try
         {
             client.callProcedure("@LoadMultipartitionTable", tableName,
-                                 table, allowELT);
+                                 table, allowExport);
         }
         catch (Exception ex)
         {
@@ -402,7 +402,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
         client = getClient();
 
-        client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT);
+        client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWEXPORT);
 
         results = client.callProcedure("JumboSelect", 0).getResults();
         assertEquals(results.length, 1);
@@ -749,7 +749,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
         try
         {
-            client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT);
+            client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWEXPORT);
 
             while (results[0].advanceRow()) {
                 if (results[0].getString("RESULT").equals("FAILURE")) {
@@ -845,7 +845,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         try
         {
             results = client.callProcedure("@SnapshotRestore", TMPDIR,
-                                           TESTNONCE, ALLOWELT).getResults();
+                                           TESTNONCE, ALLOWEXPORT).getResults();
 
             while (results[0].advanceRow()) {
                 if (results[0].getString("RESULT").equals("FAILURE")) {
@@ -924,7 +924,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         try
         {
             results = client.callProcedure("@SnapshotRestore", TMPDIR,
-                                           TESTNONCE, ALLOWELT).getResults();
+                                           TESTNONCE, ALLOWEXPORT).getResults();
         }
         catch (Exception ex)
         {
@@ -980,7 +980,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         client = getClient();
 
         try {
-            client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT);
+            client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWEXPORT);
         }
         catch (Exception e) {
             assertTrue(e.getMessage().contains("No savefile state to restore"));
@@ -1026,7 +1026,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
             client = getClient();
 
-            results = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT).getResults();
+            results = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWEXPORT).getResults();
             assertNotNull(results);
             deleteTestFiles();
             releaseClient(client);
@@ -1065,7 +1065,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
             client = getClient();
 
-            VoltTable results[] = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWELT).getResults();
+            VoltTable results[] = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE, ALLOWEXPORT).getResults();
             assertNotNull(results);
             deleteTestFiles();
             releaseClient(client);
@@ -1144,7 +1144,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         try
         {
             results = client.callProcedure("@SnapshotRestore", TMPDIR,
-                                           TESTNONCE, ALLOWELT).getResults();
+                                           TESTNONCE, ALLOWEXPORT).getResults();
             // XXX Should check previous results for success but meh for now
         }
         catch (Exception ex)
@@ -1226,7 +1226,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         try
         {
             results = client.callProcedure("@SnapshotRestore", TMPDIR,
-                                           TESTNONCE, ALLOWELT).getResults();
+                                           TESTNONCE, ALLOWEXPORT).getResults();
         }
         catch (Exception ex)
         {
@@ -1312,7 +1312,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         try
         {
             client.callProcedure("@SnapshotRestore", TMPDIR,
-                                           TESTNONCE, ALLOWELT);
+                                           TESTNONCE, ALLOWEXPORT);
         }
         catch (Exception ex)
         {
@@ -1382,7 +1382,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         try
         {
             results = client.callProcedure("@SnapshotRestore", TMPDIR,
-                                           TESTNONCE, ALLOWELT).getResults();
+                                           TESTNONCE, ALLOWEXPORT).getResults();
         }
         catch (Exception ex)
         {

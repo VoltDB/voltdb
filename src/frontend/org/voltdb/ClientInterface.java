@@ -44,7 +44,7 @@ import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.debugstate.InitiatorContext;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
 import org.voltdb.dtxn.TransactionInitiator;
-import org.voltdb.elt.ELTManager;
+import org.voltdb.export.ExportManager;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
@@ -463,7 +463,7 @@ public class ClientInterface implements DumpManager.Dumpable {
             }
             else {
                 // If no processor can handle this service, null is returned.
-                String connectorClassName = ELTManager.instance().getConnectorForService(service);
+                String connectorClassName = ExportManager.instance().getConnectorForService(service);
                 if (connectorClassName == null) {
                     //Send negative response
                     responseBuffer.put((byte)-1).flip();
@@ -483,7 +483,7 @@ public class ClientInterface implements DumpManager.Dumpable {
                     return null;
                 }
 
-                handler = ELTManager.instance().createInputHandler(service);
+                handler = ExportManager.instance().createInputHandler(service);
             }
 
             if (handler != null) {

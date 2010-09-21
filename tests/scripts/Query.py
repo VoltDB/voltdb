@@ -277,7 +277,7 @@ class VoltQueryClient(cmd.Cmd):
 
     def help_snapshotrestore(self):
         self.safe_print("Restore a snapshot:")
-        self.safe_print("\tsnapshotrestore directory nonce allowELT")
+        self.safe_print("\tsnapshotrestore directory nonce allowExport")
 
     def do_snapshotstatus(self, command):
         if self.fs == None:

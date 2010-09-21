@@ -36,7 +36,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
-import org.voltdb.elt.ExportTestClient;
+import org.voltdb.export.ExportTestClient;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing1;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing2;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing3;
@@ -227,7 +227,7 @@ public class TestSecuritySuite extends RegressionSuite {
         // user1 can connect (in groups list)
         ExportTestClient eclient = new ExportTestClient(1);
         eclient.connectToELServers("user1", "password");
-        eclient.disconnectFromELServers();
+        eclient.disconnectFromExportServers();
 
         // Expected to throw an exception on failure
         assertTrue(true);
@@ -246,7 +246,7 @@ public class TestSecuritySuite extends RegressionSuite {
         assertTrue(caught);
 
         try {
-            eclient.disconnectFromELServers();
+            eclient.disconnectFromExportServers();
         }
         catch (IOException ignored){
         }
@@ -296,7 +296,7 @@ public class TestSecuritySuite extends RegressionSuite {
         ArrayList<String> elgroups = new ArrayList<String>();
         elgroups.add("group1");
 
-        project.addELT("org.voltdb.elt.processors.RawProcessor", true /*enabled*/, elgroups);
+        project.addExport("org.voltdb.export.processors.RawProcessor", true /*enabled*/, elgroups);
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 1 Local Site/Partitions running on JNI backend

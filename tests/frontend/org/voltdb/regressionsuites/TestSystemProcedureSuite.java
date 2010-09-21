@@ -178,7 +178,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     }
 
     // Pretty lame test but at least invoke the procedure.
-    // "@Quiesce" is used more meaningfully in TestELTSuite.
+    // "@Quiesce" is used more meaningfully in TestExportSuite.
     public void testQuiesce() throws IOException, ProcCallException {
         Client client = getClient();
         VoltTable results[] = client.callProcedure("@Quiesce").getResults();

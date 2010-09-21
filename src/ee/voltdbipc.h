@@ -123,7 +123,7 @@ private:
 
     int8_t activateTableStream(struct ipc_command *cmd);
     void  tableStreamSerializeMore(struct ipc_command *cmd);
-    void  eltAction(struct ipc_command *cmd);
+    void  exportAction(struct ipc_command *cmd);
 
     void signalHandler(int signum, siginfo_t *info, void *context);
     static void signalDispatcher(int signum, siginfo_t *info, void *context);

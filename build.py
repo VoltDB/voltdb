@@ -358,7 +358,7 @@ if whichtests in ("${eetestsuite}", "storage"):
      StreamedTable_test
      table_and_indexes_test
      table_test
-     tabletuple_elt_test
+     tabletuple_export_test
      TupleStreamWrapper_test
     """
 

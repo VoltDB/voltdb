@@ -50,7 +50,7 @@ public enum LogKeys {
     host_VoltDB_CreatingVoltDB,
     host_VoltDB_InvalidHostCount,
     host_VoltDB_CouldNotRetrieveLeaderAddress,
-    host_VoltDB_ELTInitFailure,
+    host_VoltDB_ExportInitFailure,
     host_VoltDB_CatalogReadFailure,
     host_VoltDB_StartupString,
     host_TheHashinator_ExceptionHashingString,
@@ -82,9 +82,9 @@ public enum LogKeys {
     benchmark_BenchmarkController_NotEnoughClients,
     benchmark_BenchmarkController_NotEnoughHosts,
 
-    //ELT
-    elt_ELTManager_NoLoaderExtensions,
-    elt_ELTManager_DataDroppedLoaderDead,
+    //EXPORT
+    export_ExportManager_NoLoaderExtensions,
+    export_ExportManager_DataDroppedLoaderDead,
 
     //COMPILER
     compiler_VoltCompiler_LeaderAndHostCountAndSitesPerHost,

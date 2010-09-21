@@ -113,7 +113,7 @@ typedef struct {
     int64_t txnId;
     int64_t lastCommittedTxnId;
     int64_t undoToken;
-    int16_t  allowELT;
+    int16_t  allowExport;
     char data[0];
 }__attribute__((packed)) load_table_cmd;
 
@@ -188,16 +188,18 @@ typedef struct {
 }__attribute__((packed)) hashinate_msg;
 
 /*
- * Header for an ELT action.
+ * Header for an Export action.
  */
 typedef struct {
     struct ipc_command cmd;
     int32_t isAck;
     int32_t isPoll;
     int32_t isReset;
+    int32_t isInfo;
+    int32_t isSync;
     int64_t offset;
     int64_t tableId;
-}__attribute__((packed)) elt_action;
+}__attribute__((packed)) export_action;
 
 
 using namespace voltdb;
@@ -312,7 +314,7 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
         result = updateCatalog(cmd);
         break;
       case 20:
-        eltAction(cmd);
+        exportAction(cmd);
         result = kErrorCode_None;
         break;
       case 21:
@@ -704,7 +706,7 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
     const int64_t txnId = ntohll(loadTableCommand->txnId);
     const int64_t lastCommittedTxnId = ntohll(loadTableCommand->lastCommittedTxnId);
     const int64_t undoToken = ntohll(loadTableCommand->undoToken);
-    const bool    allowELT = (loadTableCommand->allowELT != 0);
+    const bool    allowExport = (loadTableCommand->allowExport != 0);
     // ...and fast serialized table last.
     void* offset = loadTableCommand->data;
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(load_table_cmd));
@@ -712,7 +714,7 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
         ReferenceSerializeInput serialize_in(offset, sz);
 
         m_engine->setUndoToken(undoToken);
-        bool success = m_engine->loadTable(allowELT, tableId, serialize_in, txnId, lastCommittedTxnId);
+        bool success = m_engine->loadTable(allowExport, tableId, serialize_in, txnId, lastCommittedTxnId);
         if (success) {
             return kErrorCode_Success;
         } else {
@@ -989,15 +991,17 @@ void VoltDBIPC::tableHashCode( struct ipc_command *cmd) {
     writeOrDie(m_fd, (unsigned char*)response, 9);
 }
 
-void VoltDBIPC::eltAction(struct ipc_command *cmd) {
-    elt_action *action = (elt_action*)cmd;
+void VoltDBIPC::exportAction(struct ipc_command *cmd) {
+    export_action *action = (export_action*)cmd;
 
     m_engine->resetReusedResultOutputBuffer();
-    long result = m_engine->eltAction(action->isAck,
-                                      action->isPoll,
-                                      action->isReset,
-                                      static_cast<int64_t>(ntohll(action->offset)),
-                                      static_cast<int64_t>(ntohll(action->tableId)));
+    long result = m_engine->exportAction(action->isAck,
+                                         action->isPoll,
+                                         action->isReset,
+                                         action->isInfo,
+                                         action->isSync,
+                                         static_cast<int64_t>(ntohll(action->offset)),
+                                         static_cast<int64_t>(ntohll(action->tableId)));
     int buflength = m_engine->getResultsSize();
 
     // write offset across bigendian.

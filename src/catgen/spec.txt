@@ -47,7 +47,7 @@ begin ConnectorTableInfo      "Per-export connector table configuration"
   bool appendOnly             "True if this table is an append-only table for export."
 end
 
-begin Connector                      "Export connector (ELT)"
+begin Connector                      "Export connector"
   string loaderclass                 "The class name of the connector"
   bool enabled                       "Is the connector enabled"
   UserRef* authUsers                 "Users authorized to invoke this procedure"

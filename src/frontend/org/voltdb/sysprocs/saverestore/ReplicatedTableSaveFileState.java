@@ -30,9 +30,9 @@ import org.voltdb.sysprocs.SysProcFragmentId;
 
 public class ReplicatedTableSaveFileState extends TableSaveFileState
 {
-    ReplicatedTableSaveFileState(String tableName, int allowELT)
+    ReplicatedTableSaveFileState(String tableName, int allowExport)
     {
-        super(tableName, allowELT);
+        super(tableName, allowExport);
     }
 
     @Override
@@ -150,7 +150,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         plan_fragment.inputDepIds = new int[] {};
         addPlanDependencyId(result_dependency_id);
         ParameterSet params = new ParameterSet();
-        params.setParameters(getTableName(), result_dependency_id, m_allowELT);
+        params.setParameters(getTableName(), result_dependency_id, m_allowExport);
         plan_fragment.parameters = params;
         return plan_fragment;
     }
@@ -170,7 +170,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         addPlanDependencyId(result_dependency_id);
         ParameterSet params = new ParameterSet();
         params.setParameters(getTableName(), destinationSiteId,
-                             result_dependency_id, m_allowELT);
+                             result_dependency_id, m_allowExport);
         plan_fragment.parameters = params;
         return plan_fragment;
     }

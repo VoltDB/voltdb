@@ -26,7 +26,7 @@ package org.voltdb.twitter.hadoop.hdfs;
 import java.io.IOException;
 
 import org.apache.hadoop.fs.FileSystem;
-import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
+import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportDecoderBase;
 
 public class ExportToHDFSDecoder extends ExportDecoderBase {

@@ -35,7 +35,7 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 
 /**
- * Polls a Volt cluster via the statistics sysproc and ELTs the results to a database via JDBC.
+ * Polls a Volt cluster via the statistics sysproc and Exports the results to a database via JDBC.
  * Can be embedded in an application or invoked from the command line
  *
  */

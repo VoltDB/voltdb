@@ -25,16 +25,16 @@ import org.voltdb.ExecutionSite;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SysProcSelector;
+import org.voltdb.TableStreamType;
 import org.voltdb.VoltTable;
-import org.voltdb.elt.ELTProtoMessage;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
+import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FastSerializer.BufferGrowCallback;
 import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.TableStreamType;
 
 /**
  * Wrapper for native Execution Engine library.
@@ -377,7 +377,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     @Override
     public void loadTable(final int tableId, final VoltTable table,
         final long txnId, final long lastCommittedTxnId,
-        final long undoToken, boolean allowELT) throws EEException
+        final long undoToken, boolean allowExport) throws EEException
     {
         if (LOG.isTraceEnabled()) {
             LOG.trace("loading table id=" + tableId + "...");
@@ -389,7 +389,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
         final int errorCode = nativeLoadTable(pointer, tableId, serialized_table,
                                               txnId, lastCommittedTxnId,
-                                              undoToken, allowELT);
+                                              undoToken, allowExport);
         checkErrorCode(errorCode);
     }
 
@@ -482,27 +482,28 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     /**
-     * Instruct the EE to execute an ELT poll and/or ack action. Poll response
+     * Instruct the EE to execute an Export poll and/or ack action. Poll response
      * data is returned in the usual results buffer, length preceded as usual.
      */
     @Override
-    public ELTProtoMessage eltAction(boolean ackAction, boolean pollAction,
-            boolean resetAction, long ackTxnId, int partitionId, long tableId)
+    public ExportProtoMessage exportAction(boolean ackAction, boolean pollAction,
+            boolean resetAction, boolean infoAction, boolean syncAction,
+            long ackTxnId, int partitionId, long tableId)
     {
         deserializer.clear();
-        ELTProtoMessage result = null;
+        ExportProtoMessage result = null;
         try {
-            long offset = nativeELTAction(pointer, ackAction, pollAction, resetAction,
-                                          ackTxnId, tableId);
+            long offset = nativeExportAction(pointer, ackAction, pollAction, resetAction,
+                                             infoAction, syncAction, ackTxnId, tableId);
             if (offset < 0) {
-                result = new ELTProtoMessage(partitionId, tableId);
+                result = new ExportProtoMessage(partitionId, tableId);
                 result.error();
             }
             else if (pollAction) {
                 ByteBuffer b;
                 int byteLen = deserializer.readInt();
                 if (byteLen < 0) {
-                    throw new IOException("Invalid length in ELT poll response results.");
+                    throw new IOException("Invalid length in Export poll response results.");
                 }
 
                 // need to keep the embedded length in the resulting buffer.
@@ -510,13 +511,13 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 // so add it back to the byteLen.
                 deserializer.buffer().position(0);
                 b = deserializer.readBuffer(byteLen + 4);
-                result = new ELTProtoMessage(partitionId, tableId);
+                result = new ExportProtoMessage(partitionId, tableId);
                 result.pollResponse(offset, b);
             }
         }
         catch (IOException e) {
             // TODO: Not going to rollback here so EEException seems wrong?
-            // Seems to indicate invalid ELT data which should be hard error?
+            // Seems to indicate invalid Export data which should be hard error?
             // Maybe this should be crashVoltDB?
             throw new RuntimeException(e);
         }

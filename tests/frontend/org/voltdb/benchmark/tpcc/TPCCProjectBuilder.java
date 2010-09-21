@@ -117,22 +117,22 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
         addSchema(ddlURL);
     }
 
-    public void addDefaultELT() {
-        addELT("org.voltdb.elt.connectors.VerticaConnector", true, null);
+    public void addDefaultExport() {
+        addExport("org.voltdb.export.connectors.VerticaConnector", true, null);
 
         /* Fixed after the loader completes. */
-        // addELTTable("WAREHOUSE", false);
-        // addELTTable("DISTRICT", false);
-        // addELTTable("ITEM", false);
-        // addELTTable("CUSTOMER", false);
-        // addELTTable("CUSTOMER_NAME", false);
-        // addELTTable("STOCK", false);
+        // addExportTable("WAREHOUSE", false);
+        // addExportTable("DISTRICT", false);
+        // addExportTable("ITEM", false);
+        // addExportTable("CUSTOMER", false);
+        // addExportTable("CUSTOMER_NAME", false);
+        // addExportTable("STOCK", false);
 
         /* Modified by actual benchmark: approx 6.58 ins/del per txn. */
-        // addELTTable("HISTORY", false);     // 1 insert per payment (43%)
-        // addELTTable("ORDERS", false);      // 1 insert per new order (45%)
-        // addELTTable("NEW_ORDER", false);   // 1 insert per new order; 10 deletes per delivery (4%)
-        addELTTable("ORDER_LINE", false);     // 10 inserts per new order
+        // addExportTable("HISTORY", false);     // 1 insert per payment (43%)
+        // addExportTable("ORDERS", false);      // 1 insert per new order (45%)
+        // addExportTable("NEW_ORDER", false);   // 1 insert per new order; 10 deletes per delivery (4%)
+        addExportTable("ORDER_LINE", false);     // 10 inserts per new order
     }
 
     @Override
@@ -152,7 +152,7 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
         addDefaultProcedures();
         addDefaultPartitioning();
         addDefaultSchema();
-        // addDefaultELT();
+        // addDefaultExport();
     }
 
     public String getJARFilename() { return jarFilename; }

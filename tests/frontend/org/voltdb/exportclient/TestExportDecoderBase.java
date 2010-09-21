@@ -26,7 +26,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 
 import org.voltdb.VoltType;
-import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
+import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.messaging.FastDeserializer;
 
 import junit.framework.TestCase;

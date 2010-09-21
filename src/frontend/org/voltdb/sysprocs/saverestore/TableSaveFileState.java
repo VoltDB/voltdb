@@ -36,11 +36,11 @@ public abstract class TableSaveFileState
         return NEXT_DEPENDENCY_ID++;
     }
 
-    TableSaveFileState(String tableName, int allowELT)
+    TableSaveFileState(String tableName, int allowExport)
     {
         m_tableName = tableName;
         m_planDependencyIds = new HashSet<Integer>();
-        m_allowELT = allowELT;
+        m_allowExport = allowExport;
     }
 
     abstract public SynthesizedPlanFragment[]
@@ -84,6 +84,6 @@ public abstract class TableSaveFileState
 
     private final String m_tableName;
     private final Set<Integer> m_planDependencyIds;
-    final int m_allowELT;
+    final int m_allowExport;
     int m_rootDependencyId;
 }

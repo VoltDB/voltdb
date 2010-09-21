@@ -35,9 +35,9 @@ import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SysProcSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.VoltTable;
-import org.voltdb.elt.ELTProtoMessage;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
+import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.DBBPool.BBContainer;
@@ -111,7 +111,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         ActivateTableStream(17),
         TableStreamSerializeMore(18),
         UpdateCatalog(19),
-        ELTAction(20),
+        ExportAction(20),
         RecoveryMessage(21),
         TableHashCode(22),
         Hashinate(23);
@@ -819,7 +819,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     @Override
     public void loadTable(final int tableId, final VoltTable table, final long txnId,
-            final long lastCommittedTxnId, final long undoToken, boolean allowELT)
+            final long lastCommittedTxnId, final long undoToken, boolean allowExport)
         throws EEException
     {
         m_data.clear();
@@ -829,7 +829,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putLong(lastCommittedTxnId);
         m_data.putLong(undoToken);
 
-        if(allowELT)
+        if(allowExport)
             m_data.putShort((short) 1);
         else
             m_data.putShort((short) 0);
@@ -1124,14 +1124,17 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public ELTProtoMessage eltAction(boolean ackAction, boolean pollAction,
-            boolean resetAction, long ackOffset, int partitionId, long mTableId) {
+    public ExportProtoMessage exportAction(boolean ackAction, boolean pollAction,
+            boolean resetAction, boolean infoAction, boolean syncAction,
+            long ackOffset, int partitionId, long mTableId) {
         try {
             m_data.clear();
-            m_data.putInt(Commands.ELTAction.m_id);
+            m_data.putInt(Commands.ExportAction.m_id);
             m_data.putInt(ackAction ? 1 : 0);
             m_data.putInt(pollAction ? 1 : 0);
             m_data.putInt(resetAction ? 1 : 0);
+            m_data.putInt(infoAction ? 1 : 0);
+            m_data.putInt(syncAction ? 1 : 0);
             m_data.putLong(ackOffset);
             m_data.putLong(mTableId);
             m_data.flip();
@@ -1144,8 +1147,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             results.flip();
             long result_offset = results.getLong();
             if (result_offset < 0) {
-                ELTProtoMessage reply = null;
-                reply = new ELTProtoMessage(partitionId, mTableId);
+                ExportProtoMessage reply = null;
+                reply = new ExportProtoMessage(partitionId, mTableId);
                 reply.error();
                 return reply;
             }
@@ -1161,9 +1164,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     m_connection.m_socketChannel.read(data);
                 data.flip();
 
-                ELTProtoMessage reply = null;
+                ExportProtoMessage reply = null;
                 if (pollAction) {
-                    reply = new ELTProtoMessage(partitionId, mTableId);
+                    reply = new ExportProtoMessage(partitionId, mTableId);
                     reply.pollResponse(result_offset, data);
                 }
                 return reply;

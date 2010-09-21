@@ -453,7 +453,7 @@ std::vector<std::string> Table::getColumnNames() {
     return columnNames;
 }
 
-void Table::loadTuplesFromNoHeader(bool allowELT,
+void Table::loadTuplesFromNoHeader(bool allowExport,
                             SerializeInput &serialize_io,
                             Pool *stringPool) {
     int tupleCount = serialize_io.readInt();
@@ -470,7 +470,7 @@ void Table::loadTuplesFromNoHeader(bool allowELT,
         m_tmpTarget1.setDirtyFalse();
         m_tmpTarget1.deserializeFrom(serialize_io, stringPool);
 
-        processLoadedTuple( allowELT, m_tmpTarget1);
+        processLoadedTuple( allowExport, m_tmpTarget1);
     }
 
     populateIndexes(tupleCount);
@@ -479,7 +479,7 @@ void Table::loadTuplesFromNoHeader(bool allowELT,
     m_usedTuples += tupleCount;
 }
 
-void Table::loadTuplesFrom(bool allowELT,
+void Table::loadTuplesFrom(bool allowExport,
                             SerializeInput &serialize_io,
                             Pool *stringPool) {
     /*
@@ -538,6 +538,6 @@ void Table::loadTuplesFrom(bool allowELT,
                                       message.str().c_str());
     }
 
-    loadTuplesFromNoHeader( allowELT, serialize_io, stringPool);
+    loadTuplesFromNoHeader( allowExport, serialize_io, stringPool);
 }
 }

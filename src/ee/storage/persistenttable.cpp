@@ -194,7 +194,7 @@ bool PersistentTable::insertTuple(TableTuple &source) {
     }
 
     // if EL is enabled, append the tuple to the buffer
-    // eltxxx: memoizing this more cache friendly?
+    // exportxxx: memoizing this more cache friendly?
     if (m_exportEnabled) {
         elMark =
           appendToELBuffer(m_tmpTarget1, tsSeqNo++, TupleStreamWrapper::INSERT);
@@ -233,7 +233,7 @@ void PersistentTable::insertTupleForUndo(TableTuple &source, size_t wrapperOffse
                             source.debugNoHeader().c_str());
     }
 
-    // rollback ELT
+    // rollback Export
     if (m_exportEnabled) {
         m_wrapper->rollbackTo(wrapperOffset);
     }
@@ -475,7 +475,7 @@ void PersistentTable::deleteTupleForUndo(voltdb::TableTuple &tupleCopy, size_t w
         // Also make sure they are not trying to delete our m_tempTuple
         assert(&target != &m_tempTuple);
 
-        // rollback ELT
+        // rollback Export
         if (m_exportEnabled) {
             m_wrapper->rollbackTo(wrapperOffset);
         }
@@ -662,16 +662,16 @@ void PersistentTable::onSetColumns() {
 
 /*
  * Implemented by persistent table and called by Table::loadTuplesFrom
- * to do additional processing for views and ELT
+ * to do additional processing for views and Export
  */
-void PersistentTable::processLoadedTuple(bool allowELT, TableTuple &tuple) {
+void PersistentTable::processLoadedTuple(bool allowExport, TableTuple &tuple) {
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
         m_views[i]->processTupleInsert(m_tmpTarget1);
     }
 
     // if EL is enabled, append the tuple to the buffer
-    if (allowELT && m_exportEnabled) {
+    if (allowExport && m_exportEnabled) {
         appendToELBuffer(m_tmpTarget1, tsSeqNo++,
                          TupleStreamWrapper::INSERT);
     }
@@ -717,21 +717,21 @@ void PersistentTable::flushOldTuples(int64_t timeInMillis)
 }
 
 StreamBlock*
-PersistentTable::getCommittedEltBytes()
+PersistentTable::getCommittedExportBytes()
 {
     if (m_exportEnabled && m_wrapper)
     {
-        return m_wrapper->getCommittedEltBytes();
+        return m_wrapper->getCommittedExportBytes();
     }
     return NULL;
 }
 
 bool
-PersistentTable::releaseEltBytes(int64_t releaseOffset)
+PersistentTable::releaseExportBytes(int64_t releaseOffset)
 {
     if (m_exportEnabled && m_wrapper)
     {
-        return m_wrapper->releaseEltBytes(releaseOffset);
+        return m_wrapper->releaseExportBytes(releaseOffset);
     }
     return false;
 }
@@ -810,7 +810,7 @@ void PersistentTable::nextRecoveryMessage(ReferenceSerializeOutput *out) {
 /**
  * Process the updates from a recovery message
  */
-void PersistentTable::processRecoveryMessage(RecoveryProtoMsg* message, Pool *pool, bool allowELT) {
+void PersistentTable::processRecoveryMessage(RecoveryProtoMsg* message, Pool *pool, bool allowExport) {
     switch (message->msgType()) {
     case voltdb::RECOVERY_MSG_TYPE_SCAN_TUPLES: {
         if (activeTupleCount() == 0) {
@@ -819,7 +819,7 @@ void PersistentTable::processRecoveryMessage(RecoveryProtoMsg* message, Pool *po
                 m_indexes[i]->ensureCapacity(tupleCount);
             }
         }
-        loadTuplesFromNoHeader( allowELT, *message->stream(), pool);
+        loadTuplesFromNoHeader( allowExport, *message->stream(), pool);
         break;
     }
     default:

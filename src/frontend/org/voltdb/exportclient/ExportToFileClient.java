@@ -28,7 +28,7 @@ import java.util.HashMap;
 
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
-import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
+import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CSVEscaperUtil.CSVEscaper;
@@ -208,7 +208,7 @@ public class ExportToFileClient extends ExportClientBase
     }
 
     @Override
-    public ExportDecoderBase constructELTDecoder(AdvertisedDataSource source)
+    public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source)
     {
         // For every source that provides part of a table, use the same
         // export decoder.

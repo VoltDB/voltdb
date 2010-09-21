@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.elt;
+package org.voltdb.export;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -24,15 +24,15 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
-import org.voltdb.elt.processors.RawProcessor;
+import org.voltdb.export.processors.RawProcessor;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.MessagingException;
 import org.voltdb.utils.CatalogUtil;
 
 /**
- *  Allows an ELTDataProcessor to access underlying table queues
+ *  Allows an ExportDataProcessor to access underlying table queues
  */
-public class ELTDataSource implements Comparable<ELTDataSource> {
+public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private final String m_database;
     private final String m_tableName;
@@ -53,7 +53,7 @@ public class ELTDataSource implements Comparable<ELTDataSource> {
      * @param tableId
      * @param catalogMap
      */
-    public ELTDataSource(String db, String tableName,
+    public ExportDataSource(String db, String tableName,
                          boolean isReplicated,
                          int partitionId, int siteId, long tableId,
                          CatalogMap<Column> catalogMap)
@@ -75,25 +75,25 @@ public class ELTDataSource implements Comparable<ELTDataSource> {
         m_partitionId = partitionId;
         m_siteId = siteId;
 
-        // Add the ELT meta-data columns to the schema followed by the
+        // Add the Export meta-data columns to the schema followed by the
         // catalog columns for this table.
         m_columnNames.add("VOLT_TRANSACTION_ID");
-        m_columnTypes.add((Integer)((int)VoltType.BIGINT.getValue()));
+        m_columnTypes.add(((int)VoltType.BIGINT.getValue()));
 
-        m_columnNames.add("VOLT_ELT_TIMESTAMP");
-        m_columnTypes.add((Integer)((int)VoltType.BIGINT.getValue()));
+        m_columnNames.add("VOLT_EXPORT_TIMESTAMP");
+        m_columnTypes.add(((int)VoltType.BIGINT.getValue()));
 
-        m_columnNames.add("VOLT_ELT_SEQUENCE_NUMBER");
-        m_columnTypes.add((Integer)((int)VoltType.BIGINT.getValue()));
+        m_columnNames.add("VOLT_EXPORT_SEQUENCE_NUMBER");
+        m_columnTypes.add(((int)VoltType.BIGINT.getValue()));
 
         m_columnNames.add("VOLT_PARTITION_ID");
-        m_columnTypes.add((Integer)((int)VoltType.BIGINT.getValue()));
+        m_columnTypes.add(((int)VoltType.BIGINT.getValue()));
 
         m_columnNames.add("VOLT_SITE_ID");
-        m_columnTypes.add((Integer)((int)VoltType.BIGINT.getValue()));
+        m_columnTypes.add(((int)VoltType.BIGINT.getValue()));
 
-        m_columnNames.add("VOLT_ELT_OPERATION");
-        m_columnTypes.add((Integer)((int)VoltType.TINYINT.getValue()));
+        m_columnNames.add("VOLT_EXPORT_OPERATION");
+        m_columnTypes.add(((int)VoltType.TINYINT.getValue()));
 
         for (Column c : CatalogUtil.getSortedCatalogItems(catalogMap, "index")) {
             m_columnNames.add(c.getName());
@@ -105,7 +105,7 @@ public class ELTDataSource implements Comparable<ELTDataSource> {
      * Obtain next block of data from source
      * @throws MessagingException
      */
-    public void eltAction(RawProcessor.ELTInternalMessage m) throws MessagingException {
+    public void exportAction(RawProcessor.ExportInternalMessage m) throws MessagingException {
         VoltDB.instance().getHostMessenger().send(m_siteId, 0, m);
     }
 
@@ -146,13 +146,13 @@ public class ELTDataSource implements Comparable<ELTDataSource> {
     }
 
     /**
-     * Compare two ELTDataSources for equivalence. This currently does not
+     * Compare two ExportDataSources for equivalence. This currently does not
      * compare column names, but it should once column add/drop is allowed.
      * This comparison is performed to decide if a datasource in a new catalog
      * needs to be passed to a proccessor.
      */
     @Override
-    public int compareTo(ELTDataSource o) {
+    public int compareTo(ExportDataSource o) {
         int result;
 
         result = m_database.compareTo(o.m_database);
@@ -185,10 +185,10 @@ public class ELTDataSource implements Comparable<ELTDataSource> {
      */
     @Override
     public boolean equals(Object o) {
-        if (!(o instanceof ELTDataSource))
+        if (!(o instanceof ExportDataSource))
             return false;
 
-        return compareTo((ELTDataSource)o) == 0;
+        return compareTo((ExportDataSource)o) == 0;
     }
 
 }

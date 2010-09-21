@@ -123,7 +123,7 @@ public:
     /*
      * Table lifespan can be managed bya reference count. The
      * reference is trivial to maintain since it is only accessed by
-     * the execution engine thread. Snapshot, ELT and the
+     * the execution engine thread. Snapshot, Export and the
      * corresponding CatalogDelegate may be reference count
      * holders. The table is deleted when the refcount falls to
      * zero. This allows longer running processes to complete
@@ -208,27 +208,27 @@ public:
     /**
      * Loads only tuple data and assumes there is no schema present.
      * Used for recovery where the schema is not sent.
-     * @param allowELT if false, elt enabled is overriden for this load.
+     * @param allowExport if false, export enabled is overriden for this load.
      */
-    void loadTuplesFromNoHeader(bool allowELT,
+    void loadTuplesFromNoHeader(bool allowExport,
                                 SerializeInput &serialize_in,
                                 Pool *stringPool = NULL);
 
     /**
      * Loads only tuple data, not schema, from the serialized table.
      * Used for initial data loading and receiving dependencies.
-     * @param allowELT if false, elt enabled is overriden for this load.
+     * @param allowExport if false, export enabled is overriden for this load.
      */
-    void loadTuplesFrom(bool allowELT,
-                                SerializeInput &serialize_in,
-                                Pool *stringPool = NULL);
+    void loadTuplesFrom(bool allowExport,
+                        SerializeInput &serialize_in,
+                        Pool *stringPool = NULL);
     //------------
     // EL-RELATED
     //------------
     /**
-     * Get the next block of committed but unreleased ELT bytes
+     * Get the next block of committed but unreleased Export bytes
      */
-    virtual StreamBlock* getCommittedEltBytes()
+    virtual StreamBlock* getCommittedExportBytes()
     {
         // default implementation is to return NULL, which
         // indicates an error)
@@ -236,9 +236,9 @@ public:
     }
 
     /**
-     * Release any committed ELT bytes up to the provided stream offset
+     * Release any committed Export bytes up to the provided stream offset
      */
-    virtual bool releaseEltBytes(int64_t releaseOffset)
+    virtual bool releaseExportBytes(int64_t releaseOffset)
     {
         // default implementation returns false, which
         // indicates an error
@@ -246,7 +246,7 @@ public:
     }
 
     /**
-     * Reset the elt poll marker
+     * Reset the Export poll marker
      */
     virtual void resetPollMarker() {
         // default, do nothing.
@@ -262,9 +262,9 @@ public:
 protected:
     /*
      * Implemented by persistent table and called by Table::loadTuplesFrom
-     * to do additional processing for views and ELT
+     * to do additional processing for views and Export
      */
-    virtual void processLoadedTuple(bool allowELT, TableTuple &tuple) {};
+    virtual void processLoadedTuple(bool allowExport, TableTuple &tuple) {};
 
     /*
      * Implemented by persistent table and called by Table::loadTuplesFrom

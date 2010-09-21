@@ -51,7 +51,7 @@
 #include "common/Pool.hpp"
 #include "common/ValuePeeker.hpp"
 #include "common/FatalException.hpp"
-#include "common/ELTSerializeIo.h"
+#include "common/ExportSerializeIo.h"
 #include <ostream>
 
 #include <iostream>
@@ -133,11 +133,11 @@ public:
     }
 
     /**
-        Determine the maximum number of bytes when serialized for ELT.
+        Determine the maximum number of bytes when serialized for Export.
         Excludes the bytes required by the row header (which includes
         the null bit indicators) and ignores the width of metadata cols.
     */
-    size_t maxELTSerializationSize() const {
+    size_t maxExportSerializationSize() const {
         size_t bytes = 0;
         int cols = sizeInValues();
         for (int i = 0; i < cols; ++i) {
@@ -168,7 +168,7 @@ public:
                 break;
               default:
                 // let caller handle this error
-                throwFatalException("Unknown ValueType found during ELT serialization.");
+                throwFatalException("Unknown ValueType found during Export serialization.");
                 return (size_t)0;
             }
         }
@@ -257,7 +257,7 @@ public:
 
     void deserializeFrom(voltdb::SerializeInput &tupleIn, Pool *stringPool);
     void serializeTo(voltdb::SerializeOutput &output);
-    void serializeToELT(voltdb::ELTSerializeOutput &io,
+    void serializeToExport(voltdb::ExportSerializeOutput &io,
                           int colOffset, uint8_t *nullArray);
 
     void freeObjectColumns();
@@ -549,8 +549,8 @@ inline void TableTuple::serializeTo(voltdb::SerializeOutput &output) {
 
 inline
 void
-TableTuple::serializeToELT(ELTSerializeOutput &io,
-                           int colOffset, uint8_t *nullArray)
+TableTuple::serializeToExport(ExportSerializeOutput &io,
+                              int colOffset, uint8_t *nullArray)
 {
     int columnCount = sizeInValues();
     for (int i = 0; i < columnCount; i++) {
@@ -565,7 +565,7 @@ TableTuple::serializeToELT(ELTSerializeOutput &io,
             nullArray[byte] = (uint8_t)(nullArray[byte] | mask);
             continue;
         }
-        getNValue(i).serializeToELT(io);
+        getNValue(i).serializeToExport(io);
     }
 }
 

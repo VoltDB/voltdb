@@ -23,7 +23,7 @@ import java.util.LinkedList;
 import java.util.Queue;
 import java.util.Map.Entry;
 
-import org.voltdb.elt.ELTProtoMessage;
+import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.logging.VoltLogger;
 
 
@@ -37,8 +37,8 @@ public class ExportDataSink implements Runnable
     private final ExportDecoderBase m_decoder;
     private String m_activeConnection = null;
 
-    private final HashMap<String, LinkedList<ELTProtoMessage>> m_rxQueues;
-    private final HashMap<String, LinkedList<ELTProtoMessage>> m_txQueues;
+    private final HashMap<String, LinkedList<ExportProtoMessage>> m_rxQueues;
+    private final HashMap<String, LinkedList<ExportProtoMessage>> m_txQueues;
 
     boolean m_started = false;
 
@@ -49,8 +49,8 @@ public class ExportDataSink implements Runnable
         m_partitionId = partitionId;
         m_tableName = tableName;
         m_decoder = decoder;
-        m_rxQueues = new HashMap<String, LinkedList<ELTProtoMessage>>();
-        m_txQueues = new HashMap<String, LinkedList<ELTProtoMessage>>();
+        m_rxQueues = new HashMap<String, LinkedList<ExportProtoMessage>>();
+        m_txQueues = new HashMap<String, LinkedList<ExportProtoMessage>>();
     }
 
     public long getTableId()
@@ -69,16 +69,16 @@ public class ExportDataSink implements Runnable
         {
             m_activeConnection = connectionName;
         }
-        m_rxQueues.put(connectionName, new LinkedList<ELTProtoMessage>());
-        m_txQueues.put(connectionName, new LinkedList<ELTProtoMessage>());
+        m_rxQueues.put(connectionName, new LinkedList<ExportProtoMessage>());
+        m_txQueues.put(connectionName, new LinkedList<ExportProtoMessage>());
     }
 
-    Queue<ELTProtoMessage> getRxQueue(String connectionName)
+    Queue<ExportProtoMessage> getRxQueue(String connectionName)
     {
         return m_rxQueues.get(connectionName);
     }
 
-    Queue<ELTProtoMessage> getTxQueue(String connectionName)
+    Queue<ExportProtoMessage> getTxQueue(String connectionName)
     {
         return m_txQueues.get(connectionName);
     }
@@ -100,9 +100,9 @@ public class ExportDataSink implements Runnable
             poll();
             m_started = true;
         }
-        for (Entry<String, LinkedList<ELTProtoMessage>> rx_conn : m_rxQueues.entrySet())
+        for (Entry<String, LinkedList<ExportProtoMessage>> rx_conn : m_rxQueues.entrySet())
         {
-            ELTProtoMessage m = rx_conn.getValue().poll();
+            ExportProtoMessage m = rx_conn.getValue().poll();
             if (m != null && m.isPollResponse())
             {
                 m_activeConnection = rx_conn.getKey();
@@ -116,18 +116,18 @@ public class ExportDataSink implements Runnable
         m_logger.trace("Polling table " + m_tableName +
                        ", partition " + m_partitionId + " for new data.");
 
-        ELTProtoMessage m = new ELTProtoMessage(m_partitionId, m_tableId);
+        ExportProtoMessage m = new ExportProtoMessage(m_partitionId, m_tableId);
         m.poll();
         m_txQueues.get(m_activeConnection).offer(m);
     }
 
-    private void pollAndAck(ELTProtoMessage prev)
+    private void pollAndAck(ExportProtoMessage prev)
     {
         m_logger.debug("Poller, table " + m_tableName + ": pollAndAck " +
                        prev.getAckOffset());
-        ELTProtoMessage next = new ELTProtoMessage(m_partitionId, m_tableId);
+        ExportProtoMessage next = new ExportProtoMessage(m_partitionId, m_tableId);
         next.poll().ack(prev.getAckOffset());
-        ELTProtoMessage ack = new ELTProtoMessage(m_partitionId, m_tableId);
+        ExportProtoMessage ack = new ExportProtoMessage(m_partitionId, m_tableId);
         ack.ack(prev.getAckOffset());
         for (String connectionName : m_txQueues.keySet())
         {
@@ -146,7 +146,7 @@ public class ExportDataSink implements Runnable
         }
     }
 
-    private void handlePollResponse(ELTProtoMessage m)
+    private void handlePollResponse(ExportProtoMessage m)
     {
         // Poll data is all encoded little endian.
         m.getData().order(ByteOrder.LITTLE_ENDIAN);

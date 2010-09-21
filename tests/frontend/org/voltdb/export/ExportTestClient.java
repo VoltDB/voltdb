@@ -20,7 +20,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package org.voltdb.elt;
+package org.voltdb.export;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -29,7 +29,7 @@ import java.util.HashMap;
 
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
-import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
+import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportConnection;
 import org.voltdb.exportclient.ExportDecoderBase;
@@ -52,7 +52,7 @@ public class ExportTestClient extends ExportClientBase
     }
 
     @Override
-    public ExportDecoderBase constructELTDecoder(AdvertisedDataSource source)
+    public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source)
     {
         // create a verifier with the 'schema'
         ExportTestVerifier verifier = new ExportTestVerifier(source);
@@ -90,7 +90,7 @@ public class ExportTestClient extends ExportClientBase
                 retval = false;
             }
         }
-        for (ExportConnection connection : m_elConnections.values())
+        for (ExportConnection connection : m_exportConnections.values())
         {
             if (!connection.isConnected())
             {
@@ -113,27 +113,27 @@ public class ExportTestClient extends ExportClientBase
         return retval;
     }
 
-    public boolean verifyEltOffsets()
+    public boolean verifyExportOffsets()
     {
         boolean retval = true;
 
         HashMap<Long, Long> table_offsets = new HashMap<Long, Long>();
 
         // Generate polls for every connection/table/partition
-        for (ExportConnection connection : m_elConnections.values())
+        for (ExportConnection connection : m_exportConnections.values())
         {
             HashMap<Long, Long> seen_responses = new HashMap<Long, Long>();
             for (AdvertisedDataSource source : connection.getDataSources())
             {
                 try
                 {
-                    ELTProtoMessage poll = new ELTProtoMessage(source.partitionId(),
+                    ExportProtoMessage poll = new ExportProtoMessage(source.partitionId(),
                                                                source.tableId());
                     poll.poll();
                     connection.sendMessage(poll);
 
                     // Poll this source on this connection
-                    ELTProtoMessage m = null;
+                    ExportProtoMessage m = null;
                     // We know all possibly outstanding responses will be fully
                     // drained, so just wait until we get any response for
                     // this data source
@@ -155,7 +155,7 @@ public class ExportTestClient extends ExportClientBase
                     {
                         if (table_offsets.get(table_hash) != offset)
                         {
-                            System.out.println("Mismatched ELT offset: " + offset);
+                            System.out.println("Mismatched Export offset: " + offset);
                             System.out.println("  Table ID: " + source.tableName());
                             System.out.println("  Partition: " + source.partitionId());
                             System.out.println("  Orig. offset: " + table_offsets.get(table_hash));

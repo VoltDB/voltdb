@@ -235,9 +235,9 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
-    // TestELTSuite tests most of these options are tested end-to-end; however need to test
+    // TestExportSuite tests most of these options are tested end-to-end; however need to test
     // that a disabled connector is really disabled and that auth data is correct.
-    public void testELTSetting() throws IOException {
+    public void testExportSetting() throws IOException {
         final VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestExportSuite.class.getResource("sqltypessuite-ddl.sql"));
         project.addSchema(TestExportSuite.class.getResource("sqltypessuite-nonulls-ddl.sql"));
@@ -249,13 +249,13 @@ public class TestVoltCompiler extends TestCase {
         project.addPartitionInfo("EXPRESSIONS_WITH_NULLS", "PKEY");
         project.addPartitionInfo("EXPRESSIONS_NO_NULLS", "PKEY");
         project.addPartitionInfo("JUMBO_ROW", "PKEY");
-        project.addELT("org.voltdb.elt.processors.RawProcessor", false, null);
-        project.addELTTable("ALLOW_NULLS", false);   // persistent table
-        project.addELTTable("WITH_DEFAULTS", true);  // streamed table
+        project.addExport("org.voltdb.export.processors.RawProcessor", false, null);
+        project.addExportTable("ALLOW_NULLS", false);   // persistent table
+        project.addExportTable("WITH_DEFAULTS", true);  // streamed table
         try {
-            assertTrue(project.compile("/tmp/eltsettingstest.jar"));
+            assertTrue(project.compile("/tmp/exportsettingstest.jar"));
             final String catalogContents =
-                VoltCompiler.readFileFromJarfile("/tmp/eltsettingstest.jar", "catalog.txt");
+                VoltCompiler.readFileFromJarfile("/tmp/exportsettingstest.jar", "catalog.txt");
             final Catalog cat = new Catalog();
             cat.execute(catalogContents);
 
@@ -264,31 +264,31 @@ public class TestVoltCompiler extends TestCase {
             assertFalse(connector.getEnabled());
 
         } finally {
-            final File jar = new File("/tmp/eltsettingstest.jar");
+            final File jar = new File("/tmp/exportsettingstest.jar");
             jar.delete();
         }
 
     }
 
-    // test that ELT configuration is insensitive to the case of the table name
-    public void testELTTableCase() throws IOException {
+    // test that Export configuration is insensitive to the case of the table name
+    public void testExportTableCase() throws IOException {
         final VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestVoltCompiler.class.getResource("ELTTester-ddl.sql"));
+        project.addSchema(TestVoltCompiler.class.getResource("ExportTester-ddl.sql"));
         project.addStmtProcedure("Dummy", "insert into a values (?, ?, ?);",
                                  "a.a_id: 0");
         project.addPartitionInfo("A", "A_ID");
         project.addPartitionInfo("B", "B_ID");
         project.addPartitionInfo("e", "e_id");
         project.addPartitionInfo("f", "f_id");
-        project.addELT("org.voltdb.elt.processors.RawProcessor", true, null);
-        project.addELTTable("A", true); // uppercase DDL, uppercase export
-        project.addELTTable("b", true); // uppercase DDL, lowercase export
-        project.addELTTable("E", true); // lowercase DDL, uppercase export
-        project.addELTTable("f", true); // lowercase DDL, lowercase export
+        project.addExport("org.voltdb.export.processors.RawProcessor", true, null);
+        project.addExportTable("A", true); // uppercase DDL, uppercase export
+        project.addExportTable("b", true); // uppercase DDL, lowercase export
+        project.addExportTable("E", true); // lowercase DDL, uppercase export
+        project.addExportTable("f", true); // lowercase DDL, lowercase export
         try {
-            assertTrue(project.compile("/tmp/eltsettingstest.jar"));
+            assertTrue(project.compile("/tmp/exportsettingstest.jar"));
             final String catalogContents =
-                VoltCompiler.readFileFromJarfile("/tmp/eltsettingstest.jar", "catalog.txt");
+                VoltCompiler.readFileFromJarfile("/tmp/exportsettingstest.jar", "catalog.txt");
             final Catalog cat = new Catalog();
             cat.execute(catalogContents);
             Connector connector = cat.getClusters().get("cluster").getDatabases().
@@ -300,7 +300,7 @@ public class TestVoltCompiler extends TestCase {
             assertNotNull(connector.getTableinfo().getIgnoreCase("e"));
             assertNotNull(connector.getTableinfo().getIgnoreCase("f"));
         } finally {
-            final File jar = new File("/tmp/eltsettingstest.jar");
+            final File jar = new File("/tmp/exportsettingstest.jar");
             jar.delete();
         }
     }
@@ -308,15 +308,15 @@ public class TestVoltCompiler extends TestCase {
     // test that the source table for a view is not export only
     public void testViewSourceNotExportOnly() throws IOException {
         final VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestVoltCompiler.class.getResource("ELTTesterWithView-ddl.sql"));
+        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
         project.addStmtProcedure("Dummy", "select * from v_table1r_el_only");
-        project.addELT("org.voltdb.elt.processors.RawProcessor", true, null);
-        project.addELTTable("table1r_el_only", true);
+        project.addExport("org.voltdb.export.processors.RawProcessor", true, null);
+        project.addExportTable("table1r_el_only", true);
         try {
-            assertFalse(project.compile("/tmp/elttestview.jar"));
+            assertFalse(project.compile("/tmp/exporttestview.jar"));
         }
         finally {
-            final File jar = new File("/tmp/elttestview.jar");
+            final File jar = new File("/tmp/exporttestview.jar");
             jar.delete();
         }
     }
@@ -324,15 +324,15 @@ public class TestVoltCompiler extends TestCase {
     // test that a view is not export only
     public void testViewNotExportOnly() throws IOException {
         final VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestVoltCompiler.class.getResource("ELTTesterWithView-ddl.sql"));
+        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
         project.addStmtProcedure("Dummy", "select * from table1r_el_only");
-        project.addELT("org.voltdb.elt.processors.RawProcessor", true, null);
-        project.addELTTable("v_table1r_el_only", true);
+        project.addExport("org.voltdb.export.processors.RawProcessor", true, null);
+        project.addExportTable("v_table1r_el_only", true);
         try {
-            assertFalse(project.compile("/tmp/elttestview.jar"));
+            assertFalse(project.compile("/tmp/exporttestview.jar"));
         }
         finally {
-            final File jar = new File("/tmp/elttestview.jar");
+            final File jar = new File("/tmp/exporttestview.jar");
             jar.delete();
         }
     }

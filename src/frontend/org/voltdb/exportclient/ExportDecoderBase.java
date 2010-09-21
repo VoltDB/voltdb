@@ -23,7 +23,7 @@ import java.nio.ByteOrder;
 import java.util.ArrayList;
 
 import org.voltdb.VoltType;
-import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
+import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.types.TimestampType;
 
@@ -40,7 +40,7 @@ public abstract class ExportDecoderBase
     }
 
     /**
-     * Process a row of octets from the ELT stream.  Overridden by
+     * Process a row of octets from the Export stream.  Overridden by
      * subclasses to provide whatever specific processing is desired by
      * this ELClient
      * @param rowSize the length of the row (in octets)
@@ -146,8 +146,8 @@ public abstract class ExportDecoderBase
     }
 
     /**
-     * Read a decimal according to the ELT encoding specification.
-     * @param fds Fastdeserializer containing ELT stream data
+     * Read a decimal according to the Export encoding specification.
+     * @param fds Fastdeserializer containing Export stream data
      * @return decoded BigDecimal value
      * @throws IOException
      */
@@ -169,7 +169,7 @@ public abstract class ExportDecoderBase
     }
 
     /**
-     * Read a string according to the ELT encoding specification
+     * Read a string according to the Export encoding specification
      * @param fds
      * @throws IOException
      */
@@ -182,7 +182,7 @@ public abstract class ExportDecoderBase
     }
 
     /**
-     * Read a timestamp according to the ELT encoding specification.
+     * Read a timestamp according to the Export encoding specification.
      * @param fds
      * @throws IOException
      */
@@ -193,7 +193,7 @@ public abstract class ExportDecoderBase
     }
 
     /**
-     * Read a float according to the ELT encoding specification
+     * Read a float according to the Export encoding specification
      * @param fds
      * @throws IOException
      */
@@ -203,7 +203,7 @@ public abstract class ExportDecoderBase
     }
 
     /**
-     * Read a bigint according to the ELT encoding specification.
+     * Read a bigint according to the Export encoding specification.
      * @param fds
      * @throws IOException
      */
@@ -213,7 +213,7 @@ public abstract class ExportDecoderBase
     }
 
     /**
-     * Read an integer according to the ELT encoding specification.
+     * Read an integer according to the Export encoding specification.
      * @param fds
      * @throws IOException
      */
@@ -223,7 +223,7 @@ public abstract class ExportDecoderBase
     }
 
     /**
-     * Read a small int according to the ELT encoding specification.
+     * Read a small int according to the Export encoding specification.
      * @param fds
      * @throws IOException
      */
@@ -233,7 +233,7 @@ public abstract class ExportDecoderBase
     }
 
     /**
-     * Read a tiny int according to the ELT encoding specification.
+     * Read a tiny int according to the Export encoding specification.
      * @param fds
      * @throws IOException
      */

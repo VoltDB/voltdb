@@ -184,7 +184,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         * Load table data into a persistent table specified by the tableId parameter.
         * This must be called at most only once before any data is loaded in to the table.
         */
-        bool loadTable(bool allowELT, int32_t tableId,
+        bool loadTable(bool allowExport, int32_t tableId,
                        ReferenceSerializeInput &serializeIn,
                        int64_t txnId, int64_t lastCommittedTxnId);
 
@@ -360,19 +360,22 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void processRecoveryMessage(RecoveryProtoMsg *message);
 
         /**
-         * Perform an action on behalf of ELT.
+         * Perform an action on behalf of Export.
          *
          * @param ackAction whether or not this action include a
          * release for stream octets
          * @param pollAction whether or not this action requests the
          * next buffer of unpolled octets
          * @param if ackAction is true, the stream offset being released
+         * @param if infoAction is true, the stream offset being requested for a table
+         * @param if syncAction is true, the stream offset being set for a table
          * @param the catalog version qualified id of the table to which this action applies
          * @return the universal offset for any poll results (results
          * returned separatedly via QueryResults buffer)
          */
-        long eltAction(bool ackAction, bool pollAction, bool resetAction,
-                       int64_t ackOffset, int64_t tableId);
+        long exportAction(bool ackAction, bool pollAction, bool resetAction,
+                          bool infoAction, bool syncAction,
+                          int64_t ackOffset, int64_t tableId);
 
         /**
          * Retrieve a hash code for the specified table

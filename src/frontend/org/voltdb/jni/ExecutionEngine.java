@@ -27,16 +27,16 @@ import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite;
 import org.voltdb.ParameterSet;
 import org.voltdb.SysProcSelector;
+import org.voltdb.TableStreamType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.elt.ELTProtoMessage;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.TableStreamType;
+import org.voltdb.utils.LogKeys;
 
 /**
  * Wrapper for native Execution Engine library. There are two implementations,
@@ -297,7 +297,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     abstract public void loadTable(
         int tableId, VoltTable table, long txnId,
-        long lastCommittedTxnId, long undoToken, boolean allowELT) throws EEException;
+        long lastCommittedTxnId, long undoToken, boolean allowExport) throws EEException;
 
     /**
      * Set the log levels to be used when logging in this engine
@@ -315,7 +315,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     abstract public void tick(long time, long lastCommittedTxnId);
 
     /**
-     * Instruct EE to come to an idle state. Flush ELT buffers, finish
+     * Instruct EE to come to an idle state. Flush Export buffers, finish
      * any in-progress checkpoint, etc.
      */
     abstract public void quiesce(long lastCommittedTxnId);
@@ -352,16 +352,19 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public abstract boolean undoUndoToken(long undoToken);
 
     /**
-     * Execute an ELT action against the execution engine.
+     * Execute an Export action against the execution engine.
      * @param ackAction true if this message instructs an ack.
      * @param pollAction true if this message instructs a poll.
+     * @param syncAction TODO
      * @param ackTxnId if an ack, the transaction id being acked
      * @param tableId the table being polled or acked.
-     * @return the response ELTMessage
+     * @param syncOffset TODO
+     * @return the response ExportMessage
      */
-    public abstract ELTProtoMessage eltAction(
+    public abstract ExportProtoMessage exportAction(
             boolean ackAction, boolean pollAction, boolean resetAction,
-            long ackTxnId, int partitionId, long tableId);
+            boolean infoAction, boolean syncAction,
+            long ackOffset, int partitionId, long tableId);
 
     /**
      * Calculate a hash code for a table.
@@ -464,7 +467,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param undoToken token for undo quantum where changes should be logged.
      */
     protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table,
-            long txnId, long lastCommittedTxnId, long undoToken, boolean allowELT);
+            long txnId, long lastCommittedTxnId, long undoToken, boolean allowExport);
 
     //Execution
 
@@ -608,7 +611,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     protected native long nativeTableHashCode(long pointer, int tableId);
 
     /**
-     * Perform an ELT poll or ack action. Poll data will be returned via the usual
+     * Perform an export poll or ack action. Poll data will be returned via the usual
      * results buffer. A single action may encompass both a poll and ack.
      * @param pointer Pointer to an engine instance
      * @param mAckAction True if an ack is requested
@@ -617,11 +620,13 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param mTableId The table ID being acted against.
      * @return
      */
-    protected native long nativeELTAction(
+    protected native long nativeExportAction(
             long pointer,
             boolean ackAction,
             boolean pollAction,
             boolean resetAction,
+            boolean infoRequestAction,
+            boolean syncAction,
             long mAckOffset,
             long mTableId);
 }

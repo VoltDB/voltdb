@@ -15,26 +15,26 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.elt;
+package org.voltdb.export;
 
-import org.voltdb.elt.processors.RawProcessor.ELTInternalMessage;
+import org.voltdb.export.processors.RawProcessor.ExportInternalMessage;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.network.InputHandler;
 
 /**
- * Interface ELTManager imposes on processors.
+ * Interface ExportManager imposes on processors.
  *
- *  The ELT Manager invokes this interface in known order:
+ *  The Export Manager invokes this interface in known order:
  *    1. The logger is added via addLogger.
  *    2. Table sources are added via addTable
  *    3. readyForData is invoked.
  *    4. process is called for flushed data blocks
  */
-public interface ELTDataProcessor  {
+public interface ExportDataProcessor  {
 
     /**
-     * Allow the processor access to the ELT logger. Processor may
-     * log to this logger to produce ELT category output.
+     * Allow the processor access to the Export logger. Processor may
+     * log to this logger to produce Export category output.
      * @param logger log4j logger created from VoltDB logger factory.
      */
     void addLogger(VoltLogger logger);
@@ -46,7 +46,7 @@ public interface ELTDataProcessor  {
      * @param tableName for the database
      * @param tableId corresponding to tableName.
      */
-    void addDataSource(ELTDataSource dataSource);
+    void addDataSource(ExportDataSource dataSource);
 
     /**
      * Inform the processor that initialization is complete; commence work.
@@ -56,7 +56,7 @@ public interface ELTDataProcessor  {
     /**
      * Queue a work message to the processor's mailbox.
      */
-    public void queueMessage(ELTInternalMessage m);
+    public void queueMessage(ExportInternalMessage m);
 
     /**
      * A client has connected. Create an InputHandler for it.

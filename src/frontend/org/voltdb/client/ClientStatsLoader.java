@@ -20,7 +20,7 @@ import java.sql.*;
 import org.voltdb.VoltTable;
 
 /**
- * Polls a Distributer instance for IO and procedure invocation information and ELTs the results
+ * Polls a Distributer instance for IO and procedure invocation information and exports the results
  * to a database via JDBC.
  *
  */

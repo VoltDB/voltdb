@@ -373,7 +373,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL
 Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
     JNIEnv *env, jobject obj, jlong engine_ptr, jint table_id,
     jbyteArray serialized_table, jlong txnId, jlong lastCommittedTxnId,
-    jlong undoToken, jboolean allowELT)
+    jlong undoToken, jboolean allowExport)
 {
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
@@ -387,7 +387,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
     VOLT_DEBUG("loading table %d in C++...", table_id);
 
     // convert jboolean to bool
-    bool bAllowELT = (allowELT == JNI_FALSE ? false : true);
+    bool bAllowExport = (allowExport == JNI_FALSE ? false : true);
 
     // deserialize dependency.
     jsize length = env->GetArrayLength(serialized_table);
@@ -396,7 +396,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
     ReferenceSerializeInput serialize_in(bytes, length);
     try {
         try {
-            bool success = engine->loadTable(bAllowELT, table_id, serialize_in,
+            bool success = engine->loadTable(bAllowExport, table_id, serialize_in,
                                              txnId, lastCommittedTxnId);
             env->ReleaseByteArrayElements(serialized_table, bytes, JNI_ABORT);
             VOLT_DEBUG("deserialized table");
@@ -1014,36 +1014,40 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTabl
 
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
- * Method:    nativeELTAction
+ * Method:    nativeExportAction
  *
  * @param ackAction  true if this call contains an ack
  * @param pollAction true if this call requests a poll
+ * @param infoAction true if the stream offset being requested for a table
+ * @param syncAction true if the stream offset being set for a table
  * @param ackOffset  if acking, the universal stream offset being acked/released
- * @param tableId    the table ID to which the ELT action applies
+ * @param tableId    the table ID to which the Export action applies
  *
  * @return the universal stream offset for the last octet in any
  * returned poll results (returned via the query results buffer).  On
  * any error this will be less than 0.  For any call with no
  * pollAction, any value >= 0 may be ignored.
  */
-SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeELTAction
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExportAction
   (JNIEnv *env,
    jobject obj,
    jlong engine_ptr,
    jboolean ackAction,
    jboolean pollAction,
    jboolean resetAction,
+   jboolean infoAction,
+   jboolean syncAction,
    jlong ackOffset,
    jlong tableId) {
-    VOLT_DEBUG("nativeELTAction in C++ called");
+    VOLT_DEBUG("nativeExportAction in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     try {
         try {
             engine->resetReusedResultOutputBuffer();
-            return engine->eltAction(ackAction, pollAction, resetAction,
-                                     static_cast<int64_t>(ackOffset),
-                                     static_cast<int64_t>(tableId));
+            return engine->exportAction(ackAction, pollAction, resetAction, infoAction, syncAction,
+                                        static_cast<int64_t>(ackOffset),
+                                        static_cast<int64_t>(tableId));
         } catch (SQLException e) {
             throwFatalException("%s", e.message().c_str());
         }

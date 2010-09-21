@@ -23,9 +23,9 @@ import java.util.Map;
 import java.util.Set;
 
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
-import org.voltdb.VoltTable.ColumnInfo;
 
 public class ClusterSaveFileState
 {
@@ -57,11 +57,11 @@ public class ClusterSaveFileState
         String table_name = row.getString("TABLE");
         if (row.getString("IS_REPLICATED").equals("TRUE"))
         {
-            table_state = new ReplicatedTableSaveFileState(table_name, m_allowELT);
+            table_state = new ReplicatedTableSaveFileState(table_name, m_allowExport);
         }
         else if (row.getString("IS_REPLICATED").equals("FALSE"))
         {
-            table_state = new PartitionedTableSaveFileState(table_name, m_allowELT);
+            table_state = new PartitionedTableSaveFileState(table_name, m_allowExport);
         }
         else
         {
@@ -71,7 +71,7 @@ public class ClusterSaveFileState
         return table_state;
     }
 
-    public ClusterSaveFileState(VoltTable saveFileState, int allowELT)
+    public ClusterSaveFileState(VoltTable saveFileState, int allowExport)
         throws IOException
     {
         if (saveFileState.getRowCount() == 0)
@@ -82,7 +82,7 @@ public class ClusterSaveFileState
         VoltTableRow a_row = saveFileState.fetchRow(0);
         m_clusterName = a_row.getString("CLUSTER");
         m_databaseName = a_row.getString("DATABASE");
-        m_allowELT = allowELT;
+        m_allowExport = allowExport;
 
 
         m_tableStateMap = new HashMap<String, TableSaveFileState>();
@@ -142,6 +142,6 @@ public class ClusterSaveFileState
 
     private String m_clusterName;
     private String m_databaseName;
-    final private int m_allowELT;
+    final private int m_allowExport;
     private Map<String, TableSaveFileState> m_tableStateMap;
 }

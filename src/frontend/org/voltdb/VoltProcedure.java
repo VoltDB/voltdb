@@ -638,7 +638,7 @@ public abstract class VoltProcedure {
      * @throws VoltAbortException
      */
     public void voltLoadTable(String clusterName, String databaseName,
-                              String tableName, VoltTable data, int allowELT)
+                              String tableName, VoltTable data, int allowExport)
     throws VoltAbortException
     {
         if (data == null || data.getRowCount() == 0) {
@@ -647,7 +647,7 @@ public abstract class VoltProcedure {
         try {
             m_site.loadTable(m_currentTxnState.txnId,
                              clusterName, databaseName,
-                             tableName, data, allowELT);
+                             tableName, data, allowExport);
         }
         catch (EEException e) {
             throw new VoltAbortException("Failed to load table: " + tableName);

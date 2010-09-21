@@ -184,7 +184,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                     self.wfile.write(snapshot_path)
                     self.wfile.write(' with nonce ')
                     self.wfile.write(snapshot_nonce)
-                    # The third parameter is actually 'allowELT', maybe we
+                    # The third parameter is actually 'allowExport', maybe we
                     # should change the condition here
                     if blocking_snapshot:
                         response = client.execute('snapshotrestore %s %s %d' %

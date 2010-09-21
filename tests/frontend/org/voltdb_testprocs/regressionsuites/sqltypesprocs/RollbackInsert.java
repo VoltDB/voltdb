@@ -39,7 +39,7 @@ import org.voltdb.types.TimestampType;
 /**
  * This procedure performs an insert and then rolls it back;
  * used in conjunction with the nearly identical Insert.java
- * to test ELT with rollback for TestELTSuite.java
+ * to test Export with rollback for TestExportSuite.java
  */
 
 public class RollbackInsert extends VoltProcedure {

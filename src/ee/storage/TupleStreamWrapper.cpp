@@ -22,7 +22,7 @@
 #include "common/NValue.hpp"
 #include "common/ValuePeeker.hpp"
 #include "common/tabletuple.h"
-#include "common/ELTSerializeIo.h"
+#include "common/ExportSerializeIo.h"
 
 #include <cstdio>
 #include <iostream>
@@ -188,7 +188,7 @@ void TupleStreamWrapper::discardBlock(StreamBlock *sb) {
 void TupleStreamWrapper::extendBufferChain(size_t minLength)
 {
     if (m_defaultCapacity < minLength) {
-        // eltxxx: rollback instead?
+        // exportxxx: rollback instead?
         throwFatalException("Default capacity is less than required buffer size.");
     }
 
@@ -207,7 +207,7 @@ void TupleStreamWrapper::extendBufferChain(size_t minLength)
 
     char *buffer = new char[m_defaultCapacity];
     if (!buffer) {
-        throwFatalException("Failed to claim managed buffer for ELT.");
+        throwFatalException("Failed to claim managed buffer for Export.");
     }
 
     m_currBlock = new StreamBlock(buffer, m_defaultCapacity, m_uso);
@@ -256,7 +256,7 @@ size_t TupleStreamWrapper::appendTuple(int64_t lastCommittedTxnId,
     commit(lastCommittedTxnId, txnId);
 
     // Compute the upper bound on bytes required to serialize tuple.
-    // eltxxx: can memoize this calculation.
+    // exportxxx: can memoize this calculation.
     tupleMaxLength = computeOffsets(tuple, &rowHeaderSz);
     if (!m_currBlock) {
         extendBufferChain(m_defaultCapacity);
@@ -275,8 +275,8 @@ size_t TupleStreamWrapper::appendTuple(int64_t lastCommittedTxnId,
       reinterpret_cast<uint8_t*>(m_currBlock->mutableDataPtr() + sizeof (int32_t));
 
     // position the serializer after the full rowheader
-    ELTSerializeOutput io(m_currBlock->mutableDataPtr() + rowHeaderSz,
-                          m_currBlock->remaining() - rowHeaderSz);
+    ExportSerializeOutput io(m_currBlock->mutableDataPtr() + rowHeaderSz,
+                             m_currBlock->remaining() - rowHeaderSz);
 
     // write metadata columns
     io.writeLong(txnId);
@@ -285,16 +285,16 @@ size_t TupleStreamWrapper::appendTuple(int64_t lastCommittedTxnId,
     io.writeLong(m_partitionId);
     io.writeLong(m_siteId);
 
-    // use 1 for INSERT ELT op, 0 for DELETE ELT op
+    // use 1 for INSERT EXPORT op, 0 for DELETE EXPORT op
     io.writeLong((type == INSERT) ? 1L : 0L);
 
     // write the tuple's data
-    tuple.serializeToELT(io, METADATA_COL_CNT, nullArray);
+    tuple.serializeToExport(io, METADATA_COL_CNT, nullArray);
 
     // write the row size in to the row header
     // rowlength does not include the 4 byte row header
     // but does include the null array.
-    ELTSerializeOutput hdr(m_currBlock->mutableDataPtr(), 4);
+    ExportSerializeOutput hdr(m_currBlock->mutableDataPtr(), 4);
     hdr.writeInt((int32_t)(io.position()) + (int32_t)rowHeaderSz - 4);
 
     // update m_offset
@@ -321,7 +321,7 @@ TupleStreamWrapper::computeOffsets(TableTuple &tuple,
     size_t metadataSz = (sizeof (int64_t) * 5) + 1;
 
     // returns 0 if corrupt tuple detected
-    size_t dataSz = tuple.maxELTSerializationSize();
+    size_t dataSz = tuple.maxExportSerializationSize();
     if (dataSz == 0) {
         throwFatalException("Invalid tuple passed to computeTupleMaxLength. Crashing System.");
     }
@@ -341,7 +341,7 @@ TupleStreamWrapper::resetPollMarker()
 }
 
 StreamBlock*
-TupleStreamWrapper::getCommittedEltBytes()
+TupleStreamWrapper::getCommittedExportBytes()
 {
     StreamBlock* first_unpolled_block = NULL;
 
@@ -390,7 +390,7 @@ TupleStreamWrapper::getCommittedEltBytes()
 }
 
 bool
-TupleStreamWrapper::releaseEltBytes(int64_t releaseOffset)
+TupleStreamWrapper::releaseExportBytes(int64_t releaseOffset)
 {
     // if released offset is in an already-released past, just return success
     if ((m_pendingBlocks.empty() && releaseOffset < m_currBlock->uso()) ||

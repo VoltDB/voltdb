@@ -21,19 +21,26 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.elt;
+package org.voltdb.export;
 import org.voltdb.*;
 
 @ProcInfo (
-   partitionInfo = "B.B_CLIENT: 0",
+   partitionInfo = "C.C_CLIENT: 0",
    singlePartition = true
 )
-public class InsertB extends VoltProcedure {
+public class InsertCD extends VoltProcedure {
 
-    public final SQLStmt insertB = new SQLStmt("INSERT INTO B VALUES (?, ?, ?);");
+    public final SQLStmt insertC = new SQLStmt("INSERT INTO C VALUES (?, ?, ?);");
 
-    public VoltTable[] run (long clientnum, long id_b, long item_b) throws VoltAbortException {
-        voltQueueSQL(insertB, clientnum, id_b, item_b);
+    public final SQLStmt insertD = new SQLStmt("INSERT INTO D VALUES (?, ?, ?);");
+
+    public VoltTable[] run (long clientnum, long id_cd, long item_cd) throws VoltAbortException {
+        voltQueueSQL(insertC, clientnum, id_cd, item_cd);
+
+        // insert every 10,000 id into table D.
+        if (id_cd % 10000 == 0)
+            voltQueueSQL(insertD, clientnum, id_cd, item_cd);
+
         return voltExecuteSQL();
     }
 }

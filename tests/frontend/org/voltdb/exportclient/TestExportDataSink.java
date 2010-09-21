@@ -26,19 +26,17 @@ import java.nio.ByteBuffer;
 
 import junit.framework.TestCase;
 
-import org.voltdb.elt.ELTProtoMessage;
-import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
-import org.voltdb.exportclient.ExportDataSink;
-import org.voltdb.exportclient.ExportDecoderBase;
+import org.voltdb.export.ExportProtoMessage;
+import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 
 public class TestExportDataSink extends TestCase {
 
     static final int TABLE_ID = 1;
     static final int PARTITION_ID = 2;
 
-    class TestELTDecoder extends ExportDecoderBase
+    class TestExportDecoder extends ExportDecoderBase
     {
-        public TestELTDecoder(AdvertisedDataSource source)
+        public TestExportDecoder(AdvertisedDataSource source)
         {
             super(source);
         }
@@ -62,7 +60,7 @@ public class TestExportDataSink extends TestCase {
         String CONN_NAME = "ryanlovestheyankees";
         ExportDataSink dut =
             new ExportDataSink(PARTITION_ID, TABLE_ID, "coffeetable",
-                           new TestELTDecoder(new AdvertisedDataSource((byte)0,
+                           new TestExportDecoder(new AdvertisedDataSource((byte)0,
                                                                        PARTITION_ID,
                                                                        TABLE_ID,
                                                                        "coffeetable",
@@ -71,11 +69,11 @@ public class TestExportDataSink extends TestCase {
         assertNull(dut.getTxQueue(CONN_NAME).peek());
         dut.work();
         assertNotNull(dut.getTxQueue(CONN_NAME).peek());
-        ELTProtoMessage m = dut.getTxQueue(CONN_NAME).poll();
+        ExportProtoMessage m = dut.getTxQueue(CONN_NAME).poll();
         assertTrue(m.isPoll());
         assertFalse(m.isAck());
         // move the offset along a bit
-        m = new ELTProtoMessage(PARTITION_ID, TABLE_ID);
+        m = new ExportProtoMessage(PARTITION_ID, TABLE_ID);
         m.pollResponse(0, makeFakePollData(10));
         dut.getRxQueue(CONN_NAME).offer(m);
         dut.work();
@@ -84,7 +82,7 @@ public class TestExportDataSink extends TestCase {
         assertTrue(m.isPoll());
         assertTrue(m.isAck());
         assertEquals(0, m.getAckOffset());
-        m = new ELTProtoMessage(PARTITION_ID, TABLE_ID);
+        m = new ExportProtoMessage(PARTITION_ID, TABLE_ID);
         m.pollResponse(10, makeFakePollData(20));
         dut.getRxQueue(CONN_NAME).offer(m);
         dut.work();
@@ -94,7 +92,7 @@ public class TestExportDataSink extends TestCase {
         assertTrue(m.isAck());
         assertEquals(10, m.getAckOffset());
         // stall the poll and verify the incoming message is just a poll
-        m = new ELTProtoMessage(PARTITION_ID, TABLE_ID);
+        m = new ExportProtoMessage(PARTITION_ID, TABLE_ID);
         m.pollResponse(20, makeFakePollData(0));
         dut.getRxQueue(CONN_NAME).offer(m);
         dut.work();

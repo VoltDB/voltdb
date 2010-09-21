@@ -65,15 +65,15 @@ public class LoadWarehouse extends VoltProcedure {
     public VoltTable[] run(short w_id, VoltTable warehouses, VoltTable districts, VoltTable customers,
         VoltTable stocks, VoltTable orders, VoltTable neworders, VoltTable orderLines, VoltTable histories)
     throws VoltAbortException {
-        final int allowELT = 0;
-        voltLoadTable("cluster", "database", "WAREHOUSE", warehouses, allowELT);
-        voltLoadTable("cluster", "database", "DISTRICT", districts, allowELT);
-        voltLoadTable("cluster", "database", "CUSTOMER", customers, allowELT);
-        voltLoadTable("cluster", "database", "STOCK", stocks, allowELT);
-        voltLoadTable("cluster", "database", "ORDERS", orders, allowELT);
-        voltLoadTable("cluster", "database", "NEW_ORDER", neworders, allowELT);
-        voltLoadTable("cluster", "database", "ORDER_LINE", orderLines, allowELT);
-        voltLoadTable("cluster", "database", "HISTORY", histories, allowELT);
+        final int allowExport = 0;
+        voltLoadTable("cluster", "database", "WAREHOUSE", warehouses, allowExport);
+        voltLoadTable("cluster", "database", "DISTRICT", districts, allowExport);
+        voltLoadTable("cluster", "database", "CUSTOMER", customers, allowExport);
+        voltLoadTable("cluster", "database", "STOCK", stocks, allowExport);
+        voltLoadTable("cluster", "database", "ORDERS", orders, allowExport);
+        voltLoadTable("cluster", "database", "NEW_ORDER", neworders, allowExport);
+        voltLoadTable("cluster", "database", "ORDER_LINE", orderLines, allowExport);
+        voltLoadTable("cluster", "database", "HISTORY", histories, allowExport);
         return null;
     }
 }

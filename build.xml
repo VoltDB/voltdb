@@ -654,7 +654,7 @@ JAVA COMPILATION
     <!-- compile the individual test directories -->
     <invoke-javac srcdir="${src.hsqldb.test.dir}" destdir='${build.test.dir}'/>
     <invoke-javac srcdir="${src.test.dir}" destdir='${build.test.dir}'
-        excludes="org/voltdb/benchmark/tpcc/JDBCClient.java,edu/mit/elt/ELTTester**"/>
+        excludes="org/voltdb/benchmark/tpcc/JDBCClient.java"/>
 </target>
 
 <!-- This task only executes if the voltpro.flavor property is set. -->
@@ -940,7 +940,7 @@ TEST CASES
                 <include name='org/voltdb/utils/**/*Test.class'/>
                 <exclude name="**/*$*.class"/>
                 <exclude name="**/TestMaliciousClientSuite.class" />
-                <exclude name="**/TestELTSuite.class" />
+                <exclude name="**/TestExportSuite.class" />
                 <exclude name="**/TestFailuresSuite.class" />
                 <exclude name="**/TestFixedSQLSuite.class" />
                 <exclude name="**/TestPlansGroupBySuite.class" />
@@ -1668,10 +1668,10 @@ UTILITIES
     </java>
 </target>
 
-<target name='elsinkserver'
-    description="Run the EL sink test server.">
+<target name='exportsinkserver'
+    description="Run the Export sink test server.">
     <java fork="true" failonerror="true"
-        classname="org.voltdb.elt.ELSinkServer">
+        classname="org.voltdb.export.ExportSinkServer">
         <classpath refid='project.classpath' />
         <assertions><enable/></assertions>
     </java>

@@ -179,10 +179,10 @@ class PersistentTable : public Table {
      */
     TableTuple& getTempTupleInlined(TableTuple &source);
 
-    // ELT-related inherited methods
+    // Export-related inherited methods
     virtual void flushOldTuples(int64_t timeInMillis);
-    virtual StreamBlock* getCommittedEltBytes();
-    virtual bool releaseEltBytes(int64_t releaseOffset);
+    virtual StreamBlock* getCommittedExportBytes();
+    virtual bool releaseExportBytes(int64_t releaseOffset);
     virtual void resetPollMarker();
 
     /** Add a view to this table */
@@ -207,7 +207,7 @@ class PersistentTable : public Table {
     /**
      * Process the updates from a recovery message
      */
-    void processRecoveryMessage(RecoveryProtoMsg* message, Pool *pool, bool allowELT);
+    void processRecoveryMessage(RecoveryProtoMsg* message, Pool *pool, bool allowExport);
 
     /**
      * Attempt to serialize more tuples from the table to the provided
@@ -242,9 +242,9 @@ protected:
 
     /*
      * Implemented by persistent table and called by Table::loadTuplesFrom
-     * to do additional processing for views and ELT
+     * to do additional processing for views and Export
      */
-    virtual void processLoadedTuple(bool allowELT, TableTuple &tuple);
+    virtual void processLoadedTuple(bool allowExport, TableTuple &tuple);
 
     /*
      * Implemented by persistent table and called by Table::loadTuplesFrom
@@ -281,7 +281,7 @@ protected:
     voltdb::PersistentTableStats stats_;
     voltdb::TableStats* getTableStats();
 
-    // is ELT enabled
+    // is Export enabled
     bool m_exportEnabled;
 
     // Snapshot stuff

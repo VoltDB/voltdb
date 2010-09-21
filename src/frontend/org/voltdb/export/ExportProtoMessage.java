@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.elt;
+package org.voltdb.export;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -30,7 +30,7 @@ import org.voltdb.messaging.FastSerializer;
 /**
  * Message exchanged during execution of poll/ack protocol
  */
-public class ELTProtoMessage
+public class ExportProtoMessage
 {
     public static final short kOpen           = 1 << 0;
     public static final short kOpenResponse   = 1 << 1;
@@ -39,6 +39,8 @@ public class ELTProtoMessage
     public static final short kAck            = 1 << 4;
     public static final short kClose          = 1 << 5;
     public static final short kError          = 1 << 6;
+    public static final short kInfo           = 1 << 7;
+    public static final short kSync           = 1 << 8;
 
     public boolean isOpen()         {return (m_type & kOpen) != 0;}
     public boolean isOpenResponse() {return (m_type & kOpenResponse) != 0;}
@@ -47,9 +49,11 @@ public class ELTProtoMessage
     public boolean isAck()          {return (m_type & kAck) != 0;}
     public boolean isClose()        {return (m_type & kClose) != 0;}
     public boolean isError()        {return (m_type & kError) != 0;}
+    public boolean isInfo()         {return (m_type & kInfo) != 0;}
+    public boolean isSync()         {return (m_type & kSync) != 0;}
 
     /**
-     * The ELT data source metadata returned in a kOpenResponse message.
+     * The Export data source metadata returned in a kOpenResponse message.
      */
     static public class AdvertisedDataSource {
         final private byte m_isReplicated;
@@ -111,17 +115,17 @@ public class ELTProtoMessage
     }
 
     /**
-     * Called to produce an ELT protocol message from a FastDeserializer.
+     * Called to produce an Export protocol message from a FastDeserializer.
      * Note that this expects the length preceding value was already
      * read (probably how the buffer length was originally determined).
      * @param fds
-     * @return new ELTProtoMessage from deserializer contents
+     * @return new ExportProtoMessage from deserializer contents
      * @throws IOException
      */
-    public static ELTProtoMessage readExternal(FastDeserializer fds)
+    public static ExportProtoMessage readExternal(FastDeserializer fds)
     throws IOException
     {
-        ELTProtoMessage m = new ELTProtoMessage(0, 0);
+        ExportProtoMessage m = new ExportProtoMessage(0, 0);
         m.m_version = fds.readShort();
         m.m_type = fds.readShort();
         m.m_partitionId = fds.readInt();
@@ -132,7 +136,7 @@ public class ELTProtoMessage
         return m;
     }
 
-    public ELTProtoMessage(int partitionId, long tableId) {
+    public ExportProtoMessage(int partitionId, long tableId) {
         m_partitionId = partitionId;
         m_tableId = tableId;
     }
@@ -172,41 +176,41 @@ public class ELTProtoMessage
         return m_version;
     }
 
-    public ELTProtoMessage error() {
+    public ExportProtoMessage error() {
         m_type |= kError;
         return this;
     }
 
-    public ELTProtoMessage open() {
+    public ExportProtoMessage open() {
         m_type |= kOpen;
         return this;
     }
 
-    public ELTProtoMessage openResponse(ByteBuffer bb) {
+    public ExportProtoMessage openResponse(ByteBuffer bb) {
         m_type |= kOpenResponse;
         m_data = bb;
         return this;
     }
 
-    public ELTProtoMessage poll() {
+    public ExportProtoMessage poll() {
         m_type |= kPoll;
         return this;
     }
 
-    public ELTProtoMessage pollResponse(long offset, ByteBuffer bb) {
+    public ExportProtoMessage pollResponse(long offset, ByteBuffer bb) {
         m_type |= kPollResponse;
         m_data = bb;
         m_offset = offset;
         return this;
     }
 
-    public ELTProtoMessage ack(long ackedOffset) {
+    public ExportProtoMessage ack(long ackedOffset) {
         m_type |= kAck;
         m_offset = ackedOffset;
         return this;
     }
 
-    public ELTProtoMessage close() {
+    public ExportProtoMessage close() {
         m_type |= kClose;
         return this;
     }
@@ -267,7 +271,7 @@ public class ELTProtoMessage
 
     @Override
     public String toString() {
-        String s = "ELTProtoMessage: type(" + m_type + ") offset(" +
+        String s = "ExportProtoMessage: type(" + m_type + ") offset(" +
                 m_offset + ") partitionId(" + m_partitionId +
                 ") tableId(" + m_tableId +")" + " serializableBytes(" +
                 serializableBytes() + ")";

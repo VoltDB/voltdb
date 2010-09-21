@@ -21,19 +21,19 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.elt;
+package org.voltdb.export;
 import org.voltdb.*;
 
 @ProcInfo (
-   partitionInfo = "A.A_CLIENT: 0",
+   partitionInfo = "B.B_CLIENT: 0",
    singlePartition = true
 )
-public class InsertA extends VoltProcedure {
+public class InsertB extends VoltProcedure {
 
-    public final SQLStmt insertItem = new SQLStmt("INSERT INTO A VALUES (?, ?, ?);");
+    public final SQLStmt insertB = new SQLStmt("INSERT INTO B VALUES (?, ?, ?);");
 
-    public VoltTable[] run (long client, long ID, long ITEM) throws VoltAbortException {
-        voltQueueSQL(insertItem, client, ID, ITEM);
+    public VoltTable[] run (long clientnum, long id_b, long item_b) throws VoltAbortException {
+        voltQueueSQL(insertB, clientnum, id_b, item_b);
         return voltExecuteSQL();
     }
 }

@@ -22,7 +22,7 @@
 #include "common/SQLException.h"
 #include "common/debuglog.h"
 #include "common/serializeio.h"
-#include "common/ELTSerializeIo.h"
+#include "common/ExportSerializeIo.h"
 #include "common/types.h"
 #include "common/value_defs.h"
 #include "common/FatalException.hpp"
@@ -175,8 +175,8 @@ class NValue {
     /* Serialize this NValue to a SerializeOutput */
     void serializeTo(SerializeOutput &output) const;
 
-    /* Serialize this NValue to an ELT stream */
-    void serializeToELT(ELTSerializeOutput&) const;
+    /* Serialize this NValue to an Export stream */
+    void serializeToExport(ExportSerializeOutput&) const;
 
     /* Check if the value represents SQL NULL */
     bool isNull() const;
@@ -2051,7 +2051,7 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
     }
 }
 
-inline void NValue::serializeToELT(ELTSerializeOutput &io) const
+inline void NValue::serializeToExport(ExportSerializeOutput &io) const
 {
     switch (getValueType()) {
       case VALUE_TYPE_TINYINT:
@@ -2088,13 +2088,13 @@ inline void NValue::serializeToELT(ELTSerializeOutput &io) const
       case VALUE_TYPE_BOOLEAN:
       case VALUE_TYPE_ADDRESS:
           char message[128];
-          snprintf(message, 128, "Invalid type in serializeToELT: %d", getValueType());
+          snprintf(message, 128, "Invalid type in serializeToExport: %d", getValueType());
           throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                         message);
     }
 
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                  "Invalid type in serializeToELT");
+                                  "Invalid type in serializeToExport");
 }
 
 inline bool NValue::isNull() const {

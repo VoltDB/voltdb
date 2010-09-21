@@ -43,33 +43,33 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef NATIVEELTSERIALIZEIO_H
-#define NATIVEELTSERIALIZEIO_H
+#ifndef NATIVEEXPORTSERIALIZEIO_H
+#define NATIVEEXPORTSERIALIZEIO_H
 
 namespace voltdb {
 
 /*
- * This file defines a crude ELT serialization interface.
+ * This file defines a crude Export serialization interface.
  * The idea is that other code could implement these method
- * names and duck-type their way to a different ELT
+ * names and duck-type their way to a different Export
  * serialization .. maybe doing some dynamic symbol finding
- * for a pluggable ELT serializer. It's a work in progress.
+ * for a pluggable Export serializer. It's a work in progress.
  *
  * This doesn't derive from serializeio to avoid making the
  * the serialize IO baseclass functions all virtual.
  */
 
-class ELTSerializeInput {
+class ExportSerializeInput {
   public:
 
-    ELTSerializeInput(const void* data, size_t length)
+    ExportSerializeInput(const void* data, size_t length)
     {
         current_ = reinterpret_cast<const char*>(data);
         end_ = current_ + length;
     }
 
 
-    virtual ~ELTSerializeInput() {};
+    virtual ~ExportSerializeInput() {};
 
     inline char readChar() {
         return readPrimitive<char>();
@@ -158,13 +158,13 @@ private:
     const char* end_;
 
     // No implicit copies
-    ELTSerializeInput(const ELTSerializeInput&);
-    ELTSerializeInput& operator=(const ELTSerializeInput&);
+    ExportSerializeInput(const ExportSerializeInput&);
+    ExportSerializeInput& operator=(const ExportSerializeInput&);
 };
 
-class ELTSerializeOutput {
+class ExportSerializeOutput {
   public:
-    ELTSerializeOutput(void *buffer, size_t capacity) :
+    ExportSerializeOutput(void *buffer, size_t capacity) :
         buffer_(NULL), position_(0), capacity_(0)
     {
         buffer_ = reinterpret_cast<char*>(buffer);
@@ -172,7 +172,7 @@ class ELTSerializeOutput {
         capacity_ = capacity;
     }
 
-    virtual ~ELTSerializeOutput() {
+    virtual ~ExportSerializeOutput() {
         // the serialization wrapper never owns its data buffer
     };
 
@@ -295,8 +295,8 @@ private:
     char* buffer_;
 
     // No implicit copies
-    ELTSerializeOutput(const ELTSerializeOutput&);
-    ELTSerializeOutput& operator=(const ELTSerializeOutput&);
+    ExportSerializeOutput(const ExportSerializeOutput&);
+    ExportSerializeOutput& operator=(const ExportSerializeOutput&);
 
 protected:
     // Current write position in the buffer.

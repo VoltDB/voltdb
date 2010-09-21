@@ -26,7 +26,7 @@ StreamedTable::StreamedTable(ExecutorContext *ctx, bool exportEnabled)
     : Table(100), stats_(this), m_executorContext(ctx), m_wrapper(NULL),
       m_sequenceNo(0)
 {
-    // In StreamedTable, a non-null m_wrapper implies elt enabled.
+    // In StreamedTable, a non-null m_wrapper implies export enabled.
     if (exportEnabled) {
         m_wrapper = new TupleStreamWrapper(m_executorContext->m_partitionId,
                                            m_executorContext->m_siteId,
@@ -127,21 +127,21 @@ void StreamedTable::flushOldTuples(int64_t timeInMillis)
 }
 
 StreamBlock*
-StreamedTable::getCommittedEltBytes()
+StreamedTable::getCommittedExportBytes()
 {
     if (m_wrapper)
     {
-        return m_wrapper->getCommittedEltBytes();
+        return m_wrapper->getCommittedExportBytes();
     }
     return NULL;
 }
 
 bool
-StreamedTable::releaseEltBytes(int64_t releaseOffset)
+StreamedTable::releaseExportBytes(int64_t releaseOffset)
 {
     if (m_wrapper)
     {
-        return m_wrapper->releaseEltBytes(releaseOffset);
+        return m_wrapper->releaseExportBytes(releaseOffset);
     }
     return false;
 }

@@ -29,8 +29,8 @@ import java.util.TreeSet;
 
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltTableRow;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
+import org.voltdb.VoltTableRow;
 import org.voltdb.catalog.Table;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.sysprocs.SysProcFragmentId;
@@ -42,9 +42,9 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
 {
     private static final VoltLogger LOG = new VoltLogger(PartitionedTableSaveFileState.class.getName());
 
-    public PartitionedTableSaveFileState(String tableName, int allowELT)
+    public PartitionedTableSaveFileState(String tableName, int allowExport)
     {
-        super(tableName, allowELT);
+        super(tableName, allowExport);
     }
 
     @Override
@@ -210,7 +210,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
                              originalHostsArray,
                              uncoveredPartitionsAtHost,
                              result_dependency_id,
-                             m_allowELT);
+                             m_allowExport);
         plan_fragment.parameters = params;
         return plan_fragment;
     }

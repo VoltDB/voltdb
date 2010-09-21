@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.elt.processors;
+package org.voltdb.export.processors;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -31,9 +31,9 @@ import junit.framework.TestCase;
 
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltType;
-import org.voltdb.elt.ELTDataSource;
-import org.voltdb.elt.ELTProtoMessage;
-import org.voltdb.elt.processors.RawProcessor.ProtoStateBlock;
+import org.voltdb.export.ExportDataSource;
+import org.voltdb.export.ExportProtoMessage;
+import org.voltdb.export.processors.RawProcessor.ProtoStateBlock;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.MessagingException;
@@ -41,16 +41,16 @@ import org.voltdb.network.Connection;
 import org.voltdb.network.NIOReadStream;
 import org.voltdb.network.WriteStream;
 import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltdb.utils.DeferredSerialization;
 
 public class TestRawProcessor extends TestCase {
 
     static class MockWriteStream implements WriteStream {
         DBBPool pool = new DBBPool();
 
-        LinkedBlockingDeque<ELTProtoMessage> writequeue =
-            new LinkedBlockingDeque<ELTProtoMessage>();
+        LinkedBlockingDeque<ExportProtoMessage> writequeue =
+            new LinkedBlockingDeque<ExportProtoMessage>();
 
         @Override
         public int calculatePendingWriteDelta(long now) {
@@ -78,7 +78,7 @@ public class TestRawProcessor extends TestCase {
                 ByteBuffer b = ds.serialize(pool).b;
                 b.getInt(); // eat the length prefix
                 FastDeserializer fds = new FastDeserializer(b);
-                ELTProtoMessage m = ELTProtoMessage.readExternal(fds);
+                ExportProtoMessage m = ExportProtoMessage.readExternal(fds);
                 writequeue.add(m);
             }
             catch (IOException e) {
@@ -129,7 +129,7 @@ public class TestRawProcessor extends TestCase {
             return m_writeStream;
         }
 
-        public ELTProtoMessage pollWriteStream() {
+        public ExportProtoMessage pollWriteStream() {
             return m_writeStream.writequeue.poll();
         }
 
@@ -144,9 +144,9 @@ public class TestRawProcessor extends TestCase {
         }
     }
 
-    static class MockELTDataSource extends ELTDataSource {
-        LinkedBlockingDeque<ELTProtoMessage> eequeue =
-            new LinkedBlockingDeque<ELTProtoMessage>();
+    static class MockExportDataSource extends ExportDataSource {
+        LinkedBlockingDeque<ExportProtoMessage> eequeue =
+            new LinkedBlockingDeque<ExportProtoMessage>();
 
 
         // not really sure how much of this is needed, but pass at least
@@ -165,7 +165,7 @@ public class TestRawProcessor extends TestCase {
             m_mockVoltDB.addColumnToTable("TableName", "COL2", VoltType.STRING, false, null, VoltType.STRING);
         }
 
-        public MockELTDataSource(String db, String tableName, boolean isReplicated,
+        public MockExportDataSource(String db, String tableName, boolean isReplicated,
                                  int partitionId, int siteId, int tableId)
         {
             super(db, tableName, isReplicated, partitionId, siteId, tableId,
@@ -173,11 +173,11 @@ public class TestRawProcessor extends TestCase {
         }
 
         @Override
-        public void eltAction(RawProcessor.ELTInternalMessage m) throws MessagingException {
+        public void exportAction(RawProcessor.ExportInternalMessage m) throws MessagingException {
             // Simulate what ExecutionEngineJNI and ExecutionSite do.
             if (m.m_m.isPoll()) {
-                ELTProtoMessage r =
-                    new ELTProtoMessage(m.m_m.getPartitionId(), m.m_m.getTableId());
+                ExportProtoMessage r =
+                    new ExportProtoMessage(m.m_m.getPartitionId(), m.m_m.getTableId());
                 ByteBuffer data = ByteBuffer.allocate(8);
                 data.putInt(100); // some fake poll data
                 data.putInt(200); // more fake poll data
@@ -190,36 +190,36 @@ public class TestRawProcessor extends TestCase {
 
     RawProcessor rp;
     MockConnection c;
-    MockELTDataSource ds;
+    MockExportDataSource ds;
     ProtoStateBlock sb;
-    ELTProtoMessage m, bad_m1, bad_m2;
+    ExportProtoMessage m, bad_m1, bad_m2;
 
     @Override
     public void setUp() {
         rp = new RawProcessor();
-        ds = new MockELTDataSource("db", "table", false, 1, 3, 2);
+        ds = new MockExportDataSource("db", "table", false, 1, 3, 2);
         rp.addDataSource(ds);
 
         c = new MockConnection();
         sb = rp.new ProtoStateBlock(c);
-        m = new ELTProtoMessage(1, 2);
+        m = new ExportProtoMessage(1, 2);
 
         // partition, site do not align match datasource
-        bad_m1 = new ELTProtoMessage(10, 2);
-        bad_m2 = new ELTProtoMessage(1, 10);
+        bad_m1 = new ExportProtoMessage(10, 2);
+        bad_m2 = new ExportProtoMessage(1, 10);
     }
 
     public void assertErrResponse() {
-        ELTProtoMessage r = c.pollWriteStream();
+        ExportProtoMessage r = c.pollWriteStream();
         assertEquals(RawProcessor.CLOSED, sb.m_state);
         assertTrue(r.isError());
     }
 
-    private ELTProtoMessage pollDataSource() {
+    private ExportProtoMessage pollDataSource() {
         return ds.eequeue.poll();
     }
 
-    private ELTProtoMessage pollWriteStream() {
+    private ExportProtoMessage pollWriteStream() {
         return c.pollWriteStream();
     }
 
@@ -228,7 +228,7 @@ public class TestRawProcessor extends TestCase {
     public void testFSM_closed_open() {
         assertEquals(RawProcessor.CLOSED, sb.m_state);
         sb.event(m.open());
-        ELTProtoMessage r = pollWriteStream();
+        ExportProtoMessage r = pollWriteStream();
         assertEquals(RawProcessor.CONNECTED, sb.m_state);
         assertTrue(r.isOpenResponse());
     }
@@ -254,7 +254,7 @@ public class TestRawProcessor extends TestCase {
     public void testFSM_closed_close() {
         assertEquals(RawProcessor.CLOSED, sb.m_state);
         sb.event(m.close());
-        ELTProtoMessage r = pollWriteStream();
+        ExportProtoMessage r = pollWriteStream();
         assertEquals(RawProcessor.CLOSED, sb.m_state);
         assertEquals(null, r);
     }
@@ -269,7 +269,7 @@ public class TestRawProcessor extends TestCase {
     public void testFSM_conn_ack() {
         sb.m_state = RawProcessor.CONNECTED;
         sb.event(m.ack(1000));
-        ELTProtoMessage r = pollDataSource();
+        ExportProtoMessage r = pollDataSource();
         assertEquals(RawProcessor.CONNECTED, sb.m_state);
         assertEquals(null, r);
     }
@@ -277,7 +277,7 @@ public class TestRawProcessor extends TestCase {
     public void testFSM_conn_poll() {
         sb.m_state = RawProcessor.CONNECTED;
         sb.event(m.poll());
-        ELTProtoMessage r = pollDataSource();
+        ExportProtoMessage r = pollDataSource();
         assertEquals(RawProcessor.CONNECTED, sb.m_state);
         assertTrue(r.isPollResponse());
     }
@@ -285,7 +285,7 @@ public class TestRawProcessor extends TestCase {
     public void testFSM_conn_ackpoll() {
         sb.m_state = RawProcessor.CONNECTED;
         sb.event(m.poll().ack(1000));
-        ELTProtoMessage r = pollDataSource();
+        ExportProtoMessage r = pollDataSource();
         assertEquals(RawProcessor.CONNECTED, sb.m_state);
         assertTrue(r.isPollResponse());
     }

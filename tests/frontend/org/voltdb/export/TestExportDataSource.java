@@ -21,19 +21,23 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.elt;
+package org.voltdb.export;
 
-import org.voltdb.client.ConnectionUtil;
 import java.net.UnknownHostException;
-
-import org.voltdb.*;
-import org.voltdb.catalog.Table;
-import org.voltdb.elt.processors.RawProcessor;
-import org.voltdb.messaging.*;
 
 import junit.framework.TestCase;
 
-public class TestELTDataSource extends TestCase {
+import org.voltdb.MockVoltDB;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltType;
+import org.voltdb.catalog.Table;
+import org.voltdb.client.ConnectionUtil;
+import org.voltdb.export.processors.RawProcessor;
+import org.voltdb.messaging.HostMessenger;
+import org.voltdb.messaging.MessagingException;
+import org.voltdb.messaging.VoltMessage;
+
+public class TestExportDataSource extends TestCase {
 
     private static class MockHostMessenger extends HostMessenger {
         public MockHostMessenger() throws UnknownHostException {
@@ -74,13 +78,13 @@ public class TestELTDataSource extends TestCase {
         m_mockVoltDB.addColumnToTable("RepTableName", "COL2", VoltType.STRING, false, null, VoltType.STRING);
     }
 
-    public void testELTDataSource()
+    public void testExportDataSource()
     {
         String[] tables = {"TableName", "RepTableName"};
         for (String table_name : tables)
         {
             Table table = m_mockVoltDB.getCatalogContext().database.getTables().get(table_name);
-            ELTDataSource s = new ELTDataSource("database",
+            ExportDataSource s = new ExportDataSource("database",
                                                 table.getTypeName(),
                                                 table.getIsreplicated(),
                                                 m_part,
@@ -94,11 +98,11 @@ public class TestELTDataSource extends TestCase {
             assertEquals(m_part, s.getPartitionId());
             assertEquals(m_site, s.getSiteId());
             assertEquals(table.getRelativeIndex(), s.getTableId());
-            // There are 6 additional ELT columns added
+            // There are 6 additional Export columns added
             assertEquals(2 + 6, s.m_columnNames.size());
             assertEquals(2 + 6, s.m_columnTypes.size());
             assertEquals("VOLT_TRANSACTION_ID", s.m_columnNames.get(0));
-            assertEquals("VOLT_ELT_OPERATION", s.m_columnNames.get(5));
+            assertEquals("VOLT_EXPORT_OPERATION", s.m_columnNames.get(5));
             assertEquals("COL1", s.m_columnNames.get(6));
             assertEquals("COL2", s.m_columnNames.get(7));
             assertEquals(VoltType.INTEGER.ordinal(), s.m_columnTypes.get(6).intValue());
@@ -111,7 +115,7 @@ public class TestELTDataSource extends TestCase {
         m_mockVoltDB.setHostMessenger(hm);
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ELTDataSource s = new ELTDataSource("database",
+        ExportDataSource s = new ExportDataSource("database",
                                             table.getTypeName(),
                                             table.getIsreplicated(),
                                             m_part,
@@ -119,14 +123,14 @@ public class TestELTDataSource extends TestCase {
                                             table.getRelativeIndex(),
                                             table.getColumns());
 
-        ELTProtoMessage m = new ELTProtoMessage(m_part, table.getRelativeIndex());
-        RawProcessor.ELTInternalMessage pair = new RawProcessor.ELTInternalMessage(null, m);
+        ExportProtoMessage m = new ExportProtoMessage(m_part, table.getRelativeIndex());
+        RawProcessor.ExportInternalMessage pair = new RawProcessor.ExportInternalMessage(null, m);
 
-        s.eltAction(pair);
+        s.exportAction(pair);
 
         assertEquals(m_site, hm.siteId);
         assertEquals(0, hm.mailboxId);
-        assertTrue(hm.msg instanceof RawProcessor.ELTInternalMessage);
+        assertTrue(hm.msg instanceof RawProcessor.ExportInternalMessage);
         assertEquals(pair, hm.msg);
     }
 }

@@ -20,12 +20,12 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package org.voltdb.elt;
+package org.voltdb.export;
 
 import java.io.IOException;
 import java.util.ArrayDeque;
 
-import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
+import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportDecoderBase;
 
 class ExportTestVerifier extends ExportDecoderBase
@@ -86,7 +86,7 @@ class ExportTestVerifier extends ExportDecoderBase
         try {
             Object[] decoded = decodeRow(rowData);
             // iterate the schema, verify the row data
-            // skip 5 cols into the ELT schema since it includes the ELT columns
+            // skip 5 cols into the Export schema since it includes the Export columns
             // (we check the operation type), but then we need to back up the
             // index into srcdata.
             for (int i = 5; i < m_tableSchema.size(); i++)
@@ -95,7 +95,7 @@ class ExportTestVerifier extends ExportDecoderBase
                 {
                     System.out.println("Failed on table column: " + (i-5));
                     System.out.println("  orig value:" + srcdata[i-5].toString());
-                    System.out.println("  elt value:" + decoded[i].toString());
+                    System.out.println("  export value:" + decoded[i].toString());
                     m_rowFailed = true;
                 }
             }
@@ -123,7 +123,7 @@ class ExportTestVerifier extends ExportDecoderBase
     {
         boolean result = (m_data.size() == 0) && (!m_rowFailed);
         if (!result) {
-            System.out.println("ELTVerifier error. Table ID: " + m_tableName +
+            System.out.println("ExportVerifier error. Table ID: " + m_tableName +
                                ", partition ID: " + m_partitionId);
             System.out.println("  Data size: " +
                                m_data.size() + " row failed state: " + m_rowFailed);

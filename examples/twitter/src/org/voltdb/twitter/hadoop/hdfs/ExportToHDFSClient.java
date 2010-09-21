@@ -35,7 +35,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.voltdb.VoltDB;
-import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
+import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.logging.VoltLogger;
@@ -89,7 +89,7 @@ public class ExportToHDFSClient extends ExportClientBase {
     }
 
     @Override
-    public ExportDecoderBase constructELTDecoder(AdvertisedDataSource source) {
+    public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source) {
         if (!decoders.containsKey(source.tableName())) {
             decoders.put(source.tableName(), new ExportToHDFSDecoder(source, hdfs, uri));
         }

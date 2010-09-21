@@ -26,8 +26,8 @@ import java.util.HashMap;
 import java.util.Queue;
 
 import org.voltdb.client.ConnectionUtil;
-import org.voltdb.elt.ELTProtoMessage;
-import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
+import org.voltdb.export.ExportProtoMessage;
+import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 
@@ -68,11 +68,11 @@ public class ExportConnection implements Runnable {
     }
 
     /**
-     * Open the ELT connection to the processor on m_socket.  This will
+     * Open the Export connection to the processor on m_socket.  This will
      * currently block until it receives the OPEN RESPONSE from the server
      * that contains the information about the available data sources
      */
-    public void openELTConnection() throws IOException
+    public void openExportConnection() throws IOException
     {
         m_logger.info("Starting EL Client socket to: " + m_connectionName);
         byte hashedPassword[] = ConnectionUtil.getHashedPassword(m_password);
@@ -93,7 +93,7 @@ public class ExportConnection implements Runnable {
 
         while (m_state == CONNECTING)
         {
-            ELTProtoMessage m = nextMessage();
+            ExportProtoMessage m = nextMessage();
             if (m != null && m.isOpenResponse())
             {
                 m_dataSources = m.getAdvertisedDataSources();
@@ -102,7 +102,7 @@ public class ExportConnection implements Runnable {
         }
     }
 
-    public void closeELTConnection() throws IOException {
+    public void closeExportConnection() throws IOException {
         if (m_socket.isConnected()) {
             m_socket.close();
         }
@@ -147,7 +147,7 @@ public class ExportConnection implements Runnable {
      */
     public void work()
     {
-        // eltxxx need better error handling code in here
+        // exportxxx need better error handling code in here
         if (!m_socket.isConnected() || !m_socket.isOpen())
         {
             m_state = CLOSING;
@@ -160,7 +160,7 @@ public class ExportConnection implements Runnable {
 
         // loop here to empty RX ?
         // receive data from network and hand to the proper ELProtocolHandler RX queue
-        ELTProtoMessage m = null;
+        ExportProtoMessage m = null;
         do
         {
             try {
@@ -176,7 +176,7 @@ public class ExportConnection implements Runnable {
                 m_state = CLOSING;
             }
 
-            // eltxxx need better error handling code in here
+            // exportxxx need better error handling code in here
             if (!m_socket.isConnected() || !m_socket.isOpen())
             {
                 m_state = CLOSING;
@@ -195,13 +195,13 @@ public class ExportConnection implements Runnable {
         {
             for (ExportDataSink tx_sink : part_map.values())
             {
-                Queue<ELTProtoMessage> tx_queue =
+                Queue<ExportProtoMessage> tx_queue =
                     tx_sink.getTxQueue(m_connectionName);
                 // this connection might not be connected to every sink
                 if (tx_queue != null)
                 {
                     // XXX loop to drain the tx queue?
-                    ELTProtoMessage tx_m =
+                    ExportProtoMessage tx_m =
                         tx_queue.poll();
                     if (tx_m != null)
                     {
@@ -230,12 +230,12 @@ public class ExportConnection implements Runnable {
     private void open() throws IOException
     {
         m_logger.info("Opening new EL stream connection.");
-        ELTProtoMessage m = new ELTProtoMessage(-1, -1);
+        ExportProtoMessage m = new ExportProtoMessage(-1, -1);
         m.open();
         sendMessage(m);
     }
 
-    public ELTProtoMessage nextMessage() throws IOException
+    public ExportProtoMessage nextMessage() throws IOException
     {
         FastDeserializer fds;
         final ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
@@ -295,11 +295,11 @@ public class ExportConnection implements Runnable {
         }
         messageBuf.flip();
         fds = new FastDeserializer(messageBuf);
-        ELTProtoMessage m = ELTProtoMessage.readExternal(fds);
+        ExportProtoMessage m = ExportProtoMessage.readExternal(fds);
         return m;
     }
 
-    public void sendMessage(ELTProtoMessage m) throws IOException
+    public void sendMessage(ExportProtoMessage m) throws IOException
     {
         ByteBuffer buf = m.toBuffer();
         while (buf.remaining() > 0) {

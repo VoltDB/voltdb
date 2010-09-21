@@ -23,18 +23,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
 
-import org.voltdb.elt.ELTProtoMessage.AdvertisedDataSource;
+import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.logging.VoltLogger;
 
 /**
- * Provides an extensible base class for writing ELT clients
+ * Provides an extensible base class for writing Export clients
  */
 
 public abstract class ExportClientBase implements Runnable {
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
 
     private List<InetSocketAddress> m_servers = null;
-    protected HashMap<String, ExportConnection> m_elConnections;
+    protected HashMap<String, ExportConnection> m_exportConnections;
 
     // First hash by table, second by partition
     private final HashMap<Long, HashMap<Integer, ExportDataSink>> m_sinks;
@@ -42,7 +42,7 @@ public abstract class ExportClientBase implements Runnable {
     public ExportClientBase()
     {
         m_sinks = new HashMap<Long, HashMap<Integer, ExportDataSink>>();
-        m_elConnections = new HashMap<String, ExportConnection>();
+        m_exportConnections = new HashMap<String, ExportConnection>();
         m_servers = null;
     }
 
@@ -56,13 +56,13 @@ public abstract class ExportClientBase implements Runnable {
     }
 
     /**
-     * Allow derived clients to implement their own construction of ELTDecoders
+     * Allow derived clients to implement their own construction of ExportDecoders
      * for the data sources provided by the server on this EL connection.
      * @param source
      */
-    public abstract ExportDecoderBase constructELTDecoder(AdvertisedDataSource source);
+    public abstract ExportDecoderBase constructExportDecoder(AdvertisedDataSource source);
 
-    private void constructELTDataSinks(ExportConnection elConnection)
+    private void constructExportDataSinks(ExportConnection elConnection)
     {
         for (AdvertisedDataSource source : elConnection.getDataSources())
         {
@@ -83,7 +83,7 @@ public abstract class ExportClientBase implements Runnable {
             }
             if (!part_map.containsKey(part_id))
             {
-                ExportDecoderBase decoder = constructELTDecoder(source);
+                ExportDecoderBase decoder = constructExportDecoder(source);
                 sink = new ExportDataSink(source.partitionId(),
                                       source.tableId(),
                                       source.tableName(),
@@ -107,16 +107,16 @@ public abstract class ExportClientBase implements Runnable {
     {
         if (m_servers == null || m_servers.size() == 0)
         {
-            m_logger.fatal("No servers provided for ELT, exiting...");
-            throw new RuntimeException("No servers provided for ELT connection");
+            m_logger.fatal("No servers provided for Export, exiting...");
+            throw new RuntimeException("No servers provided for Export connection");
         }
         for (InetSocketAddress server_addr : m_servers)
         {
-            ExportConnection elConnection =
+            ExportConnection exportConnection =
                 new ExportConnection(username, password, server_addr, m_sinks);
-            elConnection.openELTConnection();
-            constructELTDataSinks(elConnection);
-            m_elConnections.put(elConnection.getConnectionName(), elConnection);
+            exportConnection.openExportConnection();
+            constructExportDataSinks(exportConnection);
+            m_exportConnections.put(exportConnection.getConnectionName(), exportConnection);
         }
     }
 
@@ -124,20 +124,20 @@ public abstract class ExportClientBase implements Runnable {
      * Disconnect from any connected servers.
      * @throws IOException
      */
-    public void disconnectFromELServers() throws IOException {
-        Set<String> keySet = m_elConnections.keySet();
+    public void disconnectFromExportServers() throws IOException {
+        Set<String> keySet = m_exportConnections.keySet();
         for (String key : keySet) {
-            ExportConnection exportConnection = m_elConnections.get(key);
-            exportConnection.closeELTConnection();
+            ExportConnection exportConnection = m_exportConnections.get(key);
+            exportConnection.closeExportConnection();
         }
     }
 
     boolean checkConnections()
     {
         boolean retval = true;
-        for (String el_connection : m_elConnections.keySet())
+        for (String el_connection : m_exportConnections.keySet())
         {
-            if (!m_elConnections.get(el_connection).isConnected())
+            if (!m_exportConnections.get(el_connection).isConnected())
             {
                 m_logger.error("Lost connection: " + el_connection +
                                ", Closing...");
@@ -156,7 +156,7 @@ public abstract class ExportClientBase implements Runnable {
     {
         // drain all the received connection messages into the
         // RX queues for the ELDataSinks
-        for (ExportConnection el_connection : m_elConnections.values())
+        for (ExportConnection el_connection : m_exportConnections.values())
         {
             el_connection.work();
         }
@@ -171,7 +171,7 @@ public abstract class ExportClientBase implements Runnable {
         }
 
         // Service all the ELDataSink TX queues
-        for (ExportConnection el_connection : m_elConnections.values())
+        for (ExportConnection el_connection : m_exportConnections.values())
         {
             el_connection.work();
         }

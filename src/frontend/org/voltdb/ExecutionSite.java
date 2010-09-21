@@ -51,13 +51,13 @@ import org.voltdb.dtxn.SinglePartitionTxnState;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.SiteTransactionConnection;
 import org.voltdb.dtxn.TransactionState;
-import org.voltdb.elt.ELTManager;
-import org.voltdb.elt.ELTProtoMessage;
-import org.voltdb.elt.processors.RawProcessor;
-import org.voltdb.elt.processors.RawProcessor.ELTInternalMessage;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.exceptions.SerializableException;
+import org.voltdb.export.ExportManager;
+import org.voltdb.export.ExportProtoMessage;
+import org.voltdb.export.processors.RawProcessor;
+import org.voltdb.export.processors.RawProcessor.ExportInternalMessage;
 import org.voltdb.fault.ClusterPartitionFault;
 import org.voltdb.fault.FaultHandler;
 import org.voltdb.fault.NodeFailureFault;
@@ -909,7 +909,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             txnState.setBeginUndoToken(kInvalidUndoToken);
         }
 
-        // advance the committed transaction point. Necessary for both ELT
+        // advance the committed transaction point. Necessary for both Export
         // commit tracking and for fault detection transaction partial-transaction
         // resolution.
         if (!txnState.needsRollback())
@@ -1077,20 +1077,22 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 ((MultiPartitionParticipantTxnState)txnState).checkWorkUnits();
             }
         }
-        else if (message instanceof RawProcessor.ELTInternalMessage) {
-            RawProcessor.ELTInternalMessage eltm =
-                (RawProcessor.ELTInternalMessage) message;
-            ELTProtoMessage response =
-                ee.eltAction(eltm.m_m.isAck(),
-                             eltm.m_m.isPoll(),
-                             eltm.m_m.isClose(),
-                             eltm.m_m.getAckOffset(),
-                             eltm.m_m.getPartitionId(),
-                             eltm.m_m.getTableId());
+        else if (message instanceof RawProcessor.ExportInternalMessage) {
+            RawProcessor.ExportInternalMessage exportm =
+                (RawProcessor.ExportInternalMessage) message;
+            ExportProtoMessage response =
+                ee.exportAction(exportm.m_m.isAck(),
+                                exportm.m_m.isPoll(),
+                                exportm.m_m.isClose(),
+                                exportm.m_m.isInfo(),
+                                exportm.m_m.isSync(),
+                                exportm.m_m.getAckOffset(),
+                                exportm.m_m.getPartitionId(),
+                                exportm.m_m.getTableId());
             // not all actions generate a response
             if (response != null) {
-                ELTInternalMessage mbp = new ELTInternalMessage(eltm.m_sb, response);
-                ELTManager.instance().queueMessage(mbp);
+                ExportInternalMessage mbp = new ExportInternalMessage(exportm.m_sb, response);
+                ExportManager.instance().queueMessage(mbp);
             }
         } else if (message instanceof PotentialSnapshotWorkMessage) {
             m_snapshotter.doSnapshotWork(ee);
@@ -1655,7 +1657,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             String databaseName,
             String tableName,
             VoltTable data,
-            int allowELT)
+            int allowExport)
     throws VoltAbortException
     {
         Cluster cluster = m_context.cluster;
@@ -1675,7 +1677,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                      txnId,
                      lastCommittedTxnId,
                      getNextUndoToken(),
-                     allowELT != 0);
+                     allowExport != 0);
     }
 
     @Override

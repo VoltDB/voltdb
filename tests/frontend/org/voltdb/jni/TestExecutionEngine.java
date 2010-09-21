@@ -82,7 +82,7 @@ public class TestExecutionEngine extends TestCase {
 
     private void loadTestTables(Catalog catalog) throws Exception
     {
-        final boolean allowELT = false;
+        final boolean allowExport = false;
         int WAREHOUSE_TABLEID = warehouseTableId(catalog);
         int STOCK_TABLEID = stockTableId(catalog);
 
@@ -95,7 +95,7 @@ public class TestExecutionEngine extends TestCase {
         }
 
         System.out.println(warehousedata.toString());
-        sourceEngine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, Long.MAX_VALUE, allowELT);
+        sourceEngine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, Long.MAX_VALUE, allowExport);
 
         VoltTable stockdata = new VoltTable(
                 new VoltTable.ColumnInfo("S_I_ID", VoltType.INTEGER),
@@ -105,7 +105,7 @@ public class TestExecutionEngine extends TestCase {
         for (int i = 0; i < 1000; ++i) {
             stockdata.addRow(i, i % 200, i * i);
         }
-        sourceEngine.loadTable(STOCK_TABLEID, stockdata, 0, 0, Long.MAX_VALUE, allowELT);
+        sourceEngine.loadTable(STOCK_TABLEID, stockdata, 0, 0, Long.MAX_VALUE, allowExport);
     }
 
     public void testLoadTable() throws Exception {

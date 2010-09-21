@@ -51,7 +51,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.dtxn.TransactionInitiator;
-import org.voltdb.elt.ELTManager;
+import org.voltdb.export.ExportManager;
 import org.voltdb.fault.ClusterPartitionFault;
 import org.voltdb.fault.FaultDistributor;
 import org.voltdb.fault.FaultDistributorInterface;
@@ -454,11 +454,11 @@ public class RealVoltDB implements VoltDBInterface
             // Use the host messenger's hostId.
             int myHostId = m_messenger.getHostId();
 
-            // Let the ELT system read its configuration from the catalog.
+            // Let the Export system read its configuration from the catalog.
             try {
-                ELTManager.initialize(myHostId, m_catalogContext);
-            } catch (ELTManager.SetupException e) {
-                hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ELTInitFailure.name(), e);
+                ExportManager.initialize(myHostId, m_catalogContext);
+            } catch (ExportManager.SetupException e) {
+                hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ExportInitFailure.name(), e);
                 System.exit(-1);
             }
 
@@ -851,8 +851,8 @@ public class RealVoltDB implements VoltDBInterface
                 ci.shutdown();
             }
 
-            // shut down ELT and its connectors.
-            ELTManager.instance().shutdown();
+            // shut down Export and its connectors.
+            ExportManager.instance().shutdown();
 
             // tell all m_sites to stop their runloops
             if (m_localSites != null) {
@@ -1083,8 +1083,8 @@ public class RealVoltDB implements VoltDBInterface
             lastCatalogUpdate_txnId = currentTxnId;
             m_catalogContext = m_catalogContext.update(newCatalogURL, diffCommands, true);
 
-            // 1. update the elt manager.
-            ELTManager.instance().updateCatalog(m_catalogContext);
+            // 1. update the export manager.
+            ExportManager.instance().updateCatalog(m_catalogContext);
 
             // 2. update client interface (asynchronously)
             //    CI in turn updates the planner thread.

@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.elt.processors;
+package org.voltdb.export.processors;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -26,9 +26,9 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.voltdb.elt.ELTDataProcessor;
-import org.voltdb.elt.ELTDataSource;
-import org.voltdb.elt.ELTProtoMessage;
+import org.voltdb.export.ExportDataProcessor;
+import org.voltdb.export.ExportDataSource;
+import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
@@ -39,23 +39,23 @@ import org.voltdb.network.InputHandler;
 import org.voltdb.network.QueueMonitor;
 import org.voltdb.network.VoltProtocolHandler;
 import org.voltdb.utils.DBBPool;
+import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.NotImplementedException;
-import org.voltdb.utils.DBBPool.BBContainer;
 
 
 /**
  * A processor that provides a data block queue over a socket to
  * a remote listener without any translation of data.
  */
-public class RawProcessor extends Thread implements ELTDataProcessor {
+public class RawProcessor extends Thread implements ExportDataProcessor {
 
     // polling protocol states
     public final static int CONNECTED = 1;
     public final static int CLOSED = 2;
 
     /**
-     * This logger facility is set by the ELT manager and is configurable
+     * This logger facility is set by the Export manager and is configurable
      * via the standard VoltDB log configuration methods.
      */
     VoltLogger m_logger;
@@ -64,20 +64,20 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
      * Work messages are queued and polled from this mailbox. All work
      * done by the processor thread is serialized through this mailbox.
      */
-    private final LinkedBlockingDeque<ELTInternalMessage> m_mailbox =
-        new LinkedBlockingDeque<ELTInternalMessage>();
+    private final LinkedBlockingDeque<ExportInternalMessage> m_mailbox =
+        new LinkedBlockingDeque<ExportInternalMessage>();
 
     /**
      * Data sources, one per table per site, provide the interface to
-     * poll() and ack() EL data from the execution engines. Data sources
-     * are configured by the ELT manager at initialization time.
+     * poll() and ack() Export data from the execution engines. Data sources
+     * are configured by the Export manager at initialization time.
      * partitionid : <tableid : datasource>.
      */
-    HashMap<Integer, HashMap<Long, ELTDataSource>> m_sources =
-        new HashMap<Integer, HashMap<Long, ELTDataSource>>();
+    HashMap<Integer, HashMap<Long, ExportDataSource>> m_sources =
+        new HashMap<Integer, HashMap<Long, ExportDataSource>>();
 
-    ArrayList<ELTDataSource> m_sourcesArray =
-        new ArrayList<ELTDataSource>();
+    ArrayList<ExportDataSource> m_sourcesArray =
+        new ArrayList<ExportDataSource>();
 
     /**
      * As long as m_shouldContinue is true, the service will listen for new
@@ -96,7 +96,7 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
     final ArrayDeque<Connection> m_connections = new ArrayDeque<Connection>();
 
     /**
-     * State for an individual ELT protocol connection. This could probably be
+     * State for an individual Export protocol connection. This could probably be
      * integrated with the PollingProtocolHandler but that object is pretty
      * exclusively called by the network threadpool. Separating this makes it
      * easier to think about concurrency.
@@ -113,11 +113,11 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
          */
         void closeConnection() {
             m_state = RawProcessor.CLOSED;
-            for (ELTDataSource ds : m_sourcesArray) {
-                ELTProtoMessage m =
-                    new ELTProtoMessage(ds.getPartitionId(), ds.getTableId()).close();
+            for (ExportDataSource ds : m_sourcesArray) {
+                ExportProtoMessage m =
+                    new ExportProtoMessage(ds.getPartitionId(), ds.getTableId()).close();
                 try {
-                    ds.eltAction(new ELTInternalMessage(this, m));
+                    ds.exportAction(new ExportInternalMessage(this, m));
                 } catch (Exception e) {
                     //
                     throw new RuntimeException(e);
@@ -131,15 +131,15 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
          * @param string error message
          * @throws MessagingException
          */
-        void protocolError(ELTProtoMessage m, String string)
+        void protocolError(ExportProtoMessage m, String string)
         {
             if (m_logger != null) {
-                m_logger.error("Closing ELT connection with error: " + string);
+                m_logger.error("Closing Export connection with error: " + string);
             }
             closeConnection();
 
-            final ELTProtoMessage r =
-                new ELTProtoMessage(m.getPartitionId(), m.getTableId());
+            final ExportProtoMessage r =
+                new ExportProtoMessage(m.getPartitionId(), m.getTableId());
             r.error();
 
             m_c.writeStream().enqueue(
@@ -157,7 +157,7 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
                 });
         }
 
-        void event(final ELTProtoMessage m)
+        void event(final ExportProtoMessage m)
         {
             if (m.isError()) {
                 protocolError(m, "Internal error message. May indicate that an invalid ack offset was requested.");
@@ -185,7 +185,7 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
                 try {
                     // serialize an array of DataSources
                     fs.writeInt(m_sourcesArray.size());
-                    for (ELTDataSource src : m_sourcesArray) {
+                    for (ExportDataSource src : m_sourcesArray) {
                         src.writeAdvertisementTo(fs);
                     }
                 }
@@ -194,7 +194,7 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
                     return;
                 }
 
-                final ELTProtoMessage r = new ELTProtoMessage(-1, -1);
+                final ExportProtoMessage r = new ExportProtoMessage(-1, -1);
                 r.openResponse(fs.getBuffer());
                 m_c.writeStream().enqueue(
                     new DeferredSerialization() {
@@ -217,16 +217,16 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
                     protocolError(m, "Must not poll or ack a closed connection");
                     return;
                 }
-                ELTDataSource source =
+                ExportDataSource source =
                     RawProcessor.this.getDataSourceFor(m.getPartitionId(), m.getTableId());
                 if (source == null) {
-                    protocolError(m, "No ELT data source exists for partition(" +
+                    protocolError(m, "No Export data source exists for partition(" +
                                   m.getPartitionId() + ") and table(" +
                                   m.getTableId() + ") pair.");
                     return;
                 }
                 try {
-                    source.eltAction(new ELTInternalMessage(this, m));
+                    source.exportAction(new ExportInternalMessage(this, m));
                     return;
                 } catch (MessagingException e) {
                     protocolError(m, e.getMessage());
@@ -242,7 +242,7 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
 
             else if (m.isPollResponse()) {
                 // Forward this response to the IO system. It originated at an
-                // ExecutionSite that processed an eltAction.
+                // ExecutionSite that processed an exportAction.
                 m_c.writeStream().enqueue(
                     new DeferredSerialization() {
                         @Override
@@ -269,11 +269,11 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
      * m_mailbox queue. Make this a VoltMessage, though it is sort of
      * meaningless, to satisfy ExecutionSite mailbox requirements.
      */
-    public static class ELTInternalMessage extends VoltMessage {
+    public static class ExportInternalMessage extends VoltMessage {
         public final ProtoStateBlock m_sb;
-        public final ELTProtoMessage m_m;
+        public final ExportProtoMessage m_m;
 
-        public ELTInternalMessage(ProtoStateBlock sb, ELTProtoMessage m) {
+        public ExportInternalMessage(ProtoStateBlock sb, ExportProtoMessage m) {
             m_sb = sb;
             m_m = m;
         }
@@ -331,8 +331,8 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
         public void handleMessage(final ByteBuffer message, final Connection c) {
             try {
                 FastDeserializer fds = new FastDeserializer(message);
-                ELTProtoMessage m = ELTProtoMessage.readExternal(fds);
-                m_mailbox.add(new ELTInternalMessage(m_sb, m));
+                ExportProtoMessage m = ExportProtoMessage.readExternal(fds);
+                m_mailbox.add(new ExportInternalMessage(m_sb, m));
             }
             catch (IOException e) {
                 throw new RuntimeException(e);
@@ -373,25 +373,25 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
         m_logger = null;
     }
 
-    ELTDataSource getDataSourceFor(int partitionId, long tableId) {
-        HashMap<Long, ELTDataSource> partmap = m_sources.get(partitionId);
+    ExportDataSource getDataSourceFor(int partitionId, long tableId) {
+        HashMap<Long, ExportDataSource> partmap = m_sources.get(partitionId);
         if (partmap == null) {
             return null;
         }
-        ELTDataSource source = partmap.get(tableId);
+        ExportDataSource source = partmap.get(tableId);
         return source;
     }
 
 
     @Override
-    public void addDataSource(ELTDataSource dataSource) {
+    public void addDataSource(ExportDataSource dataSource) {
         int partid = dataSource.getPartitionId();
         long tableid = dataSource.getTableId();
 
         m_sourcesArray.add(dataSource);
-        HashMap<Long, ELTDataSource> partmap = m_sources.get(partid);
+        HashMap<Long, ExportDataSource> partmap = m_sources.get(partid);
         if (partmap == null) {
-            partmap = new HashMap<Long, ELTDataSource>();
+            partmap = new HashMap<Long, ExportDataSource>();
             m_sources.put(partid, partmap);
         }
         assert(partmap.get(tableid) == null);
@@ -410,7 +410,7 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
     }
 
     @Override
-    public void queueMessage(ELTInternalMessage m) {
+    public void queueMessage(ExportInternalMessage m) {
         m_mailbox.add(m);
     }
 
@@ -421,7 +421,7 @@ public class RawProcessor extends Thread implements ELTDataProcessor {
     // schedule a non-network event against an input handler.
     @Override
     public void run() {
-        ELTInternalMessage p;
+        ExportInternalMessage p;
         while (m_shouldContinue.get() == true) {
             try {
                 p = m_mailbox.poll(5000, TimeUnit.MILLISECONDS);

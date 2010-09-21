@@ -40,7 +40,7 @@ import org.voltdb.types.TimestampType;
     partitionInfo = "ALLOW_NULLS.PKEY: 1",
     singlePartition = true
 )
-public class Update_ELT extends VoltProcedure {
+public class Update_Export extends VoltProcedure {
 
     public final SQLStmt u_allow_nulls = new SQLStmt
     ("UPDATE ALLOW_NULLS SET A_TINYINT = ?, A_SMALLINT = ?, A_INTEGER = ?, A_BIGINT = ?, A_FLOAT = ?, A_TIMESTAMP = ?, A_INLINE_S1 = ?, A_INLINE_S2 = ?, A_POOL_S = ?, A_POOL_MAX_S = ?, A_DECIMAL = ? WHERE PKEY = ?;");

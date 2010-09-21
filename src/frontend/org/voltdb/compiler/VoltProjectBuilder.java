@@ -159,15 +159,15 @@ public class VoltProjectBuilder {
     }
 
     /** An export/tables/table entry */
-    public static final class ELTTableInfo {
+    public static final class ExportTableInfo {
         final public String m_tablename;
         final public boolean m_export_only;
-        ELTTableInfo(String tablename, boolean append) {
+        ExportTableInfo(String tablename, boolean append) {
             m_tablename = tablename;
             m_export_only = append;
         }
     }
-    final ArrayList<ELTTableInfo> m_eltTables = new ArrayList<ELTTableInfo>();
+    final ArrayList<ExportTableInfo> m_exportTables = new ArrayList<ExportTableInfo>();
 
     final LinkedHashSet<UserInfo> m_users = new LinkedHashSet<UserInfo>();
     final LinkedHashSet<GroupInfo> m_groups = new LinkedHashSet<GroupInfo>();
@@ -365,15 +365,15 @@ public class VoltProjectBuilder {
     }
 
 
-    public void addELT(final String loader, boolean enabled, List<String> groups) {
+    public void addExport(final String loader, boolean enabled, List<String> groups) {
         m_elloader = loader;
         m_elenabled = enabled;
         m_elAuthGroups = groups;
     }
 
-    public void addELTTable(String name, boolean exportonly) {
-        ELTTableInfo info = new ELTTableInfo(name, exportonly);
-        m_eltTables.add(info);
+    public void addExportTable(String name, boolean exportonly) {
+        ExportTableInfo info = new ExportTableInfo(name, exportonly);
+        m_exportTables.add(info);
     }
 
     public void setCompilerDebugPrintStream(final PrintStream out) {
@@ -646,11 +646,11 @@ public class VoltProjectBuilder {
 
             exports.appendChild(conn);
 
-            if (m_eltTables.size() > 0) {
+            if (m_exportTables.size() > 0) {
                 final Element tables = doc.createElement("tables");
                 conn.appendChild(tables);
 
-                for (ELTTableInfo info : m_eltTables) {
+                for (ExportTableInfo info : m_exportTables) {
                     final Element table = doc.createElement("table");
                     table.setAttribute("name", info.m_tablename);
                     table.setAttribute("exportonly", info.m_export_only ? "true" : "false");

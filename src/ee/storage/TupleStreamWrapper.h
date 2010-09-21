@@ -80,14 +80,14 @@ public:
     /**
      * Poll the stream for a buffer of committed bytes.
      */
-    StreamBlock* getCommittedEltBytes();
+    StreamBlock* getCommittedExportBytes();
 
     /**
      * Release data up to (not including) releaseOffset
      *
      * @return true if the release was valid, false if not
      */
-    bool releaseEltBytes(int64_t releaseOffset);
+    bool releaseExportBytes(int64_t releaseOffset);
 
     /**
      * Reset polling offset to the ack point

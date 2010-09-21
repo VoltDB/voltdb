@@ -21,23 +21,24 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.elt;
+package org.voltdb.export;
 
-import org.voltdb.benchmark.ClientMain;
-import org.voltdb.client.Client;
-import org.voltdb.client.ProcCallException;
-import org.voltdb.utils.Pair;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.Map.Entry;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.Map.Entry;
 
-public class ELTTester extends ClientMain {
+import org.voltdb.benchmark.ClientMain;
+import org.voltdb.client.Client;
+import org.voltdb.client.ProcCallException;
+import org.voltdb.utils.Pair;
+
+public class ExportTester extends ClientMain {
 
     private Client client;
     private int m_idA;
@@ -72,11 +73,11 @@ public class ELTTester extends ClientMain {
     }
 
     public String getDDLFilename() {
-        return "ELTTester-ddl.sql";
+        return "ExportTester-ddl.sql";
     }
 
     public String getJARFilename() {
-        return "ELTTester.jar";
+        return "ExportTester.jar";
     }
 
     public int getTotalTransactionTypes() {
@@ -325,12 +326,12 @@ public class ELTTester extends ClientMain {
         this.m_countInvalid = 1;  // keep mod happy
     }
 
-    public ELTTester(int clientNum, Client client) {
+    public ExportTester(int clientNum, Client client) {
         super(new String[] {});
         initialize(clientNum, client);
     }
 
-    public ELTTester() {
+    public ExportTester() {
         super(new String[] {});
         initialize(0, null);
     }
@@ -357,7 +358,7 @@ public class ELTTester extends ClientMain {
 
     @Override
     protected String getApplicationName() {
-        return "ELTTester";
+        return "ExportTester";
     }
 
     @Override

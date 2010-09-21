@@ -21,97 +21,97 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.elt;
+package org.voltdb.export;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import junit.framework.TestCase;
+
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltdb.utils.DeferredSerialization;
 
-import junit.framework.TestCase;
+public class TestExportProtoMessage extends TestCase {
 
-public class TestELTProtoMessage extends TestCase {
-
-    private void assertMsgType(ELTProtoMessage m, int skip) {
-        if ((skip & ELTProtoMessage.kOpen) == 0)
+    private void assertMsgType(ExportProtoMessage m, int skip) {
+        if ((skip & ExportProtoMessage.kOpen) == 0)
             assertFalse(m.isOpen());
-        if ((skip & ELTProtoMessage.kOpenResponse) == 0)
+        if ((skip & ExportProtoMessage.kOpenResponse) == 0)
             assertFalse(m.isOpenResponse());
-        if ((skip & ELTProtoMessage.kPoll) == 0)
+        if ((skip & ExportProtoMessage.kPoll) == 0)
             assertFalse(m.isPoll());
-        if ((skip & ELTProtoMessage.kPollResponse) == 0)
+        if ((skip & ExportProtoMessage.kPollResponse) == 0)
             assertFalse(m.isPollResponse());
-        if ((skip & ELTProtoMessage.kAck) == 0)
+        if ((skip & ExportProtoMessage.kAck) == 0)
             assertFalse(m.isAck());
-        if ((skip & ELTProtoMessage.kClose) == 0)
+        if ((skip & ExportProtoMessage.kClose) == 0)
             assertFalse(m.isClose());
-        if ((skip & ELTProtoMessage.kError) == 0)
+        if ((skip & ExportProtoMessage.kError) == 0)
             assertFalse(m.isError());
     }
 
     public void testIsOpen() {
-        ELTProtoMessage m = new ELTProtoMessage(1,2);
+        ExportProtoMessage m = new ExportProtoMessage(1,2);
         m.open();
         assertTrue(m.isOpen());
-        assertMsgType(m, ELTProtoMessage.kOpen);
+        assertMsgType(m, ExportProtoMessage.kOpen);
     }
 
     public void testIsOpenResponse() {
-        ELTProtoMessage m = new ELTProtoMessage(1,2);
+        ExportProtoMessage m = new ExportProtoMessage(1,2);
         m.openResponse(null);
         assertTrue(m.isOpenResponse());
-        assertMsgType(m, ELTProtoMessage.kOpenResponse);
+        assertMsgType(m, ExportProtoMessage.kOpenResponse);
     }
 
     public void testIsPoll() {
-        ELTProtoMessage m = new ELTProtoMessage(1,2);
+        ExportProtoMessage m = new ExportProtoMessage(1,2);
         m.poll();
         assertTrue(m.isPoll());
-        assertMsgType(m, ELTProtoMessage.kPoll);
+        assertMsgType(m, ExportProtoMessage.kPoll);
     }
 
     public void testIsPollResponse() {
-        ELTProtoMessage m = new ELTProtoMessage(1,2);
+        ExportProtoMessage m = new ExportProtoMessage(1,2);
         ByteBuffer bb = ByteBuffer.allocate(10);
         m.pollResponse(1024, bb);
         assertTrue(m.isPollResponse());
         assertTrue(m.getData() == bb);
         assertTrue(m.getAckOffset() == 1024);
-        assertMsgType(m, ELTProtoMessage.kPollResponse);
+        assertMsgType(m, ExportProtoMessage.kPollResponse);
     }
 
     public void testIsAck() {
-        ELTProtoMessage m = new ELTProtoMessage(1,2);
+        ExportProtoMessage m = new ExportProtoMessage(1,2);
         m.ack(2048);
         assertTrue(m.isAck());
         assertTrue(m.getAckOffset() == 2048);
-        assertMsgType(m, ELTProtoMessage.kAck);
+        assertMsgType(m, ExportProtoMessage.kAck);
     }
 
     public void testIsClose() {
-        ELTProtoMessage m = new ELTProtoMessage(1,2);
+        ExportProtoMessage m = new ExportProtoMessage(1,2);
         m.close();
         assertTrue(m.isClose());
-        assertMsgType(m, ELTProtoMessage.kClose);
+        assertMsgType(m, ExportProtoMessage.kClose);
     }
 
     public void testIsError() {
-        ELTProtoMessage m = new ELTProtoMessage(1,2);
+        ExportProtoMessage m = new ExportProtoMessage(1,2);
         m.error();
         assertTrue(m.isError());
-        assertMsgType(m, ELTProtoMessage.kError);
+        assertMsgType(m, ExportProtoMessage.kError);
     }
 
     // also tests toBuffer, serializableBytes()
     // serialize with bytebuffer data
     public void testReadExternal1() throws IOException {
-        ELTProtoMessage m1, m2;
+        ExportProtoMessage m1, m2;
 
-        m1 = new ELTProtoMessage(1,2);
+        m1 = new ExportProtoMessage(1,2);
         ByteBuffer b = ByteBuffer.allocate(100);
         b.putInt(100);
         b.putInt(200);
@@ -123,10 +123,10 @@ public class TestELTProtoMessage extends TestCase {
 
         // test the length prefix, which isn't consumed by readExternal
         assertEquals(m1.serializableBytes(), fdsm1.readInt());
-        m2 = ELTProtoMessage.readExternal(fdsm1);
+        m2 = ExportProtoMessage.readExternal(fdsm1);
 
         assertTrue(m2.isPollResponse());
-        assertMsgType(m2, ELTProtoMessage.kPollResponse);
+        assertMsgType(m2, ExportProtoMessage.kPollResponse);
         assertEquals(1000, m2.getAckOffset());
         assertEquals(100, m2.getData().getInt());
         assertEquals(200, m2.getData().getInt());
@@ -137,9 +137,9 @@ public class TestELTProtoMessage extends TestCase {
     // also tests toBuffer, serializableBytes()
     // with null data payload
     public void testReadExternal2() throws IOException {
-        ELTProtoMessage m1, m2;
+        ExportProtoMessage m1, m2;
 
-        m1 = new ELTProtoMessage(1,2);
+        m1 = new ExportProtoMessage(1,2);
         m1.ack(2000);
 
         ByteBuffer bm1 = m1.toBuffer();
@@ -147,10 +147,10 @@ public class TestELTProtoMessage extends TestCase {
 
         // test the length prefix, which isn't consumed by readExternal
         assertEquals(m1.serializableBytes(), fdsm1.readInt());
-        m2 = ELTProtoMessage.readExternal(fdsm1);
+        m2 = ExportProtoMessage.readExternal(fdsm1);
 
         assertTrue(m2.isAck());
-        assertMsgType(m2, ELTProtoMessage.kAck);
+        assertMsgType(m2, ExportProtoMessage.kAck);
         assertEquals(2000, m2.getAckOffset());
         assertEquals(0, m2.getData().capacity());
         assertEquals(1, m2.getPartitionId());
@@ -160,9 +160,9 @@ public class TestELTProtoMessage extends TestCase {
     // also tests toBuffer, serializableBytes()
     // serialize with 0 capacity bytebuffer data
     public void testReadExternal3() throws IOException {
-        ELTProtoMessage m1, m2;
+        ExportProtoMessage m1, m2;
 
-        m1 = new ELTProtoMessage(1,2);
+        m1 = new ExportProtoMessage(1,2);
         ByteBuffer b = ByteBuffer.allocate(0);
         m1.pollResponse(1000, b);
 
@@ -171,10 +171,10 @@ public class TestELTProtoMessage extends TestCase {
 
         // test the length prefix, which isn't consumed by readExternal
         assertEquals(m1.serializableBytes(), fdsm1.readInt());
-        m2 = ELTProtoMessage.readExternal(fdsm1);
+        m2 = ExportProtoMessage.readExternal(fdsm1);
 
         assertTrue(m2.isPollResponse());
-        assertMsgType(m2, ELTProtoMessage.kPollResponse);
+        assertMsgType(m2, ExportProtoMessage.kPollResponse);
         assertEquals(1000, m2.getAckOffset());
         assertEquals(0, m2.getData().capacity());
         assertEquals(1, m2.getPartitionId());
@@ -183,7 +183,7 @@ public class TestELTProtoMessage extends TestCase {
 
     // mimic what raw processor and the el poller do to each other
     public void testELPollerPattern() throws IOException {
-        final ELTProtoMessage r = new ELTProtoMessage(1, 5);
+        final ExportProtoMessage r = new ExportProtoMessage(1, 5);
         ByteBuffer data = ByteBuffer.allocate(8);
         data.putInt(100);
         data.putInt(200);
@@ -207,12 +207,12 @@ public class TestELTProtoMessage extends TestCase {
         ByteBuffer b = bb.b;
         assertEquals(32, b.getInt());
         FastDeserializer fds = new FastDeserializer(b);
-        ELTProtoMessage m = ELTProtoMessage.readExternal(fds);
+        ExportProtoMessage m = ExportProtoMessage.readExternal(fds);
         assertEquals(1, m.m_partitionId);
         assertEquals(5, m.getTableId());
         assertTrue(m.isPollResponse());
         assertTrue(m.getData().remaining() == 8);
-        assertMsgType(m, ELTProtoMessage.kPollResponse);
+        assertMsgType(m, ExportProtoMessage.kPollResponse);
 
     }
 
