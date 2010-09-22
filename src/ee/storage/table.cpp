@@ -129,10 +129,12 @@ Table::~Table() {
 }
 
 void Table::initializeWithColumns(TupleSchema *schema, const std::string* columnNames, bool ownsTupleSchema) {
-    m_ownsTupleSchema = ownsTupleSchema;
 
     // copy the tuple schema
-    TupleSchema::freeTupleSchema(m_schema);
+    if (m_ownsTupleSchema) {
+        TupleSchema::freeTupleSchema(m_schema);
+    }
+    m_ownsTupleSchema = ownsTupleSchema;
     m_schema  = schema;
 
     m_columnCount = schema->columnCount();
