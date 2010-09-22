@@ -1,8 +1,13 @@
 #!/bin/bash
 EXIT=0
 if ! ps -ef | grep pup*et; then
-  echo "puppet is not running on $HOSTNAME"
-  EXIT=1
+  echo "puppet is not running on $HOSTNAME -- restarting"
+  # try to restart
+  /usr/bin/ruby /usr/sbin/puppetd --server=volt1 || EXIT=1
+  if ! ps -ef | grep pup*et; then
+    echo "puppet is still not running on $HOSTNAME"
+    EXIT=1
+  fi
 fi
 
 # what kind of machine does hudson think we are?
