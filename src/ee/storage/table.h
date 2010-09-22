@@ -173,6 +173,7 @@ public:
     inline const std::string& columnName(int index) const { return m_columnNames[index]; }
     inline int columnCount() const { return m_columnCount; };
     int columnIndex(const std::string &name) const;
+    const std::string *columnNames() { return m_columnNames; }
     std::vector<std::string> getColumnNames();
     // ------------------------------------------------------------------
     // INDEXES

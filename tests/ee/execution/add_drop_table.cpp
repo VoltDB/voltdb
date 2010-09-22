@@ -44,6 +44,14 @@ class AddDropTableTest : public Test {
           m_hostId(101), m_hostName("host101"), m_catVersion(0)
     {
         m_engine = new VoltDBEngine();
+
+    m_resultBuffer = new char[1024 * 1024 * 2];
+        m_exceptionBuffer = new char[4096];
+        m_engine->setBuffers(NULL, 0,
+                 m_resultBuffer, 1024 * 1024 * 2,
+                 m_exceptionBuffer, 4096);
+
+    m_engine->resetReusedResultOutputBuffer();
         m_engine->initialize(m_clusterId, m_siteId, m_partitionId,
                              m_hostId, m_hostName);
 
@@ -66,6 +74,8 @@ class AddDropTableTest : public Test {
     ~AddDropTableTest()
     {
         delete m_engine;
+    delete[] m_resultBuffer;
+    delete[] m_exceptionBuffer;
     }
 
 
@@ -121,6 +131,8 @@ class AddDropTableTest : public Test {
     std::string m_hostName;
     int m_catVersion;         // catalog version
     VoltDBEngine *m_engine;
+    char *m_resultBuffer;
+    char *m_exceptionBuffer;
 };
 
 /*
@@ -372,6 +384,58 @@ TEST_F(AddDropTableTest, DropTable)
 
     // release the last reference.
     table1->decrementRefcount();
+}
+
+/*
+ * Add / Drop / Add
+ */
+TEST_F(AddDropTableTest, AddDropAdd)
+{
+    bool result;
+
+    result = m_engine->updateCatalog(tableACmds(), ++m_catVersion);
+    ASSERT_TRUE(result);
+
+    result = m_engine->updateCatalog(tableADeleteCmd(), ++m_catVersion);
+    ASSERT_TRUE(result);
+
+    result = m_engine->updateCatalog(tableACmds(), ++m_catVersion);
+    ASSERT_TRUE(result);
+}
+
+/*
+ * Test on engine.
+ * Verify updateCatalog removes a table from engine's collections.
+ * And that stats are functional afterwards.
+ */
+TEST_F(AddDropTableTest, StatsWithDropTable)
+{
+    bool result = m_engine->updateCatalog(tableACmds(), ++m_catVersion);
+    ASSERT_TRUE(result);
+
+    result = m_engine->updateCatalog(tableBCmds(), ++m_catVersion);
+    ASSERT_TRUE(result);
+
+    // get stats - relying on valgrind for most verification here
+    int locators12[] = {1, 2};
+    int statresult = m_engine->getStats(STATISTICS_SELECTOR_TYPE_TABLE, locators12, 2, false, 1L);
+    ASSERT_TRUE(statresult == 1);
+
+    // delete A.
+    result = m_engine->updateCatalog(tableADeleteCmd(), ++m_catVersion);
+    ASSERT_TRUE(result);
+
+    // get stats for the remaining table by relative offset
+    int locators1[] = {1};
+    statresult = m_engine->getStats(STATISTICS_SELECTOR_TYPE_TABLE, locators1, 1, false, 1L);
+    ASSERT_TRUE(statresult == 1);
+
+    result = m_engine->updateCatalog(tableACmds(), ++m_catVersion);
+    ASSERT_TRUE(result);
+
+    // get stats for the tables by relative offset
+    statresult = m_engine->getStats(STATISTICS_SELECTOR_TYPE_TABLE, locators12, 2, false, 1L);
+    ASSERT_TRUE(statresult == 1);
 }
 
 /*

@@ -51,7 +51,6 @@ void StatsAgent::unregisterStatsSource(voltdb::StatisticsSelectorType sst)
     if (it1 == m_statsCategoryByStatsSelector.end()) {
         return;
     }
-
     it1->second.clear();
 }
 
@@ -78,10 +77,12 @@ Table* StatsAgent::getStats(voltdb::StatisticsSelectorType sst,
          */
         voltdb::StatsSource *ss = (*statsSources)[catalogIds[0]];
         voltdb::Table *table = ss->getStatsTable(interval, now);
-        statsTable = reinterpret_cast<Table*>(voltdb::TableFactory::getCopiedTempTable(
+        statsTable = reinterpret_cast<Table*>(
+            voltdb::TableFactory::getTempTable(
                 table->databaseId(),
-                "Persistent Table aggregated stats temp table",
-                table,
+                std::string("Persistent Table aggregated stats temp table"),
+                TupleSchema::createTupleSchema(table->schema()),
+                table->columnNames(),
                 NULL));
         m_statsTablesByStatsSelector[sst] = statsTable;
     }
