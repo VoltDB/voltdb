@@ -49,7 +49,7 @@ public class ClientConfig {
             m_defaultMaxArenaSize//262144
     };
     boolean m_heavyweight = false;
-    int m_maxOutstandingTxns = 1000;
+    int m_maxOutstandingTxns = 3000;
     StatsUploaderSettings m_statsSettings = null;
 
     /**
