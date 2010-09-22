@@ -396,18 +396,17 @@ public class LocalCluster implements VoltServerConfig {
                 if (pipeToFile == null) {
                     continue;
                 }
-                if (pipeToFile.m_witnessedReady.get() != true) {
-                    try {
-                        // wait for explicit notification
-                        synchronized (pipeToFile) {
+                synchronized(pipeToFile) {
+                    if (pipeToFile.m_witnessedReady.get() != true) {
+                        try {
                             pipeToFile.wait();
                         }
+                        catch (InterruptedException ex) {
+                            Logger.getLogger(LocalCluster.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+                        allReady = false;
+                        break;
                     }
-                    catch (InterruptedException ex) {
-                        Logger.getLogger(LocalCluster.class.getName()).log(Level.SEVERE, null, ex);
-                    }
-                    allReady = false;
-                    break;
                 }
             }
         } while (allReady == false);
@@ -612,16 +611,16 @@ public class LocalCluster implements VoltServerConfig {
         }
 
         // wait for the joining site to be ready
-        while (ptf.m_witnessedReady.get() != true && !ptf.m_eof) {
-            if (logtime) System.out.println("********** pre witness: " + (System.currentTimeMillis() - startTime) + " ms");
-            try {
-                // wait for explicit notification
-                synchronized (ptf) {
+        synchronized (ptf) {
+            while (ptf.m_witnessedReady.get() != true && !ptf.m_eof) {
+                if (logtime) System.out.println("********** pre witness: " + (System.currentTimeMillis() - startTime) + " ms");
+                try {
+                    // wait for explicit notification
                     ptf.wait();
                 }
-            }
-            catch (InterruptedException ex) {
-                Logger.getLogger(LocalCluster.class.getName()).log(Level.SEVERE, null, ex);
+                catch (InterruptedException ex) {
+                    Logger.getLogger(LocalCluster.class.getName()).log(Level.SEVERE, null, ex);
+                }
             }
         }
         if (ptf.m_witnessedReady.get()) {
