@@ -26,6 +26,12 @@
 #include <vector>
 #include "boost/scoped_array.hpp"
 
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <stdio.h>
+
 #define throwFatalException(...) { char reallysuperbig_nonce_message[8192]; snprintf(reallysuperbig_nonce_message, 8192, __VA_ARGS__); throw voltdb::FatalException( reallysuperbig_nonce_message, __FILE__, __LINE__); }
 namespace voltdb {
 class FatalException {
@@ -36,52 +42,70 @@ public:
      */
     FatalException(std::string message, const char *filename, unsigned long lineno) :
         m_reason(message), m_filename(filename), m_lineno(lineno) {
-        void *traces[128];
-        for (int i=0; i < 128; i++) traces[i] = NULL; // silence valgrind
-        const int numTraces = backtrace( traces, 128);
-        char** traceSymbols = backtrace_symbols( traces, numTraces);
-        for (int ii = 0; ii < numTraces; ii++) {
-            std::size_t sz = 200;
-            char *function = static_cast<char*>(malloc(sz));
-            char *begin = NULL, *end = NULL;
-            //Find parens surrounding mangled name
-            for (char *j = traceSymbols[ii]; *j; ++j) {
-                if (*j == '(') {
-                    begin = j;
-                }
-                else if (*j == '+') {
-                    end = j;
-                }
-            }
 
-            if (begin && end) {
-                *begin++ = '\0';
-                *end = '\0';
+      FILE *bt = fopen("/tmp/voltdb_backtrace.txt", "a+");
 
-                int status;
-                char *ret = abi::__cxa_demangle(begin, function, &sz, &status);
-                if (ret) {
-                    //return value may be a realloc of input
-                    function = ret;
-                } else {
-                    // demangle failed, treat it like a C function with no args
-                    strncpy(function, begin, sz);
-                    strncat(function, "()", sz);
-                    function[sz-1] = '\0';
-                }
-                m_traces.push_back(std::string(function));
-            } else {
-                //didn't find the mangled name in the trace
-                m_traces.push_back(std::string(traceSymbols[ii]));
-            }
-            free(function);
-        }
-        free(traceSymbols);
+      void *traces[128];
+      for (int i=0; i < 128; i++) traces[i] = NULL; // silence valgrind
+      const int numTraces = backtrace( traces, 128);
+      char** traceSymbols = backtrace_symbols( traces, numTraces);
+
+      // write header for backtrace file
+      fprintf(bt, "VoltDB Backtrace (%d)\n", numTraces);
+
+      for (int ii = 0; ii < numTraces; ii++) {
+    std::size_t sz = 200;
+    char *function = static_cast<char*>(malloc(sz));
+    char *begin = NULL, *end = NULL;
+
+    // write original symbol to file.
+    fprintf(bt, "raw[%d]: %s\n", ii, traceSymbols[ii]);
+
+    //Find parens surrounding mangled name
+    for (char *j = traceSymbols[ii]; *j; ++j) {
+      if (*j == '(') {
+        begin = j;
+      }
+      else if (*j == '+') {
+        end = j;
+      }
     }
-    const std::string m_reason;
-    const char *m_filename;
-    const unsigned long m_lineno;
-    std::vector<std::string> m_traces;
+
+    if (begin && end) {
+      *begin++ = '\0';
+      *end = '\0';
+
+      int status;
+      char *ret = abi::__cxa_demangle(begin, function, &sz, &status);
+      if (ret) {
+        //return value may be a realloc of input
+        function = ret;
+      } else {
+        // demangle failed, treat it like a C function with no args
+        strncpy(function, begin, sz);
+        strncat(function, "()", sz);
+        function[sz-1] = '\0';
+      }
+      m_traces.push_back(std::string(function));
+    } else {
+      //didn't find the mangled name in the trace
+      m_traces.push_back(std::string(traceSymbols[ii]));
+    }
+    free(function);
+      }
+
+      for (int ii=0; ii < m_traces.size(); ii++) {
+    const char* str = m_traces[ii].c_str();
+    fprintf(bt, "demangled[%d]: %s\n", ii, str);
+      }
+
+      fclose(bt);
+      free(traceSymbols);
+    }
+  const std::string m_reason;
+  const char *m_filename;
+  const unsigned long m_lineno;
+  std::vector<std::string> m_traces;
 };
 }
 #endif /* FATALEXCEPTION_HPP_ */
