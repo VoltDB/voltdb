@@ -218,11 +218,11 @@ void Catalog::registerGlobally(CatalogType *catObj) {
     boost::unordered_map<std::string, CatalogType*>::iterator iter
       = m_allCatalogObjects.find(catObj->path());
     if (iter != m_allCatalogObjects.end()) {
-        // this is a memory leak. assert in debug builds.
+        // this is a memory leak
+        //
         // if unregister doesn't fully remove children of deleted
-        // catalog objects, and the identical parent is re-added,
-        // this invariant will be broken.
-        assert(!"Registering new item for existing catalog path.");
+        // catalog objects, and the identical parent is re-added, this
+        // invariant will be broken.
         delete iter->second;
     }
     m_allCatalogObjects[catObj->path()] = catObj;
