@@ -99,6 +99,7 @@ public class StatsAgent {
                     final VoltTable table = ss.getStatsTable();
                     while (table != null && table.advanceRow())
                         resultTable.add(table);
+                    table.resetRowPosition();
                 } else {
                     Object statsRows[][] = ss.getStatsRows(interval, now);
                     for (Object[] row : statsRows) {
