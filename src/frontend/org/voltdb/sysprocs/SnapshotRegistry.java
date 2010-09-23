@@ -49,6 +49,8 @@ public class SnapshotRegistry {
         public final String nonce;
         public final boolean result; //true success, false failure
 
+        public final long bytesWritten;
+
         private final HashMap< String, Table> tables = new HashMap< String, Table>();
 
         private Snapshot(long startTime, int hostId, String path, String nonce,
@@ -63,10 +65,11 @@ public class SnapshotRegistry {
                         SnapshotUtil.constructFilenameForTable(table,
                                                                nonce,
                                                                Integer.toString(hostId));
-                    this.tables.put(table.getTypeName(), new Table(table.getTypeName(), filename, startTime));
+                    this.tables.put(table.getTypeName(), new Table(table.getTypeName(), filename));
                 }
             }
             result = false;
+            bytesWritten = 0;
         }
 
         private Snapshot(Snapshot incomplete, long timeFinished) {
@@ -77,13 +80,16 @@ public class SnapshotRegistry {
             synchronized (tables) {
                 tables.putAll(incomplete.tables);
             }
+            long bytesWritten = 0;
+            boolean result = true;
             for (Table t : tables.values()) {
+                bytesWritten += t.size;
                 if (t.error != null) {
                     result = false;
-                    return;
                 }
             }
-            result = true;
+            this.bytesWritten = bytesWritten;
+            this.result = result;
         }
 
         public interface TableUpdater {
@@ -113,25 +119,19 @@ public class SnapshotRegistry {
             public final String name;
             public final String filename;
             public final long size;
-            public final long timeClosed;
-            public final long timeCreated;
             public final Exception error;
 
-            private Table(String name, String filename, long timeCreated) {
+            private Table(String name, String filename) {
                 this.name = name;
                 this.filename = filename;
-                this.timeCreated = timeCreated;
                 size = 0;
-                timeClosed = 0;
                 error = null;
             }
 
-            public Table(Table t, long size, long timeClosed, Exception error) {
+            public Table(Table t, long size, Exception error) {
                 this.name = t.name;
                 this.filename = t.filename;
                 this.size = size;
-                this.timeClosed = timeClosed;
-                this.timeCreated = t.timeCreated;
                 this.error = error;
             }
         }

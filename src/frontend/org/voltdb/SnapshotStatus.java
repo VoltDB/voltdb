@@ -96,14 +96,19 @@ public class SnapshotStatus extends StatsSource {
         Pair<Snapshot, Table> p = (Pair<Snapshot, Table>) rowKey;
         Snapshot s = p.getFirst();
         Table t = p.getSecond();
-        final double duration = t.timeClosed - t.timeCreated;
-        final double throughput = (t.size / (1024.0 * 1024.0)) / duration;
+        double duration = 0;
+        double throughput = 0;
+        if (s.timeFinished != 0) {
+            duration = (s.timeFinished - s.timeStarted) / 1000.0;
+            throughput = (s.bytesWritten / (1024.0 * 1024.0)) / duration;
+        }
+
         rowValues[columnNameToIndex.get("TABLE")] = t.name;
         rowValues[columnNameToIndex.get("PATH")] = s.path;
         rowValues[columnNameToIndex.get("FILENAME")] = t.filename;
         rowValues[columnNameToIndex.get("NONCE")] = s.nonce;
-        rowValues[columnNameToIndex.get("START_TIME")] = t.timeCreated;
-        rowValues[columnNameToIndex.get("END_TIME")] = t.timeClosed;
+        rowValues[columnNameToIndex.get("START_TIME")] = s.timeStarted;
+        rowValues[columnNameToIndex.get("END_TIME")] = s.timeFinished;
         rowValues[columnNameToIndex.get("SIZE")] = t.size;
         rowValues[columnNameToIndex.get("DURATION")] = duration;
         rowValues[columnNameToIndex.get("THROUGHPUT")] = throughput;

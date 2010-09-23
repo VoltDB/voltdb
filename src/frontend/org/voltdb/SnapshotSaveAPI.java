@@ -181,7 +181,6 @@ public class SnapshotSaveAPI
                         final Runnable onClose = new Runnable() {
                             @Override
                             public void run() {
-                                final long now = System.currentTimeMillis();
                                 snapshotRecord.updateTable(table.getTypeName(),
                                         new SnapshotRegistry.Snapshot.TableUpdater() {
                                     @Override
@@ -190,7 +189,6 @@ public class SnapshotSaveAPI
                                         return snapshotRecord.new Table(
                                                 registryTable,
                                                 sdtFinal.getBytesWritten(),
-                                                now,
                                                 sdtFinal.getLastWriteException());
                                     }
                                 });

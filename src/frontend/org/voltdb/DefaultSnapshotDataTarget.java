@@ -79,7 +79,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
 
     private final AtomicInteger m_outstandingWriteTasks = new AtomicInteger(0);
 
-    private static final ExecutorService m_es = Executors.newFixedThreadPool( 1, new ThreadFactory() {
+    private static final ExecutorService m_es = Executors.newSingleThreadExecutor(new ThreadFactory() {
         @Override
         public Thread newThread(Runnable r) {
 
@@ -227,19 +227,23 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     m_bytesAllowedBeforeSync.release(bytesSinceLastSync);
                 }
             }
-        }, 1000, 1, TimeUnit.SECONDS);
+        }, 1, 1, TimeUnit.SECONDS);
         m_syncTask = syncTask;
     }
 
     @Override
     public void close() throws IOException, InterruptedException {
-        m_syncTask.cancel(false);
-        synchronized (m_outstandingWriteTasks) {
-            while (m_outstandingWriteTasks.get() > 0) {
-                m_outstandingWriteTasks.wait();
+        try {
+            synchronized (m_outstandingWriteTasks) {
+                while (m_outstandingWriteTasks.get() > 0) {
+                    m_outstandingWriteTasks.wait();
+                }
             }
+            m_syncTask.cancel(false);
+            m_channel.force(false);
+        } finally {
+            m_bytesAllowedBeforeSync.release(m_bytesWrittenSinceLastSync.getAndSet(0));
         }
-        m_channel.force(false);
         m_channel.position(8);
         ByteBuffer completed = ByteBuffer.allocate(1);
         if (m_writeFailed) {
