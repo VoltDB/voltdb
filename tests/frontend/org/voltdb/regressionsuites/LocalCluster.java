@@ -147,7 +147,12 @@ public class LocalCluster implements VoltServerConfig {
                         // INITIALIZING INITIATOR ID: 1, SITEID: 0
                         String[] split = data.split(" ");
                         synchronized(this) {
-                            m_hostId = Integer.parseInt(split[split.length - 1]);
+                            try {
+                                m_hostId = Integer.parseInt(split[split.length - 1]);
+                            } catch (java.lang.NumberFormatException e) {
+                                System.err.println("Had a number format exception processing line: '" + data + "'");
+                                throw e;
+                            }
                         }
                     }
 

@@ -468,24 +468,30 @@ import org.voltdb.utils.Pair;
 
         while (!oldlist.isEmpty()) {
             final VoltPort port = oldlist.poll();
-            if (port.isRunning()) {
-                continue;
-            }
-            if (port.isDead()) {
-                unregisterChannel(port);
-                try {
-                    port.m_selectionKey.channel().close();
-                } catch (IOException e) {}
-            } else if (port.hasQueuedRunnables()) {
-                port.lockForHandlingWork();
-                port.getKey().interestOps(0);
-                m_selector.selectedKeys().remove(port.getKey());
-                synchronized (m_tasks) {
-                    m_tasks.offer(getPortCallRunnable(port));
-                    m_tasks.notify();
+            try {
+                if (port.isRunning()) {
+                    continue;
                 }
-            } else {
-                resumeSelection(port);
+                if (port.isDead()) {
+                    unregisterChannel(port);
+                    try {
+                        port.m_selectionKey.channel().close();
+                    } catch (IOException e) {}
+                } else if (port.hasQueuedRunnables()) {
+                        port.lockForHandlingWork();
+                        port.getKey().interestOps(0);
+                    m_selector.selectedKeys().remove(port.getKey());
+                    synchronized (m_tasks) {
+                        m_tasks.offer(getPortCallRunnable(port));
+                        m_tasks.notify();
+                    }
+                } else {
+                    resumeSelection(port);
+                }
+            } catch (java.nio.channels.CancelledKeyException e) {
+                networkLog.warn(
+                        "Had a cancelled key exception while processing queued runnables for port "
+                        + port.m_remoteHost, e);
             }
         }
     }

@@ -104,8 +104,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                Runnable offBackPressure)
     {
         assert(messenger != null);
-        System.out.printf("INITIALIZING INITIATOR ID: %d, SITEID: %d\n", initiatorId, siteId);
-        System.out.flush();
+        hostLog.info("INITIALIZING INITIATOR ID: " + initiatorId  + ", SITEID: " + siteId);
 
         m_idManager = new TransactionIdManager(initiatorId);
         m_hostId = hostId;
