@@ -371,33 +371,33 @@ public class ClientInterface implements DumpManager.Dumpable {
 
             //Didn't get the value. Client isn't going to get anymore time.
             if (lengthBuffer.hasRemaining()) {
+                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
+                             "): wire protocol violation (timeout reading message length).");
                 //Send negative response
                 responseBuffer.put((byte)2).flip();
                 socket.write(responseBuffer);
                 socket.close();
-                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                             "): wire protocol violation (timeout reading message length).");
                 return null;
             }
             lengthBuffer.flip();
 
             final int messageLength = lengthBuffer.getInt();
             if (messageLength < 0) {
-              //Send negative response
+                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
+                             "): wire protocol violation (message length " + messageLength + " is negative).");
+                //Send negative response
                 responseBuffer.put((byte)3).flip();
                 socket.write(responseBuffer);
                 socket.close();
-                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                             "): wire protocol violation (message length " + messageLength + " is negative).");
                 return null;
             }
             if (messageLength > ((1024 * 1024) * 2)) {
-                //Send negative response
+                  authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
+                               "): wire protocol violation (message length " + messageLength + " is too large).");
+                  //Send negative response
                   responseBuffer.put((byte)3).flip();
                   socket.write(responseBuffer);
                   socket.close();
-                  authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                               "): wire protocol violation (message length " + messageLength + " is too large).");
                   return null;
               }
 
@@ -417,12 +417,12 @@ public class ClientInterface implements DumpManager.Dumpable {
 
             //Didn't get the whole message. Client isn't going to get anymore time.
             if (lengthBuffer.hasRemaining()) {
+                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
+                             "): wire protocol violation (timeout reading authentication strings).");
                 //Send negative response
                 responseBuffer.put((byte)2).flip();
                 socket.write(responseBuffer);
                 socket.close();
-                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                             "): wire protocol violation (timeout reading authentication strings).");
                 return null;
             }
             message.flip().position(1);//skip version
@@ -440,12 +440,12 @@ public class ClientInterface implements DumpManager.Dumpable {
             boolean authenticated = context.authSystem.authenticate(username, password);
 
             if (!authenticated) {
+                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
+                             "): user " + username + " failed authentication.");
                 //Send negative response
                 responseBuffer.put((byte)-1).flip();
                 socket.write(responseBuffer);
                 socket.close();
-                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                             "): user " + username + " failed authentication.");
                 return null;
             }
 
@@ -504,12 +504,12 @@ public class ClientInterface implements DumpManager.Dumpable {
 
             }
             else {
+                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
+                             "): user " + username + " failed authentication.");
                 // Send negative response
                 responseBuffer.put((byte)-1).flip();
                 socket.write(responseBuffer);
                 socket.close();
-                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                             "): user " + username + " failed authentication.");
                 return null;
 
             }

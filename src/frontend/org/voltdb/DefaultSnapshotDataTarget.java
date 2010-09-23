@@ -27,8 +27,12 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.Semaphore;
 import java.util.zip.CRC32;
 
 import org.voltdb.client.ConnectionUtil;
@@ -46,25 +50,25 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     private final FileChannel m_channel;
     private final FileOutputStream m_fos;
     private static final VoltLogger hostLog = new VoltLogger("HOST");
-    private final ScheduledExecutorService m_es;
     private Runnable m_onCloseHandler = null;
 
     /*
      * If a write fails then this snapshot is hosed.
      * Set the flag so all writes return immediately. The system still
-     * needs to scan the all table to clear the dirty bits
+     * needs to scan all the tables to clear the dirty bits
      * so the process continues as if the writes are succeeding.
      * A more efficient failure mode would do the scan but not the
      * extra serialization work.
      */
     private volatile boolean m_writeFailed = false;
     private volatile IOException m_writeException = null;
+
     private volatile long m_bytesWritten = 0;
 
-    private static final long m_maxBytesWrittenBetweenSync = (1024 * 1024) * 256;
-    private long m_bytesWrittenSinceLastSync = 0;
-    private long m_lastSyncTime = 0;
+    private static final Semaphore m_bytesAllowedBeforeSync = new Semaphore((1024 * 1024) * 256);
+    private final AtomicInteger m_bytesWrittenSinceLastSync = new AtomicInteger(0);
 
+    private final ScheduledFuture<?> m_syncTask;
     /*
      * Accept a single write even though simulating a full disk is enabled;
      */
@@ -72,6 +76,32 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
 
     @SuppressWarnings("unused")
     private final String m_tableName;
+
+    private final AtomicInteger m_outstandingWriteTasks = new AtomicInteger(0);
+
+    private static final ExecutorService m_es = Executors.newFixedThreadPool( 1, new ThreadFactory() {
+        @Override
+        public Thread newThread(Runnable r) {
+
+            return new Thread(
+                    Thread.currentThread().getThreadGroup(),
+                    r,
+                    "Snapshot write service ",
+                    131072);
+        }
+    });
+
+    private static final ScheduledExecutorService m_syncService = Executors.newSingleThreadScheduledExecutor(
+            new ThreadFactory() {
+        @Override
+        public Thread newThread(Runnable r) {
+            return new Thread(
+                    Thread.currentThread().getThreadGroup(),
+                    r,
+                    "Snapshot sync service ",
+                    131072);
+        }
+    });
 
     public DefaultSnapshotDataTarget(
             final File file,
@@ -116,17 +146,6 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         m_tableName = tableName;
         m_fos = new FileOutputStream(file);
         m_channel = m_fos.getChannel();
-        m_es = Executors.newScheduledThreadPool(1, new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable r) {
-
-                return new Thread(
-                        Thread.currentThread().getThreadGroup(),
-                        r,
-                        "Snapshot target for " + file.getName() + " host " + hostId,
-                        131072);
-            }
-        });
         final FastSerializer fs = new FastSerializer();
         fs.writeInt(0);//CRC
         fs.writeInt(0);//Header length placeholder
@@ -171,7 +190,6 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             m_writeException = new IOException("Disk full");
             m_writeFailed = true;
             m_fos.close();
-            m_es.shutdown();
             throw m_writeException;
         }
 
@@ -185,46 +203,43 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             writeFuture.get();
         } catch (InterruptedException e) {
             m_fos.close();
-            m_es.shutdown();
-            return;
+            throw new java.io.InterruptedIOException();
         } catch (ExecutionException e) {
             m_fos.close();
-            m_es.shutdown();
             throw m_writeException;
         }
         if (m_writeFailed) {
             m_fos.close();
-            m_es.shutdown();
             throw m_writeException;
         }
 
-        m_es.scheduleAtFixedRate(new Runnable() {
+        ScheduledFuture<?> syncTask = null;
+        syncTask = m_syncService.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
-                final long now = System.currentTimeMillis();
-                if (now - m_lastSyncTime < 10000 || m_bytesWrittenSinceLastSync == 0) {
-                    return;
+                int bytesSinceLastSync = 0;
+                while ((bytesSinceLastSync = m_bytesWrittenSinceLastSync.getAndSet(0)) > 0) {
+                    try {
+                        m_channel.force(false);
+                    } catch (IOException e) {
+                        hostLog.error("Error syncing snapshot", e);
+                    }
+                    m_bytesAllowedBeforeSync.release(bytesSinceLastSync);
                 }
-                try {
-                    m_fos.getFD().sync();
-                } catch (IOException e) {
-                    m_writeException = e;
-                    hostLog.error("Error while attempting to sync snapshot data for file "  + m_file, e);
-                    m_writeFailed = true;
-                    throw new RuntimeException(e);
-                }
-                m_lastSyncTime = System.currentTimeMillis();
-                m_bytesWrittenSinceLastSync = 0;
             }
-        }, 10000, 10, TimeUnit.SECONDS);
+        }, 1000, 1, TimeUnit.SECONDS);
+        m_syncTask = syncTask;
     }
 
     @Override
     public void close() throws IOException, InterruptedException {
-        m_es.shutdown();
-        m_es.awaitTermination( 1, TimeUnit.DAYS);
-        m_channel.force(true);
-        m_fos.getFD().sync();
+        m_syncTask.cancel(false);
+        synchronized (m_outstandingWriteTasks) {
+            while (m_outstandingWriteTasks.get() > 0) {
+                m_outstandingWriteTasks.wait();
+            }
+        }
+        m_channel.force(false);
         m_channel.position(8);
         ByteBuffer completed = ByteBuffer.allocate(1);
         if (m_writeFailed) {
@@ -233,7 +248,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             completed.put((byte)1).flip();
         }
         m_channel.write(completed);
-        m_fos.getFD().sync();
+        m_channel.force(false);
         m_channel.close();
         if (m_onCloseHandler != null) {
             m_onCloseHandler.run();
@@ -256,7 +271,8 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             tupleData.b.position(0);
         }
 
-        return m_es.submit(new Callable<Object>() {
+        m_outstandingWriteTasks.incrementAndGet();
+        Future<?> writeTask = m_es.submit(new Callable<Object>() {
             @Override
             public Object call() throws Exception {
                 try {
@@ -267,16 +283,15 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                             throw new IOException("Disk full");
                         }
                     }
+
+                    m_bytesAllowedBeforeSync.acquire(tupleData.b.remaining());
+
+                    int totalWritten = 0;
                     while (tupleData.b.hasRemaining()) {
-                        final long written = m_channel.write(tupleData.b);
-                        m_bytesWritten += written;
-                        m_bytesWrittenSinceLastSync += written;
+                        totalWritten += m_channel.write(tupleData.b);
                     }
-                    if (m_bytesWrittenSinceLastSync >= m_maxBytesWrittenBetweenSync) {
-                        m_fos.getFD().sync();
-                        m_bytesWrittenSinceLastSync = 0;
-                        m_lastSyncTime = System.currentTimeMillis();
-                    }
+                    m_bytesWritten += totalWritten;
+                    m_bytesWrittenSinceLastSync.addAndGet(totalWritten);
                 } catch (IOException e) {
                     m_writeException = e;
                     hostLog.error("Error while attempting to write snapshot data to file " + m_file, e);
@@ -284,10 +299,16 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     throw e;
                 } finally {
                     tupleData.discard();
+                    synchronized (m_outstandingWriteTasks) {
+                        if (m_outstandingWriteTasks.decrementAndGet() == 0) {
+                            m_outstandingWriteTasks.notify();
+                        }
+                    }
                 }
                 return null;
             }
         });
+        return writeTask;
     }
 
     @Override
