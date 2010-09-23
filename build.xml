@@ -371,6 +371,9 @@ DISTRIBUTION
 
     <!-- populate top level README by copying and renaming README.dist -->
     <copy tofile="${dist.dir}/README" file="doc/README.dist"/>
+    
+    <!-- populate top level thirdparty readmy by copying it -->
+    <copy tofile="${dist.dir}/README.thirdparty" file="README.thirdparty.txt"/>
 
     <!-- populate examples top level README -->
     <copy tofile="${dist.dir}/examples/README" file="examples/README"/>
