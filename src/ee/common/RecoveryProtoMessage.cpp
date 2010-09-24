@@ -32,6 +32,8 @@ RecoveryProtoMsg::RecoveryProtoMsg(ReferenceSerializeInput *in) :
     assert(m_type != RECOVERY_MSG_TYPE_SCAN_COMPLETE);
     int32_t totalTupleCount = in->readInt();
     m_totalTupleCount = *reinterpret_cast<uint32_t*>(&totalTupleCount);
+    if (m_type == RECOVERY_MSG_TYPE_COMPLETE)
+        m_exportStreamSeqNo = in->readLong();
 }
 
 /*

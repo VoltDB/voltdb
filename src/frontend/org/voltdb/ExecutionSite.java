@@ -1084,7 +1084,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 ee.exportAction(exportm.m_m.isAck(),
                                 exportm.m_m.isPoll(),
                                 exportm.m_m.isClose(),
-                                exportm.m_m.isInfo(),
                                 exportm.m_m.isSync(),
                                 exportm.m_m.getAckOffset(),
                                 exportm.m_m.getPartitionId(),

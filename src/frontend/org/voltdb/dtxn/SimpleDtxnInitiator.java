@@ -66,7 +66,6 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     private final ExecutorTxnIdSafetyState m_safetyState;
 
     private static final VoltLogger transactionLog = new VoltLogger("TRANSACTION");
-    @SuppressWarnings("unused")
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     /**

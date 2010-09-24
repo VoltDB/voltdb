@@ -1125,7 +1125,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     @Override
     public ExportProtoMessage exportAction(boolean ackAction, boolean pollAction,
-            boolean resetAction, boolean infoAction, boolean syncAction,
+            boolean resetAction, boolean syncAction,
             long ackOffset, int partitionId, long mTableId) {
         try {
             m_data.clear();
@@ -1133,7 +1133,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             m_data.putInt(ackAction ? 1 : 0);
             m_data.putInt(pollAction ? 1 : 0);
             m_data.putInt(resetAction ? 1 : 0);
-            m_data.putInt(infoAction ? 1 : 0);
             m_data.putInt(syncAction ? 1 : 0);
             m_data.putLong(ackOffset);
             m_data.putLong(mTableId);

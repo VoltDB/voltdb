@@ -367,14 +367,12 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * @param pollAction whether or not this action requests the
          * next buffer of unpolled octets
          * @param if ackAction is true, the stream offset being released
-         * @param if infoAction is true, the stream offset being requested for a table
          * @param if syncAction is true, the stream offset being set for a table
          * @param the catalog version qualified id of the table to which this action applies
          * @return the universal offset for any poll results (results
          * returned separatedly via QueryResults buffer)
          */
-        long exportAction(bool ackAction, bool pollAction, bool resetAction,
-                          bool infoAction, bool syncAction,
+        long exportAction(bool ackAction, bool pollAction, bool resetAction, bool syncAction,
                           int64_t ackOffset, int64_t tableId);
 
         /**

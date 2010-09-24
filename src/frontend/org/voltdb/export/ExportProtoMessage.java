@@ -39,8 +39,7 @@ public class ExportProtoMessage
     public static final short kAck            = 1 << 4;
     public static final short kClose          = 1 << 5;
     public static final short kError          = 1 << 6;
-    public static final short kInfo           = 1 << 7;
-    public static final short kSync           = 1 << 8;
+    public static final short kSync           = 1 << 7;
 
     public boolean isOpen()         {return (m_type & kOpen) != 0;}
     public boolean isOpenResponse() {return (m_type & kOpenResponse) != 0;}
@@ -49,7 +48,6 @@ public class ExportProtoMessage
     public boolean isAck()          {return (m_type & kAck) != 0;}
     public boolean isClose()        {return (m_type & kClose) != 0;}
     public boolean isError()        {return (m_type & kError) != 0;}
-    public boolean isInfo()         {return (m_type & kInfo) != 0;}
     public boolean isSync()         {return (m_type & kSync) != 0;}
 
     /**

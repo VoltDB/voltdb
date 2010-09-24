@@ -85,6 +85,8 @@ private:
      */
     int32_t m_tuplesRead;
 
+    int64_t m_exportStreamSeqNo;
+
     /*
      * CatalogId of the table this recovery message is for
      */

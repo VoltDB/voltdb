@@ -112,6 +112,8 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
 
     private IODaemon m_iodaemon;
 
+    private final int m_partitionId;
+
     private class IODaemon {
 
         private final SocketChannel m_sc;
@@ -237,9 +239,16 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
             recoveryLog.trace("Received tuple data at site " + m_siteId +
                     " for table " + m_tables.get(tableId).m_name);
         } else if (type == RecoveryMessageType.Complete) {
+            message.position(messageTypeOffset + 5);
             RecoveryTable table = m_tables.remove(tableId);
             recoveryLog.info("Received completion message at site " + m_siteId +
                     " for table " + table.m_name);
+            long exportOffset = message.getLong();
+            assert(exportOffset >= -1);
+            if (exportOffset >= 0) {
+                m_engine.exportAction(false, false, false, true, exportOffset, m_partitionId, tableId);
+            }
+
         } else {
             recoveryLog.fatal("Received an unexpect message of type " + type);
             VoltDB.crashVoltDB();
@@ -335,12 +344,14 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
             ExecutionEngine engine,
             Mailbox mailbox,
             final int siteId,
+            final int partitionId,
             Runnable onCompletion,
             MessageHandler messageHandler) {
         super();
         m_mailbox = mailbox;
         m_engine = engine;
         m_siteId = siteId;
+        m_partitionId = partitionId;
         m_messageHandler = messageHandler;
 
         /*
@@ -484,6 +495,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
                 engine,
                 mailbox,
                 siteId,
+                partitionId,
                 onCompletion,
                 messageHandler);
     }

@@ -195,7 +195,6 @@ typedef struct {
     int32_t isAck;
     int32_t isPoll;
     int32_t isReset;
-    int32_t isInfo;
     int32_t isSync;
     int64_t offset;
     int64_t tableId;
@@ -998,7 +997,6 @@ void VoltDBIPC::exportAction(struct ipc_command *cmd) {
     long result = m_engine->exportAction(action->isAck,
                                          action->isPoll,
                                          action->isReset,
-                                         action->isInfo,
                                          action->isSync,
                                          static_cast<int64_t>(ntohll(action->offset)),
                                          static_cast<int64_t>(ntohll(action->tableId)));

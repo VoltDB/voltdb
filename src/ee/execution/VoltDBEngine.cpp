@@ -1202,13 +1202,18 @@ void VoltDBEngine::processRecoveryMessage(RecoveryProtoMsg *message) {
 
 long
 VoltDBEngine::exportAction(bool ackAction, bool pollAction, bool resetAction,
-                           bool infoAction, bool syncAction,
-                           int64_t ackOffset, int64_t tableId)
+                           bool syncAction, int64_t ackOffset, int64_t tableId)
 {
     map<int64_t, Table*>::iterator pos = m_exportingTables.find(tableId);
 
     // return no data and polled offset for unavailable tables.
     if (pos == m_exportingTables.end()) {
+        // ignore trying to sync a non-exported table
+        if (syncAction) {
+            assert(ackOffset == 0);
+            return 0;
+        }
+
         m_resultOutput.writeInt(0);
         if (ackOffset < 0) {
             return 0;
@@ -1219,6 +1224,12 @@ VoltDBEngine::exportAction(bool ackAction, bool pollAction, bool resetAction,
     }
 
     Table *table_for_el = pos->second;
+
+    if (syncAction) {
+        table_for_el->setExportStreamSequenceNo(ackOffset);
+        // done after the sync
+        return 0;
+    }
 
     // perform any releases before polls.
     if (ackOffset > 0) {

@@ -52,7 +52,7 @@ public class ExportManager
     /**
      * Processors also log using this facility.
      */
-    private static final VoltLogger exportLog = new VoltLogger("Export");
+    private static final VoltLogger exportLog = new VoltLogger("EXPORT");
 
     /**
      * Thrown if the initial setup of the loader fails

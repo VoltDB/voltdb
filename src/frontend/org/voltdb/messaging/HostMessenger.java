@@ -475,7 +475,8 @@ public class HostMessenger implements Messenger {
             throw new Exception("Rejoin HostId is not a failed host.");
 
         SocketChannel sock = SocketJoiner.connect(
-                m_localHostId, hostId, addr, catalogCRC, liveHosts, catalogVersionNumber);
+                m_localHostId, hostId, addr, catalogCRC, liveHosts,
+                catalogVersionNumber);
 
         m_tempNewFH = new ForeignHost(this, hostId, sock);
         m_tempNewFH.sendReadyMessage();

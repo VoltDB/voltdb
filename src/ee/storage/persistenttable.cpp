@@ -86,7 +86,7 @@ TableTuple keyTuple;
 PersistentTable::PersistentTable(ExecutorContext *ctx, bool exportEnabled) :
     Table(TABLE_BLOCKSIZE), m_executorContext(ctx), m_uniqueIndexes(NULL), m_uniqueIndexCount(0), m_allowNulls(NULL),
     m_indexes(NULL), m_indexCount(0), m_pkeyIndex(NULL), m_wrapper(NULL),
-    tsSeqNo(0), stats_(this), m_exportEnabled(exportEnabled),
+    m_tsSeqNo(0), stats_(this), m_exportEnabled(exportEnabled),
     m_COWContext(NULL)
 {
     if (exportEnabled)
@@ -197,7 +197,7 @@ bool PersistentTable::insertTuple(TableTuple &source) {
     // exportxxx: memoizing this more cache friendly?
     if (m_exportEnabled) {
         elMark =
-          appendToELBuffer(m_tmpTarget1, tsSeqNo++, TupleStreamWrapper::INSERT);
+          appendToELBuffer(m_tmpTarget1, m_tsSeqNo++, TupleStreamWrapper::INSERT);
     }
 
     /*
@@ -332,8 +332,8 @@ bool PersistentTable::updateTuple(TableTuple &source, TableTuple &target, bool u
     // if EL is enabled, append the tuple to the buffer
     if (m_exportEnabled) {
         // only need the earliest mark
-        elMark = appendToELBuffer(ptuua->getOldTuple(), tsSeqNo, TupleStreamWrapper::DELETE);
-        appendToELBuffer(target, tsSeqNo++, TupleStreamWrapper::INSERT);
+        elMark = appendToELBuffer(ptuua->getOldTuple(), m_tsSeqNo, TupleStreamWrapper::DELETE);
+        appendToELBuffer(target, m_tsSeqNo++, TupleStreamWrapper::INSERT);
         ptuua->setELMark(elMark);
     }
 
@@ -443,7 +443,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
 
     // if EL is enabled, append the tuple to the buffer
     if (m_exportEnabled) {
-        size_t elMark = appendToELBuffer(target, tsSeqNo++, TupleStreamWrapper::DELETE);
+        size_t elMark = appendToELBuffer(target, m_tsSeqNo++, TupleStreamWrapper::DELETE);
         ptuda->setELMark(elMark);
     }
 
@@ -672,7 +672,7 @@ void PersistentTable::processLoadedTuple(bool allowExport, TableTuple &tuple) {
 
     // if EL is enabled, append the tuple to the buffer
     if (allowExport && m_exportEnabled) {
-        appendToELBuffer(m_tmpTarget1, tsSeqNo++,
+        appendToELBuffer(m_tmpTarget1, m_tsSeqNo++,
                          TupleStreamWrapper::INSERT);
     }
 }

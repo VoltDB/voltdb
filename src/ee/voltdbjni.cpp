@@ -1018,7 +1018,6 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTabl
  *
  * @param ackAction  true if this call contains an ack
  * @param pollAction true if this call requests a poll
- * @param infoAction true if the stream offset being requested for a table
  * @param syncAction true if the stream offset being set for a table
  * @param ackOffset  if acking, the universal stream offset being acked/released
  * @param tableId    the table ID to which the Export action applies
@@ -1035,7 +1034,6 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
    jboolean ackAction,
    jboolean pollAction,
    jboolean resetAction,
-   jboolean infoAction,
    jboolean syncAction,
    jlong ackOffset,
    jlong tableId) {
@@ -1045,7 +1043,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
     try {
         try {
             engine->resetReusedResultOutputBuffer();
-            return engine->exportAction(ackAction, pollAction, resetAction, infoAction, syncAction,
+            return engine->exportAction(ackAction, pollAction, resetAction, syncAction,
                                         static_cast<int64_t>(ackOffset),
                                         static_cast<int64_t>(tableId));
         } catch (SQLException e) {

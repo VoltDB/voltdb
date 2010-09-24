@@ -222,6 +222,18 @@ class PersistentTable : public Table {
      */
     size_t hashCode();
 
+    /**
+     * Get the current offset in bytes of the export stream for this Table
+     * since startup.
+     */
+    int64_t getExportStreamSequenceNo() { return m_exportEnabled ? m_tsSeqNo : -1; }
+
+    /**
+     * Set the current offset in bytes of the export stream for this Table
+     * since startup (used for rejoin/recovery).
+     */
+    virtual void setExportStreamSequenceNo(int64_t seqNo) { m_tsSeqNo = seqNo; }
+
 protected:
     // ------------------------------------------------------------------
     // FROM PIMPL
@@ -269,7 +281,7 @@ protected:
 
     // temporary for tuplestream stuff
     TupleStreamWrapper *m_wrapper;
-    int64_t tsSeqNo;
+    int64_t m_tsSeqNo;
 
     // partition key
     int m_partitionColumn;

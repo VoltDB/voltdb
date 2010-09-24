@@ -154,7 +154,7 @@ public class TestExecutionEngine extends TestCase {
 
 
             serialized = sourceEngine.tableStreamSerializeMore( container, WAREHOUSE_TABLEID, TableStreamType.RECOVERY);
-            assertEquals( 5, serialized);
+            assertEquals( 13, serialized);
             assertEquals( RecoveryMessageType.Complete.ordinal(), container.b.get());
             assertEquals( WAREHOUSE_TABLEID, container.b.getInt());
 
@@ -168,7 +168,7 @@ public class TestExecutionEngine extends TestCase {
 
 
             serialized = sourceEngine.tableStreamSerializeMore( container, STOCK_TABLEID, TableStreamType.RECOVERY);
-            assertEquals( 5, serialized);
+            assertEquals( 13, serialized);
             assertEquals( RecoveryMessageType.Complete.ordinal(), container.b.get());
             assertEquals( STOCK_TABLEID, container.b.getInt());
 
@@ -273,6 +273,7 @@ public class TestExecutionEngine extends TestCase {
                             destinationEngine,
                             destinationMailbox,
                             destinationId,
+                            0,
                             onDestinationCompletion,
                             mh);
                 /*

@@ -362,8 +362,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @return the response ExportMessage
      */
     public abstract ExportProtoMessage exportAction(
-            boolean ackAction, boolean pollAction, boolean resetAction,
-            boolean infoAction, boolean syncAction,
+            boolean ackAction, boolean pollAction, boolean resetAction, boolean syncAction,
             long ackOffset, int partitionId, long tableId);
 
     /**
@@ -625,7 +624,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             boolean ackAction,
             boolean pollAction,
             boolean resetAction,
-            boolean infoRequestAction,
             boolean syncAction,
             long mAckOffset,
             long mTableId);
