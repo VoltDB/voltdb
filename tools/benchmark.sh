@@ -9,16 +9,21 @@
 #   EXTRAENV         A string containing extra options, typically used for
 #                    snapshot setup or rate limiting.
 
-echo "cd ~/trunk && BMCLIENT=$BMCLIENT BMDURATION=$BMDURATION BMCLIENTCOUNT=1 CLIENT1=$HOSTNAME BMKFACTOR=$BMKFACTOR BMSITESPERHOST=12 BMTPCCWAREHOUSES=`dc -e "$BMHOSTCOUNT 12 * p q"` VOLTBIN=/home/test/workspace/build-centos/trunk/obj/release/voltbin BMHOSTCOUNT=$BMHOSTCOUNT $EXTRAENV ant benchmarkenv" > ~/trunk/tools/benchmark-$HOSTNAME.sh
-echo "date" >> ~/trunk/tools/benchmark-$HOSTNAME.sh
-chmod a+x ~/trunk/tools/benchmark-$HOSTNAME.sh
+# get the directory containing this script
+TOOLSDIR=`readlink -f $(dirname "${BASH_SOURCE[0]}")`
+# infer the trunk directory from that
+TRUNKDIR=`dirname ${TOOLSDIR}`
 
-if [ ! -f ~/workspace/build-centos/trunk/obj/release/voltbin/mysqlp -a -f ~/voltbin/mysqlp ]
+echo "cd ${TRUNKDIR} && BMCLIENT=$BMCLIENT BMDURATION=$BMDURATION BMCLIENTCOUNT=1 CLIENT1=$HOSTNAME BMKFACTOR=$BMKFACTOR BMSITESPERHOST=12 BMTPCCWAREHOUSES=`dc -e "$BMHOSTCOUNT 12 * p q"` VOLTBIN=${TRUNKDIR}/obj/release/voltbin BMHOSTCOUNT=$BMHOSTCOUNT $EXTRAENV ant benchmarkenv" > ${TOOLSDIR}/benchmark-$HOSTNAME.sh
+echo "date" >> ${TOOLSDIR}/benchmark-$HOSTNAME.sh
+chmod a+x ${TOOLSDIR}/benchmark-$HOSTNAME.sh
+
+if [ ! -f ${TRUNKDIR}/obj/release/voltbin/mysqlp -a -f ~/voltbin/mysqlp ]
 then
-    cp ~/voltbin/mysqlp ~/workspace/build-centos/trunk/obj/release/voltbin
+    cp ~/voltbin/mysqlp ${TRUNKDIR}/obj/release/voltbin
 fi
 
 rm -f /home/test/output/benchmark-$HOSTNAME.log
 touch /home/test/output/benchmark-$HOSTNAME.log
 tail -f /home/test/output/benchmark-$HOSTNAME.log &
-java -jar ~/.hudson/hudson-cli.jar -s http://newbobbi:8080 build $MULTINODE_HELPER -p COMMAND="~/trunk/tools/benchmark-$HOSTNAME.sh" -p COUNT=$BMHOSTCOUNT -p HOST2=empty -p HOST3=empty -p HOST4=empty -p HOST5=empty -p HOST6=empty -p HOST7=empty -p HOST8=empty -p HOST9=empty -p HOST10=empty -p HOST11=empty -p HOST12=empty -p OUTPUTFILE=/home/test/output/benchmark-$HOSTNAME.log -s
+java -jar ~/.hudson/hudson-cli.jar -s http://newbobbi:8080 build $MULTINODE_HELPER -p COMMAND="${TOOLSDIR}/benchmark-$HOSTNAME.sh" -p COUNT=$BMHOSTCOUNT -p HOST2=empty -p HOST3=empty -p HOST4=empty -p HOST5=empty -p HOST6=empty -p HOST7=empty -p HOST8=empty -p HOST9=empty -p HOST10=empty -p HOST11=empty -p HOST12=empty -p OUTPUTFILE=/home/test/output/benchmark-$HOSTNAME.log -s
