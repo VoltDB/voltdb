@@ -445,6 +445,9 @@ CLEANING
   <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf src/frontend/org/voltdb/catalog/*.java'"/>
   </exec>
+  <exec dir='.' executable='/bin/sh'>
+    <arg line="-c 'rm -rf 20index.jar bingo.jar dedupe.jar measureoverhead.jar tpcc.jar'"/>
+  </exec>
 </target>
 
 <target name='cleantmp' description="Remove all data files Volt generated in /tmp.">
