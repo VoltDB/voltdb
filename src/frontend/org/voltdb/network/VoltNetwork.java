@@ -615,7 +615,9 @@ import org.voltdb.utils.Pair;
 
     public ArrayList<Long> getThreadIds() {
         ArrayList<Long> ids = new ArrayList<Long>();
-        ids.add(Thread.currentThread().getId());
+        if (m_thread != null) {
+            ids.add(m_thread.getId());
+        }
         for (WeakReference<Thread> ref : m_networkThreads) {
             ids.add(ref.get().getId());
         }
