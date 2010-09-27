@@ -428,7 +428,11 @@ import org.voltdb.utils.Pair;
             for (SelectionKey key : keys) {
                 VoltPort port = (VoltPort) key.attachment();
                 if (port != null) {
-                    unregisterChannel (port);
+                    try {
+                        unregisterChannel (port);
+                    } catch (Exception e) {
+                        networkLog.error("Exception unregisering port " + port, e);
+                    }
                 }
             }
 

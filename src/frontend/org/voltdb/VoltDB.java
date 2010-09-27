@@ -116,6 +116,14 @@ public class VoltDB {
          */
         public boolean m_quietAdhoc = false;
 
+        public final File m_commitLogDir = new File("/tmp");
+
+        public final int m_commitInterval = 1000;
+
+        public final boolean m_waitForCommit = false;
+
+        public final boolean m_useCommitLog = false;
+
         public Configuration() { }
 
         public Configuration(String args[]) {

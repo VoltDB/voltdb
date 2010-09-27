@@ -40,6 +40,7 @@ import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.DeferredSerialization;
+import org.voltdb.CommitLog;
 
 public class HostMessenger implements Messenger {
 
@@ -276,13 +277,13 @@ public class HostMessenger implements Messenger {
     }
 
     @Override
-    public Mailbox createMailbox(int siteId, int mailboxId) {
+    public Mailbox createMailbox(int siteId, int mailboxId, CommitLog commitLog) {
         assert(m_initialized);
         int localSiteId = siteId % VoltDB.SITES_TO_HOST_DIVISOR;
         MessengerSite site = m_messengerSites[localSiteId];
         if (site == null) return null;
 
-        return site.createMailbox(mailboxId);
+        return site.createMailbox(mailboxId, commitLog);
     }
 
     public void send(final int siteId, final int mailboxId, final VoltMessage message)
@@ -342,6 +343,7 @@ public class HostMessenger implements Messenger {
          */
         final FutureTask<ByteBuffer> buildMessageTask = new FutureTask<ByteBuffer>(
                 new Callable<ByteBuffer>() {
+                    @Override
                     public final ByteBuffer call() throws IOException {
                         return message.getBufferForMessaging(heapPool).b;
                     }

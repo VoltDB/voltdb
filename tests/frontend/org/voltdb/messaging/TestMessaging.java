@@ -43,9 +43,24 @@ import org.voltdb.VoltDB;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.DBBPool;
+import org.voltdb.CommitLog;
 
 public class TestMessaging extends TestCase {
 
+    private static final CommitLog dummyLog = new CommitLog() {
+
+        @Override
+        public void logMessage(VoltMessage message, SiteMailbox mailbox) {
+            message.setDurable();
+            mailbox.deliver(message);
+        }
+
+        @Override
+        public void shutdown() throws InterruptedException {
+            return;
+        }
+
+    };
     public static class MsgTest extends VoltMessage {
 
         public static final byte MSG_TEST_ID = 127;
@@ -97,6 +112,11 @@ public class TestMessaging extends TestCase {
                 }
             }
             return true;
+        }
+
+        @Override
+        protected boolean requiresDurabilityP() {
+            return false;
         }
     }
 
@@ -160,7 +180,7 @@ public class TestMessaging extends TestCase {
             messenger.createLocalSite(mySiteId);
             // create the mailboxes
             for (int i = 0; i < mailboxCount; i++) {
-                mbox[i] = currentMessenger.createMailbox(mySiteId, i);
+                mbox[i] = currentMessenger.createMailbox(mySiteId, i, dummyLog);
             }
             // claim this site is done
             sitesDone.incrementAndGet();
@@ -347,8 +367,8 @@ public class TestMessaging extends TestCase {
         msg1.createLocalSite(siteId1);
         msg2.createLocalSite(siteId2);
 
-        Mailbox mb1 = msg1.createMailbox(siteId1, 1);
-        Mailbox mb2 = msg2.createMailbox(siteId2, 1);
+        Mailbox mb1 = msg1.createMailbox(siteId1, 1, dummyLog);
+        Mailbox mb2 = msg2.createMailbox(siteId2, 1, dummyLog);
 
         MsgTest.initWithSize(16);
         MsgTest mt = (MsgTest) VoltMessage.createNewMessage(MsgTest.MSG_TEST_ID);
@@ -426,11 +446,11 @@ public class TestMessaging extends TestCase {
         msg3.createLocalSite(siteId3);
         msg3.createLocalSite(siteId4);
 
-        Mailbox mb1 = msg1.createMailbox(siteId1, 1);
-        Mailbox mb2 = msg2.createMailbox(siteId2, 1);
-        Mailbox mb3 = msg3.createMailbox(siteId3, 1);
-        Mailbox mb4 = msg3.createMailbox(siteId4, 1);
-        Mailbox mb5 = msg1.createMailbox(siteId5, 1);
+        Mailbox mb1 = msg1.createMailbox(siteId1, 1, dummyLog);
+        Mailbox mb2 = msg2.createMailbox(siteId2, 1, dummyLog);
+        Mailbox mb3 = msg3.createMailbox(siteId3, 1, dummyLog);
+        Mailbox mb4 = msg3.createMailbox(siteId4, 1, dummyLog);
+        Mailbox mb5 = msg1.createMailbox(siteId5, 1, dummyLog);
 
         MsgTest.initWithSize(16);
         MsgTest mt = (MsgTest) VoltMessage.createNewMessage(MsgTest.MSG_TEST_ID);

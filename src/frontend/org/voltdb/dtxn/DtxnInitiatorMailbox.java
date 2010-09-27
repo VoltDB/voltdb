@@ -292,4 +292,9 @@ public class DtxnInitiatorMailbox implements Mailbox
     public VoltMessage recvBlocking(Subject[] s, long timeout) {
         throw new UnsupportedOperationException();
     }
+
+    @Override
+    public int getSiteId() {
+        return m_siteId;
+    }
 }

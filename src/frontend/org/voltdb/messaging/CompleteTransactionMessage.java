@@ -111,4 +111,10 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
 
         return sb.toString();
     }
+
+    @Override
+    protected boolean requiresDurabilityP() {
+        return false;
+    }
+
 }

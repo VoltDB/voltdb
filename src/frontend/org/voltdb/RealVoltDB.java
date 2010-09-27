@@ -64,6 +64,8 @@ import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.HostMessenger;
 import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.Messenger;
+import org.voltdb.messaging.SiteMailbox;
+import org.voltdb.messaging.VoltMessage;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.DumpManager;
@@ -214,7 +216,7 @@ public class RealVoltDB implements VoltDBInterface
         @Override
         public void run() {
             Mailbox mailbox = VoltDB.instance().getMessenger()
-            .createMailbox(m_siteId, VoltDB.DTXN_MAILBOX_ID);
+            .createMailbox(m_siteId, VoltDB.DTXN_MAILBOX_ID, VoltDB.instance().getCommitLog());
 
             m_siteObj =
                 new ExecutionSite(VoltDB.instance(),
@@ -279,7 +281,10 @@ public class RealVoltDB implements VoltDBInterface
 
     private long m_recoveryStartTime = System.currentTimeMillis();
 
+    private CommitLog m_commitLog;
+
     // methods accessed via the singleton
+    @Override
     public void startSampler() {
         if (m_hasStartedSampler.compareAndSet(false, true)) {
             m_sampler.start();
@@ -293,8 +298,29 @@ public class RealVoltDB implements VoltDBInterface
     /**
      * Initialize all the global components, then initialize all the m_sites.
      */
+    @Override
     public void initialize(VoltDB.Configuration config) {
         synchronized(m_startAndStopLock) {
+            if (config.m_useCommitLog) {
+                try {
+                    m_commitLog = new CommitLogImpl( config.m_commitLogDir, config.m_commitInterval, config.m_waitForCommit);
+                } catch (IOException e) {
+                    hostLog.fatal("Unable to intialize commit log", e);
+                    System.exit(-1);
+                }
+            } else {
+                m_commitLog = new CommitLog() {
+                    @Override
+                    public void logMessage(VoltMessage message, SiteMailbox mailbox) {
+                        message.setDurable();
+                        mailbox.deliver(message);
+                    }
+
+                    @Override
+                    public void shutdown() throws InterruptedException {
+                    }
+                };
+            }
             if (m_pidFile == null) {
                 String name = java.lang.management.ManagementFactory.getRuntimeMXBean().getName();
                 String pidString = name.substring(0, name.indexOf('@'));
@@ -525,7 +551,10 @@ public class RealVoltDB implements VoltDBInterface
             int siteId = Integer.parseInt(siteForThisThread.getTypeName());
             ExecutionSite siteObj =
                 new ExecutionSite(VoltDB.instance(),
-                                  VoltDB.instance().getMessenger().createMailbox(siteId, VoltDB.DTXN_MAILBOX_ID),
+                                  VoltDB.instance().getMessenger().createMailbox(
+                                          siteId,
+                                          VoltDB.DTXN_MAILBOX_ID,
+                                          m_commitLog),
                                   siteId,
                                   serializedCatalog,
                                   null,
@@ -774,6 +803,7 @@ public class RealVoltDB implements VoltDBInterface
         return downHosts;
     }
 
+    @Override
     public void readBuildInfo() {
         StringBuilder sb = new StringBuilder(64);
         m_buildString = "VoltDB";
@@ -809,6 +839,7 @@ public class RealVoltDB implements VoltDBInterface
     /**
      * Start all the site's event loops. That's it.
      */
+    @Override
     public void run() {
         // start the separate EE threads
         for (ExecutionSiteRunner r : m_runners) {
@@ -829,6 +860,7 @@ public class RealVoltDB implements VoltDBInterface
      * @param mainSiteThread The thread that m_inititalized the VoltDB or
      * null if called from that thread.
      */
+    @Override
     public void shutdown(Thread mainSiteThread) throws InterruptedException {
         synchronized(m_startAndStopLock) {
             fivems.interrupt();
@@ -1108,48 +1140,59 @@ public class RealVoltDB implements VoltDBInterface
         }
     }
 
+    @Override
     public VoltDB.Configuration getConfig()
     {
         return m_config;
     }
 
+    @Override
     public String getBuildString() {
         return m_buildString;
     }
 
+    @Override
     public String getVersionString() {
         return m_versionString;
     }
 
+    @Override
     public Messenger getMessenger() {
         return m_messenger;
     }
 
+    @Override
     public HostMessenger getHostMessenger() {
         return m_messenger;
     }
 
+    @Override
     public ArrayList<ClientInterface> getClientInterfaces() {
         return m_clientInterfaces;
     }
 
+    @Override
     public Hashtable<Integer, ExecutionSite> getLocalSites() {
         return m_localSites;
     }
 
+    @Override
     public VoltNetwork getNetwork() {
         return m_network;
     }
 
+    @Override
     public StatsAgent getStatsAgent() {
         return m_statsAgent;
     }
 
+    @Override
     public FaultDistributorInterface getFaultDistributor()
     {
         return m_faultManager;
     }
 
+    @Override
     public CatalogContext getCatalogContext() {
         synchronized(m_catalogUpdateLock) {
             return m_catalogContext;
@@ -1162,6 +1205,7 @@ public class RealVoltDB implements VoltDBInterface
      *
      * @return true if the VoltDB is running.
      */
+    @Override
     public boolean isRunning() {
         return m_isRunning;
     }
@@ -1214,5 +1258,10 @@ public class RealVoltDB implements VoltDBInterface
                 "Node recovery completed after " + delta + " seconds with " + megabytes +
                 " megabytes transferreds at a rate of " +
                 megabytesPerSecond + " megabytes/sec");
+    }
+
+    @Override
+    public CommitLog getCommitLog() {
+        return m_commitLog;
     }
 }

@@ -39,6 +39,8 @@ import org.voltdb.catalog.Table;
 import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.messaging.HostMessenger;
 import org.voltdb.messaging.Messenger;
+import org.voltdb.messaging.SiteMailbox;
+import org.voltdb.messaging.VoltMessage;
 import org.voltdb.network.VoltNetwork;
 
 public class MockVoltDB implements VoltDBInterface
@@ -371,6 +373,21 @@ public class MockVoltDB implements VoltDBInterface
     public void onRecoveryCompletion(long transferred) {
         // TODO Auto-generated method stub
 
+    }
+
+    @Override
+    public CommitLog getCommitLog() {
+        return new CommitLog() {
+            @Override
+            public void logMessage(VoltMessage message, SiteMailbox mailbox) {
+                message.setDurable();
+                mailbox.deliver(message);
+            }
+
+            @Override
+            public void shutdown() throws InterruptedException {
+            }
+        };
     }
 
 }

@@ -116,4 +116,6 @@ public interface Mailbox {
      * @return A message object on success or null if interrupted
      */
     public VoltMessage recvBlocking(Subject s[], long timeout);
+
+    public int getSiteId();
 }

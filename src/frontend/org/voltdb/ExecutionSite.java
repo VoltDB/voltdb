@@ -257,6 +257,11 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         public byte getSubject() {
             return Subject.FAILURE.getId();
         }
+
+        @Override
+        protected boolean requiresDurabilityP() {
+            return false;
+        }
     }
 
     // This message is used locally to schedule a node failure event's
@@ -281,6 +286,11 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         public byte getSubject() {
             return Subject.FAILURE.getId();
         }
+
+        @Override
+        protected boolean requiresDurabilityP() {
+            return false;
+        }
     }
 
     /**
@@ -297,6 +307,10 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         @Override
         public byte getSubject() {
             return Subject.DEFAULT.getId();
+        }
+        @Override
+        protected boolean requiresDurabilityP() {
+            return false;
         }
     }
 
@@ -315,6 +329,11 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         protected void flattenToBuffer(DBBPool pool) {} // can be empty if only used locally
         @Override
         protected void initFromBuffer() {} // can be empty if only used locally
+
+        @Override
+        protected boolean requiresDurabilityP() {
+            return false;
+        }
     }
 
     private class ExecutionSiteNodeFailureFaultHandler implements FaultHandler
@@ -503,12 +522,19 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     }
 
     protected class SystemProcedureContext implements SystemProcedureExecutionContext {
+        @Override
         public Database getDatabase()               { return m_context.database; }
+        @Override
         public Cluster getCluster()                 { return m_context.cluster; }
+        @Override
         public Site getSite()                       { return getCatalogSite(); }
+        @Override
         public ExecutionEngine getExecutionEngine() { return ee; }
+        @Override
         public long getLastCommittedTxnId()         { return lastCommittedTxnId; }
+        @Override
         public long getNextUndo()                   { return getNextUndoToken(); }
+        @Override
         public ExecutionSite getExecutionSite()     { return ExecutionSite.this; }
     }
 
@@ -1768,6 +1794,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
      *
      */
 
+    @Override
     public SiteTracker getSiteTracker() {
         return m_context.siteTracker;
     }

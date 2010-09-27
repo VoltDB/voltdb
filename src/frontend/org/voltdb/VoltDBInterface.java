@@ -34,6 +34,8 @@ public interface VoltDBInterface
 
     public void readBuildInfo();
 
+    public CommitLog getCommitLog();
+
     /**
      * Initialize all the global components, then initialize all the m_sites.
      */

@@ -191,4 +191,9 @@ public class InitiateResponseMessage extends VoltMessage {
         ms.txnId = m_txnId;
         return ms;
     }
+
+    @Override
+    protected boolean requiresDurabilityP() {
+        return false;
+    }
 }

@@ -57,4 +57,9 @@ public class DebugMessage extends VoltMessage {
         m_buffer.position(HEADER_SIZE + 1); // skip the msg id
         shouldDump = m_buffer.get() == 0;
     }
+
+    @Override
+    protected boolean requiresDurabilityP() {
+        return false;
+    }
 }

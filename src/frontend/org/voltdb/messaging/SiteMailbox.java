@@ -23,6 +23,8 @@ import java.util.Deque;
 
 import org.voltdb.debugstate.MailboxHistory;
 import org.voltdb.debugstate.MailboxHistory.MessageState;
+import org.voltdb.CommitLog;
+import org.voltdb.VoltDB;
 
 /**
  *
@@ -41,13 +43,16 @@ public class SiteMailbox implements Mailbox {
     ArrayDeque<VoltMessage> m_lastTenMembershipNotices = new ArrayDeque<VoltMessage>();
     ArrayDeque<VoltMessage> m_lastTenHeartbeats = new ArrayDeque<VoltMessage>();
 
-    SiteMailbox(HostMessenger hostMessenger, int siteId, int mailboxId) {
+    private final CommitLog m_commitLog;
+
+    SiteMailbox(HostMessenger hostMessenger, int siteId, int mailboxId, CommitLog commitLog) {
         this.m_hostMessenger = hostMessenger;
         this.m_siteId = siteId;
         MESSAGE_HISTORY_SIZE = 0;
         for (Subject s : Subject.values()) {
             m_messages.add( s.getId(), new ArrayDeque<VoltMessage>());
         }
+        m_commitLog = commitLog;
     }
 
     @Override
@@ -57,7 +62,11 @@ public class SiteMailbox implements Mailbox {
 
     @Override
     public void deliver(VoltMessage message) {
-        deliver(message, false);
+        if (message.requiresDurability()) {
+            m_commitLog.logMessage(message, this);
+        } else {
+            deliver(message, false);
+        }
     }
 
     public void deliver(VoltMessage message, final boolean toFront) {
@@ -259,5 +268,10 @@ public class SiteMailbox implements Mailbox {
      */
     public int getWaitingCount() {
         return m_messages.get(Subject.DEFAULT.getId()).size();
+    }
+
+    @Override
+    public int getSiteId() {
+        return m_siteId;
     }
 }

@@ -51,7 +51,7 @@ public class TestDistributer extends TestCase {
 
         @Override
         public int getMaxRead() {
-            return 8096;
+            return 8192;
         }
 
         @Override

@@ -287,6 +287,11 @@ public class RawProcessor extends Thread implements ExportDataProcessor {
         protected void initFromBuffer() {
             throw new NotImplementedException("Invalid serialization request.");
         }
+
+        @Override
+        protected boolean requiresDurabilityP() {
+            return false;
+        }
     }
 
     /**

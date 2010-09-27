@@ -60,6 +60,11 @@ public abstract class VoltMessage {
     protected ByteBuffer m_buffer = null;
     protected byte m_subject;
 
+    /**
+     * Set to true once this message has been synced to disk
+     */
+    private boolean m_isDurable = false;
+
     public static VoltMessage createNewMessage(byte messageType) {
         // instantiate a new message instance according to the type
         VoltMessage message = instantiate(messageType);
@@ -218,4 +223,18 @@ public abstract class VoltMessage {
     public byte getSubject() {
         return m_subject;
     }
+
+    public void setDurable() {
+        m_isDurable = true;
+    }
+
+    public ByteBuffer getBuffer() {
+        return m_buffer;
+    }
+
+    public boolean requiresDurability() {
+        return requiresDurabilityP() && !m_isDurable;
+    }
+
+    protected abstract boolean requiresDurabilityP();
 }

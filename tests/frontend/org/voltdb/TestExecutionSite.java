@@ -138,6 +138,7 @@ public class TestExecutionSite extends TestCase {
             return fail;
         }
 
+        @Override
         public void send(int siteId, int mailboxId, VoltMessage message) throws MessagingException {
             m_totalSends++;
             if (message instanceof HeartbeatResponseMessage) {
@@ -155,6 +156,7 @@ public class TestExecutionSite extends TestCase {
             }
         }
 
+        @Override
         public void send(int[] siteIds, int mailboxId, VoltMessage message) throws MessagingException {
             if (message instanceof HeartbeatResponseMessage) {
                 m_heartBeatSends += siteIds.length;
@@ -185,10 +187,12 @@ public class TestExecutionSite extends TestCase {
 
         private final Subject m_defaultSubjects[] = new Subject[] { Subject.FAILURE, Subject.DEFAULT };
 
+        @Override
         public VoltMessage recv() {
             return recv(m_defaultSubjects);
         }
 
+        @Override
         public VoltMessage recvBlocking() {
             return recvBlocking(m_defaultSubjects);
         }
@@ -295,6 +299,12 @@ public class TestExecutionSite extends TestCase {
             postoffice.remove(m_siteId);
             // stop/join this site's thread
             throw new Error();
+        }
+
+        @Override
+        public int getSiteId() {
+            // TODO Auto-generated method stub
+            return 0;
         }
     }
 
@@ -812,10 +822,12 @@ public class TestExecutionSite extends TestCase {
 
         // execute transaction
         es1 = new Thread(new Runnable() {
+            @Override
             public void run() {m_sites[0].recursableRun(tx1_1);}});
         es1.start();
 
         es2 = new Thread(new Runnable() {
+            @Override
             public void run() {m_sites[1].recursableRun(tx1_2);}});
         es2.start();
 
@@ -926,10 +938,12 @@ public class TestExecutionSite extends TestCase {
 
         // execute transaction
         es1 = new Thread(new Runnable() {
+            @Override
             public void run() {m_sites[0].recursableRun(tx1_1);}});
         es1.start();
 
         es2 = new Thread(new Runnable() {
+            @Override
             public void run() {m_sites[1].recursableRun(tx1_2);}});
         es2.start();
 
@@ -1044,6 +1058,7 @@ public class TestExecutionSite extends TestCase {
 
         // execute transaction
         es1 = new Thread(new Runnable() {
+            @Override
             public void run() {m_sites[0].recursableRun(tx1_1);}});
         es1.start();
 

@@ -65,6 +65,7 @@ import org.voltdb.network.NIOReadStream;
 import org.voltdb.network.WriteStream;
 import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltdb.CommitLog;
 
 public class SimpleDtxnInitiatorTest extends TestCase {
     MockMessenger m_messenger;
@@ -97,7 +98,7 @@ public class SimpleDtxnInitiatorTest extends TestCase {
     class MockMessenger implements Messenger
     {
         @Override
-        public Mailbox createMailbox(int siteId, int mailboxId)
+        public Mailbox createMailbox(int siteId, int mailboxId, CommitLog log)
         {
             return new MockMailbox();
         }

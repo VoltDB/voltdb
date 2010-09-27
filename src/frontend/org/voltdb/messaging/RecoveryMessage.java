@@ -110,4 +110,9 @@ public class RecoveryMessage extends VoltMessage {
     protected void initFromBuffer() {
         m_recoveryMessagesAvailable = false;
     }
+
+    @Override
+    protected boolean requiresDurabilityP() {
+        return false;
+    }
 }

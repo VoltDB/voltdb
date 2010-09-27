@@ -70,6 +70,7 @@ public class MockMailbox implements Mailbox {
         }
     }
 
+    @Override
     public void send(int siteId, int mailboxId, VoltMessage message) throws MessagingException {
         outgoingMessages.add(new Message(siteId, mailboxId, message));
 
@@ -79,6 +80,7 @@ public class MockMailbox implements Mailbox {
         }
     }
 
+    @Override
     public void send(int[] siteIds, int mailboxId, VoltMessage message) throws MessagingException {
         for (int i=0; siteIds != null && i < siteIds.length; ++i) {
             MockMailbox dest = postoffice.get(siteIds[i]);
@@ -94,10 +96,12 @@ public class MockMailbox implements Mailbox {
 
     private static final Subject m_defaultSubjects[] = new Subject[] { Subject.FAILURE_SITE_UPDATE, Subject.DEFAULT };
 
+    @Override
     public VoltMessage recv() {
         return recv(m_defaultSubjects);
     }
 
+    @Override
     public VoltMessage recvBlocking() {
         return recvBlocking(m_defaultSubjects);
     }
@@ -220,4 +224,10 @@ public class MockMailbox implements Mailbox {
     final ArrayList<Deque<VoltMessage>> m_messages = new ArrayList<Deque<VoltMessage>>();
 
     private final ArrayDeque<Message> outgoingMessages = new ArrayDeque<Message>();
+
+    @Override
+    public int getSiteId() {
+        // TODO Auto-generated method stub
+        return 0;
+    }
 }
