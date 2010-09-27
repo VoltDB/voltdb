@@ -81,10 +81,10 @@ public class ProcessData {
                     OutputLine ol = new OutputLine(m_processName, m_stream, line);
                     if (m_handler != null) {
                         m_handler.update(ol);
-                    }// else {
+                    } else {
                         final long now = (System.currentTimeMillis() / 1000) - 1256158053;
                         System.out.println("(" + now + ")" + m_processName + ": " + line);
-                    //}
+                    }
                 } else {
                     return;
                 }
