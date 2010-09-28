@@ -39,7 +39,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 public class LocalSingleProcessServer implements VoltServerConfig {
 
     public final String m_jarFileName;
-    public final int m_siteCount;
+    public int m_siteCount;
     public final BackendTarget m_target;
 
     ServerThread m_server = null;
@@ -67,9 +67,6 @@ public class LocalSingleProcessServer implements VoltServerConfig {
             } else {
                 m_target = target;
             }
-        }
-        for (int ii = 0; ii < siteCount; ii++) {
-            m_siteProcesses.add(new EEProcess(m_target, "LocalSingleProcessServer_site_" + ii + ".log"));
         }
     }
     @Override
@@ -137,6 +134,7 @@ public class LocalSingleProcessServer implements VoltServerConfig {
         for (EEProcess proc : m_siteProcesses) {
             proc.waitForShutdown();
         }
+        m_siteProcesses.clear();
         if (m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
             if (!EEProcess.m_valgrindErrors.isEmpty()) {
                 String failString = "";
@@ -159,6 +157,9 @@ public class LocalSingleProcessServer implements VoltServerConfig {
         config.m_pathToDeployment = m_pathToDeployment;
 
         config.m_ipcPorts = java.util.Collections.synchronizedList(new ArrayList<Integer>());
+        for (int ii = 0; ii < m_siteCount; ii++) {
+            m_siteProcesses.add(new EEProcess(m_target, "LocalSingleProcessServer_site_" + ii + ".log"));
+        }
         for (EEProcess proc : m_siteProcesses) {
             config.m_ipcPorts.add(proc.port());
         }

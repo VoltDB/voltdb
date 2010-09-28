@@ -34,6 +34,7 @@ import org.voltdb.regressionsuites.LocalSingleProcessServer;
 public class CatalogChangeSingleProcessServer extends LocalSingleProcessServer
 {
     VoltProjectBuilder m_origBuilder;
+    private int m_originalSiteCount = 0;
 
     public CatalogChangeSingleProcessServer(String jarFileName,
                                             int siteCount,
@@ -59,6 +60,8 @@ public class CatalogChangeSingleProcessServer extends LocalSingleProcessServer
 
     public boolean recompile(int siteCount)
     {
+        m_originalSiteCount = m_siteCount;
+        m_siteCount = siteCount;
         boolean compiled = m_origBuilder.compile(m_jarFileName, siteCount, 0);
         m_pathToDeployment = m_origBuilder.getPathToDeployment();
         return compiled;
@@ -66,6 +69,8 @@ public class CatalogChangeSingleProcessServer extends LocalSingleProcessServer
 
     public boolean recompile(VoltProjectBuilder builder, int siteCount)
     {
+        m_originalSiteCount = m_siteCount;
+        m_siteCount = siteCount;
         boolean compiled = builder.compile(m_jarFileName, siteCount, 0);
         m_pathToDeployment = builder.getPathToDeployment();
         return compiled;
@@ -73,6 +78,7 @@ public class CatalogChangeSingleProcessServer extends LocalSingleProcessServer
 
     public boolean revertCompile()
     {
+        m_siteCount = m_originalSiteCount;
         boolean compiled = m_origBuilder.compile(m_jarFileName, m_siteCount, 0);
         m_pathToDeployment = m_origBuilder.getPathToDeployment();
         return compiled;
