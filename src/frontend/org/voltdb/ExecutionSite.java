@@ -1112,6 +1112,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                                 exportm.m_m.isClose(),
                                 exportm.m_m.isSync(),
                                 exportm.m_m.getAckOffset(),
+                                0,
                                 exportm.m_m.getPartitionId(),
                                 exportm.m_m.getTableId());
             // not all actions generate a response

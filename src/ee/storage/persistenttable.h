@@ -226,13 +226,22 @@ class PersistentTable : public Table {
      * Get the current offset in bytes of the export stream for this Table
      * since startup.
      */
-    int64_t getExportStreamSequenceNo() { return m_exportEnabled ? m_tsSeqNo : -1; }
+    void getExportStreamSequenceNo(long &seqNo, size_t &streamBytesUsed) {
+        seqNo = m_exportEnabled ? m_tsSeqNo : -1;
+        streamBytesUsed = m_wrapper ? m_wrapper->bytesUsed() : 0;
+    }
 
     /**
      * Set the current offset in bytes of the export stream for this Table
      * since startup (used for rejoin/recovery).
      */
-    virtual void setExportStreamSequenceNo(int64_t seqNo) { m_tsSeqNo = seqNo; }
+    virtual void setExportStreamPositions(int64_t seqNo, size_t streamBytesUsed) {
+        // assume this only gets called from a fresh rejoined node
+        assert(m_tsSeqNo == 0);
+        m_tsSeqNo = seqNo;
+        if (m_wrapper)
+            m_wrapper->setBytesUsed(streamBytesUsed);
+    }
 
 protected:
     // ------------------------------------------------------------------

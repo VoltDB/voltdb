@@ -139,6 +139,19 @@ public class ExportProtoMessage
         m_tableId = tableId;
     }
 
+    public String messageTypesAsString() {
+        String retval = "|";
+        if (isOpen()) retval += "OPEN|";
+        if (isOpenResponse()) retval += "OPEN_REPONSE|";
+        if (isPoll()) retval += "POLL|";
+        if (isPollResponse()) retval += "POLL_RESPONSE|";
+        if (isAck()) retval += "ACK|";
+        if (isClose()) retval += "CLOSE|";
+        if (isError()) retval += "ERROR|";
+        if (isSync()) retval += "SYNC|";
+        return retval;
+    }
+
     public ByteBuffer toBuffer() throws IOException {
         FastSerializer fs = new FastSerializer();
         writeToFastSerializer(fs);

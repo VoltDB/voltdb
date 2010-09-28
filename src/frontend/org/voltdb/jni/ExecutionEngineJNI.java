@@ -488,13 +488,13 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     @Override
     public ExportProtoMessage exportAction(boolean ackAction, boolean pollAction,
             boolean resetAction, boolean syncAction,
-            long ackTxnId, int partitionId, long tableId)
+            long ackTxnId, long seqNo, int partitionId, long tableId)
     {
         deserializer.clear();
         ExportProtoMessage result = null;
         try {
             long offset = nativeExportAction(pointer, ackAction, pollAction, resetAction,
-                                             syncAction, ackTxnId, tableId);
+                                             syncAction, ackTxnId, seqNo, tableId);
             if (offset < 0) {
                 result = new ExportProtoMessage(partitionId, tableId);
                 result.error();

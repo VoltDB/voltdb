@@ -19,6 +19,9 @@
 #include "common/DefaultTupleSerializer.h"
 #include "storage/persistenttable.h"
 
+#include <cstdio>
+using namespace std;
+
 namespace voltdb {
 RecoveryContext::RecoveryContext(PersistentTable *table, int32_t tableId) :
         m_table(table),
@@ -43,7 +46,10 @@ bool RecoveryContext::nextMessage(ReferenceSerializeOutput *out) {
         out->writeByte(static_cast<int8_t>(RECOVERY_MSG_TYPE_COMPLETE));
         out->writeInt(m_tableId);
         // last message gets the export stream counter
-        out->writeLong(m_table->getExportStreamSequenceNo());
+        long seqNo = 0; size_t offset = 0;
+        m_table->getExportStreamSequenceNo(seqNo, offset);
+        out->writeLong(seqNo);
+        out->writeLong((long) offset);
         //No tuple count added to message because completion message is only used in Java
         return false;
     }

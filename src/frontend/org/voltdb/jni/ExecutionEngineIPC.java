@@ -1126,7 +1126,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     @Override
     public ExportProtoMessage exportAction(boolean ackAction, boolean pollAction,
             boolean resetAction, boolean syncAction,
-            long ackOffset, int partitionId, long mTableId) {
+            long ackOffset, long seqNo, int partitionId, long mTableId) {
         try {
             m_data.clear();
             m_data.putInt(Commands.ExportAction.m_id);
@@ -1135,6 +1135,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             m_data.putInt(resetAction ? 1 : 0);
             m_data.putInt(syncAction ? 1 : 0);
             m_data.putLong(ackOffset);
+            m_data.putLong(seqNo);
             m_data.putLong(mTableId);
             m_data.flip();
             m_connection.write();

@@ -35,6 +35,16 @@ public class TimestampType implements JSONString {
     }
 
     /**
+     * Create a TimestampType from a Java Date class.
+     * Microseconds will be rounded to zero.
+     * @param Java Date instance.
+     */
+    public TimestampType(Date date) {
+        m_usecs = 0;
+        m_date = (Date) date.clone();
+    }
+
+    /**
      * Create a TimestampType instance for the current time.
      */
     public TimestampType() {

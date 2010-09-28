@@ -373,7 +373,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * returned separatedly via QueryResults buffer)
          */
         long exportAction(bool ackAction, bool pollAction, bool resetAction, bool syncAction,
-                          int64_t ackOffset, int64_t tableId);
+                          int64_t ackOffset, int64_t seqNo, int64_t tableId);
 
         /**
          * Retrieve a hash code for the specified table

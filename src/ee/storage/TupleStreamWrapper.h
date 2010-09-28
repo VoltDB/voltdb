@@ -60,6 +60,12 @@ public:
         return m_uso;
     }
 
+    /** Set the total number of bytes used (for rejoin/recover) */
+    void setBytesUsed(size_t count) {
+        assert(m_uso == 0);
+        m_uso = count;
+    }
+
     /** truncate stream back to mark */
     void rollbackTo(size_t mark);
 

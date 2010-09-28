@@ -1036,6 +1036,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
    jboolean resetAction,
    jboolean syncAction,
    jlong ackOffset,
+   jlong seqNo,
    jlong tableId) {
     VOLT_DEBUG("nativeExportAction in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
@@ -1045,6 +1046,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
             engine->resetReusedResultOutputBuffer();
             return engine->exportAction(ackAction, pollAction, resetAction, syncAction,
                                         static_cast<int64_t>(ackOffset),
+                                        static_cast<int64_t>(seqNo),
                                         static_cast<int64_t>(tableId));
         } catch (SQLException e) {
             throwFatalException("%s", e.message().c_str());

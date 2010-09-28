@@ -524,6 +524,7 @@ public abstract class VoltProcedure {
         if (slot == TimestampType.class) {
             if (pclass == Long.class) return new TimestampType((Long)param);
             if (pclass == TimestampType.class) return param;
+            if (pclass == Date.class) return new TimestampType((Date) param);
             // if a string is given for a date, use java's JDBC parsing
             if (pclass == String.class) {
                 try {

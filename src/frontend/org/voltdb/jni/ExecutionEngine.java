@@ -363,7 +363,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     public abstract ExportProtoMessage exportAction(
             boolean ackAction, boolean pollAction, boolean resetAction, boolean syncAction,
-            long ackOffset, int partitionId, long tableId);
+            long ackOffset, long seqNo, int partitionId, long tableId);
 
     /**
      * Calculate a hash code for a table.
@@ -626,5 +626,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             boolean resetAction,
             boolean syncAction,
             long mAckOffset,
+            long seqNo,
             long mTableId);
 }

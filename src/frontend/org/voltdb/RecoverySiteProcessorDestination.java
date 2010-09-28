@@ -240,13 +240,15 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
                     " for table " + m_tables.get(tableId).m_name);
         } else if (type == RecoveryMessageType.Complete) {
             message.position(messageTypeOffset + 5);
+            long seqNo = message.getLong();
+            long bytesUsed = message.getLong();
+            assert(seqNo >= -1);
             RecoveryTable table = m_tables.remove(tableId);
             recoveryLog.info("Received completion message at site " + m_siteId +
-                    " for table " + table.m_name);
-            long exportOffset = message.getLong();
-            assert(exportOffset >= -1);
-            if (exportOffset >= 0) {
-                m_engine.exportAction(false, false, false, true, exportOffset, m_partitionId, tableId);
+                    " for table " + table.m_name + " with export info (" + seqNo +
+                    "," + bytesUsed + ")");
+            if (seqNo >= 0) {
+                m_engine.exportAction(false, false, false, true, bytesUsed, seqNo, m_partitionId, tableId);
             }
 
         } else {

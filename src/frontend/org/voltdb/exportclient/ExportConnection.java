@@ -55,6 +55,8 @@ public class ExportConnection implements Runnable {
     private final HashMap<Long, HashMap<Integer, ExportDataSink>> m_sinks;
     private ArrayList<AdvertisedDataSource> m_dataSources;
 
+    private long m_lastAckOffset;
+
     public ExportConnection(
             String username, String password,
             InetSocketAddress serverAddr,
@@ -184,6 +186,7 @@ public class ExportConnection implements Runnable {
 
             if (m != null && m.isPollResponse())
             {
+                m_lastAckOffset = m.getAckOffset();
                 ExportDataSink rx_sink = m_sinks.get(m.getTableId()).get(m.getPartitionId());
                 rx_sink.getRxQueue(m_connectionName).offer(m);
             }
@@ -305,5 +308,9 @@ public class ExportConnection implements Runnable {
         while (buf.remaining() > 0) {
             m_socket.write(buf);
         }
+    }
+
+    public long getLastAckOffset() {
+        return m_lastAckOffset;
     }
 }

@@ -240,7 +240,7 @@ public:
      * Set the current offset in bytes of the export stream for this Table
      * since startup (used for rejoin/recovery).
      */
-    virtual void setExportStreamSequenceNo(int64_t seqNo) {
+    virtual void setExportStreamPositions(int64_t seqNo, size_t streamBytesUsed) {
         // this should be overidden by any table involved in an export
         assert(false);
     }

@@ -1202,7 +1202,7 @@ void VoltDBEngine::processRecoveryMessage(RecoveryProtoMsg *message) {
 
 long
 VoltDBEngine::exportAction(bool ackAction, bool pollAction, bool resetAction,
-                           bool syncAction, int64_t ackOffset, int64_t tableId)
+                           bool syncAction, int64_t ackOffset, int64_t seqNo, int64_t tableId)
 {
     map<int64_t, Table*>::iterator pos = m_exportingTables.find(tableId);
 
@@ -1226,7 +1226,7 @@ VoltDBEngine::exportAction(bool ackAction, bool pollAction, bool resetAction,
     Table *table_for_el = pos->second;
 
     if (syncAction) {
-        table_for_el->setExportStreamSequenceNo(ackOffset);
+        table_for_el->setExportStreamPositions(seqNo, (size_t) ackOffset);
         // done after the sync
         return 0;
     }

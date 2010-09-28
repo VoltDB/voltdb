@@ -197,6 +197,7 @@ typedef struct {
     int32_t isReset;
     int32_t isSync;
     int64_t offset;
+    int64_t seqNo;
     int64_t tableId;
 }__attribute__((packed)) export_action;
 
@@ -998,6 +999,7 @@ void VoltDBIPC::exportAction(struct ipc_command *cmd) {
                                          action->isReset,
                                          action->isSync,
                                          static_cast<int64_t>(ntohll(action->offset)),
+                                         static_cast<int64_t>(ntohll(action->seqNo)),
                                          static_cast<int64_t>(ntohll(action->tableId)));
     int buflength = m_engine->getResultsSize();
 
