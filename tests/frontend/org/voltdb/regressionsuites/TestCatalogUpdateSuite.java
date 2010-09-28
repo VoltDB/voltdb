@@ -416,6 +416,30 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         assertTrue(result.getRowCount() == 2);
     }
 
+    public void testAddDropTableRepeat() throws Exception {
+        Client client = getClient();
+        loadSomeData(client, 0, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
+
+        for (int i=0; i < 100; i++)
+        {
+            // add tables O1, O2, O3
+            String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtables.jar");
+            String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtables.xml");
+            VoltTable[] results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
+            assertTrue(results.length == 1);
+
+            // Thread.sleep(2000);
+
+            // revert to the original schema
+            newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
+            deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml");
+            results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
+            assertTrue(results.length == 1);
+       }
+    }
+
     /**
      * Simple code to copy a file from one place to another...
      * Java should have this built in... stupid java...
