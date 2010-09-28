@@ -42,6 +42,12 @@ CatalogType::CatalogType(Catalog * catalog, CatalogType * parent, const string &
     }
 }
 
+CatalogType::~CatalogType() {
+    if (this != m_catalog) {
+        m_catalog->unregisterGlobally(this);
+    }
+}
+
 void CatalogType::set(const string &field, const string &value) {
     CatalogValue val;
     int32_t indicator = tolower(value[0]);

@@ -254,7 +254,7 @@ def gencpp( classes, prepath, postpath ):
         write( '\nprotected:')
 
         # constructor
-        write( '    ' + clsname + '(Catalog * catalog, CatalogType * parent, const std::string &path, const std::string &name);\n' )
+        write( '    ' + clsname + '(Catalog * catalog, CatalogType * parent, const std::string &path, const std::string &name);' )
 
         # Field Member variables.
         for field in cls.fields:
@@ -276,6 +276,9 @@ def gencpp( classes, prepath, postpath ):
 
         # public section
         write("\npublic:")
+
+        # destructor
+        write('    ~' + clsname + '();\n');
 
         # getter methods
         for field in cls.fields:
@@ -345,6 +348,22 @@ def gencpp( classes, prepath, postpath ):
             else:
                 write( interp( '    m_fields["$pubname"] = value;', locals() ) )
         write ( "}\n" )
+
+        # write the destructor
+        write(clsname + '::~' + clsname + '() {');
+        for field in cls.fields:
+            if field.type[-1] == '*':
+                ftype = field.type.rstrip('*')
+                itr = ftype.lower() + '_iter'
+                privname = 'm_' + field.name
+                tab = '   '
+                write(interp('$tab std::map<std::string, $ftype*>::const_iterator $itr = $privname.begin();', locals()))
+                write(interp('$tab while ($itr != $privname.end()) {', locals()))
+                write(interp('$tab $tab delete $itr->second;', locals()))
+                write(interp('$tab $tab $itr++;', locals()))
+                write(interp('$tab }', locals()))
+                write(interp('$tab $privname.clear();\n', locals()))
+        write('}\n')
 
         # write update()
         write ( interp( 'void $clsname::update() {', locals() ) )

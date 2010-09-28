@@ -42,13 +42,12 @@ Catalog::Catalog()
 }
 
 Catalog::~Catalog() {
-    boost::unordered_map<std::string, CatalogType*>::iterator iter;
-    for (iter = m_allCatalogObjects.begin(); iter != m_allCatalogObjects.end(); iter++) {
-        CatalogType *ct = iter->second;
-        if (ct != this) {
-            delete ct;
-        }
+    std::map<std::string, Cluster*>::const_iterator cluster_iter = m_clusters.begin();
+    while (cluster_iter != m_clusters.end()) {
+        delete cluster_iter->second;
+        cluster_iter++;
     }
+    m_clusters.clear();
 }
 
 /*
@@ -67,15 +66,16 @@ void Catalog::cleanupExecutionBookkeeping() {
 void Catalog::purgeDeletions() {
     for (std::vector<std::string>::iterator i = m_deletions.begin();
          i != m_deletions.end();
-         i++) {
+         i++)
+    {
         boost::unordered_map<std::string, CatalogType*>::iterator object = m_allCatalogObjects.find(*i);
         if (object == m_allCatalogObjects.end()) {
             std::string errmsg = "Catalog reference for " + (*i) + " not found.";
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, errmsg);
         }
         delete object->second;
-        m_allCatalogObjects.erase(object);
     }
+    m_deletions.clear();
 }
 
 void Catalog::execute(const string &stmts) {
@@ -217,15 +217,21 @@ CatalogType *Catalog::itemForPathPart(const CatalogType *parent, const string &p
 void Catalog::registerGlobally(CatalogType *catObj) {
     boost::unordered_map<std::string, CatalogType*>::iterator iter
       = m_allCatalogObjects.find(catObj->path());
-    if (iter != m_allCatalogObjects.end()) {
-        // this is a memory leak
-        //
-        // if unregister doesn't fully remove children of deleted
-        // catalog objects, and the identical parent is re-added, this
-        // invariant will be broken.
-        delete iter->second;
+    if (iter != m_allCatalogObjects.end() && iter->second != catObj ) {
+        // this is a defect if it happens
+        printf("Replacing object at path: %s (%p,%p)\n",
+               catObj->path().c_str(), iter->second, catObj);
+        assert(false);
     }
     m_allCatalogObjects[catObj->path()] = catObj;
+}
+
+void Catalog::unregisterGlobally(CatalogType *catObj) {
+    boost::unordered_map<std::string, CatalogType*>::iterator iter
+      = m_allCatalogObjects.find(catObj->path());
+    if (iter != m_allCatalogObjects.end()) {
+        m_allCatalogObjects.erase(iter);
+    }
 }
 
 void Catalog::update() {

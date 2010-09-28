@@ -32,7 +32,7 @@ class CatalogType;
 
 /**
  * A safe interface to a generic map of CatalogType instances. It is safe
- * because it is read-only.
+ * because it is read-only. (Exception: maps can be cleared.)
  *
  * @param <T> The subclass of CatalogType that this map will contain.
  */
@@ -86,6 +86,11 @@ public:
      * @return The end iterator for the items in the map
      */
     field_map_iter end() const;
+
+    /**
+     * Clear the map. Does no destruction.
+     */
+    void clear();
 };
 
 template <class T>
@@ -156,6 +161,12 @@ typename std::map<std::string, T*>::const_iterator CatalogMap<T>::begin() const 
 template <class T>
 typename std::map<std::string, T*>::const_iterator CatalogMap<T>::end() const {
     return m_items.end();
+}
+
+// this is totally not const
+template <class T>
+void CatalogMap<T>::clear() {
+    m_items.clear();
 }
 
 

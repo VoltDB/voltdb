@@ -45,13 +45,13 @@ class AddDropTableTest : public Test {
     {
         m_engine = new VoltDBEngine();
 
-    m_resultBuffer = new char[1024 * 1024 * 2];
+        m_resultBuffer = new char[1024 * 1024 * 2];
         m_exceptionBuffer = new char[4096];
         m_engine->setBuffers(NULL, 0,
-                 m_resultBuffer, 1024 * 1024 * 2,
-                 m_exceptionBuffer, 4096);
+                             m_resultBuffer, 1024 * 1024 * 2,
+                             m_exceptionBuffer, 4096);
 
-    m_engine->resetReusedResultOutputBuffer();
+        m_engine->resetReusedResultOutputBuffer();
         m_engine->initialize(m_clusterId, m_siteId, m_partitionId,
                              m_hostId, m_hostName);
 
@@ -74,8 +74,8 @@ class AddDropTableTest : public Test {
     ~AddDropTableTest()
     {
         delete m_engine;
-    delete[] m_resultBuffer;
-    delete[] m_exceptionBuffer;
+        delete[] m_resultBuffer;
+        delete[] m_exceptionBuffer;
     }
 
 
@@ -212,6 +212,10 @@ TEST_F(AddDropTableTest, DetectDeletedTable)
         ++delIter;
     }
     ASSERT_TRUE(found);
+
+    // call this twice on purpose - reasonable to expect idempotent behaviour.
+    catalog->purgeDeletions();
+    catalog->purgeDeletions();
 }
 
 /*
@@ -268,6 +272,7 @@ TEST_F(AddDropTableTest, DeletionsSetCleared)
         ASSERT_EQ(path, "/clusters[cluster]/databases[database]/tables[tableA]");
         ++delIter;
     }
+    catalog->purgeDeletions();
 
     // delete a second table. verify deletion bookkeeping
     catalog->execute(tableBDeleteCmd());
@@ -281,6 +286,7 @@ TEST_F(AddDropTableTest, DeletionsSetCleared)
         ASSERT_EQ(path, "/clusters[cluster]/databases[database]/tables[tableB]");
         ++delIter;
     }
+    catalog->purgeDeletions();
 }
 
 /*
@@ -393,14 +399,32 @@ TEST_F(AddDropTableTest, AddDropAdd)
 {
     bool result;
 
+    // std::string addboth = tableACmds() + "\n" + tableBCmds();
+    // std::string dropboth = tableADeleteCmd() + "\n" + tableBDeleteCmd();
+
+    // result = m_engine->updateCatalog(addboth, ++m_catVersion);
+    // ASSERT_TRUE(result);
+
     result = m_engine->updateCatalog(tableACmds(), ++m_catVersion);
     ASSERT_TRUE(result);
 
-    result = m_engine->updateCatalog(tableADeleteCmd(), ++m_catVersion);
-    ASSERT_TRUE(result);
+    for (int ii=0; ii < 20; ii++) {
+        printf("Starting cycle %d\n", ii);
 
-    result = m_engine->updateCatalog(tableACmds(), ++m_catVersion);
-    ASSERT_TRUE(result);
+        // result = m_engine->updateCatalog(tableBDeleteCmd(), ++m_catVersion);
+        // ASSERT_TRUE(result);
+
+        // A-only to B-only
+        result = m_engine->updateCatalog(tableADeleteCmd() + "\n" + tableBCmds(), ++m_catVersion);
+        ASSERT_TRUE(result);
+
+        // B-only to A-only
+        result = m_engine->updateCatalog(tableBDeleteCmd() + "\n" + tableACmds(), ++m_catVersion);
+        ASSERT_TRUE(result);
+
+        // result = m_engine->updateCatalog(tableBCmds(), ++m_catVersion);
+        // ASSERT_TRUE(result);
+    }
 }
 
 /*

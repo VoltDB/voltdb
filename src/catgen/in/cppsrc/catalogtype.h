@@ -77,7 +77,7 @@ class CatalogType {
     int32_t m_relativeIndex;
 
     CatalogType(Catalog * catalog, CatalogType * parent, const std::string &path, const std::string &name);
-    virtual ~CatalogType() {}
+    virtual ~CatalogType();
 
     void set(const std::string &field, const std::string &value);
     virtual void update() = 0;

@@ -180,10 +180,14 @@ public class AppUpdate extends ClientMain {
 
             if (!checkTransaction(t.name, clientResponse, false, false)) {
                 if (clientResponse.getStatusString() != null) {
-                    if (clientResponse.getStatusString().contains("Procedure InsertA was not found")) {
+                    if (clientResponse.getStatusString().contains("Procedure does not exist: InsertA") ||
+                        clientResponse.getStatusString().contains("Procedure InsertA was not found"))
+                    {
                         m_counts[Transaction.InsertAFail.ordinal()].incrementAndGet();
                     }
-                    else if (clientResponse.getStatusString().contains("Procedure InsertB was not found")) {
+                    else if (clientResponse.getStatusString().contains("Procedure does not exist: InsertB") ||
+                             clientResponse.getStatusString().contains("Procedure InsertB was not found"))
+                    {
                         m_counts[Transaction.InsertBFail.ordinal()].incrementAndGet();
                     }
                     else if (clientResponse.getStatusString().contains("Trying to update main catalog context with diff commands generated for an out-of date catalog."))
@@ -198,7 +202,7 @@ public class AppUpdate extends ClientMain {
                             throw new RuntimeException("Unexpected failure: " + clientResponse.getStatusString());
                     }
                     else {
-                        throw new RuntimeException("Error. Unexpected failure from harness: " + clientResponse.getStatus());
+                        throw new RuntimeException("Error. Unexpected failure from harness: " + clientResponse.getStatusString());
                     }
                 }
 
@@ -311,15 +315,15 @@ public class AppUpdate extends ClientMain {
 
             if (queued) {
                 tuplesLoaded += 1;
-                if (tuplesLoaded % 1000 == 0) {
+                if (tuplesLoaded % 100000 == 0) {
                     System.err.println("Loaded: " + tuplesLoaded);
                 }
             }
         }
 
-        // change catalogs with a probability of 0.01%
-        else if (m_rand.nextInt(1000) < 10) {
-            checkTables();
+        // change catalogs with a small probability
+        else if (m_rand.nextInt(100000) < 10) {
+            // checkTables();
             queued = updateToCatalog(m_rand.nextInt(1000) % 3);
         }
 
