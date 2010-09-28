@@ -152,6 +152,11 @@ public class ClientVoter {
         long this_millisecond = System.currentTimeMillis();
 
         ClientConfig config = new ClientConfig("program", "none");
+        /*
+         * Allow a large number of outstanding txns in order to be able to drive a large
+         * cluster. Config must be modified before instantiating the client.
+         */
+        config.setMaxOutstandingTxns(6000);
         final org.voltdb.client.Client voltclient = ClientFactory.createClient(config);
 
         String[] voltServers = serverList.split(",");
