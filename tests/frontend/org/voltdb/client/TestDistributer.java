@@ -127,6 +127,7 @@ public class TestDistributer extends TestCase {
 
     // A fake server.
     class MockVolt extends Thread {
+        boolean handleConnection = true;
         MockVolt(int port) {
             try {
                 network = new VoltNetwork();
@@ -195,7 +196,9 @@ public class TestDistributer extends TestCase {
                         client.write(responseBuffer);
 
                         client.configureBlocking(false);
-                        network.registerChannel( client, handler);
+                        if (handleConnection) {
+                            network.registerChannel( client, handler);
+                        }
                     }
                 }
             } catch (IOException e) {
@@ -402,6 +405,44 @@ public class TestDistributer extends TestCase {
                 ignored.printStackTrace();
             }
         }
+    }
+
+    @Test
+    public void testClientBlockedOnMaxOutstanding() throws Exception {
+        // create a fake server and connect to it.
+        MockVolt volt0 = new MockVolt(20000);
+        volt0.handleConnection = false;
+        volt0.start();
+
+        ClientConfig config = new ClientConfig();
+        config.setMaxOutstandingTxns(5);
+
+        final Client client = ClientFactory.createClient(config);
+        client.createConnection("localhost", 20000);
+
+        final java.util.concurrent.atomic.AtomicInteger counter = new java.util.concurrent.atomic.AtomicInteger(0);
+        final Thread loadThread = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    for (int ii = 0; ii < 6; ii++) {
+                        client.callProcedure(new NullCallback(), "foo");
+                        counter.incrementAndGet();
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        };
+        loadThread.start();
+
+        final long start = System.currentTimeMillis();
+        loadThread.join(300);
+        final long finish = System.currentTimeMillis();
+        assert(finish - start >= 300);
+        assert(counter.get() == 5);
+        volt0.shutdown();
+        loadThread.stop();
     }
 
     public void testUnresolvedHost() throws IOException {
