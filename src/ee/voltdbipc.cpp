@@ -369,7 +369,6 @@ int8_t VoltDBIPC::loadCatalog(struct ipc_command *cmd) {
 }
 
 int8_t VoltDBIPC::updateCatalog(struct ipc_command *cmd) {
-    printf("updateCatalog\n");
     assert(m_engine);
     if (!m_engine) {
         return kErrorCode_Error;
@@ -382,7 +381,7 @@ int8_t VoltDBIPC::updateCatalog(struct ipc_command *cmd) {
     };
     struct updatecatalog *uc = (struct updatecatalog*)cmd;
     try {
-        if (m_engine->updateCatalog(std::string(uc->data), uc->catalogVersion) == true) {
+        if (m_engine->updateCatalog(std::string(uc->data), ntohl(uc->catalogVersion)) == true) {
             return kErrorCode_Success;
         }
     } catch (FatalException e) {
