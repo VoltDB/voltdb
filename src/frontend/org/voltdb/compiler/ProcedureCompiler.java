@@ -19,6 +19,10 @@ package org.voltdb.compiler;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltdb.ProcInfo;
@@ -40,6 +44,7 @@ import org.voltdb.catalog.StmtParameter;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.CatalogUtil;
 
 /**
@@ -61,6 +66,52 @@ public abstract class ProcedureCompiler {
             compileJavaProcedure(compiler, hsql, estimates, catalog, db, procedureDescriptor);
         else
             compileSingleStmtProcedure(compiler, hsql, estimates, catalog, db, procedureDescriptor);
+    }
+
+    public static Map<String, Field> getValidSQLStmts(VoltCompiler compiler, String procName, Class<?> procClass, boolean withPrivate)
+            throws VoltCompilerException {
+
+        Map<String, Field> retval = new HashMap<String, Field>();
+
+        Field[] fields = procClass.getDeclaredFields();
+        for (Field f : fields) {
+            // skip non SQL fields
+            if (f.getType() != SQLStmt.class)
+                continue;
+
+            int modifiers = f.getModifiers();
+
+            // skip private fields if asked (usually a superclass)
+            if (Modifier.isPrivate(modifiers) && (!withPrivate))
+                continue;
+
+            // don't allow non-final SQLStmts
+            if (Modifier.isFinal(modifiers) == false) {
+                String msg = "Procedure " + procName + " contains a non-final SQLStmt field.";
+                if (procClass.getSimpleName().equals(procName) == false) {
+                    msg = "Superclass " + procClass.getSimpleName() + " of procedure " +
+                          procName + " contains a non-final SQLStmt field.";
+                }
+                if (compiler != null)
+                    throw compiler.new VoltCompilerException(msg);
+                else
+                    new VoltLogger("HOST").warn(msg);
+            }
+
+            f.setAccessible(true);
+            retval.put(f.getName(), f);
+        }
+
+        Class<?> superClass = procClass.getSuperclass();
+        if (superClass != null) {
+            Map<String, Field> superStmts = getValidSQLStmts(compiler, procName, superClass, false);
+            for (Entry<String, Field> e : superStmts.entrySet()) {
+                if (retval.containsKey(e.getKey()) == false)
+                    retval.put(e.getKey(), e.getValue());
+            }
+        }
+
+        return retval;
     }
 
 
@@ -136,32 +187,35 @@ public abstract class ProcedureCompiler {
         boolean procHasWriteStmts = false;
 
         // iterate through the fields and deal with
-        Field[] fields = procClass.getFields();
+        Map<String, Field> stmtMap = getValidSQLStmts(compiler, procClass.getSimpleName(), procClass, true);
+
+        Field[] fields = new Field[stmtMap.size()];
+        int index = 0;
+        for (Field f : stmtMap.values()) {
+            fields[index++] = f;
+        }
         for (Field f : fields) {
-            if (f.getType() == SQLStmt.class) {
-                //String fieldName = f.getName();
-                SQLStmt stmt = null;
+            SQLStmt stmt = null;
 
-                try {
-                    stmt = (SQLStmt) f.get(procInstance);
-                } catch (IllegalArgumentException e) {
-                    e.printStackTrace();
-                } catch (IllegalAccessException e) {
-                    e.printStackTrace();
-                }
-
-                // add the statement to the catalog
-                Statement catalogStmt = procedure.getStatements().add(f.getName());
-
-                // compile the statement
-                StatementCompiler.compile(compiler, hsql, catalog, db,
-                        estimates, catalogStmt, stmt.getText(),
-                        info.singlePartition);
-
-                // if a single stmt is not read only, then the proc is not read only
-                if (catalogStmt.getReadonly() == false)
-                    procHasWriteStmts = true;
+            try {
+                stmt = (SQLStmt) f.get(procInstance);
+            } catch (IllegalArgumentException e) {
+                e.printStackTrace();
+            } catch (IllegalAccessException e) {
+                e.printStackTrace();
             }
+
+            // add the statement to the catalog
+            Statement catalogStmt = procedure.getStatements().add(f.getName());
+
+            // compile the statement
+            StatementCompiler.compile(compiler, hsql, catalog, db,
+                    estimates, catalogStmt, stmt.getText(),
+                    info.singlePartition);
+
+            // if a single stmt is not read only, then the proc is not read only
+            if (catalogStmt.getReadonly() == false)
+                procHasWriteStmts = true;
         }
 
         // set the read onlyness of a proc
@@ -169,18 +223,26 @@ public abstract class ProcedureCompiler {
 
         // find the run() method and get the params
         Method procMethod = null;
-        Method[] methods = procClass.getMethods();
+        Method[] methods = procClass.getDeclaredMethods();
         for (final Method m : methods) {
             String name = m.getName();
             if (name.equals("run")) {
+                assert (m.getDeclaringClass() == procClass);
+
                 // if not null, then we've got more than one run method
                 if (procMethod != null) {
-                    String msg = "Procedure: " + shortName + " has multiple run(...) methods. ";
+                    String msg = "Procedure: " + shortName + " has multiple public run(...) methods. ";
                     msg += "Only a single run(...) method is supported.";
                     throw compiler.new VoltCompilerException(msg);
                 }
-                // found it!
-                procMethod = m;
+
+                if (Modifier.isPublic(m.getModifiers())) {
+                    // found it!
+                    procMethod = m;
+                }
+                else {
+                    compiler.addWarn("Procedure: " + shortName + " has non-public run(...) method.");
+                }
             }
         }
         if (procMethod == null) {

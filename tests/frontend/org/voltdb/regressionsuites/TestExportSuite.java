@@ -44,6 +44,7 @@ import org.voltdb.utils.SnapshotVerifier;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Delete;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Insert;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertAddedTable;
+import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertBase;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.RollbackInsert;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Update_Export;
 
@@ -626,6 +627,7 @@ public class TestExportSuite extends RegressionSuite {
      */
     static final Class<?>[] PROCEDURES = {
         Insert.class,
+        InsertBase.class,
         RollbackInsert.class,
         Update_Export.class,
         Delete.class

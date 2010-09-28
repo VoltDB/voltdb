@@ -38,7 +38,14 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
-import org.voltdb_testprocs.regressionsuites.sqltypesprocs.*;
+import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Delete;
+import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Insert;
+import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertBase;
+import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertMulti;
+import org.voltdb_testprocs.regressionsuites.sqltypesprocs.ParamSetArrays;
+import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Select;
+import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Update;
+import org.voltdb_testprocs.regressionsuites.sqltypesprocs.UpdateDecimal;
 
 public class TestSQLTypesSuite extends RegressionSuite {
 
@@ -57,6 +64,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
     /** Procedures used by this suite */
     static final Class<?>[] PROCEDURES = { Delete.class,
                                            Insert.class,
+                                           InsertBase.class,
                                            InsertMulti.class,
                                            Select.class,
                                            Update.class,

@@ -22,6 +22,7 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -40,6 +41,7 @@ import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
+import org.voltdb.compiler.ProcedureCompiler;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
@@ -180,7 +182,7 @@ public abstract class VoltProcedure {
         if (catProc.getHasjava()) {
             int tempParamTypesLength = 0;
             Method tempProcMethod = null;
-            Method[] methods = getClass().getMethods();
+            Method[] methods = getClass().getDeclaredMethods();
             Class<?> tempParamTypes[] = null;
             boolean tempParamTypeIsPrimitive[] = null;
             boolean tempParamTypeIsArray[] = null;
@@ -188,6 +190,8 @@ public abstract class VoltProcedure {
             for (final Method m : methods) {
                 String name = m.getName();
                 if (name.equals("run")) {
+                    if (Modifier.isPublic(m.getModifiers()) == false)
+                        continue;
                     //inspect(m);
                     tempProcMethod = m;
                     tempParamTypes = tempProcMethod.getParameterTypes();
@@ -213,31 +217,42 @@ public abstract class VoltProcedure {
                 log.debug("No good method found in: " + getClass().getName());
             }
 
-            Field[] fields = getClass().getFields();
+            // iterate through the fields and deal with
+            Map<String, Field> stmtMap = null;
+            try {
+                stmtMap = ProcedureCompiler.getValidSQLStmts(null, getClass().getSimpleName(), getClass(), true);
+            } catch (Exception e1) {
+                // shouldn't throw anything outside of the compiler
+                e1.printStackTrace();
+            }
+
+            Field[] fields = new Field[stmtMap.size()];
+            int index = 0;
+            for (Field f : stmtMap.values()) {
+                fields[index++] = f;
+            }
             for (final Field f : fields) {
-                if (f.getType() == SQLStmt.class) {
-                    String name = f.getName();
-                    Statement s = catProc.getStatements().get(name);
-                    if (s != null) {
-                        try {
-                            /*
-                             * Cache all the information we need about the statements in this stored
-                             * procedure locally instead of pulling them from the catalog on
-                             * a regular basis.
-                             */
-                            SQLStmt stmt = (SQLStmt) f.get(this);
+                String name = f.getName();
+                Statement s = catProc.getStatements().get(name);
+                if (s != null) {
+                    try {
+                        /*
+                         * Cache all the information we need about the statements in this stored
+                         * procedure locally instead of pulling them from the catalog on
+                         * a regular basis.
+                         */
+                        SQLStmt stmt = (SQLStmt) f.get(this);
 
-                            stmt.catStmt = s;
+                        stmt.catStmt = s;
 
-                            initSQLStmt(stmt);
+                        initSQLStmt(stmt);
 
-                        } catch (IllegalArgumentException e) {
-                            e.printStackTrace();
-                        } catch (IllegalAccessException e) {
-                            e.printStackTrace();
-                        }
-                        //LOG.fine("Found statement " + name);
+                    } catch (IllegalArgumentException e) {
+                        e.printStackTrace();
+                    } catch (IllegalAccessException e) {
+                        e.printStackTrace();
                     }
+                    //LOG.fine("Found statement " + name);
                 }
             }
         }

@@ -27,7 +27,6 @@ import java.math.BigDecimal;
 
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
-import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.types.TimestampType;
 
@@ -36,27 +35,21 @@ import org.voltdb.types.TimestampType;
     singlePartition = true
 )
 
-public class Insert extends VoltProcedure {
+public class Insert extends InsertBase {
 
-    public final SQLStmt i_no_nulls = new SQLStmt
-      ("INSERT INTO NO_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
-
-    public final SQLStmt i_allow_nulls = new SQLStmt
-    ("INSERT INTO ALLOW_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-
-    public final SQLStmt i_with_defaults = new SQLStmt
-    ("INSERT INTO WITH_DEFAULTS (PKEY) VALUES (?)");
+    // see InsertBase for 3 more SQL statements
+    // this class doubles as a test for visibility and inheritance of statements
 
     public final SQLStmt i_with_null_defaults = new SQLStmt
     ("INSERT INTO WITH_NULL_DEFAULTS (PKEY) VALUES (?)");
 
-    public final SQLStmt i_expressions_with_nulls = new SQLStmt
+    final SQLStmt i_expressions_with_nulls = new SQLStmt
     ("INSERT INTO EXPRESSIONS_WITH_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
-    public final SQLStmt i_expressions_no_nulls = new SQLStmt
+    private final SQLStmt i_expressions_no_nulls = new SQLStmt
       ("INSERT INTO EXPRESSIONS_NO_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
-    public final SQLStmt i_jumbo_row = new SQLStmt
+    protected final SQLStmt i_jumbo_row = new SQLStmt
     ("INSERT INTO JUMBO_ROW VALUES (?, ?, ?)");
 
     public VoltTable[] run(
