@@ -1903,7 +1903,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                                                                   params,
                                                                   txnState.txnId,
                                                                   lastCommittedTxnId,
-                                                                  getNextUndoToken());
+                                                                  txnState.isReadOnly() ? Long.MAX_VALUE : getNextUndoToken());
 
                 sendDependency(currentFragResponse, dep.depId, dep.dependency);
 
