@@ -409,8 +409,6 @@ TEST_F(AddDropTableTest, AddDropAdd)
     ASSERT_TRUE(result);
 
     for (int ii=0; ii < 20; ii++) {
-        printf("Starting cycle %d\n", ii);
-
         // result = m_engine->updateCatalog(tableBDeleteCmd(), ++m_catVersion);
         // ASSERT_TRUE(result);
 
