@@ -243,7 +243,8 @@ public class RealVoltDB implements VoltDBInterface
     public VoltDB.Configuration m_config = new VoltDB.Configuration();
     private CatalogContext m_catalogContext;
     private String m_buildString;
-    private String m_versionString = "1.2.01";
+    private static final String m_defaultVersionString = "1.2.01";
+    private String m_versionString = m_defaultVersionString;
     // fields accessed via the singleton
     private HostMessenger m_messenger = null;
     private final ArrayList<ClientInterface> m_clientInterfaces =
@@ -803,10 +804,10 @@ public class RealVoltDB implements VoltDBInterface
         return downHosts;
     }
 
-    @Override
-    public void readBuildInfo() {
+    public static String[] extractBuildInfo() {
         StringBuilder sb = new StringBuilder(64);
-        m_buildString = "VoltDB";
+        String buildString = "VoltDB";
+        String versionString = m_defaultVersionString;
         byte b = -1;
         try {
             InputStream buildstringStream =
@@ -819,20 +820,28 @@ public class RealVoltDB implements VoltDBInterface
             if (parts.length != 2) {
                 throw new RuntimeException("Invalid buildstring.txt file.");
             }
-            m_versionString = parts[0].trim();
-            m_buildString = parts[1].trim();
+            versionString = parts[0].trim();
+            buildString = parts[1].trim();
         } catch (Exception ignored) {
             try {
                 InputStream buildstringStream = new FileInputStream("version.txt");
                 while ((b = (byte) buildstringStream.read()) != -1) {
                     sb.append((char)b);
                 }
-                m_versionString = sb.toString().trim();
+                versionString = sb.toString().trim();
             }
             catch (Exception ignored2) {
                 log.l7dlog( Level.ERROR, LogKeys.org_voltdb_VoltDB_FailedToRetrieveBuildString.name(), ignored);
             }
         }
+        return new String[] { versionString, buildString };
+    }
+
+    @Override
+    public void readBuildInfo() {
+        String buildInfo[] = extractBuildInfo();
+        m_versionString = buildInfo[0];
+        m_buildString = buildInfo[1];
         hostLog.info("Build: " + m_versionString + " " + m_buildString);
     }
 

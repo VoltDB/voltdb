@@ -45,6 +45,7 @@ import javax.xml.validation.SchemaFactory;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltdb.ProcInfo;
 import org.voltdb.ProcInfoData;
+import org.voltdb.RealVoltDB;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
@@ -314,7 +315,17 @@ public class VoltCompiler {
             return false;
         }
 
+        StringBuffer buildinfo = new StringBuffer();
+        String info[] = RealVoltDB.extractBuildInfo();
+        buildinfo.append(info[0]).append('\n');
+        buildinfo.append(info[1]).append('\n');
+        buildinfo.append(System.getProperty("user.name")).append('\n');
+        buildinfo.append(System.getProperty("user.dir")).append('\n');
+        buildinfo.append(Long.toString(System.currentTimeMillis())).append('\n');
+
         try {
+            byte buildinfoBytes[] = buildinfo.toString().getBytes("UTF-8");
+            m_jarOutput.put("buildinfo.txt", buildinfoBytes);
             m_jarOutput.put("catalog.txt", catalogBytes);
             m_jarOutput.put("project.xml", new File(projectFileURL));
             for (final Entry<String, String> e : m_ddlFilePaths.entrySet())

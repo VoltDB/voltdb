@@ -153,6 +153,9 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
         CRC32 crc = new CRC32();
 
         for (Entry<String, byte[]> e : super.entrySet()) {
+            if (e.getKey().equals("buildinfo.txt")) {
+                continue;
+            }
             crc.update(e.getKey().getBytes("UTF-8"));
             crc.update(e.getValue());
         }
