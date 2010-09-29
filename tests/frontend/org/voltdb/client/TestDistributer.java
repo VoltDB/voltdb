@@ -25,7 +25,6 @@ package org.voltdb.client;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
@@ -128,16 +127,12 @@ public class TestDistributer extends TestCase {
     // A fake server.
     class MockVolt extends Thread {
         boolean handleConnection = true;
-        MockVolt(int port) {
-            try {
-                network = new VoltNetwork();
-                network.start();
-                socket = ServerSocketChannel.open();
-                socket.configureBlocking(false);
-                socket.socket().bind(new InetSocketAddress(port));
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+        MockVolt(int port) throws IOException {
+            network = new VoltNetwork();
+            network.start();
+            socket = ServerSocketChannel.open();
+            socket.configureBlocking(false);
+            socket.socket().bind(new InetSocketAddress(port));
         }
 
         @Override
@@ -262,44 +257,38 @@ public class TestDistributer extends TestCase {
 
 
     @Test
-    public void testCreateConnection() throws InterruptedException {
+    public void testCreateConnection() throws Exception {
         MockVolt volt0 = null;
         MockVolt volt1 = null;
-
-        // create a fake server and connect to it.
-        volt0 = new MockVolt(20000);
-        volt0.start();
-
-        volt1 = new MockVolt(20001);
-        volt1.start();
-
-        assertTrue(volt1.socket.isOpen());
-        assertTrue(volt0.socket.isOpen());
-
-        // And a distributer
-        Distributer dist = new Distributer();
         try {
+            // create a fake server and connect to it.
+            volt0 = new MockVolt(20000);
+            volt0.start();
+
+            volt1 = new MockVolt(20001);
+            volt1.start();
+
+            assertTrue(volt1.socket.isOpen());
+            assertTrue(volt0.socket.isOpen());
+
+            // And a distributer
+            Distributer dist = new Distributer();
             dist.createConnection("localhost", "", "", 20000);
             dist.createConnection("localhost", "", "", 20001);
-        } catch (UnknownHostException e) {
-            e.printStackTrace();
-            fail();
-        } catch (IOException e) {
-            e.printStackTrace();
-            fail();
-        }
 
-        Thread.sleep(1000);
-        assertTrue(volt1.handler != null);
-        assertTrue(volt0.handler != null);
-
-        if (volt0 != null) {
-            volt0.shutdown();
-            volt0.join();
+            Thread.sleep(1000);
+            assertTrue(volt1.handler != null);
+            assertTrue(volt0.handler != null);
         }
-        if (volt1 != null) {
-            volt1.shutdown();
-            volt1.join();
+        finally {
+            if (volt0 != null) {
+                volt0.shutdown();
+                volt0.join();
+            }
+            if (volt1 != null) {
+                volt1.shutdown();
+                volt1.join();
+            }
         }
     }
 
@@ -371,40 +360,32 @@ public class TestDistributer extends TestCase {
         }
     }
 
-    public void testClient() {
+    public void testClient() throws Exception {
        MockVolt volt = null;
 
-        try {
-            // create a fake server and connect to it.
-            volt = new MockVolt(21212);
-            volt.start();
+       try {
+           // create a fake server and connect to it.
+           volt = new MockVolt(21212);
+           volt.start();
 
-            Client clt = ClientFactory.createClient();
-            clt.createConnection("localhost");
+           Client clt = ClientFactory.createClient();
+           clt.createConnection("localhost");
 
-            // this call blocks for a result!
-            clt.callProcedure("Foo", new Integer(1));
-            assertEquals(1, volt.handler.roundTrips.get());
+           // this call blocks for a result!
+           clt.callProcedure("Foo", new Integer(1));
+           assertEquals(1, volt.handler.roundTrips.get());
 
-            // this call doesn't block! (use drain)
-            clt.callProcedure(new ProcCallback(), "Bar", new Integer(2));
-            clt.drain();
-            assertEquals(2, volt.handler.roundTrips.get());
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            fail();
-        }
-        finally {
-            try {
-                if (volt != null) {
-                    volt.shutdown();
-                    volt.join();
-                }
-            } catch(Exception ignored) {
-                ignored.printStackTrace();
-            }
-        }
+           // this call doesn't block! (use drain)
+           clt.callProcedure(new ProcCallback(), "Bar", new Integer(2));
+           clt.drain();
+           assertEquals(2, volt.handler.roundTrips.get());
+       }
+       finally {
+           if (volt != null) {
+               volt.shutdown();
+               volt.join();
+           }
+       }
     }
 
     @Test
@@ -412,37 +393,41 @@ public class TestDistributer extends TestCase {
         // create a fake server and connect to it.
         MockVolt volt0 = new MockVolt(20000);
         volt0.handleConnection = false;
-        volt0.start();
+        try {
+            volt0.start();
 
-        ClientConfig config = new ClientConfig();
-        config.setMaxOutstandingTxns(5);
+            ClientConfig config = new ClientConfig();
+            config.setMaxOutstandingTxns(5);
 
-        final Client client = ClientFactory.createClient(config);
-        client.createConnection("localhost", 20000);
+            final Client client = ClientFactory.createClient(config);
+            client.createConnection("localhost", 20000);
 
-        final java.util.concurrent.atomic.AtomicInteger counter = new java.util.concurrent.atomic.AtomicInteger(0);
-        final Thread loadThread = new Thread() {
-            @Override
-            public void run() {
-                try {
-                    for (int ii = 0; ii < 6; ii++) {
-                        client.callProcedure(new NullCallback(), "foo");
-                        counter.incrementAndGet();
+            final java.util.concurrent.atomic.AtomicInteger counter = new java.util.concurrent.atomic.AtomicInteger(0);
+            final Thread loadThread = new Thread() {
+                @Override
+                public void run() {
+                    try {
+                        for (int ii = 0; ii < 6; ii++) {
+                            client.callProcedure(new NullCallback(), "foo");
+                            counter.incrementAndGet();
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
                     }
-                } catch (Exception e) {
-                    e.printStackTrace();
                 }
-            }
-        };
-        loadThread.start();
+            };
+            loadThread.start();
 
-        final long start = System.currentTimeMillis();
-        loadThread.join(300);
-        final long finish = System.currentTimeMillis();
-        assert(finish - start >= 300);
-        assert(counter.get() == 5);
-        volt0.shutdown();
-        loadThread.stop();
+            final long start = System.currentTimeMillis();
+            loadThread.join(300);
+            final long finish = System.currentTimeMillis();
+            assert(finish - start >= 300);
+            assert(counter.get() == 5);
+            loadThread.stop();
+        }
+        finally {
+            volt0.shutdown();
+        }
     }
 
     public void testUnresolvedHost() throws IOException {
