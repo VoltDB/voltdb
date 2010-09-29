@@ -88,7 +88,8 @@ public class VoltJUnitFormatter implements JUnitResultFormatter {
         String testName = "unknown";
         if (arg0 != null) {
             testName = arg0.toString();
-            testName = testName.substring(0, testName.indexOf('('));
+            if (arg0.toString().indexOf('(') != -1)
+                testName = testName.substring(0, testName.indexOf('('));
         }
 
         out.println("    " + testName + " had an error.");
