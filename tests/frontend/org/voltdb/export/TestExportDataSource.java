@@ -45,6 +45,7 @@ public class TestExportDataSource extends TestCase {
                   ConnectionUtil.getLocalAddress(), // Coordinator IP
                   1,    // expected hosts,
                   0,    // catalogCRC
+                  0,    // deploymentCRC
                   null); // hostLog);
         }
 

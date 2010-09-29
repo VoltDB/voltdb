@@ -384,12 +384,13 @@ public class RealVoltDB implements VoltDBInterface
             catalog.execute(serializedCatalog);
 
             // note if this fails it will print an error first
-            if (!CatalogUtil.compileDeployment(catalog, m_config.m_pathToDeployment))
+            long depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_config.m_pathToDeployment);
+            if (depCRC < 0)
                 System.exit(-1);
 
             serializedCatalog = catalog.serialize();
 
-            m_catalogContext = new CatalogContext(catalog, m_config.m_pathToCatalog, catalogVersion, -1);
+            m_catalogContext = new CatalogContext(catalog, m_config.m_pathToCatalog, depCRC, catalogVersion, -1);
             final SnapshotSchedule schedule =
                 m_catalogContext.database.getSnapshotschedule().get("default");
 
@@ -454,12 +455,12 @@ public class RealVoltDB implements VoltDBInterface
                 }
 
                 hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_CreatingVoltDB.name(), new Object[] { m_catalogContext.numberOfNodes, leader }, null);
-                m_messenger = new HostMessenger(m_network, leader, m_catalogContext.numberOfNodes, m_catalogContext.catalogCRC, hostLog);
+                m_messenger = new HostMessenger(m_network, leader, m_catalogContext.numberOfNodes, m_catalogContext.catalogCRC, depCRC, hostLog);
                 Object retval[] = m_messenger.waitForGroupJoin();
                 m_instanceId = new Object[] { retval[0], retval[1] };
             }
             else {
-                downHosts.addAll(initializeForRejoin(config, m_catalogContext.catalogCRC));
+                downHosts.addAll(initializeForRejoin(config, m_catalogContext.catalogCRC, depCRC));
                 /**
                  * Whatever hosts were reported as being down on rejoin should
                  * be reported to the fault manager so that the fault can be distributed.
@@ -669,7 +670,7 @@ public class RealVoltDB implements VoltDBInterface
         }
     }
 
-    public HashSet<Integer> initializeForRejoin(VoltDB.Configuration config, long catalogCRC) {
+    public HashSet<Integer> initializeForRejoin(VoltDB.Configuration config, long catalogCRC, long deploymentCRC) {
      // sensible defaults (sorta)
         String rejoinHostCredentialString = null;
         String rejoinHostAddressString = null;
@@ -734,7 +735,7 @@ public class RealVoltDB implements VoltDBInterface
             hostLog.error("Problem opening listening rejoin socket: " + e.getMessage());
             System.exit(-1);
         }
-        m_messenger = new HostMessenger(m_network, listener, m_catalogContext.numberOfNodes, catalogCRC, hostLog);
+        m_messenger = new HostMessenger(m_network, listener, m_catalogContext.numberOfNodes, catalogCRC, deploymentCRC, hostLog);
 
         // make empty strings null
         if ((rejoinUser != null) && (rejoinUser.length() == 0)) rejoinUser = null;
@@ -779,6 +780,7 @@ public class RealVoltDB implements VoltDBInterface
         m_catalogContext = new CatalogContext(
                 m_catalogContext.catalog,
                 m_catalogContext.pathToCatalogJar,
+                deploymentCRC,
                 m_messenger.getDiscoveredCatalogVersion(),
                 0);
 
@@ -983,7 +985,8 @@ public class RealVoltDB implements VoltDBInterface
         // connect to the joining node, build a foreign host
         InetSocketAddress addr = new InetSocketAddress(rejoiningHostname, portToConnect);
         try {
-            messenger.rejoinForeignHostPrepare(rejoinHostId, addr, m_catalogContext.catalogCRC, liveHosts, m_catalogContext.catalogVersion);
+            messenger.rejoinForeignHostPrepare(rejoinHostId, addr, m_catalogContext.catalogCRC,
+                    m_catalogContext.deploymentCRC, liveHosts, m_catalogContext.catalogVersion);
             return null;
         } catch (Exception e) {
             //e.printStackTrace();
@@ -1104,7 +1107,8 @@ public class RealVoltDB implements VoltDBInterface
             String diffCommands,
             String newCatalogURL,
             int expectedCatalogVersion,
-            long currentTxnId)
+            long currentTxnId,
+            long deploymentCRC)
     {
         synchronized(m_catalogUpdateLock) {
             // another site already did this work.
@@ -1122,7 +1126,7 @@ public class RealVoltDB implements VoltDBInterface
 
             // 0. update the global context
             lastCatalogUpdate_txnId = currentTxnId;
-            m_catalogContext = m_catalogContext.update(newCatalogURL, diffCommands, true);
+            m_catalogContext = m_catalogContext.update(newCatalogURL, diffCommands, true, deploymentCRC);
 
             // 1. update the export manager.
             ExportManager.instance().updateCatalog(m_catalogContext);
@@ -1140,7 +1144,7 @@ public class RealVoltDB implements VoltDBInterface
         synchronized(m_catalogUpdateLock)
         {
             m_catalogContext = m_catalogContext.update(CatalogContext.NO_PATH,
-                                                       diffCommands, false);
+                                                       diffCommands, false, -1);
         }
 
         for (ClientInterface ci : m_clientInterfaces)

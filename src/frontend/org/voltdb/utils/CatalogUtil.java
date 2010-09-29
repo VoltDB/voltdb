@@ -21,6 +21,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.security.MessageDigest;
@@ -31,6 +32,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.zip.CRC32;
 
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
@@ -42,10 +44,29 @@ import javax.xml.validation.SchemaFactory;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.*;
+import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.CatalogType;
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Constraint;
+import org.voltdb.catalog.ConstraintRef;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Group;
+import org.voltdb.catalog.GroupRef;
+import org.voltdb.catalog.Index;
+import org.voltdb.catalog.PlanFragment;
+import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.catalog.Table;
 import org.voltdb.compiler.ClusterCompiler;
 import org.voltdb.compiler.ClusterConfig;
-import org.voltdb.compiler.deploymentfile.*;
+import org.voltdb.compiler.deploymentfile.ClusterType;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.HttpdType;
+import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
+import org.voltdb.compiler.deploymentfile.UsersType;
+import org.voltdb.compiler.deploymentfile.UsersType.User;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
@@ -393,18 +414,19 @@ public abstract class CatalogUtil {
      * Parse the deployment.xml file and add its data into the catalog.
      * @param catalog Catalog to be updated.
      * @param deploymentURL Path to the deployment.xml file.
+     * @return CRC of the deployment contents (>0) or -1 on failure.
      */
-    public static boolean compileDeployment(Catalog catalog, String deploymentURL) {
+    public static long compileDeploymentAndGetCRC(Catalog catalog, String deploymentURL) {
         DeploymentType deployment = parseDeployment(deploymentURL);
 
         // wasn't a valid xml deployment file
         if (deployment == null) {
             hostLog.error("Not a valid XML deployment file at URL: " + deploymentURL);
-            return false;
+            return -1;
         }
 
         if (!validateDeployment(catalog, deployment)) {
-            return false;
+            return -1;
         }
 
         // set the cluster info
@@ -416,7 +438,84 @@ public abstract class CatalogUtil {
         // set the HTTPD info
         setHTTPDInfo(catalog, deployment.getHttpd());
 
-        return true;
+        return getDeploymentCRC(deployment);
+    }
+
+    public static long getDeploymentCRC(String deploymentURL) {
+        DeploymentType deployment = parseDeployment(deploymentURL);
+
+        // wasn't a valid xml deployment file
+        if (deployment == null) {
+            hostLog.error("Not a valid XML deployment file at URL: " + deploymentURL);
+            return -1;
+        }
+
+        return getDeploymentCRC(deployment);
+    }
+
+    /**
+     * This code is not really tenable, and should be replaced with some
+     * XML normalization code, but for now it should work and be pretty
+     * tolerant of XML documents with different formatting for the same
+     * values.
+     * @return A positive CRC for the deployment contents
+     */
+    static long getDeploymentCRC(DeploymentType deployment) {
+        StringBuilder sb = new StringBuilder();
+
+        sb.append(" CLUSTER ");
+        ClusterType ct = deployment.getCluster();
+        sb.append(ct.getHostcount()).append(",");
+        sb.append(ct.getKfactor()).append(",");
+        sb.append(ct.getLeader()).append(",");
+        sb.append(ct.getSitesperhost()).append("\n");
+
+        sb.append(" PARTITIONDETECTION ");
+        PartitionDetectionType pdt = ct.getPartitionDetection();
+        if (pdt != null) {
+            sb.append(pdt.isEnabled()).append(",");
+            PartitionDetectionType.Snapshot st = pdt.getSnapshot();
+            assert(st != null);
+            sb.append(st.getPrefix()).append(",");
+            sb.append(st.getPath()).append("\n");
+        }
+
+        sb.append(" USERS ");
+        UsersType ut = deployment.getUsers();
+        if (ut != null) {
+            List<User> users = ut.getUser();
+            for (User u : users) {
+                sb.append(" USER ");
+                sb.append(u.getName()).append(",");
+                sb.append(u.getGroups()).append(",");
+                sb.append(u.getPassword()).append(",");
+            }
+        }
+        sb.append("\n");
+
+        sb.append(" HTTPD ");
+        HttpdType ht = deployment.getHttpd();
+        if (ht != null) {
+            HttpdType.Jsonapi jt = ht.getJsonapi();
+            if (jt != null) {
+                sb.append(jt.isEnabled()).append(",");
+            }
+            sb.append(ht.getPort());
+        }
+
+        byte[] data = null;
+        try {
+            data = sb.toString().getBytes("UTF-8");
+        } catch (UnsupportedEncodingException e) {}
+
+        CRC32 crc = new CRC32();
+        crc.update(data);
+
+        long retval = crc.getValue();
+        retval = Math.abs(retval);
+        if (retval < 0)
+            return 0;
+        return retval;
     }
 
     /**
@@ -610,7 +709,7 @@ public abstract class CatalogUtil {
            // if the json api info is available, use it
            HttpdType.Jsonapi jsonapi = httpd.getJsonapi();
            if (jsonapi != null)
-               jsonEnabled = jsonapi.getEnabled().equalsIgnoreCase("true");
+               jsonEnabled = jsonapi.isEnabled();
         }
 
         // set the catalog info

@@ -65,6 +65,7 @@ public class SocketJoiner extends Thread {
     static final int CRC_FAILURE = 2;
     static final int HOSTID_FAILURE = 4;
     static final int CATVER_FAILURE = 8;
+    static final int DEPCRC_FAILURE = 16;
 
     static final int PING = 333;
     InetAddress m_coordIp = null;
@@ -78,6 +79,7 @@ public class SocketJoiner extends Thread {
     long m_timestamp;//Part of instanceId
     Integer m_addr;
     long m_catalogCRC;
+    long m_deploymentCRC;
     int m_discoveredCatalogVersion = 0;
 
     // from configuation data
@@ -112,18 +114,22 @@ public class SocketJoiner extends Thread {
         return success;
     }
 
-    public SocketJoiner(InetAddress coordIp, int expectedHosts, long catalogCRC, VoltLogger hostLog) {
+    public SocketJoiner(InetAddress coordIp, int expectedHosts,
+            long catalogCRC, long deploymentCRC, VoltLogger hostLog) {
         m_coordIp = coordIp;
         m_expectedHosts = expectedHosts;
         m_hostLog = hostLog;
         m_catalogCRC = catalogCRC;
+        m_deploymentCRC = deploymentCRC;
     }
 
-    public SocketJoiner(ServerSocketChannel acceptor, int expectedHosts, long catalogCRC, VoltLogger hostLog) {
+    public SocketJoiner(ServerSocketChannel acceptor, int expectedHosts,
+            long catalogCRC, long deploymentCRC, VoltLogger hostLog) {
         m_listenerSocket = acceptor;
         m_expectedHosts = expectedHosts;
         m_hostLog = hostLog;
         m_catalogCRC = catalogCRC;
+        m_deploymentCRC = deploymentCRC;
         m_addr = ByteBuffer.wrap(acceptor.socket().getInetAddress().getAddress()).getInt();
     }
 
@@ -278,6 +284,7 @@ public class SocketJoiner extends Thread {
 
             long difftimes[] = new long[m_expectedHosts - 1];
             long othercrcs[] = new long[m_expectedHosts - 1];
+            long otherdepcrcs[] = new long[m_expectedHosts - 1];
 
             // ask each connection to send it's time and catalog CRC
             for (int hostId = 1; hostId < m_expectedHosts; hostId++) {
@@ -289,6 +296,7 @@ public class SocketJoiner extends Thread {
                 long timestamp = in.readLong();
                 difftimes[hostId - 1] = System.currentTimeMillis() - timestamp;
                 othercrcs[hostId - 1] = in.readLong();
+                otherdepcrcs[hostId - 1] = in.readLong();
             }
 
             // figure out how bad the skew is and if it's acceptable
@@ -311,6 +319,13 @@ public class SocketJoiner extends Thread {
             for (long crc : othercrcs) {
                 if (crc != m_catalogCRC) {
                     errors |= CRC_FAILURE;
+                }
+            }
+
+            // figure out if any deployment files are not identical
+            for (long crc : otherdepcrcs) {
+                if (crc != m_deploymentCRC) {
+                    errors |= DEPCRC_FAILURE;
                 }
             }
 
@@ -337,6 +352,10 @@ public class SocketJoiner extends Thread {
             if ((errors & CRC_FAILURE) != 0) {
                 if (m_hostLog != null)
                     m_hostLog.error("Catalog checksums do not match across cluster");
+            }
+            if ((errors & DEPCRC_FAILURE) != 0) {
+                if (m_hostLog != null)
+                    m_hostLog.error("Deployment file checksums do not match across cluster");
             }
             if (errors != 0) {
                 VoltDB.crashVoltDB();
@@ -463,6 +482,8 @@ public class SocketJoiner extends Thread {
             out.writeLong(System.currentTimeMillis());
             // write the local catalog crc
             out.writeLong(m_catalogCRC);
+            // write the local deployment crc
+            out.writeLong(m_deploymentCRC);
             out.flush();
             long maxDiffMS = in.readLong();
             if (m_hostLog != null)
@@ -545,6 +566,7 @@ public class SocketJoiner extends Thread {
             long difftimes[] = new long[m_expectedHosts - 1];
             int readHostIds[] = new int[m_expectedHosts - 1];
             long othercrcs[] = new long[m_expectedHosts - 1];
+            long otherdepcrcs[] = new long[m_expectedHosts - 1];
             int catalogVersions[] = new int[m_expectedHosts - 1];
             for (Entry<Integer, SocketChannel> e : m_sockets.entrySet()) {
                 out = getOutputForHost(e.getKey());
@@ -559,6 +581,7 @@ public class SocketJoiner extends Thread {
 
                 readHostIds[i] = in.readInt();
                 othercrcs[i] = in.readLong();
+                otherdepcrcs[i] = in.readLong();
                 long timestamp = in.readLong();
                 difftimes[i] = System.currentTimeMillis() - timestamp;
                 catalogVersions[i] = in.readInt();
@@ -593,6 +616,13 @@ public class SocketJoiner extends Thread {
             for (long crc : othercrcs) {
                 if (crc != m_catalogCRC) {
                     errors |= CRC_FAILURE;
+                }
+            }
+
+            // figure out if any deployment files are not identical
+            for (long crc : otherdepcrcs) {
+                if (crc != m_deploymentCRC) {
+                    errors |= DEPCRC_FAILURE;
                 }
             }
 
@@ -640,6 +670,10 @@ public class SocketJoiner extends Thread {
                     m_hostLog.error("This is likely a bug in VoltDB and you should contact the VoltDB team.");
                 }
             }
+            if ((errors & DEPCRC_FAILURE) != 0) {
+                if (m_hostLog != null)
+                    m_hostLog.error("Deployment file checksums do not match across cluster");
+            }
             if (errors != 0) {
                 VoltDB.crashVoltDB();
             }
@@ -671,6 +705,7 @@ public class SocketJoiner extends Thread {
             int rejoiningHostId,
             InetSocketAddress address,
             long catalogCRC,
+            long deploymentCRC,
             HashSet<Integer> liveHosts,
             int catalogVersionNumber) throws Exception {
         SocketChannel remoteConnection = null;
@@ -702,8 +737,9 @@ public class SocketJoiner extends Thread {
             // write the id of the new host
             out.writeInt(rejoiningHostId);
 
-            // write catalog crc
+            // write catalog & deployment crcs
             out.writeLong(catalogCRC);
+            out.writeLong(deploymentCRC);
 
             // write the current time so the re-join node can measure skew
             out.writeLong(System.currentTimeMillis());

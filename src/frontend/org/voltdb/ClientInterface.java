@@ -58,12 +58,12 @@ import org.voltdb.network.QueueMonitor;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.network.VoltProtocolHandler;
 import org.voltdb.network.WriteStream;
+import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.DeferredSerialization;
 import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.EstTime;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.Pair;
-import org.voltdb.utils.DBBPool.BBContainer;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -991,7 +991,8 @@ public class ClientInterface implements DumpManager.Dumpable {
                     task.params = new ParameterSet();
                     task.params.m_params = new Object[] {
                             changeResult.encodedDiffCommands, changeResult.catalogURL,
-                            changeResult.expectedCatalogVersion, changeResult.deploymentURL
+                            changeResult.expectedCatalogVersion, changeResult.deploymentURL,
+                            changeResult.deploymentCRC
                     };
                     task.clientHandle = changeResult.clientHandle;
 

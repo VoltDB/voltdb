@@ -115,9 +115,9 @@ public class TestCatalogVersioning extends TestCase {
         String addTableFoo = "add /clusters[cluster]/databases[database] tables FOO";
         String addTableBar = "add /clusters[cluster]/databases[database] tables BAR";
 
-        CatalogContext context = new CatalogContext(catalog, CatalogContext.NO_PATH, 0, 0);
+        CatalogContext context = new CatalogContext(catalog, CatalogContext.NO_PATH, 0, 0, 0);
 
-        CatalogContext foocontext = context.update(CatalogContext.NO_PATH, addTableFoo, true);
+        CatalogContext foocontext = context.update(CatalogContext.NO_PATH, addTableFoo, true, -1);
         assertTrue(context != foocontext);
         assertTrue(context.catalogVersion < foocontext.catalogVersion);
         assertTrue(context.catalog.m_currentCatalogVersion < foocontext.catalog.m_currentCatalogVersion);
@@ -126,7 +126,7 @@ public class TestCatalogVersioning extends TestCase {
         assertTrue(context.catalog.getSubTreeVersion() <= foocontext.catalog.getSubTreeVersion());
 
         // and advance it all one more time to show a copy of copy is a woodchuck
-        CatalogContext barcontext = foocontext.update(CatalogContext.NO_PATH, addTableBar, true);
+        CatalogContext barcontext = foocontext.update(CatalogContext.NO_PATH, addTableBar, true, -1);
         assertTrue(foocontext != barcontext);
         assertTrue(foocontext.catalogVersion < barcontext.catalogVersion);
         assertTrue(foocontext.catalog.m_currentCatalogVersion < barcontext.catalog.m_currentCatalogVersion);

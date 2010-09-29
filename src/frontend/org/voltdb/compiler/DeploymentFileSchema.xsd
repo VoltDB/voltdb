@@ -22,6 +22,10 @@
 
     For more information about jaxb, see:
     http://java.sun.com/developer/technicalArticles/WebServices/jaxb/
+    
+    
+    ALSO, if you change this, consider updating:
+        CatalogUtil.getDeploymentCRC()
 
   -->
 
@@ -81,7 +85,7 @@
     <xs:sequence>
       <xs:element name="jsonapi" minOccurs="0" maxOccurs="1">
         <xs:complexType>
-          <xs:attribute name="enabled" type="xs:string" use="required"/>
+          <xs:attribute name="enabled" type="xs:boolean" use="required"/>
         </xs:complexType>
       </xs:element>
     </xs:sequence>

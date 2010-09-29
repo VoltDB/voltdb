@@ -196,7 +196,7 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public CatalogContext getCatalogContext()
     {
-        m_context = new CatalogContext(m_catalog, CatalogContext.NO_PATH, 0, 0);
+        m_context = new CatalogContext(m_catalog, CatalogContext.NO_PATH, 0, 0, 0);
         return m_context;
     }
 
@@ -327,7 +327,7 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public void catalogUpdate(String diffCommands,
             String newCatalogURL, int expectedCatalogVersion,
-            long currentTxnId)
+            long currentTxnId, long deploymentCRC)
     {
         // TODO Auto-generated method stub
 
@@ -346,7 +346,7 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public void clusterUpdate(String diffCommands) {
         m_context = m_context.update(CatalogContext.NO_PATH,
-                                     diffCommands, false);
+                                     diffCommands, false, -1);
     }
 
     @Override

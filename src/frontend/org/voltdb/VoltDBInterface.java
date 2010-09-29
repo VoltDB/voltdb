@@ -17,8 +17,8 @@
 package org.voltdb;
 
 import java.util.ArrayList;
-import java.util.Hashtable;
 import java.util.HashSet;
+import java.util.Hashtable;
 
 import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.messaging.HostMessenger;
@@ -113,9 +113,10 @@ public interface VoltDBInterface
      * @param diffCommands The commands to update the current catalog to the new one.
      * @param expectedCatalogVersion The version of the catalog the commands are targeted for.
      * @param currentTxnId  The transaction ID at which this method is called
+     * @param deploymentCRC The CRC of the deployment file
      */
    public void catalogUpdate(String diffCommands, String newCatalogURL,
-           int expectedCatalogVersion, long currentTxnId);
+           int expectedCatalogVersion, long currentTxnId, long deploymentCRC);
 
    /**
     * Updates the physical cluster configuration stored in the catalog at this server.

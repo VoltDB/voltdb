@@ -38,12 +38,12 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import junit.framework.TestCase;
 
+import org.voltdb.CommitLog;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.DBBPool;
-import org.voltdb.CommitLog;
 
 public class TestMessaging extends TestCase {
 
@@ -165,7 +165,7 @@ public class TestMessaging extends TestCase {
                         leader = ConnectionUtil.getLocalAddress();
                     }
                     System.out.printf("Host/Site %d/%d is creating a new HostMessenger.\n", hostId, mySiteId);
-                    HostMessenger messenger = new HostMessenger(network, leader, hostCount, 0, null);
+                    HostMessenger messenger = new HostMessenger(network, leader, hostCount, 0, 0, null);
                     currentMessenger = messenger;
                     messengers[hostId] = currentMessenger;
                 }
@@ -295,9 +295,9 @@ public class TestMessaging extends TestCase {
 
     public void testJoiner() {
         try {
-            SocketJoiner joiner1 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 0, null);
-            SocketJoiner joiner2 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 0, null);
-            SocketJoiner joiner3 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 0, null);
+            SocketJoiner joiner1 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 0, 0, null);
+            SocketJoiner joiner2 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 0, 0, null);
+            SocketJoiner joiner3 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 0, 0, null);
 
             joiner1.start();
             joiner2.start();
@@ -319,10 +319,32 @@ public class TestMessaging extends TestCase {
         MockVoltDB mockVoltDB = new MockVoltDB();
         VoltDB.replaceVoltDBInstanceForTest(mockVoltDB);
 
+        // test catalog crcs
         try {
-            SocketJoiner joiner1 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 0, null);
-            SocketJoiner joiner2 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 0, null);
-            SocketJoiner joiner3 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 1, null);
+            SocketJoiner joiner1 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 0, 0, null);
+            SocketJoiner joiner2 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 0, 0, null);
+            SocketJoiner joiner3 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 1, 0, null);
+
+            joiner1.start();
+            joiner2.start();
+            joiner3.start();
+
+            joiner1.join();
+            joiner2.join();
+            joiner3.join();
+
+            assertTrue(mockVoltDB.getCrashCount() > 0);
+            return;
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        assertTrue(false);
+
+        // test deployment crcs
+        try {
+            SocketJoiner joiner1 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 0, 0, null);
+            SocketJoiner joiner2 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 0, 0, null);
+            SocketJoiner joiner3 = new SocketJoiner(ConnectionUtil.getLocalAddress(), 3, 0, 1, null);
 
             joiner1.start();
             joiner2.start();
@@ -348,9 +370,9 @@ public class TestMessaging extends TestCase {
         }
         VoltNetwork network = new VoltNetwork();
         network.start();
-        HostMessenger msg1 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 2, 0, null);
+        HostMessenger msg1 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 2, 0, 0, null);
         Thread.sleep(20);
-        HostMessenger msg2 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 2, 0, null);
+        HostMessenger msg2 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 2, 0, 0, null);
 
         System.out.println("Waiting for socketjoiners...");
         msg1.waitForGroupJoin();
@@ -415,11 +437,11 @@ public class TestMessaging extends TestCase {
     public void testMultiMailbox() throws MessagingException, UnknownHostException, InterruptedException {
         VoltNetwork network = new VoltNetwork();
         network.start();
-        HostMessenger msg1 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 3, 0, null);
+        HostMessenger msg1 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 3, 0, 0, null);
         Thread.sleep(20);
-        HostMessenger msg2 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 3, 0, null);
+        HostMessenger msg2 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 3, 0, 0, null);
         Thread.sleep(20);
-        HostMessenger msg3 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 3, 0, null);
+        HostMessenger msg3 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 3, 0, 0, null);
 
         System.out.println("Waiting for socketjoiners...");
         msg1.waitForGroupJoin();
@@ -563,7 +585,7 @@ public class TestMessaging extends TestCase {
 
                 VoltNetwork network = new VoltNetwork();
                 network.start();
-                HostMessenger msg = new HostMessenger(network, listener, 2, 0, null);
+                HostMessenger msg = new HostMessenger(network, listener, 2, 0, 0, null);
                 m_ready.set(true);
                 msg.waitForGroupJoin();
 
@@ -588,9 +610,9 @@ public class TestMessaging extends TestCase {
         }
         VoltNetwork network = new VoltNetwork();
         network.start();
-        HostMessenger msg1 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 2, 0, null);
+        HostMessenger msg1 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 2, 0, 0, null);
         Thread.sleep(20);
-        HostMessenger msg2 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 2, 0, null);
+        HostMessenger msg2 = new HostMessenger(network, ConnectionUtil.getLocalAddress(), 2, 0, 0, null);
 
         System.out.println("Waiting for socketjoiners...");
         msg1.waitForGroupJoin();
@@ -628,7 +650,7 @@ public class TestMessaging extends TestCase {
 
         HashSet<Integer> liveHosts = new HashSet<Integer>();
         liveHosts.add(msg1.getHostId());
-        msg1.rejoinForeignHostPrepare(msg2hostId, new InetSocketAddress(internalPort), 0, liveHosts, 1);
+        msg1.rejoinForeignHostPrepare(msg2hostId, new InetSocketAddress(internalPort), 0, 0, liveHosts, 1);
         msg1.rejoinForeignHostCommit();
 
         // this timeout is rather lousy, but neither is it exception safe!

@@ -23,13 +23,21 @@
 
 package org.voltdb.utils;
 
+import java.io.File;
 import java.util.List;
 
-import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
-import org.voltdb.catalog.*;
-import org.voltdb.types.ConstraintType;
-
 import junit.framework.TestCase;
+
+import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
+import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Constraint;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Index;
+import org.voltdb.catalog.Table;
+import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.types.ConstraintType;
 
 public class TestCatalogUtil extends TestCase {
 
@@ -103,5 +111,48 @@ public class TestCatalogUtil extends TestCase {
                 }
             }
         }
+    }
+
+    public void testDeploymentCRCs() {
+        final String dep1 = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+                            "<deployment>" +
+                            "<cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'/>" +
+                            "<httpd port='0'>" +
+                            "<jsonapi enabled='true'/>" +
+                            "</httpd>" +
+                            "</deployment>";
+
+        // differs in a meaningful way from dep1
+        final String dep2 = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+                            "<deployment>" +
+                            "<cluster hostcount='4' kfactor='1' leader='localhost' sitesperhost='2'/>" +
+                            "<httpd port='0'>" +
+                            "<jsonapi enabled='true'/>" +
+                            "</httpd>" +
+                            "</deployment>";
+
+        // differs in whitespace and attribute order from dep1
+        final String dep3 = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+                            "<deployment>" +
+                            "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2' />" +
+                            "   <httpd port='0' >" +
+                            "       <jsonapi enabled='true'/>" +
+                            "   </httpd>" +
+                            "</deployment>";
+
+        final File tmpDep1 = VoltProjectBuilder.writeStringToTempFile(dep1);
+        final File tmpDep2 = VoltProjectBuilder.writeStringToTempFile(dep2);
+        final File tmpDep3 = VoltProjectBuilder.writeStringToTempFile(dep3);
+
+        final long crcDep1 = CatalogUtil.getDeploymentCRC(tmpDep1.getPath());
+        final long crcDep2 = CatalogUtil.getDeploymentCRC(tmpDep2.getPath());
+        final long crcDep3 = CatalogUtil.getDeploymentCRC(tmpDep3.getPath());
+
+        assertTrue(crcDep1 > 0);
+        assertTrue(crcDep2 > 0);
+        assertTrue(crcDep3 > 0);
+
+        assertTrue(crcDep1 != crcDep2);
+        assertTrue(crcDep1 == crcDep3);
     }
 }

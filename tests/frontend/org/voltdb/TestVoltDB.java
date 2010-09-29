@@ -25,15 +25,14 @@ package org.voltdb;
 
 import java.io.File;
 
-import org.voltdb.VoltDB;
+import junit.framework.TestCase;
+
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
-
-import junit.framework.TestCase;
 
 public class TestVoltDB extends TestCase {
 
@@ -167,8 +166,8 @@ public class TestVoltDB extends TestCase {
         catalog.execute(serializedCatalog);
 
         // this should fail because group "bar" does not exist
-        assertFalse("Deployment file shouldn't have been able to validate",
-                CatalogUtil.compileDeployment(catalog,project.getPathToDeployment()));
+        assertTrue("Deployment file shouldn't have been able to validate",
+                CatalogUtil.compileDeploymentAndGetCRC(catalog,project.getPathToDeployment()) < 0);
     }
 
     /**
@@ -203,7 +202,7 @@ public class TestVoltDB extends TestCase {
         catalog.execute(serializedCatalog);
 
         assertTrue("Deployment file should have been able to validate",
-                CatalogUtil.compileDeployment(catalog,project.getPathToDeployment()));
+                CatalogUtil.compileDeploymentAndGetCRC(catalog,project.getPathToDeployment()) >= 0);
     }
 
 }

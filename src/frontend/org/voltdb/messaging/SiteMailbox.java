@@ -21,10 +21,9 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 
+import org.voltdb.CommitLog;
 import org.voltdb.debugstate.MailboxHistory;
 import org.voltdb.debugstate.MailboxHistory.MessageState;
-import org.voltdb.CommitLog;
-import org.voltdb.VoltDB;
 
 /**
  *

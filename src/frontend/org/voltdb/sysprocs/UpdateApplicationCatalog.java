@@ -81,7 +81,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
      */
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
             String catalogDiffCommands, String catalogURL,
-            int expectedCatalogVersion, String deploymentURL)
+            int expectedCatalogVersion, String deploymentURL,
+            long deploymentCRC)
     {
         // TODO: compute CRC for catalog vs. a crc provided by the initiator.
         // validateCRC(catalogURL, initiatorsCRC);
@@ -90,7 +91,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         // others will see there is no work to do and gracefully continue.
         // then update data at the local site.
         String commands = Encoder.decodeBase64AndDecompress(catalogDiffCommands);
-        VoltDB.instance().catalogUpdate(commands, catalogURL, expectedCatalogVersion, getTransactionId());
+        VoltDB.instance().catalogUpdate(commands, catalogURL, expectedCatalogVersion, getTransactionId(), deploymentCRC);
         ctx.getExecutionSite().updateCatalog(commands);
 
         VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);

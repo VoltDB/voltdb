@@ -47,12 +47,13 @@ public class CatalogContext {
     public final int catalogVersion;
     public final String pathToCatalogJar;
     public final long catalogCRC;
+    public final long deploymentCRC;
 
     // PRIVATE
     //private final String m_path;
     private final InMemoryJarfile m_jarfile;
 
-    public CatalogContext(Catalog catalog, String pathToCatalogJar, int version, long prevCRC) {
+    public CatalogContext(Catalog catalog, String pathToCatalogJar, long deploymentCRC, int version, long prevCRC) {
         // check the heck out of the given params in this immutable class
         assert(catalog != null);
         assert(pathToCatalogJar != null);
@@ -79,11 +80,6 @@ public class CatalogContext {
             catalogCRC = prevCRC;
         }
 
-        if (catalogCRC == 0) {
-            @SuppressWarnings("unused")
-            int x = 5;
-        }
-
         this.catalog = catalog;
         cluster = catalog.getClusters().get("cluster");
         database = cluster.getDatabases().get("database");
@@ -91,6 +87,7 @@ public class CatalogContext {
         authSystem = new AuthSystem(database, cluster.getSecurityenabled());
         sites = cluster.getSites();
         siteTracker = new SiteTracker(cluster.getSites());
+        this.deploymentCRC = deploymentCRC;
 
         // count nodes
         numberOfNodes = cluster.getHosts().size();
@@ -110,11 +107,12 @@ public class CatalogContext {
         catalogVersion = version;
     }
 
-    public CatalogContext update(String pathToNewJar, String diffCommands, boolean incrementVersion) {
+    public CatalogContext update(String pathToNewJar, String diffCommands, boolean incrementVersion, long deploymentCRC) {
         Catalog newCatalog = catalog.deepCopy();
         newCatalog.execute(diffCommands);
         int incValue = incrementVersion ? 1 : 0;
-        CatalogContext retval = new CatalogContext(newCatalog, pathToNewJar, catalogVersion + incValue, catalogCRC);
+        long realDepCRC = deploymentCRC > 0 ? deploymentCRC : this.deploymentCRC;
+        CatalogContext retval = new CatalogContext(newCatalog, pathToNewJar, realDepCRC, catalogVersion + incValue, catalogCRC);
         return retval;
     }
 
