@@ -1,5 +1,10 @@
 <?xml version="1.0"?>
 <project>
+    <info>
+        <name>Voter Example</name>
+        <version>1.0</version>
+        <description>Demonstrates call-in vote counting scheme.</description>
+    </info>
     <database name='database'>
         <schemas>
             <schema path='ddl.sql' />

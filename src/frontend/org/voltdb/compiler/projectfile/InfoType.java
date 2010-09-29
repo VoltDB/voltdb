@@ -15,19 +15,19 @@ import javax.xml.bind.annotation.XmlType;
 
 
 /**
- * <p>Java class for projectType complex type.
+ * <p>Java class for infoType complex type.
  * 
  * <p>The following schema fragment specifies the expected content contained within this class.
  * 
  * <pre>
- * &lt;complexType name="projectType">
+ * &lt;complexType name="infoType">
  *   &lt;complexContent>
  *     &lt;restriction base="{http://www.w3.org/2001/XMLSchema}anyType">
- *       &lt;sequence>
- *         &lt;element name="info" type="{}infoType" minOccurs="0"/>
- *         &lt;element name="security" type="{}securityType" minOccurs="0"/>
- *         &lt;element name="database" type="{}databaseType"/>
- *       &lt;/sequence>
+ *       &lt;all>
+ *         &lt;element name="name" type="{http://www.w3.org/2001/XMLSchema}string"/>
+ *         &lt;element name="version" type="{http://www.w3.org/2001/XMLSchema}string"/>
+ *         &lt;element name="description" type="{http://www.w3.org/2001/XMLSchema}string"/>
+ *       &lt;/all>
  *     &lt;/restriction>
  *   &lt;/complexContent>
  * &lt;/complexType>
@@ -36,88 +36,88 @@ import javax.xml.bind.annotation.XmlType;
  * 
  */
 @XmlAccessorType(XmlAccessType.FIELD)
-@XmlType(name = "projectType", propOrder = {
-    "info",
-    "security",
-    "database"
+@XmlType(name = "infoType", propOrder = {
+
 })
-public class ProjectType {
+public class InfoType {
 
-    protected InfoType info;
-    protected SecurityType security;
     @XmlElement(required = true)
-    protected DatabaseType database;
+    protected String name;
+    @XmlElement(required = true)
+    protected String version;
+    @XmlElement(required = true)
+    protected String description;
 
     /**
-     * Gets the value of the info property.
+     * Gets the value of the name property.
      * 
      * @return
      *     possible object is
-     *     {@link InfoType }
+     *     {@link String }
      *     
      */
-    public InfoType getInfo() {
-        return info;
+    public String getName() {
+        return name;
     }
 
     /**
-     * Sets the value of the info property.
+     * Sets the value of the name property.
      * 
      * @param value
      *     allowed object is
-     *     {@link InfoType }
+     *     {@link String }
      *     
      */
-    public void setInfo(InfoType value) {
-        this.info = value;
+    public void setName(String value) {
+        this.name = value;
     }
 
     /**
-     * Gets the value of the security property.
+     * Gets the value of the version property.
      * 
      * @return
      *     possible object is
-     *     {@link SecurityType }
+     *     {@link String }
      *     
      */
-    public SecurityType getSecurity() {
-        return security;
+    public String getVersion() {
+        return version;
     }
 
     /**
-     * Sets the value of the security property.
+     * Sets the value of the version property.
      * 
      * @param value
      *     allowed object is
-     *     {@link SecurityType }
+     *     {@link String }
      *     
      */
-    public void setSecurity(SecurityType value) {
-        this.security = value;
+    public void setVersion(String value) {
+        this.version = value;
     }
 
     /**
-     * Gets the value of the database property.
+     * Gets the value of the description property.
      * 
      * @return
      *     possible object is
-     *     {@link DatabaseType }
+     *     {@link String }
      *     
      */
-    public DatabaseType getDatabase() {
-        return database;
+    public String getDescription() {
+        return description;
     }
 
     /**
-     * Sets the value of the database property.
+     * Sets the value of the description property.
      * 
      * @param value
      *     allowed object is
-     *     {@link DatabaseType }
+     *     {@link String }
      *     
      */
-    public void setDatabase(DatabaseType value) {
-        this.database = value;
+    public void setDescription(String value) {
+        this.description = value;
     }
 
 }

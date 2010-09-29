@@ -32,9 +32,19 @@
   <xsd:element name="project" type="projectType"/>
   <xsd:complexType name="projectType">
     <xsd:sequence>
+      <xsd:element name="info" minOccurs='0' maxOccurs='1' type="infoType"/>
       <xsd:element name="security" minOccurs='0' maxOccurs='1' type="securityType"/>
       <xsd:element name="database" minOccurs="1" maxOccurs="1" type="databaseType"/>
     </xsd:sequence>
+  </xsd:complexType>
+
+  <!-- <info> -->
+  <xsd:complexType name="infoType">
+    <xsd:all>
+      <xsd:element name="name" type="xsd:string"/>
+      <xsd:element name="version" type="xsd:string"/>
+      <xsd:element name="description" type="xsd:string"/>
+    </xsd:all>
   </xsd:complexType>
 
   <!-- <security> -->
