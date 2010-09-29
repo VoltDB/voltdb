@@ -157,30 +157,30 @@ public class Log
 
     public static void debug(Throwable th)
     {
-        if (!isDebugEnabled())
-            return;
-        __log.debug(EXCEPTION, th);
+        //if (!isDebugEnabled())
+        //    return;
+        //__log.debug(EXCEPTION, th);*/
     }
 
     public static void debug(String msg)
     {
-        if (!initialized())
-            return;
-        __log.debug(msg);
+        //if (!initialized())
+        //    return;
+        //__log.debug(msg);
     }
 
     public static void debug(String msg, Object arg)
     {
-        if (!initialized())
-            return;
-        __log.debug(msg, arg);
+        //if (!initialized())
+        //    return;
+        //__log.debug(msg, arg);
     }
 
     public static void debug(String msg, Object arg0, Object arg1)
     {
-        if (!initialized())
-            return;
-        __log.debug(msg, arg0, arg1);
+        //if (!initialized())
+        //    return;
+        //__log.debug(msg, arg0, arg1);
     }
 
     /**
@@ -200,23 +200,23 @@ public class Log
 
     public static void info(String msg)
     {
-        if (!initialized())
-            return;
-        __log.info(msg);
+        //if (!initialized())
+        //    return;
+        //__log.info(msg);
     }
 
     public static void info(String msg, Object arg)
     {
-        if (!initialized())
-            return;
-        __log.info(msg, arg);
+        //if (!initialized())
+        //    return;
+        //__log.info(msg, arg);
     }
 
     public static void info(String msg, Object arg0, Object arg1)
     {
-        if (!initialized())
-            return;
-        __log.info(msg, arg0, arg1);
+        //if (!initialized())
+        //    return;
+        //__log.info(msg, arg0, arg1);
     }
 
     public static boolean isDebugEnabled()
@@ -228,37 +228,37 @@ public class Log
 
     public static void warn(String msg)
     {
-        if (!initialized())
-            return;
-        __log.warn(msg);
+        //if (!initialized())
+        //    return;
+        //__log.warn(msg);
     }
 
     public static void warn(String msg, Object arg)
     {
-        if (!initialized())
-            return;
-        __log.warn(msg, arg);
+        //if (!initialized())
+        //    return;
+        //__log.warn(msg, arg);
     }
 
     public static void warn(String msg, Object arg0, Object arg1)
     {
-        if (!initialized())
-            return;
-        __log.warn(msg, arg0, arg1);
+        //if (!initialized())
+        //    return;
+        //__log.warn(msg, arg0, arg1);
     }
 
     public static void warn(String msg, Throwable th)
     {
-        if (!initialized())
-            return;
-        __log.warn(msg, th);
+        //if (!initialized())
+        //    return;
+        //__log.warn(msg, th);
     }
 
     public static void warn(Throwable th)
     {
-        if (!initialized())
-            return;
-        __log.warn(EXCEPTION, th);
+        //if (!initialized())
+        //    return;
+        //__log.warn(EXCEPTION, th);
     }
 
     /**
