@@ -295,7 +295,7 @@ public class TestRejoinEndToEnd extends TestCase {
         return failType != DONT_FAIL;
     }
 
-    /*public void testRejoinSysprocButFail() throws Exception {
+    public void testRejoinSysprocButFail() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("rejoin.jar"), 1, 1, 0, "localhost");
         assertTrue(success);
@@ -431,7 +431,7 @@ public class TestRejoinEndToEnd extends TestCase {
 
         localServer.shutdown();
         cluster.shutDown();
-    }*/
+    }
 
     class TrivialExportClient extends ExportClientBase {
 
