@@ -22,8 +22,8 @@ import java.util.HashMap;
 import java.util.List;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.CatalogContext;
 import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.HsqlBackend;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
@@ -31,6 +31,7 @@ import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.utils.Encoder;
@@ -91,8 +92,9 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         // others will see there is no work to do and gracefully continue.
         // then update data at the local site.
         String commands = Encoder.decodeBase64AndDecompress(catalogDiffCommands);
-        VoltDB.instance().catalogUpdate(commands, catalogURL, expectedCatalogVersion, getTransactionId(), deploymentCRC);
-        ctx.getExecutionSite().updateCatalog(commands);
+        CatalogContext context =
+            VoltDB.instance().catalogUpdate(commands, catalogURL, expectedCatalogVersion, getTransactionId(), deploymentCRC);
+        ctx.getExecutionSite().updateCatalog(commands, context);
 
         VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
         result.addRow(VoltSystemProcedure.STATUS_OK);

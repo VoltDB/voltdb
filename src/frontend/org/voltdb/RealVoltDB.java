@@ -34,6 +34,7 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Random;
@@ -665,7 +666,6 @@ public class RealVoltDB implements VoltDBInterface
                                                  m_statsManager);
             fivems.start();
 
-
             hostLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null);
         }
     }
@@ -1102,8 +1102,23 @@ public class RealVoltDB implements VoltDBInterface
 
     /** Last transaction ID at which the catalog updated. */
     private static long lastCatalogUpdate_txnId = 0;
+
+    /** Struct to associate a context with a counter of served sites */
+    private static class ContextTracker {
+        ContextTracker(CatalogContext context) {
+            m_dispensedSites = 1;
+            m_context = context;
+        }
+        long m_dispensedSites;
+        CatalogContext m_context;
+    }
+
+    /** Associate transaction ids to contexts */
+    private HashMap<Long, ContextTracker>m_txnIdToContextTracker =
+        new HashMap<Long, ContextTracker>();
+
     @Override
-    public void catalogUpdate(
+    public CatalogContext catalogUpdate(
             String diffCommands,
             String newCatalogURL,
             int expectedCatalogVersion,
@@ -1111,12 +1126,18 @@ public class RealVoltDB implements VoltDBInterface
             long deploymentCRC)
     {
         synchronized(m_catalogUpdateLock) {
-            // another site already did this work.
-            if (currentTxnId == lastCatalogUpdate_txnId) {
-                return;
-            }
-            else if (currentTxnId < lastCatalogUpdate_txnId) {
-                throw new RuntimeException("Trying to update main catalog context with an old transaction.");
+            // A site is catching up with catalog updates
+            if (currentTxnId <= lastCatalogUpdate_txnId) {
+                ContextTracker contextTracker = m_txnIdToContextTracker.get(currentTxnId);
+                // This 'dispensed' concept is a little crazy fragile. Maybe it would be better
+                // to keep a rolling N catalogs? Or perhaps to keep catalogs for N minutes? Open
+                // to opinions here.
+                contextTracker.m_dispensedSites++;
+                int ttlsites = m_catalogContext.siteTracker.getLiveExecutionSitesForHost(m_messenger.getHostId()).size();
+                if (contextTracker.m_dispensedSites == ttlsites) {
+                    m_txnIdToContextTracker.remove(currentTxnId);
+                }
+                return contextTracker.m_context;
             }
             else if (m_catalogContext.catalog.getCatalogVersion() != expectedCatalogVersion) {
                 throw new RuntimeException("Trying to update main catalog context with diff " +
@@ -1124,17 +1145,21 @@ public class RealVoltDB implements VoltDBInterface
                 expectedCatalogVersion + " does not match actual version: " + m_catalogContext.catalog.getCatalogVersion());
             }
 
-            // 0. update the global context
+            // 0. A new catalog! Update the global context and the context tracker
             lastCatalogUpdate_txnId = currentTxnId;
             m_catalogContext = m_catalogContext.update(newCatalogURL, diffCommands, true, deploymentCRC);
+            m_txnIdToContextTracker.put(currentTxnId, new ContextTracker(m_catalogContext));
 
             // 1. update the export manager.
             ExportManager.instance().updateCatalog(m_catalogContext);
 
             // 2. update client interface (asynchronously)
             //    CI in turn updates the planner thread.
-            for (ClientInterface ci : m_clientInterfaces)
+            for (ClientInterface ci : m_clientInterfaces) {
                 ci.notifyOfCatalogUpdate();
+            }
+
+            return m_catalogContext;
         }
     }
 

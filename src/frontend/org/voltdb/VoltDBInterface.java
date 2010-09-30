@@ -115,7 +115,7 @@ public interface VoltDBInterface
      * @param currentTxnId  The transaction ID at which this method is called
      * @param deploymentCRC The CRC of the deployment file
      */
-   public void catalogUpdate(String diffCommands, String newCatalogURL,
+    public CatalogContext catalogUpdate(String diffCommands, String newCatalogURL,
            int expectedCatalogVersion, long currentTxnId, long deploymentCRC);
 
    /**

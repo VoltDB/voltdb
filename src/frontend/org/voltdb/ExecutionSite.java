@@ -46,11 +46,11 @@ import org.voltdb.debugstate.ExecutorContext;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
 import org.voltdb.dtxn.RestrictedPriorityQueue;
-import org.voltdb.dtxn.RestrictedPriorityQueue.QueueState;
 import org.voltdb.dtxn.SinglePartitionTxnState;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.SiteTransactionConnection;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.dtxn.RestrictedPriorityQueue.QueueState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.exceptions.SerializableException;
@@ -741,8 +741,8 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         return true;
     }
 
-    public boolean updateCatalog(String catalogDiffCommands) {
-        m_context = VoltDB.instance().getCatalogContext();
+    public boolean updateCatalog(String catalogDiffCommands, CatalogContext context) {
+        m_context = context;
         loadProceduresFromCatalog(VoltDB.getEEBackendType());
         ee.updateCatalog(catalogDiffCommands, m_context.catalogVersion);
 

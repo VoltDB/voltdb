@@ -325,12 +325,11 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void catalogUpdate(String diffCommands,
+    public CatalogContext catalogUpdate(String diffCommands,
             String newCatalogURL, int expectedCatalogVersion,
             long currentTxnId, long deploymentCRC)
     {
-        // TODO Auto-generated method stub
-
+        throw new UnsupportedOperationException("unimplemented");
     }
 
     @Override
