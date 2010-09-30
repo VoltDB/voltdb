@@ -280,6 +280,28 @@ DISTRIBUTION
     </exec>
 </target>
 
+<!-- Copy an example and move the basebuild.xml into that example -->
+<macrodef name="distribute-example">
+    <attribute name="exampledir"/>
+    <sequential>
+        <copy todir="${dist.dir}/examples/@{exampledir}" >
+            <fileset dir="examples/@{exampledir}" defaultexcludes="yes">
+                <include name="**/*"/>
+            </fileset>
+            <fileset dir="examples/includes" defaultexcludes="yes">
+                <include name="**/*"/>
+                <exclude name="README"/>
+            </fileset>
+        </copy>
+
+        <!-- Perform any post processing required -->
+        <exec dir="tools" executable="python" failonerror="true">
+            <arg line="example-dist-cleanup.py"/>
+            <arg line="${dist.dir}/examples/@{exampledir}"/>
+        </exec>
+    </sequential>
+</macrodef>
+
 <target name="dist_internal" depends="compile, ee, voltdb.jar, voltdbclient.jar">
     <!-- prepare release directory for new content -->
     <delete includeemptydirs="true" failonerror='false'>
@@ -371,7 +393,7 @@ DISTRIBUTION
 
     <!-- populate top level README by copying and renaming README.dist -->
     <copy tofile="${dist.dir}/README" file="doc/README.dist"/>
-    
+
     <!-- populate top level thirdparty readmy by copying it -->
     <copy tofile="${dist.dir}/README.thirdparty" file="README.thirdparty.txt"/>
 
@@ -379,11 +401,13 @@ DISTRIBUTION
     <copy tofile="${dist.dir}/examples/README" file="examples/README"/>
 
     <!-- populate the other examples -->
-    <copy todir="${dist.dir}/examples" >
-        <fileset dir="examples" defaultexcludes="yes">
-            <include name="**/*"/>
-        </fileset>
-    </copy>
+    <distribute-example exampledir="auction"/>
+    <distribute-example exampledir="game_of_life"/>
+    <distribute-example exampledir="helloworld"/>
+    <distribute-example exampledir="key_value"/>
+    <distribute-example exampledir="satellite"/>
+    <distribute-example exampledir="twitter"/>
+    <distribute-example exampledir="voter"/>
 
     <!-- populate the ad hoc tool -->
     <copy todir="${dist.dir}/tools" >
