@@ -240,6 +240,27 @@ public class BenchmarkController {
         }
     }
 
+    private ArrayList<File> parsePushFiles(String pushfiles) {
+        if (pushfiles == null) {
+            return new ArrayList<File>(0);
+        }
+        ArrayList<File> files = new ArrayList<File>();
+        String filenames[] = pushfiles.split(",");
+        for (String filename : filenames) {
+            File f = new File(filename);
+            if (f.exists()) {
+                if (f.canRead()) {
+                    files.add(f);
+                } else {
+                    benchmarkLog.warn("Push file " + filename + " is not readable");
+                }
+            } else {
+                benchmarkLog.warn("Push file " + filename + " does not exist");
+            }
+        }
+        return files;
+    }
+
     public void setupBenchmark() {
         // actually compile and write the catalog to disk
         // the benchmark can produce multiple catalogs.
@@ -253,28 +274,38 @@ public class BenchmarkController {
         m_jarFileName = jarFileNames[0];
         m_pathToDeployment = m_projectBuilder.getPathToDeployment();
 
+        final ArrayList<File> pushFiles = parsePushFiles(m_config.pushfiles);
+        final ArrayList<String> pushedJarFiles = new ArrayList<String>();
+        for (File f : pushFiles) {
+            if (f.getName().endsWith(".jar")) {
+                pushedJarFiles.add(f.getName());
+            }
+        }
+
         // copy the catalog and deployment file to the servers, but don't bother in local mode
         SSHTools ssh = new SSHTools(m_config.remoteUser);
         boolean status;
         if (m_config.localmode == false) {
-            for (String fileName : jarFileNames) {
+            for (String filename : jarFileNames) {
                 for (InetSocketAddress host : m_config.hosts) {
-                    status = ssh.copyFromLocal(new File(fileName),
+                    status = ssh.copyFromLocal(new File(filename),
                                                host.getHostName(),
                                                m_config.remotePath);
                     if(!status)
                         System.out.println(
                         "SSH copyFromLocal failed to copy "
-                        + fileName + " to "
+                        + filename + " to "
                         + m_config.remoteUser + "@" + host + ":" + m_config.remotePath);
                 }
+            }
+            for (File file : pushFiles) {
                 for (String client : m_config.clients) {
-                    status = ssh.copyFromLocal(new File(fileName),
+                    status = ssh.copyFromLocal(file,
                                                client,
                                                m_config.remotePath);
                     if(!status)
                         System.out.println("SSH copyFromLocal failed to copy "
-                        + fileName + " to "
+                        + file + " to "
                         + m_config.remoteUser + "@" + client + ":" + m_config.remotePath);
                 }
             }
@@ -448,6 +479,10 @@ public class BenchmarkController {
             if (System.getProperty("java.class.path") != null) {
                 classpath = classpath + ":" + System.getProperty("java.class.path");
             }
+            for (String jar : pushedJarFiles) {
+                classpath = classpath + ":" + jar;
+            }
+
             loaderCommand.append(" -cp \"" + classpath + "\" ");
             loaderCommand.append(m_loaderClass.getCanonicalName());
             for (InetSocketAddress host : m_config.hosts) {
@@ -512,6 +547,9 @@ public class BenchmarkController {
         if (System.getProperty("java.class.path") != null) {
             classpath = classpath + ":" + System.getProperty("java.class.path");
         }
+        for (String jar : pushedJarFiles) {
+            classpath = classpath + ":" + jar;
+        }
         clArgs.add("-cp");
         clArgs.add("\"" + classpath + "\"");
 
@@ -525,6 +563,9 @@ public class BenchmarkController {
         clArgs.add("STATSDATABASEURL=" + m_config.statsDatabaseURL);
         clArgs.add("STATSPOLLINTERVAL=" + m_config.interval);
         clArgs.add("PROJECTBUILDERNAME=" + m_builderClass.getName());
+        if (m_config.maxOutstanding != null) {
+            clArgs.add("MAXOUTSTANDING=" + m_config.maxOutstanding);
+        }
 
         // path to deployment file on the server
         clArgs.add("DEPLOYMENTFILEPATH=" + new File(m_pathToDeployment).getName());
@@ -554,7 +595,7 @@ public class BenchmarkController {
                 uploader.setCommandLineForClient(
                         client + ":" + String.valueOf(j),
                         fullCommand.toString());
-                benchmarkLog.debug("Client Commnand: " + fullCommand.toString());
+                benchmarkLog.debug("Client Command: " + fullCommand.toString());
                 m_clientPSM.startProcess(client + ":" + String.valueOf(j), args);
             }
         }
@@ -836,6 +877,8 @@ public class BenchmarkController {
         String statsTag = null;
         String applicationName = null;
         String subApplicationName = null;
+        String pushfiles = null;
+        Integer maxOutstanding = null;
 
         // try to read connection string for reporting database
         // from a "mysqlp" file
@@ -968,7 +1011,12 @@ public class BenchmarkController {
                 subApplicationName = parts[1];
             } else if (parts[0].equals("PROJECTBUILDERNAME")) {
                 projectBuilderName = parts[1];
-            } else {
+            } else if (parts[0].equals("PUSHFILES")) {
+                pushfiles = parts[1];
+            } else if (parts[0].equals("MAXOUTSTANDING")){
+                maxOutstanding = Integer.parseInt(parts[1]);
+            }
+            else {
                 clientParams.put(parts[0].toLowerCase(), parts[1]);
             }
         }
@@ -1059,7 +1107,7 @@ public class BenchmarkController {
                 remotePath, remoteUser, listenForDebugger, serverHeapSize, clientHeapSize,
                 localmode, useProfile, checkTransaction, checkTables, snapshotPath, snapshotPrefix,
                 snapshotFrequency, snapshotRetain, databaseURL[0], databaseURL[1], statsTag,
-                applicationName, subApplicationName);
+                applicationName, subApplicationName, pushfiles, maxOutstanding);
         config.parameters.putAll(clientParams);
 
         // ACTUALLY RUN THE BENCHMARK

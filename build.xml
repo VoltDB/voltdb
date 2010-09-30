@@ -1432,6 +1432,7 @@ BENCHMARKS
         <jvmarg value="-Djava.library.path=${build.dir}/nativelibs" />
         <assertions><disable/></assertions>
         <arg value="CLIENT=${client}" />
+        <arg value="PUSHFILES=${pushfiles}" />
         <arg value="PROJECTBUILDERNAME=${projectbuilder}" />
         <arg value="BACKEND=${backend}" />
         <arg value="HOSTCOUNT=${hostcount}" />
@@ -1479,6 +1480,7 @@ BENCHMARKS
         <!-- Actual TXN rate sent to cluster will be:
             TXNRATE * CLIENTCOUNT * PROCESSESPERCLIENT -->
         <arg value="TXNRATE=${txnrate}" />
+        <arg value="MAXOUTSTANDING=${maxoutstanding}" />
         <!-- Actual number of connections opened to cluster will be:
             NUMCONNECTIONS * CLIENTCOUNT * PROCESSESPERCLIENT * HOSTCOUNT -->
         <arg value="NUMCONNECTIONS=${numconnections}" />

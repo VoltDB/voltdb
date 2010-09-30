@@ -432,6 +432,7 @@ public abstract class ClientMain {
         String statsDatabaseURL = null;
         String deploymentFilePath = null;
         int statsPollInterval = 10000;
+        Integer maxOutstanding = null;
 
         // scan the inputs once to read everything but host names
         for (final String arg : args) {
@@ -471,6 +472,8 @@ public abstract class ClientMain {
             }
             else if (parts[0].equals("DEPLOYMENTFILEPATH")) {
                 deploymentFilePath = parts[1];
+            } else if (parts[0].equals("MAXOUTSTANDING")) {
+                maxOutstanding = Integer.parseInt(parts[1]);
             }
         }
         StatsUploaderSettings statsSettings = null;
@@ -493,6 +496,9 @@ public abstract class ClientMain {
         clientConfig.setExpectedOutgoingMessageSize(getExpectedOutgoingMessageSize());
         clientConfig.setHeavyweight(useHeavyweightClient());
         clientConfig.setStatsUploaderSettings(statsSettings);
+        if (maxOutstanding != null) {
+            clientConfig.setMaxOutstandingTxns(maxOutstanding);
+        }
 
         m_voltClient =
             ClientFactory.createClient(clientConfig);

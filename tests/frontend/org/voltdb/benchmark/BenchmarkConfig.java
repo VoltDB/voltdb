@@ -57,6 +57,8 @@ public class BenchmarkConfig {
     public final String statsTag;//Identifies the result set
     public final String applicationName;
     public final String subApplicationName;
+    public final String pushfiles;
+    public final Integer maxOutstanding;
 
     public final Map<String, String> parameters = new HashMap<String, String>();
 
@@ -88,7 +90,9 @@ public class BenchmarkConfig {
             String resultsDatabaseURL,
             String statsTag,
             String applicationName,
-            String subApplicationName
+            String subApplicationName,
+            String pushfiles,
+            Integer maxOutstanding
         ) {
 
         this.benchmarkClient = benchmarkClient;
@@ -123,6 +127,8 @@ public class BenchmarkConfig {
         this.statsTag = statsTag;
         this.applicationName = applicationName;
         this.subApplicationName = subApplicationName;
+        this.pushfiles = pushfiles;
+        this.maxOutstanding = maxOutstanding;
     }
 
     @Override
