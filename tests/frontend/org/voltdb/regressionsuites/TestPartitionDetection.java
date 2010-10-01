@@ -22,14 +22,21 @@
  */
 
 package org.voltdb.regressionsuites;
-import junit.framework.TestCase;
-
-import java.io.*;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import junit.framework.TestCase;
+
 import org.voltdb.BackendTarget;
-import org.voltdb.client.*;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.SnapshotVerifier;
 
@@ -128,6 +135,17 @@ public class TestPartitionDetection extends TestCase
     public void testPartitionAndVerifySnapshot() throws Exception {
         final Semaphore rateLimit = new Semaphore(10);
         final Client client = ClientFactory.createClient();
+
+        // clean up from any previous test execution.
+        try {
+            File file = new File("/" + TMPDIR + "/" + TESTNONCE + "-T-host_1.vpt");
+            file.delete();
+            file = new File("/" + TMPDIR + "/ppd_nonce.digest");
+            file.delete();
+        } catch (Exception ignored) {
+            ignored.printStackTrace();
+        }
+
 
         try {
             VoltProjectBuilder builder = getBuilderForTest();

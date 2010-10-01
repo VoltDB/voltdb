@@ -1134,7 +1134,10 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                                       lastCommittedTxnId,
                                       m_systemProcedureContext,
                                       ConnectionUtil.getHostnameOrAddress());
-            VoltDB.crashVoltDB();
+            hostLog.info("Received ExecutionSiteLocalSnapshotMessage. Finished local snapshot");
+            if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() == -1) {
+                VoltDB.crashVoltDB();
+            }
         }
         else {
             hostLog.l7dlog(Level.FATAL, LogKeys.org_voltdb_dtxn_SimpleDtxnConnection_UnkownMessageClass.name(),
