@@ -76,7 +76,7 @@ public class AuthenticatedConnectionCache {
         m_targetSize = targetSize;
     }
 
-    public Client getClient(String userName, byte[] hashedPassword) throws IOException {
+    public synchronized Client getClient(String userName, byte[] hashedPassword) throws IOException {
         // UN-AUTHENTICATED
         if ((userName == null) || (userName == "")) {
             if ((hashedPassword != null) && (hashedPassword.length > 0)) {
@@ -117,6 +117,7 @@ public class AuthenticatedConnectionCache {
             conn.user = userName;
             conn.client = (ClientImpl) ClientFactory.createClient();
             conn.client.createConnectionWithHashedCredentials(m_hostname, m_port, userName, hashedPassword);
+            m_connections.put(userName, conn);
             attemptToShrinkPoolIfNeeded();
         }
         return conn.client;

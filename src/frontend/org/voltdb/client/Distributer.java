@@ -453,14 +453,14 @@ class Distributer {
 //        }.start();
     }
 
-    synchronized void createConnection(String host, String program, String password, int port)
+    void createConnection(String host, String program, String password, int port)
         throws UnknownHostException, IOException
     {
         byte hashedPassword[] = ConnectionUtil.getHashedPassword(password);
         createConnectionWithHashedCredentials(host, program, hashedPassword, port);
     }
 
-    public void createConnectionWithHashedCredentials(String host, String program, byte[] hashedPassword, int port)
+    synchronized void createConnectionWithHashedCredentials(String host, String program, byte[] hashedPassword, int port)
         throws UnknownHostException, IOException
     {
         final Object connectionStuff[] =

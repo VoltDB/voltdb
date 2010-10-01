@@ -127,7 +127,7 @@ public class HTTPClientInterface {
 
             if (params != null) {
                 ParameterSet paramSet = ParameterSet.fromJSONString(params);
-                success =  client.callProcedure(cb, procName, paramSet.toArray());
+                success = client.callProcedure(cb, procName, paramSet.toArray());
             }
             else {
                 success = client.callProcedure(cb, procName);
