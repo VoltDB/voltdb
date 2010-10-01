@@ -75,7 +75,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(keyColumnTypes, keyColumnLengths, keyColumnAllowNull, true);
     TableIndexScheme schemeCopy(scheme);
     schemeCopy.keySchema = keySchema;
-    VOLT_TRACE("Creating index for %s.\n%s", scheme.get<0>().c_str(), keySchema->debug().c_str());
+    VOLT_TRACE("Creating index for %s.\n%s", scheme.name.c_str(), keySchema->debug().c_str());
     const int keySize = keySchema->tupleLength();
 
     // no int specialization beyond this point
