@@ -26,17 +26,17 @@ package org.voltdb.benchmark.workloads.multipartbench;
 import java.net.URL;
 
 import org.voltdb.benchmark.workloads.WorkloadProjectBuilder;
-import org.voltdb.benchmark.workloads.multipartbench.procedures.CreditDebitAccounts;
-import org.voltdb.benchmark.workloads.multipartbench.procedures.InsertAccount;
-import org.voltdb.benchmark.workloads.multipartbench.procedures.TotalBalances;
-import org.voltdb.benchmark.workloads.multipartbench.procedures.UpdateBalance;
+import org.voltdb.benchmark.workloads.multipartbench.procedures.*;
 
 public class MultiPartProjectBuilder extends WorkloadProjectBuilder
 {
     public static final Class<?> m_procedures[] = new Class<?>[]
     {
         CreditDebitAccounts.class,
+        EveryoneWins.class,
         InsertAccount.class,
+        NullMultiProc.class,
+        SelectEmptyTable.class,
         TotalBalances.class,
         UpdateBalance.class
     };
@@ -46,7 +46,8 @@ public class MultiPartProjectBuilder extends WorkloadProjectBuilder
 
     public static String m_partitioning[][] = new String[][]
     {
-        {"FAKE_ACCOUNTS", "ID"}
+        {"FAKE_ACCOUNTS", "ID"},
+        {"EMPTY_TABLE", "ID"}
     };
 
     @Override

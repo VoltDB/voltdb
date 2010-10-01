@@ -17,6 +17,18 @@
         <procedure procName="TotalBalances" percOfWL="100">
         </procedure>
     </workload>
+    <workload wlName="EveryoneWins">
+        <procedure procName="EveryoneWins" percOfWL="100">
+        </procedure>
+    </workload>
+    <workload wlName="NullMultiProc">
+        <procedure procName="NullMultiProc" percOfWL="100">
+        </procedure>
+    </workload>
+    <workload wlName="SelectEmptyTable">
+        <procedure procName="SelectEmptyTable" percOfWL="100">
+        </procedure>
+    </workload>
     <workload wlName="UpdateBalance">
         <procedure procName="UpdateBalance" percOfWL="100">
             <param offset="0">
