@@ -1021,6 +1021,11 @@ public class BenchmarkController {
             }
         }
 
+        if (maxOutstanding == null) {
+            maxOutstanding =
+                org.voltdb.dtxn.SimpleDtxnInitiator.MAX_DESIRED_PENDING_TXNS * (hostCount / (k_factor + 1));
+        }
+
         if (duration < 1000) {
             System.err.println("Duration is specified in milliseconds");
             System.exit(-1);
