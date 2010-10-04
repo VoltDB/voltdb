@@ -67,6 +67,17 @@
 #include <sched.h>
 #endif
 
+#ifdef LINUX
+#if __SIZEOF_POINTER__ == 4
+#error VoltDB server does not compile or run on 32-bit platforms. The Java client library does (ant jars)
+#endif
+#else
+#ifndef __x86_64
+#error VoltDB server does not compile or run on 32-bit platforms. The Java clien
+t library does (ant jars)
+#endif
+#endif
+
 //#include <google/profiler.h>
 
 //#include <jni/jni.h>
