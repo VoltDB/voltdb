@@ -44,6 +44,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.Feedback;
 import org.voltdb.regressionsuites.TestExportSuite;
+import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 
 public class TestVoltCompiler extends TestCase {
@@ -1151,6 +1152,115 @@ public class TestVoltCompiler extends TestCase {
         Table tbl = c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().getIgnoreCase("t");
         String defaultvalue = tbl.getColumns().getIgnoreCase("id").getDefaultvalue();
         assertTrue(defaultvalue.equalsIgnoreCase("a'b''c"));
+    }
+
+    // Test that DDLCompiler's index creation adheres to the rules implicit in
+    // the EE's tableindexfactory.  Currently (10/3/2010) these are:
+    // All column types can be used in a tree array.  Only int types can
+    // be used in hash tables or array indexes
+
+    String[] column_types = {"tinyint", "smallint", "integer", "bigint",
+                             "float", "varchar(10)", "timestamp", "decimal"};
+
+    IndexType[] default_index_types = {IndexType.HASH_TABLE,
+                                       IndexType.HASH_TABLE,
+                                       IndexType.HASH_TABLE,
+                                       IndexType.HASH_TABLE,
+                                       IndexType.BALANCED_TREE,
+                                       IndexType.BALANCED_TREE,
+                                       IndexType.HASH_TABLE,
+                                       IndexType.BALANCED_TREE};
+
+    boolean[] can_be_hash = {true, true, true, true, false, false, true, false};
+    boolean[] can_be_array = {true, true, true, true, false, false, true, false};
+    boolean[] can_be_tree = {true, true, true, true, true, true, true, true};
+
+    public void testDDLCompilerIndexDefaultTypes()
+    {
+        for (int i = 0; i < column_types.length; i++)
+        {
+            String s =
+                "create table t(id " + column_types[i] + " not null, num integer not null);\n" +
+                "create index idx_t_id on t(id);\n" +
+                "create index idx_t_idnum on t(id,num);";
+            VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+            assertFalse(c.hasErrors());
+            Database d = c.m_catalog.getClusters().get("cluster").getDatabases().get("database");
+            assertEquals(default_index_types[i].getValue(),
+                         d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t_id").getType());
+            assertEquals(default_index_types[i].getValue(),
+                         d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t_idnum").getType());
+        }
+    }
+
+    public void testDDLCompilerHashIndexAllowed()
+    {
+        for (int i = 0; i < column_types.length; i++)
+        {
+            final String s =
+                "create table t(id " + column_types[i] + " not null, num integer not null);\n" +
+                "create index idx_t_id_hash on t(id);\n" +
+                "create index idx_t_idnum_hash on t(id,num);";
+            VoltCompiler c = compileForDDLTest(getPathForSchema(s), can_be_hash[i]);
+            if (can_be_hash[i])
+            {
+                // do appropriate index exists checks
+                assertFalse(c.hasErrors());
+                Database d = c.m_catalog.getClusters().get("cluster").getDatabases().get("database");
+                assertEquals(IndexType.HASH_TABLE.getValue(),
+                             d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t_id_hash").getType());
+                assertEquals(IndexType.HASH_TABLE.getValue(),
+                             d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t_idnum_hash").getType());
+            }
+            else
+            {
+                assertTrue(c.hasErrors());
+            }
+        }
+    }
+
+    public void testDDLCompilerArrayIndexAllowed()
+    {
+        for (int i = 0; i < column_types.length; i++)
+        {
+            final String s =
+                "create table t(id " + column_types[i] + " not null, num integer not null);\n" +
+                "create index idx_t_id_array on t(id);\n" +
+                "create index idx_t_idnum_array on t(id,num);";
+            VoltCompiler c = compileForDDLTest(getPathForSchema(s), can_be_array[i]);
+            if (can_be_array[i])
+            {
+                // do appropriate index exists checks
+                assertFalse(c.hasErrors());
+                Database d = c.m_catalog.getClusters().get("cluster").getDatabases().get("database");
+                assertEquals(IndexType.ARRAY.getValue(),
+                             d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t_id_array").getType());
+                assertEquals(IndexType.ARRAY.getValue(),
+                             d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t_idnum_array").getType());
+            }
+            else
+            {
+                assertTrue(c.hasErrors());
+            }
+        }
+    }
+
+    public void testDDLCompilerVarcharTreeIndexAllowed()
+    {
+        for (int i = 0; i < column_types.length; i++)
+        {
+            final String s =
+                "create table t(id " + column_types[i] + " not null, num integer not null);\n" +
+                "create index idx_t_id_tree on t(id);\n" +
+                "create index idx_t_idnum_tree on t(id,num);";
+            VoltCompiler c = compileForDDLTest(getPathForSchema(s), can_be_tree[i]);
+            assertFalse(c.hasErrors());
+            Database d = c.m_catalog.getClusters().get("cluster").getDatabases().get("database");
+            assertEquals(IndexType.BALANCED_TREE.getValue(),
+                         d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t_id_tree").getType());
+            assertEquals(IndexType.BALANCED_TREE.getValue(),
+                         d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t_idnum_tree").getType());
+        }
     }
 
     /*public void testForeignKeys() {

@@ -566,33 +566,73 @@ public class DDLCompiler {
 
         String name = attrs.getNamedItem("name").getNodeValue();
         // this won't work for multi-column indices
+        // XXX not sure what 'this' is above, perhaps stale comment --izzy
         String colList = attrs.getNamedItem("columns").getNodeValue();
         String[] colNames = colList.split(",");
         Column[] columns = new Column[colNames.length];
+        boolean has_nonint_col = false;
+        String nonint_col_name = null;
 
         for (int i = 0; i < colNames.length; i++) {
             columns[i] = columnMap.get(colNames[i]);
             if (columns[i] == null) {
-                //String msg = "Index " + name + " references column " + colNames[i] +
-                //  " which doesn't exist";
-                //throw compiler.new VoltCompilerException(msg);
                 return;
+            }
+            VoltType colType = VoltType.get((byte)columns[i].getType());
+            if (colType == VoltType.DECIMAL || colType == VoltType.FLOAT ||
+                colType == VoltType.STRING)
+            {
+                has_nonint_col = true;
+                nonint_col_name = colNames[i];
             }
         }
 
         Index index = table.getIndexes().add(name);
-        // all indexes default to hash tables
-        // if they are used in a non-equality lookup, the planner
-        //  will change this to a binary tree
 
-        // set the type of the index based on it's name (giant hack)
+        // set the type of the index based on the index name and column types
+        // Currently, only int types can use hash or array indexes
         String indexNameNoCase = name.toLowerCase();
         if (indexNameNoCase.contains("tree"))
+        {
             index.setType(IndexType.BALANCED_TREE.getValue());
+        }
         else if (indexNameNoCase.contains("array"))
-            index.setType(IndexType.ARRAY.getValue());
+        {
+            if (!has_nonint_col)
+            {
+                index.setType(IndexType.ARRAY.getValue());
+            }
+            else
+            {
+                String msg = "Index " + name + " in table " + table.getTypeName() +
+                             " uses a non-arrayable column: " + nonint_col_name;
+                throw m_compiler.new VoltCompilerException(msg);
+            }
+        }
+        else if (indexNameNoCase.contains("hash"))
+        {
+            if (!has_nonint_col)
+            {
+                index.setType(IndexType.HASH_TABLE.getValue());
+            }
+            else
+            {
+                String msg = "Index " + name + " in table " + table.getTypeName() +
+                             " uses a non-hashable column" + nonint_col_name;
+                throw m_compiler.new VoltCompilerException(msg);
+            }
+        }
         else
-            index.setType(IndexType.HASH_TABLE.getValue());
+        {
+            if (!has_nonint_col)
+            {
+                index.setType(IndexType.HASH_TABLE.getValue());
+            }
+            else
+            {
+                index.setType(IndexType.BALANCED_TREE.getValue());
+            }
+        }
 
         // need to set other index data here (column, etc)
         for (int i = 0; i < columns.length; i++) {
@@ -600,6 +640,11 @@ public class DDLCompiler {
             cref.setColumn(columns[i]);
             cref.setIndex(i);
         }
+
+        String msg = "Created index: " + name + " on table: " +
+                     table.getTypeName() + " of type: " + IndexType.get(index.getType()).name();
+
+        m_compiler.addInfo(msg);
 
         indexMap.put(name, index);
     }
