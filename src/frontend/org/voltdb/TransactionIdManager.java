@@ -20,6 +20,8 @@ package org.voltdb;
 import java.util.Calendar;
 import java.util.Date;
 
+import org.voltdb.logging.VoltLogger;
+
 /**
  * <p>The TransactionIdManager creates Transaction ids that
  * get assigned to VoltDB timestamps. A transaction id contains
@@ -108,22 +110,33 @@ public class TransactionIdManager {
         else {
             // reset the counter and lastUsedTime for the new millisecond
             if (currentTime < lastUsedTime) {
-                System.err.println("Initiator time moved backwards from: " + lastUsedTime + " to " + currentTime);
+                VoltLogger log = new VoltLogger("HOST");
+                double diffSeconds = (lastUsedTime - currentTime) / 1000.0;
+                String msg = String.format("Initiator time moved backwards from: %d to %d, a difference of %.2f seconds.",
+                        lastUsedTime, currentTime, diffSeconds);
+                log.error(msg);
+                System.err.println(msg);
                 // if the diff is less than 5 ms, wait a bit
-                if ((lastUsedTime - currentTime) < 5) {
-                    int count = 0;
+                if ((lastUsedTime - currentTime) < VoltDB.BACKWARD_TIME_FORGIVENESS_WINDOW_MS) {
+                    int count = VoltDB.BACKWARD_TIME_FORGIVENESS_WINDOW_MS;
                     // note, the loop should stop once lastUsedTime is PASSED, not current
-                    while ((currentTime <= lastUsedTime) && (count++ < 100000)) {
-                        Thread.yield();
+                    while ((currentTime <= lastUsedTime) && (count-- > 0)) {
+                        try {
+                            Thread.sleep(lastUsedTime - currentTime + 1);
+                        } catch (InterruptedException e) {}
                         currentTime = System.currentTimeMillis();
                     }
                     // if the loop above ended because it ran too much
-                    if (count >= 100000) {
+                    if (count < 0) {
+                        log.error("VoltDB was unable to recover after the system time was externally negatively adusted. " +
+                                  "It is possible that there is a serious system time or NTP error. ");
                         VoltDB.crashVoltDB();
                     }
                 }
                 // crash immediately if time has gone backwards by too much
                 else {
+                    log.error(String.format("%.2f is larger than the max allowable number of seconds that the clock can be negatively adjusted (%d)",
+                                            diffSeconds, VoltDB.BACKWARD_TIME_FORGIVENESS_WINDOW_MS / 1000));
                     VoltDB.crashVoltDB();
                 }
             }

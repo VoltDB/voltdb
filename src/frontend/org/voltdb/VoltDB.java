@@ -39,6 +39,8 @@ public class VoltDB {
     public static final String DEFAULT_EXTERNAL_INTERFACE = "";
     public static final String DEFAULT_INTERNAL_INTERFACE = "";
 
+    public static final int BACKWARD_TIME_FORGIVENESS_WINDOW_MS = 3000;
+
     static final int INITIATOR_SITE_ID = 0;
     public static final int DTXN_MAILBOX_ID = 0;
 
