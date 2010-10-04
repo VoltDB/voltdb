@@ -79,16 +79,17 @@ To begin exporting to HDFS, type "ant hadoop-el". Every minute, you'll see a mes
 over to a new file in HDFS. You can view these files in HDFS -after- they've finished being written to (this is why it
 rolls over every minute). Take a look in the HDFS path /user/${user.name}/twitter/input for these files.
 
+The hadoop executable in ${HOME}/hadoop/bin/hadoop is used by default. See build.xml for more info.
+
 ####################
 # 8. Run MapReduce #
 ####################
 
-With the hashtags now sitting in HDFS, you can run a Hadoop MapReduce job over them. This is just a demonstration of
-integrating VoltDB with Hadoop, so it computes the same aggregates that VoltDB does (most popular hashtags).
+With the hashtags now sitting in HDFS, you can run a Hadoop MapReduce job over them. The this will compute the number of unique tweeters per hour. The first job maps from tweet time to username and then combines/reduces by deduping usernames for each hour. The second job maps from every hour/username to hour/one and then combines/reduces by summing the ones for each hour.
 
-To run the MapReduce job (it actually runs two jobs), type "ant hadoop-mr". This will kick off Hadoop and compute the
+To run the MapReduce job, type "ant hadoop-mr". This will kick off Hadoop and compute the
 aggregates, writing them to HDFS. You can watch the status of the job as it outputs to standard out. When both complete,
-you can look in the HDFS path /user/${user.name}/twitter/output for the aggregates.
+you can look in the HDFS path /user/${user.name}/twitter/output for the aggregates. Unix timestamps are used to represent each hour.
 
 ##################
 # 9. Ant targets #

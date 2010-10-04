@@ -63,6 +63,7 @@ public class RollingAppender {
         long delay = start.getTimeInMillis() - now.getTimeInMillis();
         new Timer(true).scheduleAtFixedRate(new TimerTask() {
 
+            @Override
             public void run() {
                 roll();
             }
@@ -73,6 +74,7 @@ public class RollingAppender {
     private synchronized void roll() {
         try {
             if (out != null) {
+                out.flush();
                 out.close();
             }
 

@@ -40,9 +40,9 @@ public class Select extends VoltProcedure {
             "ORDER BY hashcount DESC " +
             "LIMIT ?;");
 
-    public VoltTable[] run(long maxAgeMicros, int limit) throws VoltAbortException {
+    public VoltTable[] run(long maxAgeMillis, int limit) throws VoltAbortException {
         // execute query
-        voltQueueSQL(SQL, maxAgeMicros, limit);
+        voltQueueSQL(SQL, maxAgeMillis, limit);
         return voltExecuteSQL(true);
     }
 

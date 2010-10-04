@@ -24,6 +24,7 @@
 package org.voltdb.twitter.hadoop.mr;
 
 import java.net.URI;
+import java.util.Calendar;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -54,12 +55,16 @@ public class JobRunner extends Configured implements Tool {
         Configuration config = new Configuration();
         config.setInt("mapred.job.reuse.jvm.num.tasks", -1);
 
-        ToolRunner.run(config, new HashtagCount(twitterDir + "/input", twitterDir + "/tmp"), args);
-        ToolRunner.run(config, new HashtagSort(twitterDir + "/tmp", twitterDir + "/output"), args);
+        Calendar cal = Calendar.getInstance();
+        cal.roll(Calendar.DATE, false);
+        config.setLong("DISCARD_POINT", cal.getTime().getTime());
 
-        FileSystem fs = FileSystem.get(URI.create("hdfs://localhost:9000" + twitterDir), config);
-        fs.delete(new Path(twitterDir + "/tmp"), true);
-        fs.close();
+        ToolRunner.run(config, new Bucket(twitterDir + "/input", twitterDir + "/tmp"), args);
+        ToolRunner.run(config, new Count(twitterDir + "/tmp", twitterDir + "/output"), args);
+
+        //FileSystem fs = FileSystem.get(URI.create("hdfs://localhost:9000" + twitterDir), config);
+        //fs.delete(new Path(twitterDir + "/tmp"), true);
+        //fs.close();
 
         return 0;
     }

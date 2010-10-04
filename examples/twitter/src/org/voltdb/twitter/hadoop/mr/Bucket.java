@@ -26,48 +26,63 @@ package org.voltdb.twitter.hadoop.mr;
 import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.Date;
+import java.util.HashSet;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
-import org.apache.hadoop.mapreduce.lib.reduce.IntSumReducer;
 import org.apache.hadoop.util.Tool;
 
-public class HashtagCount extends Configured implements Tool {
+public class Bucket extends Configured implements Tool {
 
-    private static final Log LOG = LogFactory.getLog(HashtagCount.class);
+    private static final Log LOG = LogFactory.getLog(Bucket.class);
 
-    public static class Map extends Mapper<LongWritable, Text, Text, IntWritable> {
+    public static class Map extends Mapper<LongWritable, Text, LongWritable, Text> {
 
-        private static final IntWritable ONE = new IntWritable(1);
-
-        private Pattern regex;
+        private final Pattern regex = Pattern.compile("^\\d+,\\d+,\\d+,\\d+,\\d+,\\d+,(.*),(\\d+).*$");
         private Matcher matcher;
-        private Text hashtag;
-
-        public Map() {
-            regex = Pattern.compile("^\\d+,\\d+,\\d+,\\d+,\\d+,\\d+,(.*),.*$");
-            hashtag = new Text();
-        }
+        private final Text username = new Text();
+        private LongWritable time = new LongWritable();
 
         @Override
         public void map(LongWritable offset, Text line, Context context) throws IOException, InterruptedException {
             matcher = regex.matcher(line.toString());
             if (matcher.matches()) {
-                hashtag.set(matcher.group(1));
-                context.write(hashtag, ONE);
+                final Date createdAt = new Date(Long.parseLong(matcher.group(2)));
+                createdAt.setMinutes(0);
+                createdAt.setSeconds(0);
+                username.set(matcher.group(1));
+                time.set(createdAt.getTime());
+                context.write( time, username);
             } else {
                 LOG.warn("Error parsing line: " + line);
+            }
+        }
+
+    }
+
+    public static class Reduce extends Reducer<LongWritable, Text, LongWritable, Text> {
+
+        @Override
+        public void reduce(LongWritable hour, Iterable<Text> usersWithDupes, Context context) throws IOException, InterruptedException {
+            HashSet<String> users = new HashSet<String>();
+            for (Text user : usersWithDupes) {
+                users.add(user.toString());
+            }
+            for (String user : users) {
+                context.write( hour, new Text(user));
             }
         }
 
@@ -76,18 +91,18 @@ public class HashtagCount extends Configured implements Tool {
     private String inputDir;
     private String outputDir;
 
-    public HashtagCount(String inputDir, String outputDir) {
+    public Bucket(String inputDir, String outputDir) {
         this.inputDir = inputDir;
         this.outputDir = outputDir;
     }
 
     @Override
     public int run(String[] args) throws Exception {
-        Job job = new Job(getConf(), "hashtag-count");
-        job.setJarByClass(HashtagCount.class);
+        Job job = new Job(getConf(), "user-bucket");
+        job.setJarByClass(Bucket.class);
         job.setMapperClass(Map.class);
-        job.setCombinerClass(IntSumReducer.class);
-        job.setReducerClass(IntSumReducer.class);
+        job.setCombinerClass(Reduce.class);
+        job.setReducerClass(Reduce.class);
 
         // input/output paths
         FileInputFormat.addInputPaths(job, inputDir);
@@ -98,11 +113,11 @@ public class HashtagCount extends Configured implements Tool {
         job.setOutputFormatClass(TextOutputFormat.class);
 
         // map output classes
-        job.setMapOutputKeyClass(Text.class);
-        job.setMapOutputValueClass(IntWritable.class);
+        job.setMapOutputKeyClass(LongWritable.class);
+        job.setMapOutputValueClass(Text.class);
 
         // reduce output classes
-        job.setOutputKeyClass(Text.class);
+        job.setOutputKeyClass(LongWritable.class);
         job.setOutputValueClass(IntWritable.class);
 
         return job.waitForCompletion(true) ? 0 : 1;

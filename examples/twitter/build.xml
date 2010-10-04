@@ -4,8 +4,8 @@
 <property name="TwitterUsername" value="Set_to_your_username"/>
 <property name="TwitterPassword" value="Set_to_your_password"/>
 <property name="hdfs.path" value="/user/${user.name}/twitter" />
-<property name="hadoop" value="${user.home}/hadoop/hadoop-0.20.2/bin/hadoop" />
-<property name="jar" value="hashtag-count.jar" />
+<property name="hadoop" value="${user.home}/hadoop/bin/hadoop" />
+<property name="jar" value="unique-user-count.jar" />
 
 <import file="../includes/basebuild.xml"/>
 
@@ -44,6 +44,12 @@
 </target>
 
 <target name="hadoop-el" description="Start the EL client.">
+    <exec executable="${hadoop}" failonerror="false">
+        <arg line="fs" />
+        <arg line="-rmr" />
+        <arg value="-skipTrash" />
+        <arg value="${hdfs.path}" />
+    </exec>
     <invoke-java classname="org.voltdb.twitter.hadoop.hdfs.ExportToHDFSClient">
         <arg value="${hdfs.path}/input" />
         <arg value="localhost" />
@@ -60,6 +66,18 @@
 </target>
 
 <target name="hadoop-mr" depends="hadoop-jar" description="Run the MapReduce job.">
+    <exec executable="${hadoop}" failonerror="false">
+        <arg line="fs" />
+        <arg line="-rmr" />
+        <arg value="-skipTrash" />
+        <arg value="${hdfs.path}/tmp" />
+    </exec>
+    <exec executable="${hadoop}" failonerror="false">
+        <arg line="fs" />
+        <arg line="-rmr" />
+        <arg value="-skipTrash" />
+        <arg value="${hdfs.path}/output" />
+    </exec>
     <exec executable="${hadoop}" failonerror="true">
         <arg line="jar ${jar}" />
         <arg line="-D mapred.reduce.tasks=1" />

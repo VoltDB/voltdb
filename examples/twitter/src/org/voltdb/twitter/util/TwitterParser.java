@@ -25,11 +25,13 @@ package org.voltdb.twitter.util;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.Date;
 
 import org.voltdb.twitter.database.DB;
 
-public class TwitterParser {
+import twitter4j.Status;
 
+public class TwitterParser {
     private DB db;
     private Pattern regex;
     private Matcher matcher;
@@ -41,7 +43,23 @@ public class TwitterParser {
         regex = Pattern.compile("(#\\p{Alpha}\\S+?)(?:\\p{Punct}|\\s|$)");
     }
 
-    public void parseHashTags(String message) {
+    public void parseStatus(Status status) {
+        final Date createdAt = status.getCreatedAt();
+        final String user = status.getUser().getName();
+        final String text = status.getText();
+        parseHashTags( text, createdAt);
+        logUserActivity( user, createdAt);
+    }
+
+    private void logUserActivity( String user, Date createdAt) {
+        if (user.length() > 32) {
+            db.insertUserActivity( user.substring(0, 32), createdAt);
+        } else {
+            db.insertUserActivity( user, createdAt);
+        }
+    }
+
+    private void parseHashTags(String message, Date createdAt) {
         matcher = regex.matcher(message);
         while (matcher.find()) {
             String hashTag = matcher.group();
@@ -60,7 +78,7 @@ public class TwitterParser {
                 hashTag = hashTag.substring(0, 32);
             }
 
-            db.insertHashTag(hashTag);
+            db.insertHashTag(hashTag, createdAt);
         }
     }
 

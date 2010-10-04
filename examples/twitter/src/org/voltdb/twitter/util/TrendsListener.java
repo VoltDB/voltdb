@@ -59,7 +59,7 @@ public class TrendsListener implements StatusListener {
 
     @Override
     public void onStatus(Status status) {
-        twitterParser.parseHashTags(status.getText());
+        twitterParser.parseStatus(status);
     }
 
     @Override

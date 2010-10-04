@@ -26,9 +26,9 @@ import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Date;
 
 import org.voltdb.VoltTable;
-import org.voltdb.VoltTableRow;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -62,18 +62,48 @@ public class DB {
     }
 
     // insert a new hashtag
-    public void insertHashTag(String hashTag) {
+    public void insertHashTag(String hashTag, Date createdAt) {
         try {
             client.callProcedure(
                     new ProcedureCallback() {
 
                         @Override
-                        public void clientCallback(ClientResponse response) {}
+                        public void clientCallback(ClientResponse response) {
+                            if (response.getStatus() != ClientResponse.SUCCESS){
+                                System.out.println("failed insert");
+                                System.out.println(response.getStatusString());
+                            }
+                        }
 
                     },
                     Insert.class.getSimpleName(),
                     hashTag,
-                    System.currentTimeMillis() * 1000L);
+                    createdAt.getTime());
+        } catch (NoConnectionsException e) {
+            System.err.println("Lost connection to database, terminating");
+            System.exit(-1);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void insertUserActivity(String username, Date createdAt) {
+        try {
+            client.callProcedure(
+                    new ProcedureCallback() {
+
+                        @Override
+                        public void clientCallback(ClientResponse response) {
+                            if (response.getStatus() != ClientResponse.SUCCESS){
+                                System.out.println("failed insert");
+                                System.out.println(response.getStatusString());
+                            }
+                        }
+
+                    },
+                    "InsertTweet",
+                    username,
+                    createdAt.getTime());
         } catch (NoConnectionsException e) {
             System.err.println("Lost connection to database, terminating");
             System.exit(-1);
@@ -83,19 +113,15 @@ public class DB {
     }
 
     // select hashtags within a certain time range
-    public List<HashTag> selectHashTags(long maxAgeMicros, int limit) {
+    public List<HashTag> selectHashTags(long maxAgeMillis, int limit) {
         try {
             ClientResponse response = client.callProcedure(Select.class.getSimpleName(),
-                    System.currentTimeMillis() * 1000L - maxAgeMicros, limit);
+                    System.currentTimeMillis() - maxAgeMillis, limit);
             VoltTable[] tables = response.getResults();
             VoltTable table = tables[0];
-            VoltTableRow row = table.fetchRow(0);
-
-            int rowCount = table.getRowCount();
             List<HashTag> hashTags = new LinkedList<HashTag>();
-            for (int i = 0; i < rowCount; i++) {
-                hashTags.add(new HashTag(row.getString(0), (int) row.getLong(1)));
-                row.advanceRow();
+            while (table.advanceRow()) {
+                hashTags.add(new HashTag(table.getString(0), (int) table.getLong(1)));
             }
             return hashTags;
         } catch (NoConnectionsException e) {
@@ -110,9 +136,9 @@ public class DB {
     }
 
     // delete hashtags older than a certain max age
-    public long deleteHashTags(long maxAgeMicros) {
+    public long deleteHashTags(long maxAgeMillis) {
         try {
-            long deleteAllEarlierThan = System.currentTimeMillis() * 1000L - maxAgeMicros;
+            long deleteAllEarlierThan = System.currentTimeMillis() - maxAgeMillis;
             long deleteCount = client.callProcedure(Delete.class.getSimpleName(),
                     deleteAllEarlierThan).getResults()[0].asScalarLong();
             return deleteCount;

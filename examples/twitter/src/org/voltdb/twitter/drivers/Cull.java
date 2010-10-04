@@ -29,7 +29,7 @@ import org.voltdb.twitter.database.DB;
 
 public class Cull {
 
-    private long retentionRangeMicros;
+    private long retentionRangeMillis;
     private long runFrequencyMillis;
     private DB db;
 
@@ -56,8 +56,8 @@ public class Cull {
     }
 
     public Cull(int retentionRangeHours, int runFrequencyHours, List<String> servers) {
-        retentionRangeMicros = (long) retentionRangeHours * 60L * 60L * 1000L * 1000L;
-        runFrequencyMillis = (long) runFrequencyHours * 60L * 60L * 1000L;
+        retentionRangeMillis = retentionRangeHours * 60L * 60L * 1000L;
+        runFrequencyMillis = runFrequencyHours * 60L * 60L * 1000L;
         db = new DB(servers);
     }
 
@@ -72,7 +72,7 @@ public class Cull {
             }
 
             // delete hashtags
-            long deleteCount = db.deleteHashTags(retentionRangeMicros);
+            long deleteCount = db.deleteHashTags(retentionRangeMillis);
             System.out.println("Deleted " + deleteCount + " old hashtags");
         }
     }

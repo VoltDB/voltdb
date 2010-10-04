@@ -36,51 +36,34 @@ import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
-import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.reduce.IntSumReducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.Tool;
 
-public class HashtagSort extends Configured implements Tool {
+public class Count extends Configured implements Tool {
 
-    private static final Log LOG = LogFactory.getLog(HashtagSort.class);
+    private static final Log LOG = LogFactory.getLog(Count.class);
 
-    public static class Map extends Mapper<LongWritable, Text, IntWritable, Text> {
+    public static class Map extends Mapper<LongWritable, Text, LongWritable, IntWritable> {
 
+        private static final IntWritable ONE = new IntWritable(1);
         private Pattern regex;
         private Matcher matcher;
-        private IntWritable count;
-        private Text hashtag;
 
         public Map() {
-            regex = Pattern.compile("^(.*)\t(\\d+)$");
-            count = new IntWritable();
-            hashtag = new Text();
+            regex = Pattern.compile("^(\\d+)\t(.*)$");
         }
 
         @Override
         public void map(LongWritable offset, Text line, Context context) throws IOException, InterruptedException {
             matcher = regex.matcher(line.toString());
             if (matcher.matches()) {
-                count.set(-Integer.parseInt(matcher.group(2)));
-                hashtag.set(matcher.group(1));
-                context.write(count, hashtag);
+                context.write( new LongWritable(Long.parseLong(matcher.group(1))), ONE);
             } else {
                 LOG.warn("Error parsing line: " + line);
-            }
-        }
-
-    }
-
-    public static class Reduce extends Reducer<IntWritable, Text, Text, IntWritable> {
-
-        @Override
-        public void reduce(IntWritable count, Iterable<Text> hashtags, Context context) throws IOException, InterruptedException {
-            for (Text hashtag : hashtags) {
-                count.set(-count.get());
-                context.write(hashtag, count);
             }
         }
 
@@ -89,17 +72,18 @@ public class HashtagSort extends Configured implements Tool {
     private String inputDir;
     private String outputDir;
 
-    public HashtagSort(String inputDir, String outputDir) {
+    public Count(String inputDir, String outputDir) {
         this.inputDir = inputDir;
         this.outputDir = outputDir;
     }
 
     @Override
     public int run(String[] args) throws Exception {
-        Job job = new Job(getConf(), "hashtag-sort");
-        job.setJarByClass(HashtagSort.class);
+        Job job = new Job(getConf(), "user-count");
+        job.setJarByClass(Count.class);
         job.setMapperClass(Map.class);
-        job.setReducerClass(Reduce.class);
+        job.setCombinerClass(IntSumReducer.class);
+        job.setReducerClass(IntSumReducer.class);
 
         // input/output paths
         FileInputFormat.addInputPaths(job, inputDir);
@@ -110,11 +94,11 @@ public class HashtagSort extends Configured implements Tool {
         job.setOutputFormatClass(TextOutputFormat.class);
 
         // map output classes
-        job.setMapOutputKeyClass(IntWritable.class);
-        job.setMapOutputValueClass(Text.class);
+        job.setMapOutputKeyClass(LongWritable.class);
+        job.setMapOutputValueClass(IntWritable.class);
 
         // reduce output classes
-        job.setOutputKeyClass(Text.class);
+        job.setOutputKeyClass(LongWritable.class);
         job.setOutputValueClass(IntWritable.class);
 
         return job.waitForCompletion(true) ? 0 : 1;
