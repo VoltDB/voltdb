@@ -90,9 +90,14 @@ int JNITopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
 
     jsize length = m_jniEnv->GetArrayLength(jbuf);
     if (length > 0) {
-        jbyte *bytes = m_jniEnv->GetByteArrayElements(jbuf, NULL);
+        jboolean is_copy;
+        jbyte *bytes = m_jniEnv->GetByteArrayElements(jbuf, &is_copy);
         ReferenceSerializeInput serialize_in(bytes, length);
         destination->loadTuplesFrom(true, serialize_in, stringPool);
+        if (is_copy == JNI_TRUE)
+        {
+            m_jniEnv->ReleaseByteArrayElements(jbuf, bytes, 0);
+        }
         return 1;
     }
     else {
