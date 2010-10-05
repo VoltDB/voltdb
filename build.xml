@@ -52,6 +52,7 @@
 <!-- import the pro build.xml if it exists and is requested -->
 <import file="${voltpro}/build.xml" optional="true"/>
 
+<property name='base.dir'                   location='.' />
 <property name='build.dir'                   location='obj/${build}' />
 <property name='build.prod.dir'              location='${build.dir}/prod' />
 <property name='build.test.dir'              location='${build.dir}/test' />
@@ -256,13 +257,6 @@ PRIMARY ENTRY POINTS
 DISTRIBUTION
 ***************************************
 -->
-<target name="voltbin_install" depends="voltbin">
-    <!-- use cp to preserve permissions -->
-    <exec dir="." executable="sh" failonerror="true">
-        <arg line="-c"/>
-        <arg line="'cp ${build.dir}/voltbin/* ~/voltbin/'"/>
-    </exec>
-</target>
 
 <target name="voltbin" depends="compile, ee, jars">
     <mkdir dir="${build.dir}/voltbin" />
@@ -295,15 +289,12 @@ DISTRIBUTION
             <fileset dir="examples/@{exampledir}" defaultexcludes="yes">
                 <include name="**/*"/>
             </fileset>
-            <fileset dir="examples/includes" defaultexcludes="yes">
-                <include name="**/*"/>
-                <exclude name="README"/>
-            </fileset>
         </copy>
 
         <!-- Perform any post processing required -->
         <exec dir="tools" executable="python" failonerror="true">
             <arg line="example-dist-cleanup.py"/>
+            <arg line="${base.dir}/examples/includes/basebuild.xml"/>
             <arg line="${dist.dir}/examples/@{exampledir}"/>
         </exec>
     </sequential>
@@ -1445,7 +1436,7 @@ BENCHMARKS
     <antcall target="benchmark" inheritAll='true'>
         <param name="hostcount" value="1"/>
         <param name="host1" value="localhost"/>
-        <param name="sitesperhost" value="4"/>
+        <param name="sitesperhost" value="2"/>
         <param name="clientcount" value="1"/>
         <param name="clienthost1" value="localhost"/>
         <param name="processesperclient" value="1"/>

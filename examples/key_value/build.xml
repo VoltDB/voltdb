@@ -40,7 +40,7 @@
    </invoke-java>
 </target>
 
-<target name='cleanImpl' depends="basebuild.cleanImpl">
+<target name='clean' depends="basebuild.clean">
     <delete includeemptydirs="true" failonerror='false'>
         <fileset dir="." defaultexcludes="yes" >
             <include name="key-value-client.log" />

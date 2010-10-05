@@ -1,32 +1,29 @@
 <?xml version="1.0" ?>
 <project name="basebuild">
 
-<!--
-***************************************
-SHARED PATHS AND PROPERTIES
-***************************************
--->
+<!-- ***************************************
+     SHARED PATHS AND PROPERTIES
+     *************************************** -->
 
-<property name='catalog'               value='catalog.jar'/>
+<property name='voltdb.dir'            location='../../obj/release/dist/voltdb/'/>
+
 <property name='build.dir'             location='obj/'/>
 <property name='src.dir'               location='src/'/>
 <property name='debugoutput.dir'       location='debugoutput/'/>
 <property name='junit.haltonfailure'   value='true'/>
-<property name='log4j.configuration'   location='../../voltdb/log4j.properties'/>
+<property name='log4j.configuration'   location='${voltdb.dir}/log4j.properties'/>
 
 <path id='project.classpath'>
-    <fileset dir='../../voltdb' >
+    <fileset dir='${voltdb.dir}' >
         <include name='voltdb*.jar' />
     </fileset>
     <pathelement location='${build.dir}' />
     <pathelement path="${java.class.path}"/>
 </path>
 
-<!--
-***************************************
-CONCRETE SHARED TARGETS
-***************************************
--->
+<!-- ***************************************
+     MACROS
+     *************************************** -->
 
 <!-- Example client use this for default jvm arguments. -->
 <macrodef name="invoke-java">
@@ -46,12 +43,14 @@ CONCRETE SHARED TARGETS
   </sequential>
 </macrodef>
 
-<target name="default" depends="srccompile, catalog, server"
+<!-- ***************************************
+     CONCRETE SHARED TARGETS
+     *************************************** -->
+
+<target name="default" depends="srccompile, proccompile, catalog, server"
         description="Compile and start server."/>
 
-<!-- Some examples override cleanImpl to remove adhoc files -->
-<target name='clean' depends="cleanImpl" description="Remove compilation artifacts"/>
-<target name="cleanImpl">
+<target name="clean" description="Remove compilation artifacts">
     <delete includeemptydirs="true" failonerror='false'>
         <fileset dir="${build.dir}" includes="**/*" />
         <fileset dir="${debugoutput.dir}" includes="**/*" />
@@ -61,17 +60,15 @@ CONCRETE SHARED TARGETS
     </delete>
 </target>
 
-<!-- Some examples override srcCompileImpl to add additional srcs or dependencies -->
-<target name="srccompile" depends="srccompileImpl, proccompileImpl" description="Compile all java"/>
-
-<target name="srccompileImpl">
+<!-- Some examples override srccompileImpl to add additional srcs or dependencies -->
+<target name="srccompile">
     <mkdir dir='${build.dir}' />
     <javac target="1.6" srcdir="${src.dir}" destdir='${build.dir}' debug='true'>
         <classpath refid="project.classpath" />
     </javac>
 </target>
 
-<target name="proccompileImpl" if="procedures.dir">
+<target name="proccompile" if="procedures.dir">
     <javac target="1.6" srcdir="${procedures.dir}" destdir='${build.dir}' debug='true'>
         <classpath refid="project.classpath" />
     </javac>
@@ -89,7 +86,7 @@ CONCRETE SHARED TARGETS
 
 <target name="server" description="Start the server and load the catalog." >
     <java fork="yes" classname="org.voltdb.VoltDB" >
-        <jvmarg value="-Djava.library.path=../../voltdb" />
+        <jvmarg value="-Djava.library.path=${voltdb.dir}" />
         <jvmarg value="-server" />
         <jvmarg value="-Xmx512m" />
         <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError" />

@@ -6,7 +6,7 @@
 
 <import file="../includes/basebuild.xml"/>
 
-<target name="srccompileImpl" depends="basebuild.srccompileImpl">
+<target name="srccompile" depends="basebuild.srccompile">
     <mkdir dir='${build.dir}/com/auctionexample/datafiles' />
     <copy todir="${build.dir}/com/auctionexample/datafiles" >
         <fileset dir="${src.dir}/com/auctionexample/datafiles" defaultexcludes="yes">
