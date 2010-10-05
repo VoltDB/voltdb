@@ -205,7 +205,7 @@ PRIMARY ENTRY POINTS
 <target name="check"
     depends="compile, voltdbipc, ee"
     description="Run Java and C++ JNI testcases and test plan fragments." >
-    <condition property="timeoutLength" value="${timeoutLength}" else='900000'>
+    <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
         <isset property="timeoutLength"/>
     </condition>
 
@@ -224,7 +224,7 @@ PRIMARY ENTRY POINTS
 <target name="check_quick"
     depends="compile, voltdbipc"
     description="Run a subset of Java testcases and test fragments." >
-    <condition property="timeoutLength" value="${timeoutLength}" else='240000'>
+    <condition property="timeoutLength" value="${timeoutLength}" else='480000'>
         <isset property="timeoutLength"/>
     </condition>
 
@@ -1022,7 +1022,7 @@ TEST CASES
 
 <target name="junit" description="Run testcases for Java classes.">
     <!-- Run the unit tests -->
-    <condition property="timeoutLength" value="${timeoutLength}" else='900000'>
+    <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
         <isset property="timeoutLength"/>
     </condition>
 
