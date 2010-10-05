@@ -41,6 +41,8 @@ class JNILocalFrameBarrier {
         m_refs = numReferences;
         m_result = m_env->PushLocalFrame(m_refs);
         m_isCopy = JNI_FALSE;
+        m_jbuf = 0;
+        m_bytes = NULL;
     }
 
     void addDependencyRef(jboolean isCopy, jbyteArray jbuf, jbyte* bytes)
