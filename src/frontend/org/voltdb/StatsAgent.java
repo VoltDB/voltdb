@@ -16,9 +16,9 @@
  */
 package org.voltdb;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.ArrayList;
 
 /**
  * Agent responsible for collecting stats on this host.
@@ -97,9 +97,13 @@ public class StatsAgent {
                  */
                 if (ss.isEEStats()) {
                     final VoltTable table = ss.getStatsTable();
-                    while (table != null && table.advanceRow())
-                        resultTable.add(table);
-                    table.resetRowPosition();
+                    // this table can be null during recovery, at least
+                    if (table != null) {
+                        while (table.advanceRow()) {
+                            resultTable.add(table);
+                        }
+                        table.resetRowPosition();
+                    }
                 } else {
                     Object statsRows[][] = ss.getStatsRows(interval, now);
                     for (Object[] row : statsRows) {

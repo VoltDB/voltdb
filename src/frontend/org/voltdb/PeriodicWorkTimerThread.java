@@ -21,6 +21,8 @@ import java.util.ArrayList;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 
+import org.voltdb.logging.VoltLogger;
+
 /**
  * This thread fires a timer every five milliseconds
  * which ultimately fires the tick to each execution
@@ -32,6 +34,7 @@ public class PeriodicWorkTimerThread extends Thread {
     ArrayList<ClientInterface> m_clientInterfaces;
     StatsManager m_statsManager;
     private long m_lastTime;
+    private static final VoltLogger log = new VoltLogger("HOST");
 
     public PeriodicWorkTimerThread(ArrayList<ClientInterface> clientInterfaces,
                                    StatsManager statsManager) {
@@ -47,30 +50,34 @@ public class PeriodicWorkTimerThread extends Thread {
 
         LinkedBlockingDeque<Object> foo = new LinkedBlockingDeque<Object>();
         while(true) {
-            //long beforeTime = System.nanoTime();
             try {
-                foo.poll(5, TimeUnit.MILLISECONDS);
-            } catch (InterruptedException e) {
-                return;
-            }
-            for (ClientInterface ci : m_clientInterfaces) {
-                ci.processPeriodicWork();
-            }
+                //long beforeTime = System.nanoTime();
+                try {
+                    foo.poll(5, TimeUnit.MILLISECONDS);
+                } catch (InterruptedException e) {
+                    return;
+                }
+                for (ClientInterface ci : m_clientInterfaces) {
+                    ci.processPeriodicWork();
+                }
 
-            // Ask the statistics manager to send out change notifications if
-            // enough time has passed
-            final long currentTime = System.currentTimeMillis();
-            if (m_statsManager != null
-                    && (currentTime - m_lastTime) >= StatsManager.POLL_INTERVAL) {
-                m_lastTime = currentTime;
-                m_statsManager.sendNotification();
-            }
+                // Ask the statistics manager to send out change notifications if
+                // enough time has passed
+                final long currentTime = System.currentTimeMillis();
+                if (m_statsManager != null
+                        && (currentTime - m_lastTime) >= StatsManager.POLL_INTERVAL) {
+                    m_lastTime = currentTime;
+                    m_statsManager.sendNotification();
+                }
 
-            //long duration = System.nanoTime() - beforeTime;
-            //double millis = duration / 1000000.0;
-            //System.out.printf("TICK %.2f\n", millis);
-            //System.out.flush();
+                //long duration = System.nanoTime() - beforeTime;
+                //double millis = duration / 1000000.0;
+                //System.out.printf("TICK %.2f\n", millis);
+                //System.out.flush();
+            }
+            catch (Exception ex) {
+                log.warn(ex.getMessage(), ex);
+            }
         }
     }
-
 }
