@@ -805,9 +805,16 @@ public class ClientInterface implements DumpManager.Dumpable {
          * provides an AuthUser object.
          */
         if (task.procName.startsWith("@")) {
-
-            // AdHoc requires unique permission. Then has to plan in a separate thread.
-            if (task.procName.equals("@AdHoc")) {
+            if (task.procName.equals("@ping")) {
+                final ClientResponseImpl pingResponse =
+                    new ClientResponseImpl(ClientResponseImpl.SUCCESS,
+                                           new VoltTable[0],
+                                           "pong",
+                                           task.clientHandle);
+                c.writeStream().enqueue(pingResponse);
+                return;
+            } else if (task.procName.equals("@AdHoc")) {
+                // AdHoc requires unique permission. Then has to plan in a separate thread.
                 if (!user.hasAdhocPermission()) {
                     final ClientResponseImpl errorResponse =
                         new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,

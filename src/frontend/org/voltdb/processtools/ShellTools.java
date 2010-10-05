@@ -19,18 +19,26 @@ package org.voltdb.processtools;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 
 public abstract class ShellTools {
 
     public static String cmd(String command) {
-        String[] command2 = command.split(" ");
-        return cmd(command2);
+        return cmd( command, null);
     }
 
-    public static String cmd(String[] command) {
+    public static String cmd(String command, String input) {
+        String[] command2 = command.split(" ");
+        return cmd(command2, input);
+    }
+
+    public static String cmd(String[] command, String passwordScript) {
         StringBuilder retval = new StringBuilder();
         ProcessBuilder pb = new ProcessBuilder(command);
         pb.redirectErrorStream(true);
+        if (passwordScript != null) {
+            pb.environment().put("SSH_ASKPASS", passwordScript);
+        }
         Process p = null;
         try {
             p = pb.start();
@@ -38,6 +46,7 @@ public abstract class ShellTools {
             e.printStackTrace();
             return null;
         }
+
         BufferedInputStream in = new BufferedInputStream(p.getInputStream());
         int c;
         try {
@@ -57,9 +66,12 @@ public abstract class ShellTools {
         return retval.toString();
     }
 
-    public static boolean cmdToStdOut(String[] command) {
+    public static boolean cmdToStdOut(String[] command, String passwordScript) {
         ProcessBuilder pb = new ProcessBuilder(command);
         pb.redirectErrorStream(true);
+        if (passwordScript != null) {
+            pb.environment().put("SSH_ASKPASS", passwordScript);
+        }
         Process p = null;
         try {
             p = pb.start();
@@ -67,6 +79,7 @@ public abstract class ShellTools {
             e.printStackTrace();
             return false;
         }
+
         BufferedInputStream in = new BufferedInputStream(p.getInputStream());
         int c;
         try {
@@ -86,9 +99,17 @@ public abstract class ShellTools {
         return p.exitValue() == 0;
     }
 
-    public static boolean cmdToStdOut(String command) {
+    public static boolean cmdToStdOut(String command[]) {
+        return cmdToStdOut( command, null);
+    }
+
+    public static boolean cmdToStdOut(String command, String input) {
         String[] command2 = command.split(" ");
-        return cmdToStdOut(command2);
+        return cmdToStdOut(command2, input);
+    }
+
+    public static boolean cmdToStdOut(String command) {
+        return cmdToStdOut(command, null);
     }
 
     public static void main(String[] args) {

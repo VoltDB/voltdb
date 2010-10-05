@@ -18,23 +18,57 @@
 package org.voltdb.processtools;
 
 import java.io.File;
+import java.io.FileOutputStream;
 
 public class SSHTools {
 
     private final String m_username;
     private final String m_keyFile;
+    private final String m_password;
 
     public SSHTools() {
-        this(null, null);
+        this(null, null, null);
     }
 
     public SSHTools(String username) {
-        this(username, null);
+        this(username, null, null);
     }
 
-    public SSHTools(String username, String key) {
+    public SSHTools(String username, String key, String password) {
         m_username = username;
         m_keyFile = key;
+        m_password = password;
+    }
+
+    private File m_file = null;
+    public String generatePasswordScript() {
+        if (m_password != null) {
+            try {
+                File passwordScript = File.createTempFile("foo", "bar");
+                passwordScript.setExecutable(true);
+                passwordScript.deleteOnExit();
+                final String sep = System.getProperty("line.separator");
+                StringBuilder sb = new StringBuilder();
+                sb.append("#!/bin/sh").append(sep);
+                sb.append("echo \"" + m_password + "\"").append(sep);
+                FileOutputStream fos = new FileOutputStream(passwordScript);
+                fos.write(sb.toString().getBytes("UTF-8"));
+                fos.flush();
+                fos.close();
+                return passwordScript.getAbsolutePath();
+            } catch (java.io.IOException e) {
+                throw new RuntimeException(e);
+            }
+        } else {
+            return null;
+        }
+    }
+
+    private void deletePasswordScript() {
+        if (m_file != null) {
+            m_file.delete();
+            m_file = null;
+        }
     }
 
     public String createUrl(String hostname, String path) {
@@ -67,7 +101,12 @@ public class SSHTools {
         command[i++] = src.getPath();
         command[i++] = createUrl(hostNameTo, pathTo);
         assert(i == len);
-        String output = ShellTools.cmd(command);
+        String output = null;
+        try {
+            output = ShellTools.cmd(command, generatePasswordScript());
+        } finally {
+            deletePasswordScript();
+        }
         if (output.length() > 1) {
             System.err.print(output);
             return false;
@@ -91,8 +130,12 @@ public class SSHTools {
         command[i++] = createUrl(hostNameFrom, pathFrom);
         command[i++] = dst.getPath();
         assert(i == len);
-
-        String output = ShellTools.cmd(command);
+        String output = null;
+        try {
+            output = ShellTools.cmd(command, generatePasswordScript());
+        } finally {
+            deletePasswordScript();
+        }
         if (output.length() > 1) {
             System.err.print(output);
             return false;
@@ -118,7 +161,12 @@ public class SSHTools {
         command[i++] = createUrl(hostNameTo, pathTo);
         assert(i == len);
 
-        String output = ShellTools.cmd(command);
+        String output = null;
+        try {
+            output = ShellTools.cmd(command, generatePasswordScript());
+        } finally {
+            deletePasswordScript();
+        }
         if (output.length() > 1) {
             System.err.print(output);
             return false;
@@ -128,11 +176,19 @@ public class SSHTools {
     }
 
     public String cmd(String hostname, String remotePath, String command) {
-        return ShellTools.cmd(convert(hostname, remotePath, command));
+        try {
+            return ShellTools.cmd(convert(hostname, remotePath, command), generatePasswordScript());
+        } finally {
+            deletePasswordScript();
+        }
     }
 
     public String cmd(String hostname, String remotePath, String[] command) {
-        return ShellTools.cmd(convert(hostname, remotePath, command));
+        try {
+            return ShellTools.cmd(convert(hostname, remotePath, command), generatePasswordScript());
+        } finally {
+            deletePasswordScript();
+        }
     }
 
     public String[] convert(String hostname, String remotePath, String command) {
@@ -183,5 +239,15 @@ public class SSHTools {
         command[i++] = "StrictHostKeyChecking=no";
 
         return i;
+    }
+
+    @Override
+    protected void finalize() {
+        deletePasswordScript();
+    }
+
+    public static void main(String args[]) throws Exception {
+        SSHTools tools = new SSHTools(args[0], null, args[1]);
+        System.out.println(tools.cmd( args[2], args[3], args[4]));
     }
 }
