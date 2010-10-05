@@ -31,14 +31,30 @@ class JNILocalFrameBarrier {
     int32_t m_refs;
     int32_t m_result;
 
+    jboolean m_isCopy;
+    jbyteArray m_jbuf;
+    jbyte* m_bytes;
+
   public:
     JNILocalFrameBarrier(JNIEnv* env, int32_t numReferences) {
         m_env = env;
         m_refs = numReferences;
         m_result = m_env->PushLocalFrame(m_refs);
+        m_isCopy = JNI_FALSE;
+    }
+
+    void addDependencyRef(jboolean isCopy, jbyteArray jbuf, jbyte* bytes)
+    {
+        m_isCopy = isCopy;
+        m_jbuf = jbuf;
+        m_bytes = bytes;
     }
 
     ~JNILocalFrameBarrier() {
+        if (m_isCopy == JNI_TRUE)
+        {
+            m_env->ReleaseByteArrayElements(m_jbuf, m_bytes, 0);
+        }
         // pass jobject* to get pointer to previous frame?
         m_env->PopLocalFrame(NULL);
     }
@@ -92,12 +108,11 @@ int JNITopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
     if (length > 0) {
         jboolean is_copy;
         jbyte *bytes = m_jniEnv->GetByteArrayElements(jbuf, &is_copy);
+        // Add the dependency buffer info to the stack object
+        // so it'll get cleaned up if loadTuplesFrom throws
+        jni_frame.addDependencyRef(is_copy, jbuf, bytes);
         ReferenceSerializeInput serialize_in(bytes, length);
         destination->loadTuplesFrom(true, serialize_in, stringPool);
-        if (is_copy == JNI_TRUE)
-        {
-            m_jniEnv->ReleaseByteArrayElements(jbuf, bytes, 0);
-        }
         return 1;
     }
     else {
