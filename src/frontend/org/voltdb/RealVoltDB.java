@@ -1294,7 +1294,7 @@ public class RealVoltDB implements VoltDBInterface
         final double megabytesPerSecond = megabytes / ((now - m_recoveryStartTime) / 1000.0);
         hostLog.info(
                 "Node recovery completed after " + delta + " seconds with " + megabytes +
-                " megabytes transferreds at a rate of " +
+                " megabytes transferred at a rate of " +
                 megabytesPerSecond + " megabytes/sec");
     }
 
