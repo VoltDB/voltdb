@@ -19,6 +19,7 @@ package org.voltdb.processtools;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 
 public class SSHTools {
 
@@ -40,34 +41,42 @@ public class SSHTools {
         m_password = password;
     }
 
-    private File m_file = null;
     public String generatePasswordScript() {
-        if (m_password != null) {
-            try {
-                File passwordScript = File.createTempFile("foo", "bar");
-                passwordScript.setExecutable(true);
-                passwordScript.deleteOnExit();
-                final String sep = System.getProperty("line.separator");
-                StringBuilder sb = new StringBuilder();
+        try {
+            final File passwordScript = File.createTempFile("foo", "bar");
+            passwordScript.setExecutable(true);
+            passwordScript.deleteOnExit();
+            //Make sure it is deleted eventually
+            final Thread t = new Thread() {
+                @Override
+                public void run() {
+                    try {
+                        Thread.sleep(10000);
+                    } catch (InterruptedException e) {
+                    }
+                    passwordScript.delete();
+                }
+            };
+            t.setDaemon(true);
+            t.start();
+            final String sep = System.getProperty("line.separator");
+            StringBuilder sb = new StringBuilder();
+            if (m_password != null) {
                 sb.append("#!/bin/sh").append(sep);
                 sb.append("echo \"" + m_password + "\"").append(sep);
-                FileOutputStream fos = new FileOutputStream(passwordScript);
-                fos.write(sb.toString().getBytes("UTF-8"));
-                fos.flush();
-                fos.close();
-                return passwordScript.getAbsolutePath();
-            } catch (java.io.IOException e) {
-                throw new RuntimeException(e);
+                sb.append("rm $0");
+            } else {
+                sb.append("#!/bin/sh").append(sep);
+                sb.append("echo \"\"").append(sep);
+                sb.append("rm $0");
             }
-        } else {
-            return null;
-        }
-    }
-
-    private void deletePasswordScript() {
-        if (m_file != null) {
-            m_file.delete();
-            m_file = null;
+            FileOutputStream fos = new FileOutputStream(passwordScript);
+            fos.write(sb.toString().getBytes("UTF-8"));
+            fos.flush();
+            fos.close();
+            return passwordScript.getAbsolutePath();
+        } catch (java.io.IOException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -101,12 +110,7 @@ public class SSHTools {
         command[i++] = src.getPath();
         command[i++] = createUrl(hostNameTo, pathTo);
         assert(i == len);
-        String output = null;
-        try {
-            output = ShellTools.cmd(command, generatePasswordScript());
-        } finally {
-            deletePasswordScript();
-        }
+        String output = ShellTools.cmd(command, generatePasswordScript());
         if (output.length() > 1) {
             System.err.print(output);
             return false;
@@ -130,12 +134,7 @@ public class SSHTools {
         command[i++] = createUrl(hostNameFrom, pathFrom);
         command[i++] = dst.getPath();
         assert(i == len);
-        String output = null;
-        try {
-            output = ShellTools.cmd(command, generatePasswordScript());
-        } finally {
-            deletePasswordScript();
-        }
+        String output = ShellTools.cmd(command, generatePasswordScript());
         if (output.length() > 1) {
             System.err.print(output);
             return false;
@@ -161,12 +160,7 @@ public class SSHTools {
         command[i++] = createUrl(hostNameTo, pathTo);
         assert(i == len);
 
-        String output = null;
-        try {
-            output = ShellTools.cmd(command, generatePasswordScript());
-        } finally {
-            deletePasswordScript();
-        }
+        String output = ShellTools.cmd(command, generatePasswordScript());
         if (output.length() > 1) {
             System.err.print(output);
             return false;
@@ -175,20 +169,29 @@ public class SSHTools {
         return true;
     }
 
-    public String cmd(String hostname, String remotePath, String command) {
-        try {
-            return ShellTools.cmd(convert(hostname, remotePath, command), generatePasswordScript());
-        } finally {
-            deletePasswordScript();
+    public Process command(String hostname, String remotePath, String command[]) {
+        ProcessBuilder pb = new ProcessBuilder(convert(hostname, remotePath, command));
+        pb.redirectErrorStream(true);
+        String passwordScript = generatePasswordScript();
+        if (passwordScript != null) {
+            pb.environment().put("SSH_ASKPASS", passwordScript);
         }
+        Process p = null;
+        try {
+            p = pb.start();
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+        return p;
+    }
+
+    public String cmd(String hostname, String remotePath, String command) {
+        return ShellTools.cmd(convert(hostname, remotePath, command), generatePasswordScript());
     }
 
     public String cmd(String hostname, String remotePath, String[] command) {
-        try {
-            return ShellTools.cmd(convert(hostname, remotePath, command), generatePasswordScript());
-        } finally {
-            deletePasswordScript();
-        }
+        return ShellTools.cmd(convert(hostname, remotePath, command), generatePasswordScript());
     }
 
     public String[] convert(String hostname, String remotePath, String command) {
@@ -239,11 +242,6 @@ public class SSHTools {
         command[i++] = "StrictHostKeyChecking=no";
 
         return i;
-    }
-
-    @Override
-    protected void finalize() {
-        deletePasswordScript();
     }
 
     public static void main(String args[]) throws Exception {
