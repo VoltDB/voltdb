@@ -972,6 +972,7 @@ TEST CASES
                 <exclude name="**/TestFailuresSuite.class" />
                 <exclude name="**/TestFixedSQLSuite.class" />
                 <exclude name="**/TestPlansGroupBySuite.class" />
+                <exclude name="**/TestRejoinEndToEnd.class" />
                 <exclude name="**/TestRollbackSuite.class" />
                 <exclude name="**/TestSaveRestoreSysprocSuite.class" />
                 <exclude name="**/TestSQLFeaturesSuite.class" />
