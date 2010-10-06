@@ -9,6 +9,74 @@ from xml.dom import Node
 ## example from it's home in /examples to ${build.dir}/dist/examples.
 ##
 
+
+def readFile(filename):
+    "read a file into a string"
+    FH=open(filename, 'r')
+    fileString = FH.read()
+    FH.close()
+    return fileString
+
+def writeFile(filename, content):
+    "read a file into a string"
+    FH=open(filename, 'w')
+    FH.write(content)
+    FH.close()
+
+def pruneTextNodes(aNode):
+    ""
+    toRemove = []
+    for child in aNode.childNodes:
+        if child.nodeType == Node.TEXT_NODE:
+            toRemove.append(child)
+        else:
+            pruneTextNodes(child)
+    for child in toRemove:
+        aNode.removeChild(child)
+
+def getElementId(node):
+    assert node.nodeType == Node.ELEMENT_NODE
+    if node.hasAttribute("name"):
+        return node.tagName + "-" + node.getAttribute("name")
+    elif node.hasAttribute("id"):
+        return node.tagName + "-" + node.getAttribute("id")
+    else:
+        return node.tagName
+
+def findNodesWithId(node, id):
+    retval = []
+    if (id == None) or (getElementId(node) == id):
+        retval.append(node)
+    for i in range(node.childNodes.length):
+        child = node.childNodes.item(i)
+        if child.nodeType == Node.ELEMENT_NODE:
+            retval += findNodesWithId(child, id);
+    return retval
+
+def addBeforeNodesWithId(doc, root, id, text, comment):
+    toadd = findNodesWithId(root, id)
+    print toadd
+    for node in toadd:
+        if text != None:
+            text = doc.createTextNode(text)
+            root.insertBefore(text, node)
+        if comment != None:
+            comment = doc.createComment(comment)
+            root.insertBefore(comment, node)
+
+def addWhitespace(doc, project):
+    toadd = []
+
+    for i in range(project.childNodes.length):
+        child = project.childNodes.item(i)
+        if child.nodeType == Node.ELEMENT_NODE:
+            if child.tagName == "property":
+                continue
+        ws = doc.createTextNode("\n")
+        toadd.append((ws,child))
+    for pair in toadd:
+        project.insertBefore(pair[0], pair[1])
+
 def orderAttributes__(attributes, attributeOrder):
     ordered = []
     if attributeOrder == None:
@@ -66,7 +134,7 @@ def prettyXml__(node, indent, attributeOrder):
     elif node.nodeType == Node.PROCESSING_INSTRUCTION_NODE:
         print "PROCESSING_INSTRUCTION_NODE"
     elif node.nodeType == Node.COMMENT_NODE:
-        print "COMMENT_NODE"
+        output += "<!-- " + node.data + " -->\n"
     elif node.nodeType == Node.DOCUMENT_NODE:
         # print childen
         for child in node.childNodes:

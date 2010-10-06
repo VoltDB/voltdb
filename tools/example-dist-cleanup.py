@@ -10,53 +10,6 @@ from xmltools import *
 ## example from it's home in /examples to ${build.dir}/dist/examples.
 ##
 
-def readFile(filename):
-    "read a file into a string"
-    FH=open(filename, 'r')
-    fileString = FH.read()
-    FH.close()
-    return fileString
-
-def writeFile(filename, content):
-    "read a file into a string"
-    FH=open(filename, 'w')
-    FH.write(content)
-    FH.close()
-
-def killText(aNode):
-    toRemove = []
-    for child in aNode.childNodes:
-        if child.nodeType == Node.TEXT_NODE:
-            toRemove.append(child)
-        else:
-            killText(child)
-    for child in toRemove:
-        aNode.removeChild(child)
-
-class Property:
-
-    def __init__(self, name, location, value):
-        self.name = name
-        self.location = location
-        self.value = value
-
-    def node(self, doc):
-        retval = doc.createElement("property")
-        setAttribute("name", self.name)
-        if self.location != None:
-            setAttribute("location", self.location)
-        if self.value != None:
-            setAttribute("value", self.value)
-
-class Target:
-
-    def __init__(self, element):
-        self.name = element.tagName
-        self.desc = None
-        if element.hasAttribute("desc"):
-            self.desc = element.getAttribute("desc")
-        self.element = element
-
 def splitElements(project):
     properties = []
     targets = []
@@ -100,6 +53,10 @@ def mergeTargets(base, build, doc):
     basemap = {}
     for target in base:
         basemap[target.getAttribute("name")] = target
+    buildmap = {}
+    for target in build:
+        buildmap[target.getAttribute("name")] = target
+
     for target in build:
         name = target.getAttribute("name")
         depends = target.getAttribute("depends")
@@ -140,21 +97,15 @@ def mergeTargets(base, build, doc):
     for target in base:
         name = target.getAttribute("name")
         if name in basemap:
+            if name == "export":
+                #ignore non-overrided export targets
+                continue
             retval.append(target)
+
     for target in build:
         retval.append(target)
 
     return retval
-
-def addWhitespace(doc, project):
-    toadd = []
-
-    for i in range(project.childNodes.length):
-        child = project.childNodes.item(i)
-        ws = doc.createTextNode("\n")
-        toadd.append((ws,child))
-    for pair in toadd:
-        project.insertBefore(pair[0], pair[1])
 
 # args should be
 # 1. the program name
@@ -170,8 +121,8 @@ pathToBasebuild = sys.argv[1]
 
 basedom = parse(open(pathToBasebuild))
 builddom = parse(open(pathToBuildXml))
-killText(basedom)
-killText(builddom)
+pruneTextNodes(basedom)
+pruneTextNodes(builddom)
 
 baseproject = basedom.getElementsByTagName("project").item(0)
 buildproject = builddom.getElementsByTagName("project").item(0)
@@ -215,6 +166,14 @@ targets = mergeTargets(basetargets, buildtargets, output)
 for t in targets:
     newproject.appendChild(t)
 
+addWhitespace(output, newproject)
+
+addBeforeNodesWithId(output, newproject, "property-voltdb.dir", "\n", None)
+addBeforeNodesWithId(output, newproject, "property-voltdb.dir", None,
+    "Adjust the location of VoltDB if you move this example.")
+
+addBeforeNodesWithId(output, newproject, "property-build.dir", "\n", None)
+
 attributeOrder = {
     "property": ["name", "value", "location"],
     "target"  : ["name", "depends", "description"],
@@ -222,8 +181,6 @@ attributeOrder = {
     "javac"   : ["srcdir", "destdir"],
     "fileset" : ["dir"],
 }
-
-addWhitespace(output, newproject)
 
 content = prettyXml(output, attributeOrder)
 writeFile(pathToBuildXml, content)

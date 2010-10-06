@@ -1,6 +1,8 @@
 <?xml version="1.0" ?>
 <project default="default" name="Game of life build file">
 
+<property name='catalog' value='gameoflife.jar'/>
+
 <import file="../includes/basebuild.xml"/>
 
 <target name="client" description="Start the client that controls the game board." >
