@@ -169,7 +169,7 @@ public class SSHTools {
         return true;
     }
 
-    public Process command(String hostname, String remotePath, String command[]) {
+    public ProcessData command(String hostname, String remotePath, String command[], String processName, OutputHandler handler) {
         ProcessBuilder pb = new ProcessBuilder(convert(hostname, remotePath, command));
         pb.redirectErrorStream(true);
         String passwordScript = generatePasswordScript();
@@ -183,7 +183,7 @@ public class SSHTools {
             e.printStackTrace();
             return null;
         }
-        return p;
+        return new ProcessData( processName, handler, p);
     }
 
     public String cmd(String hostname, String remotePath, String command) {

@@ -107,6 +107,16 @@ public class ProcessData {
         m_err.start();
     }
 
+    ProcessData(String processName, OutputHandler handler, Process p) {
+        m_process = p;
+        BufferedReader out = new BufferedReader(new InputStreamReader(m_process.getInputStream()));
+        BufferedReader err = new BufferedReader(new InputStreamReader(m_process.getErrorStream()));
+        m_out = new StreamWatcher(out, processName, Stream.STDOUT, handler);
+        m_err = new StreamWatcher(err, processName, Stream.STDERR, handler);
+        m_out.start();
+        m_err.start();
+    }
+
     public int kill() {
         m_out.m_expectDeath.set(true);
         m_err.m_expectDeath.set(true);
