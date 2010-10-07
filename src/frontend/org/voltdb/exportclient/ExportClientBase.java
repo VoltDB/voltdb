@@ -47,7 +47,7 @@ public abstract class ExportClientBase implements Runnable {
     }
 
     /**
-     * Provide the ELClient with a list of servers to which to connect
+     * Provide the ExportClient with a list of servers to which to connect
      * @param servers
      */
     public void setServerInfo(List<InetSocketAddress> servers)
@@ -57,7 +57,7 @@ public abstract class ExportClientBase implements Runnable {
 
     /**
      * Allow derived clients to implement their own construction of ExportDecoders
-     * for the data sources provided by the server on this EL connection.
+     * for the data sources provided by the server on this Export connection.
      * @param source
      */
     public abstract ExportDecoderBase constructExportDecoder(AdvertisedDataSource source);
@@ -67,10 +67,10 @@ public abstract class ExportClientBase implements Runnable {
         for (AdvertisedDataSource source : elConnection.getDataSources())
         {
             // Construct the app-specific decoder supplied by subclass
-            // and build an ELDataSink for this data source
+            // and build an ExportDataSink for this data source
             m_logger.info("Creating decoder for table: " + source.tableName() +
                           ", part ID: " + source.partitionId());
-            // Put the ELDataSink in our hashed collection if it doesn't exist
+            // Put the ExportDataSink in our hashed collection if it doesn't exist
             ExportDataSink sink = null;
             long table_id = source.tableId();
             int part_id = source.partitionId();
@@ -91,19 +91,19 @@ public abstract class ExportClientBase implements Runnable {
                 part_map.put(part_id, sink);
             }
             sink = part_map.get(part_id);
-            // and plug the ELConnection into the ELDataSink
-            sink.addELConnection(elConnection.getConnectionName());
+            // and plug the ExportConnection into the ExportDataSink
+            sink.addExportConnection(elConnection.getConnectionName());
         }
     }
 
     /**
      * Connect to all the specified servers.  This will open the sockets,
-     * advance the EL protocol to the open state to each server, retrieve
+     * advance the Export protocol to the open state to each server, retrieve
      * each AdvertisedDataSource list, and create data sinks for every
      * table/partition pair.
      * @throws IOException
      */
-    public void connectToELServers(String username, String password) throws IOException
+    public void connectToExportServers(String username, String password) throws IOException
     {
         if (m_servers == null || m_servers.size() == 0)
         {
@@ -148,20 +148,20 @@ public abstract class ExportClientBase implements Runnable {
     }
 
     /**
-     * Perform one iteration of EL Client work.
+     * Perform one iteration of Export Client work.
      *  Override if the specific client has strange workflow/termination conditions.
-     * Largely for EL clients used for test.
+     * Largely for Export clients used for test.
      */
     public void work()
     {
         // drain all the received connection messages into the
-        // RX queues for the ELDataSinks
+        // RX queues for the ExportDataSinks
         for (ExportConnection el_connection : m_exportConnections.values())
         {
             el_connection.work();
         }
 
-        // work all the ELDataSinks to generate outgoing messages
+        // work all the ExportDataSinks to generate outgoing messages
         for (HashMap<Integer, ExportDataSink> part_map : m_sinks.values())
         {
             for (ExportDataSink work_sink : part_map.values())
@@ -170,7 +170,7 @@ public abstract class ExportClientBase implements Runnable {
             }
         }
 
-        // Service all the ELDataSink TX queues
+        // Service all the ExportDataSink TX queues
         for (ExportConnection el_connection : m_exportConnections.values())
         {
             el_connection.work();

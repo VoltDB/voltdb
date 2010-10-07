@@ -49,7 +49,7 @@ import org.voltdb_testprocs.regressionsuites.sqltypesprocs.RollbackInsert;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Update_Export;
 
 /**
- *  End to end Export tests using the RawProcessor and the ELSinkServer.
+ *  End to end Export tests using the RawProcessor and the ExportSinkServer.
  *
  *  Note, this test reuses the TestSQLTypesSuite schema and procedures.
  *  Each table in that schema, to the extent the DDL is supported by the
@@ -123,7 +123,7 @@ public class TestExportSuite extends RegressionSuite {
         callbackSucceded = true;
         m_tester = new ExportTestClient(getServerConfig().getNodeCount());
         try {
-            m_tester.connectToELServers(null, null);
+            m_tester.connectToExportServers(null, null);
         }
         catch (final IOException e){
             throw new RuntimeException(e);
@@ -152,7 +152,7 @@ public class TestExportSuite extends RegressionSuite {
         // make a new tester and see if it gets the new advertisement!
         m_tester.disconnectFromExportServers();
         m_tester = new ExportTestClient(getServerConfig().getNodeCount());
-        m_tester.connectToELServers(null, null);
+        m_tester.connectToExportServers(null, null);
 
         // verify that it exports
         for (int i=0; i < 10; i++) {
@@ -200,7 +200,7 @@ public class TestExportSuite extends RegressionSuite {
     }
 
     /**
-     * Sends ten tuples to an EL enabled VoltServer and verifies the receipt
+     * Sends ten tuples to an Export enabled VoltServer and verifies the receipt
      * of those tuples after a quiesce (shutdown). Base case.
      */
     public void testExportRoundTripPersistentTable() throws Exception
@@ -277,7 +277,7 @@ public class TestExportSuite extends RegressionSuite {
     }
 
     /**
-     * Sends ten tuples to an EL enabled VoltServer and verifies the receipt
+     * Sends ten tuples to an Export enabled VoltServer and verifies the receipt
      * of those tuples after a quiesce (shutdown). Base case.
      */
     public void testExportRoundTripStreamedTable() throws Exception
@@ -327,8 +327,8 @@ public class TestExportSuite extends RegressionSuite {
     }
 
     /*
-     * Sends many tuples to an EL enabled VoltServer and verifies the receipt
-     * of each in the EL stream. Some procedures rollback (after a real insert).
+     * Sends many tuples to an Export enabled VoltServer and verifies the receipt
+     * of each in the Export stream. Some procedures rollback (after a real insert).
      * Tests that streams are correct in the face of rollback.
      */
     public void testExportRollback() throws Exception {

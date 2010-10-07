@@ -81,7 +81,7 @@ public class ExportToHDFSClient extends ExportClientBase {
         this.decoders = new HashMap<String, ExportToHDFSDecoder>();
 
         try {
-            connectToELServers("", "");
+            connectToExportServers("", "");
         } catch (IOException e) {
             LOG.fatal("Unable to connect to VoltDB servers for export");
             System.exit(1);

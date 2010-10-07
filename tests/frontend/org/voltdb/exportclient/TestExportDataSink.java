@@ -65,7 +65,7 @@ public class TestExportDataSink extends TestCase {
                                                                        TABLE_ID,
                                                                        "coffeetable",
                                                                        null, null)));
-        dut.addELConnection(CONN_NAME);
+        dut.addExportConnection(CONN_NAME);
         assertNull(dut.getTxQueue(CONN_NAME).peek());
         dut.work();
         assertNotNull(dut.getTxQueue(CONN_NAME).peek());

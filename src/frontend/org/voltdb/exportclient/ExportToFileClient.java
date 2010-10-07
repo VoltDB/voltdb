@@ -383,7 +383,7 @@ public class ExportToFileClient extends ExportClientBase
             new ExportToFileClient(escaper, nonce, outdir);
         client.setVoltServers(volt_servers);
         try {
-            client.connectToELServers(user, password);
+            client.connectToExportServers(user, password);
         }
         catch (IOException e) {
             m_logger.fatal("Unable to connect to VoltDB servers for export");

@@ -63,7 +63,7 @@ public class ExportDataSink implements Runnable
         return m_partitionId;
     }
 
-    void addELConnection(String connectionName)
+    void addExportConnection(String connectionName)
     {
         if (m_activeConnection == null)
         {
