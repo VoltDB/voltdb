@@ -23,9 +23,6 @@
 
 package org.voltdb.regressionsuites;
 
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
@@ -35,9 +32,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltdb.VoltDB.Configuration;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.benchmark.tpcc.procedures.InsertNewOrder;
 import org.voltdb.catalog.LoadCatalogToString;
@@ -50,6 +47,7 @@ import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.types.TimestampType;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * Tests a mix of multi-partition and single partition procedures on a
@@ -441,39 +439,15 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
     }
 
     /**
-     * Simple code to copy a file from one place to another...
-     * Java should have this built in... stupid java...
-     */
-    static void copyFile(String fromPath, String toPath) {
-        File inputFile = new File(fromPath);
-        File outputFile = new File(toPath);
-
-        try {
-            FileReader in = new FileReader(inputFile);
-            FileWriter out = new FileWriter(outputFile);
-            int c;
-
-            while ((c = in.read()) != -1)
-              out.write(c);
-
-            in.close();
-            out.close();
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-            fail();
-        }
-    }
-
-    /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
      * This particular class runs all tests on the the local JNI backend with both
      * one and two partition configurations, as well as on the hsql backend.
      *
      * @return The TestSuite containing all the tests to be run.
+     * @throws Exception
      */
-    static public Test suite() {
+    static public Test suite() throws Exception {
         // the suite made here will all be using the tests from this class
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestCatalogUpdateSuite.class);
 
@@ -493,7 +467,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         // build the jarfile
         boolean basecompile = config.compile(project);
         assertTrue(basecompile);
-        copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml"));
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml"));
 
         // add this config to the set of tests to run
         builder.addServerConfig(config);
@@ -516,7 +490,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project.setSecurityEnabled(true);
         boolean compile = config.compile(project);
         assertTrue(compile);
-        copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-base-secure.xml"));
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-base-secure.xml"));
 
         //config = new LocalSingleProcessServer("catalogupdate-local-addtables.jar", 2, BackendTarget.NATIVE_EE_JNI);
         config = new LocalCluster("catalogupdate-cluster-addtables.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
@@ -528,7 +502,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project.addProcedures(BASEPROCS_OPROCS);
         compile = config.compile(project);
         assertTrue(compile);
-        copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtables.xml"));
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtables.xml"));
 
         // as above but also with a materialized view added to O1
         try {
@@ -542,7 +516,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
             project.addProcedures(BASEPROCS_OPROCS);
             compile = config.compile(project);
             assertTrue(compile);
-            copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtableswithmatview.xml"));
+            MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtableswithmatview.xml"));
         } catch (IOException e) {
             fail();
         }
@@ -555,7 +529,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project.addProcedures(EXPANDEDPROCS);
         compile = config.compile(project);
         assertTrue(compile);
-        copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.xml"));
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.xml"));
 
         //config = new LocalSingleProcessServer("catalogupdate-local-conflict.jar", 2, BackendTarget.NATIVE_EE_JNI);
         config = new LocalCluster("catalogupdate-cluster-conflict.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
@@ -565,7 +539,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project.addProcedures(CONFLICTPROCS);
         compile = config.compile(project);
         assertTrue(compile);
-        copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-conflict.xml"));
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-conflict.xml"));
 
         //config = new LocalSingleProcessServer("catalogupdate-local-many.jar", 2, BackendTarget.NATIVE_EE_JNI);
         config = new LocalCluster("catalogupdate-cluster-many.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
@@ -575,7 +549,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project.addProcedures(SOMANYPROCS);
         compile = config.compile(project);
         assertTrue(compile);
-        copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-many.xml"));
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-many.xml"));
 
         return builder;
     }

@@ -55,7 +55,6 @@ def findNodesWithId(node, id):
 
 def addBeforeNodesWithId(doc, root, id, text, comment):
     toadd = findNodesWithId(root, id)
-    print toadd
     for node in toadd:
         if text != None:
             text = doc.createTextNode(text)

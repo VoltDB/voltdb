@@ -24,8 +24,6 @@
 package org.voltdb;
 
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.URLEncoder;
@@ -42,6 +40,7 @@ import org.voltdb.messaging.HostMessenger;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
+import org.voltdb.utils.MiscUtils;
 
 public class RejoinTestBase extends TestCase {
     protected static final String m_username;
@@ -114,38 +113,13 @@ public class RejoinTestBase extends TestCase {
         ServerThread localServer;
     }
 
-    /**
-     * Simple code to copy a file from one place to another...
-     * Java should have this built in... stupid java...
-     */
-    static void copyFile(String fromPath, String toPath) {
-        File inputFile = new File(fromPath);
-        File outputFile = new File(toPath);
-
-        try {
-            FileReader in = new FileReader(inputFile);
-            FileWriter out = new FileWriter(outputFile);
-            int c;
-
-            while ((c = in.read()) != -1)
-              out.write(c);
-
-            in.close();
-            out.close();
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-            fail();
-        }
-    }
-
     Context getServerReadyToReceiveNewNode() throws Exception {
         Context retval = new Context();
 
         VoltProjectBuilder builder = getBuilderForTest();
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("rejoin.jar"), 1, 2, 1, "localhost");
         assertTrue(success);
-        copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
 
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");

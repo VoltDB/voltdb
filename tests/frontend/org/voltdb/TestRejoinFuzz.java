@@ -35,6 +35,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.utils.MiscUtils;
 
 public class TestRejoinFuzz extends RejoinTestBase {
     //
@@ -60,7 +61,7 @@ public class TestRejoinFuzz extends RejoinTestBase {
         final int numTuples = cluster.isValgrind() ? 10000 : 60000;
         boolean success = cluster.compile(builder);
         assertTrue(success);
-        copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
         cluster.setHasLocalServer(false);
 
         final ArrayList<Integer> serverValues = new ArrayList<Integer>();

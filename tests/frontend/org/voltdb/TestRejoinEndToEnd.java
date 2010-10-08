@@ -44,6 +44,7 @@ import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportConnection;
 import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.utils.MiscUtils;
 
 public class TestRejoinEndToEnd extends RejoinTestBase {
 
@@ -140,7 +141,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         VoltProjectBuilder builder = getBuilderForTest();
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("rejoin.jar"), 1, 1, 0, "localhost");
         assertTrue(success);
-        copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
 
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
@@ -183,7 +184,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_FAILURE, false);
         boolean success = cluster.compile(builder);
         assertTrue(success);
-        copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
         cluster.setHasLocalServer(false);
 
         cluster.startUp();
@@ -194,7 +195,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         cluster = new LocalCluster("rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_RECOVERING, false);
         success = cluster.compile(builder);
         assertTrue(success);
-        copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
         cluster.setHasLocalServer(false);
 
         cluster.startUp();
@@ -210,7 +211,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         boolean success = cluster.compile(builder);
         assertTrue(success);
-        copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
         cluster.setHasLocalServer(false);
 
         cluster.startUp();
@@ -324,7 +325,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         boolean success = cluster.compile(builder);
         assertTrue(success);
-        copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
         cluster.setHasLocalServer(false);
 
         cluster.startUp();
@@ -416,7 +417,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         boolean success = cluster.compile(builder);
         assertTrue(success);
-        copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
         cluster.setHasLocalServer(false);
 
         cluster.startUp();

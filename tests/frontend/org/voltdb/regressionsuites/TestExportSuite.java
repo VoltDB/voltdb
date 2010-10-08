@@ -41,6 +41,7 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.export.ExportTestClient;
 import org.voltdb.utils.SnapshotVerifier;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Delete;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Insert;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertAddedTable;
@@ -649,7 +650,7 @@ public class TestExportSuite extends RegressionSuite {
         org.junit.runner.JUnitCore.runClasses(TestOrderBySuite.class);
     }
 
-    static public junit.framework.Test suite()
+    static public junit.framework.Test suite() throws Exception
     {
         VoltServerConfig config;
 
@@ -716,7 +717,7 @@ public class TestExportSuite extends RegressionSuite {
         project.addPartitionInfo("JUMBO_ROW", "PKEY");
         project.addProcedures(PROCEDURES2);
         compile = config.compile(project);
-        TestCatalogUpdateSuite.copyFile(project.getPathToDeployment(),
+        MiscUtils.copyFile(project.getPathToDeployment(),
                 Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.xml"));
         assertTrue(compile);
 
@@ -749,7 +750,7 @@ public class TestExportSuite extends RegressionSuite {
         project.addProcedures(PROCEDURES);
         project.addProcedures(PROCEDURES3);
         compile = config.compile(project);
-        TestCatalogUpdateSuite.copyFile(project.getPathToDeployment(),
+        MiscUtils.copyFile(project.getPathToDeployment(),
                 Configuration.getPathToCatalogForTest("export-ddl-addedtable.xml"));
         assertTrue(compile);
 

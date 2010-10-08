@@ -531,7 +531,7 @@ public class LocalCluster implements VoltServerConfig {
         int portNo = VoltDB.DEFAULT_PORT + hostId;
 
         // port to connect to (not too simple, eh?)
-        int portNoToRejoin = VoltDB.DEFAULT_PORT + hostId + 1;
+        int portNoToRejoin = VoltDB.DEFAULT_PORT + ((hostId + 1) % getNodeCount());
         if (m_hasLocalServer) portNoToRejoin = VoltDB.DEFAULT_PORT;
 
         if (portOffset != null) {

@@ -35,6 +35,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.utils.MiscUtils;
 
 public class TestRejoinFuzz2 extends RejoinTestBase {
 
@@ -64,7 +65,7 @@ public class TestRejoinFuzz2 extends RejoinTestBase {
         cluster.setMaxHeap(64);
         boolean success = cluster.compile(builder);
         assertTrue(success);
-        copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
         cluster.setHasLocalServer(false);
 
         cluster.startUp();
