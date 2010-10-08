@@ -186,14 +186,20 @@ public class ExportToFileClient extends ExportClientBase
         }
     }
 
-    public void setVoltServers(String[] voltServers)
+    public void setVoltServers(String[] voltServers, int[] ports)
     {
+        if (ports == null) {
+            ports = new int[voltServers.length];
+            for (int i = 0; i < voltServers.length; i++)
+                ports[i] = VoltDB.DEFAULT_PORT;
+        }
+
         ArrayList<InetSocketAddress> servers =
             new ArrayList<InetSocketAddress>();
         for (int i = 0; i < voltServers.length; i++)
         {
             InetSocketAddress server =
-                new InetSocketAddress(voltServers[i], VoltDB.DEFAULT_PORT);
+                new InetSocketAddress(voltServers[i], ports[i]);
             servers.add(server);
         }
         setServerInfo(servers);
@@ -381,7 +387,7 @@ public class ExportToFileClient extends ExportClientBase
         }
         ExportToFileClient client =
             new ExportToFileClient(escaper, nonce, outdir);
-        client.setVoltServers(volt_servers);
+        client.setVoltServers(volt_servers, null);
         try {
             client.connectToExportServers(user, password);
         }
