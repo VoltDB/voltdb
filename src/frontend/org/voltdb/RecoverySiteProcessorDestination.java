@@ -30,6 +30,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
@@ -413,33 +414,85 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
             recoveryLog.fatal("Timed out waiting for connection from source partition");
             VoltDB.crashVoltDB();
         }
-        m_sc.configureBlocking(true);
-        m_sc.socket().setTcpNoDelay(true);
-
-        ByteBuffer messageLength = ByteBuffer.allocate(4);
-        while (messageLength.hasRemaining()) {
-            int read = m_sc.read(messageLength);
-            if (read == -1) {
-                throw new EOFException();
-            }
-        }
-        messageLength.flip();
-
-        ByteBuffer response = ByteBuffer.allocate(messageLength.getInt());
-        while (response.hasRemaining()) {
-            int read = m_sc.read(response);
-            if (read == -1) {
-                throw new EOFException();
-            }
-        }
-        response.flip();
-
-        final int sourceSite = response.getInt();
-        m_stopBeforeTxnId = response.getLong();
-        recoveryLog.info("Recovery initiate ack received at site " + m_siteId + " from site " +
-                sourceSite + " will sync after txnId " + m_stopBeforeTxnId);
-        m_iodaemon = new IODaemon(m_sc);
         ssc.close();
+
+        /*
+         * Run the reads in a separate thread and do blocking IO.
+         * Couldn't get setSoTimeout to work.
+         */
+        final AtomicBoolean recoveryAckReaderSuccess = new AtomicBoolean(false);
+        final Thread recoveryAckReader = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    m_sc.configureBlocking(true);
+                    m_sc.socket().setTcpNoDelay(true);
+
+                    ByteBuffer messageLength = ByteBuffer.allocate(4);
+                    while (messageLength.hasRemaining()) {
+                        final int read = m_sc.read(messageLength);
+                        if (read == -1) {
+                            throw new EOFException();
+                        }
+                    }
+                    messageLength.flip();
+
+                    ByteBuffer response = ByteBuffer.allocate(messageLength.getInt());
+                    while (response.hasRemaining()) {
+                        int read = m_sc.read(response);
+                        if (read == -1) {
+                            throw new EOFException();
+                        }
+                    }
+                    response.flip();
+
+                    final int sourceSite = response.getInt();
+                    m_stopBeforeTxnId = response.getLong();
+                    recoveryLog.info("Recovery initiate ack received at site " + m_siteId + " from site " +
+                            sourceSite + " will sync after txnId " + m_stopBeforeTxnId);
+                    m_iodaemon = new IODaemon(m_sc);
+                    recoveryAckReaderSuccess.set(true);
+                } catch (Exception e) {
+                    recoveryLog.fatal("Failure while attempting to read recovery initiate ack message", e);
+                    VoltDB.crashVoltDB();
+                }
+            }
+        };
+        recoveryAckReader.start();
+
+        /*
+         * Poll the mailbox so that heartbeat and txns messages are received. It is necessary
+         * to participate in that process so the source site can unblock its priority queue if it
+         * is blocked on safety or ordering.
+         */
+        while (recoveryAckReader.isAlive() && System.currentTimeMillis() - startTime < 5000) {
+            VoltMessage message = m_mailbox.recvBlocking();
+            if (message != null) {
+                if (message instanceof RecoveryMessage) {
+                    RecoveryMessage rm = (RecoveryMessage)message;
+                    if (!rm.recoveryMessagesAvailable()) {
+                        recoveryLog.error("Received a recovery initiate request from " + rm.sourceSite() +
+                                " while a recovery was already in progress. Ignoring it.");
+                    }
+                } else {
+                    m_messageHandler.handleMessage(message);
+                }
+            }
+        }
+        if (recoveryAckReader.isAlive()) {
+            recoveryLog.fatal("Timed out waiting to read recovery initiate ack message");
+            VoltDB.crashVoltDB();
+        }
+        if (recoveryAckReaderSuccess.get() == false) {
+            recoveryLog.fatal("There was an error while reading the recovery initiate ack message");
+            VoltDB.crashVoltDB();
+        }
+        //ensure memory visibility?
+        try {
+            recoveryAckReader.join();
+        } catch (InterruptedException e) {
+            throw new java.io.InterruptedIOException("Interrupted while joining on recovery initiate ack reader");
+        }
 
         return;
     }

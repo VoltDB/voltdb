@@ -21,8 +21,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
-import java.util.Map.Entry;
 import java.util.PriorityQueue;
+import java.util.Map.Entry;
 
 import org.voltdb.VoltDB;
 import org.voltdb.debugstate.ExecutorContext;
@@ -218,10 +218,8 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
         for (LastInitiatorData l : m_initiatorData.values())
             if (l.m_lastSeenTxnId < min) min = l.m_lastSeenTxnId;
 
-        // this minimum is the newest safe transaction to run
-        // but you still need to check if a transaction has been confirmed
-        //  by its initiator
-        //  (note: this check is done when peeking/polling from the queue)
+        //  This transaction is the guaranteed minimum
+        //  but is not yet necessarily 2PC'd to every site.
         m_newestCandidateTransaction = min;
 
         // this will update the state of the queue if needed
@@ -324,40 +322,72 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
         TransactionState ts = super.peek();
         LastInitiatorData lid = null;
 
-        // Check terminal states (currently only BLOCKED_CLOSED)
-        // and handle an empty queue first.
+        // Terminal states (currently only BLOCKED_CLOSED)
         if (m_state == QueueState.BLOCKED_CLOSED) {
-            newState = m_state;
+            return m_state;
         }
-        else if (ts == null) {
-            newState = QueueState.BLOCKED_EMPTY;
-        }
+        assert (newState == QueueState.UNBLOCKED);
 
-        // If still unblocked, check roadblocks. Note that heartbeats
-        // can drive an empty queue to the BLOCKED_CLOSED state, too.
-        if (newState == QueueState.UNBLOCKED) {
-            newState = checkRoadBlock(ts.txnId);
-        }
-        else if (newState == QueueState.BLOCKED_EMPTY) {
+        // Empty queue
+        if (ts == null) {
+            // Roadblocks - heartbeats can drive an empty queue
+            // to the BLOCKED_CLOSED state, too.
             QueueState checkRoadBlock = checkRoadBlock(m_newestCandidateTransaction);
-            if (checkRoadBlock == QueueState.BLOCKED_CLOSED)
-                newState = checkRoadBlock;
+            if (checkRoadBlock == QueueState.BLOCKED_CLOSED) {
+                executeStateChange(checkRoadBlock, ts, lid);
+                return m_state;
+            } else {
+                //No roadblock due to heartbeats, switch to BLOCKED_EMPTY
+                newState = QueueState.BLOCKED_EMPTY;
+                executeStateChange(newState, ts, lid);
+                return m_state;
+            }
+
+        }
+        assert (newState == QueueState.UNBLOCKED);
+
+        // Roadblocks - txn drives queue to BLOCKED_CLOSED due to roadblock
+        {
+            newState = checkRoadBlock(ts.txnId);
+            if (newState == QueueState.BLOCKED_CLOSED) {
+                executeStateChange(newState, ts, lid);
+                return m_state;
+            }
         }
 
-        // No roadblocks, not empty - verify order and safety
-        if (newState == QueueState.UNBLOCKED) {
-            if (ts.txnId > m_newestCandidateTransaction) {
-                newState = QueueState.BLOCKED_ORDERING;
-            }
-            else {
-                // note the exception to the safety dance for recovering partitions
-                lid = m_initiatorData.get(ts.initiatorSiteId);
-                if ((lid != null) && (ts.txnId > lid.m_lastSafeTxnId)) {
-                    newState = QueueState.BLOCKED_SAFETY;
-                }
-            }
-        }
+        assert (newState == QueueState.UNBLOCKED);
 
+        // Sufficient ordering established?
+        if (ts.txnId > m_newestCandidateTransaction) {
+            newState = QueueState.BLOCKED_ORDERING;
+            executeStateChange(newState, ts, lid);
+            return m_state;
+        }
+        assert (newState == QueueState.UNBLOCKED);
+
+        // Remember, an 'in recovery' response satisfies the safety dance
+        lid = m_initiatorData.get(ts.initiatorSiteId);
+        if (lid == null) {
+            // what does this mean???
+        }
+        else if (ts.txnId > lid.m_lastSafeTxnId) {
+            newState = QueueState.BLOCKED_SAFETY;
+            executeStateChange(newState, ts, lid);
+            return m_state;
+        }
+        assert (newState == QueueState.UNBLOCKED);
+
+        // legitimately unblocked
+        assert (ts != null);
+
+        executeStateChange( newState, ts, lid);
+
+        return newState;
+    }
+
+    private void executeStateChange(QueueState newState, TransactionState ts,
+            LastInitiatorData lid)
+    {
         // Execute state changes
         if (newState != m_state) {
             // Count millis spent non-empty but blocked
@@ -378,8 +408,6 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
 
             m_state = newState;
         }
-
-        return m_state;
     }
 
     private void sendHearbeatResponse(TransactionState ts, LastInitiatorData lid) {
@@ -412,19 +440,34 @@ public class RestrictedPriorityQueue extends PriorityQueue<TransactionState> {
     public Long safeToRecover() {
         boolean safe = true;
         for (LastInitiatorData data : m_initiatorData.values()) {
-            if (data.m_lastSeenTxnId == DtxnConstants.DUMMY_LAST_SEEN_TXN_ID) {
+            final long lastSeenTxnId = data.m_lastSeenTxnId;
+            if (lastSeenTxnId == DtxnConstants.DUMMY_LAST_SEEN_TXN_ID) {
                 safe = false;
             }
         }
         if (!safe) {
             return null;
-        } else {
-            TransactionState next = super.peek();
-            if (next == null) {
+        }
+
+        TransactionState next = peek();
+        if (next == null) {
+            // no work - have heard from all initiators. use a heartbeat
+            if (m_state == QueueState.BLOCKED_EMPTY) {
                 return m_newestCandidateTransaction;
-            } else {
-                return Math.min( m_newestCandidateTransaction, next.txnId);
             }
+            // waiting for some txn to be 2pc to this site.
+            else if (m_state == QueueState.BLOCKED_SAFETY) {
+                return null;
+            } else if (m_state == QueueState.BLOCKED_ORDERING){
+                return null;
+            }
+            m_recoveryLog.error("Unexpected RPQ state " + m_state + " when attempting to start recovery at " +
+                    " the source site. Consider killing the recovering node and trying again");
+            return null; // unreachable
+        }
+        else {
+            // bingo - have a real transaction to return as the recovery point
+            return next.txnId;
         }
     }
 }
