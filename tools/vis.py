@@ -183,8 +183,8 @@ def main():
 
     starttime = datetime.datetime.now() - timedelta
     timestamp = time.mktime(starttime.timetuple()) * 1000.0
-    latencies = latency_stat.get_latencies(timestamp, 900)
-    throughput = volt_stat.get_throughputs(starttime, 900)
+    latencies = latency_stat.get_latencies(timestamp, 9000)
+    throughput = volt_stat.get_throughputs(starttime, 9000)
 
     latency_stat.close()
     volt_stat.close()
