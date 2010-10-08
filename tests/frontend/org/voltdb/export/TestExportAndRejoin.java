@@ -90,35 +90,49 @@ public class TestExportAndRejoin extends TestCase {
         }
 
         void shutdown() throws InterruptedException {
-            m_cluster.shutDown();
+            synchronized(this) {
+                m_continue.set(false);
+                m_cluster.shutDown();
+            }
         }
 
         @Override
         public void run() {
             while (m_continue.get()) {
-                try {
-                    if (m_hostAlive) {
-                        Thread.sleep(1000);
-                        m_cluster.shutDownSingleHost(m_currentHost);
-                        m_hostAlive = false;
-                        Thread.sleep(1000);
-                    }
-                    else {
-                        boolean success = m_cluster.recoverOne(m_currentHost, null, "localhost");
-                        m_tryKills++;
-                        if (success) {
-                            m_hostAlive = true;
-                            m_currentHost = (m_currentHost + 1) % m_cluster.getNodeCount();
-                            m_tryKills = 0;
-                        }
-                        if (m_tryKills >= 6)
-                            fail();
-                    }
+                operation();
+            }
+        }
 
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                    fail();
+        void operation() {
+            try {
+                if (m_hostAlive) {
+                    Thread.sleep(1000);
+                    synchronized(this) {
+                        if (!m_continue.get()) return;
+                        m_cluster.shutDownSingleHost(m_currentHost);
+                    }
+                    m_hostAlive = false;
+                    Thread.sleep(1000);
                 }
+                else {
+                    boolean success = true;
+                    synchronized(this) {
+                        if (!m_continue.get()) return;
+                        success = m_cluster.recoverOne(m_currentHost, null, "localhost");
+                    }
+                    m_tryKills++;
+                    if (success) {
+                        m_hostAlive = true;
+                        m_currentHost = (m_currentHost + 1) % m_cluster.getNodeCount();
+                        m_tryKills = 0;
+                    }
+                    if (m_tryKills >= 6)
+                        System.exit(-1);
+                }
+
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+                System.exit(-1);
             }
         }
     }
@@ -145,7 +159,7 @@ public class TestExportAndRejoin extends TestCase {
 
         void shutdown() {
             m_continue.set(false);
-            this.interrupt();
+            //this.interrupt();
         }
 
         void runInsert() {
@@ -247,8 +261,8 @@ public class TestExportAndRejoin extends TestCase {
                 System.out.printf("Host %d (re)connected\n", m_hostId);
             }
             catch (Exception e) {
-                System.out.printf("Host %d still unreacable\n", m_hostId);
-                try { Thread.sleep(1000); } catch (InterruptedException e1) {}
+                //System.out.printf("Host %d still unreacable\n", m_hostId);
+                try { Thread.sleep(10); } catch (InterruptedException e1) {}
             }
         }
 
@@ -292,7 +306,7 @@ public class TestExportAndRejoin extends TestCase {
         ClusterRunner runner = new ClusterRunner();
         runner.start();
 
-        SpammingClient[] spammers = new SpammingClient[HOST_COUNT * 2];
+        SpammingClient[] spammers = new SpammingClient[HOST_COUNT * 10];
         for (int i = 0; i < spammers.length; i++) {
             spammers[i] = new SpammingClient((short) i, i % HOST_COUNT);
         }
@@ -303,7 +317,7 @@ public class TestExportAndRejoin extends TestCase {
         ExportClient exporter = new ExportClient();
         exporter.start();
 
-        int sleepTime = 60000;
+        int sleepTime = 1 * 60 * 1000;
         while (sleepTime > 0) {
             if (!globalContinue.get()) {
                 fail();
