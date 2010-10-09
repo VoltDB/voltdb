@@ -41,9 +41,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.exportclient.ExportToFileClient;
 import org.voltdb.regressionsuites.LocalCluster;
-import org.voltdb.utils.CSVEscaperUtil.CSVEscaper;
 import org.voltdb.utils.MiscUtils;
 
 public class TestExportAndRejoin extends TestCase {
@@ -66,19 +64,11 @@ public class TestExportAndRejoin extends TestCase {
         builder.addSchema(schemaPath);
         builder.addPartitionInfo("counter", "incr");
 
-        //builder.addExportTable("counter", false);
-        //builder.addExport("org.voltdb.export.processors.RawProcessor", true, null);
-
         builder.addProcedures(InsertEcho.class);
         builder.addStmtProcedure("Check", "select * from counter where incr = ? and clientid = ?;", "counter.incr:0");
         return builder;
     }
 
-    /**
-     * A cluster runner starts a VoltDB LocalCluster with several nodes
-     * and k-safety and just rotates through them, killing and recovering.
-     *
-     */
     class ClusterRunner extends Thread {
 
         LocalCluster m_cluster;
@@ -147,19 +137,6 @@ public class TestExportAndRejoin extends TestCase {
         }
     }
 
-    /**
-     * A spamming client connects to a single voltdb node
-     * and sends lots of sequential inserts to it, spread out
-     * among partitions.
-     *
-     * On failure of the node, the client will try to reconnect.
-     * On reconnection, it will discover whether the last sent work
-     * got done or not.
-     *
-     * Create many spamming clients to put load on a server. Note
-     * that these do syncronous IO
-     *
-     */
     class SpammingClient extends Thread {
 
         final Client m_client;
@@ -316,43 +293,10 @@ public class TestExportAndRejoin extends TestCase {
 
     }
 
-    /**
-     * The export client sucks down tuples and verifies the following
-     * condition:
-     *
-     * For any client id, the increment counter is increasing with no
-     * gaps or doubles.
-     *
-     * Currently incomplete.
-     *
-     */
     class ExportClient extends Thread {
-
-        ExportToFileClient m_client;
-
-        void connect() throws IOException {
-            m_client = new ExportToFileClient(new CSVEscaper(), "TEAR-Counter", new File("."));
-            String[] voltServers = new String[HOST_COUNT];
-            for (int i = 0; i < HOST_COUNT; i++)
-                voltServers[i] = "localhost";
-            int[] ports = new int[HOST_COUNT];
-            for (int i = 0; i < HOST_COUNT; i++)
-                ports[i] = VoltDB.DEFAULT_PORT + i;
-            m_client.setVoltServers(voltServers, ports);
-            m_client.connectToExportServers("", "");
-        }
 
         @Override
         public void run() {
-            while (globalContinue.get()) {
-                try {
-                    connect();
-                } catch (IOException e) {
-                    assert(false);
-                    globalContinue.set(false);
-                }
-                m_client.run();
-            }
         }
 
     }
@@ -360,10 +304,7 @@ public class TestExportAndRejoin extends TestCase {
 
     public void testSimultanious() throws Exception {
         ClusterRunner runner = new ClusterRunner();
-        //ExportClient exporter = new ExportClient();
-
         runner.start();
-        //exporter.start();
 
         SpammingClient[] spammers = new SpammingClient[HOST_COUNT * 10];
         for (int i = 0; i < spammers.length; i++) {
@@ -372,6 +313,9 @@ public class TestExportAndRejoin extends TestCase {
         for (int i = 0; i < spammers.length; i++) {
             spammers[i].start();
         }
+
+        ExportClient exporter = new ExportClient();
+        exporter.start();
 
         int sleepTime = 1 * 60 * 1000;
         while (sleepTime > 0) {
@@ -390,11 +334,10 @@ public class TestExportAndRejoin extends TestCase {
             assertTrue(spammers[i].getConfirmedInserts() > 0);
         }
 
-        globalContinue.set(false);
+        exporter.join();
+
         runner.shutdown();
         runner.join();
-
-        //exporter.join();
     }
 
 }
