@@ -593,7 +593,7 @@ class NValue {
                  valueToString(origType).c_str(),
                  valueToString(newType).c_str());
         throw SQLException(SQLException::
-                           volt_unsupported_type_conversion_error,
+                           data_exception_most_specific_type_mismatch,
                            msg);
     }
 
@@ -1056,15 +1056,32 @@ class NValue {
               }
               return ((getDouble() > val) - (getDouble() < val));
           }
-
           default:
-              throwFatalException("non comparable types lhs '%d' rhs '%d'", getValueType(), rhs.getValueType());
+          {
+              char message[128];
+              snprintf(message, 128,
+                       "Type %s cannot be cast for comparison to type %s",
+                       valueToString(rhs.getValueType()).c_str(),
+                       valueToString(getValueType()).c_str());
+              throw SQLException(SQLException::
+                                 data_exception_most_specific_type_mismatch,
+                                 message);
+              // Not reached
+              return 0;
+          }
         }
     }
 
     int compareStringValue (const NValue rhs) const {
         if (rhs.getValueType() != VALUE_TYPE_VARCHAR) {
-            throwFatalException( "non comparable types lhs '%d' rhs '%d'", getValueType(), rhs.getValueType());
+            char message[128];
+            snprintf(message, 128,
+                     "Type %s cannot be cast for comparison to type %s",
+                     valueToString(rhs.getValueType()).c_str(),
+                     valueToString(getValueType()).c_str());
+            throw SQLException(SQLException::
+                               data_exception_most_specific_type_mismatch,
+                               message);
         }
         const char* left = reinterpret_cast<const char*>(getObjectValue());
         const char* right = reinterpret_cast<const char*>(rhs.getObjectValue());
@@ -1144,9 +1161,18 @@ class NValue {
           }
           default:
           {
-              throwFatalException( "non comparable types lhs '%d' rhs '%d'", getValueType(), rhs.getValueType());
+              char message[128];
+              snprintf(message, 128,
+                       "Type %s cannot be cast for comparison to type %s",
+                       valueToString(rhs.getValueType()).c_str(),
+                       valueToString(getValueType()).c_str());
+              throw SQLException(SQLException::
+                                 data_exception_most_specific_type_mismatch,
+                                 message);
+              // Not reached
+              return 0;
           }
-        }
+       }
     }
 
     NValue opAddBigInts(const int64_t lhs, const int64_t rhs) const {
@@ -1837,7 +1863,7 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
       default:
           char message[128];
           snprintf(message, 128, "NValue::serializeToTupleStorage() unrecognized type '%d'", type);
-          throw SQLException(SQLException::volt_unsupported_type_conversion_error,
+          throw SQLException(SQLException::data_exception_most_specific_type_mismatch,
                              message);
     }
 }
@@ -2237,7 +2263,8 @@ inline NValue NValue::castAs(ValueType type) const {
           char message[128];
           snprintf(message, 128, "Type %d not a recognized type for casting",
                   (int) type);
-          throw SQLException(SQLException::volt_unsupported_type_conversion_error,
+          throw SQLException(SQLException::
+                             data_exception_most_specific_type_mismatch,
                              message);
     }
 }

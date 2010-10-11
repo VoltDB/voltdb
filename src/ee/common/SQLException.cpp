@@ -20,18 +20,22 @@
 #include <iostream>
 #include <cassert>
 
-namespace voltdb {
+using namespace voltdb;
 
+// Please keep these ordered alphabetically.
+// Names and codes are standardized.
 const char* SQLException::data_exception_division_by_zero = "22012";
-const char* SQLException::data_exception_string_data_length_mismatch = "22026";
-const char* SQLException::data_exception_numeric_value_out_of_range = "22003";
 const char* SQLException::data_exception_invalid_parameter = "22023";
+const char* SQLException::data_exception_most_specific_type_mismatch = "2200G";
+const char* SQLException::data_exception_numeric_value_out_of_range = "22003";
+const char* SQLException::data_exception_string_data_length_mismatch = "22026";
 const char* SQLException::integrity_constraint_violation = "23000";
 
+// These are ordered by error code. Names and codes are volt
+// specific - must find merge conflicts on duplicate codes.
 const char* SQLException::volt_output_buffer_overflow = "V0001";
 const char* SQLException::volt_temp_table_memory_overflow = "V0002";
 const char* SQLException::volt_decimal_serialization_error = "V0003";
-const char* SQLException::volt_unsupported_type_conversion_error = "V0004";
 
 SQLException::SQLException(const char* sqlState, std::string message) :
     SerializableEEException(VOLT_EE_EXCEPTION_TYPE_SQL, message),
@@ -47,5 +51,4 @@ void SQLException::p_serialize(ReferenceSerializeOutput *output) {
     for (int ii = 0; m_sqlState != NULL && ii < 5; ii++) {
         output->writeByte(m_sqlState[ii]);
     }
-}
 }

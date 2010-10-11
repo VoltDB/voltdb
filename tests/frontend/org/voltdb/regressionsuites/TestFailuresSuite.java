@@ -35,6 +35,9 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.exceptions.ConstraintFailureException;
+import org.voltdb_testprocs.regressionsuites.failureprocs.BadDecimalToVarcharCompare;
+import org.voltdb_testprocs.regressionsuites.failureprocs.BadFloatToVarcharCompare;
+import org.voltdb_testprocs.regressionsuites.failureprocs.BadVarcharCompare;
 import org.voltdb_testprocs.regressionsuites.failureprocs.CleanupFail;
 import org.voltdb_testprocs.regressionsuites.failureprocs.DivideByZero;
 import org.voltdb_testprocs.regressionsuites.failureprocs.FetchTooMuch;
@@ -50,6 +53,8 @@ public class TestFailuresSuite extends RegressionSuite {
 
     // procedures used by these tests
     static final Class<?>[] PROCEDURES = {
+        BadVarcharCompare.class, BadFloatToVarcharCompare.class,
+        BadDecimalToVarcharCompare.class,
         ViolateUniqueness.class, ViolateUniquenessAndCatchException.class,
         DivideByZero.class, WorkWithBigString.class, InsertBigString.class,
         InsertLotsOfData.class, FetchTooMuch.class, CleanupFail.class, TooFewParams.class,
@@ -62,6 +67,108 @@ public class TestFailuresSuite extends RegressionSuite {
      */
     public TestFailuresSuite(String name) {
         super(name);
+    }
+
+    // Subcase of ENG-800
+    public void testBadVarcharToAnyCompare() throws IOException
+    {
+        System.out.println("STARTING testBadVarcharToAnyCompare");
+        Client client = getClient();
+
+        boolean threw = false;
+        VoltTable[] results = null;
+        try
+        {
+            results = client.callProcedure("BadVarcharCompare", 1).getResults();
+        }
+        catch (ProcCallException e)
+        {
+            if (!isHSQL())
+            {
+                if ((e.getMessage().contains("SQL ERROR")) &&
+                        (e.getMessage().contains("cannot be cast for comparison to type VARCHAR")))
+                {
+                    threw = true;
+                }
+                else
+                {
+                    e.printStackTrace();
+                }
+            }
+            else
+            {
+                threw = true;
+            }
+        }
+        assertTrue(threw);
+    }
+
+    // Subcase of ENG-800
+    public void testBadFloatToVarcharCompare() throws IOException
+    {
+        System.out.println("STARTING testBadFloatToVarcharCompare");
+        Client client = getClient();
+
+        boolean threw = false;
+        VoltTable[] results = null;
+        try
+        {
+            results = client.callProcedure("BadFloatToVarcharCompare", 1).getResults();
+        }
+        catch (ProcCallException e)
+        {
+            if (!isHSQL())
+            {
+                if ((e.getMessage().contains("SQL ERROR")) &&
+                        (e.getMessage().contains("VARCHAR cannot be cast for comparison to type FLOAT")))
+                {
+                    threw = true;
+                }
+                else
+                {
+                    e.printStackTrace();
+                }
+            }
+            else
+            {
+                threw = true;
+            }
+        }
+        assertTrue(threw);
+    }
+
+    // Subcase of ENG-800
+    public void testBadDecimalToVarcharCompare() throws IOException
+    {
+        System.out.println("STARTING testBadDecimalToVarcharCompare");
+        Client client = getClient();
+
+        boolean threw = false;
+        VoltTable[] results = null;
+        try
+        {
+            results = client.callProcedure("BadDecimalToVarcharCompare", 1).getResults();
+        }
+        catch (ProcCallException e)
+        {
+            if (!isHSQL())
+            {
+                if ((e.getMessage().contains("SQL ERROR")) &&
+                        (e.getMessage().contains("VARCHAR cannot be cast for comparison to type DECIMAL")))
+                {
+                    threw = true;
+                }
+                else
+                {
+                    e.printStackTrace();
+                }
+            }
+            else
+            {
+                threw = true;
+            }
+        }
+        assertTrue(threw);
     }
 
     public void testViolateUniqueness() throws IOException {
@@ -411,6 +518,7 @@ public class TestFailuresSuite extends RegressionSuite {
         project.addPartitionInfo("FIVEK_STRING", "P");
         project.addPartitionInfo("FIVEK_STRING_WITH_INDEX", "ID");
         project.addPartitionInfo("WIDE", "P");
+        //project.addPartitionInfo("BAD_COMPARES", "ID");
         project.addProcedures(PROCEDURES);
         project.addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID: 2");
         // build the jarfile

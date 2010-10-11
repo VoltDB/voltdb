@@ -29,9 +29,10 @@ public:
     // Please keep these ordered alphabetically.
     // Names and codes are standardized.
     static const char* data_exception_division_by_zero;
-    static const char* data_exception_string_data_length_mismatch;
-    static const char* data_exception_numeric_value_out_of_range;
     static const char* data_exception_invalid_parameter;
+    static const char* data_exception_most_specific_type_mismatch;
+    static const char* data_exception_numeric_value_out_of_range;
+    static const char* data_exception_string_data_length_mismatch;
     static const char* integrity_constraint_violation;
 
     // These are ordered by error code. Names and codes are volt
@@ -39,7 +40,6 @@ public:
     static const char* volt_output_buffer_overflow;
     static const char* volt_temp_table_memory_overflow;
     static const char* volt_decimal_serialization_error;
-    static const char* volt_unsupported_type_conversion_error;
 
     SQLException(const char* sqlState, std::string message);
     SQLException(const char* sqlState, std::string message, VoltEEExceptionType type);
