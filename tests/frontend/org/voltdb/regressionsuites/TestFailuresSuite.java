@@ -64,7 +64,7 @@ public class TestFailuresSuite extends RegressionSuite {
         super(name);
     }
 
-    public void testVoilateUniqueness() throws IOException {
+    public void testViolateUniqueness() throws IOException {
         System.out.println("STARTING testVU");
         Client client = getClient();
 
@@ -93,20 +93,20 @@ public class TestFailuresSuite extends RegressionSuite {
         fail("testViolateUniqueness should return while catching ProcCallException");
     }
 
-    public void testVoilateUniquenessAndCatchException() throws IOException {
+    public void testViolateUniquenessAndCatchException() throws IOException {
         Client client = getClient();
-        System.out.println("STARTING testVoilateUniquenessAndCatchException");
+        System.out.println("STARTING testViolateUniquenessAndCatchException");
         VoltTable[] results = null;
         try {
             results = client.callProcedure("ViolateUniquenessAndCatchException", 1L, 1L, (byte)1).getResults();
             assertTrue(results.length == 1);
-            System.out.println("PASSED testVoilateUandCE");
+            System.out.println("PASSED testViolateUandCE");
         } catch (ProcCallException e) {
-            System.out.println("FAIL(1) testVoilateUandCE");
+            System.out.println("FAIL(1) testViolateUandCE");
             e.printStackTrace();
             fail("ViolateUniquenessAndCatchException should not have thrown a ProcCallException");
         } catch (IOException e) {
-            System.out.println("FAIL(2) testVoilateUandCE");
+            System.out.println("FAIL(2) testViolateUandCE");
             fail(e.toString());
             return;
         }
