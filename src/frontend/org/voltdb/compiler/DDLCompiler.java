@@ -783,9 +783,13 @@ public class DDLCompiler {
             for (int i = 0; i < stmt.groupByColumns.size(); i++) {
                 ParsedSelectStmt.ParsedColInfo gbcol = stmt.groupByColumns.get(i);
                 Column srcCol = srcColumnArray.get(gbcol.index);
-
                 ColumnRef cref = matviewinfo.getGroupbycols().add(srcCol.getTypeName());
-                cref.setColumn(srcCol);
+                // groupByColumns is iterating in order of groups. Store that grouping order
+                // in the column ref index. When the catalog is serialized, it will, naturally,
+                // scramble this order like a two year playing dominos, presenting the data
+                // in a meaningless sequence.
+                cref.setIndex(i);           // the column offset in the view's grouping order
+                cref.setColumn(srcCol);     // the source column from the base (non-view) table
             }
 
             ParsedSelectStmt.ParsedColInfo countCol = stmt.displayColumns.get(stmt.groupByColumns.size());

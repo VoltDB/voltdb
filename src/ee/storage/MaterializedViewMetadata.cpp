@@ -43,9 +43,12 @@ MaterializedViewMetadata::MaterializedViewMetadata(
     m_groupByColumnCount = metadata->groupbycols().size();
     m_groupByColumns = new int32_t[m_groupByColumnCount];
     std::map<std::string, catalog::ColumnRef*>::const_iterator colRefIterator;
-    int i = 0;
-    for (colRefIterator = metadata->groupbycols().begin(); colRefIterator != metadata->groupbycols().end(); colRefIterator++) {
-        m_groupByColumns[i++] = colRefIterator->second->column()->index();
+    for (colRefIterator = metadata->groupbycols().begin();
+         colRefIterator != metadata->groupbycols().end();
+         colRefIterator++)
+    {
+        int32_t grouping_order_offset = colRefIterator->second->index();
+        m_groupByColumns[grouping_order_offset] = colRefIterator->second->column()->index();
     }
 
     // set up the mapping from input col to output col
@@ -53,20 +56,20 @@ MaterializedViewMetadata::MaterializedViewMetadata(
     m_outputColumnSrcTableIndexes = new int32_t[m_outputColumnCount];
     m_outputColumnAggTypes = new ExpressionType[m_outputColumnCount];
     std::map<std::string, catalog::Column*>::const_iterator colIterator;
+    // iterate the source table
     for (colIterator = metadata->dest()->columns().begin(); colIterator != metadata->dest()->columns().end(); colIterator++) {
         const catalog::Column *destCol = colIterator->second;
-        const catalog::Column *srcCol = destCol->matviewsource();
         int destIndex = destCol->index();
+
+        const catalog::Column *srcCol = destCol->matviewsource();
 
         if (srcCol) {
             m_outputColumnSrcTableIndexes[destIndex] = srcCol->index();
             m_outputColumnAggTypes[destIndex] = static_cast<ExpressionType>(destCol->aggregatetype());
-            //printf("Setting column %d to exp type %d/%d\n", destIndex, destCol->aggregatetype(), m_outputColumnAggTypes[destIndex]);
         }
         else {
             m_outputColumnSrcTableIndexes[destIndex] = -1;
             m_outputColumnAggTypes[destIndex] = EXPRESSION_TYPE_INVALID;
-            //printf("Setting column %d to exp type %d\n", destIndex, EXPRESSION_TYPE_INVALID);
         }
     }
 
@@ -87,8 +90,6 @@ MaterializedViewMetadata::MaterializedViewMetadata(
     m_emptyTupleBackingStore = new char[m_target->schema()->tupleLength() + 1];
     memset(m_emptyTupleBackingStore, 0, m_target->schema()->tupleLength() + 1);
     m_emptyTuple.move(m_emptyTupleBackingStore);
-
-
 }
 
 MaterializedViewMetadata::~MaterializedViewMetadata() {
@@ -245,8 +246,9 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple) {
 
 bool MaterializedViewMetadata::findExistingTuple(TableTuple &oldTuple, bool expected) {
     // find the key for this tuple (which is the group by columns)
-    for (int i = 0; i < m_groupByColumnCount; i++)
+    for (int i = 0; i < m_groupByColumnCount; i++) {
         m_searchKey.setNValue(i, oldTuple.getNValue(m_groupByColumns[i]));
+    }
 
     // determine if the row exists (create the empty one if it doesn't)
     m_index->moveToKey(&m_searchKey);

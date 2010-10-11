@@ -25,21 +25,34 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 import java.net.URL;
+
 import junit.framework.Test;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb_testprocs.regressionsuites.matviewprocs.*;
+import org.voltdb_testprocs.regressionsuites.matviewprocs.AddPerson;
+import org.voltdb_testprocs.regressionsuites.matviewprocs.AddThing;
+import org.voltdb_testprocs.regressionsuites.matviewprocs.AggAges;
+import org.voltdb_testprocs.regressionsuites.matviewprocs.AggThings;
+import org.voltdb_testprocs.regressionsuites.matviewprocs.DeletePerson;
+import org.voltdb_testprocs.regressionsuites.matviewprocs.Eng798Insert;
+import org.voltdb_testprocs.regressionsuites.matviewprocs.OverflowTest;
+import org.voltdb_testprocs.regressionsuites.matviewprocs.SelectAllPeople;
+import org.voltdb_testprocs.regressionsuites.matviewprocs.UpdatePerson;
+
 
 public class TestMaterializedViewSuite extends RegressionSuite {
 
     // procedures used by these tests
     static final Class<?>[] PROCEDURES = {
         AddPerson.class, DeletePerson.class, UpdatePerson.class, AggAges.class,
-        SelectAllPeople.class, AggThings.class, AddThing.class, OverflowTest.class
+        SelectAllPeople.class, AggThings.class, AddThing.class, OverflowTest.class,
+        Eng798Insert.class
     };
 
     public TestMaterializedViewSuite(String name) {
@@ -290,6 +303,21 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(preRollbackValue, results[0].getLong(2));
     }
 
+    /** Test a view that re-orders the source table's columns */
+    public void testENG798() throws Exception {
+        if (isHSQL()) {
+            return;
+        }
+
+        // this would throw on a bad cast in the broken case.
+        Client client = getClient();
+        ClientResponse callProcedure = client.callProcedure("Eng798Insert", "clientname");
+        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
+        assertTrue(callProcedure.getResults().length == 1);
+        assertTrue(callProcedure.getResults()[0].asScalarLong() == 1);
+    }
+
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
@@ -321,6 +349,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         project.addSchema(schemaPath);
         project.addPartitionInfo("PEOPLE", "PARTITION");
         project.addPartitionInfo("OVERFLOWTEST", "COL_1");
+        project.addPartitionInfo("ENG798", "C1");
         project.addProcedures(PROCEDURES);
         // build the jarfile
         //config.compile(project);
