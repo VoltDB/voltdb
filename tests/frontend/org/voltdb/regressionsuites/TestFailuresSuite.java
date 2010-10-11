@@ -346,7 +346,7 @@ public class TestFailuresSuite extends RegressionSuite {
         }
 
         // make sure we can call adhocs
-        client.callProcedure("@AdHoc", "select * from warehouse;");
+        client.callProcedure("@AdHoc", "select * from new_order;");
     }
 
     public void testAppStatus() throws Exception {
