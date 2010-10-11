@@ -321,17 +321,26 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
                 return;
             }
 
-            VoltMessage message = m_mailbox.recvBlocking();
-            if (message != null) {
-                if (message instanceof RecoveryMessage) {
-                    RecoveryMessage rm = (RecoveryMessage)message;
-                    if (!rm.recoveryMessagesAvailable()) {
-                        recoveryLog.error("Received a recovery initiate request from " + rm.sourceSite() +
-                                " while a recovery was already in progress. Ignoring it.");
-                    }
-                } else {
-                    m_messageHandler.handleMessage(message);
+            checkMailbox(true);
+        }
+    }
+
+    private void checkMailbox(boolean block) {
+        VoltMessage message = null;
+        if (block) {
+            message = m_mailbox.recvBlocking();
+        } else {
+            message = m_mailbox.recv();
+        }
+        if (message != null) {
+            if (message instanceof RecoveryMessage) {
+                RecoveryMessage rm = (RecoveryMessage)message;
+                if (!rm.recoveryMessagesAvailable()) {
+                    recoveryLog.error("Received a recovery initiate request from " + rm.sourceSite() +
+                            " while a recovery was already in progress. Ignoring it.");
                 }
+            } else {
+                m_messageHandler.handleMessage(message);
             }
         }
     }
@@ -466,18 +475,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
          * is blocked on safety or ordering.
          */
         while (recoveryAckReader.isAlive() && System.currentTimeMillis() - startTime < 5000) {
-            VoltMessage message = m_mailbox.recvBlocking();
-            if (message != null) {
-                if (message instanceof RecoveryMessage) {
-                    RecoveryMessage rm = (RecoveryMessage)message;
-                    if (!rm.recoveryMessagesAvailable()) {
-                        recoveryLog.error("Received a recovery initiate request from " + rm.sourceSite() +
-                                " while a recovery was already in progress. Ignoring it.");
-                    }
-                } else {
-                    m_messageHandler.handleMessage(message);
-                }
-            }
+            checkMailbox(false);
         }
         if (recoveryAckReader.isAlive()) {
             recoveryLog.fatal("Timed out waiting to read recovery initiate ack message");

@@ -126,8 +126,9 @@ public class TestExportAndRejoin extends TestCase {
                         m_currentHost = (m_currentHost + 1) % m_cluster.getNodeCount();
                         m_tryKills = 0;
                     }
-                    if (m_tryKills >= 6)
+                    if (m_tryKills >= 6) {
                         System.exit(-1);
+                    }
                 }
 
             } catch (InterruptedException e) {
@@ -186,7 +187,7 @@ public class TestExportAndRejoin extends TestCase {
                 ClientResponse response = e.getClientResponse();
                 if (response.getStatusString().equals("Connection to database host (localhost) was lost before a response was received")) {
                     m_up = false;
-                    System.out.printf("Host %d unreacable\n", m_hostId);
+                    System.out.printf("Host %d unreachable\n", m_hostId);
                 }
                 else {
                     System.out.printf("UNEXPECTED FAIL: %s\n", response.getStatusString());
@@ -243,7 +244,7 @@ public class TestExportAndRejoin extends TestCase {
                 ClientResponse response = e.getClientResponse();
                 if (response.getStatusString().equals("Connection to database host (localhost) was lost before a response was received")) {
                     m_up = false;
-                    System.out.printf("Host %d unreacable\n", m_hostId);
+                    System.out.printf("Host %d unreachable\n", m_hostId);
                 }
                 else {
                     System.out.printf("UNEXPECTED FAIL: %s\n", response.getStatusString());
@@ -261,7 +262,7 @@ public class TestExportAndRejoin extends TestCase {
                 System.out.printf("Host %d (re)connected\n", m_hostId);
             }
             catch (Exception e) {
-                //System.out.printf("Host %d still unreacable\n", m_hostId);
+                //System.out.printf("Host %d still unreachable\n", m_hostId);
                 try { Thread.sleep(10); } catch (InterruptedException e1) {}
             }
         }

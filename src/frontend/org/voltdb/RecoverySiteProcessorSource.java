@@ -576,11 +576,15 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                 if (!m_ackTracker.hasOutstanding()) {
                     return;
                 } else {
-                    try {
-                        m_inThread.join(5000);
-                    } catch (InterruptedException e) {
+                    final long startWait = System.currentTimeMillis();
+                    while (m_inThread.isAlive() && System.currentTimeMillis() - startWait < 5000) {
+                        /*
+                         * Process mailbox messages as part of this loop. This is necessary to ensure the txn
+                         * ordering and heartbeat process moves forward at the recovering partition.
+                         */
+                        checkMailbox(false);
                     }
-                    //Make sure that the last ack is processed and onCompletion is ru
+                    //Make sure that the last ack is processed and onCompletion is run
                     synchronized (this) {
                         if (m_inThread.isAlive()) {
                             if (m_onCompletion != null) {
@@ -591,24 +595,30 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                             }
                         }
                     }
+                    return;
                 }
             }
 
-            /*
-             * Process mailbox messages as part of this loop. Hand off non-recovery messages to
-             * the ES provided handler
-             */
-            VoltMessage message = m_mailbox.recvBlocking();
-            if (message != null) {
-                if (message instanceof RecoveryMessage) {
-                    RecoveryMessage rm = (RecoveryMessage)message;
-                    if (!rm.recoveryMessagesAvailable()) {
-                        recoveryLog.error("Received a recovery initiate request from " + rm.sourceSite() +
-                                " while a recovery was already in progress. Ignoring it.");
-                    }
-                } else {
-                    m_messageHandler.handleMessage(message);
+            checkMailbox(true);
+        }
+    }
+
+    private void checkMailbox(boolean block) {
+        VoltMessage message = null;
+        if (block) {
+            message = m_mailbox.recvBlocking();
+        } else {
+            message = m_mailbox.recv();
+        }
+        if (message != null) {
+            if (message instanceof RecoveryMessage) {
+                RecoveryMessage rm = (RecoveryMessage)message;
+                if (!rm.recoveryMessagesAvailable()) {
+                    recoveryLog.error("Received a recovery initiate request from " + rm.sourceSite() +
+                            " while a recovery was already in progress. Ignoring it.");
                 }
+            } else {
+                m_messageHandler.handleMessage(message);
             }
         }
     }
