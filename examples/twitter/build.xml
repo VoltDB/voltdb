@@ -6,6 +6,7 @@
 <property name="hdfs.path" value="/user/${user.name}/twitter" />
 <property name="hadoop" value="${user.home}/hadoop/bin/hadoop" />
 <property name="jar" value="unique-user-count.jar" />
+<property name='catalog' value='twitter.jar'/>
 
 <import file="../includes/basebuild.xml"/>
 
@@ -55,7 +56,7 @@
         <arg value="localhost" />
     </invoke-java>
 </target>
-    
+
 <!-- could be refactored to only include the relevant classes -->
 <target name="hadoop-jar" depends="srccompile" description="Compile the JAR to be used by Hadoop.">
     <jar destfile="${jar}" basedir="obj">
