@@ -76,12 +76,26 @@ public class TransactionIdManager {
     // remembers the last txn generated
     long lastTxnId = 0;
 
+    // forgiveness time
+    // gets set to inf if using a single node
+    long BACKWARD_TIME_FORGIVENESS_WINDOW_MS = VoltDB.BACKWARD_TIME_FORGIVENESS_WINDOW_MS;
+
     /**
      * Initialize the TransactionIdManager for this site
      * @param initiatorId The siteId of the current site.
      */
     public TransactionIdManager(int initiatorId) {
         this.initiatorId = initiatorId;
+
+        // if the cluster has one node, allow clocks to be changed up to one week
+        VoltDBInterface instance = VoltDB.instance();
+        if (instance != null) {
+            CatalogContext context = instance.getCatalogContext();
+            if ((context != null) && (context.numberOfNodes == 1)) {
+                // millis * seconds * minutes * hours * days = 1 week
+                BACKWARD_TIME_FORGIVENESS_WINDOW_MS = 1000 * 60 * 60 * 24 * 7;
+            }
+        }
     }
 
     /**
@@ -116,9 +130,12 @@ public class TransactionIdManager {
                         lastUsedTime, currentTime, diffSeconds);
                 log.error(msg);
                 System.err.println(msg);
-                // if the diff is less than 5 ms, wait a bit
-                if ((lastUsedTime - currentTime) < VoltDB.BACKWARD_TIME_FORGIVENESS_WINDOW_MS) {
-                    int count = VoltDB.BACKWARD_TIME_FORGIVENESS_WINDOW_MS;
+                // if the diff is less than some specified amount of time, wait a bit
+                if ((lastUsedTime - currentTime) < BACKWARD_TIME_FORGIVENESS_WINDOW_MS) {
+                    log.info("This node will delay any stored procedures sent to it.");
+                    log.info(String.format("This node will resume full operation in  %.2f seconds.", diffSeconds));
+
+                    long count = BACKWARD_TIME_FORGIVENESS_WINDOW_MS;
                     // note, the loop should stop once lastUsedTime is PASSED, not current
                     while ((currentTime <= lastUsedTime) && (count-- > 0)) {
                         try {
@@ -136,7 +153,7 @@ public class TransactionIdManager {
                 // crash immediately if time has gone backwards by too much
                 else {
                     log.error(String.format("%.2f is larger than the max allowable number of seconds that the clock can be negatively adjusted (%d)",
-                                            diffSeconds, VoltDB.BACKWARD_TIME_FORGIVENESS_WINDOW_MS / 1000));
+                                            diffSeconds, BACKWARD_TIME_FORGIVENESS_WINDOW_MS / 1000));
                     VoltDB.crashVoltDB();
                 }
             }
