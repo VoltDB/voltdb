@@ -33,7 +33,7 @@ public class TestTransactionIdManager extends TestCase {
 
     @Override
     public void setUp() {
-        tim = new TransactionIdManager(VoltDB.INITIATOR_SITE_ID);
+        tim = new TransactionIdManager(VoltDB.INITIATOR_SITE_ID, 0);
     }
 
     public void testGetNextUniqueId() {
@@ -76,7 +76,7 @@ public class TestTransactionIdManager extends TestCase {
         long siteid = TransactionIdManager.getInitiatorIdFromTransactionId(tim.getNextUniqueTransactionId());
         assertEquals(siteid, VoltDB.INITIATOR_SITE_ID);
 
-        TransactionIdManager tim2 = new TransactionIdManager(5);
+        TransactionIdManager tim2 = new TransactionIdManager(5, -1);
         siteid = TransactionIdManager.getInitiatorIdFromTransactionId(tim2.getNextUniqueTransactionId());
         assertEquals(5, siteid);
         siteid = TransactionIdManager.getInitiatorIdFromTransactionId(tim2.getNextUniqueTransactionId());

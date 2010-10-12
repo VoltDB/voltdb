@@ -680,7 +680,8 @@ public class ClientInterface implements DumpManager.Dumpable {
             int siteId,
             int initiatorId,
             int port,
-            SnapshotSchedule schedule) {
+            SnapshotSchedule schedule,
+            long timestampTestingSalt) {
 
         int myHostId = -1;
 
@@ -716,7 +717,8 @@ public class ClientInterface implements DumpManager.Dumpable {
                     context,
                     messenger, myHostId,
                     siteId, initiatorId,
-                    onBackPressure, offBackPressure);
+                    onBackPressure, offBackPressure,
+                    timestampTestingSalt);
 
         // create the adhoc planner thread
         AsyncCompilerWorkThread plannerThread = new AsyncCompilerWorkThread(context, siteId);

@@ -622,7 +622,8 @@ public class RealVoltDB implements VoltDBInterface
                                                currSiteId,
                                                site.getInitiatorid(),
                                                config.m_port + portOffset++,
-                                               schedule);
+                                               schedule,
+                                               m_config.m_timestampTestingSalt);
                     m_clientInterfaces.add(ci);
                     try {
                         ci.startAcceptingConnections();

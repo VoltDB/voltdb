@@ -126,6 +126,12 @@ public class VoltDB {
 
         public final boolean m_useCommitLog = false;
 
+        /**
+         * How much (ms) to skew the timestamp generation for
+         * the TransactionIdManager. Should be ZERO except for tests.
+         */
+        public long m_timestampTestingSalt = 0;
+
         public Configuration() { }
 
         public Configuration(String args[]) {
@@ -202,6 +208,14 @@ public class VoltDB {
                     m_rejoinToHostAndPort = arg.substring("rejoinhost ".length()).trim();
                     if (m_rejoinToHostAndPort.compareTo("") == 0)
                         m_rejoinToHostAndPort = null;
+                }
+
+                // handle timestampsalt
+                else if (arg.equals("timestampsalt")) {
+                    m_timestampTestingSalt = Long.parseLong(args[++i]);
+                }
+                else if (arg.startsWith("timestampsalt ")) {
+                    m_timestampTestingSalt = Long.parseLong(arg.substring("timestampsalt ".length()));
                 }
 
                 else if (arg.equals("catalog")) {

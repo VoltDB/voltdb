@@ -100,12 +100,13 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                Messenger messenger, int hostId, int siteId,
                                int initiatorId,
                                Runnable onBackPressure,
-                               Runnable offBackPressure)
+                               Runnable offBackPressure,
+                               long timestampTestingSalt)
     {
         assert(messenger != null);
         hostLog.info("INITIALIZING INITIATOR ID: " + initiatorId  + ", SITEID: " + siteId);
 
-        m_idManager = new TransactionIdManager(initiatorId);
+        m_idManager = new TransactionIdManager(initiatorId, timestampTestingSalt);
         m_hostId = hostId;
         m_siteId = siteId;
         m_safetyState = new ExecutorTxnIdSafetyState(siteId, context.siteTracker);
@@ -114,8 +115,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                     siteId,
                     m_safetyState,
                     (org.voltdb.messaging.HostMessenger)messenger);
-        messenger.createMailbox(siteId, VoltDB.DTXN_MAILBOX_ID,
-                                            m_mailbox);
+        messenger.createMailbox(siteId, VoltDB.DTXN_MAILBOX_ID, m_mailbox);
         m_mailbox.setInitiator(this);
         m_onBackPressure = onBackPressure;
         m_offBackPressure = offBackPressure;

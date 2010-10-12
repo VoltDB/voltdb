@@ -76,6 +76,12 @@ public class TransactionIdManager {
     // remembers the last txn generated
     long lastTxnId = 0;
 
+
+    // salt used for testing to simulate clock skew
+    // when non-zero, getting the time will be adjusted
+    // by this value
+    long m_timestampTestingSalt = 0;
+
     // forgiveness time
     // gets set to inf if using a single node
     long BACKWARD_TIME_FORGIVENESS_WINDOW_MS = VoltDB.BACKWARD_TIME_FORGIVENESS_WINDOW_MS;
@@ -83,9 +89,21 @@ public class TransactionIdManager {
     /**
      * Initialize the TransactionIdManager for this site
      * @param initiatorId The siteId of the current site.
+     * @param timestampTestingSalt Value of the salt used to skew a clock in testing.
      */
-    public TransactionIdManager(int initiatorId) {
+    public TransactionIdManager(int initiatorId, long timestampTestingSalt) {
         this.initiatorId = initiatorId;
+
+        m_timestampTestingSalt = timestampTestingSalt;
+
+        // warn if running with a simulated clock skew
+        // this should only be used for testing
+        if (m_timestampTestingSalt != 0) {
+            VoltLogger log = new VoltLogger("HOST");
+            log.warn(String.format("Initiator (id=%d) running in test mode with non-zero timestamp testing value: %d",
+                     initiatorId, timestampTestingSalt));
+        }
+
 
         // if the cluster has one node, allow clocks to be changed up to one week
         VoltDBInterface instance = VoltDB.instance();
@@ -105,7 +123,9 @@ public class TransactionIdManager {
      * @return The newly generated transaction id.
      */
     public long getNextUniqueTransactionId() {
-        long currentTime = System.currentTimeMillis();
+        // get the current time, usually the salt value is zero
+        // in testing it is used to simulate clock skew
+        long currentTime = System.currentTimeMillis() + m_timestampTestingSalt;
         if (currentTime == lastUsedTime) {
             // increment the counter for this millisecond
             counterValue++;

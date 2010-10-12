@@ -30,6 +30,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -53,6 +54,10 @@ public class LocalCluster implements VoltServerConfig {
         ONE_FAILURE,
         ONE_RECOVERING
     }
+
+    // the timestamp salt for the TransactionIdManager
+    // will vary between -3 and 3 uniformly
+    static final int TIMESTAMP_SALT_VARIANCE = 3;
 
     // configuration data
     final String m_jarFileName;
@@ -83,6 +88,8 @@ public class LocalCluster implements VoltServerConfig {
     private int m_ipcPortOffset1;
     private int m_ipcPortOffset2;
     private int m_ipcPortOffset3;
+
+    private int m_timestampSaltOffset;
 
     private final ArrayList<ArrayList<EEProcess>> m_eeProcs = new ArrayList<ArrayList<EEProcess>>();
 
@@ -264,6 +271,8 @@ public class LocalCluster implements VoltServerConfig {
                                            "-classpath",
                                            classPath,
                                            "org.voltdb.VoltDB",
+                                           "timestampsalt",
+                                           "0",
                                            "catalog",
                                            m_jarFileName,
                                            "deployment",
@@ -274,8 +283,8 @@ public class LocalCluster implements VoltServerConfig {
                                            "-1");
 
         // when we actually append a port value and deployment file, these will be correct
-        m_debugOffset1 = m_procBuilder.command().size() - 12;
-        m_debugOffset2 = m_procBuilder.command().size() - 11;
+        m_debugOffset1 = m_procBuilder.command().size() - 14;
+        m_debugOffset2 = m_procBuilder.command().size() - 13;
         if (m_debug) {
             m_procBuilder.command().add(m_debugOffset1, "");
             m_procBuilder.command().add(m_debugOffset1, "");
@@ -283,6 +292,7 @@ public class LocalCluster implements VoltServerConfig {
         m_portOffset = m_procBuilder.command().size() - 3;
         m_pathToDeploymentOffset = m_procBuilder.command().size() - 5;
         m_rejoinOffset = m_procBuilder.command().size() - 1;
+        m_timestampSaltOffset = m_procBuilder.command().size() - 9;
 
         if (m_target.isIPC) {
             m_procBuilder.command().add("");
@@ -465,6 +475,7 @@ public class LocalCluster implements VoltServerConfig {
             m_procBuilder.command().set(m_portOffset, String.valueOf(VoltDB.DEFAULT_PORT + hostId));
             m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
             m_procBuilder.command().set(m_rejoinOffset, "");
+            m_procBuilder.command().set(m_timestampSaltOffset, String.valueOf(getRandomTimestampSalt()));
             if (m_debug) {
                 m_procBuilder.command().set(m_debugOffset1, "-Xdebug");
                 m_procBuilder.command().set(
@@ -573,6 +584,7 @@ public class LocalCluster implements VoltServerConfig {
             m_procBuilder.command().set(m_portOffset, String.valueOf(portNo));
             m_procBuilder.command().set(m_pathToDeploymentOffset, m_pathToDeployment);
             m_procBuilder.command().set(m_rejoinOffset, rejoinHost + ":" + String.valueOf(portNoToRejoin));
+            m_procBuilder.command().set(m_timestampSaltOffset, String.valueOf(getRandomTimestampSalt()));
             if (m_debug) {
                 m_procBuilder.command().set(m_debugOffset1, "-Xdebug");
                 m_procBuilder.command().set(
@@ -819,6 +831,15 @@ public class LocalCluster implements VoltServerConfig {
     @Override
     public boolean isValgrind() {
         return m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC;
+    }
+
+    int getRandomTimestampSalt() {
+        Random r = new Random();
+        // if variance is 3, get a range between 0 and 6 inclusive
+        int retval = r.nextInt(TIMESTAMP_SALT_VARIANCE * 2 + 1);
+        // shift that range so it goes from -3 to 3 inclusive
+        retval -= TIMESTAMP_SALT_VARIANCE;
+        return retval;
     }
 
 }
