@@ -62,8 +62,8 @@ def normalize_value(v, type):
         return v
 
 def normalize_values(tuples, columns):
-    # 'c' here is a fastserializer.VoltColumn and
-    # I assume t is a fastserializer.VoltTable.
+    # 'c' here is a voltdbclient.VoltColumn and
+    # I assume t is a voltdbclient.VoltTable.
     if hasattr(tuples, "__iter__"):
         for i in xrange(len(tuples)):
             if hasattr(tuples[i], "__iter__"):

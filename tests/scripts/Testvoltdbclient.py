@@ -34,7 +34,7 @@ import sys
 import subprocess
 import time
 
-from fastserializer import *
+from voltdbclient import *
 
 SERVER_NAME = "EchoServer"
 decimal.getcontext().prec = 19

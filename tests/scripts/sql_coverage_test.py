@@ -30,7 +30,7 @@ import cPickle
 import os.path
 import imp
 from base64 import encodestring
-from fastserializer import *
+from voltdbclient import *
 from optparse import OptionParser
 from xml2 import XMLGenerator
 from Query import VoltQueryClient

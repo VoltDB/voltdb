@@ -29,7 +29,7 @@ import random
 import time
 import datetime
 from sys import maxint
-from fastserializer import *
+from voltdbclient import *
 
 VARIABLE_TYPE = "_variable"
 VALUE_TYPE = "_value"

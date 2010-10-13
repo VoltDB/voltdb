@@ -30,7 +30,7 @@ from base64 import decodestring
 from distutils.util import strtobool
 from xml2 import XMLParser
 from optparse import OptionParser
-from fastserializer import VoltColumn, VoltTable
+from voltdbclient import VoltColumn, VoltTable
 
 __quiet = True
 

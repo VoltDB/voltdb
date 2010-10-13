@@ -414,8 +414,8 @@ DISTRIBUTION
         </fileset>
     </copy>
 
-    <!-- copy fastserializer.py for python examples -->
-    <copy todir="${dist.dir}/tools/browser_adhoc" file="tests/scripts/fastserializer.py"/>
+    <!-- copy voltdbclient.py for python examples -->
+    <copy todir="${dist.dir}/tools/browser_adhoc" file="tests/scripts/voltdbclient.py"/>
     <copy todir="${dist.dir}/tools/browser_adhoc" file="tests/scripts/Query.py"/>
 
     <!-- populate project generator -->
@@ -841,7 +841,7 @@ TEST CASES
 <!-- tests of build.xml itself -->
 <target name="ant_unit_tests" depends="testnexthostprop" />
 
-<target name="pythonfser" description="run python fastserializer tests">
+<target name="pythonfser" description="run python voltdbclient tests">
     <property name="build.dir.suffix" value="" /> <!-- Default -->
     <property name='classpath' refid='project.classpath' />
     <property name='echoserver.command' value="java
@@ -849,7 +849,7 @@ TEST CASES
     ${classpath} -server -Xmx256m -ea
     org.voltdb.messaging.EchoServer" />
     <exec dir='tests/scripts/' executable='python' failonerror='true'>
-        <arg line="Testfastserializer.py"/>
+        <arg line="Testvoltdbclient.py"/>
         <arg line='"${echoserver.command}"'/>
     </exec>
 </target>
