@@ -389,4 +389,10 @@ public class MockVoltDB implements VoltDBInterface
         };
     }
 
+    @Override
+    public boolean recovering() {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
 }

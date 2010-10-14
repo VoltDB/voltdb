@@ -27,6 +27,9 @@ import org.voltdb.network.VoltNetwork;
 
 public interface VoltDBInterface
 {
+
+    public boolean recovering();
+
     /**
      * Whether calls to crashVoltDB should result in a crash or be ignored
      */

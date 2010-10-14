@@ -265,7 +265,7 @@ public class RealVoltDB implements VoltDBInterface
 
     // Should the execution sites be started in recovery mode
     // (used for joining a node to an existing cluster)
-    private boolean m_recovering = false;
+    private volatile boolean m_recovering = false;
 
     // Synchronize initialize and shutdown.
     private final Object m_startAndStopLock = new Object();
@@ -280,6 +280,8 @@ public class RealVoltDB implements VoltDBInterface
     private final VoltDBNodeFailureFaultHandler m_faultHandler = new VoltDBNodeFailureFaultHandler();
 
     private volatile boolean m_isRunning = false;
+
+    public boolean recovering() { return m_recovering; }
 
     private long m_recoveryStartTime = System.currentTimeMillis();
 
@@ -1293,6 +1295,10 @@ public class RealVoltDB implements VoltDBInterface
         final long delta = ((now - m_recoveryStartTime) / 1000);
         final long megabytes = transferred / (1024 * 1024);
         final double megabytesPerSecond = megabytes / ((now - m_recoveryStartTime) / 1000.0);
+        m_recovering = false;
+        for (ClientInterface intf : getClientInterfaces()) {
+            intf.mayActivateSnapshotDaemon();
+        }
         hostLog.info(
                 "Node recovery completed after " + delta + " seconds with " + megabytes +
                 " megabytes transferred at a rate of " +

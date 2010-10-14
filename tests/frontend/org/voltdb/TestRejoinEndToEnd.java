@@ -313,6 +313,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
     }
 
     public void testRejoinWithExport() throws Exception {
+        System.out.println("testRejoinWithExport");
         VoltProjectBuilder builder = getBuilderForTest();
         builder.addExportTable("blah", false);
         builder.addExportTable("blah_replicated", false);
@@ -376,6 +377,11 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         localServer.start();
         localServer.waitForInitialization();
 
+        Thread.sleep(1000);
+        while (VoltDB.instance().recovering()) {
+            Thread.sleep(100);
+        }
+
         client = ClientFactory.createClient(m_cconfig);
         client.createConnection("localhost");
 
@@ -411,6 +417,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
     }
 
     public void testRejoinDataTransfer() throws Exception {
+        System.out.println("testRejoinDataTransfer");
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setSecurityEnabled(true);
 

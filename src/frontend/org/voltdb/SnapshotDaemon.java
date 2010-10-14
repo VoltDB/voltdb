@@ -149,9 +149,14 @@ class SnapshotDaemon {
     /**
      * Make this SnapshotDaemon responsible for generating snapshots
      */
-    public void makeActive()
+    public synchronized void makeActive()
     {
         m_isActive = true;
+    }
+
+    public synchronized void makeInactive() {
+        m_isActive = false;
+        m_snapshots.clear();
     }
 
     private class Snapshot implements Comparable<Snapshot> {
@@ -182,6 +187,7 @@ class SnapshotDaemon {
     synchronized Pair<String, Object[]> processPeriodicWork(final long now) {
         if (!m_isActive)
         {
+            m_state = State.STARTUP;
             return null;
         }
 

@@ -435,13 +435,27 @@ public class ClientInterface implements DumpManager.Dumpable {
             CatalogContext context = m_catalogContext.get();
 
             /*
-             * Authenticate the user.
+             * Don't use the auth system during recovery. Not safe to use
+             * the node to initiate multi-partition txns during recovery
              */
-            boolean authenticated = context.authSystem.authenticate(username, password);
+            if (!VoltDB.instance().recovering()) {
+                /*
+                 * Authenticate the user.
+                 */
+                boolean authenticated = context.authSystem.authenticate(username, password);
 
-            if (!authenticated) {
+                if (!authenticated) {
+                    authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
+                                 "): user " + username + " failed authentication.");
+                    //Send negative response
+                    responseBuffer.put((byte)-1).flip();
+                    socket.write(responseBuffer);
+                    socket.close();
+                    return null;
+                }
+            } else {
                 authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                             "): user " + username + " failed authentication.");
+                        "): user " + username + " because this node is rejoining.");
                 //Send negative response
                 responseBuffer.put((byte)-1).flip();
                 socket.write(responseBuffer);
@@ -725,7 +739,8 @@ public class ClientInterface implements DumpManager.Dumpable {
         plannerThread.start();
         final ClientInterface ci = new ClientInterface(
                 port, context, network, siteId, initiator,
-                plannerThread, allPartitions, schedule);
+                plannerThread, allPartitions, schedule,
+                VoltDB.instance().recovering());
         onBackPressure.m_ci = ci;
         offBackPressure.m_ci = ci;
 
@@ -734,7 +749,7 @@ public class ClientInterface implements DumpManager.Dumpable {
 
     ClientInterface(int port, CatalogContext context, VoltNetwork network, int siteId,
                     TransactionInitiator initiator, AsyncCompilerWorkThread plannerThread,
-                    int[] allPartitions, SnapshotSchedule schedule)
+                    int[] allPartitions, SnapshotSchedule schedule, boolean recovering)
     {
         m_catalogContext.set(context);
         m_initiator = initiator;
@@ -749,11 +764,18 @@ public class ClientInterface implements DumpManager.Dumpable {
 
         m_acceptor = new ClientAcceptor(port, network);
         m_snapshotDaemon = new SnapshotDaemon(schedule);
-        // if this ClientInterface's site ID is the lowest non-execution site ID
-        // in the cluster, make our SnapshotDaemon responsible for snapshots
-        if (siteId ==
-            m_catalogContext.get().siteTracker.getLowestLiveNonExecSiteId())
+
+        if (!recovering)
         {
+            mayActivateSnapshotDaemon();
+        }
+    }
+
+    // if this ClientInterface's site ID is the lowest non-execution site ID
+    // in the cluster, make our SnapshotDaemon responsible for snapshots
+    public void mayActivateSnapshotDaemon() {
+        if (m_siteId ==
+                m_catalogContext.get().siteTracker.getLowestLiveNonExecSiteId()) {
             m_snapshotDaemon.makeActive();
         }
     }
@@ -1061,6 +1083,8 @@ public class ClientInterface implements DumpManager.Dumpable {
                 m_catalogContext.get().siteTracker.getLowestLiveNonExecSiteId())
             {
                 m_snapshotDaemon.makeActive();
+            } else {
+                m_snapshotDaemon.makeInactive();
             }
         }
 
