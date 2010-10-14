@@ -98,8 +98,8 @@ class FastSerializer:
     # if these assumptions are not true. it is further assumed
     # that host order is little endian. See isNaN().
 
-    def __init__(self, host = None, port = None, username = None,
-                 password = None, dump_file = None):
+    def __init__(self, host = None, port = 21212, username = "",
+                 password = "", dump_file = None):
         # connect a socket to host, port and get a file object
         self.wbuf = array.array('c')
         self.rbuf = ""
@@ -188,7 +188,7 @@ class FastSerializer:
                               if_else(x == self.NULL_DECIMAL_INDICATOR,
                                       None, x)}
 
-        if username != None and password != None:
+        if username != None and password != None and host != None:
             self.authenticate(username, password)
 
     def __compileStructs(self):
