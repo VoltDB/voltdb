@@ -32,10 +32,8 @@ voter
 
 
 Each example includes a DDL file and a project.xml that lists the DDL
-file and the stored procedures names. The auction, game of life,
-satellite, twitter, and voter examples also include an Ant build
-file. (Helloworld is the exception. See the README in the helloworld
-folder for an explanation of how to build that example.)
+file and the stored procedures names, as well as an Ant build file 
+to simplify the build process.
 
 The command "ant -p" will print a description of the available targets
 for each example. The targets "client" and "server" let you run a
