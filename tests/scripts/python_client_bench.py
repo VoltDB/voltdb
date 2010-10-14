@@ -29,27 +29,11 @@
 # On my i7 920 desktop I was getting 4k invocations with 1 python process and 6 threads and 9.75k invocation with three python processes with 6 threads each
 #
 
-from threading import Thread
-from threading import Lock
+from multiprocessing import *
 from datetime import *
 from fastserializer import *
 
-global requestCount
-requestCount = 0
-global counterLock
-counterLock = Lock()
-
-global startTime
-startTime = datetime.datetime.now()
-
-global endTime
-endTime = startTime + datetime.timedelta( 0, 60)
-
-def ThreadFunc():
-    global requestCount
-    global startTime;
-    global endTime
-    global counterLock
+def ProcessFunc( countQueue, endTime):
     client = FastSerializer("localhost", 21212, "", "")
     proc = VoltProcedure( client, "measureOverhead", [FastSerializer.VOLTTYPE_INTEGER] )
     counter = 0;
@@ -58,19 +42,26 @@ def ThreadFunc():
         response = proc.call([counter])
         if response.status != 1:
             print response.statusString
-        counterLock.acquire();
-        requestCount += 1
-        counterLock.release();
         now = datetime.datetime.now().microsecond / 1000
+    countQueue.put(counter)
 
-threads = []
-for x in range(6):
-    t = Thread( None, ThreadFunc)
-    threads.append(t)
-    t.start()
+startTime = datetime.datetime.now()
+endTime = startTime + datetime.timedelta( 0, 60)
 
-for x in threads:
-    x.join()
+countQueue = Queue()
+procs = []
+for x in range(12):
+    p = Process( target=ProcessFunc, args=( countQueue, endTime ))
+    procs.append(p)
+    p.start()
+
+for p in procs:
+    p.join()
+
+requestCount = 0;
+count = None
+while not countQueue.empty():
+    requestCount = requestCount + countQueue.get()
 
 duration = datetime.datetime.now() - startTime
 
