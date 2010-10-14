@@ -24,7 +24,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-import org.voltdb.*;
+import org.voltdb.CatalogContext;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltDBInterface;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.logging.VoltLogger;
@@ -315,7 +317,7 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
 
     /*
      * Pre-process the pending faults list. Update known faults and return a
-     * map of FaultType -> fault set.
+     * map of FaultType -> fault set containing the new faults (post-filtering).
      */
     private HashMap<FaultType, HashSet<VoltFault>>
     organizeNewFaults(ArrayDeque<VoltFault> pendingFaults)
@@ -351,43 +353,49 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
             return newFaults;
         }
 
+        // if there are no new node faults, there is no work to do.
+        if (newFaults.get(FaultType.NODE_FAILURE) == null) {
+            return newFaults;
+        }
+
         // if this surviving node is in a survivor set that is <= 1/2
         // of the previous cluster size, and this survivor set is
         // durable, then trigger partition detection by rewriting the
-        // node faults in to cluster partition faults
-        if (m_partitionDetectionEnabled) {
-            HashSet<VoltFault> knownnfs = m_knownFaults.get(FaultType.NODE_FAILURE);
-            final int prevSurvivorCnt = tracker.getAllLiveHosts().size();
-            final int ttlNodeFaults = knownnfs.size();
-            boolean blessedSet = true;
+        // node faults in to cluster partition faults.
 
-            // exact 50-50 splits. The lowest survivor host doesn't trigger PPD
-            // if the blessed host is in the failure set, this set is not blessed.
-            if (ttlNodeFaults * 2 == prevSurvivorCnt) {
-                Integer blessedHost = tracker.getHostForSite(tracker.getLowestLiveNonExecSiteId());
-                for (VoltFault fault : knownnfs) {
-                    if (fault instanceof NodeFailureFault) {
-                        NodeFailureFault nf = (NodeFailureFault)fault;
-                        if (nf.getHostId() == blessedHost) {
-                            blessedSet = false;
-                            break;
-                        }
+        // Known faults is complete (includes newFaults), as this
+        // function is always called after organizeFaults().
+        HashSet<VoltFault> knownnfs = m_knownFaults.get(FaultType.NODE_FAILURE);
+        final int prevSurvivorCnt = tracker.getAllLiveHosts().size();
+        final int ttlNodeFaults = knownnfs.size();
+        boolean blessedSet = true;
+
+        // exact 50-50 splits. The lowest survivor host doesn't trigger PPD
+        // if the blessed host is in the failure set, this set is not blessed.
+        if (ttlNodeFaults * 2 == prevSurvivorCnt) {
+            Integer blessedHost = tracker.getHostForSite(tracker.getLowestLiveNonExecSiteId());
+            for (VoltFault fault : knownnfs) {
+                if (fault instanceof NodeFailureFault) {
+                    NodeFailureFault nf = (NodeFailureFault)fault;
+                    if (nf.getHostId() == blessedHost) {
+                        blessedSet = false;
+                        break;
                     }
                 }
             }
+        }
 
-            // Evaluate the PPD trigger condition: not blessed or a strict minority
-            if (!blessedSet || (ttlNodeFaults * 2 > prevSurvivorCnt)) {
-                // rewrite the node faults in to partition faults.
-                HashSet<VoltFault> ppdFaults = new HashSet<VoltFault>();
-                HashSet<VoltFault> newnfs = newFaults.get(FaultType.NODE_FAILURE);
-                for (VoltFault nf :  newnfs) {
-                    VoltFault ppd = new ClusterPartitionFault((NodeFailureFault)nf);
-                    ppdFaults.add(ppd);
-                }
-                newFaults.put(FaultType.CLUSTER_PARTITION, ppdFaults);
-                newFaults.remove(FaultType.NODE_FAILURE);
+        // Evaluate the PPD trigger condition: not blessed or a strict minority
+        if (!blessedSet || (ttlNodeFaults * 2 > prevSurvivorCnt)) {
+            // rewrite the node faults in to partition faults.
+            HashSet<VoltFault> ppdFaults = new HashSet<VoltFault>();
+            HashSet<VoltFault> newnfs = newFaults.get(FaultType.NODE_FAILURE);
+            for (VoltFault nf :  newnfs) {
+                VoltFault ppd = new ClusterPartitionFault((NodeFailureFault)nf);
+                ppdFaults.add(ppd);
             }
+            newFaults.put(FaultType.CLUSTER_PARTITION, ppdFaults);
+            newFaults.remove(FaultType.NODE_FAILURE);
         }
 
         return newFaults;
