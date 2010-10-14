@@ -125,7 +125,8 @@ def run_config(config, basedir, output_dir, random_seed, report_all, args):
         counter += 1
 
     if run_once("jni", command, statements) != 0:
-        exit(-1)
+        print >> sys.stderr, "Test with the JNI backend had errors."
+        exit(1)
 
     random.seed(random_seed)
     random.setstate(random_state)
@@ -143,7 +144,8 @@ def run_config(config, basedir, output_dir, random_seed, report_all, args):
         counter += 1
 
     if run_once("hsqldb", command, statements) != 0:
-        exit(-1)
+        print >> sys.stderr, "Test with the HSQLDB backend had errors."
+        exit(1)
 
     report_dict = {"Seed": random_seed, "Statements": statements}
     report = XMLGenerator(report_dict)
@@ -233,7 +235,7 @@ if __name__ == "__main__":
 
     if len(args) < 3:
         usage()
-        sys.exit(-1)
+        sys.exit(3)
 
     config_filename = args[0]
     output_dir = args[1]
@@ -245,7 +247,7 @@ if __name__ == "__main__":
         if options.config not in config_list.get_configs():
             print >> sys.stderr, \
                 "Selected config %s not present in config file" % options.config
-            sys.exit(-1)
+            sys.exit(3)
         else:
             configs_to_run.append(options.config)
     else:
@@ -266,4 +268,5 @@ if __name__ == "__main__":
     generate_summary(output_dir, statistics)
 
     if not success:
-        exit(-1)
+        print >> sys.stderr, "SQL coverage has errors."
+        exit(1)
