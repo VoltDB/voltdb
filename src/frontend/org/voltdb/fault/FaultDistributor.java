@@ -66,6 +66,7 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
     // If true, concurrent failures of 1/2 or more of the current node set, leaving behind
     // a durable survivor set will cause the survivors to checkpoint and die.
     private final boolean m_partitionDetectionEnabled;
+    private boolean m_triggeredPartitionDetection = false;
 
     // Pairs a fault handlers to its specific unhandled fault set
     class FaultHandlerData {
@@ -286,7 +287,7 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
             makePolicyDecisions(organizeNewFaults(pendingFaults));
 
         // and apply those policies...
-        if (postPolicyFaults.isEmpty()) {
+        if (postPolicyFaults == null || postPolicyFaults.isEmpty()) {
             return;
         }
 
@@ -358,6 +359,12 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
             return newFaults;
         }
 
+        // once partition detection is triggered, don't take further fault actions
+        // want to allow everything to shutdown gracefully and independently
+        if (m_triggeredPartitionDetection) {
+            return null;
+        }
+
         // if this surviving node is in a survivor set that is <= 1/2
         // of the previous cluster size, and this survivor set is
         // durable, then trigger partition detection by rewriting the
@@ -396,6 +403,7 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
             }
             newFaults.put(FaultType.CLUSTER_PARTITION, ppdFaults);
             newFaults.remove(FaultType.NODE_FAILURE);
+            m_triggeredPartitionDetection = true;
         }
 
         return newFaults;
