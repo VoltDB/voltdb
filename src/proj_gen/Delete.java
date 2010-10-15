@@ -9,11 +9,10 @@ import org.voltdb.*;
  * procedure.  The <code>run</code> method is
  * defined to accept one or more parameters. These parameters take the
  * values the client passes via the
- * <code>VoltClient.callProcedure</code> invocation.
+ * <code>Client.callProcedure</code> invocation.
  *
- * <a
- * href="https://hzproject.com/svn/repos/doc/trunk/Stored%20Procedure%20API.docx">Stored
- * Procedure API</a> specifies valid stored procedure definitions,
+ * The <a href="https://community.voltdb.com/documentation">VoltDB
+ * User Guide</a> specifies valid stored procedure definitions,
  * including valid run method parameter types, required annotation
  * metadata, and correct use the Volt query interface.
 */
