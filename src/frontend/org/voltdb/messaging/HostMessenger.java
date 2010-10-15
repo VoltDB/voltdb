@@ -36,6 +36,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.voltdb.CommitLog;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ConnectionUtil;
+import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.DBBPool;
@@ -428,40 +429,6 @@ public class HostMessenger implements Messenger {
     }
 
     /**
-     * Find the host id of any failed node and return it.
-     * @return The host id of a failed node or -1 if all nodes running.
-     */
-    public int findDownHostId() {
-        for (int hostId = 0; hostId < m_foreignHosts.length; hostId++) {
-            if (hostId == m_localHostId) {
-                continue;
-            }
-            ForeignHost fh = m_foreignHosts[hostId];
-            if (fh == null || (fh.isUp() == false))
-                return hostId;
-        }
-        return -1;
-    }
-
-    /**
-     * Figure out if the given hostid is a down host.
-     * @param hostId The id of the host to check.
-     * @return Whether or not it is known to be down.
-     */
-    public boolean isDownHostId(int hostId) {
-        assert(hostId >= 0);
-        if (m_foreignHosts.length <= hostId) return false;
-        ForeignHost fh = m_foreignHosts[hostId];
-
-        // FH will be null if there has never been a working foreign host with that hostid since this
-        // node joined the cluster
-        if (fh == null)
-            return true;
-
-        return !fh.isUp();
-    }
-
-    /**
      * Initiate the addition of a replacement foreign host.
      *
      * @param hostId The id of the failed host to replace.
@@ -478,7 +445,8 @@ public class HostMessenger implements Messenger {
             throw new Exception("Rejoin HostId can be negative.");
         if (m_foreignHosts.length <= hostId)
             throw new Exception("Rejoin HostId out of expexted range.");
-        if (m_foreignHosts[hostId] != null && m_foreignHosts[hostId].isUp())
+        SiteTracker st = VoltDB.instance().getCatalogContext().siteTracker;
+        if (m_foreignHosts[hostId] != null && st.getAllLiveHosts().contains(hostId))
             throw new Exception("Rejoin HostId is not a failed host.");
 
         SocketChannel sock = SocketJoiner.connect(

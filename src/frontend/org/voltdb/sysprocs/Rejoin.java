@@ -39,6 +39,7 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Site;
 import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.messaging.HostMessenger;
 
 @ProcInfo(singlePartition = false)
@@ -95,9 +96,10 @@ public class Rejoin extends VoltSystemProcedure {
 
         // verify valid hostId
         VoltDBInterface instance = VoltDB.instance();
-        HostMessenger hm = instance.getHostMessenger();
-        if (hm.isDownHostId(rejoinHostId)) {
-            // connect
+        SiteTracker st = instance.getCatalogContext().siteTracker;
+        if (st.getAllDownHosts().contains((rejoinHostId)))
+        {
+          // connect
             error = VoltDB.instance().doRejoinPrepare(
                     getTransactionId(),
                     rejoinHostId,

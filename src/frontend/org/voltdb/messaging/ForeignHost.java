@@ -170,6 +170,7 @@ public class ForeignHost {
 
     synchronized void close()
     {
+        m_isUp = false;
         if (m_closing) return;
         m_closing = true;
         if (m_connection != null)
