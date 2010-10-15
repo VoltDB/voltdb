@@ -243,6 +243,10 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     // That must be arranged separately.
     static class ExecutionSiteLocalSnapshotMessage extends VoltMessage
     {
+        ExecutionSiteLocalSnapshotMessage(long roadblocktxnid) {
+            m_roadblockTransactionId = roadblocktxnid;
+        }
+
         @Override
         protected void flattenToBuffer(DBBPool pool) {
             // can be empty if only used locally
@@ -262,6 +266,8 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         protected boolean requiresDurabilityP() {
             return false;
         }
+
+        long m_roadblockTransactionId;
     }
 
     // This message is used locally to schedule a node failure event's
@@ -1131,7 +1137,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             saveAPI.startSnapshotting(schedule.getPath(),
                                       schedule.getPrefix(),
                                       (byte) 0x1,
-                                      lastCommittedTxnId,
+                                      ((ExecutionSiteLocalSnapshotMessage) message).m_roadblockTransactionId,
                                       m_systemProcedureContext,
                                       ConnectionUtil.getHostnameOrAddress());
             hostLog.info("Received ExecutionSiteLocalSnapshotMessage. Finished local snapshot");
@@ -1490,7 +1496,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             m_transactionQueue.makeRoadBlock(
                 globalInitiationPoint,
                 QueueState.BLOCKED_CLOSED,
-                new ExecutionSiteLocalSnapshotMessage());
+                new ExecutionSiteLocalSnapshotMessage(globalInitiationPoint));
         }
 
 
