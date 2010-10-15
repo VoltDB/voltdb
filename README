@@ -7,17 +7,26 @@ What is VoltDB?
 ====================
 VoltDB is an in-memory online transaction processing (OLTP) database
 designed from the ground up to be the fastest most scalable OLTP
-system in the world.
+system in the world. VoltDB is distributed in a Community Edition 
+(GPL3 license) and in an Enterprise Edition (commercial license). 
+For difference between the two editions, see 
+http://voltdb.com/content/voltdb-editions-and-pricing.
 
 
-What it is not?
-===============
+What VoltDB is not
+==================
 VoltDB is not a general purpose database like MySQL or PostgreSQL, for
 example.
 
 
-Getting Started
+Binary Distributions
 ===============
+Binary distributions of VoltDB Community Edition are available from the 
+VoltDB community site at http://community.voltdb.com/downloads. 
+
+
+Getting Started Building VoltDB from Source
+============================================
 'ant check'      Compile VoltDB and run all tests.
 
 'ant doc'        Generate Javadoc in doc/java-api:
@@ -31,7 +40,14 @@ https://svn.voltdb.com/eng/trunk/examples/README for details.
 
 Documentation
 =============
-Documentation on using VoltDB to build OLTP applications is available from the VoltDB community site at http://community.voltdb.com/documentation/
+Documentation on using VoltDB to build OLTP applications is available from 
+the VoltDB community site at http://community.voltdb.com/documentation/
+
+
+Forums
+======
+For help using or building VoltDB, see the VoltDB forums at 
+http://community.voltdb.com/forum.
 
 
 This content is available at https://svn.voltdb.com/eng/trunk/README.
