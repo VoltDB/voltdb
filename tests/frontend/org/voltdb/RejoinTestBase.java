@@ -41,11 +41,15 @@ import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb_testprocs.rejoinfuzz.NonOrgVoltDBProc;
 
 public class RejoinTestBase extends TestCase {
     protected static final String m_username;
     protected static final String m_password;
     protected static final ClientConfig m_cconfig = new ClientConfig("ry@nlikesthe", "y@nkees");
+
+    static final Class<?>[] PROCEDURES = { NonOrgVoltDBProc.class };
+
 
     static {
         String username = null;
@@ -105,6 +109,7 @@ public class RejoinTestBase extends TestCase {
         };
 
         builder.addProcedures(pi);
+        builder.addProcedures(PROCEDURES);
         return builder;
     }
 

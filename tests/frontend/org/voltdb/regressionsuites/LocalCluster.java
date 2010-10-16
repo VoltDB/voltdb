@@ -117,13 +117,14 @@ public class LocalCluster implements VoltServerConfig {
         long m_initTime;
         private boolean m_eof = false;
 
-        PipeToFile(String filename, InputStream stream, String token) {
+        PipeToFile(String filename, InputStream stream, String token,
+                   boolean appendLog) {
             m_witnessedReady = new AtomicBoolean(false);
             m_token = token;
             m_filename = filename;
             m_input = new BufferedReader(new InputStreamReader(stream));
             try {
-                m_writer = new FileWriter(filename);
+                m_writer = new FileWriter(filename, appendLog);
             }
             catch (IOException ex) {
                 Logger.getLogger(LocalCluster.class.getName()).log(Level.SEVERE, null, ex);
@@ -515,7 +516,7 @@ public class LocalCluster implements VoltServerConfig {
 
             PipeToFile ptf = new PipeToFile(testoutputdir + File.separator +
                     getName() + "-" + hostId + ".txt", proc.getInputStream(),
-                    PipeToFile.m_initToken);
+                    PipeToFile.m_initToken, false);
             m_pipes.add(ptf);
             ptf.setName("ClusterPipe:" + String.valueOf(hostId));
             ptf.start();
@@ -611,7 +612,8 @@ public class LocalCluster implements VoltServerConfig {
             }
 
             ptf = new PipeToFile(testoutputdir + File.separator +
-                    getName() + "-" + hostId + ".txt", proc.getInputStream(), PipeToFile.m_rejoinToken);
+                    getName() + "-" + hostId + ".txt", proc.getInputStream(),
+                    PipeToFile.m_rejoinToken, true);
             synchronized (this) {
                 m_pipes.set(hostId, ptf);
                 // replace the existing dead proc

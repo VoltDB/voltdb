@@ -112,7 +112,13 @@ public class CatalogContext {
         newCatalog.execute(diffCommands);
         int incValue = incrementVersion ? 1 : 0;
         long realDepCRC = deploymentCRC > 0 ? deploymentCRC : this.deploymentCRC;
-        CatalogContext retval = new CatalogContext(newCatalog, pathToNewJar, realDepCRC, catalogVersion + incValue, catalogCRC);
+        String realPathToNewJar = pathToNewJar;
+        // If there's no new catalog path, preserve the old one rather than
+        // bashing it
+        if (realPathToNewJar.startsWith(NO_PATH)) {
+            realPathToNewJar = this.pathToCatalogJar;
+        }
+        CatalogContext retval = new CatalogContext(newCatalog, realPathToNewJar, realDepCRC, catalogVersion + incValue, catalogCRC);
         return retval;
     }
 
