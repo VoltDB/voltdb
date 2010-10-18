@@ -74,7 +74,7 @@
     </javac>
 </target>
 
-<target name="catalog" depends="srccompile" description="Compile the catalog using the schema and the DDL file" >
+<target name="catalog" depends="srccompile, proccompile" description="Compile the catalog using the schema and the DDL file" >
     <java fork="yes" failonerror="true" classname="org.voltdb.compiler.VoltCompiler" >
         <jvmarg value="-Dlog4j.configuration=file://${log4j.configuration}"/>
         <arg value="project.xml"/> <!-- project file -->
