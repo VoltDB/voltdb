@@ -66,6 +66,8 @@ hours with an export to file client produced a 27MB file, though this number wil
 # 7. Export to Hadoop #
 #######################
 
+This example requires the 0.20.2 release of hadoop in order to work correctly.
+
 This application contains a custom export client that can write directly into Hadoop's HDFS. The details of Hadoop and
 how to get it running are beyond the scope of this README, but you can find more about this project on their website:
 
