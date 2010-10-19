@@ -166,6 +166,7 @@ public class SnapshotSiteProcessor {
     public void initiateSnapshots(ExecutionEngine ee, Deque<SnapshotTableTask> tasks) {
         m_snapshotTableTasks = new ArrayDeque<SnapshotTableTask>(tasks);
         m_snapshotTargets = new ArrayList<SnapshotDataTarget>();
+        m_snapshotTargetTerminators = new ArrayList<Thread>();
         for (final SnapshotTableTask task : tasks) {
             if (!task.m_isReplicated) {
                 assert(task != null);
@@ -243,9 +244,7 @@ public class SnapshotSiteProcessor {
 
                         }
                     };
-                    if (m_snapshotTargetTerminators != null) {
-                        m_snapshotTargetTerminators.add(terminatorThread);
-                    }
+                    m_snapshotTargetTerminators.add(terminatorThread);
                     terminatorThread.start();
                 }
                 m_availableSnapshotBuffers.offer(snapshotBuffer);
@@ -292,6 +291,16 @@ public class SnapshotSiteProcessor {
                                     throw new RuntimeException(e);
                                 }
                             }
+                            for (Thread t : m_snapshotTargetTerminators){
+                                if (t == this) {
+                                    continue;
+                                }
+                                try {
+                                    t.join();
+                                } catch (InterruptedException e) {
+                                    return;
+                                }
+                            }
                         } finally {
                             /**
                              * Set it to -1 indicating the system is ready to perform another snapshot.
@@ -303,9 +312,7 @@ public class SnapshotSiteProcessor {
                     }
                 };
 
-                if (m_snapshotTargetTerminators != null) {
-                    m_snapshotTargetTerminators.add(terminatorThread);
-                }
+                m_snapshotTargetTerminators.add(terminatorThread);
 
                 terminatorThread.start();
             }
@@ -319,7 +326,6 @@ public class SnapshotSiteProcessor {
      */
     public HashSet<Exception> completeSnapshotWork(ExecutionEngine ee) throws InterruptedException {
         HashSet<Exception> retval = new HashSet<Exception>();
-        m_snapshotTargetTerminators = new ArrayList<Thread>();
         while (m_snapshotTableTasks != null) {
             Future<?> result = doSnapshotWork(ee);
             if (result != null) {
@@ -342,7 +348,6 @@ public class SnapshotSiteProcessor {
         for (final Thread t : m_snapshotTargetTerminators) {
             t.join();
         }
-        m_snapshotTargetTerminators = null;
 
         return retval;
     }

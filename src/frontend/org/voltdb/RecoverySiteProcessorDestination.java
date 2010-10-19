@@ -157,10 +157,17 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
                         }
                     }
                 } catch (IOException e) {
+                    try {
+                        while (!m_incoming.isEmpty()) {
+                            Thread.sleep(50);
+                        }
+                        Thread.sleep(300);
+                    } catch (InterruptedException e2) {}
                     if (closed) {
                         return;
                     }
-                    recoveryLog.error("Error reading a message from a recovery stream", e);
+                    recoveryLog.error(
+                            "Error reading a message from a recovery stream.", e);
                 } catch (InterruptedException e) {
                     return;
                 }

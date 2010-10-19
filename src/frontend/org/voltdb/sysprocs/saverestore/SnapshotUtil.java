@@ -94,7 +94,8 @@ public class SnapshotUtil {
         fileBuffer.put(tableListBytes);
         fileBuffer.flip();
         fos.getChannel().write(fileBuffer);
-        fos.getFD().sync();
+        fos.getChannel().force(false);
+        fos.close();
     }
 
     public static List<String> retrieveRelevantTableNames(String path,

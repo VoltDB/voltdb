@@ -203,10 +203,6 @@ public class EEProcess {
                                          + "] Returned end of stream and exit value "
                                          + p.exitValue());
                             }
-                            if (!m_allHeapBlocksFreed) {
-                                m_valgrindErrors
-                                .add("Not all heap blocks were freed");
-                            }
                             return;
                         }
                     } catch (final IOException e) {

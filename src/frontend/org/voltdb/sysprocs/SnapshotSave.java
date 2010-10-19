@@ -209,7 +209,9 @@ public class SnapshotSave extends VoltSystemProcedure
                     {
                         try
                         {
-                            saveFilePath.createNewFile();
+                            if (saveFilePath.createNewFile()) {
+                                saveFilePath.delete();
+                            }
                         }
                         catch (IOException ex)
                         {
@@ -296,6 +298,7 @@ public class SnapshotSave extends VoltSystemProcedure
             {
                 // Something lost, bomb out and just return the whole
                 // table of results to the client for analysis
+                results[0].resetRowPosition();
                 return results;
             }
         }

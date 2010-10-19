@@ -319,17 +319,22 @@ class SnapshotDaemon {
             assert(result.getColumnCount() == 1);
             assert(result.getColumnType(0) == VoltType.STRING);
             hostLog.error("Snapshot failed with failure response: " + result.getString(0));
+            m_snapshots.removeLast();
             return;
         }
 
         //assert(result.getColumnName(1).equals("TABLE"));
-
+        boolean success = true;
         while (result.advanceRow()) {
             if (!result.getString("RESULT").equals("SUCCESS")) {
+                success = false;
                 hostLog.error("Snapshot save feasability test failed for host "
                         + result.getLong("HOST_ID") + " table " + result.getString("TABLE") +
                         " with error message " + result.getString("ERR_MSG"));
             }
+        }
+        if (!success) {
+            m_snapshots.removeLast();
         }
     }
 

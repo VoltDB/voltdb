@@ -457,6 +457,55 @@ public class TestSnapshotDaemon {
         assertEquals(SnapshotDaemon.State.WAITING, daemon.getState());
         work = daemon.processPeriodicWork(startTime + 15000);
         assertNotNull(work);
+        assertTrue("@SnapshotSave".equals(work.getFirst()));
+        daemon.processClientResponse(new ClientResponse() {
+
+            @Override
+            public Exception getException() {
+                return null;
+            }
+
+            @Override
+            public String getStatusString() {
+                return null;
+            }
+
+            @Override
+            public VoltTable[] getResults() {
+                VoltTable result = new VoltTable(SnapshotSave.nodeResultsColumns);
+                result.addRow(0, "desktop", "0", "SUCCESS", "epic success");
+                return new VoltTable[] { result };
+            }
+
+            @Override
+            public byte getStatus() {
+                return ClientResponse.SUCCESS;
+            }
+
+            @Override
+            public int getClusterRoundtrip() {
+                return 0;
+            }
+
+            @Override
+            public int getClientRoundtrip() {
+                return 0;
+            }
+
+            @Override
+            public byte getAppStatus() {
+                return 0;
+            }
+
+            @Override
+            public String getAppStatusString() {
+                return null;
+            }
+
+        });
+
+        work = daemon.processPeriodicWork(startTime + 20000);
+        assertNotNull(work);
         assertTrue("@SnapshotDelete".equals(work.getFirst()));
     }
 }
