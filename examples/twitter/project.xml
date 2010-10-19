@@ -5,9 +5,9 @@
             <schema path='twitter-ddl.sql' />
         </schemas>
         <procedures>
-            <procedure class='org.voltdb.twitter.database.procedures.Insert' />
-            <procedure class='org.voltdb.twitter.database.procedures.Select' />
-            <procedure class='org.voltdb.twitter.database.procedures.Delete' />
+            <procedure class='com.procedures.Insert' />
+            <procedure class='com.procedures.Select' />
+            <procedure class='com.procedures.Delete' />
             <procedure class='InsertTweet' partitioninfo='tweets.username: 0' >
                 <sql>INSERT INTO tweets VALUES (?, ?);</sql>
             </procedure>

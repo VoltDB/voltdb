@@ -20,29 +20,27 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package org.voltdb.twitter.database.procedures;
+package com.procedures;
 
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
+
 @ProcInfo(
         singlePartition = false
 )
-public class Select extends VoltProcedure {
+public class Delete extends VoltProcedure {
 
     public final SQLStmt SQL = new SQLStmt(
-            "SELECT hashtag, COUNT(*) AS hashcount " +
+            "DELETE " +
             "FROM hashtags " +
-            "WHERE tweet_timestamp > ? " +
-            "GROUP BY hashtag " +
-            "ORDER BY hashcount DESC " +
-            "LIMIT ?;");
+            "WHERE tweet_timestamp < ?;");
 
-    public VoltTable[] run(long maxAgeMillis, int limit) throws VoltAbortException {
+    public VoltTable[] run(long deleteAllEarlierThan) throws VoltAbortException {
         // execute query
-        voltQueueSQL(SQL, maxAgeMillis, limit);
+        voltQueueSQL(SQL, deleteAllEarlierThan);
         return voltExecuteSQL(true);
     }
 
