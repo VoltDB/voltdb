@@ -1,105 +1,123 @@
-###################
-# 1. Introduction #
-###################
+Introduction
+============
+This example application uses the Twitter streaming API to monitor a
+stream of tweets and parse out hashtags. Hashtag trends are calculated
+and made available via a web interface. Additionally, tweet usernames
+and timestamps can be exported to Hadoop's HDFS to have MapReduce jobs
+run over them.
 
-This example application uses the Twitter streaming API to monitor a stream of tweets and parse out hashtags. Hashtag
-trends are calculated and made available via a web interface. Additionally, hashtag data can be exported to Hadoop's
-HDFS to have MapReduce jobs run over them.
-
-##########################
-# 2. Required parameters #
-##########################
-
-First off, you MUST use valid Twitter credentials for this application to be able to receive tweets. You can edit the
-build.xml file to contain your username and password or you can provide them as command line arguments to ant itself:   
+Required parameters
+===================
+First off, you MUST use valid Twitter credentials for this application
+to be able to receive tweets. You can edit the build.xml file to
+contain your username and password or you can provide them as command
+line arguments to ant itself:
 
   * -DTwitterUsername - The twitter login username.
   * -DTwitterPassword - The twitter login password.
 
-##########################
-# 3. Optional parameters #
-##########################
-
-Additionally, you can customize the following when running the client:
+Optional parameters
+===================
+Additionally, you can customize the following settings for the client
+in the build.xml:
 
   * The local web server port.
   * The number of hashtags to show in each table.
 
-#######################
-# 4. Start the server #
-#######################
+Start the server
+================
+When you're ready to run the application, simply type "ant". This will
+compile all the Java files, build the catalog, and start the VoltDB
+server.
 
-When you're ready to run the application, simply type "ant". This will compile all the Java files, build the catalog,
-and start the VoltDB server.
+Start the client
+================
+Once you see that the server has started running, you're ready to run
+the client. This is the part that is responsible for connecting to the
+Twitter streaming API, saving hashtags into VoltDB, and displaying
+aggregates through a web interface. To run it, type "ant client".
 
-#######################
-# 5. Start the client #
-#######################
+You will see a message saying that the web server is online and
+listening at localhost:12345 (assuming you didn't edit the default
+port). If your Twitter credentials are invalid, you will see a message
+saying so after about 10 seconds when Twitter sends back an HTTP "401
+Unauthorized" status.
 
-Once you see that the server has started running, you're ready to run the client. This is the part that is responsible
-for connecting to the Twitter streaming API, saving hashtags into VoltDB, and displaying aggregates through a web
-interface. To run it, type "ant client".
+If all goes well, you will be able to view the aggregate hashtag data
+in your web browser.
 
-You will see a message saying that the web server is online and listening at localhost:12345 (assuming you didn't edit
-the default port). If your Twitter credentials are invalid, you will see a message saying so after about 10 seconds when
-Twitter sends back an HTTP "401 Unauthorized" status.
-
-If all goes well, you will be able to view the aggregate hashtag data in your web browser.
-
-####################
-# 6. Cull the data #
-####################
-
-A second client can be run that will periodically delete old hashtags. This is so that the application could
-theoretically run forever. It too has customizable parameters:
+Cull the data
+=============
+A second client can be run that will periodically delete old
+hashtags. This is so that the application could theoretically run
+forever. It too has customizable parameters:
 
   * The retention range in hours.
   * The frequency with which to perform the delete in hours.
 
-To run it, type "ant cull". It will be idle most of time, occasionally waking up to delete old hashtags.
+To run it, type "ant cull". It will be idle most of time, occasionally
+waking up to delete old hashtags.
 
-Note that this application doesn't produce much data because it only saves hashtags, not full tweets. If you wanted to
-run it for a long time, you probably don't need to run the cull client. For reference, running this application for 88
-hours with an export to file client produced a 27MB file, though this number will obviously vary.
+Note that this application doesn't produce much data because it only
+saves hashtags, usernames, and tweet timestamps, not full tweets. If
+you wanted to run it for a long time, you probably don't need to run
+the cull client. For reference, running this application for 88 hours
+with an export to file client produced a 27MB file, though this number
+will obviously vary.
 
-#######################
-# 7. Export to Hadoop #
-#######################
-
-This example requires the 0.20.2 release of hadoop in order to work correctly.
-
-This application contains a custom export client that can write directly into Hadoop's HDFS. The details of Hadoop and
-how to get it running are beyond the scope of this README, but you can find more about this project on their website:
+Export to Hadoop
+================
+This application contains a custom export client that can write
+directly into Hadoop's HDFS. The details of Hadoop and how to get it
+running are beyond the scope of this README, but you can find more
+about this project on their website:
 
     http://hadoop.apache.org/
 
-To run the HDFS export client, you must have Hadoop running locally. For the purposes of demonstration, a single-node
-pseudo-distributed cluster (see the Hadoop docs) will suffice. The export client uses HDFS's append API, so make sure it
-is enabled in your Hadoop configuration (it most likely isn't). This is the dfs.support.append in hdfs-site.xml.
+NOTE: This example requires the 0.20.2 release of hadoop in order to
+work correctly.
 
-To begin exporting to HDFS, type "ant hadoop-el". Every minute, you'll see a message saying that output is being rolled
-over to a new file in HDFS. You can view these files in HDFS -after- they've finished being written to (this is why it
-rolls over every minute). Take a look in the HDFS path /user/${user.name}/twitter/input for these files.
+To run the HDFS export client, you must have Hadoop running
+locally. For the purposes of demonstration, a single-node
+pseudo-distributed cluster (see the Hadoop docs) will suffice. The
+export client uses HDFS's append API, so make sure it is enabled in
+your Hadoop configuration (it most likely isn't). This is accomplished
+by assigning the value 'true' to the property dfs.support.append in
+hdfs-site.xml.
 
-The hadoop executable in ${HOME}/hadoop/bin/hadoop is used by default. See build.xml for more info.
+To begin exporting to HDFS, type "ant hadoop-el". Every minute, you'll
+see a message saying that output is being rolled over to a new file in
+HDFS. You can view these files in HDFS -after- they've finished being
+written to (this is why it rolls over every minute). Take a look in
+the HDFS path /user/${user.name}/twitter/input for these files.
 
-####################
-# 8. Run MapReduce #
-####################
+The hadoop executable in ${HOME}/hadoop/bin/hadoop is used by
+default. See build.xml for more info.
 
-With the hashtags now sitting in HDFS, you can run a Hadoop MapReduce job over them. The this will compute the number of unique tweeters per hour. The first job maps from tweet time to username and then combines/reduces by deduping usernames for each hour. The second job maps from every hour/username to hour/one and then combines/reduces by summing the ones for each hour.
+Run MapReduce
+=============
+With the usernames and timestamps of processed tweets now sitting in
+HDFS, you can run Hadoop MapReduce jobs over them. The sample provided
+in the example will compute the number of unique tweeters per hour. It
+consists of two MapReduce jobs.  The first job maps from tweet time to
+username and then combines/reduces by eliminating duplicate usernames
+within each hour. The second job maps from every hour/username to
+hour/one and then combines/reduces by summing the ones for each hour.
 
-To run the MapReduce job, type "ant hadoop-mr". This will kick off Hadoop and compute the
-aggregates, writing them to HDFS. You can watch the status of the job as it outputs to standard out. When both complete,
-you can look in the HDFS path /user/${user.name}/twitter/output for the aggregates. Unix timestamps are used to represent each hour.
+To run the MapReduce sample, type "ant hadoop-mr". This will kick off
+Hadoop and compute the aggregates, writing them to HDFS. You can watch
+the status of the job as it outputs to standard out. When both
+complete, you can look in the HDFS path
+/user/${user.name}/twitter/output for the aggregates. Unix timestamps
+are used to represent each hour.
 
-##################
-# 9. Ant targets #
-##################
+Ant targets
+===========
+Note that you can type "ant -p" to view this information from ant
+build files in general:
 
-Note that you can type "ant -p" to view this information from ant build files in general:
-
-    ant             Compile all Java clients and stored procedures, build the catalog, and start the VoltDB server.
+    ant             Compile all Java clients and stored procedures,
+                    build the catalog, and start the VoltDB server.
     ant server      Start the VoltDB server
     ant client      Start the client and web server.
     ant cull        Start the cull process.
