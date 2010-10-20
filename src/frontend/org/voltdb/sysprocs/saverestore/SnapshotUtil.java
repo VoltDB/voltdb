@@ -118,10 +118,15 @@ public class SnapshotUtil {
     }
 
     /**
-     * Check if the CRC of the snapshot file matches the digest.
-     * @param f The snapshot file object
+     * Check if the CRC of the snapshot digest. Note that this only checks if
+     * the CRC at the beginning of the digest file matches the CRC of the digest
+     * file itself.
+     *
+     * @param f
+     *            The snapshot digest file object
      * @return The table list as a string
-     * @throws IOException If CRC does not match
+     * @throws IOException
+     *             If CRC does not match
      */
     public static String CRCCheck(File f) throws IOException {
         final FileInputStream fis = new FileInputStream(f);
