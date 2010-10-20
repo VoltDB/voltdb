@@ -114,6 +114,8 @@ std::string NValue::debug() const {
     }
     std::ostringstream buffer;
     std::string out_val;
+    const char* ptr;
+    int64_t addr;
     buffer << getTypeName(type) << "::";
     switch (type) {
       case VALUE_TYPE_TINYINT:
@@ -130,10 +132,12 @@ std::string NValue::debug() const {
         buffer << getDouble();
         break;
       case VALUE_TYPE_VARCHAR:
-        out_val = std::string(reinterpret_cast<const char*>(getObjectValue()),
+        ptr = reinterpret_cast<const char*>(getObjectValue());
+        addr = reinterpret_cast<int64_t>(ptr);
+        out_val = std::string(ptr,
                               getObjectLength());
         buffer << "[" << getObjectLength() << "]";
-        buffer << "\"" << out_val << "\"";
+        buffer << "\"" << out_val << "\"[@" << addr << "]";
         break;
       case VALUE_TYPE_DECIMAL:
         buffer << createStringFromDecimal();

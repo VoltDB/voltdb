@@ -139,8 +139,18 @@ void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple) {
     int colindex = 0;
     // set up the first n columns, based on group-by columns
     for (colindex = 0; colindex < m_groupByColumnCount; colindex++) {
-        m_updatedTuple.setNValue(colindex,
+        // note that if the tuple is in the mv's target table,
+        // tuple values should be pulled from the existing tuple in
+        // that table. This works around a memory ownership issue
+        // related to out-of-line strings.
+        if (exists) {
+            m_updatedTuple.setNValue(colindex,
+                                 m_existingTuple.getNValue(colindex));
+        }
+        else {
+            m_updatedTuple.setNValue(colindex,
                                  newTuple.getNValue(m_groupByColumns[colindex]));
+        }
     }
 
     // set up the next column, which is a count
@@ -215,7 +225,11 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple) {
     int colindex = 0;
     // set up the first n columns, based on group-by columns
     for (colindex = 0; colindex < m_groupByColumnCount; colindex++) {
-        m_updatedTuple.setNValue(colindex, oldTuple.getNValue(m_groupByColumns[colindex]));
+        // note that if the tuple is in the mv's target table,
+        // tuple values should be pulled from the existing tuple in
+        // that table. This works around a memory ownership issue
+        // related to out-of-line strings.
+        m_updatedTuple.setNValue(colindex, m_existingTuple.getNValue(colindex));
     }
 
     m_updatedTuple.setNValue(colindex, count);
@@ -255,10 +269,10 @@ bool MaterializedViewMetadata::findExistingTuple(TableTuple &oldTuple, bool expe
     m_existingTuple = m_index->nextValueAtKey();
     if (m_existingTuple.isNullTuple()) {
         if (expected) {
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                          "MaterializedViewMetadata went"
-                                          " looking for a tuple in the view and"
-                                          " expected to find it but didn't");
+            std::string name = m_target->name();
+            throwFatalException("MaterializedViewMetadata for table %s went"
+                                " looking for a tuple in the view and"
+                                " expected to find it but didn't", name.c_str());
         }
         return false;
     }

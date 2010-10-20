@@ -69,7 +69,7 @@ public class SocketJoiner extends Thread {
 
     static final int PING = 333;
     InetAddress m_coordIp = null;
-    int m_localHostId;
+    int m_localHostId = 0;
     Hashtable<Integer, SocketChannel> m_sockets = new Hashtable<Integer, SocketChannel>();
     Hashtable<Integer, DataInputStream> m_inputs = new Hashtable<Integer, DataInputStream>();
     Hashtable<Integer, DataOutputStream> m_outputs = new Hashtable<Integer, DataOutputStream>();
