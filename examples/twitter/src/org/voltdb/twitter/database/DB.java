@@ -36,10 +36,11 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.twitter.database.procedures.Delete;
-import org.voltdb.twitter.database.procedures.Insert;
-import org.voltdb.twitter.database.procedures.Select;
 import org.voltdb.twitter.util.HashTag;
+
+import com.procedures.Delete;
+import com.procedures.Insert;
+import com.procedures.Select;
 
 public class DB {
 
