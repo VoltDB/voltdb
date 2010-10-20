@@ -644,7 +644,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         assertNotNull(deleteResults);
         assertEquals( 1, deleteResults.length);
         assertEquals( 9, deleteResults[0].getColumnCount());
-        assertEquals( 8, deleteResults[0].getRowCount());
+        assertEquals( 7, deleteResults[0].getRowCount());
         tmp_files = tmp_dir.listFiles(cleaner);
         assertEquals( 0, tmp_files.length);
 

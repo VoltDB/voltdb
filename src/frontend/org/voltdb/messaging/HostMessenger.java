@@ -145,7 +145,7 @@ public class HostMessenger implements Messenger {
     }
 
     public synchronized Object[] waitForGroupJoin() {
-         return waitForGroupJoin(Integer.MAX_VALUE);
+         return waitForGroupJoin(0);
     }
 
     public synchronized Object[] waitForGroupJoin(int timeout) {
@@ -155,8 +155,13 @@ public class HostMessenger implements Messenger {
             try {
                 m_joiner.join(timeout);
                 if (!m_joiner.getSuccess()) {
-                    new VoltLogger("HOST").
-                        fatal("The joiner thread was not successful");
+                    if (timeout == 0) {
+                        new VoltLogger("HOST").
+                            fatal("The joiner thread was not successful");
+                    } else {
+                        new VoltLogger("HOST").
+                            fatal("Timed out waiting for other nodes to connect. It is safe to retry rejoin.");
+                    }
                     VoltDB.crashVoltDB();
                 }
                 //timeout

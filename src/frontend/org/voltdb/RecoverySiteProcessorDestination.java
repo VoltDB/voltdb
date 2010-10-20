@@ -157,10 +157,23 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
                         }
                     }
                 } catch (IOException e) {
+                    /*
+                     * Wait until the last message is delivered
+                     * and then wait some more so it can be processed
+                     * so that closed can be set and the exception
+                     * suppressed.
+                     */
+                    try {
+                        while (!m_incoming.isEmpty()) {
+                            Thread.sleep(50);
+                        }
+                        Thread.sleep(300);
+                    } catch (InterruptedException e2) {}
                     if (closed) {
                         return;
                     }
-                    recoveryLog.error("Error reading a message from a recovery stream", e);
+                    recoveryLog.error(
+                            "Error reading a message from a recovery stream.", e);
                 } catch (InterruptedException e) {
                     return;
                 }

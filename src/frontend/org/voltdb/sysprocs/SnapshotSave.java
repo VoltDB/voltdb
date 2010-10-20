@@ -209,7 +209,15 @@ public class SnapshotSave extends VoltSystemProcedure
                     {
                         try
                         {
-                            saveFilePath.createNewFile();
+                            /*
+                             * Sanity check that the file can be created
+                             * and then delete it so empty files aren't
+                             * orphaned if another part of the snapshot
+                             * test fails.
+                             */
+                            if (saveFilePath.createNewFile()) {
+                                saveFilePath.delete();
+                            }
                         }
                         catch (IOException ex)
                         {
@@ -296,6 +304,7 @@ public class SnapshotSave extends VoltSystemProcedure
             {
                 // Something lost, bomb out and just return the whole
                 // table of results to the client for analysis
+                results[0].resetRowPosition();
                 return results;
             }
         }
