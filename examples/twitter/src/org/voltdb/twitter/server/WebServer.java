@@ -37,7 +37,7 @@ import org.voltdb.twitter.util.HTMLUtils;
 
 public class WebServer {
 
-    private static final long SECOND = 1000L * 1000L;
+    private static final long SECOND = 1000L;
     private static final long MINUTE = 60L * SECOND;
     private static final long HOUR = 60L * MINUTE;
 
@@ -96,10 +96,10 @@ public class WebServer {
             html.add("<div id=\"bottom\">");
             html.add("<table><tbody><tr>");
 
-            // past 15 seconds
+            // past 20 seconds
             html.add("<td>");
-            html.add("<h2>15 seconds</h2>");
-            html.addAll(util.table(db.selectHashTags(15L * SECOND, limit)));
+            html.add("<h2>20 seconds</h2>");
+            html.addAll(util.table(db.selectHashTags(20L * SECOND, limit)));
             html.add("</td>");
 
             // past 1 minute
