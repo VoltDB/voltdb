@@ -16,15 +16,8 @@
  */
 package org.voltdb.fault;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
 
-import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
 import org.voltdb.dtxn.SiteTracker;
@@ -60,13 +53,12 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
     // Fault distributer runs in this thread
     private Thread m_thread;
 
-    // The fault distributor's reference to the VoltDB catalog context.
-    private CatalogContext m_catalogContext;
-
     // If true, concurrent failures of 1/2 or more of the current node set, leaving behind
     // a durable survivor set will cause the survivors to checkpoint and die.
     private final boolean m_partitionDetectionEnabled;
-    private boolean m_triggeredPartitionDetection = false;
+
+    // True if a partition detection occurred. All future faults are ignored
+    private volatile boolean m_partitionDetectionTriggered;
 
     // Pairs a fault handlers to its specific unhandled fault set
     class FaultHandlerData {
@@ -107,7 +99,6 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
     public FaultDistributor(VoltDBInterface voltdb, boolean enablePartitionDetectionPolicy)
     {
         m_partitionDetectionEnabled = enablePartitionDetectionPolicy;
-        m_catalogContext = voltdb.getCatalogContext();
         m_faultHandlers =
             new HashMap<FaultType, TreeMap<Integer, List<FaultHandlerData>>>();
         for (VoltFault.FaultType type : VoltFault.FaultType.values()) {
@@ -282,16 +273,16 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
             m_pendingFaults = new ArrayDeque<VoltFault>();
         }
 
-        // examine the known faults and the new faults and make policy decisions
-        HashMap<FaultType, HashSet<VoltFault>> postPolicyFaults =
-            makePolicyDecisions(organizeNewFaults(pendingFaults));
+        // Examine the known faults and the new faults
+        HashMap<FaultType, HashSet<VoltFault>> postFilterFaults =
+            organizeNewFaults(pendingFaults);
 
-        // and apply those policies...
-        if (postPolicyFaults == null || postPolicyFaults.isEmpty()) {
+        // No action if all faults were known/filtered
+        if (postFilterFaults == null || postFilterFaults.isEmpty()) {
             return;
         }
 
-        for (Map.Entry<FaultType, HashSet<VoltFault>> entry : postPolicyFaults.entrySet()) {
+        for (Map.Entry<FaultType, HashSet<VoltFault>> entry : postFilterFaults.entrySet()) {
             TreeMap<Integer, List<FaultHandlerData>> handler_map =
                 m_faultHandlers.get(entry.getKey());
             if (handler_map == null)
@@ -323,6 +314,10 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
     private HashMap<FaultType, HashSet<VoltFault>>
     organizeNewFaults(ArrayDeque<VoltFault> pendingFaults)
     {
+        if (m_partitionDetectionTriggered) {
+            return null;
+        }
+
         HashMap<FaultType, HashSet<VoltFault>> faultsMap = new HashMap<FaultType, HashSet<VoltFault>>();
         while (!pendingFaults.isEmpty()) {
             VoltFault fault = pendingFaults.poll();
@@ -340,76 +335,6 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
         return faultsMap;
     }
 
-    /*
-     * Look at the known faults and the new faults and decide what action(s)
-     * to take.
-     */
-    private HashMap<FaultType, HashSet<VoltFault>>
-    makePolicyDecisions(HashMap<FaultType, HashSet<VoltFault>> newFaults)
-    {
-        SiteTracker tracker = m_catalogContext.siteTracker;
-
-        // default policy
-        if (!m_partitionDetectionEnabled) {
-            return newFaults;
-        }
-
-        // if there are no new node faults, there is no work to do.
-        if (newFaults.get(FaultType.NODE_FAILURE) == null) {
-            return newFaults;
-        }
-
-        // once partition detection is triggered, don't take further fault actions
-        // want to allow everything to shutdown gracefully and independently
-        if (m_triggeredPartitionDetection) {
-            return null;
-        }
-
-        // if this surviving node is in a survivor set that is <= 1/2
-        // of the previous cluster size, and this survivor set is
-        // durable, then trigger partition detection by rewriting the
-        // node faults in to cluster partition faults.
-
-        // Known faults is complete (includes newFaults), as this
-        // function is always called after organizeFaults().
-        HashSet<VoltFault> knownnfs = m_knownFaults.get(FaultType.NODE_FAILURE);
-        final int prevSurvivorCnt = tracker.getAllLiveHosts().size();
-        final int ttlNodeFaults = knownnfs.size();
-        boolean blessedSet = true;
-
-        // exact 50-50 splits. The lowest survivor host doesn't trigger PPD
-        // if the blessed host is in the failure set, this set is not blessed.
-        if (ttlNodeFaults * 2 == prevSurvivorCnt) {
-            Integer blessedHost = tracker.getHostForSite(tracker.getLowestLiveNonExecSiteId());
-            for (VoltFault fault : knownnfs) {
-                if (fault instanceof NodeFailureFault) {
-                    NodeFailureFault nf = (NodeFailureFault)fault;
-                    if (nf.getHostId() == blessedHost) {
-                        blessedSet = false;
-                        break;
-                    }
-                }
-            }
-        }
-
-        // Evaluate the PPD trigger condition: not blessed or a strict minority
-        if (!blessedSet || (ttlNodeFaults * 2 > prevSurvivorCnt)) {
-            // rewrite the node faults in to partition faults.
-            HashSet<VoltFault> ppdFaults = new HashSet<VoltFault>();
-            HashSet<VoltFault> newnfs = newFaults.get(FaultType.NODE_FAILURE);
-            for (VoltFault nf :  newnfs) {
-                VoltFault ppd = new ClusterPartitionFault((NodeFailureFault)nf);
-                ppdFaults.add(ppd);
-            }
-            newFaults.put(FaultType.CLUSTER_PARTITION, ppdFaults);
-            newFaults.remove(FaultType.NODE_FAILURE);
-            m_triggeredPartitionDetection = true;
-        }
-
-        return newFaults;
-    }
-
-
     private void processClearedFaults() {
         HashMap<FaultType, HashSet<VoltFault>> pendingClearedFaults;
         synchronized (this) {
@@ -425,14 +350,6 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
             HashSet<VoltFault> faults = entry.getValue();
             for (VoltFault fault : faults) {
                 boolean remove = m_knownFaults.get(fault.getFaultType()).remove(fault);
-
-                // It's possible the cluster fault was originally known as a node-fault.
-                // HACK - really want a better fault equivalence rather than having
-                // all of these sets organized by fault type
-                if (!remove && fault instanceof ClusterPartitionFault) {
-                    remove = m_knownFaults.get(FaultType.NODE_FAILURE).remove(fault);
-                    assert(remove);
-                }
             }
 
             // Clear the fault from each registered handler
@@ -478,5 +395,71 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
             hostLog.fatal("", e);
             VoltDB.crashVoltDB();
         }
+    }
+
+    @Override
+    public PPDPolicyDecision makePPDPolicyDecisions(HashSet<Integer> newFailedSiteIds)
+    {
+        if (!m_partitionDetectionEnabled) {
+            return PPDPolicyDecision.NodeFailure;
+        }
+
+        // if there are no node faults, there is no work to do.
+        if (newFailedSiteIds == null || newFailedSiteIds.size() == 0) {
+            return PPDPolicyDecision.NodeFailure;
+        }
+
+        // this tracker *is already updated* with the new failed site IDs
+        final SiteTracker tracker = VoltDB.instance().getCatalogContext().siteTracker;
+
+        // collapse failed sites into failed hosts
+        final HashSet<Integer> failedHosts = new HashSet<Integer>();
+        for (Integer siteId : newFailedSiteIds) {
+            failedHosts.add(tracker.getHostForSite(siteId));
+        }
+
+        // because tracker already represents newFailedSiteId failures...
+        final int prevSurvivorCnt = tracker.getAllLiveHosts().size() + failedHosts.size();
+
+        // find the lowest hostId between the still-alive hosts and the
+        // failed hosts. Which set contains the lowest hostId?
+        int blessedHostId = Integer.MAX_VALUE;
+        boolean blessedHostIdInFailedSet = true;
+
+        for (Integer hostId : failedHosts) {
+            if (hostId < blessedHostId) {
+                blessedHostId = hostId;
+            }
+        }
+
+        for (Integer hostId : tracker.getAllLiveHosts()) {
+            if (hostId < blessedHostId) {
+                blessedHostId = hostId;
+                blessedHostIdInFailedSet = false;
+            }
+        }
+
+        // Evaluate PPD triggers.
+
+        // Exact 50-50 splits. The set with the lowest survivor host doesn't trigger PPD
+        // If the blessed host is in the failure set, this set is not blessed.
+        if (failedHosts.size() * 2 == prevSurvivorCnt) {
+            if (blessedHostIdInFailedSet) {
+                m_partitionDetectionTriggered = true;
+                return PPDPolicyDecision.PartitionDetection;
+            }
+            else {
+                return PPDPolicyDecision.NodeFailure;
+            }
+        }
+
+        // A strict, viable minority is always a partition.
+        if (failedHosts.size() * 2 > prevSurvivorCnt) {
+            m_partitionDetectionTriggered = true;
+            return PPDPolicyDecision.PartitionDetection;
+        }
+
+        // all remaining cases are normal node failures
+        return PPDPolicyDecision.NodeFailure;
     }
 }

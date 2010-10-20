@@ -17,62 +17,25 @@
 
 package org.voltdb;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.PrintStream;
-import java.io.UnsupportedEncodingException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.URLDecoder;
-import java.net.UnknownHostException;
+import java.io.*;
+import java.net.*;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Hashtable;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Site;
-import org.voltdb.catalog.SnapshotSchedule;
-import org.voltdb.client.Client;
-import org.voltdb.client.ClientConfig;
-import org.voltdb.client.ClientFactory;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureCallback;
+import org.voltdb.catalog.*;
+import org.voltdb.client.*;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
-import org.voltdb.fault.ClusterPartitionFault;
-import org.voltdb.fault.FaultDistributor;
-import org.voltdb.fault.FaultDistributorInterface;
-import org.voltdb.fault.FaultHandler;
-import org.voltdb.fault.NodeFailureFault;
-import org.voltdb.fault.VoltFault;
+import org.voltdb.fault.*;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
-import org.voltdb.messaging.HostMessenger;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.Messenger;
-import org.voltdb.messaging.SiteMailbox;
-import org.voltdb.messaging.VoltMessage;
+import org.voltdb.messaging.*;
 import org.voltdb.network.VoltNetwork;
-import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.DumpManager;
-import org.voltdb.utils.HTTPAdminListener;
-import org.voltdb.utils.LogKeys;
-import org.voltdb.utils.VoltSampler;
+import org.voltdb.utils.*;
 
 public class RealVoltDB implements VoltDBInterface
 {
@@ -89,11 +52,6 @@ public class RealVoltDB implements VoltDBInterface
                 if (fault instanceof NodeFailureFault)
                 {
                     NodeFailureFault node_fault = (NodeFailureFault) fault;
-                    handleNodeFailureFault(node_fault);
-                }
-                if (fault instanceof ClusterPartitionFault)
-                {
-                    NodeFailureFault node_fault = ((ClusterPartitionFault)fault).getCause();
                     handleNodeFailureFault(node_fault);
                 }
                 VoltDB.instance().getFaultDistributor().reportFaultHandled(this, fault);
@@ -403,7 +361,7 @@ public class RealVoltDB implements VoltDBInterface
             // This should be the first handler to run when a node fails
             m_faultManager.registerFaultHandler(NodeFailureFault.NODE_FAILURE_CATALOG,
                                                 m_faultHandler,
-                                                FaultType.NODE_FAILURE, FaultType.CLUSTER_PARTITION);
+                                                FaultType.NODE_FAILURE);
 
 
             // Initialize the complex partitioning scheme

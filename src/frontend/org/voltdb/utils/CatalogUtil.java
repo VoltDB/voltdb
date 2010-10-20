@@ -652,7 +652,7 @@ public abstract class CatalogUtil {
             if (cluster.getPartitionDetection() != null && cluster.getPartitionDetection().isEnabled()) {
                 catCluster.setNetworkpartition(true);
                 CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
-                SnapshotSchedule sched = faultsnapshots.add(FaultType.CLUSTER_PARTITION.toString());
+                SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
                 sched.setPrefix(cluster.getPartitionDetection().getSnapshot().getPrefix());
                 sched.setPath(cluster.getPartitionDetection().getSnapshot().getPath());
             }

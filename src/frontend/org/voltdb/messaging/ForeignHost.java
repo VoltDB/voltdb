@@ -28,13 +28,9 @@ import org.voltdb.VoltDB;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.fault.*;
 import org.voltdb.logging.VoltLogger;
-import org.voltdb.network.Connection;
-import org.voltdb.network.QueueMonitor;
-import org.voltdb.network.VoltProtocolHandler;
-import org.voltdb.utils.DBBPool;
+import org.voltdb.network.*;
+import org.voltdb.utils.*;
 import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.utils.DeferredSerialization;
-import org.voltdb.utils.EstTime;
 
 public class ForeignHost {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -68,13 +64,6 @@ public class ForeignHost {
                 if (fault instanceof NodeFailureFault)
                 {
                     NodeFailureFault node_fault = (NodeFailureFault)fault;
-                    if (node_fault.getHostId() == m_hostId) {
-                        close();
-                    }
-                }
-                else if (fault instanceof ClusterPartitionFault)
-                {
-                    NodeFailureFault node_fault = ((ClusterPartitionFault)fault).getCause();
                     if (node_fault.getHostId() == m_hostId) {
                         close();
                     }
@@ -162,8 +151,7 @@ public class ForeignHost {
                     registerFaultHandler(
                             NodeFailureFault.NODE_FAILURE_FOREIGN_HOST,
                             new FHFaultHandler(),
-                            org.voltdb.fault.VoltFault.FaultType.NODE_FAILURE,
-                            org.voltdb.fault.VoltFault.FaultType.CLUSTER_PARTITION);
+                            org.voltdb.fault.VoltFault.FaultType.NODE_FAILURE);
             }
         }
     }

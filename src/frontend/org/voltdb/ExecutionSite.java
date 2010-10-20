@@ -19,13 +19,7 @@ package org.voltdb;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -33,66 +27,25 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
 import org.voltdb.VoltProcedure.VoltAbortException;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.Site;
-import org.voltdb.catalog.SnapshotSchedule;
-import org.voltdb.catalog.Table;
+import org.voltdb.catalog.*;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.debugstate.ExecutorContext;
-import org.voltdb.dtxn.DtxnConstants;
-import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
-import org.voltdb.dtxn.RestrictedPriorityQueue;
-import org.voltdb.dtxn.SinglePartitionTxnState;
-import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.dtxn.SiteTransactionConnection;
-import org.voltdb.dtxn.TransactionState;
+import org.voltdb.dtxn.*;
 import org.voltdb.dtxn.RestrictedPriorityQueue.QueueState;
-import org.voltdb.exceptions.EEException;
-import org.voltdb.exceptions.SQLException;
-import org.voltdb.exceptions.SerializableException;
+import org.voltdb.exceptions.*;
 import org.voltdb.export.ExportManager;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.export.processors.RawProcessor;
 import org.voltdb.export.processors.RawProcessor.ExportInternalMessage;
-import org.voltdb.fault.ClusterPartitionFault;
-import org.voltdb.fault.FaultHandler;
-import org.voltdb.fault.NodeFailureFault;
-import org.voltdb.fault.VoltFault;
+import org.voltdb.fault.*;
+import org.voltdb.fault.FaultDistributorInterface.PPDPolicyDecision;
 import org.voltdb.fault.VoltFault.FaultType;
-import org.voltdb.jni.ExecutionEngine;
-import org.voltdb.jni.ExecutionEngineIPC;
-import org.voltdb.jni.ExecutionEngineJNI;
-import org.voltdb.jni.MockExecutionEngine;
+import org.voltdb.jni.*;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
-import org.voltdb.messaging.CompleteTransactionMessage;
-import org.voltdb.messaging.CompleteTransactionResponseMessage;
-import org.voltdb.messaging.DebugMessage;
-import org.voltdb.messaging.FailureSiteUpdateMessage;
-import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FragmentResponseMessage;
-import org.voltdb.messaging.FragmentTaskMessage;
-import org.voltdb.messaging.HeartbeatMessage;
-import org.voltdb.messaging.HeartbeatResponseMessage;
-import org.voltdb.messaging.InitiateResponseMessage;
-import org.voltdb.messaging.InitiateTaskMessage;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.MessagingException;
-import org.voltdb.messaging.MultiPartitionParticipantMessage;
-import org.voltdb.messaging.RecoveryMessage;
-import org.voltdb.messaging.SiteMailbox;
-import org.voltdb.messaging.Subject;
-import org.voltdb.messaging.TransactionInfoBaseMessage;
-import org.voltdb.messaging.VoltMessage;
-import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.DumpManager;
-import org.voltdb.utils.Encoder;
-import org.voltdb.utils.EstTime;
-import org.voltdb.utils.LogKeys;
+import org.voltdb.messaging.*;
+import org.voltdb.utils.*;
 
 /**
  * The main executor of transactional work in the system. Controls running
@@ -274,17 +227,15 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     // required  processing at an execution site.
     static class ExecutionSiteNodeFailureMessage extends VoltMessage
     {
-        final boolean m_partitionDetection;
         final HashSet<NodeFailureFault> m_failedHosts;
-        ExecutionSiteNodeFailureMessage(HashSet<NodeFailureFault> failedHosts,
-                                        boolean partitionDetection)
+        ExecutionSiteNodeFailureMessage(HashSet<NodeFailureFault> failedHosts)
         {
-            m_partitionDetection = partitionDetection;
             m_failedHosts = failedHosts;
         }
 
         @Override
         protected void flattenToBuffer(DBBPool pool) {} // can be empty if only used locally
+
         @Override
         protected void initFromBuffer() {} // can be empty if only used locally
 
@@ -350,23 +301,20 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             if (m_shouldContinue == false) {
                 return;
             }
-            boolean partitionDetection = false;
             HashSet<NodeFailureFault> failedNodes = new HashSet<NodeFailureFault>();
             for (VoltFault fault : faults) {
                 if (fault instanceof NodeFailureFault)
                 {
                     NodeFailureFault node_fault = (NodeFailureFault)fault;
                     failedNodes.add(node_fault);
-                } else if (fault instanceof ClusterPartitionFault) {
-                    ClusterPartitionFault cpf = (ClusterPartitionFault)fault;
-                    failedNodes.add(cpf.getCause());
-                    partitionDetection = true;
-                } else {
+                }
+                else
+                {
                     VoltDB.instance().getFaultDistributor().reportFaultHandled(this, fault);
                 }
             }
             if (!failedNodes.isEmpty()) {
-                m_mailbox.deliver(new ExecutionSiteNodeFailureMessage(failedNodes, partitionDetection));
+                m_mailbox.deliver(new ExecutionSiteNodeFailureMessage(failedNodes));
             }
         }
 
@@ -587,7 +535,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         VoltDB.instance().getFaultDistributor().
         registerFaultHandler(NodeFailureFault.NODE_FAILURE_EXECUTION_SITE,
                              m_faultHandler,
-                             FaultType.NODE_FAILURE, FaultType.CLUSTER_PARTITION);
+                             FaultType.NODE_FAILURE);
 
         if (voltdb.getBackendTargetType() == BackendTarget.NONE) {
             ee = new MockExecutionEngine();
@@ -1131,8 +1079,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         }
         else if (message instanceof ExecutionSiteLocalSnapshotMessage) {
             hostLog.info("Received ExecutionSiteLocalSnapshotMessage. Initiating local snapshot");
-            SnapshotSchedule schedule = m_context.cluster.getFaultsnapshots().
-                get(FaultType.CLUSTER_PARTITION.toString());
+            SnapshotSchedule schedule = m_context.cluster.getFaultsnapshots().get("CLUSTER_PARTITION");
             SnapshotSaveAPI saveAPI = new SnapshotSaveAPI();
             saveAPI.startSnapshotting(schedule.getPath(),
                                       schedule.getPrefix(),
@@ -1226,26 +1173,42 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         if (commit_and_safe == null) {
             return;
         }
-        /*
-         * Agreed on a fault set. Do the work of patching up the execution site.
-         * Do a little work to identify the newly failed site ids and only handle those
-         */
+
+
+        // Agreed on a fault set.
+
+        // Do the work of patching up the execution site.
+        // Do a little work to identify the newly failed site ids and only handle those
+
         HashSet<Integer> newFailedSiteIds = new HashSet<Integer>(failedSiteIds);
         newFailedSiteIds.removeAll(m_handledFailedSites);
-        handleSiteFaults(message.m_partitionDetection,
-                         newFailedSiteIds,
-                         commit_and_safe[0],
-                         commit_and_safe[1]);
+
+        // Use this agreed new-fault set to make PPD decisions.
+        // Since this agreement process should eventually be moved to
+        // the fault distributor - this is written with some intentional
+        // feature envy.
+
+        PPDPolicyDecision makePPDPolicyDecisions =
+            VoltDB.instance().getFaultDistributor().makePPDPolicyDecisions(newFailedSiteIds);
+
+        if (makePPDPolicyDecisions == PPDPolicyDecision.NodeFailure) {
+            handleSiteFaults(false,
+                    newFailedSiteIds,
+                    commit_and_safe[0],
+                    commit_and_safe[1]);
+        }
+        else if (makePPDPolicyDecisions == PPDPolicyDecision.PartitionDetection) {
+            handleSiteFaults(true,
+                    newFailedSiteIds,
+                    commit_and_safe[0],
+                    commit_and_safe[1]);
+        }
+
         m_handledFailedSites.addAll(failedSiteIds);
         for (NodeFailureFault fault : failures) {
             if (newFailedSiteIds.containsAll(m_context.siteTracker.getAllSitesForHost(fault.getHostId()))) {
-                if (message.m_partitionDetection) {
-                    VoltDB.instance().getFaultDistributor().
-                        reportFaultHandled(m_faultHandler, new ClusterPartitionFault(fault));
-                } else {
-                    VoltDB.instance().getFaultDistributor().
-                        reportFaultHandled(m_faultHandler, fault);
-                }
+                VoltDB.instance().getFaultDistributor().
+                reportFaultHandled(m_faultHandler, fault);
             }
         }
     }

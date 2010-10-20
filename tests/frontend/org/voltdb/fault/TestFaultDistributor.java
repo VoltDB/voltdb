@@ -22,13 +22,16 @@
  */
 package org.voltdb.fault;
 
-import org.voltdb.MockVoltDB;
-import org.voltdb.fault.VoltFault.FaultType;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.Semaphore;
 
 import junit.framework.TestCase;
 
-import java.util.*;
-import java.util.concurrent.Semaphore;
+import org.voltdb.MockVoltDB;
+import org.voltdb.VoltDB;
+import org.voltdb.fault.FaultDistributorInterface.PPDPolicyDecision;
+import org.voltdb.fault.VoltFault.FaultType;
 
 public class TestFaultDistributor extends TestCase
 {
@@ -206,39 +209,33 @@ public class TestFaultDistributor extends TestCase
     {
         // need to add live sites and generate a context for mock functionality
         MockVoltDB voltdb = new MockVoltDB();
+        FaultDistributor dut = new FaultDistributor(voltdb, true);
+        voltdb.setFaultDistributor(dut);
+        VoltDB.replaceVoltDBInstanceForTest(voltdb);
+
         voltdb.addPartition(1);
+
         voltdb.addHost(0);
         voltdb.addSite(100, 0, 1, true);
         voltdb.addSite(1000, 0, 1, false);
+
         voltdb.addHost(1);
         voltdb.addSite(101, 0, 1, true);
         voltdb.addSite(1010, 0, 1, false);
         voltdb.getCatalogContext();
 
-        // enable possible partition detection (PPD)
-        FaultDistributor dut = new FaultDistributor(voltdb, true);
-        MockFaultHandler nodeFaultHdlr = new MockFaultHandler(FaultType.NODE_FAILURE);
-        MockFaultHandler clusterPartHdlr = new MockFaultHandler(FaultType.CLUSTER_PARTITION);
-        dut.registerFaultHandler(1, nodeFaultHdlr, FaultType.NODE_FAILURE);
-        dut.registerFaultHandler(2, clusterPartHdlr, FaultType.CLUSTER_PARTITION);
+        // set sites at host 0 down... as if the catalog were updated
+        // and the surviving set was not the blessed host id.
+        voltdb.killSite(100);
+        voltdb.killSite(1000);
 
-        // verify node fault was promoted to cluster partition fault
-        dut.reportFault(new NodeFailureFault(0, "hostname"));
-        clusterPartHdlr.m_handledFaults.acquire();
-        assertTrue(clusterPartHdlr.m_gotFault);
+        HashSet<Integer> failedSiteIds = new HashSet<Integer>();
+        failedSiteIds.add(100);
+        failedSiteIds.add(1000);
 
-        // no node faults were produced. this handler has higher priority
-        // than the cluster handler; presumably it ran if cluster semaphore
-        // was acquired.
-        assertFalse(nodeFaultHdlr.m_handledFaults.tryAcquire());
-
-        // clear the cluster partition fault and verify it
-        // reported cleared to the cluster partition handler,
-        // not the node failure handler
-        ClusterPartitionFault cpf = new ClusterPartitionFault(new NodeFailureFault(0, "ignored"));
-        dut.reportFaultCleared(cpf);
-        clusterPartHdlr.m_clearedFaults.acquire();
-        assertFalse(nodeFaultHdlr.m_clearedFaults.tryAcquire());
+        // should get a PPD now.
+        PPDPolicyDecision makePPDPolicyDecisions = dut.makePPDPolicyDecisions(failedSiteIds);
+        assertEquals(PPDPolicyDecision.PartitionDetection, makePPDPolicyDecisions);
     }
 
     // do not trigger PPD
@@ -246,30 +243,33 @@ public class TestFaultDistributor extends TestCase
     {
         // need to add live sites and generate a context for mock functionality
         MockVoltDB voltdb = new MockVoltDB();
+        FaultDistributor dut = new FaultDistributor(voltdb, true);
+        voltdb.setFaultDistributor(dut);
+        VoltDB.replaceVoltDBInstanceForTest(voltdb);
+
         voltdb.addPartition(1);
+
         voltdb.addHost(0);
         voltdb.addSite(100, 0, 1, true);
         voltdb.addSite(1000, 0, 1, false);
+
         voltdb.addHost(1);
         voltdb.addSite(101, 1, 1, true);
         voltdb.addSite(1010, 1, 1, false);
-        voltdb.addHost(2);
-        voltdb.addSite(102, 2, 1, true);
-        voltdb.addSite(1020, 2, 1, false);
         voltdb.getCatalogContext();
 
-        // enable possible partition detection (PPD)
-        FaultDistributor dut = new FaultDistributor(voltdb, true);
-        MockFaultHandler nodeFaultHdlr = new MockFaultHandler(FaultType.NODE_FAILURE);
-        MockFaultHandler clusterPartHdlr = new MockFaultHandler(FaultType.CLUSTER_PARTITION);
-        dut.registerFaultHandler(1, nodeFaultHdlr, FaultType.NODE_FAILURE);
-        dut.registerFaultHandler(2, clusterPartHdlr, FaultType.CLUSTER_PARTITION);
+        // set sites at host 1 down... as if the catalog were updated
+        // and the surviving set contained the blessed host id.
+        voltdb.killSite(101);
+        voltdb.killSite(1010);
 
-        // verify node fault was not promoted to cluster partition fault
-        dut.reportFault(new NodeFailureFault(0, "hostname"));
-        nodeFaultHdlr.m_handledFaults.acquire();
-        assertTrue(nodeFaultHdlr.m_gotFault);
-        assertFalse(clusterPartHdlr.m_handledFaults.tryAcquire());
+        HashSet<Integer> failedSiteIds = new HashSet<Integer>();
+        failedSiteIds.add(101);
+        failedSiteIds.add(1010);
+
+        // should get a PPD now.
+        PPDPolicyDecision makePPDPolicyDecisions = dut.makePPDPolicyDecisions(failedSiteIds);
+        assertEquals(PPDPolicyDecision.NodeFailure, makePPDPolicyDecisions);
     }
 
 
