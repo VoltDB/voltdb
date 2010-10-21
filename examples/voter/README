@@ -42,7 +42,8 @@ By using a cluster of server nodes, you can get both exemplary throughput (TPS) 
 ant targets
 -----------
 
-ant                 : compile all Java clients and stored procedures, build the catalog
+ant                 : compile all Java clients and stored procedures, build the catalog, and
+                      start the server
 
 ant server          : start the server
 
