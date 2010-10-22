@@ -23,6 +23,7 @@ import javax.servlet_voltpatches.ServletException;
 import javax.servlet_voltpatches.http.HttpServletRequest;
 import javax.servlet_voltpatches.http.HttpServletResponse;
 
+import org.eclipse.jetty_voltpatches.server.AsyncContinuation;
 import org.eclipse.jetty_voltpatches.server.Request;
 import org.eclipse.jetty_voltpatches.server.Server;
 import org.eclipse.jetty_voltpatches.server.bio.SocketConnector;
@@ -45,6 +46,19 @@ public class HTTPAdminListener {
                            HttpServletRequest request,
                            HttpServletResponse response)
                            throws IOException, ServletException {
+
+            // if this is an internal jetty retry, then just tell
+            // jetty we're still working on it. There is a risk of
+            // masking other errors in doing this, but it's probably
+            // low compared with the default policy of retrys.
+            AsyncContinuation cont = baseRequest.getAsyncContinuation();
+            // this is set to false on internal jetty retrys
+            if (!cont.isInitial()) {
+                // The continuation object has been woken up by the
+                // retry. Tell it to go back to sleep.
+                cont.suspend();
+                return;
+            }
 
             // kick over to the HTTP/JSON interface
             if (baseRequest.getRequestURI().contains("/api/1.0/")) {

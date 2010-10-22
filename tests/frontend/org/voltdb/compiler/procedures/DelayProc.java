@@ -36,6 +36,7 @@ public class DelayProc extends VoltProcedure {
 
     public long run(long delay) {
         numCalls++;
+        assert(numCalls == 1);
         System.out.printf("Numcalls: %d\n", numCalls);
         try {
             Thread.sleep(delay);
