@@ -1,0 +1,80 @@
+#!/usr/bin/expect -f
+
+# run this script from the examples/auction directory of the unpacked kit under test
+
+set timeout 150
+proc abort {} {
+  exec mv project.xml.bak project.xml
+  exit 1
+}
+
+exec rm -f EXPORTDEMO-BID.csv  EXPORTDEMO-ITEM.csv
+
+spawn ant catalog server
+set server_id $spawn_id
+expect -i $server_id eof abort timeout abort "INFO HOST: Build: 1.2.01 https://svn.voltdb.com/eng/trunk?revision=1149"
+expect -i $server_id eof abort timeout abort "Server completed initialization."
+# wait for server to really be ready
+sleep 1
+
+spawn ant client
+set client_id $spawn_id
+expect -i $client_id eof abort timeout abort "Welcome to Bobbi's Awesome Auctions"
+expect -i $client_id eof abort timeout abort "Loading ITEM Table"
+expect -i $client_id eof abort timeout abort "4"
+expect -i $client_id eof abort timeout abort "ITEM Table Loaded"
+expect -i $client_id eof abort timeout abort "Loading USER Table"
+expect -i $client_id eof abort timeout abort "16"
+expect -i $client_id eof abort timeout abort "USER Table Loaded"
+expect -i $client_id eof abort timeout abort "Loading CATEGORY Table"
+expect -i $client_id eof abort timeout abort "6"
+expect -i $client_id eof abort timeout abort "CATEGORY Table Loaded"
+expect -i $client_id eof abort timeout abort "Running auctions"
+expect -i $client_id eof abort timeout abort "OPEN"
+expect -i $client_id eof abort timeout abort "CLOSED"
+expect -i $client_id eof abort timeout abort "Complete..."
+expect -i $client_id eof abort timeout abort "Where do ghosts shop?"
+expect -i $client_id eof abort timeout abort "In Boo-tiques!"
+expect -i $client_id eof abort timeout abort "BUILD SUCCESSFUL"
+expect -i $client_id timeout abort eof
+close -i $server_id
+
+exec mv project.xml project.xml.bak
+exec sed s/false/true/g project.xml.bak > project.xml
+
+spawn ant clean catalog server
+set server_id $spawn_id
+expect -i $server_id eof abort timeout abort "INFO HOST: Build: 1.2.01 https://svn.voltdb.com/eng/trunk?revision=1149"
+expect -i $server_id eof abort timeout abort "Server completed initialization."
+# wait for server to really be ready
+sleep 1
+
+spawn ant client
+set client_id $spawn_id
+
+spawn ant export
+set export_id $spawn_id
+
+expect -i $client_id eof abort timeout abort "Welcome to Bobbi's Awesome Auctions"
+expect -i $client_id eof abort timeout abort "Loading ITEM Table"
+expect -i $client_id eof abort timeout abort "4"
+expect -i $client_id eof abort timeout abort "ITEM Table Loaded"
+expect -i $client_id eof abort timeout abort "Loading USER Table"
+expect -i $client_id eof abort timeout abort "16"
+expect -i $client_id eof abort timeout abort "USER Table Loaded"
+expect -i $client_id eof abort timeout abort "Loading CATEGORY Table"
+expect -i $client_id eof abort timeout abort "6"
+expect -i $client_id eof abort timeout abort "CATEGORY Table Loaded"
+expect -i $client_id eof abort timeout abort "Running auctions"
+expect -i $client_id eof abort timeout abort "OPEN"
+expect -i $client_id eof abort timeout abort "CLOSED"
+expect -i $client_id eof abort timeout abort "Complete..."
+expect -i $client_id eof abort timeout abort "Where do ghosts shop?"
+expect -i $client_id eof abort timeout abort "In Boo-tiques!"
+expect -i $client_id eof abort timeout abort "BUILD SUCCESSFUL"
+expect -i $client_id timeout abort eof
+close -i $server_id
+
+expect -i $export_id timeout abort eof
+
+exec mv project.xml.bak project.xml
