@@ -42,11 +42,11 @@ public class SnapshotSiteProcessor {
         new AtomicInteger(-1);
 
     /**
-     * Ensure the first thread to run the fragment does the creation
+     * Ensure only one thread running the setup fragment does the creation
      * of the targets and the distribution of the work.
      */
-    public static final Semaphore m_snapshotCreateSetupPermit =
-        new Semaphore(1);
+    public static final Object m_snapshotCreateLock = new Object();
+    public static Semaphore m_snapshotCreateSetupPermit = null;
 
     /**
      * Only proceed once permits are available after setup completes
@@ -84,13 +84,13 @@ public class SnapshotSiteProcessor {
      * of targets in case this EE ends up being the one that needs
      * to close each target.
      */
-    private ArrayList<SnapshotDataTarget> m_snapshotTargets;
+    private ArrayList<SnapshotDataTarget> m_snapshotTargets = null;
 
     /**
      * Queue of tasks for tables that still need to be snapshotted.
      * This is polled from until there are no more tasks.
      */
-    private ArrayDeque<SnapshotTableTask> m_snapshotTableTasks;
+    private ArrayDeque<SnapshotTableTask> m_snapshotTableTasks = null;
 
 
     /**
@@ -317,7 +317,6 @@ public class SnapshotSiteProcessor {
                 };
 
                 m_snapshotTargetTerminators.add(terminatorThread);
-
                 terminatorThread.start();
             }
         }
@@ -349,8 +348,11 @@ public class SnapshotSiteProcessor {
          * Block until the sync has actually occurred in the forked threads.
          * The threads are spawned even in the blocking case to keep it simple.
          */
-        for (final Thread t : m_snapshotTargetTerminators) {
-            t.join();
+        if (m_snapshotTargetTerminators != null) {
+            for (final Thread t : m_snapshotTargetTerminators) {
+                t.join();
+            }
+            m_snapshotTargetTerminators = null;
         }
 
         return retval;
