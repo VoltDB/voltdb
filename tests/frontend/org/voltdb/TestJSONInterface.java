@@ -60,7 +60,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
-import java.math.BigDecimal;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -76,14 +75,8 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
-import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
-import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
-import org.voltdb.compiler.procedures.CrazyBlahProc;
-import org.voltdb.compiler.procedures.SelectStarHelloWorld;
-import org.voltdb.types.TimestampType;
+import org.voltdb.compiler.procedures.DelayProc;
 import org.voltdb.utils.Encoder;
 
 public class TestJSONInterface extends TestCase {
@@ -156,8 +149,12 @@ public class TestJSONInterface extends TestCase {
 
         assertEquals(expectedCode, responseCode);
 
-        conn.getInputStream().close();
-        conn.disconnect();
+        try {
+            conn.getInputStream().close();
+            conn.disconnect();
+        }
+        // ignore closing problems here
+        catch (Exception e) {}
         conn = null;
 
         //System.err.println(response);
@@ -236,7 +233,7 @@ public class TestJSONInterface extends TestCase {
         return response;
     }
 
-    public void testSimple() throws Exception {
+    /*public void testSimple() throws Exception {
         String simpleSchema =
             "create table blah (" +
             "ival bigint default 23 not null, " +
@@ -587,12 +584,81 @@ public class TestJSONInterface extends TestCase {
         ParameterSet pset = new ParameterSet();
         pset.setParameters("foo", "bar", "foobar");
         try {
-            callProcOverJSON("Insert", pset, null, null, false, 403 /* HTTP_FORBIDDEN */);
+            callProcOverJSON("Insert", pset, null, null, false, 403); // HTTP_FORBIDDEN
         }
         catch (Exception e) {
             // make sure failed due to permissions on http
             assertTrue(e.getMessage().contains("403"));
         }
+
+        server.shutdown();
+        server.join();
+    }
+
+    public void testLongProc() throws Exception {
+        String simpleSchema =
+            "CREATE TABLE foo (\n" +
+            "    bar BIGINT NOT NULL,\n" +
+            "    PRIMARY KEY (bar)\n" +
+            ");";
+
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+        String schemaPath = schemaFile.getPath();
+        schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addSchema(schemaPath);
+        builder.addPartitionInfo("foo", "bar");
+        builder.addProcedures(DelayProc.class);
+        builder.setHTTPDPort(8095);
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+        assertTrue(success);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+        config.m_pathToDeployment = builder.getPathToDeployment();
+        ServerThread server = new ServerThread(config);
+        server.start();
+        server.waitForInitialization();
+
+        ParameterSet pset = new ParameterSet();
+        pset.setParameters(30000);
+        String response = callProcOverJSON("DelayProc", pset, null, null, false);
+        Response r = responseFromJSON(response);
+        assertEquals(ClientResponse.SUCCESS, r.status);
+
+        server.shutdown();
+        server.join();
+    }*/
+
+    public void testGarbageProcs() throws Exception {
+        String simpleSchema =
+            "CREATE TABLE foo (\n" +
+            "    bar BIGINT NOT NULL,\n" +
+            "    PRIMARY KEY (bar)\n" +
+            ");";
+
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+        String schemaPath = schemaFile.getPath();
+        schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addSchema(schemaPath);
+        builder.addPartitionInfo("foo", "bar");
+        builder.addProcedures(DelayProc.class);
+        builder.setHTTPDPort(8095);
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+        assertTrue(success);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+        config.m_pathToDeployment = builder.getPathToDeployment();
+        ServerThread server = new ServerThread(config);
+        server.start();
+        server.waitForInitialization();
+
+        callProcOverJSONRaw("http://localhost:8080/api/1.0/Tim", 404);
+        callProcOverJSONRaw("http://localhost:8080/api/1.0/Tim?Procedure=foo&Parameters=[x4{]", 404);
 
         server.shutdown();
         server.join();
