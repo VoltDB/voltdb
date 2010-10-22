@@ -93,6 +93,13 @@ public class HTTPClientInterface {
             String procName = request.getParameter("Procedure");
             String params = request.getParameter("Parameters");
 
+            // null procs are bad news
+            if (procName == null) {
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                continuation.complete();
+                return;
+            }
+
             // The SHA-1 hash of the password
             byte[] hashedPasswordBytes = null;
 
@@ -126,7 +133,22 @@ public class HTTPClientInterface {
             boolean success;
 
             if (params != null) {
-                ParameterSet paramSet = ParameterSet.fromJSONString(params);
+                ParameterSet paramSet = null;
+                try {
+                    paramSet = ParameterSet.fromJSONString(params);
+                }
+                // if decoding params has a fail, then fail
+                catch (Exception e) {
+                    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    continuation.complete();
+                    return;
+                }
+                // if the paramset has content, but decodes to null, fail
+                if (paramSet == null) {
+                    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    continuation.complete();
+                    return;
+                }
                 success = client.callProcedure(cb, procName, paramSet.toArray());
             }
             else {
