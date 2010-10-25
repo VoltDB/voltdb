@@ -445,16 +445,22 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
         // If the blessed host is in the failure set, this set is not blessed.
         if (failedHosts.size() * 2 == prevSurvivorCnt) {
             if (blessedHostIdInFailedSet) {
+                hostLog.info("Partition detection triggered for 50/50 cluster failure. " +
+                             "This survivor set is shutting down.");
                 m_partitionDetectionTriggered = true;
                 return PPDPolicyDecision.PartitionDetection;
             }
             else {
+                hostLog.info("Partition detected for 50/50 failure. " +
+                             "This survivor set is continuing execution.");
                 return PPDPolicyDecision.NodeFailure;
             }
         }
 
         // A strict, viable minority is always a partition.
         if (failedHosts.size() * 2 > prevSurvivorCnt) {
+            hostLog.info("Partition detection triggered. " +
+                         "This minority survivor set is shutting down.");
             m_partitionDetectionTriggered = true;
             return PPDPolicyDecision.PartitionDetection;
         }

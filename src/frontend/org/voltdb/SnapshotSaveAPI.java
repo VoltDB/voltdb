@@ -19,6 +19,7 @@ package org.voltdb;
 
 import java.io.*;
 import java.util.*;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
@@ -61,12 +62,34 @@ public class SnapshotSaveAPI
     {
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = SnapshotSave.constructNodeResultsTable();
+        final int numLocalSites = VoltDB.instance().getLocalSites().values().size();
 
         // One site wins the race to create the snapshot targets, populating
         // m_taskListsForSites for the other sites and creating an appropriate
-        // number of snapshot permits
-        if (SnapshotSiteProcessor.m_snapshotCreateSetupPermit.tryAcquire()) {
-            createSetup(file_path, file_nonce, startTime, context, hostname, result);
+        // number of snapshot permits.
+        synchronized (SnapshotSiteProcessor.m_snapshotCreateLock) {
+
+            // First time use lazy initialization (need to calculate numLocalSites.
+            if (SnapshotSiteProcessor.m_snapshotCreateSetupPermit == null) {
+                SnapshotSiteProcessor.m_snapshotCreateSetupPermit = new Semaphore(numLocalSites);
+            }
+
+            try {
+                SnapshotSiteProcessor.m_snapshotCreateSetupPermit.acquire();
+            } catch (InterruptedException e) {
+                result.addRow(Integer.parseInt(context.getSite().getHost().getTypeName()),
+                        hostname,
+                        "",
+                        "FAILURE",
+                        e.toString());
+                return result;
+            }
+
+            if (SnapshotSiteProcessor.m_snapshotCreateSetupPermit.availablePermits() == 0) {
+                createSetup(file_path, file_nonce, startTime, context, hostname, result);
+                // release permits for the next setup, now that is one is complete
+                SnapshotSiteProcessor.m_snapshotCreateSetupPermit.release(numLocalSites);
+            }
         }
 
         // All sites wait for a permit to start their individual snapshot tasks
@@ -80,10 +103,6 @@ public class SnapshotSaveAPI
             if (m_taskList == null) {
                 return result;
             } else {
-                if (SnapshotSiteProcessor.m_taskListsForSites.isEmpty()) {
-                    assert(SnapshotSiteProcessor.m_snapshotCreateSetupPermit.availablePermits() == 1);
-                    assert(SnapshotSiteProcessor.m_snapshotPermits.availablePermits() == 0);
-                }
                 assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() > 0);
                 context.getExecutionSite().initiateSnapshots(m_taskList);
             }
@@ -316,18 +335,6 @@ public class SnapshotSaveAPI
                     "FAILURE",
                     e.toString());
             return result;
-        } finally {
-            /*
-             * The last thread to acquire a snapshot permit has to be the one
-             * to release the setup permit to ensure that a thread
-             * doesn't come late and think it is supposed to do the setup work
-             */
-            synchronized (SnapshotSiteProcessor.m_snapshotPermits) {
-                if (SnapshotSiteProcessor.m_snapshotPermits.availablePermits() == 0 &&
-                        SnapshotSiteProcessor.m_snapshotCreateSetupPermit.availablePermits() == 0) {
-                    SnapshotSiteProcessor.m_snapshotCreateSetupPermit.release();
-                }
-            }
         }
         return null;
     }
