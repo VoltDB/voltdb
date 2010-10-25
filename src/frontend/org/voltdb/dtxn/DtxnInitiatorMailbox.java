@@ -17,23 +17,13 @@
 
 package org.voltdb.dtxn;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
 import org.voltdb.fault.*;
 import org.voltdb.fault.VoltFault.FaultType;
-import org.voltdb.messaging.HeartbeatResponseMessage;
-import org.voltdb.messaging.HostMessenger;
-import org.voltdb.messaging.InitiateResponseMessage;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.MessagingException;
-import org.voltdb.messaging.Subject;
-import org.voltdb.messaging.VoltMessage;
+import org.voltdb.messaging.*;
 import org.voltdb.network.Connection;
 import org.voltdb.utils.EstTime;
 
@@ -57,15 +47,9 @@ public class DtxnInitiatorMailbox implements Mailbox
         {
             synchronized (m_initiator) {
                 for (VoltFault fault : faults) {
-                    if (fault instanceof NodeFailureFault || fault instanceof ClusterPartitionFault)
+                    if (fault instanceof NodeFailureFault)
                     {
-                        NodeFailureFault node_fault;
-                        if (fault instanceof NodeFailureFault) {
-                            node_fault = (NodeFailureFault)fault;
-                        }
-                        else {
-                            node_fault = ((ClusterPartitionFault)fault).getCause();
-                        }
+                        NodeFailureFault node_fault = (NodeFailureFault)fault;
                         ArrayList<Integer> dead_sites =
                             VoltDB.instance().getCatalogContext().siteTracker.
                             getAllSitesForHost(node_fault.getHostId());
@@ -123,7 +107,7 @@ public class DtxnInitiatorMailbox implements Mailbox
         // but before everything else (to prevent any new work for bad sites)
         registerFaultHandler(NodeFailureFault.NODE_FAILURE_INITIATOR,
                              new InitiatorNodeFailureFaultHandler(),
-                             FaultType.NODE_FAILURE, FaultType.CLUSTER_PARTITION);
+                             FaultType.NODE_FAILURE);
     }
 
     public void setInitiator(TransactionInitiator initiator) {

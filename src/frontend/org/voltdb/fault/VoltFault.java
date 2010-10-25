@@ -28,7 +28,7 @@ public class VoltFault
 {
     public enum FaultType
     {
-        UNKNOWN, NODE_FAILURE, CLUSTER_PARTITION;
+        UNKNOWN, NODE_FAILURE;
     }
 
     public VoltFault(FaultType faultType)

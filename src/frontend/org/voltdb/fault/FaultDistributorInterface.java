@@ -16,10 +16,17 @@
  */
 package org.voltdb.fault;
 
+import java.util.HashSet;
+
 import org.voltdb.fault.VoltFault.FaultType;
 
 public interface FaultDistributorInterface
 {
+    public enum PPDPolicyDecision {
+        NodeFailure,
+        PartitionDetection
+    }
+
 
     /**
      * Register a FaultHandler object to be notified when FaultType type occurs.
@@ -69,4 +76,12 @@ public interface FaultDistributorInterface
      * Prevents many false positives that prevent an orderly shutdown.
      */
     public abstract void shutDown() throws InterruptedException;
+
+    /**
+     * Allow fault manager to make partition detection decisons once
+     * a fault set is agreed to by the execution site agreement process
+     * @param newFailedSiteIds
+     * @return
+     */
+    public abstract PPDPolicyDecision makePPDPolicyDecisions(HashSet<Integer> newFailedSiteIds);
 }

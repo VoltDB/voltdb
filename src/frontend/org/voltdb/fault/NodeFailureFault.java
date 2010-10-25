@@ -60,10 +60,6 @@ public class NodeFailureFault extends VoltFault
             NodeFailureFault ofault = (NodeFailureFault)other;
             return ofault.getHostId() == m_hostId;
         }
-        else if (other instanceof ClusterPartitionFault) {
-            ClusterPartitionFault fault = (ClusterPartitionFault)other;
-            return fault.getCause().getHostId() == m_hostId;
-        }
         return false;
     }
 
