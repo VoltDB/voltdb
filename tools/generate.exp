@@ -2,13 +2,18 @@
 
 # run this script from the tools directory of the unpacked kit under test
 
+set buildstring "Build: 1.2.01 https://svn.voltdb.com/eng/trunk?revision=1149"
+if { $argc >= 0 } {
+  set buildstring [lindex $argv 0]
+}
+
 set timeout 150
 proc abort {} { exit 1 }
 
 exec python generate tmc com tmc
 spawn ant -f tmc/build.xml server
 set server_id $spawn_id
-expect -i $server_id eof abort timeout abort "INFO HOST - Build: 1.2.01 https://svn.voltdb.com/eng/trunk?revision=1149"
+expect -i $server_id eof abort timeout abort "INFO HOST - $buildstring"
 expect -i $server_id eof abort timeout abort "Server completed initialization."
 # wait for server to really be ready
 sleep 1

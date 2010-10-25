@@ -2,6 +2,11 @@
 
 # run this script from the examples/auction directory of the unpacked kit under test
 
+set buildstring "Build: 1.2.01 https://svn.voltdb.com/eng/trunk?revision=1149"
+if { $argc >= 0 } {
+  set buildstring [lindex $argv 0]
+}
+
 set timeout 150
 proc abort {} {
   exec mv project.xml.bak project.xml
@@ -12,7 +17,7 @@ exec rm -f EXPORTDEMO-BID.csv  EXPORTDEMO-ITEM.csv
 
 spawn ant catalog server
 set server_id $spawn_id
-expect -i $server_id eof abort timeout abort "INFO HOST: Build: 1.2.01 https://svn.voltdb.com/eng/trunk?revision=1149"
+expect -i $server_id eof abort timeout abort "INFO HOST: $buildstring"
 expect -i $server_id eof abort timeout abort "Server completed initialization."
 # wait for server to really be ready
 sleep 1
@@ -44,7 +49,7 @@ exec sed s/false/true/g project.xml.bak > project.xml
 
 spawn ant clean catalog server
 set server_id $spawn_id
-expect -i $server_id eof abort timeout abort "INFO HOST: Build: 1.2.01 https://svn.voltdb.com/eng/trunk?revision=1149"
+expect -i $server_id eof abort timeout abort "INFO HOST: $buildstring"
 expect -i $server_id eof abort timeout abort "Server completed initialization."
 # wait for server to really be ready
 sleep 1
