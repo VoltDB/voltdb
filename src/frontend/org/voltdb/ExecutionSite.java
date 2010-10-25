@@ -1078,28 +1078,33 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             m_snapshotter.doSnapshotWork(ee);
         }
         else if (message instanceof ExecutionSiteLocalSnapshotMessage) {
-            hostLog.info("Received ExecutionSiteLocalSnapshotMessage. Completing any on-going snapshots.");
+            hostLog.info("Executing local snapshot. Completing any on-going snapshots.");
 
             // first finish any on-going snapshot
             try {
-                m_snapshotter.completeSnapshotWork(ee);
+                HashSet<Exception> completeSnapshotWork = m_snapshotter.completeSnapshotWork(ee);
+                if (completeSnapshotWork != null && !completeSnapshotWork.isEmpty()) {
+                    for (Exception e : completeSnapshotWork) {
+                        hostLog.error("Error completing in progress snapshot.", e);
+                    }
+                }
             } catch (InterruptedException e) {
                 hostLog.warn("Interrupted during snapshot completion", e);
             }
 
-            hostLog.info("Received ExecutionSiteLocalSnapshotMessage. Creating final snapshot.");
+            hostLog.info("Executing local snapshot. Creating new snapshot.");
 
             // then initiate the local snapshot
             SnapshotSchedule schedule = m_context.cluster.getFaultsnapshots().get("CLUSTER_PARTITION");
             SnapshotSaveAPI saveAPI = new SnapshotSaveAPI();
-            saveAPI.startSnapshotting(schedule.getPath(),
+            VoltTable startSnapshotting = saveAPI.startSnapshotting(schedule.getPath(),
                                       schedule.getPrefix(),
                                       (byte) 0x1,
                                       ((ExecutionSiteLocalSnapshotMessage) message).m_roadblockTransactionId,
                                       m_systemProcedureContext,
                                       ConnectionUtil.getHostnameOrAddress());
-
-            hostLog.info("Received ExecutionSiteLocalSnapshotMessage. Finished final snapshot. Shutting down.");
+            hostLog.info("Executing local snapshot. Finished final snapshot. Shutting down. " +
+                    "Result: " + startSnapshotting.toString());
             if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() == -1) {
                 VoltDB.crashVoltDB();
             }
