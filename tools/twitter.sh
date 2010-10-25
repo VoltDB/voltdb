@@ -10,4 +10,6 @@ sleep 20
 ant cull &
 sleep 180
 links -source http://localhost:12345
+# links leaves a line unterminated
+echo
 ps -ef | grep ant.jar | awk " { print \$2 } " | xargs kill -9
