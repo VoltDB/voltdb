@@ -45,9 +45,7 @@
 </condition>
 
 <!-- stub the voltpro classpath fileset so a fileset with this id always exists -->
-<fileset id="voltpro.classpath" file="build.xml">
-  <exclude name="build.xml"/>
-</fileset>
+<path id="voltpro.classpath" />
 
 <!-- import the pro build.xml if it exists and is requested -->
 <import file="${voltpro}/build.xml" optional="true"/>
@@ -102,7 +100,7 @@
         <exclude name='ant.jar' />
     </fileset>
     <pathelement path="${java.class.path}"/>
-    <fileset refid="voltpro.classpath"/>
+    <path refid="voltpro.classpath"/>
 </path>
 
 <!-- select which set of regression suite configuration types to run -->
@@ -503,6 +501,9 @@ JAR BUILDING
             <include name="org/hsqldb_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
         </fileset>
+        <fileset dir="${voltpro.build.prod.dir}" defaultexcludes="yes">
+            <include name="org/voltdb/**" />
+        </fileset>
         <fileset dir="${build.test.dir}" defaultexcludes="yes" >
             <include name="org/voltdb/ServerThread.class" />
             <include name="org/voltdb/benchmark/*" />
@@ -687,7 +688,7 @@ JAVA COMPILATION
 
 <!-- This task only executes if the voltpro.flavor property is set. -->
 <target name="compile_pro" if="voltpro.flavor">
-  <antcall target="voltpro.compile"/>
+  <ant target="compile" dir="${voltpro}" inheritAll="false" inheritRefs="true" />
 </target>
 
 <!--
