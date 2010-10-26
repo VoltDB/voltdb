@@ -166,7 +166,7 @@ protected:
         std::pair<MMIter,MMIter> key_iter;
         for (key_iter = m_entries.equal_range(key); key_iter.first != key_iter.second; ++(key_iter.first)) {
             if (key_iter.first->second == tuple->address()) {
-                m_entries.erase(key_iter.first);
+                m_entries.quick_erase(key_iter.first);
                 return true; //deleted
             }
         }

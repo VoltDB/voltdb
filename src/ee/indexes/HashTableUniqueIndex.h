@@ -164,7 +164,7 @@ protected:
         typename MapType::iterator mapiter = m_entries.find(key);
         if (mapiter == m_entries.end())
             return false; //key not exists
-        m_entries.erase(mapiter);
+        m_entries.quick_erase(mapiter);
         return true; //deleted
     }
 
