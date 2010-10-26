@@ -82,8 +82,8 @@ SELECT resultid as id,
 FROM results
 WHERE time >= '%s'
       AND benchmarkname = 'org.voltdb.benchmark.tpcc.TPCCClient'
-      AND txnpersecond >= hostcount * 32000
-      AND txnpersecond >= 35001
+      AND txnpersecond >= hostcount * 35100
+      AND txnpersecond <= hostcount * 78000
 GROUP BY hostcount, DATE(time)
 ORDER BY time DESC
 LIMIT %u
