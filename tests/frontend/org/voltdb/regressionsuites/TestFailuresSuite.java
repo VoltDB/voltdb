@@ -38,6 +38,7 @@ import org.voltdb.exceptions.ConstraintFailureException;
 import org.voltdb_testprocs.regressionsuites.failureprocs.BadDecimalToVarcharCompare;
 import org.voltdb_testprocs.regressionsuites.failureprocs.BadFloatToVarcharCompare;
 import org.voltdb_testprocs.regressionsuites.failureprocs.BadVarcharCompare;
+import org.voltdb_testprocs.regressionsuites.failureprocs.BatchTooBig;
 import org.voltdb_testprocs.regressionsuites.failureprocs.CleanupFail;
 import org.voltdb_testprocs.regressionsuites.failureprocs.DivideByZero;
 import org.voltdb_testprocs.regressionsuites.failureprocs.FetchTooMuch;
@@ -58,7 +59,7 @@ public class TestFailuresSuite extends RegressionSuite {
         ViolateUniqueness.class, ViolateUniquenessAndCatchException.class,
         DivideByZero.class, WorkWithBigString.class, InsertBigString.class,
         InsertLotsOfData.class, FetchTooMuch.class, CleanupFail.class, TooFewParams.class,
-        ReturnAppStatus.class
+        ReturnAppStatus.class, BatchTooBig.class
     };
 
     /**
@@ -231,9 +232,9 @@ public class TestFailuresSuite extends RegressionSuite {
         return;
     }
 
-    /*
-     * Check that a very large ConstraintFailureException can serialize correctly.
-     */
+    //
+    // Check that a very large ConstraintFailureException can serialize correctly.
+    //
     public void testTicket511_ViolateUniquenessWithLargeString() throws Exception {
         Client client = getClient();
         System.out.println("STARTING testTicket511_ViolateUniquenessWithLargeString");
@@ -490,6 +491,24 @@ public class TestFailuresSuite extends RegressionSuite {
         assertTrue(threwException);
         assertTrue("statusstring".equals(response.getAppStatusString()));
         assertEquals(response.getAppStatus(), 4);
+    }
+
+    public void testBatchTooBig() throws Exception {
+        // HSQL has a different error... skip it
+        if (isHSQL()) return;
+
+        System.out.println("STARTING testAppStatus");
+        Client client = getClient();
+
+        try {
+            client.callProcedure( "BatchTooBig", 0, 0, (byte)0);
+            fail();
+        }
+        catch (ProcCallException e) {
+            String msg = e.getMessage();
+            System.out.println(msg);
+            assertTrue(msg.contains("attempted to queue"));
+        }
     }
 
     /**

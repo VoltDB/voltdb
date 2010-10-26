@@ -717,7 +717,8 @@ public abstract class VoltProcedure {
 
         if (m_batchQueryStmtIndex == m_batchQueryStmts.length) {
             throw new RuntimeException("Procedure attempted to queue more than " + m_batchQueryStmts.length +
-                    " statements in a batch.");
+                    "statements in a single batch.\n  You may use multiple batches of up to 1000 statements," +
+                    "each,\n  but you may also want to consider dividing this work into multiple procedures.");
         } else {
             m_batchQueryStmts[m_batchQueryStmtIndex++] = stmt;
             m_batchQueryArgs[m_batchQueryArgsIndex++] = args;
