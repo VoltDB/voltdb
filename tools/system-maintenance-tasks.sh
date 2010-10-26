@@ -2,7 +2,7 @@
 /home/test/tools/vis.py ~/voltbin/mysqlp /home/test/.hudson/userContent/performance perf 800 320
 python ~/trunk/tools/vis-micro-hudson.py ~/voltbin/mysqlp ~/.hudson/userContent/microbenchmark 30DaySpan 30
 # clean up stray java processes
-ps -ef | grep java | grep -v grep | grep -v hudson.war | sed 's/test *//g' | sed 's/ .*//g' | xargs -r kill -9
+ps -ef | grep "jvm.*java" | grep -v grep | grep -v hudson.war | sed 's/test *//g' | sed 's/ .*//g' | xargs -r kill -9
 # check disk space on hzproject.com
 # ssh hudson@hzproject.com df . | tail -1 | awk "(\$5 > 75) {exit 1}" || exit 1
 # echo date of current build
