@@ -97,6 +97,11 @@ public class BenchmarkController {
     @SuppressWarnings("unused")
     private static final VoltLogger log = new VoltLogger(BenchmarkController.class.getName());
     private static final VoltLogger benchmarkLog = new VoltLogger("BENCHMARK");
+    // don't subject the following node to stress
+    String m_controllerHostName = null;
+    // a node which is OK to subject to stress
+    String m_reservedHostName = null;
+    String[] m_reservedHostCommand;
 
     public static interface BenchmarkInterest {
         public void benchmarkHasUpdated(BenchmarkResults currentResults);
@@ -365,6 +370,7 @@ public class BenchmarkController {
 
             // START THE SERVERS
             m_serverPSM = new ProcessSetManager();
+            boolean seenControllerNode = false;
             for (InetSocketAddress host : m_config.hosts) {
 
                 String debugString = "";
@@ -393,14 +399,11 @@ public class BenchmarkController {
                         "-server",
                         "-cp", "\"voltdbfat.jar:vertica_4.0_jdk_5.jar\"",
                         "org.voltdb.VoltDB",
-                        "catalog",
-                        m_jarFileName,
-                        "deployment",
-                        new File(m_pathToDeployment).getName(),
+                        "catalog", m_jarFileName,
+                        "deployment", new File(m_pathToDeployment).getName(),
                         m_config.useProfile,
                         m_config.backend,
-                        "port",
-                        Integer.toString(host.getPort())};
+                        "port", Integer.toString(host.getPort())};
 
                 command = ssh.convert(host.getHostName(), m_config.remotePath,
                                       command);
@@ -414,6 +417,22 @@ public class BenchmarkController {
                 benchmarkLog.debug(fullCommand.toString());
 
                 m_serverPSM.startProcess(host.getHostName(), command);
+
+                if (seenControllerNode) {
+                    m_reservedHostName = host.getHostName();
+                    m_reservedHostCommand = new String[command.length + 2];
+                    int i = 0;
+                    for (; i < command.length; i++) {
+                        assert(command[i] != null);
+                        m_reservedHostCommand[i] = command[i];
+                    }
+                    m_reservedHostCommand[i] = "rejoinhost";
+                    i++;
+                    m_reservedHostCommand[i] = m_controllerHostName;
+                } else {
+                    m_controllerHostName = host.getHostName();
+                    seenControllerNode = true;
+                }
             }
 
             // WAIT FOR SERVERS TO BE READY
@@ -711,7 +730,7 @@ public class BenchmarkController {
         }
 
         try {
-            m_statusThread.join(1000);
+            m_statusThread.join(10000);
         }
         catch (InterruptedException e) {
             benchmarkLog.warn(e);
