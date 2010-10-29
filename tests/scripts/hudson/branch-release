@@ -1,0 +1,4 @@
+/home/test/tools/check-released.sh
+cd release
+svn info
+ant clean check

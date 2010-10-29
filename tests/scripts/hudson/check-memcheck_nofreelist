@@ -1,0 +1,4 @@
+/home/test/tools/check-released.sh
+cd trunk
+svn info
+BUILD=memcheck_nofreelist ant clean check -Dbuild=memcheck_nofreelist -DVOLT_REGRESSIONS=local

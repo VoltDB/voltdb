@@ -1,0 +1,2 @@
+cd /home/test/trunk
+ant junitclass -Djunitclass=TestExportSuite -DtimeoutLength=600000

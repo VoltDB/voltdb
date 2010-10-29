@@ -1,0 +1,4 @@
+cd trunk
+svn up
+svn info
+VOLTPRO=../pro ant clean compile ee voltdbipc dist jars voltbin

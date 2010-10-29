@@ -1,0 +1,4 @@
+/home/test/tools/check-released.sh
+cd trunk
+svn info
+ant clean check_quick -Dbuild=debug -DtimeoutLength=9000000

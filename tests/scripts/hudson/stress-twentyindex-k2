@@ -1,0 +1,1 @@
+BMCLIENT=org.voltdb.benchmark.twentyindex.ClientBenchmark BMKFACTOR=2 BMDURATION=1800 MULTINODE_HELPER=multinode-CentOS-90m BMHOSTCOUNT=3 ~/tools/benchmark.sh

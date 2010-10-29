@@ -1,0 +1,1 @@
+BMCLIENT=org.voltdb.benchmark.overhead.OverheadClient BMKFACTOR=2 BMDURATION=180 MULTINODE_HELPER=multinode-CentOS-90m BMHOSTCOUNT=3 ~/rejoin-trunk/tools/benchmark.sh

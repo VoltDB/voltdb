@@ -1,0 +1,2 @@
+hostname > ${TMPFILE}
+java -jar ~/.hudson/hudson-cli.jar -s http://newbobbi:8080 offline-node $HOSTNAME -m "$MESSAGE"

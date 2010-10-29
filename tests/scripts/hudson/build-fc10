@@ -1,0 +1,4 @@
+cd trunk
+svn up
+svn info
+ant clean compile ee voltbin

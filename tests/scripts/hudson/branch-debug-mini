@@ -1,0 +1,4 @@
+cd release
+/opt/local/bin/svn info
+rm -rf obj/debug
+ant check -Dbuild=debug

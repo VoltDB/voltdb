@@ -1,0 +1,1 @@
+BMCLIENT=org.voltdb.benchmark.dedupe.ClientBenchmark BMKFACTOR=1 BMDURATION=3600 MULTINODE_HELPER=multinode-CentOS-90m BMHOSTCOUNT=4 ~/tools/benchmark.sh

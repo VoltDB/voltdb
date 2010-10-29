@@ -1,0 +1,5 @@
+cd trunk
+ant clean voltbin
+cd tools
+svn info
+./runWorkloads.sh

@@ -1,0 +1,4 @@
+/home/test/tools/check-released.sh
+cd trunk
+svn info
+BUILD=memcheck ant clean check_quick -Dbuild=memcheck -DtimeoutLength=9000000 -DVOLT_REGRESSIONS=local

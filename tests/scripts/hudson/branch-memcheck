@@ -1,0 +1,4 @@
+/home/test/tools/check-released.sh
+cd release
+svn info
+BUILD=memcheck ant clean check -Dbuild=memcheck -DVOLT_REGRESSIONS=local

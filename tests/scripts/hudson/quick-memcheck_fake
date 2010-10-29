@@ -1,0 +1,7 @@
+/home/test/tools/check-released.sh
+cd trunk
+svn info
+# ant clean check_quick -DtimeoutLength=9000000 -DVOLT_REGRESSIONS=local
+ant clean compile voltdbipc
+mv obj/release obj/memcheck_fake
+ant check_quick -Dbuild=memcheck_fake -DVOLT_REGRESSIONS=local
