@@ -39,12 +39,15 @@ public class SelectEmptyTable extends VoltProcedure
 
     //public final SQLStmt bogusUpdate = new SQLStmt("UPDATE EMPTY_TABLE SET ID = ?");
 
-    public long run(int id) throws VoltAbortException
+    public long run(int reps) throws VoltAbortException
     {
         //int id = getSeededRandomNumberGenerator().nextInt(100000);
 
         // Add a SQL statement to the execution queue.
-        voltQueueSQL(emptySelect);
+        for (int i = 0; i < reps; i++)
+        {
+            voltQueueSQL(emptySelect);
+        }
 
         // Run all queued queries.
         // Passing true parameter since this is the last voltExecuteSQL for this procedure.
