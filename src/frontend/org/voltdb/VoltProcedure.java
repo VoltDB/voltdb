@@ -772,26 +772,6 @@ public abstract class VoltProcedure {
         if (ProcedureProfiler.profilingLevel == ProcedureProfiler.Level.INTRUSIVE) {
             retval = executeQueriesInIndividualBatches(m_batchQueryStmtIndex, m_batchQueryStmts, m_batchQueryArgs, isFinalSQL);
         }
-        else if (m_catProc.getSinglepartition() == false) {
-            // check for duplicate sql statements
-            // if so, do them individually for now
-            boolean duplicate = false;
-
-            for (int i = 0; i < m_batchQueryStmtIndex; i++) {
-                for (int j = i + 1; i < m_batchQueryStmtIndex; i++) {
-                    if (m_batchQueryStmts[i] == m_batchQueryStmts[j])
-                        duplicate = true;
-                }
-            }
-            if (duplicate) {
-                retval = executeQueriesInIndividualBatches(
-                    m_batchQueryStmtIndex, m_batchQueryStmts, m_batchQueryArgs, isFinalSQL);
-            }
-            else {
-                retval = executeQueriesInABatch(
-                    m_batchQueryStmtIndex, m_batchQueryStmts, m_batchQueryArgs, isFinalSQL);
-            }
-        }
         else {
             retval = executeQueriesInABatch(
                 m_batchQueryStmtIndex, m_batchQueryStmts, m_batchQueryArgs, isFinalSQL);
@@ -1178,7 +1158,6 @@ public abstract class VoltProcedure {
 
     private VoltTable[] slowPath(int batchSize, SQLStmt[] batchStmts, Object[][] batchArgs, boolean finalTask) {
         VoltTable[] results = new VoltTable[batchSize];
-        FastSerializer fs = new FastSerializer();
 
         // the set of dependency ids for the expected results of the batch
         // one per sql statment
@@ -1221,7 +1200,7 @@ public abstract class VoltProcedure {
 
             // Build the set of params for the frags
             ParameterSet paramSet = getCleanParams(stmt, batchArgs[i]);
-            fs.clear();
+            FastSerializer fs = new FastSerializer();
             try {
                 fs.writeObject(paramSet);
             } catch (IOException e) {

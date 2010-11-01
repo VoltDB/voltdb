@@ -43,7 +43,9 @@ public class TestMultiPartitionSuite extends RegressionSuite {
 
     // procedures used by these tests
     static final Class<?>[] PROCEDURES = {
-        MultiSiteSelect.class, MultiSiteIndexSelect.class,
+        MultiSiteSelect.class,
+        MultiSiteSelectDuped.class,
+        MultiSiteIndexSelect.class,
         MultiSiteDelete.class, UpdateNewOrder.class
     };
 
@@ -169,6 +171,37 @@ public class TestMultiPartitionSuite extends RegressionSuite {
         }
     }
 
+    public void testDuplicateSQL() throws IOException {
+        Client client = getClient();
+
+        try {
+            int dupes = 5;
+            client.callProcedure("InsertNewOrder", 1L, 1L, 1L);
+            client.callProcedure("InsertNewOrder", 2L, 2L, 2L);
+            client.callProcedure("InsertNewOrder", 3L, 3L, 3L);
+            client.callProcedure("InsertNewOrder", 4L, 4L, 5L);
+
+            System.out.println("\nBEGIN TEST\n==================\n");
+
+            VoltTable[] results = client.callProcedure("MultiSiteSelectDuped", dupes).getResults();
+
+            assertEquals(dupes, results.length);
+            VoltTable resultAll = results[0];
+
+            System.out.println("All Got " + String.valueOf(resultAll.getRowCount()) + " rows.");
+            assertTrue(resultAll.getRowCount() == 4);
+
+            for (int i = 1; i < dupes; i++)
+            {
+                assertTrue(results[0].hasSameContents(results[i]));
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            assertTrue(false);
+        }
+        assertTrue(true);
+    }
 
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.

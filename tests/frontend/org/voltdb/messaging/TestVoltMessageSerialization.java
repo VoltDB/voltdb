@@ -29,6 +29,7 @@ import java.nio.ByteBuffer;
 import junit.framework.TestCase;
 
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.ParameterSet;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -123,6 +124,67 @@ public class TestVoltMessageSerialization extends TestCase {
         ft2.discard();
         pool.clear();
     }
+
+    public void testFragmentTaskWithTwoFrags() throws IOException {
+        DBBPool pool = new DBBPool();
+
+        Object[] params1 = {(Integer)10, (Double)10.1};
+        Object[] params2 = {(Integer)20, (Double)20.2};
+
+        ParameterSet param_set1 = new ParameterSet(true);
+        param_set1.setParameters(params1);
+        ParameterSet param_set2 = new ParameterSet(true);
+        param_set2.setParameters(params2);
+
+        FastSerializer param1_fs = new FastSerializer();
+        param1_fs.writeObject(param_set1);
+        ByteBuffer param1_buf = param1_fs.getBuffer();
+
+        FastSerializer param2_fs = new FastSerializer();
+        param2_fs.writeObject(param_set2);
+        ByteBuffer param2_buf = param2_fs.getBuffer();
+
+        FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, true,
+            new long[] { 5, 10 }, new int[] { 12, 24 },
+            new ByteBuffer[] { param1_buf, param2_buf }, true);
+        ft.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_PARTITION);
+
+        FragmentTaskMessage ft2 = (FragmentTaskMessage) checkVoltMessage(ft, pool);
+
+        assertEquals(ft.getInitiatorSiteId(), ft2.getInitiatorSiteId());
+        assertEquals(ft.getCoordinatorSiteId(), ft2.getCoordinatorSiteId());
+        assertEquals(ft.getTxnId(), ft2.getTxnId());
+        assertEquals(ft.isReadOnly(), ft2.isReadOnly());
+
+        assertEquals(ft.getFragmentCount(), ft2.getFragmentCount());
+
+        assertEquals(ft.isFinalTask(), ft2.isFinalTask());
+        assertEquals(ft.isSysProcTask(), ft2.isSysProcTask());
+
+        assertEquals(2, ft2.getFragmentCount());
+        ParameterSet params = null;
+        ByteBuffer paramData = ft2.getParameterDataForFragment(0);
+        if (paramData != null) {
+            final FastDeserializer fds = new FastDeserializer(paramData);
+            params = fds.readObject(ParameterSet.class);
+        }
+        assertEquals(10, params.toArray()[0]);
+        assertEquals(10.1, params.toArray()[1]);
+
+        params = null;
+        paramData = ft2.getParameterDataForFragment(1);
+        if (paramData != null) {
+            final FastDeserializer fds = new FastDeserializer(paramData);
+            params = fds.readObject(ParameterSet.class);
+        }
+        assertEquals(20, params.toArray()[0]);
+        assertEquals(20.2, params.toArray()[1]);
+
+        ft.discard();
+        ft2.discard();
+        pool.clear();
+    }
+
 
     public void testFragmentResponse() throws IOException {
         DBBPool pool = new DBBPool();

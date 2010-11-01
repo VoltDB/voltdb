@@ -19,6 +19,7 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 
 import org.voltdb.VoltTable;
 import org.voltdb.debugstate.MailboxHistory.MessageState;
@@ -47,8 +48,8 @@ public class FragmentResponseMessage extends VoltMessage {
     boolean m_dirty = true;
     boolean m_recovering = false;
     short m_dependencyCount = 0;
-    int[] m_dependencyIds = new int[50];
-    VoltTable[] m_dependencies = new VoltTable[50];
+    ArrayList<Integer> m_dependencyIds = new ArrayList<Integer>();
+    ArrayList<VoltTable> m_dependencies = new ArrayList<VoltTable>();
     SerializableException m_exception;
 
     /** Empty constructor for de-serialization */
@@ -82,8 +83,9 @@ public class FragmentResponseMessage extends VoltMessage {
     }
 
     public void addDependency(int dependencyId, VoltTable table) {
-        m_dependencyIds[m_dependencyCount] = dependencyId;
-        m_dependencies[m_dependencyCount++] = table;
+        m_dependencyIds.add(dependencyId);
+        m_dependencies.add(table);
+        m_dependencyCount++;
     }
 
     public int getExecutorSiteId() {
@@ -107,11 +109,11 @@ public class FragmentResponseMessage extends VoltMessage {
     }
 
     public int getTableDependencyIdAtIndex(int index) {
-        return m_dependencyIds[index];
+        return m_dependencyIds.get(index);
     }
 
     public VoltTable getTableAtIndex(int index) {
-        return m_dependencies[index];
+        return m_dependencies.get(index);
     }
 
     public RuntimeException getException() {
@@ -136,7 +138,7 @@ public class FragmentResponseMessage extends VoltMessage {
             FastSerializer fs = new FastSerializer();
             try {
                 for (int i = 0; i < m_dependencyCount; i++)
-                    fs.writeObject(m_dependencies[i]);
+                    fs.writeObject(m_dependencies.get(i));
             } catch (IOException e) {
                 e.printStackTrace();
                 assert(false);
@@ -163,7 +165,7 @@ public class FragmentResponseMessage extends VoltMessage {
         m_buffer.put((byte) (m_recovering ? 1 : 0));
         m_buffer.putShort(m_dependencyCount);
         for (int i = 0; i < m_dependencyCount; i++)
-            m_buffer.putInt(m_dependencyIds[i]);
+            m_buffer.putInt(m_dependencyIds.get(i));
         if (tableBytes != null)
             m_buffer.put(tableBytes);
         if (m_exception != null) {
@@ -185,13 +187,13 @@ public class FragmentResponseMessage extends VoltMessage {
         m_dirty = m_buffer.get() == 0 ? false : true;
         m_recovering = m_buffer.get() == 0 ? false : true;
         m_dependencyCount = m_buffer.getShort();
-        assert(m_dependencyCount <= 50);
+        //assert(m_dependencyCount <= 50);
         for (int i = 0; i < m_dependencyCount; i++)
-            m_dependencyIds[i] = m_buffer.getInt();
+            m_dependencyIds.add(m_buffer.getInt());
         for (int i = 0; i < m_dependencyCount; i++) {
             FastDeserializer fds = new FastDeserializer(m_buffer);
             try {
-                m_dependencies[i] = fds.readObject(VoltTable.class);
+                m_dependencies.add(fds.readObject(VoltTable.class));
             } catch (IOException e) {
                 e.printStackTrace();
                 assert(false);
@@ -224,10 +226,10 @@ public class FragmentResponseMessage extends VoltMessage {
             sb.append("\n  PRISTINE");
 
         for (int i = 0; i < m_dependencyCount; i++) {
-            sb.append("\n  DEP ").append(m_dependencyIds[i]);
-            sb.append(" WITH ").append(m_dependencies[i].getRowCount()).append(" ROWS (");
-            for (int j = 0; j < m_dependencies[i].getColumnCount(); j++) {
-                sb.append(m_dependencies[i].getColumnName(j)).append(", ");
+            sb.append("\n  DEP ").append(m_dependencyIds.get(i));
+            sb.append(" WITH ").append(m_dependencies.get(i).getRowCount()).append(" ROWS (");
+            for (int j = 0; j < m_dependencies.get(i).getColumnCount(); j++) {
+                sb.append(m_dependencies.get(i).getColumnName(j)).append(", ");
             }
             sb.setLength(sb.lastIndexOf(", "));
             sb.append(")");

@@ -128,8 +128,11 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             for (ArrayList<?> l : m_inputDepIds) {
                 @SuppressWarnings("unchecked")
                 ArrayList<Integer> l2 = (ArrayList<Integer>) l;
-                for (int depId : l2) {
-                    retval[i++] = depId;
+                if (l2 != null)
+                {
+                    for (int depId : l2) {
+                        retval[i++] = depId;
+                    }
                 }
             }
         }
