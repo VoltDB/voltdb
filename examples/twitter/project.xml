@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <project>
-    <database name='database'>
+    <database>
         <schemas>
             <schema path='twitter-ddl.sql' />
         </schemas>

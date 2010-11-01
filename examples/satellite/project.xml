@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <project>
      <security enabled="true"/>
-     <database name='database'>
+     <database>
         <schemas>
             <schema path='satellite.ddl' />
         </schemas>
