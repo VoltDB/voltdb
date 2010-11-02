@@ -115,9 +115,11 @@ public class BenchmarkController {
 
             while (resultsToRead > 0) {
                 ProcessData.OutputLine line = m_clientPSM.nextBlocking();
-                //System.err.printf("(%s): \"%s\"\n", line.processName, line.message);
+                if (m_config.showConsoleOutput)
+                {
+                    System.err.printf("(%s): \"%s\"\n", line.processName, line.message);
+                }
                 if (line.stream == ProcessData.Stream.STDERR) {
-                    // System.err.printf("(%s): \"%s\"\n", line.processName, line.message);
                     continue;
                 }
 
@@ -439,7 +441,10 @@ public class BenchmarkController {
             String readyMsg = "Server completed initialization.";
             ProcessData.OutputLine line = m_serverPSM.nextBlocking();
             while(line.message.equals(readyMsg) == false) {
-                //System.err.printf("(%s): \"%s\"\n", line.processName, line.message);
+                if (m_config.showConsoleOutput)
+                {
+                    System.err.printf("(%s): \"%s\"\n", line.processName, line.message);
+                }
                 line = m_serverPSM.nextBlocking();
             }
         }
@@ -469,7 +474,10 @@ public class BenchmarkController {
                     m_config.interval);
             m_clusterMonitor.start();
         } catch (Exception e) {
-            //System.err.println(e.getMessage());
+            if (m_config.showConsoleOutput)
+            {
+                System.err.println(e.getMessage());
+            }
             m_clusterMonitor = null;
         }
 
@@ -697,11 +705,15 @@ public class BenchmarkController {
                 nextIntervalTime = m_config.interval * (m_pollIndex.get() + 1) + startTime;
             }
 
-            /*ProcessData.OutputLine serv_line =*/ m_serverPSM.nextNonBlocking();
-            //if (serv_line != null)
-            //{
-            //    System.err.printf("(%s): \"%s\"\n", serv_line.processName, serv_line.message);
-            //}
+            if (m_config.showConsoleOutput)
+            {
+                ProcessData.OutputLine serv_line = m_serverPSM.nextNonBlocking();
+                while (serv_line != null)
+                {
+                    System.err.printf("(%s): \"%s\"\n", serv_line.processName, serv_line.message);
+                    serv_line = m_serverPSM.nextNonBlocking();
+                }
+            }
 
             // wait some time
             // TODO this should probably be done with Thread.sleep(...), but for now
@@ -896,6 +908,7 @@ public class BenchmarkController {
         String statsTag = null;
         String applicationName = null;
         String subApplicationName = null;
+        boolean showConsoleOutput = false;
         String pushfiles = null;
         Integer maxOutstanding = null;
 
@@ -1028,6 +1041,8 @@ public class BenchmarkController {
                 applicationName = parts[1];
             } else if (parts[0].equals("SUBAPPLICATIONNAME")) {
                 subApplicationName = parts[1];
+            } else if (parts[0].equals("SHOWCONSOLEOUTPUT")) {
+                showConsoleOutput = true;
             } else if (parts[0].equals("PROJECTBUILDERNAME")) {
                 projectBuilderName = parts[1];
             } else if (parts[0].equals("PUSHFILES")) {
@@ -1131,7 +1146,8 @@ public class BenchmarkController {
                 remotePath, remoteUser, listenForDebugger, serverHeapSize, clientHeapSize,
                 localmode, useProfile, checkTransaction, checkTables, snapshotPath, snapshotPrefix,
                 snapshotFrequency, snapshotRetain, databaseURL[0], databaseURL[1], statsTag,
-                applicationName, subApplicationName, pushfiles, maxOutstanding);
+                applicationName, subApplicationName, showConsoleOutput,
+                pushfiles, maxOutstanding);
         config.parameters.putAll(clientParams);
 
         // ACTUALLY RUN THE BENCHMARK
