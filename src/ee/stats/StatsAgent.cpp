@@ -38,14 +38,15 @@ StatsAgent::StatsAgent() {}
  */
 void StatsAgent::registerStatsSource(voltdb::StatisticsSelectorType sst, voltdb::CatalogId catalogId, voltdb::StatsSource* statsSource)
 {
-    m_statsCategoryByStatsSelector[sst][catalogId] = statsSource;
+    m_statsCategoryByStatsSelector[sst].insert(
+        std::pair<voltdb::CatalogId, voltdb::StatsSource*>(catalogId, statsSource));
 }
 
 void StatsAgent::unregisterStatsSource(voltdb::StatisticsSelectorType sst)
 {
     // get the map of id-to-source
     std::map<voltdb::StatisticsSelectorType,
-      std::map<voltdb::CatalogId, voltdb::StatsSource*> >::iterator it1 =
+      std::multimap<voltdb::CatalogId, voltdb::StatsSource*> >::iterator it1 =
       m_statsCategoryByStatsSelector.find(sst);
 
     if (it1 == m_statsCategoryByStatsSelector.end()) {
@@ -69,13 +70,22 @@ Table* StatsAgent::getStats(voltdb::StatisticsSelectorType sst,
     if (catalogIds.size() < 1) {
         return NULL;
     }
-    std::map<voltdb::CatalogId, voltdb::StatsSource*> *statsSources = &m_statsCategoryByStatsSelector[sst];
+
+    std::multimap<voltdb::CatalogId, voltdb::StatsSource*> *statsSources = &m_statsCategoryByStatsSelector[sst];
+
     Table *statsTable = m_statsTablesByStatsSelector[sst];
     if (statsTable == NULL) {
         /*
          * Initialize the output table the first time.
          */
-        voltdb::StatsSource *ss = (*statsSources)[catalogIds[0]];
+        std::multimap<voltdb::CatalogId, voltdb::StatsSource*>::const_iterator iter =
+            statsSources->find(catalogIds[0]);
+        if (iter == statsSources->end()) {
+            assert (false);
+            return NULL;
+        }
+
+        voltdb::StatsSource *ss = iter->second;
         voltdb::Table *table = ss->getStatsTable(interval, now);
         statsTable = reinterpret_cast<Table*>(
             voltdb::TableFactory::getTempTable(
@@ -90,14 +100,20 @@ Table* StatsAgent::getStats(voltdb::StatisticsSelectorType sst,
     statsTable->deleteAllTuples(false);
 
     for (int ii = 0; ii < catalogIds.size(); ii++) {
-        voltdb::StatsSource *ss = (*statsSources)[catalogIds[ii]];
-        assert (ss != NULL);
-        if (ss == NULL) {
-            continue;
-        }
+        std::multimap<voltdb::CatalogId, voltdb::StatsSource*>::const_iterator iter;
+        for (iter = statsSources->find(catalogIds[ii]);
+             (iter != statsSources->end()) && (iter->first == catalogIds[ii]);
+             iter++) {
 
-        voltdb::TableTuple *statsTuple = ss->getStatsTuple(interval, now);
-        statsTable->insertTuple(*statsTuple);
+            voltdb::StatsSource *ss = iter->second;
+            assert (ss != NULL);
+            if (ss == NULL) {
+                continue;
+            }
+
+            voltdb::TableTuple *statsTuple = ss->getStatsTuple(interval, now);
+            statsTable->insertTuple(*statsTuple);
+        }
     }
     return statsTable;
 }

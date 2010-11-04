@@ -71,7 +71,7 @@ private:
     /**
      * Map from a statistics selector to a map of CatalogIds to StatsSources.
      */
-    std::map<voltdb::StatisticsSelectorType, std::map<voltdb::CatalogId, voltdb::StatsSource*> > m_statsCategoryByStatsSelector;
+    std::map<voltdb::StatisticsSelectorType, std::multimap<voltdb::CatalogId, voltdb::StatsSource*> > m_statsCategoryByStatsSelector;
 
     /**
      * Temporary tables for aggregating the results of table statistics keyed by type of statistic

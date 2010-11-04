@@ -258,6 +258,7 @@ CTX.INPUT['indexes'] = """
  arrayuniqueindex.cpp
  tableindex.cpp
  tableindexfactory.cpp
+ IndexStats.cpp
 """
 
 CTX.INPUT['storage'] = """
