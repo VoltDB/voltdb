@@ -154,10 +154,11 @@
         <nexthosthelper h1="volt4b" h2="volt4c" p1="@{prop}" p2="@{next}" />
         <nexthosthelper h1="volt4c" h2="volt2"  p1="@{prop}" p2="@{next}" />
         <nexthosthelper h1="volt2"  h2="volt1"  p1="@{prop}" p2="@{next}" />
-
+        <nexthosthelper h1="volt1"  h2="volt5a"  p1="@{prop}" p2="@{next}" />
         <nexthosthelper h1="volt5a" h2="volt5b" p1="@{prop}" p2="@{next}" />
         <nexthosthelper h1="volt5b" h2="volt5c" p1="@{prop}" p2="@{next}" />
         <nexthosthelper h1="volt5c" h2="volt5d" p1="@{prop}" p2="@{next}" />
+        <nexthosthelper h1="volt5d" h2="volt5e" p1="@{prop}" p2="@{next}" />
     </sequential>
 </macrodef>
 
@@ -179,6 +180,11 @@
 <nexthostprop prop="clienthost2" next="clienthost3" />
 <nexthostprop prop="clienthost3" next="clienthost4" />
 <nexthostprop prop="clienthost4" next="clienthost5" />
+<nexthostprop prop="clienthost5" next="clienthost6" />
+<nexthostprop prop="clienthost6" next="clienthost7" />
+<nexthostprop prop="clienthost7" next="clienthost8" />
+<nexthostprop prop="clienthost8" next="clienthost9" />
+<nexthostprop prop="clienthost9" next="clienthost10" />
 
 <target name="testnexthostprop">
     <fail>
@@ -1493,6 +1499,11 @@ BENCHMARKS
         <arg value="CLIENTHOST=${clienthost3}" />
         <arg value="CLIENTHOST=${clienthost4}" />
         <arg value="CLIENTHOST=${clienthost5}" />
+        <arg value="CLIENTHOST=${clienthost6}" />
+        <arg value="CLIENTHOST=${clienthost7}" />
+        <arg value="CLIENTHOST=${clienthost8}" />
+        <arg value="CLIENTHOST=${clienthost9}" />
+        <arg value="CLIENTHOST=${clienthost10}" />
         <arg value="LISTENFORDEBUGGER=${debug}" />
         <arg value="USEPROFILE=${useprofile}" />
         <arg value="CHECKTRANSACTION=${checktransaction}" />
