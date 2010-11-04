@@ -52,8 +52,9 @@ public:
      * @parameter partitionId this stat source is associated with
      * @parameter databaseId Database this source is associated with
      */
-    virtual void configure(
+    void configure(
             std::string name,
+            std::string tableName,
             voltdb::CatalogId hostId,
             std::string hostname,
             voltdb::CatalogId siteId,
@@ -84,10 +85,10 @@ private:
     /**
      * Index whose stats are being collected.
      */
-    voltdb::TableIndex * m_index;
+    voltdb::TableIndex *m_index;
 
     voltdb::NValue m_indexName;
-
+    voltdb::NValue m_tableName;
     voltdb::NValue m_indexType;
 
     int8_t m_isUnique;

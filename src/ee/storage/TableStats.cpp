@@ -28,8 +28,8 @@ namespace voltdb {
 /*
  * Constructor caches reference to the table that will be generating the statistics
  */
-TableStats::TableStats(voltdb::Table* table) : voltdb::StatsSource(), m_table(table),
-        m_lastActiveTupleCount(0), m_lastAllocatedTupleCount(0), m_lastDeletedTupleCount(0) {
+TableStats::TableStats(voltdb::Table* table)
+    : voltdb::StatsSource(), m_table(table), m_lastTupleCount(0) {
 }
 
 /**
@@ -63,9 +63,10 @@ std::vector<std::string> TableStats::generateStatsColumnNames() {
     std::vector<std::string> columnNames = StatsSource::generateStatsColumnNames();
     columnNames.push_back("TABLE_NAME");
     columnNames.push_back("TABLE_TYPE");
-    columnNames.push_back("TABLE_ACTIVE_TUPLE_COUNT");
-    columnNames.push_back("TABLE_ALLOCATED_TUPLE_COUNT");
-    columnNames.push_back("TABLE_DELETED_TUPLE_COUNT");
+    columnNames.push_back("TUPLE_COUNT");
+    columnNames.push_back("TUPLE_ALLOCATED_MEMORY");
+    columnNames.push_back("TUPLE_DATA_MEMORY");
+    columnNames.push_back("STRING_DATA_MEMORY");
     return columnNames;
 }
 
@@ -75,28 +76,22 @@ std::vector<std::string> TableStats::generateStatsColumnNames() {
 void TableStats::updateStatsTuple(voltdb::TableTuple *tuple) {
     tuple->setNValue( StatsSource::m_columnName2Index["TABLE_NAME"], m_tableName);
     tuple->setNValue( StatsSource::m_columnName2Index["TABLE_TYPE"], m_tableType);
-    int64_t activeTupleCount = m_table->activeTupleCount();
-    int64_t allocatedTupleCount = m_table->allocatedTupleCount();
-    int64_t deletedTupleCount = m_table->deletedTupleCount();
+    int64_t tupleCount = m_table->activeTupleCount();
 
     if (interval()) {
-        activeTupleCount = activeTupleCount - m_lastActiveTupleCount;
-        m_lastActiveTupleCount = m_table->activeTupleCount();
-
-        allocatedTupleCount = allocatedTupleCount - m_lastAllocatedTupleCount;
-        m_lastAllocatedTupleCount = m_table->allocatedTupleCount();
-
-        deletedTupleCount = deletedTupleCount - m_lastDeletedTupleCount;
-        m_lastDeletedTupleCount = m_table->deletedTupleCount();
+        tupleCount = tupleCount - m_lastTupleCount;
+        m_lastTupleCount = m_table->activeTupleCount();
     }
 
     tuple->setNValue(
-            StatsSource::m_columnName2Index["TABLE_ACTIVE_TUPLE_COUNT"],
-            ValueFactory::getBigIntValue(activeTupleCount));
-    tuple->setNValue( StatsSource::m_columnName2Index["TABLE_ALLOCATED_TUPLE_COUNT"],
-            ValueFactory::getBigIntValue(allocatedTupleCount));
-    tuple->setNValue( StatsSource::m_columnName2Index["TABLE_DELETED_TUPLE_COUNT"],
-            ValueFactory::getBigIntValue(deletedTupleCount));
+            StatsSource::m_columnName2Index["TUPLE_COUNT"],
+            ValueFactory::getBigIntValue(tupleCount));
+    tuple->setNValue( StatsSource::m_columnName2Index["TUPLE_ALLOCATED_MEMORY"],
+            ValueFactory::getIntegerValue(-1));
+    tuple->setNValue( StatsSource::m_columnName2Index["TUPLE_DATA_MEMORY"],
+            ValueFactory::getIntegerValue(-1));
+    tuple->setNValue( StatsSource::m_columnName2Index["STRING_DATA_MEMORY"],
+            ValueFactory::getIntegerValue(-1));
 }
 
 /**
@@ -111,8 +106,9 @@ void TableStats::populateSchema(
     types.push_back(voltdb::VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);
     types.push_back(voltdb::VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);
     types.push_back(voltdb::VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT)); allowNull.push_back(false);
-    types.push_back(voltdb::VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT)); allowNull.push_back(false);
-    types.push_back(voltdb::VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT)); allowNull.push_back(false);
+    types.push_back(voltdb::VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER)); allowNull.push_back(false);
+    types.push_back(voltdb::VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER)); allowNull.push_back(false);
+    types.push_back(voltdb::VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER)); allowNull.push_back(false);
 }
 
 TableStats::~TableStats() {

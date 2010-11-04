@@ -47,7 +47,7 @@ public:
      * @parameter partitionId this stat source is associated with
      * @parameter databaseId Database this source is associated with
      */
-    virtual void configure(
+    void configure(
             std::string name,
             voltdb::CatalogId hostId,
             std::string hostname,
@@ -87,9 +87,7 @@ private:
 
     voltdb::NValue m_tableType;
 
-    int64_t m_lastActiveTupleCount;
-    int64_t m_lastAllocatedTupleCount;
-    int64_t m_lastDeletedTupleCount;
+    int64_t m_lastTupleCount;
 };
 
 }

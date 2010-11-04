@@ -97,6 +97,8 @@ public class Statistics extends VoltSystemProcedure {
 
         site.registerPlanFragment(SysProcFragmentId.PF_tableData, this);
         site.registerPlanFragment(SysProcFragmentId.PF_tableAggregator, this);
+        site.registerPlanFragment(SysProcFragmentId.PF_indexData, this);
+        site.registerPlanFragment(SysProcFragmentId.PF_indexAggregator, this);
         site.registerPlanFragment(SysProcFragmentId.PF_procedureData, this);
         site.registerPlanFragment(SysProcFragmentId.PF_procedureAggregator, this);
         site.registerPlanFragment(SysProcFragmentId.PF_initiatorData, this);
@@ -349,8 +351,9 @@ public class Statistics extends VoltSystemProcedure {
         else if (selector.toUpperCase().equals(SysProcSelector.STARVATION.name())) {
             results = getStarvationData(interval, now);
         }
-        else if (selector.toUpperCase().equals(SysProcSelector.MANAGEMENT.name())){
+        else if (selector.toUpperCase().equals(SysProcSelector.MANAGEMENT.name())) {
             VoltTable[] tableResults = getTableData(interval, now);
+            VoltTable[] indexResults = getIndexData(interval, now);
             VoltTable[] procedureResults = getProcedureData(interval, now);
             VoltTable[] initiatorResults = getInitiatorData(interval, now);
             VoltTable[] ioResults = getIOStatsData(interval, now);
@@ -360,6 +363,7 @@ public class Statistics extends VoltSystemProcedure {
                     procedureResults[0],
                     ioResults[0],
                     tableResults[0],
+                    indexResults[0],
                     starvationResults[0]
             };
             final long endTime = System.currentTimeMillis();
