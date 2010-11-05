@@ -66,24 +66,23 @@
 #include "storage/tableiterator.h"
 #include "storage/tableutil.h"
 
-using std::string;
-using std::vector;
+using namespace std;
 using namespace voltdb;
 
 #define NUM_OF_COLUMNS 5
 #define NUM_OF_TUPLES 10000
 
-voltdb::ValueType COLUMN_TYPES[NUM_OF_COLUMNS]  = { voltdb::VALUE_TYPE_BIGINT,
-                                                    voltdb::VALUE_TYPE_TINYINT,
-                                                    voltdb::VALUE_TYPE_SMALLINT,
-                                                    voltdb::VALUE_TYPE_INTEGER,
-                                                    voltdb::VALUE_TYPE_BIGINT };
+ValueType COLUMN_TYPES[NUM_OF_COLUMNS]  = { VALUE_TYPE_BIGINT,
+                                                    VALUE_TYPE_TINYINT,
+                                                    VALUE_TYPE_SMALLINT,
+                                                    VALUE_TYPE_INTEGER,
+                                                    VALUE_TYPE_BIGINT };
 int32_t COLUMN_SIZES[NUM_OF_COLUMNS]                = {
-                           NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT),
-                           NValue::getTupleStorageSize(voltdb::VALUE_TYPE_TINYINT),
-                           NValue::getTupleStorageSize(voltdb::VALUE_TYPE_SMALLINT),
-                           NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER),
-                           NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT) };
+                           NValue::getTupleStorageSize(VALUE_TYPE_BIGINT),
+                           NValue::getTupleStorageSize(VALUE_TYPE_TINYINT),
+                           NValue::getTupleStorageSize(VALUE_TYPE_SMALLINT),
+                           NValue::getTupleStorageSize(VALUE_TYPE_INTEGER),
+                           NValue::getTupleStorageSize(VALUE_TYPE_BIGINT) };
 bool COLUMN_ALLOW_NULLS[NUM_OF_COLUMNS]         = { true, true, true, true, true };
 
 class TableTest : public Test {
@@ -98,14 +97,14 @@ class TableTest : public Test {
 
     protected:
         void init(bool xact) {
-            voltdb::CatalogId database_id = 1000;
-            std::vector<boost::shared_ptr<const voltdb::TableColumn> > columns;
+            CatalogId database_id = 1000;
+            vector<boost::shared_ptr<const TableColumn> > columns;
             char buffer[32];
 
-            std::string *columnNames = new std::string[NUM_OF_COLUMNS];
-            std::vector<voltdb::ValueType> columnTypes;
-            std::vector<int32_t> columnLengths;
-            std::vector<bool> columnAllowNull;
+            string *columnNames = new string[NUM_OF_COLUMNS];
+            vector<ValueType> columnTypes;
+            vector<int32_t> columnLengths;
+            vector<bool> columnAllowNull;
             for (int ctr = 0; ctr < NUM_OF_COLUMNS; ctr++) {
                 snprintf(buffer, 32, "column%02d", ctr);
                 columnNames[ctr] = buffer;
@@ -113,12 +112,12 @@ class TableTest : public Test {
                 columnLengths.push_back(COLUMN_SIZES[ctr]);
                 columnAllowNull.push_back(COLUMN_ALLOW_NULLS[ctr]);
             }
-            voltdb::TupleSchema *schema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
+            TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
             if (xact) {
-                persistent_table = voltdb::TableFactory::getPersistentTable(database_id, NULL, "test_table", schema, columnNames, -1, false, false);
+                persistent_table = TableFactory::getPersistentTable(database_id, NULL, "test_table", schema, columnNames, -1, false, false);
                 table = persistent_table;
             } else {
-                temp_table = voltdb::TableFactory::getTempTable(database_id, "test_table", schema, columnNames, NULL);
+                temp_table = TableFactory::getTempTable(database_id, "test_table", schema, columnNames, NULL);
                 table = temp_table;
             }
             assert(tableutil::addRandomTuples(this->table, NUM_OF_TUPLES));
@@ -127,9 +126,9 @@ class TableTest : public Test {
             delete[] columnNames;
         }
 
-        voltdb::Table* table;
-        voltdb::Table* temp_table;
-        voltdb::Table* persistent_table;
+        Table* table;
+        Table* temp_table;
+        Table* persistent_table;
 };
 
 TEST_F(TableTest, ValueTypes) {
@@ -137,8 +136,8 @@ TEST_F(TableTest, ValueTypes) {
     // Make sure that our table has the right types and that when
     // we pull out values from a tuple that it has the right type too
     //
-    voltdb::TableIterator iterator = this->table->tableIterator();
-    voltdb::TableTuple tuple(table->schema());
+    TableIterator iterator = this->table->tableIterator();
+    TableTuple tuple(table->schema());
     while (iterator.next(tuple)) {
         for (int ctr = 0; ctr < NUM_OF_COLUMNS; ctr++) {
             EXPECT_EQ(COLUMN_TYPES[ctr], this->table->schema()->columnType(ctr));
@@ -152,8 +151,8 @@ TEST_F(TableTest, TupleInsert) {
     // All of the values have already been inserted, we just
     // need to make sure that the data makes sense
     //
-    voltdb::TableIterator iterator = this->table->tableIterator();
-    voltdb::TableTuple tuple(table->schema());
+    TableIterator iterator = this->table->tableIterator();
+    TableTuple tuple(table->schema());
     while (iterator.next(tuple)) {
         //printf("%s\n", tuple->debug(this->table).c_str());
         //
@@ -165,7 +164,7 @@ TEST_F(TableTest, TupleInsert) {
     //
     // Make sure that if we insert one tuple, we only get one tuple
     //
-    voltdb::TableTuple &temp_tuple = this->table->tempTuple();
+    TableTuple &temp_tuple = this->table->tempTuple();
     ASSERT_EQ(true, tableutil::setRandomTupleValues(this->table, &temp_tuple));
     this->table->deleteAllTuples(true);
     ASSERT_EQ(0, this->table->activeTupleCount());
@@ -193,8 +192,8 @@ TEST_F(TableTest, TupleUpdate) {
     //      (2) Updating a tuple without changing the values doesn't do anything
     //
 
-    std::vector<int64_t> totals;
-    std::vector<int64_t> totalsNotSlim;
+    vector<int64_t> totals;
+    vector<int64_t> totalsNotSlim;
     totals.reserve(NUM_OF_COLUMNS);
     totalsNotSlim.reserve(NUM_OF_COLUMNS);
     for (int col_ctr = 0; col_ctr < NUM_OF_COLUMNS; col_ctr++) {
@@ -202,11 +201,11 @@ TEST_F(TableTest, TupleUpdate) {
         totalsNotSlim[col_ctr] = 0;
     }
 
-    voltdb::TableIterator iterator = this->table->tableIterator();
-    voltdb::TableTuple tuple(table->schema());
+    TableIterator iterator = this->table->tableIterator();
+    TableTuple tuple(table->schema());
     while (iterator.next(tuple)) {
         bool update = (rand() % 2 == 0);
-        voltdb::TableTuple &temp_tuple = table->tempTuple();
+        TableTuple &temp_tuple = table->tempTuple();
         for (int col_ctr = 0; col_ctr < NUM_OF_COLUMNS; col_ctr++) {
             //
             // Only check for numeric columns
@@ -216,7 +215,7 @@ TEST_F(TableTest, TupleUpdate) {
                 // Update Column
                 //
                 if (update) {
-                    voltdb::NValue new_value = getRandomValue(COLUMN_TYPES[col_ctr]);
+                    NValue new_value = getRandomValue(COLUMN_TYPES[col_ctr]);
                     temp_tuple.setNValue(col_ctr, new_value);
                     totals[col_ctr] += ValuePeeker::peekAsBigInt(new_value);
                     totalsNotSlim[col_ctr] += ValuePeeker::peekAsBigInt(new_value);
@@ -252,8 +251,8 @@ TEST_F(TableTest, TupleDelete) {
     // We are just going to delete all of the odd tuples, then make
     // sure they don't exist anymore
     //
-    voltdb::TableIterator iterator = this->table->tableIterator();
-    voltdb::TableTuple tuple(table.get());
+    TableIterator iterator = this->table->tableIterator();
+    TableTuple tuple(table.get());
     while (iterator.next(tuple)) {
         if (tuple.get(1).getBigInt() != 0) {
             EXPECT_EQ(true, temp_table->deleteTuple(tuple));
@@ -271,8 +270,8 @@ TEST_F(TableTest, TupleDelete) {
     //
     // First clear out our table
     //
-    voltdb::TableIterator iterator = this->table->tableIterator();
-    voltdb::TableTuple *tuple;
+    TableIterator iterator = this->table->tableIterator();
+    TableTuple *tuple;
     while ((tuple = iterator.next()) != NULL) {
         EXPECT_EQ(true, persistent_table->deleteTuple(tuple));
     }
@@ -282,10 +281,10 @@ TEST_F(TableTest, TupleDelete) {
     //
     //int xact_ctr;
     int xact_cnt = 6;
-    std::vector<boost::shared_ptr<voltdb::UndoLog> > undos;
+    vector<boost::shared_ptr<UndoLog> > undos;
     for (int xact_ctr = 0; xact_ctr < xact_cnt; xact_ctr++) {
-        voltdb::TransactionId xact_id = xact_ctr;
-        undos.push_back(boost::shared_ptr<voltdb::UndoLog>(new voltdb::UndoLog(xact_id)));
+        TransactionId xact_id = xact_ctr;
+        undos.push_back(boost::shared_ptr<UndoLog>(new UndoLog(xact_id)));
     }
 
     int64_t total = 0;
@@ -294,7 +293,7 @@ TEST_F(TableTest, TupleDelete) {
         tuple = this->table->tempTuple();
         int64_t temp = rand() % 1000;
         if (xact_ctr2 % 2 == 0) total += temp;
-        voltdb::Value value = temp;
+        Value value = temp;
         tuple->set(0, value);
         //persistent_table->setUndoLog(undos[xact_ctr2]);
         EXPECT_EQ(true, persistent_table->insertTuple(tuple));
@@ -332,10 +331,10 @@ TEST_F(TableTest, TupleDelete) {
     //      (1) Updating a tuple sets the values correctly
     //      (2) Updating a tuple without changing the values doesn't do anything
     //
-    voltdb::TableTuple *tuple;
-    voltdb::TableTuple *temp_tuple;
+    TableTuple *tuple;
+    TableTuple *temp_tuple;
 
-    std::vector<int64_t> totals;
+    vector<int64_t> totals;
     totals.reserve(NUM_OF_COLUMNS);
     for (int col_ctr = 0; col_ctr < NUM_OF_COLUMNS; col_ctr++) {
         totals[col_ctr] = 0;
@@ -346,13 +345,13 @@ TEST_F(TableTest, TupleDelete) {
     //
     //int xact_ctr;
     int xact_cnt = 6;
-    sstd::vector<boost::shared_ptr<voltdb::UndoLog> > undos;
+    vector<boost::shared_ptr<UndoLog> > undos;
     for (int xact_ctr = 0; xact_ctr < xact_cnt; xact_ctr++) {
-        voltdb::TransactionId xact_id = xact_ctr;
-        undos.push_back(boost::shared_ptr<voltdb::UndoLog>(new voltdb::UndoLog(xact_id)));
+        TransactionId xact_id = xact_ctr;
+        undos.push_back(boost::shared_ptr<UndoLog>(new UndoLog(xact_id)));
     }
 
-    voltdb::TableIterator iterator = this->table->tableIterator();
+    TableIterator iterator = this->table->tableIterator();
     while ((tuple = iterator.next()) != NULL) {
         //printf("BEFORE: %s\n", tuple->debug(this->table.get()).c_str());
         int xact_ctr = (rand() % xact_cnt);
@@ -369,7 +368,7 @@ TEST_F(TableTest, TupleDelete) {
                 // Update Column
                 //
                 if (update) {
-                    voltdb::Value new_value = valueutil::getRandomValue(COLUMN_TYPES[col_ctr]);
+                    Value new_value = valueutil::getRandomValue(COLUMN_TYPES[col_ctr]);
                     temp_tuple->set(col_ctr, new_value);
 
                     //
@@ -432,8 +431,8 @@ TEST_F(TableTest, TupleDelete) {
     //
     // Loop through the tuples and delete half of them in interleaving transactions
     //
-    voltdb::TableIterator iterator = this->table->tableIterator();
-    voltdb::TableTuple *tuple;
+    TableIterator iterator = this->table->tableIterator();
+    TableTuple *tuple;
     int64_t total = 0;
     while ((tuple = iterator.next()) != NULL) {
         int xact_ctr = (rand() % xact_cnt);
@@ -467,4 +466,3 @@ TEST_F(TableTest, TupleDelete) {
 int main() {
     return TestSuite::globalInstance()->runAll();
 }
-

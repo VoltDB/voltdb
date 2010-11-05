@@ -155,7 +155,7 @@ public:
     virtual bool deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings) = 0;
 
     // ------------------------------------------------------------------
-    // TUPLES
+    // TUPLES AND MEMORY USAGE
     // ------------------------------------------------------------------
     int64_t allocatedTupleCount() const { return m_allocatedTuples; }
     int64_t activeTupleCount() const { return m_tupleCount; }
@@ -165,6 +165,8 @@ public:
     int64_t deletedTupleCount() const { return m_holeFreeTuples.size(); }
 #endif
     TableTuple& tempTuple();
+    // Only counts persistent table usage, currently
+    int64_t nonInlinedMemorySize() const { return m_nonInlinedMemorySize; }
 
     // ------------------------------------------------------------------
     // COLUMNS
@@ -304,7 +306,7 @@ protected:
     void initializeWithColumns(TupleSchema *schema, const std::string* columnNames, bool ownsTupleSchema);
     virtual void onSetColumns() {};
 
-    // TUPLES
+    // TUPLES AND MEMORY USAGE
     TableTuple m_tempTuple;
     /** not temptuple. these are for internal use. */
     TableTuple m_tmpTarget1, m_tmpTarget2;
@@ -315,6 +317,7 @@ protected:
     uint32_t m_columnCount;
     uint32_t m_tuplesPerBlock;
     uint32_t m_tupleLength;
+    int64_t m_nonInlinedMemorySize;
     // pointers to chunks of data
     std::vector<char*> m_data;
 

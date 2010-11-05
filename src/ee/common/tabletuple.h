@@ -175,6 +175,32 @@ public:
         return bytes;
     }
 
+    // Return the amount of memory allocated for non-inlined objects
+    size_t getNonInlinedMemorySize() const
+    {
+        size_t bytes = 0;
+        int cols = sizeInValues();
+        // fast-path for no inlined cols
+        if (m_schema->getUninlinedObjectColumnCount() != 0)
+        {
+            for (int i = 0; i < cols; ++i)
+            {
+                // peekObjectLength is unhappy with non-varchar
+                if (getType(i) == VALUE_TYPE_VARCHAR &&
+                    !m_schema->columnIsInlined(i))
+                {
+                    if (!getNValue(i).isNull())
+                    {
+                        bytes += (sizeof(int32_t) +
+                                  ValuePeeker::
+                                  peekObjectLength(getNValue(i)));
+                    }
+                }
+            }
+        }
+        return bytes;
+    }
+
     void setNValue(const int idx, voltdb::NValue value);
 
     /*

@@ -88,6 +88,7 @@ private:
     voltdb::NValue m_tableType;
 
     int64_t m_lastTupleCount;
+    int64_t m_lastStringDataMemory;
 };
 
 }
