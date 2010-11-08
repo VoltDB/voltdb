@@ -72,6 +72,7 @@ using namespace voltdb;
 
 #define NUM_OF_COLUMNS 5
 #define NUM_OF_TUPLES 1000
+#define NUM_OF_WIDE_TUPLES 5
 #define PKEY_ID 100
 #define INT_UNIQUE_ID 101
 #define INT_MULTI_ID 102
@@ -183,7 +184,7 @@ public:
 
         delete[] columnNames;
 
-        for (int64_t row = 1; row <= 5; ++row)
+        for (int64_t row = 1; row <= NUM_OF_WIDE_TUPLES; ++row)
         {
             setWideTableToRow(table->tempTuple(), row);
             bool result = table->insertTuple(table->tempTuple());
@@ -385,6 +386,10 @@ TEST_F(IndexTest, IntUnique) {
                           true, true, NULL));
     TableIndex* index = table->index("iu");
     EXPECT_EQ(true, index != NULL);
+
+    int64_t size_guess = (sizeof(int64_t) + sizeof(void*)) * NUM_OF_TUPLES;
+    EXPECT_EQ(size_guess, index->getMemoryEstimate());
+
     // TODO
 }
 
@@ -491,6 +496,9 @@ TEST_F(IndexTest, IntMulti) {
                           false, true, NULL));
     TableIndex* index = table->index("im");
     EXPECT_EQ(true, index != NULL);
+
+    int64_t size_guess = (sizeof(int64_t) + sizeof(void*)) * NUM_OF_TUPLES;
+    EXPECT_EQ(size_guess, index->getMemoryEstimate());
     // TODO
 }
 
@@ -509,6 +517,9 @@ TEST_F(IndexTest, IntsUnique) {
 
     TableIndex* index = table->index("ixu");
     EXPECT_EQ(true, index != NULL);
+
+    int64_t size_guess = (sizeof(int64_t) * 2 + sizeof(void*)) * NUM_OF_TUPLES;
+    EXPECT_EQ(size_guess, index->getMemoryEstimate());
 
     TableTuple tuple(table->schema());
     vector<ValueType> keyColumnTypes(2, VALUE_TYPE_BIGINT);
@@ -682,6 +693,10 @@ TEST_F(IndexTest, IntsMulti) {
 
     TableIndex* index = table->index("ixm2");
     EXPECT_EQ(true, index != NULL);
+
+    int64_t size_guess = (sizeof(int64_t) * 2 + sizeof(void*)) * NUM_OF_TUPLES;
+    EXPECT_EQ(size_guess, index->getMemoryEstimate());
+
     TableTuple tuple(table->schema());
     vector<ValueType> keyColumnTypes(2, VALUE_TYPE_BIGINT);
     vector<int32_t>
@@ -847,6 +862,11 @@ TEST_F(IndexTest, TupleKeyUnique) {
     initWideTable("ixu_wide");
     TableIndex* index = table->index("ixu_wide");
     EXPECT_EQ(true, index != NULL);
+
+    int64_t size_guess =
+        (sizeof(int*) + sizeof(char*) + sizeof(TupleSchema*) + sizeof(void*)) *
+        NUM_OF_WIDE_TUPLES;
+    EXPECT_EQ(size_guess, index->getMemoryEstimate());
 
     // make a tuple with the table's schema
     TableTuple tuple(table->schema());

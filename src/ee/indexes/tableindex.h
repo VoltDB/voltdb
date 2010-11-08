@@ -279,6 +279,10 @@ public:
 
     virtual size_t getSize() const = 0;
 
+    // Return the amount of memory we think is allocated for this
+    // index.
+    virtual int64_t getMemoryEstimate() const = 0;
+
     const std::vector<int>& getColumnIndices() const
     {
         return column_indices_vector_;

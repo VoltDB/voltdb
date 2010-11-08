@@ -221,6 +221,12 @@ public:
     }
 
     size_t getSize() const { return m_entries.size(); }
+
+    int64_t getMemoryEstimate() const
+    {
+        return ((m_tmp1.getKeySize() + sizeof(void*)) * getSize());
+    }
+
     std::string getTypeName() const { return "BinaryTreeUniqueIndex"; };
     std::string debug() const
     {
