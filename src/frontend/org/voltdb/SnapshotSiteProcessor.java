@@ -282,15 +282,10 @@ public class SnapshotSiteProcessor {
                     @Override
                     public void run() {
                         try {
-                            for (final SnapshotDataTarget t : snapshotTargets) {
-                                try {
-                                    t.close();
-                                } catch (IOException e) {
-                                    throw new RuntimeException(e);
-                                } catch (InterruptedException e) {
-                                    throw new RuntimeException(e);
-                                }
-                            }
+                            /*
+                             * Be absolutely sure the snapshot is finished
+                             * and synced to disk before another is started
+                             */
                             for (Thread t : m_snapshotTargetTerminators){
                                 if (t == this) {
                                     continue;
@@ -299,6 +294,15 @@ public class SnapshotSiteProcessor {
                                     t.join();
                                 } catch (InterruptedException e) {
                                     return;
+                                }
+                            }
+                            for (final SnapshotDataTarget t : snapshotTargets) {
+                                try {
+                                    t.close();
+                                } catch (IOException e) {
+                                    throw new RuntimeException(e);
+                                } catch (InterruptedException e) {
+                                    throw new RuntimeException(e);
                                 }
                             }
                         } finally {

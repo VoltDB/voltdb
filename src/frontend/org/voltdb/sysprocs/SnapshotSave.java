@@ -209,6 +209,12 @@ public class SnapshotSave extends VoltSystemProcedure
                     {
                         try
                         {
+                            /*
+                             * Sanity check that the file can be created
+                             * and then delete it so empty files aren't
+                             * orphaned if another part of the snapshot
+                             * test fails.
+                             */
                             if (saveFilePath.createNewFile()) {
                                 saveFilePath.delete();
                             }
