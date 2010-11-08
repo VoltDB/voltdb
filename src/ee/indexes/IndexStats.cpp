@@ -59,7 +59,7 @@ void IndexStats::configure(
     m_indexName = ValueFactory::getStringValue(m_index->getName());
     m_tableName = ValueFactory::getStringValue(tableName);
     m_indexType = ValueFactory::getStringValue(m_index->getTypeName());
-    m_isUnique = m_index->isUniqueIndex() ? 1 : 0;
+    m_isUnique = static_cast<int8_t>(m_index->isUniqueIndex() ? 1 : 0);
 }
 
 /**
