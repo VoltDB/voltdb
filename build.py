@@ -66,8 +66,6 @@ CTX.SYSTEM_DIRS = ['third_party/cpp']
 # extra flags that will get added to building test source
 if CTX.LEVEL == "MEMCHECK":
     CTX.TEST_EXTRAFLAGS = """ -g3 -DDEBUG -DMEMCHECK"""
-elif CTX.LEVEL == "MEMCHECK_NOFREELIST":
-    CTX.TEST_EXTRAFLAGS = """ -g3 -DDEBUG -DMEMCHECK -DMEMCHECK_NOFREELIST"""
 else:
     CTX.TEST_EXTRAFLAGS = """ -g3 -DDEBUG """
 
@@ -91,10 +89,6 @@ CTX.TEST_PREFIX = "tests/ee/"
 if CTX.LEVEL == "MEMCHECK":
     CTX.EXTRAFLAGS += " -g3 -rdynamic -DDEBUG -DMEMCHECK -DVOLT_LOG_LEVEL=500"
     CTX.OUTPUT_PREFIX = "obj/memcheck"
-
-if CTX.LEVEL == "MEMCHECK_NOFREELIST":
-    CTX.EXTRAFLAGS += " -g3 -rdynamic -DDEBUG -DMEMCHECK -DMEMCHECK_NOFREELIST -DVOLT_LOG_LEVEL=500"
-    CTX.OUTPUT_PREFIX = "obj/memcheck_nofreelist"
 
 if CTX.LEVEL == "DEBUG":
     CTX.EXTRAFLAGS += " -g3 -rdynamic -DDEBUG -DVOLT_LOG_LEVEL=500"
@@ -282,6 +276,7 @@ CTX.INPUT['storage'] = """
  temptable.cpp
  TupleStreamWrapper.cpp
  RecoveryContext.cpp
+ TupleBlock.cpp
 """
 
 CTX.INPUT['stats'] = """

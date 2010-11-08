@@ -1056,7 +1056,7 @@ void VoltDBIPC::signalDispatcher(int signum, siginfo_t *info, void *context) {
 }
 
 void VoltDBIPC::setupSigHandler(void) const {
-#if !defined(MEMCHECK) && !defined(MEMCHECK_NOFREELIST)
+#if !defined(MEMCHECK)
     struct sigaction action;
     memset(&action, 0, sizeof(action));
     action.sa_sigaction = VoltDBIPC::signalDispatcher;

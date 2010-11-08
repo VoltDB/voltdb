@@ -65,8 +65,6 @@ Table::Table(int tableAllocationTargetSize) :
     m_tempTuple(),
     m_schema(NULL),
     m_tupleCount(0),
-    m_usedTuples(0),
-    m_allocatedTuples(0),
     m_columnCount(0),
     m_tuplesPerBlock(0),
     m_nonInlinedMemorySize(0),
@@ -95,33 +93,10 @@ Table::~Table() {
     delete[] m_columnNames;
     m_columnNames = NULL;
 
-    delete[] reinterpret_cast<char*>(m_tempTuple.m_data);
     m_tempTuple.m_data = NULL;
 
-    /*
-     * The memcheck build uses the heap to allocate each tuple in order to
-     * detect errors while accessing tuples as well as tuples storage pointers
-     * leaking from a table after the tuple has been deleted.
-     */
-#ifdef MEMCHECK_NOFREELIST
-    for (std::set<void*>::iterator iter = m_allocatedTuplePointers.begin();
-            iter != m_allocatedTuplePointers.end(); ++iter) {
-        assert(m_deletedTuplePointers.find(*iter) == m_deletedTuplePointers.end());
-        delete[] reinterpret_cast<char*>(*iter);
-    }
-//    for (std::set<void*>::iterator iter = m_deletedTuplePointers.begin();
-//            iter != m_deletedTuplePointers.end(); ++iter) {
-//        assert(m_allocatedTuplePointers.find(*iter) == m_allocatedTuplePointers.end());
-//        delete[] reinterpret_cast<char*>(*iter);
-//    }
-    m_allocatedTuplePointers.clear();
-    m_deletedTuplePointers.clear();
     m_data.clear();
-#else
-    // clear the tuple memory
-    for (std::vector<char*>::iterator iter = m_data.begin(); iter != m_data.end(); ++iter)
-        delete[] reinterpret_cast<char*>(*iter);
-#endif
+    m_blocksWithSpace.clear();
 
     // clear any cached column serializations
     if (m_columnHeaderData)
@@ -139,10 +114,19 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::string* column
     m_schema  = schema;
 
     m_columnCount = schema->columnCount();
+
+    m_tupleLength = m_schema->tupleLength() + TUPLE_HEADER_SIZE;
 #ifdef MEMCHECK
     m_tuplesPerBlock = 1;
+    m_tableAllocationSize = m_tupleLength;
 #else
-    m_tuplesPerBlock = m_tableAllocationTargetSize / (m_schema->tupleLength() + TUPLE_HEADER_SIZE);
+    m_tuplesPerBlock = m_tableAllocationTargetSize / m_tupleLength;
+    if (m_tuplesPerBlock < 1) {
+        m_tuplesPerBlock = 1;
+        m_tableAllocationSize = m_tupleLength;
+    } else {
+        m_tableAllocationSize = m_tableAllocationTargetSize;
+    }
 #endif
 
     // initialize column names
@@ -152,23 +136,15 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::string* column
         m_columnNames[i] = columnNames[i];
 
     // initialize the temp tuple
-    char *m_tempTupleMemory = m_tempTuple.m_data;
-    delete[] reinterpret_cast<char*>(m_tempTupleMemory);
-    m_tempTupleMemory = new char[m_schema->tupleLength() + TUPLE_HEADER_SIZE];
-    m_tempTuple = TableTuple(m_tempTupleMemory, m_schema);
-    ::memset(m_tempTupleMemory, 0, m_tempTuple.tupleLength());
+    m_tempTupleMemory.reset(new char[m_schema->tupleLength() + TUPLE_HEADER_SIZE]);
+    m_tempTuple = TableTuple(m_tempTupleMemory.get(), m_schema);
+    ::memset(m_tempTupleMemory.get(), 0, m_tempTuple.tupleLength());
     m_tempTuple.setDeletedFalse();
 
     // set the data to be empty
     m_tupleCount = 0;
-    m_usedTuples = 0;
-#ifdef MEMCHECK_NOFREELIST
-    m_deletedTupleCount = 0;
-#else
-    m_holeFreeTuples.clear();//Why clear it. Shouldn't it be empty? Won't this leak?
-#endif
-
-    m_tupleLength = m_schema->tupleLength() + TUPLE_HEADER_SIZE;
+    m_blocksWithSpace.clear();//Why clear it. Shouldn't it be empty? Won't this leak?
+    m_data.clear();
 
     // note that any allocated memory in m_data is left alone
     // as is m_allocatedTuples
@@ -189,29 +165,30 @@ TableIterator Table::tableIterator() {
 void Table::nextFreeTuple(TableTuple *tuple) {
     // First check whether we have any in our list
     // In the memcheck it uses the heap instead of a free list to help Valgrind.
-#ifndef MEMCHECK_NOFREELIST
-    if (!m_holeFreeTuples.empty()) {
+    if (!m_blocksWithSpace.empty()) {
         VOLT_TRACE("GRABBED FREE TUPLE!\n");
-        char* ret = m_holeFreeTuples.back();
-        m_holeFreeTuples.pop_back();
+        stx::btree_set<TBPtr >::iterator begin = m_blocksWithSpace.begin();
+        TBPtr block = (*begin);
+        tuple->move(block->nextFreeTuple());
+        if (!block->hasFreeTuples()) {
+            m_blocksWithSpace.erase(block);
+        }
         assert (m_columnCount == tuple->sizeInValues());
-        tuple->move(ret);
         return;
     }
-#endif
 
     // if there are no tuples free, we need to grab another chunk of memory
     // Allocate a new set of tuples
-    if (m_usedTuples >= m_allocatedTuples) {
-        allocateNextBlock();
-    }
+    TBPtr block = allocateNextBlock();
 
     // get free tuple
-    assert (m_usedTuples < m_allocatedTuples);
     assert (m_columnCount == tuple->sizeInValues());
-    tuple->move(dataPtrForTuple((int) m_usedTuples));
-    ++m_usedTuples;
+    tuple->move(block->nextFreeTuple());
     //cout << "table::nextFreeTuple(" << reinterpret_cast<const void *>(this) << ") m_usedTuples == " << m_usedTuples << endl;
+
+    if (block->hasFreeTuples()) {
+        m_blocksWithSpace.insert(block);
+    }
 }
 
 // ------------------------------------------------------------------
@@ -236,12 +213,7 @@ std::string Table::debug() {
     std::ostringstream buffer;
 
     buffer << tableType() << "(" << name() << "):\n";
-    buffer << "\tAllocated Tuples:  " << m_allocatedTuples << "\n";
-#ifdef MEMCHECK_NOFREELIST
-    buffer << "\tDeleted Tuples:    " << m_deletedTupleCount << "\n";
-#else
-    buffer << "\tDeleted Tuples:    " << m_holeFreeTuples.size() << "\n";
-#endif
+    buffer << "\tAllocated Tuples:  " << allocatedTupleCount() << "\n";
     buffer << "\tNumber of Columns: " << columnCount() << "\n";
 
     //
@@ -415,7 +387,7 @@ bool Table::serializeTupleTo(SerializeOutput &serialize_io, voltdb::TableTuple *
     return true;
 }
 
-bool Table::equals(const voltdb::Table *other) const {
+bool Table::equals(voltdb::Table *other) {
     if (!(columnCount() == other->columnCount())) return false;
     if (!(indexCount() == other->indexCount())) return false;
     if (!(activeTupleCount() == other->activeTupleCount())) return false;
@@ -462,13 +434,8 @@ void Table::loadTuplesFromNoHeader(bool allowExport,
     int tupleCount = serialize_io.readInt();
     assert(tupleCount >= 0);
 
-    // allocate required data blocks first to make them alligned well
-    while (tupleCount + m_usedTuples > m_allocatedTuples) {
-        allocateNextBlock();
-    }
-
     for (int i = 0; i < tupleCount; ++i) {
-        m_tmpTarget1.move(dataPtrForTuple((int) m_usedTuples + i));
+        nextFreeTuple(&m_tmpTarget1);
         m_tmpTarget1.setDeletedFalse();
         m_tmpTarget1.setDirtyFalse();
         m_tmpTarget1.deserializeFrom(serialize_io, stringPool);
@@ -476,10 +443,7 @@ void Table::loadTuplesFromNoHeader(bool allowExport,
         processLoadedTuple( allowExport, m_tmpTarget1);
     }
 
-    populateIndexes(tupleCount);
-
     m_tupleCount += tupleCount;
-    m_usedTuples += tupleCount;
 }
 
 void Table::loadTuplesFrom(bool allowExport,

@@ -231,13 +231,16 @@ TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
     initTable(true);
     addRandomUniqueTuples( m_table, 699048);
     voltdb::TableIterator iterator(m_table);
-    voltdb::CopyOnWriteIterator COWIterator(m_table);
+    voltdb::CopyOnWriteIterator COWIterator(m_table, m_table->m_data.begin(), m_table->m_data.end());
     TableTuple tuple(m_table->schema());
     TableTuple COWTuple(m_table->schema());
 
     int iteration = 0;
-    while (iterator.next(tuple)) {
+    while (true) {
         iteration++;
+        if (!iterator.next(tuple)) {
+            break;
+        }
         ASSERT_TRUE(COWIterator.next(COWTuple));
 
         if (tuple.address() != COWTuple.address()) {
@@ -307,7 +310,7 @@ TEST_F(CopyOnWriteTest, BigTest) {
                 const bool inserted =
                         COWTuples.insert(*reinterpret_cast<int64_t*>(values)).second;
                 if (!inserted) {
-                    printf("Failed in iteration %d with values %d and %d\n", totalInserted, values[0], values[1]);
+                    printf("Failed in iteration %d, total inserted %d, with values %d and %d\n", qq, totalInserted, values[0], values[1]);
                 }
                 ASSERT_TRUE(inserted);
                 totalInserted++;

@@ -72,15 +72,13 @@
 #include "storage/ConstraintFailureException.h"
 #include "storage/MaterializedViewMetadata.h"
 #include "storage/CopyOnWriteContext.h"
+#include "storage/tableiterator.h"
 
 using namespace voltdb;
 
 void* keyTupleStorage = NULL;
 TableTuple keyTuple;
 
-/**
- * This value has to match the value in CopyOnWriteContext.cpp
- */
 #define TABLE_BLOCKSIZE 2097152
 
 PersistentTable::PersistentTable(ExecutorContext *ctx, bool exportEnabled) :
@@ -521,7 +519,7 @@ void PersistentTable::deleteTupleForUndo(TableTuple &tupleCopy, size_t wrapperOf
 }
 
 TableTuple PersistentTable::lookupTuple(TableTuple tuple) {
-    TableTuple nullTuple(m_schema);//Null tuple
+    TableTuple nullTuple(m_schema);
 
     TableIndex *pkeyIndex = primaryKeyIndex();
     if (pkeyIndex == NULL) {
@@ -529,15 +527,9 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple) {
          * Do a table scan.
          */
         TableTuple tableTuple(m_schema);
-        int tableIndex = 0;
-        for (int tupleCount = 0; tupleCount < m_tupleCount; tupleCount++) {
-            /*
-             * Find the next active tuple
-             */
-            do {
-                tableTuple.move(dataPtrForTuple(tableIndex++));
-            } while (!tableTuple.isActive());
-
+        TableIterator ti(this);
+        while (ti.hasNext()) {
+            ti.next(tableTuple);
             if (tableTuple.equalsNoSchemaCheck(tuple)) {
                 return tableTuple;
             }
@@ -713,20 +705,11 @@ void PersistentTable::processLoadedTuple(bool allowExport, TableTuple &tuple) {
     {
         m_nonInlinedMemorySize += tuple.getNonInlinedMemorySize();
     }
-}
 
-/*
- * Implemented by persistent table and called by Table::loadTuplesFrom
- * to do add tuples to indexes
- */
-void PersistentTable::populateIndexes(int tupleCount) {
     // populate indexes. walk the contiguous memory in the inner loop.
     for (int i = m_indexCount - 1; i >= 0;--i) {
         TableIndex *index = m_indexes[i];
-        for (int j = 0; j < tupleCount; ++j) {
-            m_tmpTarget1.move(dataPtrForTuple((int) m_usedTuples + j));
-            index->addEntry(&m_tmpTarget1);
-        }
+        index->addEntry(&tuple);
     }
 }
 

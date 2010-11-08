@@ -154,7 +154,18 @@ public:
     std::vector<bool> m_primaryKeyIndexSchemaAllowNull;
     std::vector<int> m_primaryKeyIndexColumns;
 };
-/*
+
+class StackCleaner {
+public:
+    StackCleaner(TableTuple tuple) : m_tuple(tuple) {}
+    ~StackCleaner() {
+        m_tuple.freeObjectColumns();
+        delete [] m_tuple.address();
+    }
+private:
+    TableTuple m_tuple;
+};
+
 TEST_F(PersistentTableLogTest, InsertDeleteThenUndoOneTest) {
     initTable(true);
     tableutil::addRandomTuples(m_table, 1000);
@@ -167,8 +178,13 @@ TEST_F(PersistentTableLogTest, InsertDeleteThenUndoOneTest) {
     voltdb::TableTuple tupleBackup(m_tableSchema);
     tupleBackup.move(new char[tupleBackup.tupleLength()]);
     tupleBackup.copyForPersistentInsert(tuple);
+    StackCleaner cleaner(tupleBackup);
 
     m_engine->setUndoToken(INT64_MIN + 2);
+    // this next line is a testing hack until engine data is
+    // de-duplicated with executorcontext data
+    m_engine->getExecutorContext();
+
     m_table->deleteTuple(tuple, true);
 
     ASSERT_TRUE( m_table->lookupTuple(tupleBackup).isNullTuple());
@@ -176,12 +192,7 @@ TEST_F(PersistentTableLogTest, InsertDeleteThenUndoOneTest) {
     m_engine->undoUndoToken(INT64_MIN + 2);
 
     ASSERT_FALSE(m_table->lookupTuple(tuple).isNullTuple());
-
-    for (int ii = 0; ii < m_tableSchema->getUninlinedStringColumnCount(); ii++) {
-        tupleBackup.getNValue(m_tableSchema->getUninlinedStringColumnInfoIndex(ii)).free();
-    }
-    delete [] tupleBackup.address();
-}*/
+}
 
 TEST_F(PersistentTableLogTest, InsertUpdateThenUndoOneTest) {
     initTable(true);

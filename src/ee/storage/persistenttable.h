@@ -267,12 +267,6 @@ protected:
      */
     virtual void processLoadedTuple(bool allowExport, TableTuple &tuple);
 
-    /*
-     * Implemented by persistent table and called by Table::loadTuplesFrom
-     * to do add tuples to indexes
-     */
-    virtual void populateIndexes(int tupleCount);
-
     // pointer to current transaction id and other "global" state.
     // abstract this out of VoltDBEngine to avoid creating dependendencies
     // between the engine and the storage layers - which complicate test.

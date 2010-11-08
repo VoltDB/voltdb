@@ -1074,21 +1074,34 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
         if (this == other) return true;
 
         int mypos = m_buffer.position();
-        m_buffer.position(0);
-        m_buffer.limit(mypos);
         int theirpos = other.m_buffer.position();
-        other.m_buffer.limit(theirpos);
-        other.m_buffer.position(0);
+        if (mypos != theirpos) {
+            return false;
+        }
+        long checksum1 = cheesyCheckSum();
+        long checksum2 = other.cheesyCheckSum();
+        boolean checksum = (cheesyCheckSum() == other.cheesyCheckSum());
+        assert(verifyTableInvariants());
+        return checksum;
+    }
 
-        boolean val = m_buffer.equals(other.m_buffer);
-
+    /**
+     * I heart commutativity
+     * @return
+     */
+    private final long cheesyCheckSum() {
+        final int mypos = m_buffer.position();
+        m_buffer.limit(mypos);
+        m_buffer.position(0);
+        long checksum = 0;
+        final byte bytes[] = m_buffer.array();
+        final int end = m_buffer.arrayOffset() + mypos;
+        for (int ii = m_buffer.arrayOffset(); ii < end; ii++) {
+            checksum += bytes[ii];
+        }
         m_buffer.limit(m_buffer.capacity());
         m_buffer.position(mypos);
-        other.m_buffer.limit(other.m_buffer.capacity());
-        other.m_buffer.position(theirpos);
-
-        assert(verifyTableInvariants());
-        return val;
+        return checksum;
     }
 
     /**

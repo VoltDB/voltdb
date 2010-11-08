@@ -19,13 +19,14 @@
 #include "storage/table.h"
 
 namespace voltdb {
-CopyOnWriteIterator::CopyOnWriteIterator(Table *table) :
-        m_table(table), m_blocks(table->m_data), m_blockIndex(0),
+CopyOnWriteIterator::CopyOnWriteIterator(
+        Table *table,
+        TBMapI start,
+        TBMapI end) :
+        m_table(table), m_blockIterator(start), m_end(end),
         m_tupleLength(table->m_tupleLength),
-        m_location(m_blocks[0] - m_tupleLength), m_activeTupleCount(table->m_tupleCount),
-        m_foundTuples(0),
-        m_blockLength(m_tupleLength * table->m_tuplesPerBlock), m_didFirstIteration(false) {
-
+        m_location(NULL),
+        m_blockOffset(0), m_currentBlock(NULL) {
 }
 
 /**
@@ -33,49 +34,33 @@ CopyOnWriteIterator::CopyOnWriteIterator(Table *table) :
  * and mark them as clean so that they can be copied during the next snapshot.
  */
 bool CopyOnWriteIterator::next(TableTuple &out) {
-    while (m_foundTuples < m_activeTupleCount) {
-        m_location = m_location + m_tupleLength;
-        const long int delta = m_location - m_blocks[m_blockIndex];
-        if (m_didFirstIteration && delta >= m_blockLength) {
-            m_location = m_blocks[++m_blockIndex];
+    while (true) {
+        if (m_currentBlock == NULL ||
+                m_blockOffset == m_currentBlock->unusedTupleBoundry()) {
+            if (m_blockIterator == m_end) {
+                break;
+            }
+            m_location = m_blockIterator.key();
+            m_currentBlock = m_blockIterator.data();
+            m_blockOffset = 0;
+            m_blockIterator++;
         } else {
-            m_didFirstIteration = true;
+            m_location += m_tupleLength;
         }
-        assert(m_location < m_blocks[m_blockIndex] + m_blockLength);
+        assert(m_location < m_currentBlock.get()->address() + m_table->m_tableAllocationSize);
         assert (out.sizeInValues() == m_table->columnCount());
+        m_blockOffset++;
         out.move(m_location);
         const bool active = out.isActive();
         const bool dirty = out.isDirty();
         // Return this tuple only when this tuple is not marked as deleted and isn't dirty
         if (active && !dirty) {
-            ++m_foundTuples;
             out.setDirtyFalse();
             return true;
         } else {
             out.setDirtyFalse();
         }
     }
-    cleanBlocksAfterLastFound();
     return false;
-}
-
-void CopyOnWriteIterator::cleanBlocksAfterLastFound() {
-    m_location = m_location + m_tupleLength;
-    while (true) {
-        long int delta = m_location - m_blocks[m_blockIndex];
-        TableTuple tuple(m_table->schema());
-        while (delta < m_blockLength) {
-            tuple.move(m_location);
-            tuple.setDirtyFalse();
-            m_location = m_location + m_tupleLength;
-            delta = m_location - m_blocks[m_blockIndex];
-        }
-        m_blockIndex++;
-        if (m_blockIndex < m_blocks.size()) {
-            m_location = m_blocks[m_blockIndex];
-        } else {
-            break;
-        }
-    }
 }
 }

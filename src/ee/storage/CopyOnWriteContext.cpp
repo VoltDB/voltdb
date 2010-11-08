@@ -24,66 +24,16 @@
 #include <cassert>
 #include <boost/crc.hpp>
 
-/**
- * Matches the allocations size in persistenttable.cpp. It's a terrible idea to cut and paste
- * it, but if they become inconsistent the memcheck build will catch it.
- */
-#ifndef MEMCHECK
-#define TABLE_BLOCKSIZE 2097152
-#endif
 namespace voltdb {
-
-// These next two methods here do some Ariel-foo that probably merits a comment.
-#ifdef MEMCHECK
-bool pairAddressToPairAddressComparator(const BlockPair a, const BlockPair b) {
-    return a.pair.first + a.tupleLength < b.pair.first;
-}
-// Created this simple comparitor to compare addresses of BlockPairs for sorting
-bool simplePairAddressToPairAddressComparator(const BlockPair a, const BlockPair b) {
-        return a.pair.first < b.pair.first;
-}
-#else
-bool pairAddressToPairAddressComparator(const BlockPair a, const BlockPair b) {
-    return a.first + TABLE_BLOCKSIZE < b.first;
-}
-// Created this simple comparitor to compare addresses of BlockPairs for sorting
-bool simplePairAddressToPairAddressComparator(const BlockPair a, const BlockPair b) {
-        return a.first < b.first;
-}
-#endif
 
 CopyOnWriteContext::CopyOnWriteContext(Table *table, TupleSerializer *serializer, int32_t partitionId) :
              m_table(table),
              m_backedUpTuples(TableFactory::getCopiedTempTable(table->databaseId(), "COW of " + table->name(), table, NULL)),
-             m_serializer(serializer), m_pool(2097152, 320), m_blocks(m_table->m_data.size()),
-             m_iterator(new CopyOnWriteIterator(table)),
+             m_serializer(serializer), m_pool(2097152, 320), m_blocks(m_table->m_data),
+             m_iterator(new CopyOnWriteIterator(table, m_blocks.begin(), m_blocks.end())),
              m_maxTupleLength(serializer->getMaxSerializedTupleSize(table->schema())),
              m_tuple(table->schema()), m_finishedTableScan(false), m_partitionId(partitionId),
-             m_tuplesSerialized(0) {
-    for (int ii = 0; ii < table->m_data.size(); ii++) {
-#ifdef MEMCHECK
-        BlockPair p;
-        p.pair =  std::pair<char*, int>(table->m_data[ii], ii);
-        p.tupleLength = table->tempTuple().tupleLength();
-#else
-        const BlockPair p(table->m_data[ii], ii);
-#endif
-        m_blocks[ii] = p;
-    }
-    std::sort( m_blocks.begin(), m_blocks.end(), simplePairAddressToPairAddressComparator);
-#ifdef DEBUG
-#ifndef MEMCHECK
-    for (int ii = 0; ii < m_blocks.size() - 1; ii++) {
-        assert(m_blocks[ii].first < m_blocks[ii + 1].first);
-    }
-#endif
-#endif
-#ifdef MEMCHECK
-    for (int ii = 0; ii < m_blocks.size() - 1; ii++) {
-        assert(m_blocks[ii].pair.first < m_blocks[ii + 1].pair.first);
-    }
-#endif
-}
+             m_tuplesSerialized(0) {}
 
 bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
     boost::crc_32_type crc;
@@ -163,28 +113,32 @@ void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
      * Find out which block the address is contained in.
      */
     char *address = tuple.address();
-#ifdef MEMCHECK
-        BlockPair compP;
-        compP.pair =  std::pair<char*, int>(address, 0);
-        compP.tupleLength = tuple.tupleLength();
-#else
-    const BlockPair compP(address, 0);
-#endif
-    BlockPairVectorI i =
-            std::lower_bound(m_blocks.begin(), m_blocks.end(), compP, pairAddressToPairAddressComparator);
-    if (i == m_blocks.end()) {
+    TBMapI i =
+                            m_blocks.lower_bound(address);
+    if (i == m_blocks.end() && m_blocks.empty()) {
         tuple.setDirtyFalse();
         return;
     }
-#ifdef MEMCHECK
-    const char *blockStartAddress = (*i).pair.first;
-    const int blockIndex = (*i).pair.second;
-    const char *blockEndAddress = blockStartAddress + tuple.tupleLength();
-#else
-    const char *blockStartAddress = (*i).first;
-    const int blockIndex = (*i).second;
-    const char *blockEndAddress = blockStartAddress + TABLE_BLOCKSIZE;
-#endif
+    if (i == m_blocks.end()) {
+        i--;
+        if (i.key() + m_table->m_tableAllocationSize < address) {
+            tuple.setDirtyFalse();
+            return;
+        }
+    } else {
+        if (i.key() > address) {
+            i--;
+            if (i.key() + m_table->m_tableAllocationSize < address) {
+                tuple.setDirtyFalse();
+                return;
+            }
+        } else {
+            assert(false);
+        }
+    }
+
+    const char *blockStartAddress = i.key();
+    const char *blockEndAddress = blockStartAddress + m_table->m_tableAllocationSize;
 
     if (address >= blockEndAddress || address < blockStartAddress) {
         /**
@@ -198,7 +152,7 @@ void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
      * Now check where this is relative to the COWIterator.
      */
     CopyOnWriteIterator *iter = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get());
-    if (iter->needToDirtyTuple(blockIndex, address, newTuple)) {
+    if (iter->needToDirtyTuple(blockStartAddress, address, newTuple)) {
         tuple.setDirtyTrue();
         /**
          * Don't back up a newly introduced tuple, just mark it as dirty.
