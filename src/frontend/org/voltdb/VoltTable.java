@@ -1094,10 +1094,17 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
         m_buffer.limit(mypos);
         m_buffer.position(0);
         long checksum = 0;
-        final byte bytes[] = m_buffer.array();
-        final int end = m_buffer.arrayOffset() + mypos;
-        for (int ii = m_buffer.arrayOffset(); ii < end; ii++) {
-            checksum += bytes[ii];
+        if (m_buffer.hasArray()) {
+            final byte bytes[] = m_buffer.array();
+            final int end = m_buffer.arrayOffset() + mypos;
+            for (int ii = m_buffer.arrayOffset(); ii < end; ii++) {
+                checksum += bytes[ii];
+            }
+        } else {
+            final int remaining = m_buffer.remaining();
+            for (int ii = 0; ii < remaining; ii++) {
+                checksum += m_buffer.get();
+            }
         }
         m_buffer.limit(m_buffer.capacity());
         m_buffer.position(mypos);
