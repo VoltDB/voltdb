@@ -49,14 +49,13 @@ WHERE runs.startTime >= '%s'
     AND clients.applicationName = "TPC-C"
     AND clients.subApplicationName = "Client"
 GROUP BY startTime
-LIMIT %u
 """
 
-    def get_latencies(self, start_time, count):
+    def get_latencies(self, start_time):
         res = []
         latencies = {}
 
-        self.cursor.execute(self.LATENCIES % (start_time, count))
+        self.cursor.execute(self.LATENCIES % (start_time))
         res = list(self.cursor.fetchall())
 
         for i in res:
@@ -86,13 +85,12 @@ WHERE time >= '%s'
       AND txnpersecond <= hostcount * 78000
 GROUP BY hostcount, DATE(time)
 ORDER BY time DESC
-LIMIT %u
 """
 
-    def get_throughputs(self, time, count):
+    def get_throughputs(self, time):
         throughput_map = {}
 
-        self.cursor.execute(self.THROUGHPUT % (time, count))
+        self.cursor.execute(self.THROUGHPUT % (time))
         return list(self.cursor.fetchall())
 
 class Plot:
@@ -144,6 +142,11 @@ def parse_credentials(filename):
 
     return credentials
 
+def starttime(daysago):
+    timedelta = datetime.timedelta(days=daysago)
+    starttime = datetime.datetime.now() - timedelta
+    return starttime
+
 def usage():
     print "Usage:"
     print "\t", sys.argv[0], "credential_file output_dir filename_base" \
@@ -179,12 +182,9 @@ def main():
                                credentials["throughput"]["password"],
                                credentials["throughput"]["database"])
 
-    timedelta = datetime.timedelta(days=30)
-
-    starttime = datetime.datetime.now() - timedelta
-    timestamp = time.mktime(starttime.timetuple()) * 1000.0
-    latencies = latency_stat.get_latencies(timestamp, 9000)
-    throughput = volt_stat.get_throughputs(starttime, 9000)
+    timestamp = time.mktime(starttime(30).timetuple()) * 1000.0
+    latencies = latency_stat.get_latencies(timestamp)
+    throughput = volt_stat.get_throughputs(starttime(90))
 
     latency_stat.close()
     volt_stat.close()
