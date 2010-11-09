@@ -1688,11 +1688,13 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             throw new VoltAbortException("table '" + tableName + "' does not exist in database " + clusterName + "." + databaseName);
         }
 
+        long undo_token = getNextUndoToken();
         ee.loadTable(table.getRelativeIndex(), data,
                      txnId,
                      lastCommittedTxnId,
-                     getNextUndoToken(),
+                     undo_token,
                      allowExport != 0);
+        ee.releaseUndoToken(undo_token);
     }
 
     @Override
