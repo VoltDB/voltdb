@@ -134,8 +134,11 @@ inline bool TableIterator::next(TableTuple &out) {
 
         //assert(out.isActive());
 
+        const bool active = out.isActive();
+        const bool pendingDelete = out.isPendingDelete();
+        const bool isPendingDeleteOnUndoRelease = out.isPendingDeleteOnUndoRelease();
         // Return this tuple only when this tuple is not marked as deleted.
-        if (out.isActive()) {
+        if (active && !(pendingDelete || isPendingDeleteOnUndoRelease)) {
             ++m_foundTuples;
             //assert(m_foundTuples == m_location);
             return true;

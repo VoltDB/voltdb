@@ -79,6 +79,21 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
         crc.process_block(out->data() + tupleStartPosition, out->data() + tupleEndPosition);
         m_tuplesSerialized++;
         rowsSerialized++;
+
+        /*
+         * If this is the table scan, check to see if the tuple is pending delete
+         * and return the tuple if it is
+         */
+        if (!m_finishedTableScan && tuple.isPendingDelete()) {
+            assert(!tuple.isPendingDeleteOnUndoRelease());
+            if (m_table->m_schema->getUninlinedObjectColumnCount() != 0)
+            {
+                m_table->m_nonInlinedMemorySize -= tuple.getNonInlinedMemorySize();
+            }
+            tuple.setPendingDeleteFalse();
+            tuple.freeObjectColumns();
+            m_table->deleteTupleStorage(tuple);
+        }
     }
     /*
      * Number of rows serialized is not known until the end. Written at the end so it
@@ -89,6 +104,50 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
     crc.process_bytes(out->data() + out->position() - 4, 4);
     out->writeIntAt(crcPosition, crc.checksum());
     return true;
+}
+
+bool CopyOnWriteContext::canSafelyFreeTuple(TableTuple tuple) {
+    if (tuple.isDirty() || m_finishedTableScan) {
+        return true;
+    }
+
+    /**
+     * Find out which block the address is contained in. Lower bound returns the first entry
+     * in the index >= the address. Unless the address happens to be equal then the block
+     * we are looking for is probably the previous entry. Then check if the address fits
+     * in the previous entry. If it doesn't then the block is something new.
+     */
+    char *address = tuple.address();
+    TBMapI i =
+                            m_blocks.lower_bound(address);
+    if (i == m_blocks.end() && m_blocks.empty()) {
+        return true;
+    }
+    if (i == m_blocks.end()) {
+        i--;
+        if (i.key() + m_table->m_tableAllocationSize < address) {
+            return true;
+        }
+        //OK it is in the very last block
+    } else {
+        if (i.key() > address) {
+            i--;
+            if (i.key() + m_table->m_tableAllocationSize < address) {
+                return true;
+            }
+            //OK... this is in this particular block
+        } else {
+            assert(false);
+        }
+    }
+
+    const char *blockStartAddress = i.key();
+
+    /**
+     * Now check where this is relative to the COWIterator.
+     */
+    CopyOnWriteIterator *iter = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get());
+    return !iter->needToDirtyTuple(blockStartAddress, address);
 }
 
 void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
@@ -125,6 +184,7 @@ void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
             tuple.setDirtyFalse();
             return;
         }
+        //OK it is in the very last block
     } else {
         if (i.key() > address) {
             i--;
@@ -132,27 +192,19 @@ void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
                 tuple.setDirtyFalse();
                 return;
             }
+            //OK... this is in this particular block
         } else {
             assert(false);
         }
     }
 
     const char *blockStartAddress = i.key();
-    const char *blockEndAddress = blockStartAddress + m_table->m_tableAllocationSize;
-
-    if (address >= blockEndAddress || address < blockStartAddress) {
-        /**
-         * Tuple is in a block allocated after the start of COW
-         */
-        tuple.setDirtyFalse();
-        return;
-    }
 
     /**
      * Now check where this is relative to the COWIterator.
      */
     CopyOnWriteIterator *iter = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get());
-    if (iter->needToDirtyTuple(blockStartAddress, address, newTuple)) {
+    if (iter->needToDirtyTuple(blockStartAddress, address)) {
         tuple.setDirtyTrue();
         /**
          * Don't back up a newly introduced tuple, just mark it as dirty.

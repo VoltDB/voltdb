@@ -326,7 +326,7 @@ TEST_F(PersistentTableMemStatsTest, DeleteAndUndoTest) {
 
     m_table->deleteTuple(tuple, true);
 
-    ASSERT_EQ(orig_size - removed_bytes, m_table->nonInlinedMemorySize());
+    ASSERT_EQ(orig_size, m_table->nonInlinedMemorySize());
 
     m_engine->undoUndoToken(INT64_MIN + 2);
 

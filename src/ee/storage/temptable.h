@@ -131,7 +131,7 @@ inline void TempTable::insertTupleNonVirtualWithDeepCopy(TableTuple &source, Poo
     // are owned by a PersistentTable or part of the EE string pool.
     //
     m_tmpTarget1.copyForPersistentInsert(source, pool); // tuple in freelist must be already cleared
-    m_tmpTarget1.setDeletedFalse();
+    m_tmpTarget1.setActiveTrue();
 }
 
 inline void TempTable::insertTupleNonVirtual(TableTuple &source) {
@@ -148,7 +148,9 @@ inline void TempTable::insertTupleNonVirtual(TableTuple &source) {
     // are owned by a PersistentTable or part of the EE string pool.
     //
     m_tmpTarget1.copy(source); // tuple in freelist must be already cleared
-    m_tmpTarget1.setDeletedFalse();
+    m_tmpTarget1.setActiveTrue();
+    m_tmpTarget1.setPendingDeleteFalse();
+    m_tmpTarget1.setPendingDeleteOnUndoReleaseFalse();
 }
 
 inline void TempTable::updateTupleNonVirtual(TableTuple &source, TableTuple &target) {

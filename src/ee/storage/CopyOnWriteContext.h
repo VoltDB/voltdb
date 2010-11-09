@@ -53,6 +53,8 @@ public:
      */
     void markTupleDirty(TableTuple tuple, bool newTuple);
 
+    bool canSafelyFreeTuple(TableTuple tuple);
+
     virtual ~CopyOnWriteContext();
 
 private:

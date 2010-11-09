@@ -73,6 +73,7 @@ class ReferenceSerializeOutput;
 class ExecutorContext;
 class MaterializedViewMetadata;
 class RecoveryProtoMsg;
+class PersistentTableUndoDeleteAction;
 
 /**
  * Represents a non-temporary table which permanently resides in
@@ -105,7 +106,7 @@ class PersistentTable : public Table {
     friend class TableIndex;
     friend class TableIterator;
     friend class PersistentTableStats;
-
+    friend class PersistentTableUndoDeleteAction;
   private:
     // no default ctor, no copy, no assignment
     PersistentTable();
@@ -125,7 +126,7 @@ class PersistentTable : public Table {
      * Inserts a Tuple without performing an allocation for the
      * uninlined strings.
      */
-    void insertTupleForUndo(TableTuple &source, size_t elMark);
+    void insertTupleForUndo(char *tuple, size_t elMark);
 
     /*
      * Note that inside update tuple the order of sourceTuple and

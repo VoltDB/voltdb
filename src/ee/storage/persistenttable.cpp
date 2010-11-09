@@ -103,7 +103,7 @@ PersistentTable::~PersistentTable() {
     while (ti.next(tuple)) {
         // indexes aren't released as they don't have ownership of strings
         tuple.freeObjectColumns();
-        tuple.setDeletedTrue();
+        tuple.setActiveFalse();
     }
     for (int i = 0; i < m_indexCount; ++i) {
         TableIndex *index = m_indexes[i];
@@ -167,7 +167,9 @@ bool PersistentTable::insertTuple(TableTuple &source) {
     // Then copy the source into the target
     //
     m_tmpTarget1.copyForPersistentInsert(source); // tuple in freelist must be already cleared
-    m_tmpTarget1.setDeletedFalse();
+    m_tmpTarget1.setActiveTrue();
+    m_tmpTarget1.setPendingDeleteFalse();
+    m_tmpTarget1.setPendingDeleteOnUndoReleaseFalse();
 
     /**
      * Inserts never "dirty" a tuple since the tuple is new, but...  The
@@ -226,59 +228,25 @@ bool PersistentTable::insertTuple(TableTuple &source) {
  * Insert a tuple but don't allocate a new copy of the uninlineable
  * strings or create an UndoAction or update a materialized view.
  */
-void PersistentTable::insertTupleForUndo(TableTuple &source, size_t wrapperOffset) {
+void PersistentTable::insertTupleForUndo(char *tuple, size_t wrapperOffset) {
 
-    // not null checks at first
-    if (!checkNulls(source)) {
-        throwFatalException("Failed to insert tuple into table %s for undo:"
-                            " null constraint violation\n%s\n", m_name.c_str(),
-                            source.debugNoHeader().c_str());
-    }
+    m_tmpTarget1.move(tuple);
+    m_tmpTarget1.setPendingDeleteOnUndoReleaseFalse();
 
     // rollback Export
     if (m_exportEnabled) {
         m_wrapper->rollbackTo(wrapperOffset);
     }
 
-
-    // First get the next free tuple This will either give us one from
-    // the free slot list, or grab a tuple at the end of our chunk of
-    // memory
-    nextFreeTuple(&m_tmpTarget1);
-    m_tupleCount++;
-
-    // Then copy the source into the target
-    m_tmpTarget1.copy(source);
-    m_tmpTarget1.setDeletedFalse();
-
-    if (m_schema->getUninlinedObjectColumnCount() != 0)
-    {
-        m_nonInlinedMemorySize += m_tmpTarget1.getNonInlinedMemorySize();
-    }
-
-    /**
-     * See the comments in insertTuple for why this has to be done. The same situation applies here
-     * in the undo case. When the tuple was deleted a copy was made for the COW. Even though it is being
-     * reintroduced here it should be considered a new tuple and marked as dirty if the COWIterator will scan it
-     * otherwise two copies will appear. The one reintroduced by the undo action and the copy made when the tuple
-     * was originally deleted.
+    /*
+     * The only thing to do is reinsert the tuple into the indexes. It was never moved,
+     * just marked as deleted.
      */
-    if (m_COWContext.get() != NULL) {
-        m_COWContext->markTupleDirty(m_tmpTarget1, true);
-    } else {
-        m_tmpTarget1.setDirtyFalse();
-    }
-    m_tmpTarget1.isDirty();
-
     if (!tryInsertOnAllIndexes(&m_tmpTarget1)) {
         deleteTupleStorage(m_tmpTarget1);
         throwFatalException("Failed to insert tuple into table %s for undo:"
                             " unique constraint violation\n%s\n", m_name.c_str(),
                             m_tmpTarget1.debugNoHeader().c_str());
-    }
-
-    if (m_exportEnabled) {
-        m_wrapper->rollbackTo(wrapperOffset);
     }
 }
 
@@ -311,7 +279,7 @@ bool PersistentTable::updateTuple(TableTuple &source, TableTuple &target, bool u
         m_nonInlinedMemorySize += source.getNonInlinedMemorySize();
     }
 
-     source.setDeletedFalse();
+     source.setActiveTrue();
      //Copy the dirty status that was set by markTupleDirty.
      if (target.isDirty()) {
          source.setDirtyTrue();
@@ -439,12 +407,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
     // Just like insert, we want to remove this tuple from all of our indexes
     deleteFromAllIndexes(&target);
 
-    /**
-     * A user initiated delete needs to have the tuple "marked dirty" so that the copy is made.
-     */
-    if (m_COWContext.get() != NULL) {
-        m_COWContext->markTupleDirty(target, false);
-    }
+    target.setPendingDeleteOnUndoReleaseTrue();
 
     /*
      * Create and register an undo action.
@@ -453,7 +416,8 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
     assert(undoQuantum);
     Pool *pool = undoQuantum->getDataPool();
     assert(pool);
-    PersistentTableUndoDeleteAction *ptuda = new (pool->allocate(sizeof(PersistentTableUndoDeleteAction))) PersistentTableUndoDeleteAction( target, this, pool);
+    PersistentTableUndoDeleteAction *ptuda =
+            new (pool->allocate(sizeof(PersistentTableUndoDeleteAction))) PersistentTableUndoDeleteAction( target.address(), this);
 
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
@@ -466,13 +430,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
         ptuda->setELMark(elMark);
     }
 
-    if (m_schema->getUninlinedObjectColumnCount() != 0)
-    {
-        m_nonInlinedMemorySize -= target.getNonInlinedMemorySize();
-    }
-
     undoQuantum->registerUndoAction(ptuda);
-    deleteTupleStorage(target);
     return true;
 }
 

@@ -41,7 +41,7 @@ public:
      * in the used portion of the table blocks and doesn't overrun to the uninitialized block memory because
      * it skiped a dirty tuple and didn't end up with the right found tuple count upon reaching the end.
      */
-    bool needToDirtyTuple(const char *blockAddress, const char *tupleAddress, const bool newTuple) {
+    bool needToDirtyTuple(const char *blockAddress, const char *tupleAddress) {
         if (blockAddress < m_currentBlock->address()) {
             return false;
         }

@@ -257,12 +257,12 @@ TEST_F(CopyOnWriteTest, TestTableTupleFlags) {
     TableTuple tuple(m_table->schema());
     tuple.move(storage);
 
-    tuple.setDeletedTrue();
+    tuple.setActiveFalse();
     tuple.setDirtyTrue();
     ASSERT_FALSE(tuple.isActive());
     ASSERT_TRUE(tuple.isDirty());
 
-    tuple.setDeletedFalse();
+    tuple.setActiveTrue();
     ASSERT_TRUE(tuple.isDirty());
     ASSERT_TRUE(tuple.isActive());
 

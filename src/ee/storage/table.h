@@ -80,7 +80,7 @@ class StatsSource;
 class StreamBlock;
 class Topend;
 class TupleBlock;
-class SortedTupleBlockList;
+class PersistentTableUndoDeleteAction;
 
 const size_t COLUMN_DESCRIPTOR_SIZE = 1 + 4 + 4; // type, name offset, name length
 
@@ -119,8 +119,8 @@ class Table {
     friend class TableStats;
     friend class StatsSource;
     friend class TupleBlock;
-    friend class SortedTupleBlockList;
     friend class ::CopyOnWriteTest_CopyOnWriteIterator;
+    friend class PersistentTableUndoDeleteAction;
   private:
     // no default constructor, no copy
     Table();
@@ -401,7 +401,7 @@ inline TBPtr Table::allocateNextBlock() {
 }
 
 inline void Table::deleteTupleStorage(TableTuple &tuple) {
-    tuple.setDeletedTrue(); // does NOT free strings
+    tuple.setActiveFalse(); // does NOT free strings
 
     // add to the free list
     m_tupleCount--;
