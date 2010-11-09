@@ -1695,6 +1695,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                      undo_token,
                      allowExport != 0);
         ee.releaseUndoToken(undo_token);
+        getNextUndoToken();
     }
 
     @Override
