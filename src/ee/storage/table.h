@@ -169,6 +169,17 @@ public:
     int64_t allocatedTupleCount() const { return m_data.size() * m_tuplesPerBlock; }
     int64_t activeTupleCount() const { return m_tupleCount; }
     TableTuple& tempTuple();
+
+    int64_t allocatedTupleMemory() const
+    {
+        return m_data.size() * m_tableAllocationSize;
+    }
+
+    int64_t occupiedTupleMemory() const
+    {
+        return m_tupleCount * m_tempTuple.tupleLength();
+    }
+
     // Only counts persistent table usage, currently
     int64_t nonInlinedMemorySize() const { return m_nonInlinedMemorySize; }
 

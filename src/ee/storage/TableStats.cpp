@@ -30,6 +30,7 @@ namespace voltdb {
  */
 TableStats::TableStats(voltdb::Table* table)
     : voltdb::StatsSource(), m_table(table), m_lastTupleCount(0),
+      m_lastAllocatedTupleMemory(0), m_lastOccupiedTupleMemory(0),
       m_lastStringDataMemory(0)
 {
 }
@@ -80,12 +81,21 @@ void TableStats::updateStatsTuple(voltdb::TableTuple *tuple) {
     tuple->setNValue( StatsSource::m_columnName2Index["TABLE_TYPE"], m_tableType);
     int64_t tupleCount = m_table->activeTupleCount();
     // This overflow is unlikely (requires 2 terabytes of allocated string memory)
+    int64_t allocated_tuple_mem_kb = m_table->allocatedTupleMemory() / 1000;
+    int64_t occupied_tuple_mem_kb = m_table->occupiedTupleMemory() / 1000;
     int64_t string_data_mem_kb = m_table->nonInlinedMemorySize() / 1000;
 
     if (interval()) {
         tupleCount = tupleCount - m_lastTupleCount;
         m_lastTupleCount = m_table->activeTupleCount();
-        string_data_mem_kb = string_data_mem_kb - (m_lastStringDataMemory / 1000);
+        allocated_tuple_mem_kb =
+            allocated_tuple_mem_kb - (m_lastAllocatedTupleMemory / 1000);
+        m_lastAllocatedTupleMemory = m_table->allocatedTupleMemory();
+        occupied_tuple_mem_kb =
+            occupied_tuple_mem_kb - (m_lastOccupiedTupleMemory / 1000);
+        m_lastOccupiedTupleMemory = m_table->occupiedTupleMemory();
+        string_data_mem_kb =
+            string_data_mem_kb - (m_lastStringDataMemory / 1000);
         m_lastStringDataMemory = m_table->nonInlinedMemorySize();
     }
 
@@ -93,16 +103,27 @@ void TableStats::updateStatsTuple(voltdb::TableTuple *tuple) {
     {
         string_data_mem_kb = -1;
     }
+    if (allocated_tuple_mem_kb > INT32_MAX)
+    {
+        allocated_tuple_mem_kb = -1;
+    }
+    if (occupied_tuple_mem_kb > INT32_MAX)
+    {
+        occupied_tuple_mem_kb = -1;
+    }
 
     tuple->setNValue(
             StatsSource::m_columnName2Index["TUPLE_COUNT"],
             ValueFactory::getBigIntValue(tupleCount));
-    tuple->setNValue( StatsSource::m_columnName2Index["TUPLE_ALLOCATED_MEMORY"],
-            ValueFactory::getIntegerValue(-1));
-    tuple->setNValue( StatsSource::m_columnName2Index["TUPLE_DATA_MEMORY"],
-            ValueFactory::getIntegerValue(-1));
+    tuple->setNValue(StatsSource::m_columnName2Index["TUPLE_ALLOCATED_MEMORY"],
+                     ValueFactory::
+                     getIntegerValue(static_cast<int32_t>(allocated_tuple_mem_kb)));
+    tuple->setNValue(StatsSource::m_columnName2Index["TUPLE_DATA_MEMORY"],
+                     ValueFactory::
+                     getIntegerValue(static_cast<int32_t>(occupied_tuple_mem_kb)));
     tuple->setNValue( StatsSource::m_columnName2Index["STRING_DATA_MEMORY"],
-                      ValueFactory::getIntegerValue(static_cast<int32_t>(string_data_mem_kb)));
+                      ValueFactory::
+                      getIntegerValue(static_cast<int32_t>(string_data_mem_kb)));
 }
 
 /**
