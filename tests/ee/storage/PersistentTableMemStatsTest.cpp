@@ -315,8 +315,6 @@ TEST_F(PersistentTableMemStatsTest, DeleteAndUndoTest) {
     tableutil::getRandomTuple(m_table, tuple);
     //cout << "Retrieved random tuple " << endl << tuple.debugNoHeader() << endl;
 
-    size_t removed_bytes = ValuePeeker::peekObjectLength(tuple.getNValue(1)) +
-        sizeof(int32_t);
     //cout << "Removing bytes from table: " << removed_bytes << endl;
 
     m_engine->setUndoToken(INT64_MIN + 2);
