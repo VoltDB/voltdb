@@ -22,6 +22,7 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 
 import org.voltdb.logging.VoltLogger;
+import org.voltdb.utils.SystemStatsCollector;
 
 /**
  * This thread fires a timer every five milliseconds
@@ -33,14 +34,17 @@ public class PeriodicWorkTimerThread extends Thread {
 
     ArrayList<ClientInterface> m_clientInterfaces;
     StatsManager m_statsManager;
-    private long m_lastTime;
+    private long m_lastStatsManagerTime;
+    private long m_lastSysStatsSCollection = 0;
+    private long m_lastSysStatsMCollection = 0;
+    private long m_lastSysStatsLCollection = 0;
     private static final VoltLogger log = new VoltLogger("HOST");
 
     public PeriodicWorkTimerThread(ArrayList<ClientInterface> clientInterfaces,
                                    StatsManager statsManager) {
         m_clientInterfaces = clientInterfaces;
         m_statsManager = statsManager;
-        m_lastTime = System.currentTimeMillis();
+        m_lastStatsManagerTime = System.currentTimeMillis();
     }
 
     @Override
@@ -65,9 +69,28 @@ public class PeriodicWorkTimerThread extends Thread {
                 // enough time has passed
                 final long currentTime = System.currentTimeMillis();
                 if (m_statsManager != null
-                        && (currentTime - m_lastTime) >= StatsManager.POLL_INTERVAL) {
-                    m_lastTime = currentTime;
+                        && (currentTime - m_lastStatsManagerTime) >= StatsManager.POLL_INTERVAL) {
+                    m_lastStatsManagerTime = currentTime;
                     m_statsManager.sendNotification();
+                }
+
+                // deal with system stats collection every 5 seconds
+                if ((currentTime - m_lastSysStatsSCollection) >= 5000) {
+
+                    m_lastSysStatsSCollection = currentTime;
+                    boolean medium = false, large = false;
+
+                    // collect medium and large samples less frequently
+                    if ((currentTime - m_lastSysStatsMCollection) >= 60000) {
+                        m_lastSysStatsMCollection = currentTime;
+                        medium = true;
+                    }
+                    if ((currentTime - m_lastSysStatsLCollection) >= 360000) {
+                        m_lastSysStatsLCollection = currentTime;
+                        large = true;
+                    }
+
+                    SystemStatsCollector.asyncSampleSystemNow(medium, large);
                 }
 
                 //long duration = System.nanoTime() - beforeTime;

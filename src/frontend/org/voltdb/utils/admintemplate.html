@@ -1,0 +1,88 @@
+<html>
+<head>
+<title>VoltDB: #HOSTNAME#</title>
+</head>
+<body>
+
+<table border='1' cellpadding='5'>
+<tr><td colspan='3' bgcolor='#aff' align='center'>
+<b>General Info
+</td></tr>
+<tr><td colspan='3'>
+<p>VoltDB Version #VERSION#</p>
+<p>Buildstring: #BUILDSTRING#</p>
+<p>Running on a cluster of #CLUSTER#.</p>
+<p></p>
+</td></tr>
+
+<tr><td colspan='3' bgcolor='#aff' align='center'>
+<b>Memory Usage and Usage History</b>
+</td></tr>
+
+<tr>
+<td bgcolor='#ffa'>
+2 min
+</td>
+<td align='center'>
+<img src='#2MINCHARTURL#' />
+</td>
+<td>
+Stats:
+<ul>
+<li>Using #USED#% of system memory for VoltDB</li>
+<li>#RISK#% of system memory has been reserved for VoltDB</li>
+<li>Rss: #RSS#mb</li>
+<li>Java: #JAVA#mb</li>
+<li>Unused Java #UNUSEDJAVA#mb</li>
+</ul>
+<table border='0' width='100%'><tr><td>
+<a href='/memorycsv/#CSVFILENAME#'>Download Data (CSV)</a>
+</td>
+<td align='right'>
+Format:
+</td>
+<td>
+<small>
+timestamp (ms since epoch),<br/>
+rss (bytes),<br/>usedajavaheap (bytes),<br/>totaljavaheap (bytes),<br/>usedjavasys (bytes),<br/>totaljavasys (bytes),<br/>maxjavaheap (bytes)</small>
+</td>
+</tr></table>
+
+</td>
+</tr>
+
+<tr>
+<td bgcolor='#ffa'>
+30 min
+</td>
+<td align='center' colspan='2'>
+<img src='#30MINCHARTURL#' />
+</td>
+</tr>
+
+<tr>
+<td bgcolor='#ffa'>
+24 hr
+</td>
+<td align='center' colspan='2'>
+<img src='#24HRCHARTURL#' />
+</td>
+</tr>
+
+<tr>
+<td colspan='3' bgcolor="#eee">
+<small>
+Chart Explanation:
+<ul>
+<li>The pink area is the memory used by the JVM.</li>
+<li>The red area is the RSS for the process and includes the JVM memory usage.</li>
+<li>The dotted yellow like represents the amount of memory reseverd for the JVM, but not yet claimed by the JVM.<br/>
+If the JVM were to use all of the memory it was permitted to use, the RSS would reach the yellow line.</li>
+</ul>
+</small>
+</td>
+</tr>
+
+
+</body>
+</html>
