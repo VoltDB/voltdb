@@ -170,9 +170,6 @@ TEST_F(TableSerializeTest, NullStrings) {
     table_->deleteAllTuples(true);
     delete table_;
     table_ = TableFactory::getTempTable(this->database_id, "temp_table", schema, columnNames, NULL);
-    // clean up
-    delete[] columnNames;
-
 
     TableTuple& tuple = table_->tempTuple();
     tuple.setNValue(0, ValueFactory::getNullStringValue());
@@ -213,6 +210,8 @@ TEST_F(TableSerializeTest, NullStrings) {
     }
     EXPECT_EQ(1, count);
     delete deserialized;
+    // clean up
+    delete[] columnNames;
 }
 
 int main() {

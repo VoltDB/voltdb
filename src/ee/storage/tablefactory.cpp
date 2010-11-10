@@ -204,6 +204,11 @@ void TableFactory::initCommon(
             TupleSchema *schema,
             const std::string *columnNames,
             const bool ownsTupleSchema) {
+
+    assert(table != NULL);
+    assert(schema != NULL);
+    assert(columnNames != NULL);
+
     table->m_databaseId = databaseId;
     table->m_name = name;
     table->initializeWithColumns(schema, columnNames, ownsTupleSchema);
