@@ -141,6 +141,20 @@ namespace voltdb
             }
         }
 
+        int64_t getSize() const
+        {
+            int64_t total = 0;
+            for (int i = 0; i < m_undoDataPools.size(); i++)
+            {
+                total += m_undoDataPools[i]->getAllocatedMemory();
+            }
+            for (int i = 0; i < m_undoQuantums.size(); i++)
+            {
+                total += m_undoQuantums[i]->getAllocatedMemory();
+            }
+            return total;
+        }
+
     private:
         // These two values serve no real purpose except to provide
         // the capability to assert various properties about the undo tokens

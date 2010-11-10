@@ -38,6 +38,11 @@ public:
     {
     }
 
+    int64_t getSize() const
+    {
+        return static_cast<int64_t>(m_size);
+    }
+
     uint64_t m_offset;
     uint64_t m_size;
     char *m_chunkData;
@@ -165,6 +170,17 @@ public:
         for (std::size_t ii = 0; ii < numChunks; ii++) {
             m_chunks[ii].m_offset = 0;
         }
+    }
+
+    int64_t getAllocatedMemory()
+    {
+        int64_t total = 0;
+        total += m_chunks.size() * m_allocationSize;
+        for (int i = 0; i < m_oversizeChunks.size(); i++)
+        {
+            total += m_oversizeChunks[i].getSize();
+        }
+        return total;
     }
 
 private:

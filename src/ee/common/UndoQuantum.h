@@ -77,6 +77,11 @@ public:
 
     virtual bool isDummy() {return false;}
 
+    inline int64_t getAllocatedMemory() const
+    {
+        return m_dataPool->getAllocatedMemory();
+    }
+
 private:
     const int64_t m_undoToken;
     std::vector<UndoAction*> m_undoActions;
