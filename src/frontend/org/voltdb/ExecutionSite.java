@@ -19,7 +19,13 @@ package org.voltdb;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -27,25 +33,66 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
 import org.voltdb.VoltProcedure.VoltAbortException;
-import org.voltdb.catalog.*;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.Site;
+import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.debugstate.ExecutorContext;
-import org.voltdb.dtxn.*;
+import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
+import org.voltdb.dtxn.RestrictedPriorityQueue;
 import org.voltdb.dtxn.RestrictedPriorityQueue.QueueState;
-import org.voltdb.exceptions.*;
+import org.voltdb.dtxn.SinglePartitionTxnState;
+import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.dtxn.SiteTransactionConnection;
+import org.voltdb.dtxn.TransactionState;
+import org.voltdb.exceptions.EEException;
+import org.voltdb.exceptions.SQLException;
+import org.voltdb.exceptions.SerializableException;
 import org.voltdb.export.ExportManager;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.export.processors.RawProcessor;
 import org.voltdb.export.processors.RawProcessor.ExportInternalMessage;
-import org.voltdb.fault.*;
 import org.voltdb.fault.FaultDistributorInterface.PPDPolicyDecision;
+import org.voltdb.fault.FaultHandler;
+import org.voltdb.fault.NodeFailureFault;
+import org.voltdb.fault.VoltFault;
 import org.voltdb.fault.VoltFault.FaultType;
-import org.voltdb.jni.*;
+import org.voltdb.jni.ExecutionEngine;
+import org.voltdb.jni.ExecutionEngineIPC;
+import org.voltdb.jni.ExecutionEngineJNI;
+import org.voltdb.jni.MockExecutionEngine;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
-import org.voltdb.messaging.*;
-import org.voltdb.utils.*;
+import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.CompleteTransactionResponseMessage;
+import org.voltdb.messaging.DebugMessage;
+import org.voltdb.messaging.FailureSiteUpdateMessage;
+import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.messaging.FragmentResponseMessage;
+import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.HeartbeatMessage;
+import org.voltdb.messaging.HeartbeatResponseMessage;
+import org.voltdb.messaging.InitiateResponseMessage;
+import org.voltdb.messaging.InitiateTaskMessage;
+import org.voltdb.messaging.Mailbox;
+import org.voltdb.messaging.MessagingException;
+import org.voltdb.messaging.MultiPartitionParticipantMessage;
+import org.voltdb.messaging.RecoveryMessage;
+import org.voltdb.messaging.SiteMailbox;
+import org.voltdb.messaging.Subject;
+import org.voltdb.messaging.TransactionInfoBaseMessage;
+import org.voltdb.messaging.VoltMessage;
+import org.voltdb.utils.DBBPool;
+import org.voltdb.utils.DumpManager;
+import org.voltdb.utils.Encoder;
+import org.voltdb.utils.EstTime;
+import org.voltdb.utils.LogKeys;
 
 /**
  * The main executor of transactional work in the system. Controls running
@@ -136,6 +183,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     private boolean haveShutdownAlready;
 
     private final TableStats m_tableStats;
+    private final IndexStats m_indexStats;
     private final StarvationTracker m_starvationTracker;
     private final Watchdog m_watchdog;
     private class Watchdog extends Thread {
@@ -452,10 +500,19 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             for (Table table : tables) {
                 tableIds[i++] = table.getRelativeIndex();
             }
-            final VoltTable[] s =
+
+            // update table stats
+            final VoltTable[] s1 =
                 ee.getStats(SysProcSelector.TABLE, tableIds, false, time);
-            if (s != null) {
-                m_tableStats.setStatsTable(s[0]);
+            if (s1 != null) {
+                m_tableStats.setStatsTable(s1[0]);
+            }
+
+            // update index stats
+            final VoltTable[] s2 =
+                ee.getStats(SysProcSelector.INDEX, tableIds, false, time);
+            if ((s2 != null) && (s2.length > 0)) {
+                m_indexStats.setStatsTable(s2[0]);
             }
         }
     }
@@ -510,6 +567,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         m_transactionQueue = null;
         m_starvationTracker = null;
         m_tableStats = null;
+        m_indexStats = null;
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
@@ -583,6 +641,10 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         statsAgent.registerStatsSource(SysProcSelector.TABLE,
                                        Integer.parseInt(getCorrespondingCatalogSite().getTypeName()),
                                        m_tableStats);
+        m_indexStats = new IndexStats(String.valueOf(getCorrespondingSiteId()), getCorrespondingSiteId());
+        statsAgent.registerStatsSource(SysProcSelector.INDEX,
+                                       Integer.parseInt(getCorrespondingCatalogSite().getTypeName()),
+                                       m_indexStats);
 
     }
 
