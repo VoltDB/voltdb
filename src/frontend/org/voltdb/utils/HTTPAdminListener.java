@@ -18,12 +18,10 @@
 package org.voltdb.utils;
 
 import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.InetAddress;
-import java.net.URL;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -160,17 +158,15 @@ public class HTTPAdminListener {
      */
     String getHTMLForAdminPage(Map<String,String> params) {
         try {
-            // 10 lines or so just to read the file
-            URL url = HTTPAdminListener.class.getResource("admintemplate.html");
-            File f = new File(url.getFile());
-            FileInputStream fis = new FileInputStream(f);
-            BufferedReader r = new BufferedReader(new InputStreamReader(fis));
+            // 8 lines or so just to read the file
+            InputStream is = HTTPAdminListener.class.getResourceAsStream("admintemplate.html");
+            BufferedReader r = new BufferedReader(new InputStreamReader(is));
             StringBuilder sb = new StringBuilder();
             String line = null;
             while ((line = r.readLine()) != null) {
                 sb.append(line);
             }
-            r.close(); fis.close();
+            r.close(); is.close();
 
             // only 4 to fill out the template
             String template = sb.toString();
