@@ -633,6 +633,7 @@ JAVA COMPILATION
         <fileset dir="${src.jetty.dir}" includes="**/*.properties" />
         <fileset dir="${src.gpl.dir}" includes="**/*.properties"/>
         <fileset dir="${src.gpl.dir}" includes="**/*.xml" />
+        <fileset dir="${src.gpl.dir}" includes="**/admintemplate.html" />
     </copy>
 
     <copy todir='${build.prod.dir}/org/hsqldb_voltpatches/resources'>
