@@ -98,55 +98,71 @@ public class HTTPAdminListener {
                 return;
             }
 
-            // handle the basic info page below this
+            try {
+                // handle the basic info page below this
 
-            CatalogContext context = VoltDB.instance().getCatalogContext();
+                CatalogContext context = VoltDB.instance().getCatalogContext();
 
-            // get the cluster info
-            String clusterinfo = context.numberOfNodes + " hosts ";
-            clusterinfo += " with " + context.numberOfExecSites + " sites ";
-            clusterinfo += " (" + context.numberOfExecSites / context.numberOfNodes;
-            clusterinfo += " per host)";
+                // get the cluster info
+                String clusterinfo = context.numberOfNodes + " hosts ";
+                clusterinfo += " with " + context.numberOfExecSites + " sites ";
+                clusterinfo += " (" + context.numberOfExecSites / context.numberOfNodes;
+                clusterinfo += " per host)";
 
-            // get the hostname
-            InetAddress addr = InetAddress.getLocalHost();
-            String hostname = addr.getHostName();
+                // get the hostname, but fail gracefully
+                String hostname = "&lt;unknownhost&gt;";
+                try {
+                    InetAddress addr = InetAddress.getLocalHost();
+                    hostname = addr.getHostName();
+                }
+                catch (Exception e) {
+                    try {
+                        InetAddress addr = InetAddress.getLocalHost();
+                        hostname = addr.getHostAddress();
+                    }
+                    catch (Exception e2) {}
+                }
 
-            // get memory usage
-            SystemStatsCollector.Datum d = SystemStatsCollector.getRecentSample();
-            double used = d.rss / (double) SystemStatsCollector.memorysize;
-            double javaused = d.javausedheapmem + d.javausedsysmem;
-            double javaunused = d.javatotalheapmem + d.javatotalsysmem - javaused;
-            double risk = (d.rss + javaunused) / SystemStatsCollector.memorysize;
+                // get memory usage
+                SystemStatsCollector.Datum d = SystemStatsCollector.getRecentSample();
+                double used = d.rss / (double) SystemStatsCollector.memorysize;
+                double javaused = d.javausedheapmem + d.javausedsysmem;
+                double javaunused = d.javatotalheapmem + d.javatotalsysmem - javaused;
+                double risk = (d.rss + javaunused) / SystemStatsCollector.memorysize;
 
-            // get csvfilename
-            String csvFilename = String.format("memstats-%s-%s.csv", hostname, new Date(System.currentTimeMillis()).toString());
+                // get csvfilename
+                String csvFilename = String.format("memstats-%s-%s.csv", hostname, new Date(System.currentTimeMillis()).toString());
 
-            // just print voltdb version for now
-            Map<String,String> params = new HashMap<String,String>();
+                // just print voltdb version for now
+                Map<String,String> params = new HashMap<String,String>();
 
-            params.put("hostname", hostname);
-            params.put("version", VoltDB.instance().getVersionString());
-            params.put("buildstring", VoltDB.instance().getBuildString());
-            params.put("cluster", clusterinfo);
-            params.put("csvfilename", csvFilename);
+                params.put("hostname", hostname);
+                params.put("version", VoltDB.instance().getVersionString());
+                params.put("buildstring", VoltDB.instance().getBuildString());
+                params.put("cluster", clusterinfo);
+                params.put("csvfilename", csvFilename);
 
-            params.put("2mincharturl", SystemStatsCollector.getGoogleChartURL(2, 320, 240, "-2min"));
-            params.put("30mincharturl", SystemStatsCollector.getGoogleChartURL(30, 640, 240, "-30min"));
-            params.put("24hrcharturl", SystemStatsCollector.getGoogleChartURL(1440, 640, 240, "-24hrs"));
+                params.put("2mincharturl", SystemStatsCollector.getGoogleChartURL(2, 320, 240, "-2min"));
+                params.put("30mincharturl", SystemStatsCollector.getGoogleChartURL(30, 640, 240, "-30min"));
+                params.put("24hrcharturl", SystemStatsCollector.getGoogleChartURL(1440, 640, 240, "-24hrs"));
 
-            params.put("used", String.format("%.1f", used * 100.0));
-            params.put("risk", String.format("%.1f", risk * 100.0));
-            params.put("rss", String.format("%.1f", d.rss / 1024.0 / 1024.0));
-            params.put("java", String.format("%.1f", javaused / 1024.0 / 1024.0));
-            params.put("unusedjava", String.format("%.1f", javaunused / 1024.0 / 1024.0));
+                params.put("used", String.format("%.1f", used * 100.0));
+                params.put("risk", String.format("%.1f", risk * 100.0));
+                params.put("rss", String.format("%.1f", d.rss / 1024.0 / 1024.0));
+                params.put("java", String.format("%.1f", javaused / 1024.0 / 1024.0));
+                params.put("unusedjava", String.format("%.1f", javaunused / 1024.0 / 1024.0));
 
-            String msg = getHTMLForAdminPage(params);
+                String msg = getHTMLForAdminPage(params);
 
-            response.setContentType("text/html;charset=utf-8");
-            response.setStatus(HttpServletResponse.SC_OK);
-            baseRequest.setHandled(true);
-            response.getWriter().print(msg);
+                response.setContentType("text/html;charset=utf-8");
+                response.setStatus(HttpServletResponse.SC_OK);
+                baseRequest.setHandled(true);
+                response.getWriter().print(msg);
+            }
+            catch (IOException e) {
+                e.printStackTrace();
+                throw e;
+            }
         }
 
     }
