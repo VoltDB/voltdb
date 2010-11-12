@@ -19,6 +19,11 @@ package org.voltdb;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
+import java.util.TreeMap;
+
+import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.utils.SystemStatsCollector;
 
 /**
  * Agent responsible for collecting stats on this host.
@@ -114,4 +119,77 @@ public class StatsAgent {
         }
         return resultTable;
     }
+
+    /////////////////////////////////////////////
+    // STATIC STUFF FOR ROLLUP GOES HERE
+
+    static class PartitionMemRow {
+        long tupleCount = 0;
+        int tupleDataMem = 0;
+        int tupleAllocatedMem = 0;
+        int indexMem = 0;
+        int stringMem = 0;
+    }
+    static Map<Integer, PartitionMemRow> m_nodeMemStats = new TreeMap<Integer, PartitionMemRow>();
+
+    static synchronized void eeUpdateMemStats(int siteId,
+                                              long tupleCount,
+                                              int tupleDataMem,
+                                              int tupleAllocatedMem,
+                                              int indexMem,
+                                              int stringMem) {
+        PartitionMemRow pmr = new PartitionMemRow();
+        pmr.tupleCount = tupleCount;
+        pmr.tupleDataMem = tupleDataMem;
+        pmr.tupleAllocatedMem = tupleAllocatedMem;
+        pmr.indexMem = indexMem;
+        pmr.stringMem = stringMem;
+        m_nodeMemStats.put(siteId, pmr);
+    }
+
+    public static VoltTable getEmptyNodeMemStatsTable() {
+        // create a table with the right schema
+        VoltTable t = new VoltTable(new ColumnInfo[] {
+                new ColumnInfo("RSS", VoltType.INTEGER),
+                new ColumnInfo("JAVAUSED", VoltType.INTEGER),
+                new ColumnInfo("JAVAUNUSED", VoltType.INTEGER),
+                new ColumnInfo("TUPLEDATA", VoltType.INTEGER),
+                new ColumnInfo("TUPLEALLOCATED", VoltType.INTEGER),
+                new ColumnInfo("INDEXMEMORY", VoltType.INTEGER),
+                new ColumnInfo("STRINGMEMORY", VoltType.INTEGER),
+                new ColumnInfo("TUPLECOUNT", VoltType.BIGINT)
+        });
+        return t;
+    }
+
+    public static VoltTable getNodeMemStatsTable() {
+        // create a table with the right schema
+        VoltTable t = getEmptyNodeMemStatsTable();
+
+        // sum up all of the site statistics
+        PartitionMemRow totals = new PartitionMemRow();
+        for (PartitionMemRow pmr : m_nodeMemStats.values()) {
+            totals.tupleCount += pmr.tupleCount;
+            totals.tupleDataMem += pmr.tupleDataMem;
+            totals.tupleAllocatedMem += pmr.tupleAllocatedMem;
+            totals.indexMem += pmr.indexMem;
+            totals.stringMem += pmr.indexMem;
+        }
+
+        // get system statistics
+        int rss = 0; int javaused = 0; int javaunused = 0;
+        SystemStatsCollector.Datum d = SystemStatsCollector.getRecentSample();
+        if (d != null) {
+            rss = (int) (d.rss / 1024);
+            javaused = (int) ((d.javausedheapmem + d.javausedsysmem) / 1204);
+            javaunused = (int) ((d.javatotalheapmem + d.javatotalsysmem - javaused) / 1024);
+        }
+
+        // create the row and return it
+        t.addRow(rss, javaused, javaunused,
+                 totals.tupleDataMem, totals.tupleAllocatedMem,
+                 totals.indexMem, totals.stringMem, totals.tupleCount);
+        return t;
+    }
+
 }

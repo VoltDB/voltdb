@@ -33,6 +33,8 @@ public class SysProcFragmentId
     public static final long PF_tableAggregator = 7;
     public static final long PF_indexData = 8;
     public static final long PF_indexAggregator = 9;
+    public static final long PF_nodeMemory = 10;
+    public static final long PF_nodeMemoryAggregator = 11;
     public static final long PF_procedureData = 13;
     public static final long PF_procedureAggregator = 14;
     public static final long PF_initiatorData = 15;

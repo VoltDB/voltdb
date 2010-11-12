@@ -501,19 +501,51 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 tableIds[i++] = table.getRelativeIndex();
             }
 
+            // data to aggregate
+            long tupleCount = 0;
+            int tupleDataMem = 0;
+            int tupleAllocatedMem = 0;
+            int indexMem = 0;
+            int stringMem = 0;
+
             // update table stats
             final VoltTable[] s1 =
                 ee.getStats(SysProcSelector.TABLE, tableIds, false, time);
             if (s1 != null) {
-                m_tableStats.setStatsTable(s1[0]);
+                VoltTable stats = s1[0];
+                assert(stats != null);
+
+                // rollup the table memory stats for this site
+                while (stats.advanceRow()) {
+                    tupleCount += stats.getLong(7);
+                    tupleAllocatedMem = (int) stats.getLong(8);
+                    tupleDataMem += (int) stats.getLong(9);
+                    stringMem += (int) stats.getLong(10);
+                }
+                stats.resetRowPosition();
+
+                m_tableStats.setStatsTable(stats);
+
             }
 
             // update index stats
             final VoltTable[] s2 =
                 ee.getStats(SysProcSelector.INDEX, tableIds, false, time);
             if ((s2 != null) && (s2.length > 0)) {
-                m_indexStats.setStatsTable(s2[0]);
+                VoltTable stats = s2[0];
+                assert(stats != null);
+
+                // rollup the index memory stats for this site
+                while (stats.advanceRow()) {
+                    indexMem += stats.getLong(10);
+                }
+                stats.resetRowPosition();
+
+                m_indexStats.setStatsTable(stats);
             }
+
+            // update the rolled up statistics
+            StatsAgent.eeUpdateMemStats(m_siteId, tupleCount, tupleDataMem, tupleAllocatedMem, indexMem, stringMem);
         }
     }
 
