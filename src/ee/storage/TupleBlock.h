@@ -23,7 +23,11 @@
 #include "boost/scoped_array.hpp"
 #include "boost/intrusive_ptr.hpp"
 #include "boost/shared_ptr.hpp"
+#include "boost/unordered_set.hpp"
 #include "stx/btree_map.h"
+#include "stx/btree_set.h"
+#include <math.h>
+#include <iostream>
 
 namespace voltdb {
 class TupleBlock;
@@ -62,89 +66,134 @@ private:
     char m_data[3];
 };
 
+//typedef boost::shared_ptr<TupleBlock> TBPtr;
+typedef boost::intrusive_ptr<TupleBlock> TBPtr;
+//typedef TupleBlock* TBPtr;
+typedef stx::btree_map< char*, TBPtr > TBMap;
+typedef TBMap::iterator TBMapI;
+typedef stx::btree_set<TBPtr> TBBucket;
+typedef TBBucket::iterator TBBucketI;
+typedef boost::shared_ptr<TBBucket> TBBucketPtr;
+typedef std::vector<TBBucketPtr> TBBucketMap;
+const int TUPLE_BLOCK_NUM_BUCKETS = 20;
+
 class TupleBlock {
     friend void ::boost::intrusive_ptr_add_ref(voltdb::TupleBlock * p);
     friend void ::boost::intrusive_ptr_release(voltdb::TupleBlock * p);
 public:
-    TupleBlock(Table *table);
+    TupleBlock(Table *table, TBBucketPtr bucket);
 
-     double loadFactor();
+    double loadFactor() {
+        return m_activeTuples / m_tuplesPerBlock;
+    }
 
-     bool hasFreeTuples();
+    inline bool hasFreeTuples() {
+        return m_activeTuples < m_tuplesPerBlock;
+    }
 
-     bool isEmpty();
+    inline bool isEmpty() {
+        if (m_activeTuples == 0) {
+            return true;
+        }
+        return false;
+    }
 
-     char* nextFreeTuple();
+    inline int calculateBucketIndex(uint32_t tuplesPendingDeleteOnUndoRelease = 0) {
+        if (!hasFreeTuples()) {
+            //std::cout << static_cast<void*>(this) << " is full, erasing from bucket" << std::endl;
+            //Completely full, don't need be considered for merging
+            //Remove self from current bucket and null out the bucket
+            if (m_bucket.get() != NULL) {
+                m_bucket->erase(TBPtr(this));
+            }
+            m_bucket = TBBucketPtr();
+            return -1;
+        } else if (tuplesPendingDeleteOnUndoRelease == m_activeTuples) {
+            //Someone was kind enough to scan the whole block, move all tuples
+            //not pending delete on undo release to another block as part
+            //of compaction. Now this block doesn't need to be considered
+            //for compaction anymore. The block will be completely discard along with the undo
+            //information. Any tuples pending delete due to a snapshot will moved and picked up
+            //by the snapshot scan from the other block
+            if (m_bucket.get() != NULL) {
+                m_bucket->erase(TBPtr(this));
+            }
+            m_bucket = TBBucketPtr();
+            return -1;
+        }
+        else {
+            return static_cast<int>(::floor((m_activeTuples / m_tuplesPerBlockDivNumBuckets) - 1));
+        }
+    }
 
-     void freeTuple(char *tupleStorage);
+    inline int getBucketIndex() {
+        return m_bucketIndex;
+    }
 
-     char * address();
+    std::pair<int, int> merge(Table *table, TBPtr source);
 
-     void reset();
+    inline std::pair<char*, int> nextFreeTuple() {
+        char *retval = NULL;
+        if (!m_freeList.empty()) {
+            retval = m_storage.get();
+            TruncatedInt offset = m_freeList.back();
+            m_freeList.pop_back();
 
-     uint32_t unusedTupleBoundry();
-//
-//    inline double loadFactor() {
-//        return m_activeTuples / static_cast<double>(m_tuplesPerBlock);
-//    }
-//
-//    inline bool hasFreeTuples() {
-//        return m_activeTuples < m_tuplesPerBlock;
-//    }
-//
-//    inline bool isEmpty() {
-//        if (m_activeTuples == 0) {
-//            return false;
-//        }
-//        return true;
-//    }
-//
-//    inline char* nextFreeTuple() {
-//        char *retval = NULL;
-//        if (!m_freeList.empty()) {
-//            char *offsetCompressed = &m_freeList[m_freeList.size() - 3];
-//            char offsetBytes[4];
-//            ::memcpy(offsetBytes, offsetCompressed, 3);
-//            offsetBytes[3] = 0;
-//            if (m_freeList.capacity() / 2 > m_freeList.size()) {
-//                std::vector<char>(m_freeList).swap(m_freeList);
-//            }
-//            retval = *reinterpret_cast<char**>(offsetBytes);
-//            m_freeList.pop_back();
-//            m_freeList.pop_back();
-//            m_freeList.pop_back();
-//        } else {
-//            retval = &(m_storage.get()[m_tupleLength * m_nextFreeTuple]);
-//            m_nextFreeTuple++;
-//        }
-//        m_activeTuples++;
-//        return retval;
-//    }
-//
-//    inline void freeTuple(char *tupleStorage) {
-//        m_activeTuples--;
-//        //Find the offset
-//        uint32_t offset = static_cast<uint32_t>((tupleStorage - m_storage.get()) / m_tupleLength);
-//        char compressedOffset[3];
-//        ::memcpy( compressedOffset, reinterpret_cast<char*>(&offset), 3);
-//        m_freeList.push_back(compressedOffset[0]);
-//        m_freeList.push_back(compressedOffset[1]);
-//        m_freeList.push_back(compressedOffset[2]);
-//    }
-//
-//    inline char * address() {
-//        return m_storage.get();
-//    }
-//
-//    inline void reset() {
-//        m_activeTuples = 0;
-//        m_nextFreeTuple = 0;
-//        m_freeList.clear();
-//    }
-//
-//    inline uint32_t unusedTupleBoundry() {
-//        return m_nextFreeTuple;
-//    }
+            if (((m_freeList.capacity() / 2) - 50) > m_freeList.size() && m_freeList.capacity() > 1365) {
+                std::vector<TruncatedInt>(m_freeList).swap(m_freeList);
+            }
+            retval += offset.unpack();
+        } else {
+            retval = &(m_storage.get()[m_tupleLength * m_nextFreeTuple]);
+            m_nextFreeTuple++;
+        }
+        m_activeTuples++;
+        int newBucketIndex = calculateBucketIndex();
+        if (newBucketIndex != m_bucketIndex) {
+            m_bucketIndex = newBucketIndex;
+            return std::pair<char*, int>(retval, newBucketIndex);
+        } else {
+            return std::pair<char*, int>(retval, -1);
+        }
+    }
+
+    void swapToBucket(TBBucketPtr newBucket) {
+        if (m_bucket != NULL) {
+            m_bucket->erase(TBPtr(this));
+        }
+        m_bucket = newBucket;
+        if (m_bucket != NULL) {
+            m_bucket->insert(TBPtr(this));
+        }
+    }
+
+    inline int freeTuple(char *tupleStorage) {
+        m_activeTuples--;
+        //Find the offset
+        uint32_t offset = static_cast<uint32_t>(tupleStorage - m_storage.get());
+        m_freeList.push_back(offset);
+        int newBucketIndex = calculateBucketIndex();
+        if (newBucketIndex != m_bucketIndex) {
+            m_bucketIndex = newBucketIndex;
+            return newBucketIndex;
+        } else {
+            return -1;
+        }
+    }
+
+    inline char * address() {
+        return m_storage.get();
+    }
+
+    inline void reset() {
+        m_activeTuples = 0;
+        m_nextFreeTuple = 0;
+        m_freeList.clear();
+    }
+
+    inline uint32_t unusedTupleBoundry() {
+        return m_nextFreeTuple;
+    }
 
 private:
     uint32_t m_references;
@@ -154,6 +203,7 @@ private:
     uint32_t m_tuplesPerBlock;
     uint32_t m_activeTuples;
     uint32_t m_nextFreeTuple;
+    const double m_tuplesPerBlockDivNumBuckets;
     /*
      * queue of offsets to <b>once used and then deleted</b> tuples.
      * Tuples after m_nextFreeTuple are also free, this queue
@@ -162,13 +212,10 @@ private:
      * NOTE THAT THESE ARE NOT THE ONLY FREE TUPLES.
      **/
     std::vector<TruncatedInt> m_freeList;
-};
 
-//typedef boost::shared_ptr<TupleBlock> TBPtr;
-typedef boost::intrusive_ptr<TupleBlock> TBPtr;
-//typedef TupleBlock* TBPtr;
-typedef stx::btree_map< char*, TBPtr > TBMap;
-typedef TBMap::iterator TBMapI;
+    int m_bucketIndex;
+    TBBucketPtr m_bucket;
+};
 }
 
 namespace boost

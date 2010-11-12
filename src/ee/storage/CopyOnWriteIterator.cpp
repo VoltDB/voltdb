@@ -40,8 +40,10 @@ bool CopyOnWriteIterator::next(TableTuple &out) {
             if (m_blockIterator == m_end) {
                 break;
             }
+            m_table->snapshotFinishedScanningBlock(m_currentBlock, m_blockIterator.data());
             m_location = m_blockIterator.key();
             m_currentBlock = m_blockIterator.data();
+            m_blockIterator.data() = TBPtr();
             m_blockOffset = 0;
             m_blockIterator++;
         } else {

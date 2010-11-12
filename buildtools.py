@@ -318,7 +318,7 @@ def runTests(CTX):
         tests += [TEST_PREFIX + "/" + dir + "/" + x for x in input]
     successes = 0
     failures = 0
-    noValgrindTests = [ "CopyOnWriteTest", "harness_test", "serializeio_test" ]
+    noValgrindTests = [ "CompactionTest", "CopyOnWriteTest", "harness_test", "serializeio_test" ]
     for test in tests:
         binname, objectname, sourcename = namesForTestCode(test)
         targetpath = OUTPUT_PREFIX + "/" + binname

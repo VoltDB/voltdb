@@ -53,6 +53,8 @@ public:
      */
     void markTupleDirty(TableTuple tuple, bool newTuple);
 
+    void notifyBlockWasCompactedAway(TBPtr block);
+
     bool canSafelyFreeTuple(TableTuple tuple);
 
     virtual ~CopyOnWriteContext();

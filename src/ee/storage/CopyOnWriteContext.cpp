@@ -92,7 +92,9 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
             }
             tuple.setPendingDeleteFalse();
             tuple.freeObjectColumns();
-            m_table->deleteTupleStorage(tuple);
+            CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
+            //Save the extra lookup if possible
+            m_table->deleteTupleStorage(tuple, iter->m_currentBlock);
         }
     }
     /*
@@ -216,6 +218,16 @@ void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
         tuple.setDirtyFalse();
         return;
     }
+}
+
+void CopyOnWriteContext::notifyBlockWasCompactedAway(TBPtr block) {
+    assert(!m_finishedTableScan);
+    CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
+    TBPtr nextBlock = iter->m_blockIterator.data();
+    m_blocks.erase(block->address());
+    iter->m_blockIterator = m_blocks.find(nextBlock->address());
+    iter->m_end = m_blocks.end();
+    assert(iter->m_blockIterator != m_blocks.end());
 }
 
 CopyOnWriteContext::~CopyOnWriteContext() {}

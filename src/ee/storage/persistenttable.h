@@ -262,6 +262,9 @@ protected:
     PersistentTable(ExecutorContext *ctx, bool exportEnabled);
     void onSetColumns();
 
+    void notifyBlockWasCompactedAway(TBPtr block);
+    void swapTuples(TableTuple sourceTuple, TableTuple destinationTuple);
+
     /*
      * Implemented by persistent table and called by Table::loadTuplesFrom
      * to do additional processing for views and Export

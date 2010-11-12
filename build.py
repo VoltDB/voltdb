@@ -347,6 +347,7 @@ if whichtests in ("${eetestsuite}", "indexes"):
 
 if whichtests in ("${eetestsuite}", "storage"):
     CTX.TESTS['storage'] = """
+     CompactionTest
      CopyOnWriteTest
      constraint_test
      filter_test

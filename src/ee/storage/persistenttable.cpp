@@ -105,6 +105,7 @@ PersistentTable::~PersistentTable() {
         tuple.freeObjectColumns();
         tuple.setActiveFalse();
     }
+
     for (int i = 0; i < m_indexCount; ++i) {
         TableIndex *index = m_indexes[i];
         if (index != m_pkeyIndex) {
@@ -738,6 +739,16 @@ bool PersistentTable::activateCopyOnWrite(TupleSerializer *serializer, int32_t p
     if (m_tupleCount == 0) {
         return false;
     }
+
+    //All blocks are now pending snapshot
+    m_blocksPendingSnapshot.swap(m_blocksNotPendingSnapshot);
+    m_blocksPendingSnapshotLoad.swap(m_blocksNotPendingSnapshotLoad);
+    //The first block is the block the snapshot iterator is pointing at. It is not eligible for merge
+    //ops. Remove it from the set of blocks pending snapshot so it can be easily identified
+    //as missing from both sets. Then remove it from the load maps by providing it a NULL bucket
+    TBPtr firstBlock = m_data.begin().data();
+    firstBlock->swapToBucket(TBBucketPtr());
+    m_blocksPendingSnapshot.erase(m_data.begin().data());
     m_COWContext.reset(new CopyOnWriteContext( this, serializer, partitionId));
     return false;
 }
@@ -831,4 +842,23 @@ size_t PersistentTable::hashCode() {
          tuple.hashCode(hashCode);
     }
     return hashCode;
+}
+
+void PersistentTable::notifyBlockWasCompactedAway(TBPtr block) {
+    if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
+        assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
+    } else {
+        assert(m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end());
+        m_COWContext->notifyBlockWasCompactedAway(block);
+    }
+
+}
+
+void PersistentTable::swapTuples(TableTuple sourceTuple, TableTuple destinationTuple) {
+    ::memcpy(destinationTuple.address(), sourceTuple.address(), m_tupleLength);
+    sourceTuple.setActiveFalse();
+    assert(!sourceTuple.isPendingDeleteOnUndoRelease());
+    if (!sourceTuple.isPendingDelete()) {
+        updateFromAllIndexes(sourceTuple, destinationTuple);
+    }
 }
