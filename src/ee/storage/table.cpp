@@ -564,13 +564,13 @@ void Table::doCompactionWithinSubset(TBBucketMap *bucketMap) {
         fullestIterator = (*bucketMap)[ii]->begin();
         if (fullestIterator != (*bucketMap)[ii]->end()) {
             foundFullest = true;
+            fullest = *fullestIterator;
             break;
         }
     }
     if (!foundFullest) {
         return;
     }
-    fullest = *fullestIterator;
 
     int fullestBucketChange = -1;
     while (fullest->hasFreeTuples()) {
@@ -588,11 +588,15 @@ void Table::doCompactionWithinSubset(TBBucketMap *bucketMap) {
                 } else {
                     lightestIterator++;
                     if (lightestIterator != (*bucketMap)[ii]->end()) {
+                        lightest = *lightestIterator;
                         foundLightest = true;
                         break;
                     }
                 }
             }
+        }
+        if (!foundLightest) {
+            return;
         }
 
         std::pair<int, int> bucketChanges = fullest->merge(this, lightest);

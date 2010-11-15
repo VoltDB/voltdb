@@ -104,13 +104,32 @@ public:
                                                                          m_primaryKeyIndexSchemaColumnSizes,
                                                                          m_primaryKeyIndexSchemaAllowNull,
                                                                          allowInlineStrings);
-        voltdb::TableIndexScheme indexScheme = voltdb::TableIndexScheme("primaryKeyIndex",
+        voltdb::TableIndexScheme indexScheme = voltdb::TableIndexScheme("BinaryTreeUniqueIndex",
                                                                         voltdb::BALANCED_TREE_INDEX,
                                                                         m_primaryKeyIndexColumns,
                                                                         m_primaryKeyIndexSchemaTypes,
                                                                         true, false, m_tableSchema);
         indexScheme.keySchema = m_primaryKeyIndexSchema;
         std::vector<voltdb::TableIndexScheme> indexes;
+
+        voltdb::TableIndexScheme indexScheme1 = voltdb::TableIndexScheme("BinaryTreeMultimapIndex",
+                                                                        voltdb::BALANCED_TREE_INDEX,
+                                                                        m_primaryKeyIndexColumns,
+                                                                        m_primaryKeyIndexSchemaTypes,
+                                                                        false, false, m_tableSchema);
+        indexes.push_back(indexScheme1);
+        voltdb::TableIndexScheme indexScheme2 = voltdb::TableIndexScheme("HashUniqueIndex",
+                                                                        voltdb::HASH_TABLE_INDEX,
+                                                                        m_primaryKeyIndexColumns,
+                                                                        m_primaryKeyIndexSchemaTypes,
+                                                                        true, false, m_tableSchema);
+        indexes.push_back(indexScheme2);
+        voltdb::TableIndexScheme indexScheme3 = voltdb::TableIndexScheme("HashMultimapIndex",
+                                                                        voltdb::HASH_TABLE_INDEX,
+                                                                        m_primaryKeyIndexColumns,
+                                                                        m_primaryKeyIndexSchemaTypes,
+                                                                        false, false, m_tableSchema);
+        indexes.push_back(indexScheme3);
 
         m_table = dynamic_cast<voltdb::PersistentTable*>(voltdb::TableFactory::getPersistentTable
                                                          (0, m_engine->getExecutorContext(), "Foo",
@@ -236,7 +255,7 @@ TEST_F(CompactionTest, BasicCompaction) {
     std::set<int32_t> pkeysNotDeleted;
     boost::unordered_set<int32_t> pkeysToDelete;
     for (int ii = 0; ii < 2330160; ii ++) {
-        if (ii % 2) {
+        if (ii % 2 == 0) {
             pkeysToDelete.insert(ii);
         } else {
             pkeysNotDeleted.insert(ii);
@@ -260,7 +279,11 @@ TEST_F(CompactionTest, BasicCompaction) {
     while (iter.next(tuple)) {
         int32_t pkey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
         key.setNValue(0, ValueFactory::getIntegerValue(pkey));
-        ASSERT_TRUE(pkeyIndex->moveToKey(&key));
+        for (int ii = 0; ii < 4; ii++) {
+            ASSERT_TRUE(m_table->m_indexes[ii]->moveToKey(&key));
+            TableTuple indexTuple = m_table->m_indexes[ii]->nextValueAtKey();
+            ASSERT_EQ(indexTuple.address(), tuple.address());
+        }
         pkeysFoundAfterDelete.insert(pkey);
     }
 
@@ -282,6 +305,15 @@ TEST_F(CompactionTest, BasicCompaction) {
     ASSERT_TRUE(pkeysFoundAfterDelete == pkeysNotDeleted);
     std::cout << "Have " << m_table->m_data.size() << " blocks left " << m_table->allocatedTupleCount() << ", " << m_table->activeTupleCount() << std::endl;
     ASSERT_EQ( m_table->m_data.size(), 7);
+
+    for (std::set<int32_t>::iterator ii = pkeysNotDeleted.begin(); ii != pkeysNotDeleted.end(); ii++) {
+        key.setNValue(0, ValueFactory::getIntegerValue(*ii));
+        ASSERT_TRUE(pkeyIndex->moveToKey(&key));
+        TableTuple tuple = pkeyIndex->nextValueAtKey();
+        m_table->deleteTuple(tuple, true);
+    }
+    ASSERT_EQ( m_table->m_data.size(), 0);
+    ASSERT_EQ( m_table->activeTupleCount(), 0);
 }
 
 int main() {

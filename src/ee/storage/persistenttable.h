@@ -107,6 +107,7 @@ class PersistentTable : public Table {
     friend class TableIterator;
     friend class PersistentTableStats;
     friend class PersistentTableUndoDeleteAction;
+    friend class ::CompactionTest_BasicCompaction;
   private:
     // no default ctor, no copy, no assignment
     PersistentTable();
@@ -251,6 +252,7 @@ protected:
     void insertIntoAllIndexes(TableTuple *tuple);
     void deleteFromAllIndexes(TableTuple *tuple);
     void updateFromAllIndexes(TableTuple &targetTuple, const TableTuple &sourceTuple);
+    void updateWithSameKeyFromAllIndexes(TableTuple &targetTuple, const TableTuple &sourceTuple);
 
     bool tryInsertOnAllIndexes(TableTuple *tuple);
     bool tryUpdateOnAllIndexes(TableTuple &targetTuple, const TableTuple &sourceTuple);

@@ -528,6 +528,14 @@ void PersistentTable::updateFromAllIndexes(TableTuple &targetTuple, const TableT
     }
 }
 
+void PersistentTable::updateWithSameKeyFromAllIndexes(TableTuple &targetTuple, const TableTuple &sourceTuple) {
+    for (int i = m_indexCount - 1; i >= 0;--i) {
+        if (!m_indexes[i]->replaceEntryNoKeyChange(&targetTuple, &sourceTuple)) {
+            throwFatalException("Failed to update tuple in index");
+        }
+    }
+}
+
 bool PersistentTable::tryInsertOnAllIndexes(TableTuple *tuple) {
     for (int i = m_indexCount - 1; i >= 0; --i) {
         FAIL_IF(!m_indexes[i]->addEntry(tuple)) {
@@ -859,6 +867,6 @@ void PersistentTable::swapTuples(TableTuple sourceTuple, TableTuple destinationT
     sourceTuple.setActiveFalse();
     assert(!sourceTuple.isPendingDeleteOnUndoRelease());
     if (!sourceTuple.isPendingDelete()) {
-        updateFromAllIndexes(sourceTuple, destinationTuple);
+        updateWithSameKeyFromAllIndexes(sourceTuple, destinationTuple);
     }
 }

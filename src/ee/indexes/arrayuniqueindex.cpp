@@ -78,6 +78,18 @@ bool ArrayUniqueIndex::replaceEntry(const TableTuple *oldTupleValue, const Table
     return true;
 }
 
+/**
+ * Update in place an index entry with a new tuple address
+ */
+bool ArrayUniqueIndex::replaceEntryNoKeyChange(const TableTuple *oldTupleValue,
+                          const TableTuple *newTupleValue) {
+    assert(oldTupleValue->address() != newTupleValue->address());
+    int32_t old_key = ValuePeeker::peekAsInteger(oldTupleValue->getNValue(column_indices_[0]));
+    entries_[old_key] = newTupleValue->address();
+    m_updates++;
+    return true;
+}
+
 bool ArrayUniqueIndex::exists(const TableTuple* values) {
     int32_t key = ValuePeeker::peekAsInteger(values->getNValue(column_indices_[0]));
     //VOLT_DEBUG("Exists?: %lld", key);

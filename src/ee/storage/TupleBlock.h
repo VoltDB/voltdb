@@ -100,13 +100,13 @@ public:
 
     inline int calculateBucketIndex(uint32_t tuplesPendingDeleteOnUndoRelease = 0) {
         if (!hasFreeTuples()) {
-            //std::cout << static_cast<void*>(this) << " is full, erasing from bucket" << std::endl;
             //Completely full, don't need be considered for merging
             //Remove self from current bucket and null out the bucket
             if (m_bucket.get() != NULL) {
+                //std::cout << static_cast<void*>(this) << " is full, erasing from bucket" << std::endl;
                 m_bucket->erase(TBPtr(this));
+                m_bucket = TBBucketPtr();
             }
-            m_bucket = TBBucketPtr();
             return -1;
         } else if (tuplesPendingDeleteOnUndoRelease == m_activeTuples) {
             //Someone was kind enough to scan the whole block, move all tuples

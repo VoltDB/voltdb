@@ -31,6 +31,7 @@ TupleBlock::TupleBlock(Table *table, TBBucketPtr bucket) :
 }
 
 std::pair<int, int> TupleBlock::merge(Table *table, TBPtr source) {
+    assert(source != this);
     uint32_t m_nextTupleInSourceOffset = 0;
     int sourceTuplesPendingDeleteOnUndoRelease = 0;
     while (hasFreeTuples() && !source->isEmpty()) {

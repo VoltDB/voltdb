@@ -91,6 +91,23 @@ public:
         return (deleted && inserted);
     }
 
+    /**
+     * Update in place an index entry with a new tuple address
+     */
+    bool replaceEntryNoKeyChange(const TableTuple *oldTupleValue,
+                              const TableTuple *newTupleValue) {
+        assert(oldTupleValue->address() != newTupleValue->address());
+        m_tmp1.setFromTuple(oldTupleValue, column_indices_, m_keySchema);
+        typename MapType::iterator mapiter = m_entries.find(m_tmp1);
+        assert(mapiter != m_entries.end());
+        if (mapiter == m_entries.end()) {
+            return false;
+        }
+        (*mapiter).second = newTupleValue->address();
+        m_updates++;
+        return true;
+    }
+
     bool checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs) {
         m_tmp1.setFromTuple(lhs, column_indices_, m_keySchema);
         m_tmp2.setFromTuple(rhs, column_indices_, m_keySchema);
