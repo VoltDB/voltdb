@@ -1,6 +1,7 @@
 <?xml version="1.0" ?>
 <project default="default" name="deletes build file">
 
+<property name='catalog' value='deletes.jar'/>
 <import file="./basebuild.xml"/>
 
 <path id='project.classpath'>
