@@ -361,7 +361,8 @@ protected:
     virtual void onSetColumns() {};
 
     double loadFactor() {
-        return activeTupleCount() / static_cast<double>(allocatedTupleCount());
+        return static_cast<double>(activeTupleCount()) /
+            static_cast<double>(allocatedTupleCount());
     }
 
     // TUPLES AND MEMORY USAGE
