@@ -81,7 +81,6 @@ Table* StatsAgent::getStats(voltdb::StatisticsSelectorType sst,
         std::multimap<voltdb::CatalogId, voltdb::StatsSource*>::const_iterator iter =
             statsSources->find(catalogIds[0]);
         if (iter == statsSources->end()) {
-            assert (false);
             return NULL;
         }
 
