@@ -1,0 +1,23 @@
+<?xml version="1.0" ?>
+<project default="default" name="deletes build file">
+
+<import file="./basebuild.xml"/>
+
+<path id='project.classpath'>
+    <fileset dir='../../../voltdb' >
+        <include name='voltdb*.jar' />
+    </fileset>
+    <pathelement location='${build.dir}' />
+    <pathelement path="${java.class.path}"/>
+</path>
+
+<target name="client" description="Start the client">
+    <invoke-java classname="com.DeletesClient" >
+      <arg value="25000"/>              <!-- average batch size -->
+      <arg value="10"/>                 <!-- number of batches to keep -->
+      <arg value="-1"/>                 <!-- number of insert/delete cycles between pruning deceased rows -->
+      <arg value="localhost" />         <!-- comma separated list of volt servers to connect to -->
+    </invoke-java>
+</target>
+
+</project>
