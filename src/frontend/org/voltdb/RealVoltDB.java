@@ -17,25 +17,61 @@
 
 package org.voltdb;
 
-import java.io.*;
-import java.net.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.URLDecoder;
+import java.net.UnknownHostException;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Hashtable;
+import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.voltdb.catalog.*;
-import org.voltdb.client.*;
+import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Site;
+import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
+import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
-import org.voltdb.fault.*;
+import org.voltdb.fault.FaultDistributor;
+import org.voltdb.fault.FaultDistributorInterface;
+import org.voltdb.fault.FaultHandler;
+import org.voltdb.fault.NodeFailureFault;
+import org.voltdb.fault.VoltFault;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
-import org.voltdb.messaging.*;
+import org.voltdb.messaging.HostMessenger;
+import org.voltdb.messaging.Mailbox;
+import org.voltdb.messaging.Messenger;
+import org.voltdb.messaging.SiteMailbox;
+import org.voltdb.messaging.VoltMessage;
 import org.voltdb.network.VoltNetwork;
-import org.voltdb.utils.*;
+import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.DumpManager;
+import org.voltdb.utils.HTTPAdminListener;
+import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.VoltSampler;
 
 public class RealVoltDB implements VoltDBInterface
 {
@@ -219,6 +255,7 @@ public class RealVoltDB implements VoltDBInterface
     private Object m_instanceId[];
     private PartitionCountStats m_partitionCountStats = null;
     private IOStats m_ioStats = null;
+    private NodeMemoryStats m_nodeMemoryStats = null;
     private StatsManager m_statsManager = null;
 
     // Should the execution sites be started in recovery mode
@@ -601,6 +638,9 @@ public class RealVoltDB implements VoltDBInterface
             m_ioStats = new IOStats("IO Stats");
             m_statsAgent.registerStatsSource(SysProcSelector.IOSTATS,
                                              0, m_ioStats);
+            m_nodeMemoryStats = new NodeMemoryStats("NodeMemory Stats");
+            m_statsAgent.registerStatsSource(SysProcSelector.NODEMEMORY,
+                                             0, m_nodeMemoryStats);
             // Create the statistics manager and register it to JMX registry
             m_statsManager = null;
             try {
