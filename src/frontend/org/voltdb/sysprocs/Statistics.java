@@ -269,7 +269,7 @@ public class Statistics extends VoltSystemProcedure {
             else {
                 result = StatsAgent.getEmptyNodeMemStatsTable();
             }
-            return new DependencyPair(DEP_initiatorData, result);
+            return new DependencyPair(DEP_nodeMemory, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_nodeMemoryAggregator) {
             VoltTable result = unionTables(dependencies.get(DEP_nodeMemory));
