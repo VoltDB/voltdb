@@ -58,7 +58,7 @@ public class Statistics extends VoltSystemProcedure {
     private static final VoltLogger HOST_LOG = new VoltLogger("HOST");
 
     static final int DEP_nodeMemory = (int)
-    SysProcFragmentId.PF_nodeMemory | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+        SysProcFragmentId.PF_nodeMemory | DtxnConstants.MULTIPARTITION_DEPENDENCY;
     static final int DEP_nodeMemoryAggregator = (int) SysProcFragmentId.PF_nodeMemoryAggregator;
 
     static final int DEP_tableData = (int)
@@ -265,9 +265,11 @@ public class Statistics extends VoltSystemProcedure {
             VoltTable result = null;
             if (context.getExecutionSite().getSiteId() == lowestSiteId) {
                 result = StatsAgent.getNodeMemStatsTable();
+                assert(result.getRowCount() == 1);
             }
             else {
                 result = StatsAgent.getEmptyNodeMemStatsTable();
+                assert(result.getRowCount() == 0);
             }
             return new DependencyPair(DEP_nodeMemory, result);
         }
@@ -361,8 +363,9 @@ public class Statistics extends VoltSystemProcedure {
         final long now = System.currentTimeMillis();
         if (selector.toUpperCase().equals(SysProcSelector.NODEMEMORY.name())) {
             results = getNodeMemData();
+            assert(results.length == 1);
         }
-        if (selector.toUpperCase().equals(SysProcSelector.TABLE.name())) {
+        else if (selector.toUpperCase().equals(SysProcSelector.TABLE.name())) {
             results = getTableData(interval, now);
         }
         else if (selector.toUpperCase().equals(SysProcSelector.INDEX.name())) {
@@ -404,7 +407,7 @@ public class Statistics extends VoltSystemProcedure {
             final long delta = endTime - now;
             HOST_LOG.info("Statistics invocation of MANAGEMENT selector took " + delta + " milliseconds");
         } else {
-            throw new VoltAbortException("Invalid Statistics selector.");
+            throw new VoltAbortException(String.format("Invalid Statistics selector %s.", selector));
         }
 
         return results;

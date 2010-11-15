@@ -16,6 +16,7 @@
  */
 package org.voltdb;
 
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -34,6 +35,9 @@ public class StatsAgent {
         new HashMap<SysProcSelector, HashMap<Integer, ArrayList<StatsSource>>>();
 
     private final HashSet<SysProcSelector> handledSelectors = new HashSet<SysProcSelector>();
+
+    private static int m_hostId = -1;
+    private static String m_hostName = null;
 
     public StatsAgent() {
         SysProcSelector selectors[] = SysProcSelector.values();
@@ -150,6 +154,8 @@ public class StatsAgent {
     public static VoltTable getEmptyNodeMemStatsTable() {
         // create a table with the right schema
         VoltTable t = new VoltTable(new ColumnInfo[] {
+                new ColumnInfo("HOSTID", VoltType.INTEGER),
+                new ColumnInfo("HOSTNAME", VoltType.STRING),
                 new ColumnInfo("RSS", VoltType.INTEGER),
                 new ColumnInfo("JAVAUSED", VoltType.INTEGER),
                 new ColumnInfo("JAVAUNUSED", VoltType.INTEGER),
@@ -162,7 +168,25 @@ public class StatsAgent {
         return t;
     }
 
-    public static VoltTable getNodeMemStatsTable() {
+    public static synchronized VoltTable getNodeMemStatsTable() {
+        // get the host id and hostname once
+        if (m_hostId == -1) {
+            m_hostId = VoltDB.instance().getHostMessenger().getHostId();
+            // get the hostname, but fail gracefully
+            m_hostName = "&lt;unknownhost&gt;";
+            try {
+                InetAddress addr = InetAddress.getLocalHost();
+                m_hostName = addr.getHostName();
+            }
+            catch (Exception e) {
+                try {
+                    InetAddress addr = InetAddress.getLocalHost();
+                    m_hostName = addr.getHostAddress();
+                }
+                catch (Exception e2) {}
+            }
+        }
+
         // create a table with the right schema
         VoltTable t = getEmptyNodeMemStatsTable();
 
@@ -173,7 +197,7 @@ public class StatsAgent {
             totals.tupleDataMem += pmr.tupleDataMem;
             totals.tupleAllocatedMem += pmr.tupleAllocatedMem;
             totals.indexMem += pmr.indexMem;
-            totals.stringMem += pmr.indexMem;
+            totals.stringMem += pmr.stringMem;
         }
 
         // get system statistics
@@ -186,9 +210,10 @@ public class StatsAgent {
         }
 
         // create the row and return it
-        t.addRow(rss, javaused, javaunused,
+        t.addRow(m_hostId, m_hostName, rss, javaused, javaunused,
                  totals.tupleDataMem, totals.tupleAllocatedMem,
                  totals.indexMem, totals.stringMem, totals.tupleCount);
+        assert(t.getRowCount() == 1);
         return t;
     }
 
