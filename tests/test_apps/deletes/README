@@ -3,11 +3,14 @@ memory instability such as unbounded memory growth.  It also provides
 some semi-dubious insert/delete throughput numbers for benchmark
 purposes.
 
-The user provides values for three input arguments:
+The user provides values for four input arguments:
 - The average row size of an insert batch,
 - The maximum number of batches to retain in the database,
 - The number of batches between which a random purge of roughly half of the
   tuples in the database occurs (set to -1 if this behavior is not wanted)
+- The number of batches between which the client will attempt to
+  start a new snapshot (and attempt to verify a previous one, if
+  present, -1 if this behavior is not wanted)
 
 The app then inserts batches of uniformly distributed random size
 around the average row size provided until it reaches the maximum

@@ -23,8 +23,13 @@
 
 package com;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
+import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
@@ -38,6 +43,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.utils.SnapshotVerifier;
 
 import com.deletes.Insert;
 
@@ -47,6 +53,9 @@ public class DeletesClient
     static int m_averageBatchSize = 25000;
     static int m_batchesToKeep = 12;
     static int m_deceasedCleanupFreq = -1;
+    static int m_snapshotFreq = -1;
+    static String m_snapshotId = "Deletes";
+    static String m_snapshotDir = "/tmp/deletes";
     static String[] m_names = new String[NUM_NAMES];
     static Random m_rand = new Random(0);
     static long m_batchNumber = 1000;
@@ -63,6 +72,8 @@ public class DeletesClient
     static long m_totalDeadDeletes = 0;
     static long m_totalDeadDeleteTime = 0;
     static long m_expectedDeadDeletes = 0;
+    static ArrayList<Integer> m_snapshotSizes = new ArrayList<Integer>();
+    static boolean m_snapshotInProgress = false;
 
     static String randomString(int stringSize)
     {
@@ -226,7 +237,7 @@ public class DeletesClient
                                          @Override
                                          public void clientCallback(ClientResponse response) {
                                              if (response.getStatus() != ClientResponse.SUCCESS){
-                                                 System.out.println("failed insert");
+                                                 System.out.println("failed delete batch");
                                                  System.out.println(response.getStatusString());
                                              }
                                              else
@@ -280,7 +291,7 @@ public class DeletesClient
                                          @Override
                                          public void clientCallback(ClientResponse response) {
                                              if (response.getStatus() != ClientResponse.SUCCESS){
-                                                 System.out.println("failed insert");
+                                                 System.out.println("failed delete deceased");
                                                  System.out.println(response.getStatusString());
                                              }
                                              else
@@ -317,6 +328,132 @@ public class DeletesClient
         System.out.println("Total delete TPS: " + (m_totalDeadDeletes * 1000)/m_totalDeadDeleteTime);
     }
 
+    // stolen from TestSaveRestoreSysproc
+    static void validateSnapshot()
+    {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PrintStream ps = new PrintStream(baos);
+        PrintStream original = System.out;
+        try {
+            System.setOut(ps);
+            String args[] = new String[] {
+                    m_snapshotId,
+                    "--dir",
+                    m_snapshotDir
+            };
+            SnapshotVerifier.main(args);
+            ps.flush();
+            String reportString = baos.toString("UTF-8");
+            //System.err.println(reportString);
+            if (reportString.startsWith("Snapshot corrupted"))
+            {
+                System.exit(-1);
+            }
+        } catch (UnsupportedEncodingException e) {}
+          finally {
+            System.setOut(original);
+        }
+    }
+
+    public static void checkSnapshotComplete(Client client)
+    {
+        // Check for outstanding snapshot
+        VoltTable[] results = null;
+        try
+        {
+            results = client.callProcedure("@SnapshotStatus").getResults();
+            //System.out.println(results[0]);
+        }
+        catch (NoConnectionsException e1)
+        {
+            // TODO Auto-generated catch block
+            e1.printStackTrace();
+        }
+        catch (IOException e1)
+        {
+            // TODO Auto-generated catch block
+            e1.printStackTrace();
+        }
+        catch (ProcCallException e1)
+        {
+            // TODO Auto-generated catch block
+            e1.printStackTrace();
+        }
+        m_snapshotInProgress = false;
+        while (results[0].advanceRow())
+        {
+            Long end_time = results[0].getLong("END_TIME");
+            if (end_time == 0)
+            {
+                m_snapshotInProgress = true;
+                return;
+            }
+        }
+        if (results[0].getRowCount() > 0)
+        {
+            validateSnapshot();
+        }
+    }
+
+    public static void performSnapshot(Client client)
+    {
+        checkSnapshotComplete(client);
+        if (m_snapshotInProgress)
+        {
+            System.out.println("Snapshot still in progress, bailing");
+            return;
+        }
+        try
+        {
+            client.callProcedure("@SnapshotDelete", new String[] {m_snapshotDir},
+                                 new String[] {m_snapshotId});
+        }
+        catch (NoConnectionsException e1)
+        {
+            // TODO Auto-generated catch block
+            e1.printStackTrace();
+        }
+        catch (IOException e1)
+        {
+            // TODO Auto-generated catch block
+            e1.printStackTrace();
+        }
+        catch (ProcCallException e1)
+        {
+            // TODO Auto-generated catch block
+            e1.printStackTrace();
+        }
+        // m_totalRows should be accurate at this point
+        m_snapshotSizes.add(m_totalRows);
+        System.out.println("Performing Snapshot with total rows: " + m_totalRows);
+        try
+        {
+            client.callProcedure(
+                                 new ProcedureCallback()
+                                 {
+                                     @Override
+                                     public void clientCallback(ClientResponse response) {
+                                         if (response.getStatus() != ClientResponse.SUCCESS)
+                                         {
+                                             System.out.println("failed snapshot");
+                                             System.out.println(response.getStatusString());
+                                         }
+                                     }
+                                 },
+                                 "@SnapshotSave", m_snapshotDir, m_snapshotId, 0);
+        }
+        catch (NoConnectionsException e)
+        {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        catch (IOException e)
+        {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+    }
+
     public static void main(String[] args)
     {
         if (args.length != 4)
@@ -326,11 +463,15 @@ public class DeletesClient
         m_averageBatchSize = Integer.valueOf(args[0]);
         m_batchesToKeep = Integer.valueOf(args[1]);
         m_deceasedCleanupFreq = Integer.valueOf(args[2]);
+        m_snapshotFreq = Integer.valueOf(args[3]);
 
-        System.out.printf("Starting Deletes app with:\n\tAverage batch size of %d\n\tKeeping %d batches\n\tCleaning up deceased every %d batches\n",
-                          m_averageBatchSize, m_batchesToKeep, m_deceasedCleanupFreq);
+        System.out.println("Starting Deletes app with:");
+        System.out.printf("\tAverage batch size of %d\n", m_averageBatchSize);
+        System.out.printf("\tKeeping %d batches\n", m_batchesToKeep);
+        System.out.printf("\tCleaning up deceased every %d batches\n", m_deceasedCleanupFreq);
+        System.out.printf("\tSnapshotting every %d batches\n", m_snapshotFreq);
 
-        String commaSeparatedServers = args[3];
+        String commaSeparatedServers = args[4];
 
         // parse the server list
         List<String> servers = new LinkedList<String>();
@@ -338,6 +479,9 @@ public class DeletesClient
         for (String server : commaSeparatedServersParts) {
             servers.add(server.trim());
         }
+
+        File tmpdir = new File(m_snapshotDir);
+        tmpdir.mkdir();
 
         generateNames(16);
         Client client = null;
@@ -363,10 +507,18 @@ public class DeletesClient
 
         // now add a batch and remove a batch
         long deceased_counter = 0;
+        long snapshot_counter = 0;
         while (true)
         {
             insertBatch(client);
             //collectStats(client);
+
+            snapshot_counter++;
+            if (snapshot_counter == m_snapshotFreq)
+            {
+                performSnapshot(client);
+                snapshot_counter = 0;
+            }
 
             deceased_counter++;
             if (deceased_counter == m_deceasedCleanupFreq)
