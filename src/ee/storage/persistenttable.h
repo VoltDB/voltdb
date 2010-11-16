@@ -59,6 +59,7 @@
 #include "storage/PersistentTableStats.h"
 #include "storage/CopyOnWriteContext.h"
 #include "storage/RecoveryContext.h"
+#include "common/UndoQuantumReleaseInterest.h"
 
 namespace voltdb {
 
@@ -100,7 +101,7 @@ class PersistentTableUndoDeleteAction;
  * value in data and adds an entry to UndoLog. We chose eager update
  * policy because we expect reverting rarely occurs.
  */
-class PersistentTable : public Table {
+class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     friend class TableFactory;
     friend class TableTuple;
     friend class TableIndex;
@@ -116,6 +117,12 @@ class PersistentTable : public Table {
 
   public:
     virtual ~PersistentTable();
+
+    void notifyQuantumRelease() {
+        if (compactionPredicate()) {
+            doForcedCompaction();
+        }
+    }
 
     // ------------------------------------------------------------------
     // OPERATIONS

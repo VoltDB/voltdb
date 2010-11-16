@@ -48,7 +48,7 @@ public class DeletesClient
     static int m_batchesToKeep = 12;
     static int m_deceasedCleanupFreq = -1;
     static String[] m_names = new String[NUM_NAMES];
-    static Random m_rand = new Random();
+    static Random m_rand = new Random(0);
     static long m_batchNumber = 1000;
     static int m_totalRows;
     static long m_highMem = 0;

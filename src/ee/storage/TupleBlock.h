@@ -116,13 +116,18 @@ public:
             //information. Any tuples pending delete due to a snapshot will moved and picked up
             //by the snapshot scan from the other block
             if (m_bucket.get() != NULL) {
+                //std::cout << static_cast<void*>(this) << " has only deleted tuples that are pending undo release "
+                        //<< tuplesPendingDeleteOnUndoRelease << std::endl;
                 m_bucket->erase(TBPtr(this));
+                m_bucket = TBBucketPtr();
             }
-            m_bucket = TBBucketPtr();
             return -1;
         }
         else {
-            return static_cast<int>(::floor((m_activeTuples / m_tuplesPerBlockDivNumBuckets) - 1));
+            int index = static_cast<int>(::floor(m_activeTuples / m_tuplesPerBlockDivNumBuckets));
+            assert(index < TUPLE_BLOCK_NUM_BUCKETS);
+            assert(index >= 0);
+            return index;
         }
     }
 
@@ -135,6 +140,7 @@ public:
     inline std::pair<char*, int> nextFreeTuple() {
         char *retval = NULL;
         if (!m_freeList.empty()) {
+            m_lastCompactionOffset = 0;
             retval = m_storage.get();
             TruncatedInt offset = m_freeList.back();
             m_freeList.pop_back();
@@ -168,6 +174,7 @@ public:
     }
 
     inline int freeTuple(char *tupleStorage) {
+        m_lastCompactionOffset = 0;
         m_activeTuples--;
         //Find the offset
         uint32_t offset = static_cast<uint32_t>(tupleStorage - m_storage.get());
@@ -195,6 +202,15 @@ public:
         return m_nextFreeTuple;
     }
 
+    ~TupleBlock();
+
+    inline uint32_t lastCompactionOffset() {
+        return m_lastCompactionOffset;
+    }
+
+    inline void lastCompactionOffset(uint32_t offset) {
+        m_lastCompactionOffset = offset;
+    }
 private:
     uint32_t m_references;
     Table* m_table;
@@ -203,6 +219,7 @@ private:
     uint32_t m_tuplesPerBlock;
     uint32_t m_activeTuples;
     uint32_t m_nextFreeTuple;
+    uint32_t m_lastCompactionOffset;
     const double m_tuplesPerBlockDivNumBuckets;
     /*
      * queue of offsets to <b>once used and then deleted</b> tuples.

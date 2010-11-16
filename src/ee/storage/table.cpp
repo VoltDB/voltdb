@@ -65,6 +65,7 @@ Table::Table(int tableAllocationTargetSize) :
     m_tempTuple(),
     m_schema(NULL),
     m_tupleCount(0),
+    m_tuplesPinnedByUndo(0),
     m_columnCount(0),
     m_tuplesPerBlock(0),
     m_nonInlinedMemorySize(0),
@@ -569,6 +570,7 @@ void Table::doCompactionWithinSubset(TBBucketMap *bucketMap) {
         }
     }
     if (!foundFullest) {
+        //std::cout << "Could not find a fullest block for compaction" << std::endl;
         return;
     }
 
@@ -596,6 +598,7 @@ void Table::doCompactionWithinSubset(TBBucketMap *bucketMap) {
             }
         }
         if (!foundLightest) {
+            //std::cout << "Could not find a lightest block for compaction" << std::endl;
             return;
         }
 

@@ -35,7 +35,7 @@ public:
     ~DummyUndoQuantum() {
         delete m_dataPool;
     }
-    void registerUndoAction(UndoAction *undoAction) {
+    void registerUndoAction(UndoAction *undoAction, UndoQuantumReleaseInterest *interest = NULL) {
         undoAction->release();
         undoAction->~UndoAction();
         m_dataPool->purge();

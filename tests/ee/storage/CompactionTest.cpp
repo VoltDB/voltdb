@@ -273,6 +273,8 @@ TEST_F(CompactionTest, BasicCompaction) {
         m_table->deleteTuple(tuple, true);
     }
 
+    m_table->doForcedCompaction();
+
     std::set<int32_t> pkeysFoundAfterDelete;
     TableIterator iter = m_table->tableIterator();
     TableTuple tuple(m_table->schema());
@@ -304,7 +306,7 @@ TEST_F(CompactionTest, BasicCompaction) {
     ASSERT_EQ(pkeysFoundAfterDelete.size(), pkeysNotDeleted.size());
     ASSERT_TRUE(pkeysFoundAfterDelete == pkeysNotDeleted);
     std::cout << "Have " << m_table->m_data.size() << " blocks left " << m_table->allocatedTupleCount() << ", " << m_table->activeTupleCount() << std::endl;
-    ASSERT_EQ( m_table->m_data.size(), 7);
+    ASSERT_EQ( m_table->m_data.size(), 8);
 
     for (std::set<int32_t>::iterator ii = pkeysNotDeleted.begin(); ii != pkeysNotDeleted.end(); ii++) {
         key.setNValue(0, ValueFactory::getIntegerValue(*ii));
@@ -312,6 +314,7 @@ TEST_F(CompactionTest, BasicCompaction) {
         TableTuple tuple = pkeyIndex->nextValueAtKey();
         m_table->deleteTuple(tuple, true);
     }
+    m_table->doForcedCompaction();
     ASSERT_EQ( m_table->m_data.size(), 0);
     ASSERT_EQ( m_table->activeTupleCount(), 0);
 }

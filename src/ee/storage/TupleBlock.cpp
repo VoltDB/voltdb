@@ -18,6 +18,9 @@
 #include "storage/table.h"
 
 namespace voltdb {
+
+volatile int tupleBlocksAllocated = 0;
+
 TupleBlock::TupleBlock(Table *table, TBBucketPtr bucket) :
         m_references(0),
         m_storage(new char[table->m_tableAllocationSize]),
@@ -25,30 +28,42 @@ TupleBlock::TupleBlock(Table *table, TBBucketPtr bucket) :
         m_tuplesPerBlock(table->m_tuplesPerBlock),
         m_activeTuples(0),
         m_nextFreeTuple(0),
+        m_lastCompactionOffset(0),
         m_tuplesPerBlockDivNumBuckets(m_tuplesPerBlock / static_cast<double>(TUPLE_BLOCK_NUM_BUCKETS)),
         m_bucketIndex(0),
         m_bucket(bucket) {
+    //tupleBlocksAllocated++;
+}
+
+TupleBlock::~TupleBlock() {
+    //tupleBlocksAllocated--;
+    //std::cout << "Destructing tuple block " << static_cast<void*>(this) << " with " << tupleBlocksAllocated << " left " << std::endl;
 }
 
 std::pair<int, int> TupleBlock::merge(Table *table, TBPtr source) {
     assert(source != this);
-    uint32_t m_nextTupleInSourceOffset = 0;
+    //std::cout << "Attempting to merge " << static_cast<void*> (this) << "(" << m_activeTuples << ") with " << static_cast<void*>(source.get()) << "(" << source->m_activeTuples << ")";
+    //std::cout << " source last compaction offset is " << source->lastCompactionOffset() << " and active tuple count is " << source->m_activeTuples << std::endl;
+
+    uint32_t m_nextTupleInSourceOffset = source->lastCompactionOffset();
     int sourceTuplesPendingDeleteOnUndoRelease = 0;
     while (hasFreeTuples() && !source->isEmpty()) {
         TableTuple sourceTuple(table->schema());
         TableTuple destinationTuple(table->schema());
 
+        bool foundSourceTuple = false;
         //Iterate further into the block looking for active tuples
         //Stop when running into the unused tuple boundry
         while (m_nextTupleInSourceOffset < source->unusedTupleBoundry()) {
             sourceTuple.move(&source->address()[m_tupleLength * m_nextTupleInSourceOffset]);
             m_nextTupleInSourceOffset++;
             if (sourceTuple.isActive()) {
+                foundSourceTuple = true;
                 break;
             }
         }
 
-        if (sourceTuple.address() == NULL) {
+        if (!foundSourceTuple) {
            //The block isn't empty, but there are no more active tuples.
            //Some of the tuples that make it register as not empty must have been
            //pending delete and those aren't mergable
@@ -71,14 +86,17 @@ std::pair<int, int> TupleBlock::merge(Table *table, TBPtr source) {
         table->swapTuples( sourceTuple, destinationTuple);
         source->freeTuple(sourceTuple.address());
     }
+    source->lastCompactionOffset(m_nextTupleInSourceOffset);
 
     int newBucketIndex = calculateBucketIndex();
     if (newBucketIndex != m_bucketIndex) {
         m_bucketIndex = newBucketIndex;
-        //std::cout << "Merged " << static_cast<void*> (this) << "(" << m_activeTuples << ") with " << static_cast<void*>(source.get()) << "(" << source->m_activeTuples << ")" << std::endl;
+        //std::cout << "Merged " << static_cast<void*> (this) << "(" << m_activeTuples << ") with " << static_cast<void*>(source.get())  << "(" << source->m_activeTuples << ")";
+        //std::cout << " found " << sourceTuplesPendingDeleteOnUndoRelease << " tuples pending delete on undo release "<< std::endl;
         return std::pair<int, int>(newBucketIndex, source->calculateBucketIndex(sourceTuplesPendingDeleteOnUndoRelease));
     } else {
-        //std::cout << "Merged " << static_cast<void*> (this) << "(" << m_activeTuples << ") with " << static_cast<void*>(source.get()) << "(" << source->m_activeTuples << ")" << std::endl;
+        //std::cout << "Merged " << static_cast<void*> (this) << "(" << m_activeTuples << ") with " << static_cast<void*>(source.get()) << "(" << source->m_activeTuples << ")";
+        //std::cout << " found " << sourceTuplesPendingDeleteOnUndoRelease << " tuples pending delete on undo release "<< std::endl;
         return std::pair<int, int>( -1, source->calculateBucketIndex(sourceTuplesPendingDeleteOnUndoRelease));
     }
 }

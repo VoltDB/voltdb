@@ -37,6 +37,8 @@ void PersistentTableUndoDeleteAction::undo() {
 void PersistentTableUndoDeleteAction::release() {
     TableTuple tuple( m_tuple, m_table->schema());
     tuple.setPendingDeleteOnUndoReleaseFalse();
+    m_table->m_tuplesPinnedByUndo--;
+
     /*
      * Before deleting the tuple free any allocated strings.
      * Persistent tables are responsible for managing the life of

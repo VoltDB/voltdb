@@ -233,6 +233,7 @@ void PersistentTable::insertTupleForUndo(char *tuple, size_t wrapperOffset) {
 
     m_tmpTarget1.move(tuple);
     m_tmpTarget1.setPendingDeleteOnUndoReleaseFalse();
+    m_tuplesPinnedByUndo--;
 
     // rollback Export
     if (m_exportEnabled) {
@@ -409,6 +410,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
     deleteFromAllIndexes(&target);
 
     target.setPendingDeleteOnUndoReleaseTrue();
+    m_tuplesPinnedByUndo++;
 
     /*
      * Create and register an undo action.
@@ -431,7 +433,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
         ptuda->setELMark(elMark);
     }
 
-    undoQuantum->registerUndoAction(ptuda);
+    undoQuantum->registerUndoAction(ptuda, this);
     return true;
 }
 
@@ -507,7 +509,8 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple) {
 void PersistentTable::insertIntoAllIndexes(TableTuple *tuple) {
     for (int i = m_indexCount - 1; i >= 0;--i) {
         if (!m_indexes[i]->addEntry(tuple)) {
-            throwFatalException("Failed to insert tuple into index");
+            throwFatalException(
+                    "Failed to insert tuple in Table: %s Index %s", m_name.c_str(), m_indexes[i]->getName().c_str());
         }
     }
 }
@@ -515,7 +518,8 @@ void PersistentTable::insertIntoAllIndexes(TableTuple *tuple) {
 void PersistentTable::deleteFromAllIndexes(TableTuple *tuple) {
     for (int i = m_indexCount - 1; i >= 0;--i) {
         if (!m_indexes[i]->deleteEntry(tuple)) {
-            throwFatalException("Failed to delete tuple from index");
+            throwFatalException(
+                    "Failed to delete tuple in Table: %s Index %s", m_name.c_str(), m_indexes[i]->getName().c_str());
         }
     }
 }
@@ -523,7 +527,8 @@ void PersistentTable::deleteFromAllIndexes(TableTuple *tuple) {
 void PersistentTable::updateFromAllIndexes(TableTuple &targetTuple, const TableTuple &sourceTuple) {
     for (int i = m_indexCount - 1; i >= 0;--i) {
         if (!m_indexes[i]->replaceEntry(&targetTuple, &sourceTuple)) {
-            throwFatalException("Failed to update tuple in index");
+            throwFatalException(
+                    "Failed to update tuple in Table: %s Index %s", m_name.c_str(), m_indexes[i]->getName().c_str());
         }
     }
 }
@@ -531,7 +536,8 @@ void PersistentTable::updateFromAllIndexes(TableTuple &targetTuple, const TableT
 void PersistentTable::updateWithSameKeyFromAllIndexes(TableTuple &targetTuple, const TableTuple &sourceTuple) {
     for (int i = m_indexCount - 1; i >= 0;--i) {
         if (!m_indexes[i]->replaceEntryNoKeyChange(&targetTuple, &sourceTuple)) {
-            throwFatalException("Failed to update tuple in index");
+            throwFatalException(
+                    "Failed to update tuple in Table: %s Index %s", m_name.c_str(), m_indexes[i]->getName().c_str());
         }
     }
 }

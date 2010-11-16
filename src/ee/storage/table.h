@@ -337,7 +337,8 @@ protected:
     void doIdleCompaction();
     void doForcedCompaction();
     bool compactionPredicate() {
-        return allocatedTupleCount() - activeTupleCount() > (m_tuplesPerBlock * 2) && loadFactor() < .75;
+        assert(m_tuplesPinnedByUndo == 0);
+        return allocatedTupleCount() - activeTupleCount() > (m_tuplesPerBlock * 3) && loadFactor() < .95;
     }
 
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
@@ -372,6 +373,7 @@ protected:
     TableTuple m_tmpTarget1, m_tmpTarget2;
     TupleSchema* m_schema;
     uint32_t m_tupleCount;
+    uint32_t m_tuplesPinnedByUndo;
     uint32_t m_columnCount;
     uint32_t m_tuplesPerBlock;
     uint32_t m_tupleLength;
@@ -451,10 +453,13 @@ inline void Table::deleteTupleStorage(TableTuple &tuple, TBPtr block) {
 
     // add to the free list
     m_tupleCount--;
+    //m_tuplesPendingDelete--;
 
     if (block.get() == NULL) {
        block = findBlock(tuple.address());
     }
+
+    bool transitioningToBlockWithSpace = !block->hasFreeTuples();
 
     int retval = block->freeTuple(tuple.address());
     if (retval != -1) {
@@ -478,12 +483,8 @@ inline void Table::deleteTupleStorage(TableTuple &tuple, TBPtr block) {
         assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
         //Eliminates circular reference
         block->swapToBucket(TBBucketPtr());
-    } else {
+    } else if (transitioningToBlockWithSpace) {
         m_blocksWithSpace.insert(block);
-    }
-
-    if (compactionPredicate()) {
-        doForcedCompaction();
     }
 }
 
