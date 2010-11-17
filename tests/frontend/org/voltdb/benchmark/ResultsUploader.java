@@ -105,7 +105,17 @@ public class ResultsUploader implements BenchmarkController.BenchmarkInterest {
             // handle any errors
             System.out.println("Unable to connect to MySQL results recording server.");
             System.out.println("SQLException: " + ex.getMessage());
-            return;
+            System.out.println("Timeout was " + DriverManager.getLoginTimeout());
+            System.out.println("Trying again");
+            try {
+                m_conn =  DriverManager.getConnection(m_config.resultsDatabaseURL);
+                m_stmt = m_conn.createStatement();
+            }
+            catch (SQLException ex2) {
+                System.out.println("Still can't connect.");
+                System.out.println("SQLException: " + ex.getMessage());
+                return;
+            }
         }
 
         // upload
