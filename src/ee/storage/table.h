@@ -333,7 +333,7 @@ protected:
     void nextFreeTuple(TableTuple *tuple);
     TBPtr allocateNextBlock();
 
-    void doCompactionWithinSubset(TBBucketMap *bucketMap);
+    bool doCompactionWithinSubset(TBBucketMap *bucketMap);
     void doIdleCompaction();
     void doForcedCompaction();
     bool compactionPredicate() {
@@ -345,6 +345,10 @@ protected:
         m_blocksPendingSnapshot.erase(nextBlock);
         if (finishedBlock.get() != NULL && !finishedBlock->isEmpty()) {
             m_blocksNotPendingSnapshot.insert(finishedBlock);
+            int bucketIndex = finishedBlock->calculateBucketIndex();
+            if (bucketIndex != -1) {
+                finishedBlock->swapToBucket(m_blocksNotPendingSnapshotLoad[bucketIndex]);
+            }
         }
     }
 
@@ -465,10 +469,11 @@ inline void Table::deleteTupleStorage(TableTuple &tuple, TBPtr block) {
     if (retval != -1) {
         //Check if if the block is currently pending snapshot
         if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
-            //std::cout << "Swapping block " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;
+            //std::cout << "Swapping block to nonsnapshot bucket " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;
             block->swapToBucket(m_blocksNotPendingSnapshotLoad[retval]);
         //Check if the block goes into the pending snapshot set of buckets
         } else if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
+            //std::cout << "Swapping block to snapshot bucket " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;
             block->swapToBucket(m_blocksPendingSnapshotLoad[retval]);
         } else {
             //In this case the block is actively being snapshotted and isn't eligible for merge operations at all

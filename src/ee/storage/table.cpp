@@ -127,12 +127,21 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::string* column
     m_tableAllocationSize = m_tupleLength;
 #else
     m_tuplesPerBlock = m_tableAllocationTargetSize / m_tupleLength;
+#ifdef USE_MMAP
+    if (m_tuplesPerBlock < 1) {
+        m_tuplesPerBlock = 1;
+        m_tableAllocationSize = nexthigher(m_tupleLength);
+    } else {
+        m_tableAllocationSize = nexthigher(m_tableAllocationTargetSize);
+    }
+#else
     if (m_tuplesPerBlock < 1) {
         m_tuplesPerBlock = 1;
         m_tableAllocationSize = m_tupleLength;
     } else {
         m_tableAllocationSize = m_tableAllocationTargetSize;
     }
+#endif
 #endif
 
     // initialize column names
@@ -216,10 +225,11 @@ void Table::nextFreeTuple(TableTuple *tuple) {
     if (retval.second != -1) {
         //Check if the block goes into the pending snapshot set of buckets
         if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
-            //std::cout << "Swapping block " << static_cast<void*>(block.get()) << " to bucket " << retval.second << std::endl;
+            //std::cout << "Swapping block to nonsnapshot bucket " << static_cast<void*>(block.get()) << " to bucket " << retval.second << std::endl;
             block->swapToBucket(m_blocksPendingSnapshotLoad[retval.second]);
         //Now check if it goes in with the others
         } else if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
+            //std::cout << "Swapping block to snapshot bucket " << static_cast<void*>(block.get()) << " to bucket " << retval.second << std::endl;
             block->swapToBucket(m_blocksNotPendingSnapshotLoad[retval.second]);
         } else {
             //In this case the block is actively being snapshotted and isn't eligible for merge operations at all
@@ -554,7 +564,7 @@ void Table::loadTuplesFrom(bool allowExport,
     loadTuplesFromNoHeader( allowExport, serialize_io, stringPool);
 }
 
-void Table::doCompactionWithinSubset(TBBucketMap *bucketMap) {
+bool Table::doCompactionWithinSubset(TBBucketMap *bucketMap) {
     /**
      * First find the two best candidate blocks
      */
@@ -571,7 +581,7 @@ void Table::doCompactionWithinSubset(TBBucketMap *bucketMap) {
     }
     if (!foundFullest) {
         //std::cout << "Could not find a fullest block for compaction" << std::endl;
-        return;
+        return false;
     }
 
     int fullestBucketChange = -1;
@@ -580,7 +590,7 @@ void Table::doCompactionWithinSubset(TBBucketMap *bucketMap) {
         TBBucketI lightestIterator;
         bool foundLightest = false;
 
-        for (int ii = 0; ii < (TUPLE_BLOCK_NUM_BUCKETS - 1); ii++) {
+        for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
             lightestIterator = (*bucketMap)[ii]->begin();
             if (lightestIterator != (*bucketMap)[ii]->end()) {
                 lightest = *lightestIterator;
@@ -598,8 +608,29 @@ void Table::doCompactionWithinSubset(TBBucketMap *bucketMap) {
             }
         }
         if (!foundLightest) {
-            //std::cout << "Could not find a lightest block for compaction" << std::endl;
-            return;
+//            TBMapI iter = m_data.begin();
+//            while (iter != m_data.end()) {
+//                std::cout << "Block " << static_cast<void*>(iter.data().get()) << " has " <<
+//                        iter.data()->activeTuples() << " active tuples and " << iter.data()->lastCompactionOffset()
+//                        << " last compaction offset and is in bucket " <<
+//                        static_cast<void*>(iter.data()->currentBucket().get()) <<
+//                        std::endl;
+//                iter++;
+//            }
+//
+//            for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
+//                std::cout << "Bucket " << ii << "(" << static_cast<void*>((*bucketMap)[ii].get()) << ") has size " << (*bucketMap)[ii]->size() << std::endl;
+//                if (!(*bucketMap)[ii]->empty()) {
+//                    TBBucketI bucketIter = (*bucketMap)[ii]->begin();
+//                    while (bucketIter != (*bucketMap)[ii]->end()) {
+//                        std::cout << "\t" << static_cast<void*>(bucketIter->get()) << std::endl;
+//                        bucketIter++;
+//                    }
+//                }
+//            }
+//
+//            std::cout << "Could not find a lightest block for compaction" << std::endl;
+            return false;
         }
 
         std::pair<int, int> bucketChanges = fullest->merge(this, lightest);
@@ -628,6 +659,7 @@ void Table::doCompactionWithinSubset(TBBucketMap *bucketMap) {
     if (!fullest->hasFreeTuples()) {
         m_blocksWithSpace.erase(fullest);
     }
+    return true;
 }
 
 void Table::doIdleCompaction() {
@@ -640,15 +672,21 @@ void Table::doIdleCompaction() {
 }
 
 void Table::doForcedCompaction() {
+    bool hadWork1 = true;
+    bool hadWork2 = true;
     std::cout << "Doing forced compaction with allocated tuple count " << allocatedTupleCount() << std::endl;
     while (compactionPredicate()) {
-        if (!m_blocksNotPendingSnapshot.empty()) {
-            doCompactionWithinSubset(&m_blocksNotPendingSnapshotLoad);
+        assert(hadWork1 || hadWork2);
+        if (!m_blocksNotPendingSnapshot.empty() && hadWork1) {
+            //std::cout << "Compacting blocks not pending snapshot " << m_blocksNotPendingSnapshot.size() << std::endl;
+            hadWork1 = doCompactionWithinSubset(&m_blocksNotPendingSnapshotLoad);
         }
-        if (!m_blocksPendingSnapshot.empty()) {
-            doCompactionWithinSubset(&m_blocksPendingSnapshotLoad);
+        if (!m_blocksPendingSnapshot.empty() && hadWork2) {
+            //std::cout << "Compacting blocks pending snapshot " << m_blocksPendingSnapshot.size() << std::endl;
+            hadWork2 = doCompactionWithinSubset(&m_blocksPendingSnapshotLoad);
         }
     }
+    assert(!compactionPredicate());
     std::cout << "Finished forced compaction with allocated tuple count " << allocatedTupleCount() << std::endl;
 }
 

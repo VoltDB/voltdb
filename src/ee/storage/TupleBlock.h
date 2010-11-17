@@ -117,7 +117,7 @@ public:
             //by the snapshot scan from the other block
             if (m_bucket.get() != NULL) {
                 //std::cout << static_cast<void*>(this) << " has only deleted tuples that are pending undo release "
-                        //<< tuplesPendingDeleteOnUndoRelease << std::endl;
+                //        << tuplesPendingDeleteOnUndoRelease << std::endl;
                 m_bucket->erase(TBPtr(this));
                 m_bucket = TBBucketPtr();
             }
@@ -141,7 +141,7 @@ public:
         char *retval = NULL;
         if (!m_freeList.empty()) {
             m_lastCompactionOffset = 0;
-            retval = m_storage.get();
+            retval = m_storage;
             TruncatedInt offset = m_freeList.back();
             m_freeList.pop_back();
 
@@ -150,7 +150,7 @@ public:
             }
             retval += offset.unpack();
         } else {
-            retval = &(m_storage.get()[m_tupleLength * m_nextFreeTuple]);
+            retval = &(m_storage[m_tupleLength * m_nextFreeTuple]);
             m_nextFreeTuple++;
         }
         m_activeTuples++;
@@ -177,7 +177,7 @@ public:
         m_lastCompactionOffset = 0;
         m_activeTuples--;
         //Find the offset
-        uint32_t offset = static_cast<uint32_t>(tupleStorage - m_storage.get());
+        uint32_t offset = static_cast<uint32_t>(tupleStorage - m_storage);
         m_freeList.push_back(offset);
         int newBucketIndex = calculateBucketIndex();
         if (newBucketIndex != m_bucketIndex) {
@@ -189,7 +189,7 @@ public:
     }
 
     inline char * address() {
-        return m_storage.get();
+        return m_storage;
     }
 
     inline void reset() {
@@ -211,10 +211,18 @@ public:
     inline void lastCompactionOffset(uint32_t offset) {
         m_lastCompactionOffset = offset;
     }
+
+    inline uint32_t activeTuples() {
+        return m_activeTuples;
+    }
+
+    inline TBBucketPtr currentBucket() {
+        return m_bucket;
+    }
 private:
     uint32_t m_references;
     Table* m_table;
-    boost::scoped_array<char>  m_storage;
+    char*   m_storage;
     uint32_t m_tupleLength;
     uint32_t m_tuplesPerBlock;
     uint32_t m_activeTuples;

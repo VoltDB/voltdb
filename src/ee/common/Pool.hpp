@@ -20,6 +20,11 @@
 #include <vector>
 #include <iostream>
 #include <stdint.h>
+#include <sys/mman.h>
+#include <errno.h>
+#include <climits>
+#include <string.h>
+#include "common/FatalException.hpp"
 
 namespace voltdb {
 #ifndef MEMCHECK
@@ -48,6 +53,20 @@ public:
     char *m_chunkData;
 };
 
+/*
+ * Find next higher power of two
+ * From http://en.wikipedia.org/wiki/Power_of_two
+ */
+template <class T>
+inline T nexthigher(T k) {
+        if (k == 0)
+                return 1;
+        k--;
+        for (int i=1; i<sizeof(T)*CHAR_BIT; i<<=1)
+                k = k | k >> i;
+        return k+1;
+}
+
 /**
  * A memory pool that provides fast allocation and deallocation. The
  * only way to release memory is to free all memory in the pool by
@@ -55,26 +74,65 @@ public:
  */
 class Pool {
 public:
+
     Pool() :
-        m_allocationSize(65536), m_maxChunkCount(1), m_currentChunkIndex(0)
+        m_allocationSize(262144), m_maxChunkCount(1), m_currentChunkIndex(0)
     {
-        m_chunks.push_back(Chunk(m_allocationSize, new char[m_allocationSize]));
+#ifdef USE_MMAP
+        char *storage =
+                static_cast<char*>(::mmap( 0, m_allocationSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
+        if (storage == MAP_FAILED) {
+            std::cout << strerror( errno ) << std::endl;
+            throwFatalException("Failed mmap");
+        }
+#else
+        char *storage = new char[m_allocationSize];
+#endif
+        m_chunks.push_back(Chunk(m_allocationSize, storage));
     }
 
     Pool(uint64_t allocationSize, uint64_t maxChunkCount) :
+#ifdef USE_MMAP
+        m_allocationSize(nexthigher(allocationSize)),
+#else
         m_allocationSize(allocationSize),
+#endif
         m_maxChunkCount(static_cast<std::size_t>(maxChunkCount)),
         m_currentChunkIndex(0)
     {
-        m_chunks.push_back(Chunk(allocationSize, new char[allocationSize]));
+#ifdef USE_MMAP
+        char *storage =
+                static_cast<char*>(::mmap( 0, m_allocationSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
+        if (storage == MAP_FAILED) {
+            std::cout << strerror( errno ) << std::endl;
+            throwFatalException("Failed mmap");
+        }
+#else
+        char *storage = new char[m_allocationSize];
+#endif
+        m_chunks.push_back(Chunk(allocationSize, storage));
     }
 
     ~Pool() {
         for (std::size_t ii = 0; ii < m_chunks.size(); ii++) {
+#ifdef USE_MMAP
+            if (::munmap( m_chunks[ii].m_chunkData, m_chunks[ii].m_size) != 0) {
+                std::cout << strerror( errno ) << std::endl;
+                throwFatalException("Failed munmap");
+            }
+#else
             delete [] m_chunks[ii].m_chunkData;
+#endif
         }
         for (std::size_t ii = 0; ii < m_oversizeChunks.size(); ii++) {
+#ifdef USE_MMAP
+            if (::munmap( m_oversizeChunks[ii].m_chunkData, m_oversizeChunks[ii].m_size) != 0) {
+                std::cout << strerror( errno ) << std::endl;
+                throwFatalException("Failed munmap");
+            }
+#else
             delete [] m_oversizeChunks[ii].m_chunkData;
+#endif
         }
     }
 
@@ -94,7 +152,17 @@ public:
                 /*
                  * Allocate an oversize chunk that will not be reused.
                  */
-                m_oversizeChunks.push_back(Chunk(size, new char[size]));
+#ifdef USE_MMAP
+                char *storage =
+                        static_cast<char*>(::mmap( 0, nexthigher(size), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
+                if (storage == MAP_FAILED) {
+                    std::cout << strerror( errno ) << std::endl;
+                    throwFatalException("Failed mmap");
+                }
+#else
+                char *storage = new char[size];
+#endif
+                m_oversizeChunks.push_back(Chunk(nexthigher(size), storage));
                 Chunk *newChunk = &(*(m_oversizeChunks.end()));
                 newChunk->m_offset = size;
 
@@ -117,7 +185,17 @@ public:
 //                  "from a performance perspective. If you see this we need to look "
 //                  "into structuring our pool sizes and allocations so the this doesn't "
 //                  "happen frequently" << std::endl;
-                m_chunks.push_back(Chunk(m_allocationSize, new char[m_allocationSize]));
+#ifdef USE_MMAP
+                char *storage =
+                        static_cast<char*>(::mmap( 0, m_allocationSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
+                if (storage == MAP_FAILED) {
+                    std::cout << strerror( errno ) << std::endl;
+                    throwFatalException("Failed mmap");
+                }
+#else
+                char *storage = new char[m_allocationSize];
+#endif
+                m_chunks.push_back(Chunk(m_allocationSize, storage));
                 currentChunk = &(*(m_chunks.rbegin()));
                 currentChunk->m_offset = size;
                 return currentChunk->m_chunkData;
@@ -146,7 +224,14 @@ public:
          */
         const std::size_t numOversizeChunks = m_oversizeChunks.size();
         for (std::size_t ii = 0; ii < numOversizeChunks; ii++) {
+#ifdef USE_MMAP
+            if (::munmap( m_oversizeChunks[ii].m_chunkData, m_oversizeChunks[ii].m_size) != 0) {
+                std::cout << strerror( errno ) << std::endl;
+                throwFatalException("Failed munmap");
+            }
+#else
             delete [] m_oversizeChunks[ii].m_chunkData;
+#endif
         }
         m_oversizeChunks.clear();
 
@@ -161,7 +246,14 @@ public:
          */
         if (numChunks > m_maxChunkCount) {
             for (std::size_t ii = m_maxChunkCount; ii < numChunks; ii++) {
-                delete [] m_chunks[ii].m_chunkData;
+#ifdef USE_MMAP
+                if (::munmap( m_chunks[ii].m_chunkData, m_chunks[ii].m_size) != 0) {
+                    std::cout << strerror( errno ) << std::endl;
+                    throwFatalException("Failed munmap");
+                }
+#else
+                delete []m_chunks[ii].m_chunkData;
+#endif
             }
             m_chunks.resize(m_maxChunkCount);
         }
