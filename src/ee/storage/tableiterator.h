@@ -118,6 +118,9 @@ inline bool TableIterator::next(TableTuple &out) {
         if (m_currentBlock == NULL ||
                 m_blockOffset >= m_currentBlock->unusedTupleBoundry()) {
             assert(m_blockIterator != m_table->m_data.end());
+            if (m_blockIterator == m_table->m_data.end()) {
+                throwFatalException("Could not find the expected number of tuples during a table scan");
+            }
             m_dataPtr = m_blockIterator.key();
             m_currentBlock = m_blockIterator.data();
             m_blockOffset = 0;
@@ -138,10 +141,12 @@ inline bool TableIterator::next(TableTuple &out) {
         const bool pendingDelete = out.isPendingDelete();
         const bool isPendingDeleteOnUndoRelease = out.isPendingDeleteOnUndoRelease();
         // Return this tuple only when this tuple is not marked as deleted.
-        if (active && !(pendingDelete || isPendingDeleteOnUndoRelease)) {
+        if (active) {
             ++m_foundTuples;
-            //assert(m_foundTuples == m_location);
-            return true;
+            if (!(pendingDelete || isPendingDeleteOnUndoRelease)) {
+                //assert(m_foundTuples == m_location);
+                return true;
+            }
         }
     }
     return false;
