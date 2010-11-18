@@ -74,10 +74,14 @@ class TempTable : public Table {
     TempTable(TempTable const&);
     TempTable operator=(TempTable const&);
 
+    // default iterator
+    TableIterator m_iter;
+
   public:
-    // Return a table iterator BY VALUE
-    TableIterator iterator() {
-        return TableIterator(this);
+    // Return the table iterator by reference
+    TableIterator& iterator() {
+        m_iter.reset();
+        return m_iter;
     }
 
     TableIterator* makeIterator() {

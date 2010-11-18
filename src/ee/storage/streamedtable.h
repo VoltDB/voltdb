@@ -50,7 +50,7 @@ class StreamedTable : public Table {
 
     // virtual Table functions
     // Return a table iterator BY VALUE
-    virtual TableIterator iterator();
+    virtual TableIterator& iterator();
     virtual TableIterator* makeIterator();
 
     virtual void deleteAllTuples(bool freeAllocatedStrings);

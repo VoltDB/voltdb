@@ -154,7 +154,7 @@ public:
     // ------------------------------------------------------------------
     // ACCESS METHODS
     // ------------------------------------------------------------------
-    virtual TableIterator iterator() = 0;
+    virtual TableIterator& iterator() = 0;
     virtual TableIterator *makeIterator() = 0;
 
     // ------------------------------------------------------------------

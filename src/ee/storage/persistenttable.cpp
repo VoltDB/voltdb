@@ -82,7 +82,8 @@ TableTuple keyTuple;
 #define TABLE_BLOCKSIZE 2097152
 
 PersistentTable::PersistentTable(ExecutorContext *ctx, bool exportEnabled) :
-    Table(TABLE_BLOCKSIZE), m_executorContext(ctx), m_uniqueIndexes(NULL), m_uniqueIndexCount(0), m_allowNulls(NULL),
+    Table(TABLE_BLOCKSIZE), m_iter(this), m_executorContext(ctx),
+    m_uniqueIndexes(NULL), m_uniqueIndexCount(0), m_allowNulls(NULL),
     m_indexes(NULL), m_indexCount(0), m_pkeyIndex(NULL), m_wrapper(NULL),
     m_tsSeqNo(0), stats_(this), m_exportEnabled(exportEnabled),
     m_COWContext(NULL)

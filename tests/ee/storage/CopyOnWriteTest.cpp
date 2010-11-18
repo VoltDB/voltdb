@@ -231,7 +231,7 @@ TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
     initTable(true);
     addRandomUniqueTuples( m_table, 699048);
 
-    voltdb::TableIterator iterator = m_table->iterator();
+    voltdb::TableIterator& iterator = m_table->iterator();
     TBMap blocks(m_table->m_data);
     voltdb::CopyOnWriteIterator COWIterator(m_table, blocks.begin(), blocks.end());
     TableTuple tuple(m_table->schema());
@@ -279,7 +279,7 @@ TEST_F(CopyOnWriteTest, BigTest) {
     DefaultTupleSerializer serializer;
     for (int qq = 0; qq < 10; qq++) {
         std::set<int64_t> originalTuples;
-        voltdb::TableIterator iterator = m_table->iterator();
+        voltdb::TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
             const std::pair<std::set<int64_t>::iterator, bool> p =
@@ -364,7 +364,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
     DefaultTupleSerializer serializer;
     for (int qq = 0; qq < 10; qq++) {
         std::set<int64_t> originalTuples;
-        voltdb::TableIterator iterator = m_table->iterator();
+        voltdb::TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
             const std::pair<std::set<int64_t>::iterator, bool> p =
@@ -453,7 +453,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
     DefaultTupleSerializer serializer;
     for (int qq = 0; qq < 10; qq++) {
         std::set<int64_t> originalTuples;
-        voltdb::TableIterator iterator = m_table->iterator();
+        voltdb::TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
             const std::pair<std::set<int64_t>::iterator, bool> p =

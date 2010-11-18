@@ -109,11 +109,15 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     friend class PersistentTableStats;
     friend class PersistentTableUndoDeleteAction;
     friend class ::CompactionTest_BasicCompaction;
+
   private:
     // no default ctor, no copy, no assignment
     PersistentTable();
     PersistentTable(PersistentTable const&);
     PersistentTable operator=(PersistentTable const&);
+
+    // default iterator
+    TableIterator m_iter;
 
   public:
     virtual ~PersistentTable();
@@ -124,9 +128,10 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
         }
     }
 
-    // Return a table iterator BY VALUE
-    TableIterator iterator() {
-        return TableIterator(this);
+    // Return a table iterator by reference
+    TableIterator& iterator() {
+        m_iter
+        return m_iter;
     }
 
     TableIterator* makeIterator() {

@@ -80,6 +80,7 @@ public:
 
 private:
     TableIterator( Table *parent);
+    void reset();
     bool continuationPredicate();
 
     /*
@@ -114,6 +115,18 @@ inline TableIterator::TableIterator(Table *parent)
     m_tuplesPerBlock(parent->m_tuplesPerBlock), m_currentBlock(NULL)
     {
     }
+
+inline void TableIterator::reset() {
+    m_blockIterator = m_table->m_data.begin();
+    m_dataPtr= NULL;
+    m_location = 0;
+    m_blockOffset = 0;
+    m_activeTuples = (int) m_table->m_tupleCount;
+    m_foundTuples = 0;
+    m_tupleLength = m_table->m_tupleLength;
+    m_tuplesPerBlock = m_table->m_tuplesPerBlock;
+    m_currentBlock = NULL;
+}
 
 inline bool TableIterator::hasNext() {
     return m_foundTuples < m_activeTuples;

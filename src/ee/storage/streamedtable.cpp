@@ -55,7 +55,7 @@ StreamedTable::~StreamedTable()
     delete m_wrapper;
 }
 
-TableIterator StreamedTable::iterator() {
+TableIterator& StreamedTable::iterator() {
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                   "May not iterate a streamed table.");
 }
