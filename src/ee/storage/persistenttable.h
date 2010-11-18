@@ -304,6 +304,8 @@ protected:
      */
     virtual void processLoadedTuple(bool allowExport, TableTuple &tuple);
 
+    TBPtr allocateNextBlock();
+
     // pointer to current transaction id and other "global" state.
     // abstract this out of VoltDBEngine to avoid creating dependendencies
     // between the engine and the storage layers - which complicate test.
@@ -411,7 +413,20 @@ inline TBPtr PersistentTable::findBlock(char *tuple) {
     return i.data();
 }
 
-
+inline TBPtr PersistentTable::allocateNextBlock() {
+    TBPtr block(new TupleBlock(this, m_blocksNotPendingSnapshotLoad[0]));
+    m_data.insert( block->address(), block);
+    m_blocksNotPendingSnapshot.insert(block);
+    if (m_tempTableMemoryInBytes) {
+        (*m_tempTableMemoryInBytes) += m_tableAllocationSize;
+        if ((*m_tempTableMemoryInBytes) > MAX_TEMP_TABLE_MEMORY) {
+            throw SQLException(SQLException::volt_temp_table_memory_overflow,
+                               "More than 100MB of temp table memory used while"
+                               " executing SQL. Aborting.");
+        }
+    }
+    return block;
+}
 
 
 }

@@ -128,6 +128,9 @@ class TempTable : public Table {
     protected:
         // can not use this constructor to coerce a cast
         explicit TempTable();
+
+    TBPtr allocateNextBlock();
+
 };
 
 inline void TempTable::insertTupleNonVirtualWithDeepCopy(TableTuple &source, Pool *pool) {
@@ -199,6 +202,23 @@ inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
     m_blocksWithSpace.clear();
     m_blocksWithSpace.insert(block);
 }
+
+inline TBPtr TempTable::allocateNextBlock() {
+    TBPtr block(new TupleBlock(this, m_blocksNotPendingSnapshotLoad[0]));
+    m_data.insert( block->address(), block);
+    m_blocksNotPendingSnapshot.insert(block);
+    if (m_tempTableMemoryInBytes) {
+        (*m_tempTableMemoryInBytes) += m_tableAllocationSize;
+        if ((*m_tempTableMemoryInBytes) > MAX_TEMP_TABLE_MEMORY) {
+            throw SQLException(SQLException::volt_temp_table_memory_overflow,
+                               "More than 100MB of temp table memory used while"
+                               " executing SQL. Aborting.");
+        }
+    }
+    return block;
+}
+
+
 
 }
 

@@ -75,6 +75,8 @@ class StreamedTable : public Table {
     voltdb::StreamedTableStats stats_;
     voltdb::TableStats *getTableStats();
 
+    TBPtr allocateNextBlock();
+
   private:
     ExecutorContext *m_executorContext;
     TupleStreamWrapper *m_wrapper;
