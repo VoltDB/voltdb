@@ -64,20 +64,20 @@ namespace voltdb {
 Table::Table(int tableAllocationTargetSize) :
     m_tempTuple(),
     m_schema(NULL),
+    m_columnNames(NULL),
+    m_columnHeaderData(NULL),
+    m_columnHeaderSize(-1),
     m_tupleCount(0),
     m_tuplesPinnedByUndo(0),
     m_columnCount(0),
     m_tuplesPerBlock(0),
     m_nonInlinedMemorySize(0),
-    m_columnHeaderData(NULL),
-    m_columnHeaderSize(-1),
-    m_columnNames(NULL),
     m_databaseId(-1),
     m_name(""),
     m_ownsTupleSchema(true),
     m_tableAllocationTargetSize(tableAllocationTargetSize),
-    m_tempTableMemoryInBytes(NULL),
-    m_refcount(0)
+    m_refcount(0),
+    m_tempTableMemoryInBytes(NULL)
 {
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));

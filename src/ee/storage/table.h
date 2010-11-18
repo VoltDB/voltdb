@@ -360,12 +360,19 @@ protected:
     // DATA
     // ------------------------------------------------------------------
 
+  protected:
     TableTuple m_tempTuple;
     boost::scoped_array<char> m_tempTupleMemory;
 
     // not temptuple. these are for internal use.
     TableTuple m_tmpTarget1, m_tmpTarget2;
     TupleSchema* m_schema;
+
+    // schema as array of string names
+    std::string* m_columnNames;
+    char *m_columnHeaderData;
+    int32_t m_columnHeaderSize;
+
     uint32_t m_tupleCount;
     uint32_t m_tuplesPinnedByUndo;
     uint32_t m_columnCount;
@@ -373,10 +380,37 @@ protected:
     uint32_t m_tupleLength;
     int64_t m_nonInlinedMemorySize;
 
+    // identity information
+    CatalogId m_databaseId;
+    std::string m_name;
+
+    // If this table owns the TupleSchema it is responsible for deleting it in the destructor
+    bool m_ownsTupleSchema;
+
+    const int m_tableAllocationTargetSize;
+    int m_tableAllocationSize;
+
+  private:
+    int32_t m_refcount;
+
+
+  protected:
+    /*
+     *   Temp table  data structures
+     */
+
+    // ptr to global integer tracking temp table memory allocated per frag
+    // should be null for persistent tables
+    int* m_tempTableMemoryInBytes;
+
+
+  protected:
+    /*
+     *   Persistent table data structures
+     */
+
     // pointers to chunks of data
     TBMap m_data;
-    char *m_columnHeaderData;
-    int32_t m_columnHeaderSize;
 
     // Set of blocks with non-empty free lists or available tuples
     // that have never been allocated
@@ -391,27 +425,6 @@ protected:
 
     // Map containing blocks that are pending snapshot
     boost::unordered_set<TBPtr> m_blocksPendingSnapshot;
-
-    // schema as array of string names
-    std::string* m_columnNames;
-
-    // GENERAL INFORMATION
-    CatalogId m_databaseId;
-    std::string m_name;
-
-    // If this table owns the TupleSchema it is responsible for deleting it in the destructor
-    bool m_ownsTupleSchema;
-
-    const int m_tableAllocationTargetSize;
-    int m_tableAllocationSize;
-
-    // ptr to global integer tracking temp table memory allocated per frag
-    // should be null for persistent tables
-    int* m_tempTableMemoryInBytes;
-
-  private:
-    int32_t m_refcount;
-
 };
 
 }
