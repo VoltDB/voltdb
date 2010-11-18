@@ -50,6 +50,9 @@
 #include <sstream>
 #include <unistd.h>
 #include <locale>
+#ifdef LINUX
+#include <malloc.h>
+#endif // LINUX
 #include "boost/shared_array.hpp"
 #include "boost/scoped_array.hpp"
 #include "boost/foreach.hpp"
@@ -126,6 +129,15 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
 
     // require a site id, at least, to inititalize.
     m_executorContext = NULL;
+
+#ifdef LINUX
+    mallopt(M_MXFAST, 64);
+    mallopt(M_TRIM_THRESHOLD, 128 * 1024);
+    mallopt(M_TOP_PAD, 0);
+    mallopt(M_MMAP_THRESHOLD, 128 * 1024);
+    mallopt(M_MMAP_MAX, 65536);
+    mallopt(M_CHECK_ACTION, 3);
+#endif // LINUX
 }
 
 bool VoltDBEngine::initialize(
