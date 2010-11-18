@@ -26,11 +26,17 @@ import java.util.Set;
 
 import org.voltdb.VoltDB;
 import org.voltdb.client.ConnectionUtil;
-import org.voltdb.fault.*;
+import org.voltdb.fault.FaultHandler;
+import org.voltdb.fault.NodeFailureFault;
+import org.voltdb.fault.VoltFault;
 import org.voltdb.logging.VoltLogger;
-import org.voltdb.network.*;
-import org.voltdb.utils.*;
+import org.voltdb.network.Connection;
+import org.voltdb.network.QueueMonitor;
+import org.voltdb.network.VoltProtocolHandler;
+import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltdb.utils.DeferredSerialization;
+import org.voltdb.utils.EstTime;
 
 public class ForeignHost {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -170,6 +176,7 @@ public class ForeignHost {
      */
     void killSocket() {
         try {
+            m_closing = true;
             m_socket.setKeepAlive(false);
             m_socket.setSoLinger(false, 0);
             Thread.sleep(25);
