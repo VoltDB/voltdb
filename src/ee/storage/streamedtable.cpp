@@ -19,6 +19,7 @@
 #include "StreamedTableUndoAction.hpp"
 #include "TupleStreamWrapper.h"
 #include "common/executorcontext.hpp"
+#include "tableiterator.h"
 
 using namespace voltdb;
 
@@ -52,6 +53,16 @@ StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx) {
 StreamedTable::~StreamedTable()
 {
     delete m_wrapper;
+}
+
+TableIterator StreamedTable::iterator() {
+    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                  "May not iterate a streamed table.");
+}
+
+TableIterator* StreamedTable::makeIterator() {
+    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                  "May not iterate a streamed table.");
 }
 
 void StreamedTable::deleteAllTuples(bool freeAllocatedStrings)

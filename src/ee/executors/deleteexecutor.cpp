@@ -118,7 +118,7 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
         assert(m_inputTable);
         assert(m_inputTuple.sizeInValues() == m_inputTable->columnCount());
         assert(m_targetTuple.sizeInValues() == m_targetTable->columnCount());
-        TableIterator inputIterator(m_inputTable);
+        TableIterator inputIterator = m_inputTable->iterator();
         while (inputIterator.next(m_inputTuple)) {
             //
             // OPTIMIZATION: Single-Sited Query Plans

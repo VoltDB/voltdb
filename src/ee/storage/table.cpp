@@ -173,10 +173,6 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::string* column
 // ------------------------------------------------------------------
 // TUPLES
 // ------------------------------------------------------------------
-TableIterator Table::tableIterator() {
-    return TableIterator(this);
-}
-
 void Table::nextFreeTuple(TableTuple *tuple) {
     // First check whether we have any in our list
     // In the memcheck it uses the heap instead of a free list to help Valgrind.
@@ -284,7 +280,7 @@ std::string Table::debug() {
     buffer << "===========================================================\n";
     buffer << "\tDATA\n";
 
-    TableIterator iter(this);
+    TableIterator iter = iterator();
     TableTuple tuple(m_schema);
     if (this->activeTupleCount() == 0) {
         buffer << "\t<NONE>\n";
@@ -400,7 +396,7 @@ bool Table::serializeTo(SerializeOutput &serialize_io) {
     // active tuple counts
     serialize_io.writeInt(static_cast<int32_t>(m_tupleCount));
     int64_t written_count = 0;
-    TableIterator titer(this);
+    TableIterator titer = iterator();
     TableTuple tuple(m_schema);
     while (titer.next(tuple)) {
         tuple.serializeTo(serialize_io);
@@ -459,8 +455,8 @@ bool Table::equals(voltdb::Table *other) {
     const voltdb::TupleSchema *otherSchema = other->schema();
     if ((!m_schema->equals(otherSchema))) return false;
 
-    voltdb::TableIterator firstTI(this);
-    voltdb::TableIterator secondTI(other);
+    voltdb::TableIterator firstTI = iterator();
+    voltdb::TableIterator secondTI = iterator();
     voltdb::TableTuple firstTuple(m_schema);
     voltdb::TableTuple secondTuple(otherSchema);
     while(firstTI.next(firstTuple)) {

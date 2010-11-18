@@ -68,7 +68,7 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
                 return false;
             } else {
                 m_finishedTableScan = true;
-                m_iterator.reset(new TableIterator(m_backedUpTuples.get()));
+                m_iterator.reset(m_backedUpTuples.get()->makeIterator());
                 continue;
             }
         }

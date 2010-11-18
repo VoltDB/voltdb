@@ -135,7 +135,7 @@ bool UnionExecutor::p_execute(const NValueArray &params) {
     for (int ctr = 0, cnt = (int)node->getInputTables().size(); ctr < cnt; ctr++) {
         Table* input_table = node->getInputTables()[ctr];
         assert(input_table);
-        TableIterator iterator(input_table);
+        TableIterator iterator = input_table->iterator();
         TableTuple tuple(input_table->schema());
         while (iterator.next(tuple)) {
             if (!output_table->insertTuple(tuple)) {

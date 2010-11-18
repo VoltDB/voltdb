@@ -49,6 +49,10 @@ class StreamedTable : public Table {
     virtual ~StreamedTable();
 
     // virtual Table functions
+    // Return a table iterator BY VALUE
+    virtual TableIterator iterator();
+    virtual TableIterator* makeIterator();
+
     virtual void deleteAllTuples(bool freeAllocatedStrings);
     virtual bool insertTuple(TableTuple &source);
     virtual bool updateTuple(TableTuple &source, TableTuple &target, bool updatesIndexes);

@@ -75,6 +75,15 @@ class TempTable : public Table {
     TempTable operator=(TempTable const&);
 
   public:
+    // Return a table iterator BY VALUE
+    TableIterator iterator() {
+        return TableIterator(this);
+    }
+
+    TableIterator* makeIterator() {
+        return new TableIterator(this);
+    }
+
         virtual ~TempTable();
 
         // ------------------------------------------------------------------

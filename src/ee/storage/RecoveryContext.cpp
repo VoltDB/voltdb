@@ -25,10 +25,9 @@ using namespace std;
 namespace voltdb {
 RecoveryContext::RecoveryContext(PersistentTable *table, int32_t tableId) :
         m_table(table),
-        m_iterator(table),
+        m_iterator(table->iterator()),
         m_tableId(tableId),
         m_recoveryPhase(RECOVERY_MSG_TYPE_SCAN_TUPLES) {
-
 }
 
 /*

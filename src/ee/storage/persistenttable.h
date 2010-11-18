@@ -124,6 +124,15 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
         }
     }
 
+    // Return a table iterator BY VALUE
+    TableIterator iterator() {
+        return TableIterator(this);
+    }
+
+    TableIterator* makeIterator() {
+        return new TableIterator(this);
+    }
+
     // ------------------------------------------------------------------
     // OPERATIONS
     // ------------------------------------------------------------------

@@ -238,7 +238,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     TableTuple inner_tuple(node->getInputTables()[1]->schema());
     TableTuple &joined = output_table->tempTuple();
 
-    TableIterator iterator0(outer_table);
+    TableIterator iterator0 = outer_table->iterator();
     while (iterator0.next(outer_tuple)) {
 
         // populate output table's temp tuple with outer table's values
@@ -248,7 +248,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
             joined.setNValue(col_ctr, outer_tuple.getNValue(col_ctr));
         }
 
-        TableIterator iterator1(inner_table);
+        TableIterator iterator1 = inner_table->iterator();
         while (iterator1.next(inner_tuple)) {
             if (predicate == NULL || predicate->eval(&outer_tuple, &inner_tuple).isTrue()) {
                 // Matched! Complete the joined tuple with the inner column values.

@@ -163,7 +163,7 @@ OrderByExecutor::p_execute(const NValueArray &params)
 
     VOLT_TRACE("Running OrderBy '%s'", m_abstractNode->debug().c_str());
     VOLT_TRACE("Input Table:\n '%s'", input_table->debug().c_str());
-    TableIterator iterator(input_table);
+    TableIterator iterator = input_table->iterator();
     TableTuple tuple(input_table->schema());
     vector<TableTuple> xs;
     while (iterator.next(tuple))

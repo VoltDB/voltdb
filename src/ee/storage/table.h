@@ -154,8 +154,8 @@ public:
     // ------------------------------------------------------------------
     // ACCESS METHODS
     // ------------------------------------------------------------------
-    /** please use TableIterator(table), not this function as this function can't be inlined.*/
-    TableIterator tableIterator();
+    virtual TableIterator iterator() = 0;
+    virtual TableIterator *makeIterator() = 0;
 
     // ------------------------------------------------------------------
     // OPERATIONS

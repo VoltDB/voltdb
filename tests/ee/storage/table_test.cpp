@@ -136,7 +136,7 @@ TEST_F(TableTest, ValueTypes) {
     // Make sure that our table has the right types and that when
     // we pull out values from a tuple that it has the right type too
     //
-    TableIterator iterator = this->table->tableIterator();
+    TableIterator iterator = this->table->iterator();
     TableTuple tuple(table->schema());
     while (iterator.next(tuple)) {
         for (int ctr = 0; ctr < NUM_OF_COLUMNS; ctr++) {
@@ -151,7 +151,7 @@ TEST_F(TableTest, TupleInsert) {
     // All of the values have already been inserted, we just
     // need to make sure that the data makes sense
     //
-    TableIterator iterator = this->table->tableIterator();
+    TableIterator iterator = this->table->iterator();
     TableTuple tuple(table->schema());
     while (iterator.next(tuple)) {
         //printf("%s\n", tuple->debug(this->table).c_str());
@@ -174,7 +174,7 @@ TEST_F(TableTest, TupleInsert) {
     //
     // Then check to make sure that it has the same value and type
     //
-    iterator = this->table->tableIterator();
+    iterator = this->table->iterator();
     ASSERT_EQ(true, iterator.next(tuple));
     for (int col_ctr = 0, col_cnt = NUM_OF_COLUMNS; col_ctr < col_cnt; col_ctr++) {
         EXPECT_EQ(COLUMN_TYPES[col_ctr], tuple.getType(col_ctr));
@@ -201,7 +201,7 @@ TEST_F(TableTest, TupleUpdate) {
         totalsNotSlim[col_ctr] = 0;
     }
 
-    TableIterator iterator = this->table->tableIterator();
+    TableIterator iterator = this->table->iterator();
     TableTuple tuple(table->schema());
     while (iterator.next(tuple)) {
         bool update = (rand() % 2 == 0);
@@ -234,7 +234,7 @@ TEST_F(TableTest, TupleUpdate) {
     for (int col_ctr = 0; col_ctr < NUM_OF_COLUMNS; col_ctr++) {
         if (isNumeric(COLUMN_TYPES[col_ctr])) {
             int64_t new_total = 0;
-            iterator = this->table->tableIterator();
+            iterator = this->table->iterator();
             while (iterator.next(tuple)) {
                 new_total += ValuePeeker::peekAsBigInt(tuple.getNValue(col_ctr));
             }
@@ -251,7 +251,7 @@ TEST_F(TableTest, TupleDelete) {
     // We are just going to delete all of the odd tuples, then make
     // sure they don't exist anymore
     //
-    TableIterator iterator = this->table->tableIterator();
+    TableIterator iterator = this->table->iterator();
     TableTuple tuple(table.get());
     while (iterator.next(tuple)) {
         if (tuple.get(1).getBigInt() != 0) {
@@ -259,7 +259,7 @@ TEST_F(TableTest, TupleDelete) {
         }
     }
 
-    iterator = this->table->tableIterator();
+    iterator = this->table->iterator();
     while (iterator.next(tuple)) {
         EXPECT_EQ(false, tuple.get(1).getBigInt() != 0);
     }
@@ -270,7 +270,7 @@ TEST_F(TableTest, TupleDelete) {
     //
     // First clear out our table
     //
-    TableIterator iterator = this->table->tableIterator();
+    TableIterator iterator = this->table->iterator();
     TableTuple *tuple;
     while ((tuple = iterator.next()) != NULL) {
         EXPECT_EQ(true, persistent_table->deleteTuple(tuple));
@@ -311,7 +311,7 @@ TEST_F(TableTest, TupleDelete) {
     // Now make sure all of the values add up to our total
     //
     int64_t new_total = 0;
-    iterator = this->table->tableIterator();
+    iterator = this->table->iterator();
     while ((tuple = iterator.next()) != NULL) {
         EXPECT_EQ(true, tuple->isActive());
         new_total += tuple->get(0).getBigInt();
@@ -351,7 +351,7 @@ TEST_F(TableTest, TupleDelete) {
         undos.push_back(boost::shared_ptr<UndoLog>(new UndoLog(xact_id)));
     }
 
-    TableIterator iterator = this->table->tableIterator();
+    TableIterator iterator = this->table->iterator();
     while ((tuple = iterator.next()) != NULL) {
         //printf("BEFORE: %s\n", tuple->debug(this->table.get()).c_str());
         int xact_ctr = (rand() % xact_cnt);
@@ -398,7 +398,7 @@ TEST_F(TableTest, TupleDelete) {
         }
     }
 
-    //iterator = this->table->tableIterator();
+    //iterator = this->table->iterator();
     //while ((tuple = iterator.next()) != NULL) {
     //    printf("TUPLE: %s\n", tuple->debug(this->table.get()).c_str());
     //}
@@ -409,7 +409,7 @@ TEST_F(TableTest, TupleDelete) {
     for (int col_ctr = 0; col_ctr < NUM_OF_COLUMNS; col_ctr++) {
         if (valueutil::isNumeric(COLUMN_TYPES[col_ctr])) {
             int64_t new_total = 0;
-            iterator = this->table->tableIterator();
+            iterator = this->table->iterator();
             while ((tuple = iterator.next()) != NULL) {
                 //fprintf(stderr, "TUPLE: %s\n", tuple->debug(this->table).c_str());
                 new_total += tuple->get(col_ctr).castAsBigInt();
@@ -431,7 +431,7 @@ TEST_F(TableTest, TupleDelete) {
     //
     // Loop through the tuples and delete half of them in interleaving transactions
     //
-    TableIterator iterator = this->table->tableIterator();
+    TableIterator iterator = this->table->iterator();
     TableTuple *tuple;
     int64_t total = 0;
     while ((tuple = iterator.next()) != NULL) {
@@ -452,7 +452,7 @@ TEST_F(TableTest, TupleDelete) {
     // Now make sure all of the values add up to our total
     //
     int64_t new_total = 0;
-    iterator = this->table->tableIterator();
+    iterator = this->table->iterator();
     while ((tuple = iterator.next()) != NULL) {
         EXPECT_EQ(true, tuple->isActive());
         new_total += 1;//tuple->get(0).getBigInt();

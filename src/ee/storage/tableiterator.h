@@ -54,14 +54,20 @@
 
 namespace voltdb {
 
+class TempTable;
+class PersistentTable;
+
 /**
  * Iterator for table which neglects deleted tuples.
  * TableIterator is a small and copiable object.
  * You can copy it, not passing a pointer of it.
  */
 class TableIterator : public TupleIterator {
+
+    friend class TempTable;
+    friend class PersistentTable;
+
 public:
-    TableIterator( Table *parent);
 
     /**
      * Updates the given tuple so that it points to the next tuple in the table.
@@ -73,7 +79,7 @@ public:
     int getLocation() const;
 
 private:
-
+    TableIterator( Table *parent);
     bool continuationPredicate();
 
     /*
