@@ -139,6 +139,10 @@ class TempTable : public Table {
     // can not use this constructor to coerce a cast
     explicit TempTable();
 
+    int allocatedBlockCount() const {
+        return m_data.size();
+    }
+
     TBPtr allocateNextBlock();
     void nextFreeTuple(TableTuple *tuple);
 

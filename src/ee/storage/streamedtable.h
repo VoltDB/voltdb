@@ -75,6 +75,11 @@ class StreamedTable : public Table {
     voltdb::StreamedTableStats stats_;
     voltdb::TableStats *getTableStats();
 
+    // Used for table stats. Could give a real answer here with some work..
+    int allocatedBlockCount() const {
+        return 0;
+    }
+
     TBPtr allocateNextBlock();
     void nextFreeTuple(TableTuple *tuple);
 

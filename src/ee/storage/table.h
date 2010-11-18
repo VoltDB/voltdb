@@ -149,13 +149,15 @@ class Table {
     // ------------------------------------------------------------------
     // TUPLES AND MEMORY USAGE
     // ------------------------------------------------------------------
+    virtual int allocatedBlockCount() const = 0;
+
     TableTuple& tempTuple() {
         assert (m_tempTuple.m_data);
         return m_tempTuple;
     }
 
     int64_t allocatedTupleCount() const {
-        return m_data.size() * m_tuplesPerBlock;
+        return allocatedBlockCount() * m_tuplesPerBlock;
     }
 
     int64_t activeTupleCount() const {
@@ -163,7 +165,7 @@ class Table {
     }
 
     int64_t allocatedTupleMemory() const {
-        return m_data.size() * m_tableAllocationSize;
+        return allocatedBlockCount() * m_tableAllocationSize;
     }
 
     int64_t occupiedTupleMemory() const {

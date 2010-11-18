@@ -270,6 +270,10 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
 
 protected:
 
+    int allocatedBlockCount() const {
+        return m_data.size();
+    }
+
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
         m_blocksPendingSnapshot.erase(nextBlock);
         if (finishedBlock.get() != NULL && !finishedBlock->isEmpty()) {
