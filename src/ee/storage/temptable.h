@@ -210,8 +210,6 @@ inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
     block->reset();
     m_data.clear();
     m_data.insert( block->address(), block);
-    m_blocksWithSpace.clear();
-    m_blocksWithSpace.insert(block);
 }
 
 inline TBPtr TempTable::allocateNextBlock() {

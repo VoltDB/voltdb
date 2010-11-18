@@ -148,7 +148,6 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::string* column
 
     // set the data to be empty
     m_tupleCount = 0;
-    m_blocksWithSpace.clear();//Why clear it. Shouldn't it be empty? Won't this leak?
     m_data.clear();
 
     // note that any allocated memory in m_data is left alone

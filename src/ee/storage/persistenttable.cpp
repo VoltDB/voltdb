@@ -734,6 +734,10 @@ void PersistentTable::onSetColumns() {
     for (int i = m_columnCount - 1; i >= 0; --i) {
         m_allowNulls[i] = m_schema->columnAllowNull(i);
     }
+
+    // Also clear some used block state. this structure doesn't have
+    // an block ownership semantics - it's just a cache. I think.
+    m_blocksWithSpace.clear();
 }
 
 /*

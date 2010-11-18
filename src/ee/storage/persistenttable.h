@@ -375,6 +375,10 @@ protected:
 
     // Map containing blocks that are pending snapshot
     boost::unordered_set<TBPtr> m_blocksPendingSnapshot;
+
+    // Set of blocks with non-empty free lists or available tuples
+    // that have never been allocated
+    stx::btree_set<TBPtr > m_blocksWithSpace;
 };
 
 inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {

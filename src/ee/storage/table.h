@@ -332,7 +332,10 @@ protected:
     }
 
     void initializeWithColumns(TupleSchema *schema, const std::string* columnNames, bool ownsTupleSchema);
-    virtual void onSetColumns() {};
+
+    // per table-type initialization
+    virtual void onSetColumns() {
+    };
 
     double loadFactor() {
         return static_cast<double>(activeTupleCount()) /
@@ -385,10 +388,6 @@ protected:
 
     // pointers to chunks of data
     TBMap m_data;
-
-    // Set of blocks with non-empty free lists or available tuples
-    // that have never been allocated
-    stx::btree_set<TBPtr > m_blocksWithSpace;
 };
 
 }
