@@ -140,6 +140,7 @@ class TempTable : public Table {
     explicit TempTable();
 
     TBPtr allocateNextBlock();
+    void nextFreeTuple(TableTuple *tuple);
 
 };
 
@@ -214,9 +215,9 @@ inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
 }
 
 inline TBPtr TempTable::allocateNextBlock() {
-    TBPtr block(new TupleBlock(this, m_blocksNotPendingSnapshotLoad[0]));
+    TBPtr block(new TupleBlock(this, TBBucketPtr()));
     m_data.insert( block->address(), block);
-    m_blocksNotPendingSnapshot.insert(block);
+
     if (m_tempTableMemoryInBytes) {
         (*m_tempTableMemoryInBytes) += m_tableAllocationSize;
         if ((*m_tempTableMemoryInBytes) > MAX_TEMP_TABLE_MEMORY) {
@@ -225,9 +226,25 @@ inline TBPtr TempTable::allocateNextBlock() {
                                " executing SQL. Aborting.");
         }
     }
+
     return block;
 }
 
+inline void TempTable::nextFreeTuple(TableTuple *tuple) {
+    TBMapI it = m_data.begin();
+    for (; it != m_data.end(); it++) {
+        if (it.data()->hasFreeTuples()) {
+            std::pair<char*, int> pair = it.data()->nextFreeTuple();
+            tuple->move(pair.first);
+            return;
+        }
+    }
+
+    TBPtr block = allocateNextBlock();
+    std::pair<char*, int> pair = block->nextFreeTuple();
+    tuple->move(pair.first);
+    return;
+}
 
 
 }

@@ -78,6 +78,11 @@ TBPtr StreamedTable::allocateNextBlock() {
                                   "streamed tables.");
 }
 
+void StreamedTable::nextFreeTuple(TableTuple *) {
+    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                  "May not use nextFreeTuple with streamed tables.");
+}
+
 bool StreamedTable::insertTuple(TableTuple &source)
 {
     size_t mark = 0;

@@ -104,6 +104,7 @@ class PersistentTableUndoDeleteAction;
 
 class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     friend class CopyOnWriteContext;
+    friend class CopyOnWriteIterator;
     friend class TableFactory;
     friend class TableTuple;
     friend class TableIndex;
@@ -268,6 +269,23 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     }
 
 protected:
+
+    void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
+        m_blocksPendingSnapshot.erase(nextBlock);
+        if (finishedBlock.get() != NULL && !finishedBlock->isEmpty()) {
+            m_blocksNotPendingSnapshot.insert(finishedBlock);
+            int bucketIndex = finishedBlock->calculateBucketIndex();
+            if (bucketIndex != -1) {
+                finishedBlock->swapToBucket(m_blocksNotPendingSnapshotLoad[bucketIndex]);
+            }
+        }
+    }
+
+    void nextFreeTuple(TableTuple *tuple);
+    bool doCompactionWithinSubset(TBBucketMap *bucketMap);
+    void doIdleCompaction();
+    void doForcedCompaction();
+
     // ------------------------------------------------------------------
     // FROM PIMPL
     // ------------------------------------------------------------------
@@ -343,6 +361,20 @@ protected:
 
     //Recovery stuff
     boost::scoped_ptr<RecoveryContext> m_recoveryContext;
+
+
+
+    // STORAGE TRACKING
+
+    // Map from load to the blocks with level of load
+    TBBucketMap m_blocksNotPendingSnapshotLoad;
+    TBBucketMap m_blocksPendingSnapshotLoad;
+
+    // Map containing blocks that aren't pending snapshot
+    boost::unordered_set<TBPtr> m_blocksNotPendingSnapshot;
+
+    // Map containing blocks that are pending snapshot
+    boost::unordered_set<TBPtr> m_blocksPendingSnapshot;
 };
 
 inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {

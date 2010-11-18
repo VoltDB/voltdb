@@ -96,7 +96,6 @@ const size_t COLUMN_DESCRIPTOR_SIZE = 1 + 4 + 4; // type, name offset, name leng
 class Table {
     friend class TableFactory;
     friend class TableIterator;
-    friend class CopyOnWriteIterator;
     friend class CopyOnWriteContext;
     friend class ExecutionEngine;
     friend class TableStats;
@@ -318,29 +317,14 @@ public:
 protected:
     // virtual block management functions
     virtual TBPtr allocateNextBlock() = 0;
+    virtual void nextFreeTuple(TableTuple *tuple) = 0;
 
     Table(int tableAllocationTargetSize);
     void resetTable();
-    void nextFreeTuple(TableTuple *tuple);
-
-    bool doCompactionWithinSubset(TBBucketMap *bucketMap);
-    void doIdleCompaction();
-    void doForcedCompaction();
 
     bool compactionPredicate() {
         assert(m_tuplesPinnedByUndo == 0);
         return allocatedTupleCount() - activeTupleCount() > (m_tuplesPerBlock * 3) && loadFactor() < .95;
-    }
-
-    void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
-        m_blocksPendingSnapshot.erase(nextBlock);
-        if (finishedBlock.get() != NULL && !finishedBlock->isEmpty()) {
-            m_blocksNotPendingSnapshot.insert(finishedBlock);
-            int bucketIndex = finishedBlock->calculateBucketIndex();
-            if (bucketIndex != -1) {
-                finishedBlock->swapToBucket(m_blocksNotPendingSnapshotLoad[bucketIndex]);
-            }
-        }
     }
 
     virtual void notifyBlockWasCompactedAway(TBPtr block) {
@@ -405,16 +389,6 @@ protected:
     // Set of blocks with non-empty free lists or available tuples
     // that have never been allocated
     stx::btree_set<TBPtr > m_blocksWithSpace;
-
-    // Map from load to the blocks with level of load
-    TBBucketMap m_blocksNotPendingSnapshotLoad;
-    TBBucketMap m_blocksPendingSnapshotLoad;
-
-    // Map containing blocks that aren't pending snapshot
-    boost::unordered_set<TBPtr> m_blocksNotPendingSnapshot;
-
-    // Map containing blocks that are pending snapshot
-    boost::unordered_set<TBPtr> m_blocksPendingSnapshot;
 };
 
 }

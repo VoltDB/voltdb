@@ -16,17 +16,18 @@
  */
 #include "storage/CopyOnWriteIterator.h"
 #include "common/tabletuple.h"
-#include "storage/table.h"
+#include "storage/persistenttable.h"
 
 namespace voltdb {
 CopyOnWriteIterator::CopyOnWriteIterator(
-        Table *table,
+        PersistentTable *table,
         TBMapI start,
         TBMapI end) :
         m_table(table), m_blockIterator(start), m_end(end),
         m_tupleLength(table->m_tupleLength),
         m_location(NULL),
-        m_blockOffset(0), m_currentBlock(NULL) {
+        m_blockOffset(0),
+        m_currentBlock(NULL) {
 }
 
 /**
