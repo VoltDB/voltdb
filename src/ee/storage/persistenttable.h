@@ -130,7 +130,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
 
     // Return a table iterator by reference
     TableIterator& iterator() {
-        m_iter
+        m_iter.reset();
         return m_iter;
     }
 
