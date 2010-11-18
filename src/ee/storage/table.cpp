@@ -76,8 +76,7 @@ Table::Table(int tableAllocationTargetSize) :
     m_name(""),
     m_ownsTupleSchema(true),
     m_tableAllocationTargetSize(tableAllocationTargetSize),
-    m_refcount(0),
-    m_tempTableMemoryInBytes(NULL)
+    m_refcount(0)
 {
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));

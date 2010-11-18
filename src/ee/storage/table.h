@@ -399,11 +399,6 @@ protected:
      *   Temp table  data structures
      */
 
-    // ptr to global integer tracking temp table memory allocated per frag
-    // should be null for persistent tables
-    int* m_tempTableMemoryInBytes;
-
-
   protected:
     /*
      *   Persistent table data structures

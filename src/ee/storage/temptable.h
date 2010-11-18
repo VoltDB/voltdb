@@ -129,6 +129,10 @@ class TempTable : public Table {
         void getNextFreeTupleInlined(TableTuple *tuple);
         voltdb::TableStats* getTableStats();
 
+        // ptr to global integer tracking temp table memory allocated per frag
+        // should be null for persistent tables
+        int* m_tempTableMemoryInBytes;
+
     protected:
         // can not use this constructor to coerce a cast
         explicit TempTable();
