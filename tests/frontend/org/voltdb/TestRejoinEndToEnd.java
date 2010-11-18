@@ -133,6 +133,8 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         context.localServer.join();
 
         client.close();
+
+        Thread.sleep(250);
         // this means there is nothing else to try
         return failType != DONT_FAIL;
     }
@@ -170,12 +172,21 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         localServer.join();
     }
 
-    public void testWithFakeSecondHostMessenger() throws Exception {
-        // failNext(i) runs the test
-        for (int i = 0; failNext(i); i++) {
-            // makes this less likely to fail for dumbness
-            Thread.sleep(100);
-        }
+
+    public void testWithFakeSecondHostMessengerNoSocket() throws Exception {
+        failNext(FAIL_NO_OPEN_SOCKET);
+    }
+
+    public void testWithFakeSecondHostMessengerTimeout() throws Exception {
+        failNext(FAIL_TIMEOUT_ON_SOCKET);
+    }
+
+    public void testWithFakeSecondHostMessengerSkew() throws Exception {
+        failNext(FAIL_SKEW);
+    }
+
+    public void testWithFakeSecondHostMessengerSuccess() throws Exception {
+        failNext(FAIL_NO_OPEN_SOCKET);
     }
 
     public void testLocalClusterRecoveringMode() throws Exception {
