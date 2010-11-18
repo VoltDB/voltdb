@@ -85,9 +85,6 @@ class PersistentTableUndoDeleteAction;
 
 const size_t COLUMN_DESCRIPTOR_SIZE = 1 + 4 + 4; // type, name offset, name length
 
-// use no more than MAX_TEMP_TABLE_MEMORY per fragment
-const int MAX_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
-
 /**
  * Represents a table which might or might not be a temporary table.
  * All tables, TempTable, PersistentTable and StreamedTable are derived

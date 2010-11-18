@@ -72,7 +72,7 @@ void StreamedTable::deleteAllTuples(bool freeAllocatedStrings)
                                   " table.");
 }
 
-TBPtr allocteNextBlock() {
+TBPtr StreamedTable::allocateNextBlock() {
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                   "May not use block alloc interface with "
                                   "streamed tables.");

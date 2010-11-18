@@ -57,6 +57,10 @@ class TableColumn;
 class TableFactory;
 class TableStats;
 
+// use no more than MAX_TEMP_TABLE_MEMORY per fragment
+const int MAX_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
+
+
 /**
  * Represents a Temporary Table to store temporary result (final
  * result or intermediate result).  Temporary Table has no indexes,
