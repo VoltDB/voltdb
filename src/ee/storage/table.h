@@ -396,12 +396,7 @@ protected:
 
   protected:
     /*
-     *   Temp table  data structures
-     */
-
-  protected:
-    /*
-     *   Persistent table data structures
+     *   Persistent table specific data structures
      */
 
     // pointers to chunks of data

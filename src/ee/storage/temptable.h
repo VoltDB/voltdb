@@ -92,50 +92,52 @@ class TempTable : public Table {
         return new TableIterator(this);
     }
 
-        virtual ~TempTable();
+    virtual ~TempTable();
 
-        // ------------------------------------------------------------------
-        // OPERATIONS
-        // ------------------------------------------------------------------
-        void deleteAllTuples(bool freeAllocatedStrings);
-        bool insertTuple(TableTuple &source);
-        bool updateTuple(TableTuple &source, TableTuple &target, bool updatesIndexes);
-        bool deleteTuple(TableTuple &tuple, bool); // deleting tuple from temp table is not supported. use deleteAllTuples instead
-        void deleteAllTuplesNonVirtual(bool freeAllocatedStrings);
+    // ------------------------------------------------------------------
+    // OPERATIONS
+    // ------------------------------------------------------------------
+    void deleteAllTuples(bool freeAllocatedStrings);
+    bool insertTuple(TableTuple &source);
+    bool updateTuple(TableTuple &source, TableTuple &target, bool updatesIndexes);
 
-        /**
-         * Uses the pool to do a deep copy of the tuple including allocations
-         * for all uninlined columns. Used by CopyOnWriteContext to back up tuples
-         * before they are dirtied
-         */
-        void insertTupleNonVirtualWithDeepCopy(TableTuple &source, Pool *pool);
+    // deleting tuple from temp table is not supported. use deleteAllTuples instead
+    bool deleteTuple(TableTuple &tuple, bool);
+    void deleteAllTuplesNonVirtual(bool freeAllocatedStrings);
 
-        /**
-         * Does a shallow copy that copies the pointer to uninlined columns.
-         */
-        void insertTupleNonVirtual(TableTuple &source);
-        void updateTupleNonVirtual(TableTuple &source, TableTuple &target);
+    /**
+     * Uses the pool to do a deep copy of the tuple including allocations
+     * for all uninlined columns. Used by CopyOnWriteContext to back up tuples
+     * before they are dirtied
+     */
+    void insertTupleNonVirtualWithDeepCopy(TableTuple &source, Pool *pool);
 
-        // ------------------------------------------------------------------
-        // INDEXES
-        // ------------------------------------------------------------------
-        int getNumOfIndexes() const             { return (0); }
-        int getNumOfUniqueIndexes() const       { return (0); }
+    /**
+     * Does a shallow copy that copies the pointer to uninlined columns.
+     */
+    void insertTupleNonVirtual(TableTuple &source);
+    void updateTupleNonVirtual(TableTuple &source, TableTuple &target);
 
-        // ------------------------------------------------------------------
-        // UTILITIY
-        // ------------------------------------------------------------------
-        std::string tableType() const;
-        void getNextFreeTupleInlined(TableTuple *tuple);
-        voltdb::TableStats* getTableStats();
+    // ------------------------------------------------------------------
+    // INDEXES
+    // ------------------------------------------------------------------
+    int getNumOfIndexes() const             { return (0); }
+    int getNumOfUniqueIndexes() const       { return (0); }
 
-        // ptr to global integer tracking temp table memory allocated per frag
-        // should be null for persistent tables
-        int* m_tempTableMemoryInBytes;
+    // ------------------------------------------------------------------
+    // UTILITIY
+    // ------------------------------------------------------------------
+    std::string tableType() const;
+    void getNextFreeTupleInlined(TableTuple *tuple);
+    voltdb::TableStats* getTableStats();
 
-    protected:
-        // can not use this constructor to coerce a cast
-        explicit TempTable();
+    // ptr to global integer tracking temp table memory allocated per frag
+    // should be null for persistent tables
+    int* m_tempTableMemoryInBytes;
+
+  protected:
+    // can not use this constructor to coerce a cast
+    explicit TempTable();
 
     TBPtr allocateNextBlock();
 
