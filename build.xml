@@ -90,7 +90,7 @@
 
 <!-- Overridden in the Hudson test script. -->
 <property name='junit.haltonfailure'    value='false' />
-<property name="j2se_api" value="http://java.sun.com/javase/6/docs/api/"/>
+<property name="j2se_api" value="http://download.oracle.com/javase/6/docs/api/"/>
 
 <path id='project.classpath'>
     <pathelement location='${build.instr.dir}' />
