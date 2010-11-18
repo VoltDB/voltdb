@@ -82,7 +82,7 @@ TableTuple keyTuple;
 #define TABLE_BLOCKSIZE 2097152
 
 PersistentTable::PersistentTable(ExecutorContext *ctx, bool exportEnabled) :
-    Table(TABLE_BLOCKSIZE), 
+    Table(TABLE_BLOCKSIZE),
     m_iter(this, m_data.begin()),
     m_executorContext(ctx),
     m_uniqueIndexes(NULL), m_uniqueIndexCount(0), m_allowNulls(NULL),

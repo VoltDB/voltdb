@@ -52,8 +52,11 @@ TupleBlock::TupleBlock(Table *table, TBBucketPtr bucket) :
 }
 
 TupleBlock::~TupleBlock() {
-    tupleBlocksAllocated--;
-    //std::cout << "Destructing tuple block " << static_cast<void*>(this) << " with " << tupleBlocksAllocated << " left " << std::endl;
+    /*
+      tupleBlocksAllocated--;
+      std::cout << "Destructing tuple block " << static_cast<void*>(this)
+                << " with " << tupleBlocksAllocated << " left " << std::endl;
+    */
 #ifdef MEMCHECK
     delete []m_storage;
 #else
@@ -70,8 +73,13 @@ TupleBlock::~TupleBlock() {
 
 std::pair<int, int> TupleBlock::merge(Table *table, TBPtr source) {
     assert(source != this);
-    //std::cout << "Attempting to merge " << static_cast<void*> (this) << "(" << m_activeTuples << ") with " << static_cast<void*>(source.get()) << "(" << source->m_activeTuples << ")";
-    //std::cout << " source last compaction offset is " << source->lastCompactionOffset() << " and active tuple count is " << source->m_activeTuples << std::endl;
+    /*
+      std::cout << "Attempting to merge " << static_cast<void*> (this)
+                << "(" << m_activeTuples << ") with " << static_cast<void*>(source.get())
+                << "(" << source->m_activeTuples << ")";
+      std::cout << " source last compaction offset is " << source->lastCompactionOffset()
+                << " and active tuple count is " << source->m_activeTuples << std::endl;
+    */
 
     uint32_t m_nextTupleInSourceOffset = source->lastCompactionOffset();
     int sourceTuplesPendingDeleteOnUndoRelease = 0;

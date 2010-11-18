@@ -316,7 +316,6 @@ public:
 
 protected:
     // virtual block management functions
-    virtual TBPtr allocateNextBlock() = 0;
     virtual void nextFreeTuple(TableTuple *tuple) = 0;
 
     Table(int tableAllocationTargetSize);
@@ -325,10 +324,6 @@ protected:
     bool compactionPredicate() {
         assert(m_tuplesPinnedByUndo == 0);
         return allocatedTupleCount() - activeTupleCount() > (m_tuplesPerBlock * 3) && loadFactor() < .95;
-    }
-
-    virtual void notifyBlockWasCompactedAway(TBPtr block) {
-        throwFatalException("Operation not supported");
     }
 
     void initializeWithColumns(TupleSchema *schema, const std::string* columnNames, bool ownsTupleSchema);

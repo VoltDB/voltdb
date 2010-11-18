@@ -153,15 +153,14 @@ class TempTable : public Table {
 
   private:
     // pointers to chunks of data. Specific to table impl. Don't leak this type.
-    TBMap m_data;
+    std::vector<TBPtr> m_data;
 };
 
 inline void TempTable::insertTupleNonVirtualWithDeepCopy(TableTuple &source, Pool *pool) {
-    //
-    // First get the next free tuple
-    // This will either give us one from the free slot list, or
-    // grab a tuple at the end of our chunk of memory
-    //
+
+    // First get the next free tuple by
+    // grabbing a tuple at the end of our chunk of memory
+
      nextFreeTuple(&m_tmpTarget1);
     ++m_tupleCount;
     //
@@ -215,18 +214,17 @@ inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
     }
 
     m_tupleCount = 0;
-    if (m_tempTableMemoryInBytes)
-        (*m_tempTableMemoryInBytes) = m_tableAllocationSize;
-    TBMapI iter = m_data.begin();
-    TBPtr block = iter->second;
-    block->reset();
-    m_data.clear();
-    m_data.insert( block->address(), block);
+    while (m_data.size() > 0) {
+        m_data.pop_back();
+        if (m_tempTableMemoryInBytes) {
+            (*m_tempTableMemoryInBytes) -= m_tableAllocationSize;
+        }
+    }
 }
 
 inline TBPtr TempTable::allocateNextBlock() {
     TBPtr block(new TupleBlock(this, TBBucketPtr()));
-    m_data.insert( block->address(), block);
+    m_data.push_back(block);
 
     if (m_tempTableMemoryInBytes) {
         (*m_tempTableMemoryInBytes) += m_tableAllocationSize;
@@ -236,21 +234,20 @@ inline TBPtr TempTable::allocateNextBlock() {
                                " executing SQL. Aborting.");
         }
     }
-
     return block;
 }
 
 inline void TempTable::nextFreeTuple(TableTuple *tuple) {
-    TBMapI it = m_data.begin();
-    for (; it != m_data.end(); it++) {
-        if (it.data()->hasFreeTuples()) {
-            std::pair<char*, int> pair = it.data()->nextFreeTuple();
-            tuple->move(pair.first);
-            return;
-        }
+
+    if (m_data.empty()) {
+        allocateNextBlock();
     }
 
-    TBPtr block = allocateNextBlock();
+    TBPtr block = m_data.back();
+    if (!block->hasFreeTuples()) {
+        block = allocateNextBlock();
+    }
+
     std::pair<char*, int> pair = block->nextFreeTuple();
     tuple->move(pair.first);
     return;
