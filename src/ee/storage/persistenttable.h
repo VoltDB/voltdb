@@ -111,6 +111,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     friend class TableIterator;
     friend class PersistentTableStats;
     friend class PersistentTableUndoDeleteAction;
+    friend class ::CopyOnWriteTest_CopyOnWriteIterator;
     friend class ::CompactionTest_BasicCompaction;
 
   private:
@@ -133,12 +134,12 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
 
     // Return a table iterator by reference
     TableIterator& iterator() {
-        m_iter.reset();
+        m_iter.reset(m_data.begin());
         return m_iter;
     }
 
     TableIterator* makeIterator() {
-        return new TableIterator(this);
+        return new TableIterator(this, m_data.begin());
     }
 
     // ------------------------------------------------------------------
@@ -270,7 +271,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
 
 protected:
 
-    int allocatedBlockCount() const {
+    size_t allocatedBlockCount() const {
         return m_data.size();
     }
 
@@ -383,6 +384,11 @@ protected:
     // Set of blocks with non-empty free lists or available tuples
     // that have never been allocated
     stx::btree_set<TBPtr > m_blocksWithSpace;
+
+  private:
+    // pointers to chunks of data. Specific to table impl. Don't leak this type.
+    TBMap m_data;
+
 };
 
 inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {

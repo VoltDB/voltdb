@@ -101,8 +101,6 @@ class Table {
     friend class TableStats;
     friend class StatsSource;
     friend class TupleBlock;
-    friend class ::CopyOnWriteTest_CopyOnWriteIterator;
-    friend class ::CompactionTest_BasicCompaction;
     friend class PersistentTableUndoDeleteAction;
 
   private:
@@ -149,7 +147,7 @@ class Table {
     // ------------------------------------------------------------------
     // TUPLES AND MEMORY USAGE
     // ------------------------------------------------------------------
-    virtual int allocatedBlockCount() const = 0;
+    virtual size_t allocatedBlockCount() const = 0;
 
     TableTuple& tempTuple() {
         assert (m_tempTuple.m_data);
@@ -381,15 +379,6 @@ protected:
 
   private:
     int32_t m_refcount;
-
-
-  protected:
-    /*
-     *   Persistent table specific data structures
-     */
-
-    // pointers to chunks of data
-    TBMap m_data;
 };
 
 }

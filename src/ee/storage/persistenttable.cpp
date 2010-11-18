@@ -82,7 +82,9 @@ TableTuple keyTuple;
 #define TABLE_BLOCKSIZE 2097152
 
 PersistentTable::PersistentTable(ExecutorContext *ctx, bool exportEnabled) :
-    Table(TABLE_BLOCKSIZE), m_iter(this), m_executorContext(ctx),
+    Table(TABLE_BLOCKSIZE), 
+    m_iter(this, m_data.begin()),
+    m_executorContext(ctx),
     m_uniqueIndexes(NULL), m_uniqueIndexCount(0), m_allowNulls(NULL),
     m_indexes(NULL), m_indexCount(0), m_pkeyIndex(NULL), m_wrapper(NULL),
     m_tsSeqNo(0), stats_(this), m_exportEnabled(exportEnabled),
@@ -109,7 +111,7 @@ PersistentTable::~PersistentTable() {
     }
 
     // delete all tuples to free strings
-    TableIterator ti(this);
+    TableIterator ti(this, m_data.begin());
     TableTuple tuple(m_schema);
 
     while (ti.next(tuple)) {
@@ -211,7 +213,7 @@ void PersistentTable::nextFreeTuple(TableTuple *tuple) {
 
 void PersistentTable::deleteAllTuples(bool freeAllocatedStrings) {
     // nothing interesting
-    TableIterator ti(this);
+    TableIterator ti(this, m_data.begin());
     TableTuple tuple(m_schema);
     while (ti.next(tuple)) {
         deleteTuple(tuple, true);
@@ -568,7 +570,7 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple) {
          * Do a table scan.
          */
         TableTuple tableTuple(m_schema);
-        TableIterator ti(this);
+        TableIterator ti(this, m_data.begin());
         while (ti.hasNext()) {
             ti.next(tableTuple);
             if (tableTuple.equalsNoSchemaCheck(tuple)) {
@@ -738,6 +740,10 @@ void PersistentTable::onSetColumns() {
     // Also clear some used block state. this structure doesn't have
     // an block ownership semantics - it's just a cache. I think.
     m_blocksWithSpace.clear();
+
+    // note that any allocated memory in m_data is left alone
+    // as is m_allocatedTuples
+    m_data.clear();
 }
 
 /*
@@ -923,7 +929,7 @@ size_t PersistentTable::hashCode() {
     TableIndexScheme sourceScheme = m_pkeyIndex->getScheme();
     sourceScheme.setTree();
     boost::scoped_ptr<TableIndex> pkeyIndex(TableIndexFactory::getInstance(sourceScheme));
-    TableIterator iter(this);
+    TableIterator iter(this, m_data.begin());
     TableTuple tuple(schema());
     while (iter.next(tuple)) {
         pkeyIndex->addEntry(&tuple);

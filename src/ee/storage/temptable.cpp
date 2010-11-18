@@ -56,7 +56,7 @@ namespace voltdb {
 
 TempTable::TempTable()
   : Table(TABLE_BLOCKSIZE),
-    m_iter(this),
+    m_iter(this, m_data.begin()),
     m_tempTableMemoryInBytes(NULL)
 {
 }

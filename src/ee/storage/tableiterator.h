@@ -79,8 +79,9 @@ public:
     int getLocation() const;
 
 private:
-    TableIterator( Table *parent);
-    void reset();
+    // Get an iterator via table->iterator()
+    TableIterator(Table *, TBMapI);
+    void reset(TBMapI);
     bool continuationPredicate();
 
     /*
@@ -106,18 +107,21 @@ private:
     TBPtr m_currentBlock;
 };
 
-inline TableIterator::TableIterator(Table *parent)
+inline TableIterator::TableIterator(Table *parent, TBMapI start)
     :
-      m_table(parent), m_blockIterator(parent->m_data.begin()),
-      m_dataPtr(NULL), m_location(0), m_blockOffset(0),
-    m_activeTuples((int) m_table->m_tupleCount),
-    m_foundTuples(0), m_tupleLength(parent->m_tupleLength),
-    m_tuplesPerBlock(parent->m_tuplesPerBlock), m_currentBlock(NULL)
+      m_table(parent),
+      m_blockIterator(start),
+      m_dataPtr(NULL),
+      m_location(0),
+      m_blockOffset(0),
+      m_activeTuples((int) m_table->m_tupleCount),
+      m_foundTuples(0), m_tupleLength(parent->m_tupleLength),
+      m_tuplesPerBlock(parent->m_tuplesPerBlock), m_currentBlock(NULL)
     {
     }
 
-inline void TableIterator::reset() {
-    m_blockIterator = m_table->m_data.begin();
+inline void TableIterator::reset(TBMapI start) {
+    m_blockIterator = start;
     m_dataPtr= NULL;
     m_location = 0;
     m_blockOffset = 0;
@@ -135,11 +139,11 @@ inline bool TableIterator::hasNext() {
 inline bool TableIterator::next(TableTuple &out) {
     while (m_foundTuples < m_activeTuples) {
         if (m_currentBlock == NULL ||
-                m_blockOffset >= m_currentBlock->unusedTupleBoundry()) {
-            assert(m_blockIterator != m_table->m_data.end());
-            if (m_blockIterator == m_table->m_data.end()) {
-                throwFatalException("Could not find the expected number of tuples during a table scan");
-            }
+            m_blockOffset >= m_currentBlock->unusedTupleBoundry()) {
+//            assert(m_blockIterator != m_table->m_data.end());
+//            if (m_blockIterator == m_table->m_data.end()) {
+//                throwFatalException("Could not find the expected number of tuples during a table scan");
+//            }
             m_dataPtr = m_blockIterator.key();
             m_currentBlock = m_blockIterator.data();
             m_blockOffset = 0;

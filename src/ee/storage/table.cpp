@@ -148,10 +148,6 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::string* column
 
     // set the data to be empty
     m_tupleCount = 0;
-    m_data.clear();
-
-    // note that any allocated memory in m_data is left alone
-    // as is m_allocatedTuples
 
     m_tmpTarget1 = TableTuple(m_schema);
     m_tmpTarget2 = TableTuple(m_schema);

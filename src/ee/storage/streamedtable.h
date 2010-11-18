@@ -76,7 +76,7 @@ class StreamedTable : public Table {
     voltdb::TableStats *getTableStats();
 
     // Used for table stats. Could give a real answer here with some work..
-    int allocatedBlockCount() const {
+    size_t allocatedBlockCount() const {
         return 0;
     }
 

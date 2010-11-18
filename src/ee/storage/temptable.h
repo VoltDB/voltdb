@@ -72,6 +72,7 @@ const int MAX_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
  */
 class TempTable : public Table {
     friend class TableFactory;
+    friend class TableIterator;
 
   private:
     // no copies, no assignment
@@ -84,12 +85,12 @@ class TempTable : public Table {
   public:
     // Return the table iterator by reference
     TableIterator& iterator() {
-        m_iter.reset();
+        m_iter.reset(m_data.begin());
         return m_iter;
     }
 
     TableIterator* makeIterator() {
-        return new TableIterator(this);
+        return new TableIterator(this, m_data.begin());
     }
 
     virtual ~TempTable();
@@ -139,13 +140,20 @@ class TempTable : public Table {
     // can not use this constructor to coerce a cast
     explicit TempTable();
 
-    int allocatedBlockCount() const {
+    size_t allocatedBlockCount() const {
         return m_data.size();
     }
 
     TBPtr allocateNextBlock();
     void nextFreeTuple(TableTuple *tuple);
 
+    virtual void onSetColumns() {
+        m_data.clear();
+    };
+
+  private:
+    // pointers to chunks of data. Specific to table impl. Don't leak this type.
+    TBMap m_data;
 };
 
 inline void TempTable::insertTupleNonVirtualWithDeepCopy(TableTuple &source, Pool *pool) {
@@ -199,7 +207,7 @@ inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
     // Don't call deleteTuple() here.
     const uint16_t uninlinedStringColumnCount = m_schema->getUninlinedObjectColumnCount();
     if (freeAllocatedStrings && uninlinedStringColumnCount > 0) {
-        TableIterator iter(this);
+        TableIterator iter(this, m_data.begin());
         while (iter.hasNext()) {
             iter.next(m_tmpTarget1);
             m_tmpTarget1.freeObjectColumns();
