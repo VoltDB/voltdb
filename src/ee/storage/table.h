@@ -295,28 +295,6 @@ protected:
      */
     virtual void processLoadedTuple(bool allowExport, TableTuple &tuple) {};
 
-    TBPtr findBlock(char *tuple) {
-        TBMapI i =
-                        m_data.lower_bound(tuple);
-        if (i == m_data.end() && m_data.empty()) {
-            throwFatalException("Tried to find a tuple block for a tuple but couldn't find one");
-        }
-        if (i == m_data.end()) {
-            i--;
-            if (i.key() + m_tableAllocationSize < tuple) {
-                throwFatalException("Tried to find a tuple block for a tuple but couldn't find one");
-            }
-        } else {
-            if (i.key() != tuple) {
-                i--;
-                if (i.key() + m_tableAllocationSize < tuple) {
-                    throwFatalException("Tried to find a tuple block for a tuple but couldn't find one");
-                }
-            }
-        }
-        return i.data();
-    }
-
     virtual void swapTuples(TableTuple sourceTuple, TableTuple destinationTuple) {
         throwFatalException("Unsupported operation");
     }
@@ -355,12 +333,6 @@ protected:
     virtual void notifyBlockWasCompactedAway(TBPtr block) {
         throwFatalException("Operation not supported");
     }
-
-    /**
-     * Normally this will return the tuple storage to the free list.
-     * In the memcheck build it will return the storage to the heap.
-     */
-    void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL));
 
     void initializeWithColumns(TupleSchema *schema, const std::string* columnNames, bool ownsTupleSchema);
     virtual void onSetColumns() {};
@@ -452,49 +424,9 @@ inline TBPtr Table::allocateNextBlock() {
     return block;
 }
 
-inline void Table::deleteTupleStorage(TableTuple &tuple, TBPtr block) {
-    tuple.setActiveFalse(); // does NOT free strings
-
-    // add to the free list
-    m_tupleCount--;
-    //m_tuplesPendingDelete--;
-
-    if (block.get() == NULL) {
-       block = findBlock(tuple.address());
-    }
-
-    bool transitioningToBlockWithSpace = !block->hasFreeTuples();
-
-    int retval = block->freeTuple(tuple.address());
-    if (retval != -1) {
-        //Check if if the block is currently pending snapshot
-        if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
-            //std::cout << "Swapping block to nonsnapshot bucket " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;
-            block->swapToBucket(m_blocksNotPendingSnapshotLoad[retval]);
-        //Check if the block goes into the pending snapshot set of buckets
-        } else if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
-            //std::cout << "Swapping block to snapshot bucket " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;
-            block->swapToBucket(m_blocksPendingSnapshotLoad[retval]);
-        } else {
-            //In this case the block is actively being snapshotted and isn't eligible for merge operations at all
-            //do nothing, once the block is finished by the iterator, the iterator will return it
-        }
-    }
-
-    if (block->isEmpty()) {
-        m_data.erase(block->address());
-        m_blocksWithSpace.erase(block);
-        m_blocksNotPendingSnapshot.erase(block);
-        assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
-        //Eliminates circular reference
-        block->swapToBucket(TBBucketPtr());
-    } else if (transitioningToBlockWithSpace) {
-        m_blocksWithSpace.insert(block);
-    }
+inline voltdb::CatalogId Table::databaseId() const {
+    return m_databaseId;
 }
-
-
-inline voltdb::CatalogId Table::databaseId() const { return m_databaseId; }
 
 }
 #endif

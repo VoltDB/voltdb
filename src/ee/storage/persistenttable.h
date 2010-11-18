@@ -101,7 +101,9 @@ class PersistentTableUndoDeleteAction;
  * value in data and adds an entry to UndoLog. We chose eager update
  * policy because we expect reverting rarely occurs.
  */
+
 class PersistentTable : public Table, public UndoQuantumReleaseInterest {
+    friend class CopyOnWriteContext;
     friend class TableFactory;
     friend class TableTuple;
     friend class TableIndex;
@@ -196,7 +198,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     virtual std::string debug();
 
     int partitionColumn() { return m_partitionColumn; }
-
     /** inlined here because it can't be inlined in base Table, as it
      *  uses Tuple.copy.
      */
@@ -288,6 +289,15 @@ protected:
     void notifyBlockWasCompactedAway(TBPtr block);
     void swapTuples(TableTuple sourceTuple, TableTuple destinationTuple);
 
+    /**
+     * Normally this will return the tuple storage to the free list.
+     * In the memcheck build it will return the storage to the heap.
+     */
+    void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL));
+
+    // helper for deleteTupleStorage
+    TBPtr findBlock(char *tuple);
+
     /*
      * Implemented by persistent table and called by Table::loadTuplesFrom
      * to do additional processing for views and Export
@@ -338,6 +348,74 @@ inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {
     m_tempTuple.copy(source);
     return m_tempTuple;
 }
+
+
+inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block) {
+    tuple.setActiveFalse(); // does NOT free strings
+
+    // add to the free list
+    m_tupleCount--;
+    //m_tuplesPendingDelete--;
+
+    if (block.get() == NULL) {
+       block = findBlock(tuple.address());
+    }
+
+    bool transitioningToBlockWithSpace = !block->hasFreeTuples();
+
+    int retval = block->freeTuple(tuple.address());
+    if (retval != -1) {
+        //Check if if the block is currently pending snapshot
+        if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
+            //std::cout << "Swapping block " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;
+            block->swapToBucket(m_blocksNotPendingSnapshotLoad[retval]);
+        //Check if the block goes into the pending snapshot set of buckets
+        } else if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
+            block->swapToBucket(m_blocksPendingSnapshotLoad[retval]);
+        } else {
+            //In this case the block is actively being snapshotted and isn't eligible for merge operations at all
+            //do nothing, once the block is finished by the iterator, the iterator will return it
+        }
+    }
+
+    if (block->isEmpty()) {
+        m_data.erase(block->address());
+        m_blocksWithSpace.erase(block);
+        m_blocksNotPendingSnapshot.erase(block);
+        assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
+        //Eliminates circular reference
+        block->swapToBucket(TBBucketPtr());
+    } else if (transitioningToBlockWithSpace) {
+        m_blocksWithSpace.insert(block);
+    }
 }
+
+inline TBPtr PersistentTable::findBlock(char *tuple) {
+    TBMapI i = m_data.lower_bound(tuple);
+    if (i == m_data.end() && m_data.empty()) {
+        throwFatalException("Tried to find a tuple block for a tuple but couldn't find one");
+    }
+    if (i == m_data.end()) {
+        i--;
+        if (i.key() + m_tableAllocationSize < tuple) {
+            throwFatalException("Tried to find a tuple block for a tuple but couldn't find one");
+        }
+    } else {
+        if (i.key() != tuple) {
+            i--;
+            if (i.key() + m_tableAllocationSize < tuple) {
+                throwFatalException("Tried to find a tuple block for a tuple but couldn't find one");
+            }
+        }
+    }
+    return i.data();
+}
+
+
+
+
+}
+
+
 
 #endif

@@ -26,7 +26,7 @@
 
 namespace voltdb {
 
-CopyOnWriteContext::CopyOnWriteContext(Table *table, TupleSerializer *serializer, int32_t partitionId) :
+CopyOnWriteContext::CopyOnWriteContext(PersistentTable *table, TupleSerializer *serializer, int32_t partitionId) :
              m_table(table),
              m_backedUpTuples(TableFactory::getCopiedTempTable(table->databaseId(), "COW of " + table->name(), table, NULL)),
              m_serializer(serializer), m_pool(2097152, 320), m_blocks(m_table->m_data),
