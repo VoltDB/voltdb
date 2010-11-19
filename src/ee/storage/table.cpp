@@ -68,6 +68,7 @@ Table::Table(int tableAllocationTargetSize) :
     m_columnHeaderData(NULL),
     m_columnHeaderSize(-1),
     m_tupleCount(0),
+    m_usedTupleCount(0),
     m_tuplesPinnedByUndo(0),
     m_columnCount(0),
     m_tuplesPerBlock(0),
@@ -410,6 +411,7 @@ void Table::loadTuplesFromNoHeader(bool allowExport,
     }
 
     m_tupleCount += tupleCount;
+    m_usedTupleCount += tupleCount;
 }
 
 void Table::loadTuplesFrom(bool allowExport,

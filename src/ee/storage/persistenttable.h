@@ -113,7 +113,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     friend class PersistentTableUndoDeleteAction;
     friend class ::CopyOnWriteTest_CopyOnWriteIterator;
     friend class ::CompactionTest_BasicCompaction;
-
+    friend class ::CompactionTest_CompactionWithCopyOnWrite;
   private:
     // no default ctor, no copy, no assignment
     PersistentTable();

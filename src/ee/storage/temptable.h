@@ -163,6 +163,8 @@ inline void TempTable::insertTupleNonVirtualWithDeepCopy(TableTuple &source, Poo
 
      nextFreeTuple(&m_tmpTarget1);
     ++m_tupleCount;
+    m_usedTupleCount++;
+
     //
     // Then copy the source into the target. Pass false for heapAllocateStrings.
     // Don't allocate space for the strings on the heap because the strings are being copied from the source
@@ -180,6 +182,8 @@ inline void TempTable::insertTupleNonVirtual(TableTuple &source) {
     //
     nextFreeTuple(&m_tmpTarget1);
     ++m_tupleCount;
+    m_usedTupleCount++;
+
     //
     // Then copy the source into the target. Pass false for heapAllocateStrings.
     // Don't allocate space for the strings on the heap because the strings are being copied from the source

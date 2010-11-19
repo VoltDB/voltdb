@@ -34,11 +34,11 @@
 #include "indexes/tableindex.h"
 #include "storage/tableiterator.h"
 #include "storage/CopyOnWriteIterator.h"
+#include "stx/btree_set.h"
 #include "common/DefaultTupleSerializer.h"
 #include <vector>
 #include <string>
 #include <stdint.h>
-#include <set>
 #include "boost/scoped_ptr.hpp"
 
 using namespace voltdb;
@@ -68,19 +68,50 @@ public:
 
         m_columnNames.push_back("1");
         m_columnNames.push_back("2");
+        m_columnNames.push_back("3");
+        m_columnNames.push_back("4");
+        m_columnNames.push_back("5");
+        m_columnNames.push_back("6");
+        m_columnNames.push_back("7");
+        m_columnNames.push_back("8");
+        m_columnNames.push_back("9");
 
         m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_INTEGER);
         m_primaryKeyIndexSchemaTypes.push_back(voltdb::VALUE_TYPE_INTEGER);
         m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_INTEGER);
 
+        //Filler columns
+        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
+        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
+        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
+        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
+        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
+        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
+        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
+
         m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
         m_primaryKeyIndexSchemaColumnSizes.push_back(voltdb::VALUE_TYPE_INTEGER);
         m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
         m_primaryKeyIndexSchemaColumnSizes.push_back(voltdb::VALUE_TYPE_INTEGER);
 
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+
         m_tableSchemaAllowNull.push_back(false);
         m_primaryKeyIndexSchemaAllowNull.push_back(false);
         m_tableSchemaAllowNull.push_back(false);
+        m_primaryKeyIndexSchemaAllowNull.push_back(false);
+        m_primaryKeyIndexSchemaAllowNull.push_back(false);
+        m_primaryKeyIndexSchemaAllowNull.push_back(false);
+        m_primaryKeyIndexSchemaAllowNull.push_back(false);
+        m_primaryKeyIndexSchemaAllowNull.push_back(false);
+        m_primaryKeyIndexSchemaAllowNull.push_back(false);
+        m_primaryKeyIndexSchemaAllowNull.push_back(false);
         m_primaryKeyIndexSchemaAllowNull.push_back(false);
 
         m_primaryKeyIndexColumns.push_back(0);
@@ -120,10 +151,15 @@ public:
 
     void addRandomUniqueTuples(Table *table, int numTuples) {
         TableTuple tuple = table->tempTuple();
+        ::memset(tuple.address() + 1, 0, tuple.tupleLength() - 1);
         for (int ii = 0; ii < numTuples; ii++) {
             tuple.setNValue(0, ValueFactory::getIntegerValue(m_primaryKeyIndex++));
             tuple.setNValue(1, ValueFactory::getIntegerValue(rand()));
-            table->insertTuple(tuple);
+            bool success = table->insertTuple(tuple);
+            if (!success) {
+                std::cout << "Failed to add random unique tuple" << std::endl;
+                return;
+            }
         }
     }
 
@@ -229,8 +265,8 @@ public:
 
 TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
     initTable(true);
-    addRandomUniqueTuples( m_table, 699048);
 
+    addRandomUniqueTuples( m_table, 174762);
     voltdb::TableIterator& iterator = m_table->iterator();
     TBMap blocks(m_table->m_data);
     voltdb::CopyOnWriteIterator COWIterator(m_table, blocks.begin(), blocks.end());
@@ -275,14 +311,14 @@ TEST_F(CopyOnWriteTest, TestTableTupleFlags) {
 
 TEST_F(CopyOnWriteTest, BigTest) {
     initTable(true);
-    addRandomUniqueTuples( m_table, 699048);
+    addRandomUniqueTuples( m_table, 174762);
     DefaultTupleSerializer serializer;
     for (int qq = 0; qq < 10; qq++) {
-        std::set<int64_t> originalTuples;
+        stx::btree_set<int64_t> originalTuples;
         voltdb::TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
-            const std::pair<std::set<int64_t>::iterator, bool> p =
+            const std::pair<stx::btree_set<int64_t>::iterator, bool> p =
                     originalTuples.insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
             const bool inserted = p.second;
             if (!inserted) {
@@ -294,7 +330,7 @@ TEST_F(CopyOnWriteTest, BigTest) {
 
         m_table->activateCopyOnWrite(&serializer, 0);
 
-        std::set<int64_t> COWTuples;
+        stx::btree_set<int64_t> COWTuples;
         char serializationBuffer[131072];
         int totalInserted = 0;
         while (true) {
@@ -316,7 +352,7 @@ TEST_F(CopyOnWriteTest, BigTest) {
                 }
                 ASSERT_TRUE(inserted);
                 totalInserted++;
-                ii += 12;
+                ii += 68;
             }
             for (int jj = 0; jj < 10; jj++) {
                 doRandomTableMutation(m_table);
@@ -349,7 +385,7 @@ TEST_F(CopyOnWriteTest, BigTest) {
             numTuples++;
             ASSERT_FALSE(tuple.isDirty());
         }
-        ASSERT_EQ(numTuples, 699048 + (m_tuplesInserted - m_tuplesDeleted));
+        ASSERT_EQ(numTuples, 174762 + (m_tuplesInserted - m_tuplesDeleted));
 
         ASSERT_EQ(originalTuples.size(), COWTuples.size());
         ASSERT_TRUE(originalTuples == COWTuples);
@@ -358,16 +394,16 @@ TEST_F(CopyOnWriteTest, BigTest) {
 
 TEST_F(CopyOnWriteTest, BigTestWithUndo) {
     initTable(true);
-    addRandomUniqueTuples( m_table, 699048);
+    addRandomUniqueTuples( m_table, 174762);
     m_engine->setUndoToken(0);
     m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0);
     DefaultTupleSerializer serializer;
     for (int qq = 0; qq < 10; qq++) {
-        std::set<int64_t> originalTuples;
+        stx::btree_set<int64_t> originalTuples;
         voltdb::TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
-            const std::pair<std::set<int64_t>::iterator, bool> p =
+            const std::pair<stx::btree_set<int64_t>::iterator, bool> p =
                     originalTuples.insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
             const bool inserted = p.second;
             if (!inserted) {
@@ -379,7 +415,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
 
         m_table->activateCopyOnWrite(&serializer, 0);
 
-        std::set<int64_t> COWTuples;
+        stx::btree_set<int64_t> COWTuples;
         char serializationBuffer[131072];
         int totalInserted = 0;
         while (true) {
@@ -401,7 +437,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
                 }
                 ASSERT_TRUE(inserted);
                 totalInserted++;
-                ii += 12;
+                ii += 68;
             }
             for (int jj = 0; jj < 10; jj++) {
                 doRandomTableMutation(m_table);
@@ -438,7 +474,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
             }
             ASSERT_FALSE(tuple.isDirty());
         }
-        ASSERT_EQ(numTuples, 699048 + (m_tuplesInserted - m_tuplesDeleted));
+        ASSERT_EQ(numTuples, 174762 + (m_tuplesInserted - m_tuplesDeleted));
 
         ASSERT_EQ(originalTuples.size(), COWTuples.size());
         ASSERT_TRUE(originalTuples == COWTuples);
@@ -447,16 +483,16 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
 
 TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
     initTable(true);
-    addRandomUniqueTuples( m_table, 699048);
+    addRandomUniqueTuples( m_table, 174762);
     m_engine->setUndoToken(0);
     m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0);
     DefaultTupleSerializer serializer;
     for (int qq = 0; qq < 10; qq++) {
-        std::set<int64_t> originalTuples;
+        stx::btree_set<int64_t> originalTuples;
         voltdb::TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
-            const std::pair<std::set<int64_t>::iterator, bool> p =
+            const std::pair<stx::btree_set<int64_t>::iterator, bool> p =
                     originalTuples.insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
             const bool inserted = p.second;
             if (!inserted) {
@@ -468,7 +504,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
 
         m_table->activateCopyOnWrite(&serializer, 0);
 
-        std::set<int64_t> COWTuples;
+        stx::btree_set<int64_t> COWTuples;
         char serializationBuffer[131072];
         int totalInserted = 0;
         while (true) {
@@ -490,7 +526,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
                 }
                 ASSERT_TRUE(inserted);
                 totalInserted++;
-                ii += 12;
+                ii += 68;
             }
             for (int jj = 0; jj < 10; jj++) {
                 doRandomTableMutation(m_table);
@@ -526,7 +562,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
             numTuples++;
             ASSERT_FALSE(tuple.isDirty());
         }
-        ASSERT_EQ(numTuples, 699048);
+        ASSERT_EQ(numTuples, 174762);
 
         ASSERT_EQ(originalTuples.size(), COWTuples.size());
         ASSERT_TRUE(originalTuples == COWTuples);

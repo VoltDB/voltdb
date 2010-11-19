@@ -94,6 +94,7 @@ bool StreamedTable::insertTuple(TableTuple &source)
                                       source,
                                       TupleStreamWrapper::INSERT);
         m_tupleCount++;
+        m_usedTupleCount++;
 
         UndoQuantum *uq = m_executorContext->getCurrentUndoQuantum();
         Pool *pool = uq->getDataPool();
@@ -121,6 +122,7 @@ bool StreamedTable::deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings)
                                       tuple,
                                       TupleStreamWrapper::DELETE);
         m_tupleCount++;
+        m_usedTupleCount++;
 
         UndoQuantum *uq = m_executorContext->getCurrentUndoQuantum();
         Pool *pool = uq->getDataPool();
