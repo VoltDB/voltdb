@@ -29,7 +29,9 @@ namespace voltdb {
  * Constructor caches reference to the table that will be generating the statistics
  */
 TableStats::TableStats(voltdb::Table* table)
-    : voltdb::StatsSource(), m_table(table), m_lastTupleCount(0) {
+    : voltdb::StatsSource(), m_table(table), m_lastTupleCount(0),
+      m_lastStringDataMemory(0)
+{
 }
 
 /**
@@ -77,10 +79,19 @@ void TableStats::updateStatsTuple(voltdb::TableTuple *tuple) {
     tuple->setNValue( StatsSource::m_columnName2Index["TABLE_NAME"], m_tableName);
     tuple->setNValue( StatsSource::m_columnName2Index["TABLE_TYPE"], m_tableType);
     int64_t tupleCount = m_table->activeTupleCount();
+    // This overflow is unlikely (requires 2 terabytes of allocated string memory)
+    int64_t string_data_mem_kb = m_table->nonInlinedMemorySize() / 1000;
 
     if (interval()) {
         tupleCount = tupleCount - m_lastTupleCount;
         m_lastTupleCount = m_table->activeTupleCount();
+        string_data_mem_kb = string_data_mem_kb - (m_lastStringDataMemory / 1000);
+        m_lastStringDataMemory = m_table->nonInlinedMemorySize();
+    }
+
+    if (string_data_mem_kb > INT32_MAX)
+    {
+        string_data_mem_kb = -1;
     }
 
     tuple->setNValue(
@@ -91,7 +102,7 @@ void TableStats::updateStatsTuple(voltdb::TableTuple *tuple) {
     tuple->setNValue( StatsSource::m_columnName2Index["TUPLE_DATA_MEMORY"],
             ValueFactory::getIntegerValue(-1));
     tuple->setNValue( StatsSource::m_columnName2Index["STRING_DATA_MEMORY"],
-            ValueFactory::getIntegerValue(-1));
+                      ValueFactory::getIntegerValue(static_cast<int32_t>(string_data_mem_kb)));
 }
 
 /**

@@ -73,7 +73,7 @@
 #include "storage/MaterializedViewMetadata.h"
 #include "storage/CopyOnWriteContext.h"
 
-namespace voltdb {
+using namespace voltdb;
 
 void* keyTupleStorage = NULL;
 TableTuple keyTuple;
@@ -99,8 +99,8 @@ PersistentTable::PersistentTable(ExecutorContext *ctx, bool exportEnabled) :
 
 PersistentTable::~PersistentTable() {
     // delete all tuples to free strings
-    voltdb::TableIterator ti(this);
-    voltdb::TableTuple tuple(m_schema);
+    TableIterator ti(this);
+    TableTuple tuple(m_schema);
 
     while (ti.next(tuple)) {
         // indexes aren't released as they don't have ownership of strings
@@ -132,8 +132,8 @@ PersistentTable::~PersistentTable() {
 // ------------------------------------------------------------------
 void PersistentTable::deleteAllTuples(bool freeAllocatedStrings) {
     // nothing interesting
-    voltdb::TableIterator ti(this);
-    voltdb::TableTuple tuple(m_schema);
+    TableIterator ti(this);
+    TableTuple tuple(m_schema);
     while (ti.next(tuple)) {
         deleteTuple(tuple, true);
     }
@@ -154,7 +154,7 @@ bool PersistentTable::insertTuple(TableTuple &source) {
     // not null checks at first
     FAIL_IF(!checkNulls(source)) {
         throw ConstraintFailureException(this, source, TableTuple(),
-                                         voltdb::CONSTRAINT_TYPE_NOT_NULL);
+                                         CONSTRAINT_TYPE_NOT_NULL);
     }
 
     //
@@ -190,7 +190,7 @@ bool PersistentTable::insertTuple(TableTuple &source) {
         m_tmpTarget1.freeObjectColumns();
         deleteTupleStorage(m_tmpTarget1);
         throw ConstraintFailureException(this, source, TableTuple(),
-                                         voltdb::CONSTRAINT_TYPE_UNIQUE);
+                                         CONSTRAINT_TYPE_UNIQUE);
     }
 
     // if EL is enabled, append the tuple to the buffer
@@ -200,16 +200,20 @@ bool PersistentTable::insertTuple(TableTuple &source) {
           appendToELBuffer(m_tmpTarget1, m_tsSeqNo++, TupleStreamWrapper::INSERT);
     }
 
+    if (m_schema->getUninlinedObjectColumnCount() != 0)
+    {
+        m_nonInlinedMemorySize += m_tmpTarget1.getNonInlinedMemorySize();
+    }
     /*
      * Create and register an undo action.
      */
-    voltdb::UndoQuantum *undoQuantum = m_executorContext->getCurrentUndoQuantum();
+    UndoQuantum *undoQuantum = m_executorContext->getCurrentUndoQuantum();
     assert(undoQuantum);
-    voltdb::Pool *pool = undoQuantum->getDataPool();
+    Pool *pool = undoQuantum->getDataPool();
     assert(pool);
-    voltdb::PersistentTableUndoInsertAction *ptuia =
-      new (pool->allocate(sizeof(voltdb::PersistentTableUndoInsertAction)))
-      voltdb::PersistentTableUndoInsertAction(m_tmpTarget1, this, pool, elMark);
+    PersistentTableUndoInsertAction *ptuia =
+      new (pool->allocate(sizeof(PersistentTableUndoInsertAction)))
+      PersistentTableUndoInsertAction(m_tmpTarget1, this, pool, elMark);
     undoQuantum->registerUndoAction(ptuia);
 
     // handle any materialized views
@@ -249,6 +253,11 @@ void PersistentTable::insertTupleForUndo(TableTuple &source, size_t wrapperOffse
     m_tmpTarget1.copy(source);
     m_tmpTarget1.setDeletedFalse();
 
+    if (m_schema->getUninlinedObjectColumnCount() != 0)
+    {
+        m_nonInlinedMemorySize += m_tmpTarget1.getNonInlinedMemorySize();
+    }
+
     /**
      * See the comments in insertTuple for why this has to be done. The same situation applies here
      * in the undo case. When the tuple was deleted a copy was made for the COW. Even though it is being
@@ -286,17 +295,23 @@ bool PersistentTable::updateTuple(TableTuple &source, TableTuple &target, bool u
      * Create and register an undo action and then use the copy of
      * the target (old value with no updates)
      */
-     voltdb::UndoQuantum *undoQuantum = m_executorContext->getCurrentUndoQuantum();
+     UndoQuantum *undoQuantum = m_executorContext->getCurrentUndoQuantum();
      assert(undoQuantum);
-     voltdb::Pool *pool = undoQuantum->getDataPool();
+     Pool *pool = undoQuantum->getDataPool();
      assert(pool);
-     voltdb::PersistentTableUndoUpdateAction *ptuua =
-       new (pool->allocate(sizeof(voltdb::PersistentTableUndoUpdateAction)))
-       voltdb::PersistentTableUndoUpdateAction(target, this, pool);
+     PersistentTableUndoUpdateAction *ptuua =
+       new (pool->allocate(sizeof(PersistentTableUndoUpdateAction)))
+       PersistentTableUndoUpdateAction(target, this, pool);
 
      if (m_COWContext.get() != NULL) {
          m_COWContext->markTupleDirty(target, false);
      }
+
+    if (m_schema->getUninlinedObjectColumnCount() != 0)
+    {
+        m_nonInlinedMemorySize -= target.getNonInlinedMemorySize();
+        m_nonInlinedMemorySize += source.getNonInlinedMemorySize();
+    }
 
      source.setDeletedFalse();
      //Copy the dirty status that was set by markTupleDirty.
@@ -320,7 +335,7 @@ bool PersistentTable::updateTuple(TableTuple &source, TableTuple &target, bool u
         if (!tryUpdateOnAllIndexes(ptuua->getOldTuple(), target)) {
             throw ConstraintFailureException(this, ptuua->getOldTuple(),
                                              target,
-                                             voltdb::CONSTRAINT_TYPE_UNIQUE);
+                                             CONSTRAINT_TYPE_UNIQUE);
         }
 
         //If the CFE is thrown the Undo action should not attempt to revert the
@@ -349,7 +364,7 @@ bool PersistentTable::updateTuple(TableTuple &source, TableTuple &target, bool u
     FAIL_IF(!checkNulls(target)) {
         throw ConstraintFailureException(this, ptuua->getOldTuple(),
                                          target,
-                                         voltdb::CONSTRAINT_TYPE_NOT_NULL);
+                                         CONSTRAINT_TYPE_NOT_NULL);
     }
 
     if (undoQuantum->isDummy()) {
@@ -373,6 +388,12 @@ bool PersistentTable::updateTuple(TableTuple &source, TableTuple &target, bool u
  */
 void PersistentTable::updateTupleForUndo(TableTuple &source, TableTuple &target,
                                          bool revertIndexes, size_t wrapperOffset) {
+    if (m_schema->getUninlinedObjectColumnCount() != 0)
+    {
+        m_nonInlinedMemorySize -= target.getNonInlinedMemorySize();
+        m_nonInlinedMemorySize += source.getNonInlinedMemorySize();
+    }
+
     //Need to back up the updated version of the tuple to provide to
     //the indexes when updating The indexes expect source's data Ptr
     //to point into the table so it is necessary to copy source to
@@ -430,11 +451,11 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
     /*
      * Create and register an undo action.
      */
-    voltdb::UndoQuantum *undoQuantum = m_executorContext->getCurrentUndoQuantum();
+    UndoQuantum *undoQuantum = m_executorContext->getCurrentUndoQuantum();
     assert(undoQuantum);
-    voltdb::Pool *pool = undoQuantum->getDataPool();
+    Pool *pool = undoQuantum->getDataPool();
     assert(pool);
-    voltdb::PersistentTableUndoDeleteAction *ptuda = new (pool->allocate(sizeof(voltdb::PersistentTableUndoDeleteAction))) voltdb::PersistentTableUndoDeleteAction( target, this, pool);
+    PersistentTableUndoDeleteAction *ptuda = new (pool->allocate(sizeof(PersistentTableUndoDeleteAction))) PersistentTableUndoDeleteAction( target, this, pool);
 
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
@@ -445,6 +466,11 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
     if (m_exportEnabled) {
         size_t elMark = appendToELBuffer(target, m_tsSeqNo++, TupleStreamWrapper::DELETE);
         ptuda->setELMark(elMark);
+    }
+
+    if (m_schema->getUninlinedObjectColumnCount() != 0)
+    {
+        m_nonInlinedMemorySize -= target.getNonInlinedMemorySize();
     }
 
     undoQuantum->registerUndoAction(ptuda);
@@ -461,7 +487,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
  * correct dirty setting when the tuple was originally inserted.
  * TODO remove duplication with regular delete. Also no view updates.
  */
-void PersistentTable::deleteTupleForUndo(voltdb::TableTuple &tupleCopy, size_t wrapperOffset) {
+void PersistentTable::deleteTupleForUndo(TableTuple &tupleCopy, size_t wrapperOffset) {
     TableTuple target = lookupTuple(tupleCopy);
     if (target.isNullTuple()) {
         throwFatalException("Failed to delete tuple from table %s:"
@@ -483,16 +509,21 @@ void PersistentTable::deleteTupleForUndo(voltdb::TableTuple &tupleCopy, size_t w
         // Just like insert, we want to remove this tuple from all of our indexes
         deleteFromAllIndexes(&target);
 
+        if (m_schema->getUninlinedObjectColumnCount() != 0)
+        {
+            m_nonInlinedMemorySize -= tupleCopy.getNonInlinedMemorySize();
+        }
+
         // Delete the strings/objects
         target.freeObjectColumns();
         deleteTupleStorage(target);
     }
 }
 
-voltdb::TableTuple PersistentTable::lookupTuple(TableTuple tuple) {
-    voltdb::TableTuple nullTuple(m_schema);//Null tuple
+TableTuple PersistentTable::lookupTuple(TableTuple tuple) {
+    TableTuple nullTuple(m_schema);//Null tuple
 
-    voltdb::TableIndex *pkeyIndex = primaryKeyIndex();
+    TableIndex *pkeyIndex = primaryKeyIndex();
     if (pkeyIndex == NULL) {
         /*
          * Do a table scan.
@@ -662,7 +693,8 @@ void PersistentTable::onSetColumns() {
 
 /*
  * Implemented by persistent table and called by Table::loadTuplesFrom
- * to do additional processing for views and Export
+ * to do additional processing for views and Export and non-inline
+ * memory tracking
  */
 void PersistentTable::processLoadedTuple(bool allowExport, TableTuple &tuple) {
     // handle any materialized views
@@ -674,6 +706,12 @@ void PersistentTable::processLoadedTuple(bool allowExport, TableTuple &tuple) {
     if (allowExport && m_exportEnabled) {
         appendToELBuffer(m_tmpTarget1, m_tsSeqNo++,
                          TupleStreamWrapper::INSERT);
+    }
+
+    // Account for non-inlined memory allocated via bulk load or recovery
+    if (m_schema->getUninlinedObjectColumnCount() != 0)
+    {
+        m_nonInlinedMemorySize += tuple.getNonInlinedMemorySize();
     }
 }
 
@@ -745,7 +783,7 @@ PersistentTable::resetPollMarker()
     }
 }
 
-voltdb::TableStats* PersistentTable::getTableStats() {
+TableStats* PersistentTable::getTableStats() {
     return &stats_;
 }
 
@@ -812,7 +850,7 @@ void PersistentTable::nextRecoveryMessage(ReferenceSerializeOutput *out) {
  */
 void PersistentTable::processRecoveryMessage(RecoveryProtoMsg* message, Pool *pool, bool allowExport) {
     switch (message->msgType()) {
-    case voltdb::RECOVERY_MSG_TYPE_SCAN_TUPLES: {
+    case RECOVERY_MSG_TYPE_SCAN_TUPLES: {
         if (activeTupleCount() == 0) {
             uint32_t tupleCount = message->totalTupleCount();
             for (int i = 0; i < m_indexCount; i++) {
@@ -852,6 +890,4 @@ size_t PersistentTable::hashCode() {
          tuple.hashCode(hashCode);
     }
     return hashCode;
-}
-
 }
