@@ -92,6 +92,12 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         assertTrue(results[0].getRowCount() == 20 || results[0].getRowCount() == 40);
 
         System.out.println("Test statistics table: " + results[0].toString());
+
+        results = client.callProcedure("@Statistics", "index", 0).getResults();
+        // one aggregate table returned
+        assertTrue(results.length == 1);
+
+        //System.out.println("Test statistics table: " + results[0].toString());
     }
 
     public void testStatistics_Procedure() throws Exception {
@@ -262,15 +268,15 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                 if (results[0].getString("TABLE_NAME").equals("WAREHOUSE")) {
                     ++foundWarehouse;
                     //Different values depending on local cluster vs. single process hence ||
-                    assertTrue(5 == results[0].getLong("TABLE_ACTIVE_TUPLE_COUNT") ||
-                            10 == results[0].getLong("TABLE_ACTIVE_TUPLE_COUNT"));
+                    assertTrue(5 == results[0].getLong("TUPLE_COUNT") ||
+                            10 == results[0].getLong("TUPLE_COUNT"));
                 }
                 if (results[0].getString("TABLE_NAME").equals("ITEM"))
                 {
                     ++foundItem;
                     //Different values depending on local cluster vs. single process hence ||
-                    assertTrue(10 == results[0].getLong("TABLE_ACTIVE_TUPLE_COUNT") ||
-                            20 == results[0].getLong("TABLE_ACTIVE_TUPLE_COUNT"));
+                    assertTrue(10 == results[0].getLong("TUPLE_COUNT") ||
+                            20 == results[0].getLong("TUPLE_COUNT"));
                 }
             }
             // make sure both warehouses were located
@@ -285,12 +291,11 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     }
 
 
-
-    /**
-     * Build a list of the tests to be run. Use the regression suite
-     * helpers to allow multiple backends.
-     * JUnit magic that uses the regression suite helper classes.
-     */
+    //
+    // Build a list of the tests to be run. Use the regression suite
+    // helpers to allow multiple backends.
+    // JUnit magic that uses the regression suite helper classes.
+    //
     static public Test suite() {
         VoltServerConfig config = null;
 

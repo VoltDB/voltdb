@@ -778,7 +778,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             {
                 ++foundItem;
                 assertEquals((num_replicated_chunks * num_replicated_items_per_chunk),
-                        results[0].getLong("TABLE_ACTIVE_TUPLE_COUNT"));
+                        results[0].getLong("TUPLE_COUNT"));
             }
         }
         // make sure all sites were loaded
@@ -871,7 +871,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             {
                 ++foundItem;
                 assertEquals((num_partitioned_items_per_chunk * num_partitioned_chunks) / 3,
-                        results[0].getLong("TABLE_ACTIVE_TUPLE_COUNT"));
+                        results[0].getLong("TUPLE_COUNT"));
             }
         }
         // make sure all sites were loaded
@@ -944,7 +944,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             {
                 ++foundItem;
                 assertEquals((num_partitioned_items_per_chunk * num_partitioned_chunks) / 3,
-                        results[0].getLong("TABLE_ACTIVE_TUPLE_COUNT"));
+                        results[0].getLong("TUPLE_COUNT"));
             }
         }
         // make sure all sites were loaded
@@ -1167,7 +1167,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             {
                 ++foundItem;
                 assertEquals((num_partitioned_items_per_chunk * num_partitioned_chunks) / 4,
-                        results[0].getLong("TABLE_ACTIVE_TUPLE_COUNT"));
+                        results[0].getLong("TUPLE_COUNT"));
             }
         }
         // make sure all sites were loaded

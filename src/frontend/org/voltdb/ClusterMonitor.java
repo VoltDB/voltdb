@@ -460,9 +460,9 @@ public class ClusterMonitor {
                     insertTableStats.setLong( index++, tableResults.getLong("PARTITION_ID"));
                     insertTableStats.setString( index++, tableResults.getString("TABLE_NAME"));
                     insertTableStats.setString( index++, tableResults.getString("TABLE_TYPE"));
-                    insertTableStats.setLong( index++, tableResults.getLong("TABLE_ACTIVE_TUPLE_COUNT"));
-                    insertTableStats.setLong( index++, tableResults.getLong("TABLE_ALLOCATED_TUPLE_COUNT"));
-                    insertTableStats.setLong( index++, tableResults.getLong("TABLE_DELETED_TUPLE_COUNT"));
+                    insertTableStats.setLong( index++, tableResults.getLong("TUPLE_COUNT"));
+                    insertTableStats.setLong( index++, tableResults.getLong("TUPLE_COUNT"));
+                    insertTableStats.setLong( index++, tableResults.getLong("TUPLE_COUNT"));
                     insertTableStats.addBatch();
                 }
             } finally {
