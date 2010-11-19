@@ -31,7 +31,9 @@ namespace voltdb {
  * Constructor caches reference to the table that will be generating the statistics
  */
 IndexStats::IndexStats(TableIndex* index)
-    : voltdb::StatsSource(), m_index(index), m_isUnique(0), m_lastTupleCount(0) {
+    : voltdb::StatsSource(), m_index(index), m_isUnique(0),
+      m_lastTupleCount(0), m_lastMemEstimate(0)
+{
 }
 
 /**
@@ -57,7 +59,7 @@ void IndexStats::configure(
     m_indexName = ValueFactory::getStringValue(m_index->getName());
     m_tableName = ValueFactory::getStringValue(tableName);
     m_indexType = ValueFactory::getStringValue(m_index->getTypeName());
-    m_isUnique = m_index->isUniqueIndex() ? 1 : 0;
+    m_isUnique = static_cast<int8_t>(m_index->isUniqueIndex() ? 1 : 0);
 }
 
 /**
@@ -85,10 +87,18 @@ void IndexStats::updateStatsTuple(voltdb::TableTuple *tuple) {
     tuple->setNValue( StatsSource::m_columnName2Index["TABLE_NAME"], m_tableName);
     tuple->setNValue( StatsSource::m_columnName2Index["INDEX_TYPE"], m_indexType);
     int64_t count = static_cast<int64_t>(m_index->getSize());
+    int64_t mem_estimate_kb = m_index->getMemoryEstimate() / 1000;
 
     if (interval()) {
         count = count - m_lastTupleCount;
         m_lastTupleCount = static_cast<int64_t>(m_index->getSize());
+        mem_estimate_kb = mem_estimate_kb - (m_lastMemEstimate / 1000);
+        m_lastMemEstimate = m_index->getMemoryEstimate();
+    }
+
+    if (mem_estimate_kb > INT32_MAX)
+    {
+        mem_estimate_kb = -1;
     }
 
     tuple->setNValue(
@@ -96,8 +106,9 @@ void IndexStats::updateStatsTuple(voltdb::TableTuple *tuple) {
             ValueFactory::getTinyIntValue(m_isUnique));
     tuple->setNValue( StatsSource::m_columnName2Index["ENTRY_COUNT"],
             ValueFactory::getBigIntValue(count));
-    tuple->setNValue( StatsSource::m_columnName2Index["MEMORY_ESTIMATE"],
-            ValueFactory::getIntegerValue(-1));
+    tuple->setNValue(StatsSource::m_columnName2Index["MEMORY_ESTIMATE"],
+                     ValueFactory::
+                     getIntegerValue(static_cast<int32_t>(mem_estimate_kb)));
 }
 
 /**

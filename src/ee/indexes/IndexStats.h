@@ -94,6 +94,7 @@ private:
     int8_t m_isUnique;
 
     int64_t m_lastTupleCount;
+    int64_t m_lastMemEstimate;
 };
 
 }
