@@ -311,7 +311,8 @@ enum TableStreamType {
 // Statistics Selector Types
 // ------------------------------------------------------------------
 enum StatisticsSelectorType {
-    STATISTICS_SELECTOR_TYPE_TABLE
+    STATISTICS_SELECTOR_TYPE_TABLE,
+    STATISTICS_SELECTOR_TYPE_INDEX
 };
 
 // ------------------------------------------------------------------

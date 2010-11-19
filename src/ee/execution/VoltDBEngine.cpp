@@ -696,8 +696,9 @@ bool VoltDBEngine::rebuildTableCollections() {
     m_tables.clear();
     m_tablesByName.clear();
 
-    // need to re-map all the table ids.
+    // need to re-map all the table ids / indexes
     getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_TABLE);
+    getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_INDEX);
 
     map<string, catalog::Table*>::const_iterator it = m_database->tables().begin();
     map<string, CatalogDelegate*>::iterator cdIt = m_catalogDelegates.begin();
@@ -713,6 +714,30 @@ bool VoltDBEngine::rebuildTableCollections() {
             getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
                                                   catTable->relativeIndex(),
                                                   tcd->getTable()->getTableStats());
+
+            // add all of the indexes to the stats source
+            std::vector<TableIndex*> tindexes = tcd->getTable()->allIndexes();
+            for (int i = 0; i < tindexes.size(); i++) {
+                TableIndex *index = tindexes[i];
+                getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_INDEX,
+                                                      catTable->relativeIndex(),
+                                                      index->getIndexStats());
+            }
+
+
+            /*map<string, catalog::Index*>::const_iterator index_iterator;
+            for (index_iterator = catTable->indexes().begin();
+                 index_iterator != catTable->indexes().end(); index_iterator++) {
+
+                const catalog::Index *catalogIndex = index_iterator->second;
+                TableIndex *index = tcd->getTable()->index(catalogIndex->name());
+                printf("Looking for index named: %s\n", catalogIndex->name().c_str());
+                assert(index);
+
+                getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_INDEX,
+                                                      catTable->relativeIndex(),
+                                                      index->getIndexStats());
+            }*/
         }
         cdIt++;
     }
@@ -1029,6 +1054,23 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
     try {
         switch (selector) {
         case STATISTICS_SELECTOR_TYPE_TABLE:
+            for (int ii = 0; ii < numLocators; ii++) {
+                CatalogId locator = static_cast<CatalogId>(locators[ii]);
+                if (m_tables.find(locator) == m_tables.end()) {
+                    char message[256];
+                    snprintf(message, 256,  "getStats() called with selector %d, and"
+                            " an invalid locator %d that does not correspond to"
+                            " a table", selector, locator);
+                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                                  message);
+                }
+            }
+
+            resultTable = m_statsManager.getStats(
+                (StatisticsSelectorType) selector,
+                locatorIds, interval, now);
+            break;
+        case STATISTICS_SELECTOR_TYPE_INDEX:
             for (int ii = 0; ii < numLocators; ii++) {
                 CatalogId locator = static_cast<CatalogId>(locators[ii]);
                 if (m_tables.find(locator) == m_tables.end()) {

@@ -55,6 +55,7 @@
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
 #include "common/TupleSchema.h"
+#include "indexes/IndexStats.h"
 
 namespace voltdb {
 
@@ -318,6 +319,8 @@ public:
         return m_scheme;
     }
 
+    virtual voltdb::IndexStats* getIndexStats();
+
 protected:
     TableIndex(const TableIndexScheme &scheme);
 
@@ -337,6 +340,9 @@ protected:
     int m_deletes;
     int m_updates;
     TupleSchema *m_tupleSchema;
+
+    // stats
+    IndexStats m_stats;
 };
 
 }
