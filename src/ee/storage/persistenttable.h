@@ -59,6 +59,7 @@
 #include "storage/PersistentTableStats.h"
 #include "storage/CopyOnWriteContext.h"
 #include "storage/RecoveryContext.h"
+#include "common/UndoQuantumReleaseInterest.h"
 
 namespace voltdb {
 
@@ -73,6 +74,7 @@ class ReferenceSerializeOutput;
 class ExecutorContext;
 class MaterializedViewMetadata;
 class RecoveryProtoMsg;
+class PersistentTableUndoDeleteAction;
 
 /**
  * Represents a non-temporary table which permanently resides in
@@ -99,13 +101,14 @@ class RecoveryProtoMsg;
  * value in data and adds an entry to UndoLog. We chose eager update
  * policy because we expect reverting rarely occurs.
  */
-class PersistentTable : public Table {
+class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     friend class TableFactory;
     friend class TableTuple;
     friend class TableIndex;
     friend class TableIterator;
     friend class PersistentTableStats;
-
+    friend class PersistentTableUndoDeleteAction;
+    friend class ::CompactionTest_BasicCompaction;
   private:
     // no default ctor, no copy, no assignment
     PersistentTable();
@@ -114,6 +117,12 @@ class PersistentTable : public Table {
 
   public:
     virtual ~PersistentTable();
+
+    void notifyQuantumRelease() {
+        if (compactionPredicate()) {
+            doForcedCompaction();
+        }
+    }
 
     // ------------------------------------------------------------------
     // OPERATIONS
@@ -125,7 +134,7 @@ class PersistentTable : public Table {
      * Inserts a Tuple without performing an allocation for the
      * uninlined strings.
      */
-    void insertTupleForUndo(TableTuple &source, size_t elMark);
+    void insertTupleForUndo(char *tuple, size_t elMark);
 
     /*
      * Note that inside update tuple the order of sourceTuple and
@@ -250,6 +259,7 @@ protected:
     void insertIntoAllIndexes(TableTuple *tuple);
     void deleteFromAllIndexes(TableTuple *tuple);
     void updateFromAllIndexes(TableTuple &targetTuple, const TableTuple &sourceTuple);
+    void updateWithSameKeyFromAllIndexes(TableTuple &targetTuple, const TableTuple &sourceTuple);
 
     bool tryInsertOnAllIndexes(TableTuple *tuple);
     bool tryUpdateOnAllIndexes(TableTuple &targetTuple, const TableTuple &sourceTuple);
@@ -261,17 +271,14 @@ protected:
     PersistentTable(ExecutorContext *ctx, bool exportEnabled);
     void onSetColumns();
 
+    void notifyBlockWasCompactedAway(TBPtr block);
+    void swapTuples(TableTuple sourceTuple, TableTuple destinationTuple);
+
     /*
      * Implemented by persistent table and called by Table::loadTuplesFrom
      * to do additional processing for views and Export
      */
     virtual void processLoadedTuple(bool allowExport, TableTuple &tuple);
-
-    /*
-     * Implemented by persistent table and called by Table::loadTuplesFrom
-     * to do add tuples to indexes
-     */
-    virtual void populateIndexes(int tupleCount);
 
     // pointer to current transaction id and other "global" state.
     // abstract this out of VoltDBEngine to avoid creating dependendencies

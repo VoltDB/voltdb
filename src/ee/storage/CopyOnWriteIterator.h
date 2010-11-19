@@ -19,6 +19,9 @@
 #include <vector>
 #include "common/tabletuple.h"
 #include "storage/TupleIterator.h"
+#include "boost/intrusive_ptr.hpp"
+#include "stx/btree_map.h"
+#include "storage/TupleBlock.h"
 
 namespace voltdb {
 class Table;
@@ -26,7 +29,10 @@ class Table;
 class CopyOnWriteIterator : public TupleIterator {
     friend class CopyOnWriteContext;
 public:
-    CopyOnWriteIterator(Table *table);
+    CopyOnWriteIterator(
+            Table *table,
+            TBMapI start,
+            TBMapI end);
 
     /**
      * When a tuple is "dirty" it is still active, but will never be a "found" tuple
@@ -35,22 +41,16 @@ public:
      * in the used portion of the table blocks and doesn't overrun to the uninitialized block memory because
      * it skiped a dirty tuple and didn't end up with the right found tuple count upon reaching the end.
      */
-    bool needToDirtyTuple(int blockIndex, const char *address, const bool newTuple) {
-        if (blockIndex < m_blockIndex) {
+    bool needToDirtyTuple(const char *blockAddress, const char *tupleAddress) {
+        if (blockAddress < m_currentBlock->address()) {
             return false;
         }
 
-        if (blockIndex > m_blockIndex) {
-            if (!newTuple) {
-                m_foundTuples++;
-            }
+        if (blockAddress > m_currentBlock->address()) {
             return true;
         }
 
-        if (address > m_location) {
-            if (!newTuple) {
-                m_foundTuples++;
-            }
+        if (tupleAddress > m_location) {
             return true;
         } else {
             return false;
@@ -67,14 +67,10 @@ private:
     Table *m_table;
 
     /**
-     * List of blocks being iterated over
-     */
-    std::vector<char*> m_blocks;
-
-    /**
      * Index of the current block being iterated over
      */
-    uint32_t m_blockIndex;
+    TBMapI m_blockIterator;
+    TBMapI m_end;
 
     /**
      * Length of a tuple
@@ -84,30 +80,12 @@ private:
     /**
      * Address of the last tuple returned
      */
-    char *   m_location;
-
-    /**
-     * Total number of tuples that are expected to be found
-     */
-    const uint32_t m_activeTupleCount;
-
-    /**
-     * Total number of tuples that have been found so far
-     */
-    uint32_t m_foundTuples;
-
-    /**
-     * Length of a block
-     */
-    const size_t m_blockLength;
+    char *m_location;
 
     bool m_didFirstIteration;
 
-    /**
-     * Need to mark all tuples allocated in the last block as found
-     * because they were inserted as dirty.
-     */
-    void cleanBlocksAfterLastFound();
+    uint32_t m_blockOffset;
+    TBPtr m_currentBlock;
 };
 }
 

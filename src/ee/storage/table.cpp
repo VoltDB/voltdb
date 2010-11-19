@@ -65,8 +65,7 @@ Table::Table(int tableAllocationTargetSize) :
     m_tempTuple(),
     m_schema(NULL),
     m_tupleCount(0),
-    m_usedTuples(0),
-    m_allocatedTuples(0),
+    m_tuplesPinnedByUndo(0),
     m_columnCount(0),
     m_tuplesPerBlock(0),
     m_nonInlinedMemorySize(0),
@@ -80,6 +79,10 @@ Table::Table(int tableAllocationTargetSize) :
     m_tempTableMemoryInBytes(NULL),
     m_refcount(0)
 {
+    for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
+        m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
+        m_blocksPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
+    }
 }
 
 Table::~Table() {
@@ -95,33 +98,11 @@ Table::~Table() {
     delete[] m_columnNames;
     m_columnNames = NULL;
 
-    delete[] reinterpret_cast<char*>(m_tempTuple.m_data);
-    m_tempTuple.m_data = NULL;
-
-    /*
-     * The memcheck build uses the heap to allocate each tuple in order to
-     * detect errors while accessing tuples as well as tuples storage pointers
-     * leaking from a table after the tuple has been deleted.
-     */
-#ifdef MEMCHECK_NOFREELIST
-    for (std::set<void*>::iterator iter = m_allocatedTuplePointers.begin();
-            iter != m_allocatedTuplePointers.end(); ++iter) {
-        assert(m_deletedTuplePointers.find(*iter) == m_deletedTuplePointers.end());
-        delete[] reinterpret_cast<char*>(*iter);
+    for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
+        m_blocksNotPendingSnapshotLoad[ii]->clear();
+        m_blocksPendingSnapshotLoad[ii]->clear();
     }
-//    for (std::set<void*>::iterator iter = m_deletedTuplePointers.begin();
-//            iter != m_deletedTuplePointers.end(); ++iter) {
-//        assert(m_allocatedTuplePointers.find(*iter) == m_allocatedTuplePointers.end());
-//        delete[] reinterpret_cast<char*>(*iter);
-//    }
-    m_allocatedTuplePointers.clear();
-    m_deletedTuplePointers.clear();
-    m_data.clear();
-#else
-    // clear the tuple memory
-    for (std::vector<char*>::iterator iter = m_data.begin(); iter != m_data.end(); ++iter)
-        delete[] reinterpret_cast<char*>(*iter);
-#endif
+    m_tempTuple.m_data = NULL;
 
     // clear any cached column serializations
     if (m_columnHeaderData)
@@ -139,10 +120,28 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::string* column
     m_schema  = schema;
 
     m_columnCount = schema->columnCount();
+
+    m_tupleLength = m_schema->tupleLength() + TUPLE_HEADER_SIZE;
 #ifdef MEMCHECK
     m_tuplesPerBlock = 1;
+    m_tableAllocationSize = m_tupleLength;
 #else
-    m_tuplesPerBlock = m_tableAllocationTargetSize / (m_schema->tupleLength() + TUPLE_HEADER_SIZE);
+    m_tuplesPerBlock = m_tableAllocationTargetSize / m_tupleLength;
+#ifdef USE_MMAP
+    if (m_tuplesPerBlock < 1) {
+        m_tuplesPerBlock = 1;
+        m_tableAllocationSize = nexthigher(m_tupleLength);
+    } else {
+        m_tableAllocationSize = nexthigher(m_tableAllocationTargetSize);
+    }
+#else
+    if (m_tuplesPerBlock < 1) {
+        m_tuplesPerBlock = 1;
+        m_tableAllocationSize = m_tupleLength;
+    } else {
+        m_tableAllocationSize = m_tableAllocationTargetSize;
+    }
+#endif
 #endif
 
     // initialize column names
@@ -152,23 +151,15 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::string* column
         m_columnNames[i] = columnNames[i];
 
     // initialize the temp tuple
-    char *m_tempTupleMemory = m_tempTuple.m_data;
-    delete[] reinterpret_cast<char*>(m_tempTupleMemory);
-    m_tempTupleMemory = new char[m_schema->tupleLength() + TUPLE_HEADER_SIZE];
-    m_tempTuple = TableTuple(m_tempTupleMemory, m_schema);
-    ::memset(m_tempTupleMemory, 0, m_tempTuple.tupleLength());
-    m_tempTuple.setDeletedFalse();
+    m_tempTupleMemory.reset(new char[m_schema->tupleLength() + TUPLE_HEADER_SIZE]);
+    m_tempTuple = TableTuple(m_tempTupleMemory.get(), m_schema);
+    ::memset(m_tempTupleMemory.get(), 0, m_tempTuple.tupleLength());
+    m_tempTuple.setActiveTrue();
 
     // set the data to be empty
     m_tupleCount = 0;
-    m_usedTuples = 0;
-#ifdef MEMCHECK_NOFREELIST
-    m_deletedTupleCount = 0;
-#else
-    m_holeFreeTuples.clear();//Why clear it. Shouldn't it be empty? Won't this leak?
-#endif
-
-    m_tupleLength = m_schema->tupleLength() + TUPLE_HEADER_SIZE;
+    m_blocksWithSpace.clear();//Why clear it. Shouldn't it be empty? Won't this leak?
+    m_data.clear();
 
     // note that any allocated memory in m_data is left alone
     // as is m_allocatedTuples
@@ -189,29 +180,69 @@ TableIterator Table::tableIterator() {
 void Table::nextFreeTuple(TableTuple *tuple) {
     // First check whether we have any in our list
     // In the memcheck it uses the heap instead of a free list to help Valgrind.
-#ifndef MEMCHECK_NOFREELIST
-    if (!m_holeFreeTuples.empty()) {
+    if (!m_blocksWithSpace.empty()) {
         VOLT_TRACE("GRABBED FREE TUPLE!\n");
-        char* ret = m_holeFreeTuples.back();
-        m_holeFreeTuples.pop_back();
+        stx::btree_set<TBPtr >::iterator begin = m_blocksWithSpace.begin();
+        TBPtr block = (*begin);
+        std::pair<char*, int> retval = block->nextFreeTuple();
+
+        /**
+         * Check to see if the block needs to move to a new bucket
+         */
+        if (retval.second != -1) {
+            //Check if if the block is currently pending snapshot
+            if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
+                block->swapToBucket(m_blocksNotPendingSnapshotLoad[retval.second]);
+            //Check if the block goes into the pending snapshot set of buckets
+            } else if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
+                block->swapToBucket(m_blocksPendingSnapshotLoad[retval.second]);
+            } else {
+                //In this case the block is actively being snapshotted and isn't eligible for merge operations at all
+                //do nothing, once the block is finished by the iterator, the iterator will return it
+            }
+        }
+
+        tuple->move(retval.first);
+        if (!block->hasFreeTuples()) {
+            m_blocksWithSpace.erase(block);
+        }
         assert (m_columnCount == tuple->sizeInValues());
-        tuple->move(ret);
         return;
     }
-#endif
 
     // if there are no tuples free, we need to grab another chunk of memory
     // Allocate a new set of tuples
-    if (m_usedTuples >= m_allocatedTuples) {
-        allocateNextBlock();
-    }
+    TBPtr block = allocateNextBlock();
 
     // get free tuple
-    assert (m_usedTuples < m_allocatedTuples);
     assert (m_columnCount == tuple->sizeInValues());
-    tuple->move(dataPtrForTuple((int) m_usedTuples));
-    ++m_usedTuples;
+
+    std::pair<char*, int> retval = block->nextFreeTuple();
+
+    /**
+     * Check to see if the block needs to move to a new bucket
+     */
+    if (retval.second != -1) {
+        //Check if the block goes into the pending snapshot set of buckets
+        if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
+            //std::cout << "Swapping block to nonsnapshot bucket " << static_cast<void*>(block.get()) << " to bucket " << retval.second << std::endl;
+            block->swapToBucket(m_blocksPendingSnapshotLoad[retval.second]);
+        //Now check if it goes in with the others
+        } else if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
+            //std::cout << "Swapping block to snapshot bucket " << static_cast<void*>(block.get()) << " to bucket " << retval.second << std::endl;
+            block->swapToBucket(m_blocksNotPendingSnapshotLoad[retval.second]);
+        } else {
+            //In this case the block is actively being snapshotted and isn't eligible for merge operations at all
+            //do nothing, once the block is finished by the iterator, the iterator will return it
+        }
+    }
+
+    tuple->move(retval.first);
     //cout << "table::nextFreeTuple(" << reinterpret_cast<const void *>(this) << ") m_usedTuples == " << m_usedTuples << endl;
+
+    if (block->hasFreeTuples()) {
+        m_blocksWithSpace.insert(block);
+    }
 }
 
 // ------------------------------------------------------------------
@@ -236,12 +267,7 @@ std::string Table::debug() {
     std::ostringstream buffer;
 
     buffer << tableType() << "(" << name() << "):\n";
-    buffer << "\tAllocated Tuples:  " << m_allocatedTuples << "\n";
-#ifdef MEMCHECK_NOFREELIST
-    buffer << "\tDeleted Tuples:    " << m_deletedTupleCount << "\n";
-#else
-    buffer << "\tDeleted Tuples:    " << m_holeFreeTuples.size() << "\n";
-#endif
+    buffer << "\tAllocated Tuples:  " << allocatedTupleCount() << "\n";
     buffer << "\tNumber of Columns: " << columnCount() << "\n";
 
     //
@@ -415,7 +441,7 @@ bool Table::serializeTupleTo(SerializeOutput &serialize_io, voltdb::TableTuple *
     return true;
 }
 
-bool Table::equals(const voltdb::Table *other) const {
+bool Table::equals(voltdb::Table *other) {
     if (!(columnCount() == other->columnCount())) return false;
     if (!(indexCount() == other->indexCount())) return false;
     if (!(activeTupleCount() == other->activeTupleCount())) return false;
@@ -462,24 +488,18 @@ void Table::loadTuplesFromNoHeader(bool allowExport,
     int tupleCount = serialize_io.readInt();
     assert(tupleCount >= 0);
 
-    // allocate required data blocks first to make them alligned well
-    while (tupleCount + m_usedTuples > m_allocatedTuples) {
-        allocateNextBlock();
-    }
-
     for (int i = 0; i < tupleCount; ++i) {
-        m_tmpTarget1.move(dataPtrForTuple((int) m_usedTuples + i));
-        m_tmpTarget1.setDeletedFalse();
+        nextFreeTuple(&m_tmpTarget1);
+        m_tmpTarget1.setActiveTrue();
         m_tmpTarget1.setDirtyFalse();
+        m_tmpTarget1.setPendingDeleteFalse();
+        m_tmpTarget1.setPendingDeleteOnUndoReleaseFalse();
         m_tmpTarget1.deserializeFrom(serialize_io, stringPool);
 
         processLoadedTuple( allowExport, m_tmpTarget1);
     }
 
-    populateIndexes(tupleCount);
-
     m_tupleCount += tupleCount;
-    m_usedTuples += tupleCount;
 }
 
 void Table::loadTuplesFrom(bool allowExport,
@@ -543,4 +563,131 @@ void Table::loadTuplesFrom(bool allowExport,
 
     loadTuplesFromNoHeader( allowExport, serialize_io, stringPool);
 }
+
+bool Table::doCompactionWithinSubset(TBBucketMap *bucketMap) {
+    /**
+     * First find the two best candidate blocks
+     */
+    TBPtr fullest;
+    TBBucketI fullestIterator;
+    bool foundFullest = false;
+    for (int ii = (TUPLE_BLOCK_NUM_BUCKETS - 2); ii >= 0; ii--) {
+        fullestIterator = (*bucketMap)[ii]->begin();
+        if (fullestIterator != (*bucketMap)[ii]->end()) {
+            foundFullest = true;
+            fullest = *fullestIterator;
+            break;
+        }
+    }
+    if (!foundFullest) {
+        //std::cout << "Could not find a fullest block for compaction" << std::endl;
+        return false;
+    }
+
+    int fullestBucketChange = -1;
+    while (fullest->hasFreeTuples()) {
+        TBPtr lightest;
+        TBBucketI lightestIterator;
+        bool foundLightest = false;
+
+        for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
+            lightestIterator = (*bucketMap)[ii]->begin();
+            if (lightestIterator != (*bucketMap)[ii]->end()) {
+                lightest = *lightestIterator;
+                if (lightest != fullest) {
+                    foundLightest = true;
+                    break;
+                } else {
+                    lightestIterator++;
+                    if (lightestIterator != (*bucketMap)[ii]->end()) {
+                        lightest = *lightestIterator;
+                        foundLightest = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if (!foundLightest) {
+//            TBMapI iter = m_data.begin();
+//            while (iter != m_data.end()) {
+//                std::cout << "Block " << static_cast<void*>(iter.data().get()) << " has " <<
+//                        iter.data()->activeTuples() << " active tuples and " << iter.data()->lastCompactionOffset()
+//                        << " last compaction offset and is in bucket " <<
+//                        static_cast<void*>(iter.data()->currentBucket().get()) <<
+//                        std::endl;
+//                iter++;
+//            }
+//
+//            for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
+//                std::cout << "Bucket " << ii << "(" << static_cast<void*>((*bucketMap)[ii].get()) << ") has size " << (*bucketMap)[ii]->size() << std::endl;
+//                if (!(*bucketMap)[ii]->empty()) {
+//                    TBBucketI bucketIter = (*bucketMap)[ii]->begin();
+//                    while (bucketIter != (*bucketMap)[ii]->end()) {
+//                        std::cout << "\t" << static_cast<void*>(bucketIter->get()) << std::endl;
+//                        bucketIter++;
+//                    }
+//                }
+//            }
+//
+//            std::cout << "Could not find a lightest block for compaction" << std::endl;
+            return false;
+        }
+
+        std::pair<int, int> bucketChanges = fullest->merge(this, lightest);
+        int tempFullestBucketChange = bucketChanges.first;
+        if (tempFullestBucketChange != -1) {
+            fullestBucketChange = tempFullestBucketChange;
+        }
+
+        if (lightest->isEmpty()) {
+            notifyBlockWasCompactedAway(lightest);
+            m_data.erase(lightest->address());
+            m_blocksWithSpace.erase(lightest);
+            m_blocksNotPendingSnapshot.erase(lightest);
+            m_blocksPendingSnapshot.erase(lightest);
+        } else {
+            int lightestBucketChange = bucketChanges.second;
+            if (lightestBucketChange != -1) {
+                lightest->swapToBucket((*bucketMap)[lightestBucketChange]);
+            }
+        }
+    }
+
+    if (fullestBucketChange != -1) {
+        fullest->swapToBucket((*bucketMap)[fullestBucketChange]);
+    }
+    if (!fullest->hasFreeTuples()) {
+        m_blocksWithSpace.erase(fullest);
+    }
+    return true;
+}
+
+void Table::doIdleCompaction() {
+    if (!m_blocksNotPendingSnapshot.empty()) {
+        doCompactionWithinSubset(&m_blocksNotPendingSnapshotLoad);
+    }
+    if (!m_blocksPendingSnapshot.empty()) {
+        doCompactionWithinSubset(&m_blocksPendingSnapshotLoad);
+    }
+}
+
+void Table::doForcedCompaction() {
+    bool hadWork1 = true;
+    bool hadWork2 = true;
+    std::cout << "Doing forced compaction with allocated tuple count " << allocatedTupleCount() << std::endl;
+    while (compactionPredicate()) {
+        assert(hadWork1 || hadWork2);
+        if (!m_blocksNotPendingSnapshot.empty() && hadWork1) {
+            //std::cout << "Compacting blocks not pending snapshot " << m_blocksNotPendingSnapshot.size() << std::endl;
+            hadWork1 = doCompactionWithinSubset(&m_blocksNotPendingSnapshotLoad);
+        }
+        if (!m_blocksPendingSnapshot.empty() && hadWork2) {
+            //std::cout << "Compacting blocks pending snapshot " << m_blocksPendingSnapshot.size() << std::endl;
+            hadWork2 = doCompactionWithinSubset(&m_blocksPendingSnapshotLoad);
+        }
+    }
+    assert(!compactionPredicate());
+    std::cout << "Finished forced compaction with allocated tuple count " << allocatedTupleCount() << std::endl;
+}
+
 }

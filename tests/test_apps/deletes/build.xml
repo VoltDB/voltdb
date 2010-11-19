@@ -1,0 +1,18 @@
+<?xml version="1.0" ?>
+<project default="default" name="deletes build file">
+
+<property name='catalog' value='deletes.jar'/>
+<import file="./basebuild.xml"/>
+
+<target name="client" description="Start the client">
+    <invoke-java classname="com.DeletesClient" >
+      <jvmarg value="-Djava.library.path=${voltdb.dir}" />
+      <arg value="25000"/>              <!-- average batch size -->
+      <arg value="10"/>                 <!-- number of batches to keep -->
+      <arg value="-1"/>                 <!-- number of insert/delete cycles between pruning deceased rows -->
+      <arg value="1"/>                 <!-- number of insert/delete cycles between snapshots -->
+      <arg value="localhost" />         <!-- comma separated list of volt servers to connect to -->
+    </invoke-java>
+</target>
+
+</project>

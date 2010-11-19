@@ -110,8 +110,11 @@ voltdb::TableTuple* StatsSource::getStatsTuple(bool interval, int64_t now) {
     m_statsTuple.setNValue(3, ValueFactory::getBigIntValue(m_siteId));
     m_statsTuple.setNValue(4, ValueFactory::getBigIntValue(m_partitionId));
     updateStatsTuple(&m_statsTuple);
-    m_statsTable->insertTuple(m_statsTuple);
-    //assert (success);
+
+    // this was put in to collect history, but wasn't bounded so it leaked
+    // also maybe better to collect history elsewhere
+    //m_statsTable->insertTuple(m_statsTuple);
+
     return &m_statsTuple;
 }
 

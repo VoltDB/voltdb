@@ -109,6 +109,28 @@ public:
         return (deleted && inserted);
     }
 
+    /**
+     * Update in place an index entry with a new tuple address
+     */
+    bool replaceEntryNoKeyChange(const TableTuple *oldTupleValue,
+                              const TableTuple *newTupleValue) {
+        assert(oldTupleValue->address() != newTupleValue->address());
+        m_tmp1.setFromTuple(oldTupleValue, column_indices_, m_keySchema);
+        std::pair<MMIter,MMIter> key_iter;
+        for (key_iter = m_entries.equal_range(m_tmp1);
+             key_iter.first != key_iter.second;
+             ++(key_iter.first))
+        {
+            if (key_iter.first->second == oldTupleValue->address())
+            {
+                key_iter.first->second = newTupleValue->address();
+                m_updates++;
+                return true;
+            }
+        }
+        return false;
+    }
+
     bool checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs)
     {
         m_tmp1.setFromTuple(lhs, column_indices_, m_keySchema);

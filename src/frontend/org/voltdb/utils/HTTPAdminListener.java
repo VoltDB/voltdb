@@ -17,7 +17,15 @@
 
 package org.voltdb.utils;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.InetAddress;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
 
 import javax.servlet_voltpatches.ServletException;
 import javax.servlet_voltpatches.http.HttpServletRequest;
@@ -80,38 +88,113 @@ public class HTTPAdminListener {
                 return;
             }
 
-            // code for debugging
-            //System.out.println( method + " '" + uri + "' " );
+            // handle the CSV request for memory stats
+            if (baseRequest.getRequestURI().contains("/memorycsv/")) {
+                String msg = SystemStatsCollector.getCSV();
+                response.setContentType("text/plain;charset=utf-8");
+                response.setStatus(HttpServletResponse.SC_OK);
+                baseRequest.setHandled(true);
+                response.getWriter().print(msg);
+                return;
+            }
 
-            // example form parsing from nanohttpd website
-            /*String msg = "<html><body><h1>Hello server</h1>\n";
-            if (parms.getProperty("username") == null)
-                msg +=
-                    "<form action='?' method='get'>\n" +
-                    "  <p>Your name: <input type='text' name='username'></p>\n" +
-                    "</form>\n";
-            else
-                msg += "<p>Hello, " + parms.getProperty("username") + "!</p>";
+            try {
+                // handle the basic info page below this
 
-            msg += "</body></html>\n";*/
+                CatalogContext context = VoltDB.instance().getCatalogContext();
 
-            CatalogContext context = VoltDB.instance().getCatalogContext();
+                // get the cluster info
+                String clusterinfo = context.numberOfNodes + " hosts ";
+                clusterinfo += " with " + context.numberOfExecSites + " sites ";
+                clusterinfo += " (" + context.numberOfExecSites / context.numberOfNodes;
+                clusterinfo += " per host)";
 
-            // just print voltdb version for now
-            String msg = "<html><body>\n";
-            msg += "<h2>VoltDB Version " + VoltDB.instance().getVersionString() + "</h2>\n";
-            msg += "<p><b>Buildstring:</b> " + VoltDB.instance().getBuildString() + "</p>\n";
-            msg += "<p>Running on a cluster of " + context.numberOfNodes + " hosts ";
-            msg += " with " + context.numberOfExecSites + " sites ";
-            msg += " (" + context.numberOfExecSites / context.numberOfNodes + " per host).</p>\n";
-            msg += "</body></html>\n";
+                // get the hostname, but fail gracefully
+                String hostname = "&lt;unknownhost&gt;";
+                try {
+                    InetAddress addr = InetAddress.getLocalHost();
+                    hostname = addr.getHostName();
+                }
+                catch (Exception e) {
+                    try {
+                        InetAddress addr = InetAddress.getLocalHost();
+                        hostname = addr.getHostAddress();
+                    }
+                    catch (Exception e2) {}
+                }
 
-            response.setContentType("text/html;charset=utf-8");
-            response.setStatus(HttpServletResponse.SC_OK);
-            baseRequest.setHandled(true);
-            response.getWriter().print(msg);
+                // get memory usage
+                SystemStatsCollector.Datum d = SystemStatsCollector.getRecentSample();
+                double used = d.rss / (double) SystemStatsCollector.memorysize;
+                double javaused = d.javausedheapmem + d.javausedsysmem;
+                double javaunused = d.javatotalheapmem + d.javatotalsysmem - javaused;
+                double risk = (d.rss + javaunused) / SystemStatsCollector.memorysize;
+
+                // get csvfilename
+                String csvFilename = String.format("memstats-%s-%s.csv", hostname, new Date(System.currentTimeMillis()).toString());
+
+                // just print voltdb version for now
+                Map<String,String> params = new HashMap<String,String>();
+
+                params.put("hostname", hostname);
+                params.put("version", VoltDB.instance().getVersionString());
+                params.put("buildstring", VoltDB.instance().getBuildString());
+                params.put("cluster", clusterinfo);
+                params.put("csvfilename", csvFilename);
+
+                params.put("2mincharturl", SystemStatsCollector.getGoogleChartURL(2, 320, 240, "-2min"));
+                params.put("30mincharturl", SystemStatsCollector.getGoogleChartURL(30, 640, 240, "-30min"));
+                params.put("24hrcharturl", SystemStatsCollector.getGoogleChartURL(1440, 640, 240, "-24hrs"));
+
+                params.put("used", String.format("%.1f", used * 100.0));
+                params.put("risk", String.format("%.1f", risk * 100.0));
+                params.put("rss", String.format("%.1f", d.rss / 1024.0 / 1024.0));
+                params.put("java", String.format("%.1f", javaused / 1024.0 / 1024.0));
+                params.put("unusedjava", String.format("%.1f", javaunused / 1024.0 / 1024.0));
+
+                String msg = getHTMLForAdminPage(params);
+
+                response.setContentType("text/html;charset=utf-8");
+                response.setStatus(HttpServletResponse.SC_OK);
+                baseRequest.setHandled(true);
+                response.getWriter().print(msg);
+            }
+            catch (IOException e) {
+                e.printStackTrace();
+                throw e;
+            }
         }
 
+    }
+
+    /**
+     * Load a template for the admin page, fill it out and return the value.
+     * @param params The key-value set of variables to replace in the template.
+     * @return The completed template.
+     */
+    String getHTMLForAdminPage(Map<String,String> params) {
+        try {
+            // 8 lines or so just to read the file
+            InputStream is = HTTPAdminListener.class.getResourceAsStream("admintemplate.html");
+            BufferedReader r = new BufferedReader(new InputStreamReader(is));
+            StringBuilder sb = new StringBuilder();
+            String line = null;
+            while ((line = r.readLine()) != null) {
+                sb.append(line);
+            }
+            r.close(); is.close();
+
+            // only 4 to fill out the template
+            String template = sb.toString();
+            for (Entry<String, String> e : params.entrySet()) {
+                template = template.replace("#" + e.getKey().toUpperCase() + "#", e.getValue());
+            }
+            return template;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return "<html><body>An unrecoverable error was encountered while generating this page.</body></html>";
     }
 
     public HTTPAdminListener(boolean jsonEnabled, int port) throws Exception {

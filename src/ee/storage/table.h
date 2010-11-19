@@ -45,17 +45,23 @@
 
 #ifndef HSTORETABLE_H
 #define HSTORETABLE_H
-
+#ifndef BTREE_DEBUG
+#define BTREE_DEBUG
+#endif
 #include <string>
 #include <vector>
-#ifdef MEMCHECK_NOFREELIST
 #include <set>
-#endif
+#include <list>
 #include "common/ids.h"
 #include "common/types.h"
 #include "common/TupleSchema.h"
 #include "common/Pool.hpp"
 #include "common/tabletuple.h"
+#include "storage/TupleBlock.h"
+#include "stx/btree_set.h"
+
+class CopyOnWriteTest_CopyOnWriteIterator;
+class CompactionTest_BasicCompaction;
 
 namespace voltdb {
 
@@ -74,6 +80,8 @@ class TableStats;
 class StatsSource;
 class StreamBlock;
 class Topend;
+class TupleBlock;
+class PersistentTableUndoDeleteAction;
 
 const size_t COLUMN_DESCRIPTOR_SIZE = 1 + 4 + 4; // type, name offset, name length
 
@@ -111,7 +119,10 @@ class Table {
     friend class ExecutionEngine;
     friend class TableStats;
     friend class StatsSource;
-
+    friend class TupleBlock;
+    friend class ::CopyOnWriteTest_CopyOnWriteIterator;
+    friend class ::CompactionTest_BasicCompaction;
+    friend class PersistentTableUndoDeleteAction;
   private:
     // no default constructor, no copy
     Table();
@@ -157,14 +168,20 @@ public:
     // ------------------------------------------------------------------
     // TUPLES AND MEMORY USAGE
     // ------------------------------------------------------------------
-    int64_t allocatedTupleCount() const { return m_allocatedTuples; }
+    int64_t allocatedTupleCount() const { return m_data.size() * m_tuplesPerBlock; }
     int64_t activeTupleCount() const { return m_tupleCount; }
-#ifdef MEMCHECK_NOFREELIST
-    int64_t deletedTupleCount() const { return m_deletedTupleCount; }
-#else
-    int64_t deletedTupleCount() const { return m_holeFreeTuples.size(); }
-#endif
     TableTuple& tempTuple();
+
+    int64_t allocatedTupleMemory() const
+    {
+        return m_data.size() * m_tableAllocationSize;
+    }
+
+    int64_t occupiedTupleMemory() const
+    {
+        return m_tupleCount * m_tempTuple.tupleLength();
+    }
+
     // Only counts persistent table usage, currently
     int64_t nonInlinedMemorySize() const { return m_nonInlinedMemorySize; }
 
@@ -278,14 +295,35 @@ protected:
      */
     virtual void processLoadedTuple(bool allowExport, TableTuple &tuple) {};
 
-    /*
-     * Implemented by persistent table and called by Table::loadTuplesFrom
-     * to do add tuples to indexes
-     */
-    virtual void populateIndexes(int tupleCount) {};
+    TBPtr findBlock(char *tuple) {
+        TBMapI i =
+                        m_data.lower_bound(tuple);
+        if (i == m_data.end() && m_data.empty()) {
+            throwFatalException("Tried to find a tuple block for a tuple but couldn't find one");
+        }
+        if (i == m_data.end()) {
+            i--;
+            if (i.key() + m_tableAllocationSize < tuple) {
+                throwFatalException("Tried to find a tuple block for a tuple but couldn't find one");
+            }
+        } else {
+            if (i.key() != tuple) {
+                i--;
+                if (i.key() + m_tableAllocationSize < tuple) {
+                    throwFatalException("Tried to find a tuple block for a tuple but couldn't find one");
+                }
+            }
+        }
+        return i.data();
+    }
+
+    virtual void swapTuples(TableTuple sourceTuple, TableTuple destinationTuple) {
+        throwFatalException("Unsupported operation");
+    }
+
 public:
 
-    virtual bool equals(const voltdb::Table *other) const;
+    virtual bool equals(voltdb::Table *other);
     virtual voltdb::TableStats* getTableStats();
 
 protected:
@@ -293,52 +331,84 @@ protected:
     void resetTable();
 
     void nextFreeTuple(TableTuple *tuple);
-    char * dataPtrForTuple(const int index) const;
-    char * dataPtrForTupleForced(const int index);
-    void allocateNextBlock();
+    TBPtr allocateNextBlock();
+
+    bool doCompactionWithinSubset(TBBucketMap *bucketMap);
+    void doIdleCompaction();
+    void doForcedCompaction();
+    bool compactionPredicate() {
+        assert(m_tuplesPinnedByUndo == 0);
+        return allocatedTupleCount() - activeTupleCount() > (m_tuplesPerBlock * 3) && loadFactor() < .95;
+    }
+
+    void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
+        m_blocksPendingSnapshot.erase(nextBlock);
+        if (finishedBlock.get() != NULL && !finishedBlock->isEmpty()) {
+            m_blocksNotPendingSnapshot.insert(finishedBlock);
+            int bucketIndex = finishedBlock->calculateBucketIndex();
+            if (bucketIndex != -1) {
+                finishedBlock->swapToBucket(m_blocksNotPendingSnapshotLoad[bucketIndex]);
+            }
+        }
+    }
+
+    virtual void notifyBlockWasCompactedAway(TBPtr block) {
+        throwFatalException("Operation not supported");
+    }
 
     /**
      * Normally this will return the tuple storage to the free list.
      * In the memcheck build it will return the storage to the heap.
      */
-    void deleteTupleStorage(TableTuple &tuple);
+    void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL));
 
     void initializeWithColumns(TupleSchema *schema, const std::string* columnNames, bool ownsTupleSchema);
     virtual void onSetColumns() {};
 
+    double loadFactor() {
+        return static_cast<double>(activeTupleCount()) /
+            static_cast<double>(allocatedTupleCount());
+    }
+
     // TUPLES AND MEMORY USAGE
     TableTuple m_tempTuple;
+    boost::scoped_array<char> m_tempTupleMemory;
     /** not temptuple. these are for internal use. */
     TableTuple m_tmpTarget1, m_tmpTarget2;
     TupleSchema* m_schema;
     uint32_t m_tupleCount;
-    uint32_t m_usedTuples;
-    uint32_t m_allocatedTuples;
+    uint32_t m_tuplesPinnedByUndo;
     uint32_t m_columnCount;
     uint32_t m_tuplesPerBlock;
     uint32_t m_tupleLength;
     int64_t m_nonInlinedMemorySize;
     // pointers to chunks of data
-    std::vector<char*> m_data;
+    TBMap m_data;
 
     char *m_columnHeaderData;
     int32_t m_columnHeaderSize;
 
-#ifdef MEMCHECK_NOFREELIST
-    int64_t m_deletedTupleCount;
-    //Store pointers to all allocated tuples so they can be freed on destruction
-    std::set<void*> m_allocatedTuplePointers;
-    std::set<void*> m_deletedTuplePointers;
-#else
     /**
-     * queue of pointers to <b>once used and then deleted</b> tuples.
-     * Tuples after used_tuples index are also free, this queue
-     * is used to find "hole" tuples which were once used (before used_tuples index)
-     * and also deleted.
-     * NOTE THAT THESE ARE NOT THE ONLY FREE TUPLES.
-    */
-    std::vector<char*> m_holeFreeTuples;
-#endif
+     * Set of blocks with non-empty free lists or available tuples
+     * that have never been allocated
+    **/
+    stx::btree_set<TBPtr > m_blocksWithSpace;
+
+    /**
+     * Map from load to the blocks with level of load
+     */
+    TBBucketMap m_blocksNotPendingSnapshotLoad;
+    TBBucketMap m_blocksPendingSnapshotLoad;
+
+    /**
+     * Map containing blocks that aren't pending snapshot
+     */
+    boost::unordered_set<TBPtr> m_blocksNotPendingSnapshot;
+
+    /**
+     * Map containing blocks that are pending snapshot
+     */
+    boost::unordered_set<TBPtr> m_blocksPendingSnapshot;
 
     // schema
     std::string* m_columnNames; // array of string names
@@ -351,39 +421,14 @@ protected:
     bool m_ownsTupleSchema;
 
     const int m_tableAllocationTargetSize;
+    int m_tableAllocationSize;
 
     // ptr to global integer tracking temp table memory allocated per frag
     // should be null for persistent tables
     int* m_tempTableMemoryInBytes;
-
   private:
     int32_t m_refcount;
 };
-
-/**
- * Returns a ptr to the tuple data requested. No checks are done that the index
- * is valid.
- */
-inline char* Table::dataPtrForTuple(const int index) const {
-    size_t blockIndex = index / m_tuplesPerBlock;
-    assert (blockIndex < m_data.size());
-    char *block = m_data[blockIndex];
-    char *retval = block + ((index % m_tuplesPerBlock) * m_tupleLength);
-
-    //VOLT_DEBUG("getDataPtrForTuple = %d,%d", offset / tableAllocationUnitSize, offset % tableAllocationUnitSize);
-    return retval;
-}
-
-/**
- * Returns a ptr to the tuple data requested, and allocates whatever memory is
- * is needed if the table isn't big enough yet.
- */
-inline char* Table::dataPtrForTupleForced(const int index) {
-    while (static_cast<size_t>(index / m_tuplesPerBlock) >= m_data.size()) {
-        allocateNextBlock();
-    }
-    return dataPtrForTuple(index);
-}
 
 inline TableTuple& Table::tempTuple() {
     assert (m_tempTuple.m_data);
@@ -392,60 +437,61 @@ inline TableTuple& Table::tempTuple() {
 
 inline const std::string& Table::name()     const { return m_name; }
 
-inline void Table::allocateNextBlock() {
-#ifdef MEMCHECK
-    int bytes = m_schema->tupleLength() + TUPLE_HEADER_SIZE;
-#else
-    int bytes = m_tableAllocationTargetSize;
-#endif
-    char *memory = (char*)(new char[bytes]);
-    m_data.push_back(memory);
-#ifdef MEMCHECK_NOFREELIST
-    assert(m_allocatedTuplePointers.insert(memory).second);
-    m_deletedTuplePointers.erase(memory);
-#endif
-    m_allocatedTuples += m_tuplesPerBlock;
+inline TBPtr Table::allocateNextBlock() {
+    TBPtr block(new TupleBlock(this, m_blocksNotPendingSnapshotLoad[0]));
+    m_data.insert( block->address(), block);
+    m_blocksNotPendingSnapshot.insert(block);
     if (m_tempTableMemoryInBytes) {
-        (*m_tempTableMemoryInBytes) += bytes;
-#ifndef MEMCHECK_NOFREELIST
+        (*m_tempTableMemoryInBytes) += m_tableAllocationSize;
         if ((*m_tempTableMemoryInBytes) > MAX_TEMP_TABLE_MEMORY) {
             throw SQLException(SQLException::volt_temp_table_memory_overflow,
                                "More than 100MB of temp table memory used while"
                                " executing SQL. Aborting.");
         }
-#endif
     }
+    return block;
 }
 
-#ifdef MEMCHECK_NOFREELIST
-inline void Table::deleteTupleStorage(TableTuple &tuple) {
-    m_tupleCount--;
-    m_deletedTupleCount++;
-    assert(m_deletedTuplePointers.find(tuple.address()) == m_deletedTuplePointers.end());
-    assert(m_allocatedTuplePointers.find(tuple.address()) != m_allocatedTuplePointers.end());
-    /**
-     * Delete the tuple so valgrind can catch future invalid access
-     * and NULL out the reference in m_data so TableIterator can skip it.
-     */
-    delete []tuple.address();
-    for (std::vector<char*>::iterator iter = m_data.begin(); iter != m_data.end(); ++iter) {
-        if (*iter == tuple.address()) {
-                *iter = NULL;
-                break;
-        }
-    }
-    assert(1 == m_allocatedTuplePointers.erase(tuple.address()));
-    assert(m_deletedTuplePointers.insert(tuple.address()).second);
-}
-#else
-inline void Table::deleteTupleStorage(TableTuple &tuple) {
-    tuple.setDeletedTrue(); // does NOT free strings
+inline void Table::deleteTupleStorage(TableTuple &tuple, TBPtr block) {
+    tuple.setActiveFalse(); // does NOT free strings
 
     // add to the free list
     m_tupleCount--;
-    m_holeFreeTuples.push_back(tuple.address());
+    //m_tuplesPendingDelete--;
+
+    if (block.get() == NULL) {
+       block = findBlock(tuple.address());
+    }
+
+    bool transitioningToBlockWithSpace = !block->hasFreeTuples();
+
+    int retval = block->freeTuple(tuple.address());
+    if (retval != -1) {
+        //Check if if the block is currently pending snapshot
+        if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
+            //std::cout << "Swapping block to nonsnapshot bucket " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;
+            block->swapToBucket(m_blocksNotPendingSnapshotLoad[retval]);
+        //Check if the block goes into the pending snapshot set of buckets
+        } else if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
+            //std::cout << "Swapping block to snapshot bucket " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;
+            block->swapToBucket(m_blocksPendingSnapshotLoad[retval]);
+        } else {
+            //In this case the block is actively being snapshotted and isn't eligible for merge operations at all
+            //do nothing, once the block is finished by the iterator, the iterator will return it
+        }
+    }
+
+    if (block->isEmpty()) {
+        m_data.erase(block->address());
+        m_blocksWithSpace.erase(block);
+        m_blocksNotPendingSnapshot.erase(block);
+        assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
+        //Eliminates circular reference
+        block->swapToBucket(TBBucketPtr());
+    } else if (transitioningToBlockWithSpace) {
+        m_blocksWithSpace.insert(block);
+    }
 }
-#endif
 
 
 inline voltdb::CatalogId Table::databaseId() const { return m_databaseId; }

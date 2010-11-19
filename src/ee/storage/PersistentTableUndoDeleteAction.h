@@ -22,21 +22,18 @@
 #include "common/TupleSchema.h"
 #include "common/Pool.hpp"
 #include "common/tabletuple.h"
-#include "persistenttable.h"
 
 
 namespace voltdb {
 
+class PersistentTable;
+
 class PersistentTableUndoDeleteAction: public voltdb::UndoAction {
 public:
-    inline PersistentTableUndoDeleteAction(voltdb::TableTuple deletedTuple,
-                                           voltdb::PersistentTable *table, voltdb::Pool *pool)
+    inline PersistentTableUndoDeleteAction(char *deletedTuple,
+                                           voltdb::PersistentTable *table)
         : m_tuple(deletedTuple), m_table(table), m_wrapperOffset(0)
-    {
-        void *tupleData = pool->allocate(m_tuple.tupleLength());
-        m_tuple.move(tupleData);
-        ::memcpy(tupleData, deletedTuple.address(), m_tuple.tupleLength());
-    }
+    {}
 
     virtual ~PersistentTableUndoDeleteAction();
 
@@ -55,7 +52,7 @@ public:
      */
     void release();
 private:
-    voltdb::TableTuple m_tuple;
+    char *m_tuple;
     PersistentTable *m_table;
     size_t m_wrapperOffset;
 };

@@ -30,6 +30,7 @@ import org.voltdb.HsqlBackend;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.SiteProcedureConnection;
+import org.voltdb.StatsAgent;
 import org.voltdb.SysProcSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
@@ -55,6 +56,10 @@ import org.voltdb.utils.Pair;
 public class Statistics extends VoltSystemProcedure {
 
     private static final VoltLogger HOST_LOG = new VoltLogger("HOST");
+
+    static final int DEP_nodeMemory = (int)
+        SysProcFragmentId.PF_nodeMemory | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+    static final int DEP_nodeMemoryAggregator = (int) SysProcFragmentId.PF_nodeMemoryAggregator;
 
     static final int DEP_tableData = (int)
         SysProcFragmentId.PF_tableData | DtxnConstants.MULTIPARTITION_DEPENDENCY;
@@ -99,6 +104,8 @@ public class Statistics extends VoltSystemProcedure {
         site.registerPlanFragment(SysProcFragmentId.PF_tableAggregator, this);
         site.registerPlanFragment(SysProcFragmentId.PF_indexData, this);
         site.registerPlanFragment(SysProcFragmentId.PF_indexAggregator, this);
+        site.registerPlanFragment(SysProcFragmentId.PF_nodeMemory, this);
+        site.registerPlanFragment(SysProcFragmentId.PF_nodeMemoryAggregator, this);
         site.registerPlanFragment(SysProcFragmentId.PF_procedureData, this);
         site.registerPlanFragment(SysProcFragmentId.PF_procedureAggregator, this);
         site.registerPlanFragment(SysProcFragmentId.PF_initiatorData, this);
@@ -247,11 +254,35 @@ public class Statistics extends VoltSystemProcedure {
         else if (fragmentId == SysProcFragmentId.PF_initiatorAggregator) {
             VoltTable result = unionTables(dependencies.get(DEP_initiatorData));
             return new DependencyPair(DEP_initiatorAggregator, result);
-        } else if (fragmentId == SysProcFragmentId.PF_partitionCount) {
+        }
+        else if (fragmentId == SysProcFragmentId.PF_nodeMemory) {
+            // Choose the lowest site ID on this host to do the scan
+            // All other sites should just return empty results tables.
+            int hostId = context.getExecutionSite().getCorrespondingHostId();
+            Integer lowestSiteId =
+                VoltDB.instance().getCatalogContext().siteTracker.
+                getLowestLiveExecSiteIdForHost(hostId);
+            VoltTable result = null;
+            if (context.getExecutionSite().getSiteId() == lowestSiteId) {
+                result = StatsAgent.getNodeMemStatsTable();
+                assert(result.getRowCount() == 1);
+            }
+            else {
+                result = StatsAgent.getEmptyNodeMemStatsTable();
+                assert(result.getRowCount() == 0);
+            }
+            return new DependencyPair(DEP_nodeMemory, result);
+        }
+        else if (fragmentId == SysProcFragmentId.PF_nodeMemoryAggregator) {
+            VoltTable result = unionTables(dependencies.get(DEP_nodeMemory));
+            return new DependencyPair(DEP_nodeMemoryAggregator, result);
+        }
+        else if (fragmentId == SysProcFragmentId.PF_partitionCount) {
             VoltTable result = new VoltTable(new VoltTable.ColumnInfo("PARTITION_COUNT", VoltType.INTEGER));
             result.addRow(context.getCluster().getPartitions().size());
             return new DependencyPair(DEP_partitionCount, result);
-        } else if (fragmentId == SysProcFragmentId.PF_ioData) {
+        }
+        else if (fragmentId == SysProcFragmentId.PF_ioData) {
             final VoltTable result = new VoltTable(ioColumnInfo);
             // Choose the lowest site ID on this host to do the scan
             // All other sites should just return empty results tables.
@@ -330,7 +361,11 @@ public class Statistics extends VoltSystemProcedure {
     {
         VoltTable[] results;
         final long now = System.currentTimeMillis();
-        if (selector.toUpperCase().equals(SysProcSelector.TABLE.name())) {
+        if (selector.toUpperCase().equals(SysProcSelector.NODEMEMORY.name())) {
+            results = getNodeMemData();
+            assert(results.length == 1);
+        }
+        else if (selector.toUpperCase().equals(SysProcSelector.TABLE.name())) {
             results = getTableData(interval, now);
         }
         else if (selector.toUpperCase().equals(SysProcSelector.INDEX.name())) {
@@ -352,6 +387,7 @@ public class Statistics extends VoltSystemProcedure {
             results = getStarvationData(interval, now);
         }
         else if (selector.toUpperCase().equals(SysProcSelector.MANAGEMENT.name())) {
+            VoltTable[] nodeMemResults = getNodeMemData();
             VoltTable[] tableResults = getTableData(interval, now);
             VoltTable[] indexResults = getIndexData(interval, now);
             VoltTable[] procedureResults = getProcedureData(interval, now);
@@ -359,6 +395,7 @@ public class Statistics extends VoltSystemProcedure {
             VoltTable[] ioResults = getIOStatsData(interval, now);
             VoltTable[] starvationResults = getIOStatsData(interval, now);
             results = new VoltTable[] {
+                    nodeMemResults[0],
                     initiatorResults[0],
                     procedureResults[0],
                     ioResults[0],
@@ -370,7 +407,7 @@ public class Statistics extends VoltSystemProcedure {
             final long delta = endTime - now;
             HOST_LOG.info("Statistics invocation of MANAGEMENT selector took " + delta + " milliseconds");
         } else {
-            throw new VoltAbortException("Invalid Statistics selector.");
+            throw new VoltAbortException(String.format("Invalid Statistics selector %s.", selector));
         }
 
         return results;
@@ -445,6 +482,34 @@ public class Statistics extends VoltSystemProcedure {
         // aggregator's output dependency table.
         results =
             executeSysProcPlanFragments(pfs, DEP_initiatorAggregator);
+        return results;
+    }
+
+    private VoltTable[] getNodeMemData() {
+        VoltTable[] results;
+        SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
+        // create a work fragment to gather node memory data
+        pfs[1] = new SynthesizedPlanFragment();
+        pfs[1].fragmentId = SysProcFragmentId.PF_nodeMemory;
+        pfs[1].outputDepId = DEP_nodeMemory;
+        pfs[1].inputDepIds = new int[]{};
+        pfs[1].multipartition = true;
+        pfs[1].parameters = new ParameterSet();
+        pfs[1].parameters.setParameters();
+
+        // create a work fragment to aggregate the results.
+        // Set the MULTIPARTITION_DEPENDENCY bit to require a dependency from every site.
+        pfs[0] = new SynthesizedPlanFragment();
+        pfs[0].fragmentId = SysProcFragmentId.PF_nodeMemoryAggregator;
+        pfs[0].outputDepId = DEP_nodeMemoryAggregator;
+        pfs[0].inputDepIds = new int[]{DEP_nodeMemory};
+        pfs[0].multipartition = false;
+        pfs[0].parameters = new ParameterSet();
+
+        // distribute and execute these fragments providing pfs and id of the
+        // aggregator's output dependency table.
+        results =
+            executeSysProcPlanFragments(pfs, DEP_nodeMemoryAggregator);
         return results;
     }
 

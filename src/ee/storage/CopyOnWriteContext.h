@@ -26,18 +26,6 @@
 #include "boost/scoped_ptr.hpp"
 
 namespace voltdb {
-
-#ifdef MEMCHECK
-typedef struct {
-    std::pair<char*, int> pair;
-    int tupleLength;
-} BlockPair;
-#else
-typedef std::pair<char*, int> BlockPair;
-#endif
-typedef std::vector<BlockPair> BlockPairVector;
-typedef BlockPairVector::iterator BlockPairVectorI;
-
 class TupleIterator;
 class TempTable;
 class ReferenceSerializeOut;
@@ -64,6 +52,10 @@ public:
      * be scanned by the COWIterator
      */
     void markTupleDirty(TableTuple tuple, bool newTuple);
+
+    void notifyBlockWasCompactedAway(TBPtr block);
+
+    bool canSafelyFreeTuple(TableTuple tuple);
 
     virtual ~CopyOnWriteContext();
 
@@ -92,7 +84,7 @@ private:
      * Copied and sorted tuple blocks that can be binary searched in order to find out. The pair
      * contains the block address as well as the original index of the block.
      */
-    BlockPairVector m_blocks;
+    TBMap m_blocks;
 
     /**
      * Iterator over the table via a CopyOnWriteIterator or an iterator over

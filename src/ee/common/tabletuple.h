@@ -62,8 +62,10 @@ namespace voltdb {
 
 #define TUPLE_HEADER_SIZE 1
 
-#define DELETED_MASK 1
+#define ACTIVE_MASK 1
 #define DIRTY_MASK 2
+#define PENDING_DELETE_MASK 4
+#define PENDING_DELETE_ON_UNDO_RELEASE_MASK 8
 
 class TableColumn;
 
@@ -221,12 +223,20 @@ public:
 
     /** Is the tuple deleted or active? */
     inline bool isActive() const {
-        return (*(reinterpret_cast<const char*> (m_data)) & DELETED_MASK) == 0 ? true : false;
+        return (*(reinterpret_cast<const char*> (m_data)) & ACTIVE_MASK) ? true : false;
     }
 
     /** Is the tuple deleted or active? */
     inline bool isDirty() const {
-        return (*(reinterpret_cast<const char*> (m_data)) & DIRTY_MASK) == 0 ? false : true;
+        return (*(reinterpret_cast<const char*> (m_data)) & DIRTY_MASK) ? true : false;
+    }
+
+    inline bool isPendingDelete() const {
+        return (*(reinterpret_cast<const char*> (m_data)) & PENDING_DELETE_MASK) ? true : false;
+    }
+
+    inline bool isPendingDeleteOnUndoRelease() const {
+        return (*(reinterpret_cast<const char*> (m_data)) & PENDING_DELETE_ON_UNDO_RELEASE_MASK) ? true : false;
     }
 
     /** Is the column value null? */
@@ -290,13 +300,31 @@ public:
     size_t hashCode(size_t seed) const;
     size_t hashCode() const;
 protected:
-    inline void setDeletedTrue() {
+    inline void setActiveTrue() {
         // treat the first "value" as a boolean flag
-        *(reinterpret_cast<char*> (m_data)) |= static_cast<char>(DELETED_MASK);
+        *(reinterpret_cast<char*> (m_data)) |= static_cast<char>(ACTIVE_MASK);
     }
-    inline void setDeletedFalse() {
+    inline void setActiveFalse() {
         // treat the first "value" as a boolean flag
-        *(reinterpret_cast<char*> (m_data)) &= static_cast<char>(~DELETED_MASK);
+        *(reinterpret_cast<char*> (m_data)) &= static_cast<char>(~ACTIVE_MASK);
+    }
+
+    inline void setPendingDeleteOnUndoReleaseTrue() {
+        // treat the first "value" as a boolean flag
+        *(reinterpret_cast<char*> (m_data)) |= static_cast<char>(PENDING_DELETE_ON_UNDO_RELEASE_MASK);
+    }
+    inline void setPendingDeleteOnUndoReleaseFalse() {
+        // treat the first "value" as a boolean flag
+        *(reinterpret_cast<char*> (m_data)) &= static_cast<char>(~PENDING_DELETE_ON_UNDO_RELEASE_MASK);
+    }
+
+    inline void setPendingDeleteTrue() {
+        // treat the first "value" as a boolean flag
+        *(reinterpret_cast<char*> (m_data)) |= static_cast<char>(PENDING_DELETE_MASK);
+    }
+    inline void setPendingDeleteFalse() {
+        // treat the first "value" as a boolean flag
+        *(reinterpret_cast<char*> (m_data)) &= static_cast<char>(~PENDING_DELETE_MASK);
     }
 
     inline void setDirtyTrue() {

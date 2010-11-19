@@ -23,8 +23,6 @@
 #include "stats/StatsSource.h"
 #include "common/TupleSchema.h"
 #include "common/ids.h"
-#include "storage/table.h"
-#include "storage/table.h"
 
 namespace voltdb {
 

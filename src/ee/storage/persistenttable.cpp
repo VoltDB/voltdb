@@ -72,15 +72,13 @@
 #include "storage/ConstraintFailureException.h"
 #include "storage/MaterializedViewMetadata.h"
 #include "storage/CopyOnWriteContext.h"
+#include "storage/tableiterator.h"
 
 using namespace voltdb;
 
 void* keyTupleStorage = NULL;
 TableTuple keyTuple;
 
-/**
- * This value has to match the value in CopyOnWriteContext.cpp
- */
 #define TABLE_BLOCKSIZE 2097152
 
 PersistentTable::PersistentTable(ExecutorContext *ctx, bool exportEnabled) :
@@ -105,8 +103,9 @@ PersistentTable::~PersistentTable() {
     while (ti.next(tuple)) {
         // indexes aren't released as they don't have ownership of strings
         tuple.freeObjectColumns();
-        tuple.setDeletedTrue();
+        tuple.setActiveFalse();
     }
+
     for (int i = 0; i < m_indexCount; ++i) {
         TableIndex *index = m_indexes[i];
         if (index != m_pkeyIndex) {
@@ -169,7 +168,9 @@ bool PersistentTable::insertTuple(TableTuple &source) {
     // Then copy the source into the target
     //
     m_tmpTarget1.copyForPersistentInsert(source); // tuple in freelist must be already cleared
-    m_tmpTarget1.setDeletedFalse();
+    m_tmpTarget1.setActiveTrue();
+    m_tmpTarget1.setPendingDeleteFalse();
+    m_tmpTarget1.setPendingDeleteOnUndoReleaseFalse();
 
     /**
      * Inserts never "dirty" a tuple since the tuple is new, but...  The
@@ -228,59 +229,26 @@ bool PersistentTable::insertTuple(TableTuple &source) {
  * Insert a tuple but don't allocate a new copy of the uninlineable
  * strings or create an UndoAction or update a materialized view.
  */
-void PersistentTable::insertTupleForUndo(TableTuple &source, size_t wrapperOffset) {
+void PersistentTable::insertTupleForUndo(char *tuple, size_t wrapperOffset) {
 
-    // not null checks at first
-    if (!checkNulls(source)) {
-        throwFatalException("Failed to insert tuple into table %s for undo:"
-                            " null constraint violation\n%s\n", m_name.c_str(),
-                            source.debugNoHeader().c_str());
-    }
+    m_tmpTarget1.move(tuple);
+    m_tmpTarget1.setPendingDeleteOnUndoReleaseFalse();
+    m_tuplesPinnedByUndo--;
 
     // rollback Export
     if (m_exportEnabled) {
         m_wrapper->rollbackTo(wrapperOffset);
     }
 
-
-    // First get the next free tuple This will either give us one from
-    // the free slot list, or grab a tuple at the end of our chunk of
-    // memory
-    nextFreeTuple(&m_tmpTarget1);
-    m_tupleCount++;
-
-    // Then copy the source into the target
-    m_tmpTarget1.copy(source);
-    m_tmpTarget1.setDeletedFalse();
-
-    if (m_schema->getUninlinedObjectColumnCount() != 0)
-    {
-        m_nonInlinedMemorySize += m_tmpTarget1.getNonInlinedMemorySize();
-    }
-
-    /**
-     * See the comments in insertTuple for why this has to be done. The same situation applies here
-     * in the undo case. When the tuple was deleted a copy was made for the COW. Even though it is being
-     * reintroduced here it should be considered a new tuple and marked as dirty if the COWIterator will scan it
-     * otherwise two copies will appear. The one reintroduced by the undo action and the copy made when the tuple
-     * was originally deleted.
+    /*
+     * The only thing to do is reinsert the tuple into the indexes. It was never moved,
+     * just marked as deleted.
      */
-    if (m_COWContext.get() != NULL) {
-        m_COWContext->markTupleDirty(m_tmpTarget1, true);
-    } else {
-        m_tmpTarget1.setDirtyFalse();
-    }
-    m_tmpTarget1.isDirty();
-
     if (!tryInsertOnAllIndexes(&m_tmpTarget1)) {
         deleteTupleStorage(m_tmpTarget1);
         throwFatalException("Failed to insert tuple into table %s for undo:"
                             " unique constraint violation\n%s\n", m_name.c_str(),
                             m_tmpTarget1.debugNoHeader().c_str());
-    }
-
-    if (m_exportEnabled) {
-        m_wrapper->rollbackTo(wrapperOffset);
     }
 }
 
@@ -313,7 +281,7 @@ bool PersistentTable::updateTuple(TableTuple &source, TableTuple &target, bool u
         m_nonInlinedMemorySize += source.getNonInlinedMemorySize();
     }
 
-     source.setDeletedFalse();
+     source.setActiveTrue();
      //Copy the dirty status that was set by markTupleDirty.
      if (target.isDirty()) {
          source.setDirtyTrue();
@@ -441,12 +409,8 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
     // Just like insert, we want to remove this tuple from all of our indexes
     deleteFromAllIndexes(&target);
 
-    /**
-     * A user initiated delete needs to have the tuple "marked dirty" so that the copy is made.
-     */
-    if (m_COWContext.get() != NULL) {
-        m_COWContext->markTupleDirty(target, false);
-    }
+    target.setPendingDeleteOnUndoReleaseTrue();
+    m_tuplesPinnedByUndo++;
 
     /*
      * Create and register an undo action.
@@ -455,7 +419,8 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
     assert(undoQuantum);
     Pool *pool = undoQuantum->getDataPool();
     assert(pool);
-    PersistentTableUndoDeleteAction *ptuda = new (pool->allocate(sizeof(PersistentTableUndoDeleteAction))) PersistentTableUndoDeleteAction( target, this, pool);
+    PersistentTableUndoDeleteAction *ptuda =
+            new (pool->allocate(sizeof(PersistentTableUndoDeleteAction))) PersistentTableUndoDeleteAction( target.address(), this);
 
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
@@ -468,13 +433,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
         ptuda->setELMark(elMark);
     }
 
-    if (m_schema->getUninlinedObjectColumnCount() != 0)
-    {
-        m_nonInlinedMemorySize -= target.getNonInlinedMemorySize();
-    }
-
-    undoQuantum->registerUndoAction(ptuda);
-    deleteTupleStorage(target);
+    undoQuantum->registerUndoAction(ptuda, this);
     return true;
 }
 
@@ -521,7 +480,7 @@ void PersistentTable::deleteTupleForUndo(TableTuple &tupleCopy, size_t wrapperOf
 }
 
 TableTuple PersistentTable::lookupTuple(TableTuple tuple) {
-    TableTuple nullTuple(m_schema);//Null tuple
+    TableTuple nullTuple(m_schema);
 
     TableIndex *pkeyIndex = primaryKeyIndex();
     if (pkeyIndex == NULL) {
@@ -529,15 +488,9 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple) {
          * Do a table scan.
          */
         TableTuple tableTuple(m_schema);
-        int tableIndex = 0;
-        for (int tupleCount = 0; tupleCount < m_tupleCount; tupleCount++) {
-            /*
-             * Find the next active tuple
-             */
-            do {
-                tableTuple.move(dataPtrForTuple(tableIndex++));
-            } while (!tableTuple.isActive());
-
+        TableIterator ti(this);
+        while (ti.hasNext()) {
+            ti.next(tableTuple);
             if (tableTuple.equalsNoSchemaCheck(tuple)) {
                 return tableTuple;
             }
@@ -556,7 +509,8 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple) {
 void PersistentTable::insertIntoAllIndexes(TableTuple *tuple) {
     for (int i = m_indexCount - 1; i >= 0;--i) {
         if (!m_indexes[i]->addEntry(tuple)) {
-            throwFatalException("Failed to insert tuple into index");
+            throwFatalException(
+                    "Failed to insert tuple in Table: %s Index %s", m_name.c_str(), m_indexes[i]->getName().c_str());
         }
     }
 }
@@ -564,7 +518,8 @@ void PersistentTable::insertIntoAllIndexes(TableTuple *tuple) {
 void PersistentTable::deleteFromAllIndexes(TableTuple *tuple) {
     for (int i = m_indexCount - 1; i >= 0;--i) {
         if (!m_indexes[i]->deleteEntry(tuple)) {
-            throwFatalException("Failed to delete tuple from index");
+            throwFatalException(
+                    "Failed to delete tuple in Table: %s Index %s", m_name.c_str(), m_indexes[i]->getName().c_str());
         }
     }
 }
@@ -572,7 +527,17 @@ void PersistentTable::deleteFromAllIndexes(TableTuple *tuple) {
 void PersistentTable::updateFromAllIndexes(TableTuple &targetTuple, const TableTuple &sourceTuple) {
     for (int i = m_indexCount - 1; i >= 0;--i) {
         if (!m_indexes[i]->replaceEntry(&targetTuple, &sourceTuple)) {
-            throwFatalException("Failed to update tuple in index");
+            throwFatalException(
+                    "Failed to update tuple in Table: %s Index %s", m_name.c_str(), m_indexes[i]->getName().c_str());
+        }
+    }
+}
+
+void PersistentTable::updateWithSameKeyFromAllIndexes(TableTuple &targetTuple, const TableTuple &sourceTuple) {
+    for (int i = m_indexCount - 1; i >= 0;--i) {
+        if (!m_indexes[i]->replaceEntryNoKeyChange(&targetTuple, &sourceTuple)) {
+            throwFatalException(
+                    "Failed to update tuple in Table: %s Index %s", m_name.c_str(), m_indexes[i]->getName().c_str());
         }
     }
 }
@@ -713,20 +678,11 @@ void PersistentTable::processLoadedTuple(bool allowExport, TableTuple &tuple) {
     {
         m_nonInlinedMemorySize += tuple.getNonInlinedMemorySize();
     }
-}
 
-/*
- * Implemented by persistent table and called by Table::loadTuplesFrom
- * to do add tuples to indexes
- */
-void PersistentTable::populateIndexes(int tupleCount) {
     // populate indexes. walk the contiguous memory in the inner loop.
     for (int i = m_indexCount - 1; i >= 0;--i) {
         TableIndex *index = m_indexes[i];
-        for (int j = 0; j < tupleCount; ++j) {
-            m_tmpTarget1.move(dataPtrForTuple((int) m_usedTuples + j));
-            index->addEntry(&m_tmpTarget1);
-        }
+        index->addEntry(&tuple);
     }
 }
 
@@ -797,6 +753,16 @@ bool PersistentTable::activateCopyOnWrite(TupleSerializer *serializer, int32_t p
     if (m_tupleCount == 0) {
         return false;
     }
+
+    //All blocks are now pending snapshot
+    m_blocksPendingSnapshot.swap(m_blocksNotPendingSnapshot);
+    m_blocksPendingSnapshotLoad.swap(m_blocksNotPendingSnapshotLoad);
+    //The first block is the block the snapshot iterator is pointing at. It is not eligible for merge
+    //ops. Remove it from the set of blocks pending snapshot so it can be easily identified
+    //as missing from both sets. Then remove it from the load maps by providing it a NULL bucket
+    TBPtr firstBlock = m_data.begin().data();
+    firstBlock->swapToBucket(TBBucketPtr());
+    m_blocksPendingSnapshot.erase(m_data.begin().data());
     m_COWContext.reset(new CopyOnWriteContext( this, serializer, partitionId));
     return false;
 }
@@ -890,4 +856,23 @@ size_t PersistentTable::hashCode() {
          tuple.hashCode(hashCode);
     }
     return hashCode;
+}
+
+void PersistentTable::notifyBlockWasCompactedAway(TBPtr block) {
+    if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
+        assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
+    } else {
+        assert(m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end());
+        m_COWContext->notifyBlockWasCompactedAway(block);
+    }
+
+}
+
+void PersistentTable::swapTuples(TableTuple sourceTuple, TableTuple destinationTuple) {
+    ::memcpy(destinationTuple.address(), sourceTuple.address(), m_tupleLength);
+    sourceTuple.setActiveFalse();
+    assert(!sourceTuple.isPendingDeleteOnUndoRelease());
+    if (!sourceTuple.isPendingDelete()) {
+        updateWithSameKeyFromAllIndexes(sourceTuple, destinationTuple);
+    }
 }

@@ -48,6 +48,8 @@
 
 #include "table.h"
 #include "common/tabletuple.h"
+#include "storage/TupleBlock.h"
+#include "storage/tableiterator.h"
 
 namespace voltdb {
 
@@ -121,7 +123,7 @@ inline void TempTable::insertTupleNonVirtualWithDeepCopy(TableTuple &source, Poo
     // This will either give us one from the free slot list, or
     // grab a tuple at the end of our chunk of memory
     //
-    getNextFreeTupleInlined(&m_tmpTarget1);
+     nextFreeTuple(&m_tmpTarget1);
     ++m_tupleCount;
     //
     // Then copy the source into the target. Pass false for heapAllocateStrings.
@@ -129,7 +131,7 @@ inline void TempTable::insertTupleNonVirtualWithDeepCopy(TableTuple &source, Poo
     // are owned by a PersistentTable or part of the EE string pool.
     //
     m_tmpTarget1.copyForPersistentInsert(source, pool); // tuple in freelist must be already cleared
-    m_tmpTarget1.setDeletedFalse();
+    m_tmpTarget1.setActiveTrue();
 }
 
 inline void TempTable::insertTupleNonVirtual(TableTuple &source) {
@@ -138,7 +140,7 @@ inline void TempTable::insertTupleNonVirtual(TableTuple &source) {
     // This will either give us one from the free slot list, or
     // grab a tuple at the end of our chunk of memory
     //
-    getNextFreeTupleInlined(&m_tmpTarget1);
+    nextFreeTuple(&m_tmpTarget1);
     ++m_tupleCount;
     //
     // Then copy the source into the target. Pass false for heapAllocateStrings.
@@ -146,7 +148,9 @@ inline void TempTable::insertTupleNonVirtual(TableTuple &source) {
     // are owned by a PersistentTable or part of the EE string pool.
     //
     m_tmpTarget1.copy(source); // tuple in freelist must be already cleared
-    m_tmpTarget1.setDeletedFalse();
+    m_tmpTarget1.setActiveTrue();
+    m_tmpTarget1.setPendingDeleteFalse();
+    m_tmpTarget1.setPendingDeleteOnUndoReleaseFalse();
 }
 
 inline void TempTable::updateTupleNonVirtual(TableTuple &source, TableTuple &target) {
@@ -155,8 +159,6 @@ inline void TempTable::updateTupleNonVirtual(TableTuple &source, TableTuple &tar
 }
 
 inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
-    // as there must be no hole.
-    assert (m_tupleCount == m_usedTuples);
 
     if (m_tupleCount == 0) {
         return;
@@ -166,69 +168,23 @@ inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
     // Don't call deleteTuple() here.
     const uint16_t uninlinedStringColumnCount = m_schema->getUninlinedObjectColumnCount();
     if (freeAllocatedStrings && uninlinedStringColumnCount > 0) {
-        for (int64_t i = m_tupleCount - 1; i >= 0; i--) {
-          m_tmpTarget1.move(dataPtrForTuple((int)i));
-          m_tmpTarget1.freeObjectColumns();
+        TableIterator iter(this);
+        while (iter.hasNext()) {
+            iter.next(m_tmpTarget1);
+            m_tmpTarget1.freeObjectColumns();
         }
     }
 
     m_tupleCount = 0;
-    m_usedTuples = 0;
-
-    // make temp tables free memory allocated during fragment execution
-    // reset back to base size
-    while (m_data.size() > 1) {
-#if defined(MEMCHECK_NOFREELIST)
-        //Chunks and individual tuples storage are the same in the memcheck build so
-        //when doing memcheck call delete tuple storage to delete the chunk in order
-        //to correctly update the metadata kept in the memcheck build
-        char* chunk = m_data.back();
-        m_data.pop_back();
-        m_allocatedTuples -= m_tuplesPerBlock;
-        // if keeping track of fragment temp memory, decrease it here
-        if (m_tempTableMemoryInBytes)
-            (*m_tempTableMemoryInBytes) -= (m_tableAllocationTargetSize * (m_schema->tupleLength() + TUPLE_HEADER_SIZE));
-        assert(chunk != NULL);
-        TableTuple tuple(this->schema());
-        tuple.move(chunk);
-        deleteTupleStorage(tuple);
-        // deleteTupleStorage mutates m_tupleCount. Fix it explictly.
-        m_tupleCount = 0;
-#elif defined(MEMCHECK)
-        char* chunk = m_data.back();
-        m_data.pop_back();
-        m_allocatedTuples -= m_tuplesPerBlock;
-        if (m_tempTableMemoryInBytes) {
-            (*m_tempTableMemoryInBytes) -= (m_schema->tupleLength() + TUPLE_HEADER_SIZE);
-        }
-        assert(chunk != NULL);
-        delete[] chunk;
-#else
-        char* chunk = m_data.back();
-        m_data.pop_back();
-        m_allocatedTuples -= m_tuplesPerBlock;
-        // if keeping track of fragment temp memory, decrease it here
-        if (m_tempTableMemoryInBytes)
-            (*m_tempTableMemoryInBytes) -= m_tableAllocationTargetSize;
-        assert(chunk != NULL);
-        delete[] chunk;
-#endif
-    }
-
-    assert(m_allocatedTuples == m_tuplesPerBlock);
-}
-inline void TempTable::getNextFreeTupleInlined(TableTuple *tuple) {
-    // if there are no tuples free, we need to grab another chunk of memory
-    // Allocate a new set of tuples
-    if (m_usedTuples >= m_allocatedTuples) {
-        allocateNextBlock();
-    }
-
-    // get free tuple
-    assert (m_usedTuples < m_allocatedTuples);
-    assert (m_columnCount == tuple->sizeInValues());
-    tuple->move(dataPtrForTuple((int) m_usedTuples));
-    ++m_usedTuples;
+    if (m_tempTableMemoryInBytes)
+        (*m_tempTableMemoryInBytes) = m_tableAllocationSize;
+    TBMapI iter = m_data.begin();
+    TBPtr block = iter->second;
+    block->reset();
+    m_data.clear();
+    m_data.insert( block->address(), block);
+    m_blocksWithSpace.clear();
+    m_blocksWithSpace.insert(block);
 }
 
 }

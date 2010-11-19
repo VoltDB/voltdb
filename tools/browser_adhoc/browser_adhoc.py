@@ -10,7 +10,7 @@ import socket
 import traceback
 
 # volt server IP address and port
-volt_server_ip = 'volt4b'
+volt_server_ip = 'localhost'
 volt_server_port = 21212
 
 # volt username/password if database security is enabled
@@ -72,8 +72,10 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 self.wfile.write('  <input type=submit name="bsubmit" value="Submit SQL"><br><br><br>\n')
                 self.wfile.write('  Display VoltDB Statistics for:<br>\n')
                 self.wfile.write('  <input type=submit name="bsubmit" value="Tables">\n')
+                self.wfile.write('  <input type=submit name="bsubmit" value="Indexes">\n')
                 self.wfile.write('  <input type=submit name="bsubmit" value="Procedures">\n')
                 self.wfile.write('  <input type=submit name="bsubmit" value="Initiators">\n')
+                self.wfile.write('  <input type=submit name="bsubmit" value="Node Memory">\n')
                 self.wfile.write('  <input type=submit name="bsubmit" value="SystemInfo">\n')
                 self.wfile.write('  <input type=submit name="bsubmit" value="IO">\n')
                 self.wfile.write('  <input type=submit name="bsubmit" value="Starvation">\n')
@@ -150,12 +152,18 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 elif (button_clicked == 'TABLES'):
                     self.wfile.write('Table Statistics<br>\n');
                     response = client.execute('stat table %d' % (interval_poll))
+                elif (button_clicked == 'INDEXES'):
+                    self.wfile.write('Index Statistics<br>\n');
+                    response = client.execute('stat index %d' % (interval_poll))
                 elif (button_clicked == 'PROCEDURES'):
                     self.wfile.write('Procedure Statistics<br>\n');
                     response = client.execute('stat procedure %d' % (interval_poll))
                 elif (button_clicked == 'INITIATORS'):
                     self.wfile.write('Initiator Statistics<br>\n');
                     response = client.execute('stat initiator %d' % (interval_poll))
+                elif (button_clicked == 'NODE MEMORY'):
+                    self.wfile.write('Node Memory Statistics<br>\n');
+                    response = client.execute('stat nodememory %d' % (interval_poll))
                 elif (button_clicked == 'IO'):
                     self.wfile.write('IO Statistics<br>\n');
                     response = client.execute('stat iostats %d' % (interval_poll))

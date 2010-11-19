@@ -100,6 +100,19 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         //System.out.println("Test statistics table: " + results[0].toString());
     }
 
+    public void testStatistics_NodeMem() throws Exception {
+        Client client = getClient();
+        VoltTable results[] = null;
+
+        Thread.sleep(1000);
+
+        results = client.callProcedure("@Statistics", "nodememory", 0).getResults();
+        // one aggregate table returned
+        assertTrue(results.length == 1);
+
+        System.out.println("Node memory statistics table: " + results[0].toString());
+    }
+
     public void testStatistics_Procedure() throws Exception {
         Client client  = getClient();
         VoltTable results[] = null;

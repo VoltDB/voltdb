@@ -146,6 +146,12 @@ public:
                               const TableTuple *newTupleValue) = 0;
 
     /**
+     * Update in place an index entry with a new tuple address
+     */
+    virtual bool replaceEntryNoKeyChange(const TableTuple *oldTupleValue,
+                              const TableTuple *newTupleValue) = 0;
+
+    /**
      * just returns whether the value is already stored. no
      * modification occurs.
      */
