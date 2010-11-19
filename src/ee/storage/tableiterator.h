@@ -54,14 +54,26 @@
 
 namespace voltdb {
 
+class TempTable;
+class PersistentTable;
+
 /**
  * Iterator for table which neglects deleted tuples.
  * TableIterator is a small and copiable object.
  * You can copy it, not passing a pointer of it.
+ *
+ * This class should be a virtual interface or should
+ * be templated on the underlying table data iterator.
+ * Either change requires some updating of the iterators
+ * that are persvasively stack allocated...
+ *
  */
 class TableIterator : public TupleIterator {
+
+    friend class TempTable;
+    friend class PersistentTable;
+
 public:
-    TableIterator( Table *parent);
 
     /**
      * Updates the given tuple so that it points to the next tuple in the table.
@@ -73,7 +85,16 @@ public:
     int getLocation() const;
 
 private:
+    // Get an iterator via table->iterator()
+    TableIterator(Table *, TBMapI);
+    TableIterator(Table *, std::vector<TBPtr>::iterator);
 
+
+    bool persistentNext(TableTuple &out);
+    bool tempNext(TableTuple &out);
+
+    void reset(TBMapI);
+    void reset(std::vector<TBPtr>::iterator);
     bool continuationPredicate();
 
     /*
@@ -97,30 +118,83 @@ private:
     uint32_t m_tupleLength;
     uint32_t m_tuplesPerBlock;
     TBPtr m_currentBlock;
+    std::vector<TBPtr>::iterator m_tempBlockIterator;
+    bool m_tempTableIterator;
 };
 
-inline TableIterator::TableIterator(Table *parent)
-    :
-      m_table(parent), m_blockIterator(parent->m_data.begin()),
-      m_dataPtr(NULL), m_location(0), m_blockOffset(0),
-    m_activeTuples((int) m_table->m_tupleCount),
-    m_foundTuples(0), m_tupleLength(parent->m_tupleLength),
-    m_tuplesPerBlock(parent->m_tuplesPerBlock), m_currentBlock(NULL)
+inline TableIterator::TableIterator(Table *parent, std::vector<TBPtr>::iterator start)
+    : m_table(parent),
+      m_dataPtr(NULL),
+      m_location(0),
+      m_blockOffset(0),
+      m_activeTuples((int) m_table->m_tupleCount),
+      m_foundTuples(0), m_tupleLength(parent->m_tupleLength),
+      m_tuplesPerBlock(parent->m_tuplesPerBlock), m_currentBlock(NULL),
+      m_tempBlockIterator(start),
+      m_tempTableIterator(true)
     {
     }
+
+
+inline TableIterator::TableIterator(Table *parent, TBMapI start)
+    :
+      m_table(parent),
+      m_blockIterator(start),
+      m_dataPtr(NULL),
+      m_location(0),
+      m_blockOffset(0),
+      m_activeTuples((int) m_table->m_tupleCount),
+      m_foundTuples(0), m_tupleLength(parent->m_tupleLength),
+      m_tuplesPerBlock(parent->m_tuplesPerBlock), m_currentBlock(NULL),
+      m_tempTableIterator(false)
+    {
+    }
+
+inline void TableIterator::reset(std::vector<TBPtr>::iterator start) {
+    m_tempBlockIterator = start;
+    m_dataPtr= NULL;
+    m_location = 0;
+    m_blockOffset = 0;
+    m_activeTuples = (int) m_table->m_tupleCount;
+    m_foundTuples = 0;
+    m_tupleLength = m_table->m_tupleLength;
+    m_tuplesPerBlock = m_table->m_tuplesPerBlock;
+    m_currentBlock = NULL;
+}
+
+inline void TableIterator::reset(TBMapI start) {
+    m_blockIterator = start;
+    m_dataPtr= NULL;
+    m_location = 0;
+    m_blockOffset = 0;
+    m_activeTuples = (int) m_table->m_tupleCount;
+    m_foundTuples = 0;
+    m_tupleLength = m_table->m_tupleLength;
+    m_tuplesPerBlock = m_table->m_tuplesPerBlock;
+    m_currentBlock = NULL;
+}
 
 inline bool TableIterator::hasNext() {
     return m_foundTuples < m_activeTuples;
 }
 
 inline bool TableIterator::next(TableTuple &out) {
+    if (!m_tempTableIterator) {
+        return persistentNext(out);
+    }
+    else {
+        return tempNext(out);
+    }
+}
+
+inline bool TableIterator::persistentNext(TableTuple &out) {
     while (m_foundTuples < m_activeTuples) {
         if (m_currentBlock == NULL ||
-                m_blockOffset >= m_currentBlock->unusedTupleBoundry()) {
-            assert(m_blockIterator != m_table->m_data.end());
-            if (m_blockIterator == m_table->m_data.end()) {
-                throwFatalException("Could not find the expected number of tuples during a table scan");
-            }
+            m_blockOffset >= m_currentBlock->unusedTupleBoundry()) {
+//            assert(m_blockIterator != m_table->m_data.end());
+//            if (m_blockIterator == m_table->m_data.end()) {
+//                throwFatalException("Could not find the expected number of tuples during a table scan");
+//            }
             m_dataPtr = m_blockIterator.key();
             m_currentBlock = m_blockIterator.data();
             m_blockOffset = 0;
@@ -151,6 +225,37 @@ inline bool TableIterator::next(TableTuple &out) {
     }
     return false;
 }
+
+inline bool TableIterator::tempNext(TableTuple &out) {
+    if (m_foundTuples < m_activeTuples) {
+        if (m_currentBlock == NULL ||
+            m_blockOffset >= m_currentBlock->unusedTupleBoundry())
+        {
+            m_currentBlock = *m_tempBlockIterator;
+            m_dataPtr = m_currentBlock->address();
+            m_blockOffset = 0;
+            m_tempBlockIterator++;
+        } else {
+            m_dataPtr += m_tupleLength;
+        }
+        assert (out.sizeInValues() == m_table->columnCount());
+        out.move(m_dataPtr);
+        assert(m_dataPtr < m_dataPtr + m_table->m_tableAllocationTargetSize);
+
+        //assert(m_foundTuples == m_location);
+
+        ++m_location;
+        ++m_blockOffset;
+
+        //assert(out.isActive());
+        ++m_foundTuples;
+        //assert(m_foundTuples == m_location);
+        return true;
+    }
+
+    return false;
+}
+
 
 inline int TableIterator::getLocation() const {
     return m_location;

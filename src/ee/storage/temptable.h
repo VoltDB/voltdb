@@ -57,6 +57,10 @@ class TableColumn;
 class TableFactory;
 class TableStats;
 
+// use no more than MAX_TEMP_TABLE_MEMORY per fragment
+const int MAX_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
+
+
 /**
  * Represents a Temporary Table to store temporary result (final
  * result or intermediate result).  Temporary Table has no indexes,
@@ -68,61 +72,95 @@ class TableStats;
  */
 class TempTable : public Table {
     friend class TableFactory;
+    friend class TableIterator;
 
   private:
     // no copies, no assignment
     TempTable(TempTable const&);
     TempTable operator=(TempTable const&);
 
+    // default iterator
+    TableIterator m_iter;
+
   public:
-        virtual ~TempTable();
+    // Return the table iterator by reference
+    TableIterator& iterator() {
+        m_iter.reset(m_data.begin());
+        return m_iter;
+    }
 
-        // ------------------------------------------------------------------
-        // OPERATIONS
-        // ------------------------------------------------------------------
-        void deleteAllTuples(bool freeAllocatedStrings);
-        bool insertTuple(TableTuple &source);
-        bool updateTuple(TableTuple &source, TableTuple &target, bool updatesIndexes);
-        bool deleteTuple(TableTuple &tuple, bool); // deleting tuple from temp table is not supported. use deleteAllTuples instead
-        void deleteAllTuplesNonVirtual(bool freeAllocatedStrings);
+    TableIterator* makeIterator() {
+        return new TableIterator(this, m_data.begin());
+    }
 
-        /**
-         * Uses the pool to do a deep copy of the tuple including allocations
-         * for all uninlined columns. Used by CopyOnWriteContext to back up tuples
-         * before they are dirtied
-         */
-        void insertTupleNonVirtualWithDeepCopy(TableTuple &source, Pool *pool);
+    virtual ~TempTable();
 
-        /**
-         * Does a shallow copy that copies the pointer to uninlined columns.
-         */
-        void insertTupleNonVirtual(TableTuple &source);
-        void updateTupleNonVirtual(TableTuple &source, TableTuple &target);
+    // ------------------------------------------------------------------
+    // OPERATIONS
+    // ------------------------------------------------------------------
+    void deleteAllTuples(bool freeAllocatedStrings);
+    bool insertTuple(TableTuple &source);
+    bool updateTuple(TableTuple &source, TableTuple &target, bool updatesIndexes);
 
-        // ------------------------------------------------------------------
-        // INDEXES
-        // ------------------------------------------------------------------
-        int getNumOfIndexes() const             { return (0); }
-        int getNumOfUniqueIndexes() const       { return (0); }
+    // deleting tuple from temp table is not supported. use deleteAllTuples instead
+    bool deleteTuple(TableTuple &tuple, bool);
+    void deleteAllTuplesNonVirtual(bool freeAllocatedStrings);
 
-        // ------------------------------------------------------------------
-        // UTILITIY
-        // ------------------------------------------------------------------
-        std::string tableType() const;
-        void getNextFreeTupleInlined(TableTuple *tuple);
-        voltdb::TableStats* getTableStats();
+    /**
+     * Uses the pool to do a deep copy of the tuple including allocations
+     * for all uninlined columns. Used by CopyOnWriteContext to back up tuples
+     * before they are dirtied
+     */
+    void insertTupleNonVirtualWithDeepCopy(TableTuple &source, Pool *pool);
 
-    protected:
-        // can not use this constructor to coerce a cast
-        explicit TempTable();
+    /**
+     * Does a shallow copy that copies the pointer to uninlined columns.
+     */
+    void insertTupleNonVirtual(TableTuple &source);
+    void updateTupleNonVirtual(TableTuple &source, TableTuple &target);
+
+    // ------------------------------------------------------------------
+    // INDEXES
+    // ------------------------------------------------------------------
+    int getNumOfIndexes() const             { return (0); }
+    int getNumOfUniqueIndexes() const       { return (0); }
+
+    // ------------------------------------------------------------------
+    // UTILITIY
+    // ------------------------------------------------------------------
+    std::string tableType() const;
+    void getNextFreeTupleInlined(TableTuple *tuple);
+    voltdb::TableStats* getTableStats();
+
+    // ptr to global integer tracking temp table memory allocated per frag
+    // should be null for persistent tables
+    int* m_tempTableMemoryInBytes;
+
+  protected:
+    // can not use this constructor to coerce a cast
+    explicit TempTable();
+
+    size_t allocatedBlockCount() const {
+        return m_data.size();
+    }
+
+    TBPtr allocateNextBlock();
+    void nextFreeTuple(TableTuple *tuple);
+
+    virtual void onSetColumns() {
+        m_data.clear();
+    };
+
+  private:
+    // pointers to chunks of data. Specific to table impl. Don't leak this type.
+    std::vector<TBPtr> m_data;
 };
 
 inline void TempTable::insertTupleNonVirtualWithDeepCopy(TableTuple &source, Pool *pool) {
-    //
-    // First get the next free tuple
-    // This will either give us one from the free slot list, or
-    // grab a tuple at the end of our chunk of memory
-    //
+
+    // First get the next free tuple by
+    // grabbing a tuple at the end of our chunk of memory
+
      nextFreeTuple(&m_tmpTarget1);
     ++m_tupleCount;
     //
@@ -168,7 +206,7 @@ inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
     // Don't call deleteTuple() here.
     const uint16_t uninlinedStringColumnCount = m_schema->getUninlinedObjectColumnCount();
     if (freeAllocatedStrings && uninlinedStringColumnCount > 0) {
-        TableIterator iter(this);
+        TableIterator iter(this, m_data.begin());
         while (iter.hasNext()) {
             iter.next(m_tmpTarget1);
             m_tmpTarget1.freeObjectColumns();
@@ -176,16 +214,50 @@ inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
     }
 
     m_tupleCount = 0;
-    if (m_tempTableMemoryInBytes)
-        (*m_tempTableMemoryInBytes) = m_tableAllocationSize;
-    TBMapI iter = m_data.begin();
-    TBPtr block = iter->second;
-    block->reset();
-    m_data.clear();
-    m_data.insert( block->address(), block);
-    m_blocksWithSpace.clear();
-    m_blocksWithSpace.insert(block);
+    while (m_data.size() > 1) {
+        m_data.pop_back();
+        if (m_tempTableMemoryInBytes) {
+            (*m_tempTableMemoryInBytes) -= m_tableAllocationSize;
+        }
+    }
+
+    // cheap clear of the preserved first block
+    if (!m_data.empty()) {
+        m_data[0]->reset();
+    }
 }
+
+inline TBPtr TempTable::allocateNextBlock() {
+    TBPtr block(new TupleBlock(this, TBBucketPtr()));
+    m_data.push_back(block);
+
+    if (m_tempTableMemoryInBytes) {
+        (*m_tempTableMemoryInBytes) += m_tableAllocationSize;
+        if ((*m_tempTableMemoryInBytes) > MAX_TEMP_TABLE_MEMORY) {
+            throw SQLException(SQLException::volt_temp_table_memory_overflow,
+                               "More than 100MB of temp table memory used while"
+                               " executing SQL. Aborting.");
+        }
+    }
+    return block;
+}
+
+inline void TempTable::nextFreeTuple(TableTuple *tuple) {
+
+    if (m_data.empty()) {
+        allocateNextBlock();
+    }
+
+    TBPtr block = m_data.back();
+    if (!block->hasFreeTuples()) {
+        block = allocateNextBlock();
+    }
+
+    std::pair<char*, int> pair = block->nextFreeTuple();
+    tuple->move(pair.first);
+    return;
+}
+
 
 }
 

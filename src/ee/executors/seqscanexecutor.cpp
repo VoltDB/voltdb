@@ -180,7 +180,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         // our expression, we'll insert them into the output table.
         //
         TableTuple tuple(target_table->schema());
-        TableIterator iterator(target_table);
+        TableIterator iterator = target_table->iterator();
         AbstractExpression *predicate = node->getPredicate();
         VOLT_TRACE("SCAN PREDICATE A:\n%s\n", predicate->debug(true).c_str());
 

@@ -859,7 +859,7 @@ bool AggregateExecutor<aggregateType>::p_execute(const NValueArray &params)
             node->getAggregateInputExpressions()[i]->getValueType();
     }
 
-    TableIterator it(input_table);
+    TableIterator it = input_table->iterator();
 
     std::vector<AbstractExpression*> groupByExpressions =
         node->getGroupByExpressions();

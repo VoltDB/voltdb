@@ -276,7 +276,7 @@ TEST_F(CompactionTest, BasicCompaction) {
     m_table->doForcedCompaction();
 
     std::set<int32_t> pkeysFoundAfterDelete;
-    TableIterator iter = m_table->tableIterator();
+    TableIterator iter = m_table->iterator();
     TableTuple tuple(m_table->schema());
     while (iter.next(tuple)) {
         int32_t pkey = ValuePeeker::peekAsInteger(tuple.getNValue(0));

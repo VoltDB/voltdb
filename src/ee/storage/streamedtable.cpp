@@ -19,6 +19,7 @@
 #include "StreamedTableUndoAction.hpp"
 #include "TupleStreamWrapper.h"
 #include "common/executorcontext.hpp"
+#include "tableiterator.h"
 
 using namespace voltdb;
 
@@ -54,11 +55,32 @@ StreamedTable::~StreamedTable()
     delete m_wrapper;
 }
 
+TableIterator& StreamedTable::iterator() {
+    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                  "May not iterate a streamed table.");
+}
+
+TableIterator* StreamedTable::makeIterator() {
+    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                  "May not iterate a streamed table.");
+}
+
 void StreamedTable::deleteAllTuples(bool freeAllocatedStrings)
 {
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                   "May not delete all tuples of a streamed"
                                   " table.");
+}
+
+TBPtr StreamedTable::allocateNextBlock() {
+    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                  "May not use block alloc interface with "
+                                  "streamed tables.");
+}
+
+void StreamedTable::nextFreeTuple(TableTuple *) {
+    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                  "May not use nextFreeTuple with streamed tables.");
 }
 
 bool StreamedTable::insertTuple(TableTuple &source)

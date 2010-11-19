@@ -101,19 +101,27 @@ class PersistentTableUndoDeleteAction;
  * value in data and adds an entry to UndoLog. We chose eager update
  * policy because we expect reverting rarely occurs.
  */
+
 class PersistentTable : public Table, public UndoQuantumReleaseInterest {
+    friend class CopyOnWriteContext;
+    friend class CopyOnWriteIterator;
     friend class TableFactory;
     friend class TableTuple;
     friend class TableIndex;
     friend class TableIterator;
     friend class PersistentTableStats;
     friend class PersistentTableUndoDeleteAction;
+    friend class ::CopyOnWriteTest_CopyOnWriteIterator;
     friend class ::CompactionTest_BasicCompaction;
+
   private:
     // no default ctor, no copy, no assignment
     PersistentTable();
     PersistentTable(PersistentTable const&);
     PersistentTable operator=(PersistentTable const&);
+
+    // default iterator
+    TableIterator m_iter;
 
   public:
     virtual ~PersistentTable();
@@ -122,6 +130,16 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
         if (compactionPredicate()) {
             doForcedCompaction();
         }
+    }
+
+    // Return a table iterator by reference
+    TableIterator& iterator() {
+        m_iter.reset(m_data.begin());
+        return m_iter;
+    }
+
+    TableIterator* makeIterator() {
+        return new TableIterator(this, m_data.begin());
     }
 
     // ------------------------------------------------------------------
@@ -182,7 +200,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     virtual std::string debug();
 
     int partitionColumn() { return m_partitionColumn; }
-
     /** inlined here because it can't be inlined in base Table, as it
      *  uses Tuple.copy.
      */
@@ -253,6 +270,27 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     }
 
 protected:
+
+    size_t allocatedBlockCount() const {
+        return m_data.size();
+    }
+
+    void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
+        m_blocksPendingSnapshot.erase(nextBlock);
+        if (finishedBlock.get() != NULL && !finishedBlock->isEmpty()) {
+            m_blocksNotPendingSnapshot.insert(finishedBlock);
+            int bucketIndex = finishedBlock->calculateBucketIndex();
+            if (bucketIndex != -1) {
+                finishedBlock->swapToBucket(m_blocksNotPendingSnapshotLoad[bucketIndex]);
+            }
+        }
+    }
+
+    void nextFreeTuple(TableTuple *tuple);
+    bool doCompactionWithinSubset(TBBucketMap *bucketMap);
+    void doIdleCompaction();
+    void doForcedCompaction();
+
     // ------------------------------------------------------------------
     // FROM PIMPL
     // ------------------------------------------------------------------
@@ -274,11 +312,22 @@ protected:
     void notifyBlockWasCompactedAway(TBPtr block);
     void swapTuples(TableTuple sourceTuple, TableTuple destinationTuple);
 
+    /**
+     * Normally this will return the tuple storage to the free list.
+     * In the memcheck build it will return the storage to the heap.
+     */
+    void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL));
+
+    // helper for deleteTupleStorage
+    TBPtr findBlock(char *tuple);
+
     /*
      * Implemented by persistent table and called by Table::loadTuplesFrom
      * to do additional processing for views and Export
      */
     virtual void processLoadedTuple(bool allowExport, TableTuple &tuple);
+
+    TBPtr allocateNextBlock();
 
     // pointer to current transaction id and other "global" state.
     // abstract this out of VoltDBEngine to avoid creating dependendencies
@@ -317,6 +366,29 @@ protected:
 
     //Recovery stuff
     boost::scoped_ptr<RecoveryContext> m_recoveryContext;
+
+
+
+    // STORAGE TRACKING
+
+    // Map from load to the blocks with level of load
+    TBBucketMap m_blocksNotPendingSnapshotLoad;
+    TBBucketMap m_blocksPendingSnapshotLoad;
+
+    // Map containing blocks that aren't pending snapshot
+    boost::unordered_set<TBPtr> m_blocksNotPendingSnapshot;
+
+    // Map containing blocks that are pending snapshot
+    boost::unordered_set<TBPtr> m_blocksPendingSnapshot;
+
+    // Set of blocks with non-empty free lists or available tuples
+    // that have never been allocated
+    stx::btree_set<TBPtr > m_blocksWithSpace;
+
+  private:
+    // pointers to chunks of data. Specific to table impl. Don't leak this type.
+    TBMap m_data;
+
 };
 
 inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {
@@ -324,6 +396,79 @@ inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {
     m_tempTuple.copy(source);
     return m_tempTuple;
 }
+
+
+inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block) {
+    tuple.setActiveFalse(); // does NOT free strings
+
+    // add to the free list
+    m_tupleCount--;
+    //m_tuplesPendingDelete--;
+
+    if (block.get() == NULL) {
+       block = findBlock(tuple.address());
+    }
+
+    bool transitioningToBlockWithSpace = !block->hasFreeTuples();
+
+    int retval = block->freeTuple(tuple.address());
+    if (retval != -1) {
+        //Check if if the block is currently pending snapshot
+        if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
+            //std::cout << "Swapping block " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;
+            block->swapToBucket(m_blocksNotPendingSnapshotLoad[retval]);
+        //Check if the block goes into the pending snapshot set of buckets
+        } else if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
+            block->swapToBucket(m_blocksPendingSnapshotLoad[retval]);
+        } else {
+            //In this case the block is actively being snapshotted and isn't eligible for merge operations at all
+            //do nothing, once the block is finished by the iterator, the iterator will return it
+        }
+    }
+
+    if (block->isEmpty()) {
+        m_data.erase(block->address());
+        m_blocksWithSpace.erase(block);
+        m_blocksNotPendingSnapshot.erase(block);
+        assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
+        //Eliminates circular reference
+        block->swapToBucket(TBBucketPtr());
+    } else if (transitioningToBlockWithSpace) {
+        m_blocksWithSpace.insert(block);
+    }
 }
+
+inline TBPtr PersistentTable::findBlock(char *tuple) {
+    TBMapI i = m_data.lower_bound(tuple);
+    if (i == m_data.end() && m_data.empty()) {
+        throwFatalException("Tried to find a tuple block for a tuple but couldn't find one");
+    }
+    if (i == m_data.end()) {
+        i--;
+        if (i.key() + m_tableAllocationSize < tuple) {
+            throwFatalException("Tried to find a tuple block for a tuple but couldn't find one");
+        }
+    } else {
+        if (i.key() != tuple) {
+            i--;
+            if (i.key() + m_tableAllocationSize < tuple) {
+                throwFatalException("Tried to find a tuple block for a tuple but couldn't find one");
+            }
+        }
+    }
+    return i.data();
+}
+
+inline TBPtr PersistentTable::allocateNextBlock() {
+    TBPtr block(new TupleBlock(this, m_blocksNotPendingSnapshotLoad[0]));
+    m_data.insert( block->address(), block);
+    m_blocksNotPendingSnapshot.insert(block);
+    return block;
+}
+
+
+}
+
+
 
 #endif

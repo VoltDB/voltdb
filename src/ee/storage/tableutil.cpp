@@ -62,7 +62,7 @@ bool getRandomTuple(const voltdb::Table* table, voltdb::TableTuple &out) {
     int cnt = (int)table->activeTupleCount();
     if (cnt > 0) {
         int idx = (rand() % cnt);
-        voltdb::TableIterator it = table2->tableIterator();
+        voltdb::TableIterator it = table2->iterator();
         while (it.next(out)) {
             if (idx-- == 0) {
                 return true;
@@ -129,7 +129,7 @@ bool equals(const voltdb::Table* table, voltdb::TableTuple *tuple0, voltdb::Tabl
 bool copy(const voltdb::Table *from_table, voltdb::Table* to_table) {
     voltdb::Table* fromtable2 = const_cast<voltdb::Table*>(from_table);
     assert(from_table->columnCount() == to_table->columnCount());
-    voltdb::TableIterator iterator = fromtable2->tableIterator();
+    voltdb::TableIterator iterator = fromtable2->iterator();
     voltdb::TableTuple tuple(fromtable2->schema());
     while (iterator.next(tuple)) {
         if (!to_table->insertTuple(tuple)) {
@@ -142,7 +142,7 @@ bool copy(const voltdb::Table *from_table, voltdb::Table* to_table) {
 bool getTupleAt(const voltdb::Table* table, int64_t position, voltdb::TableTuple &out) {
     assert(table);
     voltdb::Table* table2 = const_cast<voltdb::Table*>(table);
-    voltdb::TableIterator iterator = table2->tableIterator();
+    voltdb::TableIterator iterator = table2->iterator();
     int64_t ctr = 0;
     while (iterator.next(out)) {
         if (ctr++ == position) {

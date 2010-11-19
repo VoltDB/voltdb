@@ -85,28 +85,10 @@ class PersistentTableUndoDeleteAction;
 
 const size_t COLUMN_DESCRIPTOR_SIZE = 1 + 4 + 4; // type, name offset, name length
 
-// use no more than 100mb for temp tables per fragment
-const int MAX_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
-
 /**
  * Represents a table which might or might not be a temporary table.
- * Both TempTable and PersistentTable derive from this class.
- *
- *   free_tuples: a linked list of free (unused) tuples. The data contains
- *     all tuples, including deleted tuples. deleted tuples in this linked
- *     list are reused on next insertion.
- *   temp_tuple: when a transaction is inserting a new tuple, this tuple
- *     object is used as a reusable value-holder for the new tuple.
- *     In this way, we don't have to allocate a temporary tuple each time.
- *
- * Allocated/Active/Deleted tuples:
- *   Tuples in data are called allocated tuples.
- *   Tuples in free_tuples are called deleted tuples.
- *   Tuples in data but not in free_tuples are called active tuples.
- *   Following methods return the number of tuples in each state.
- *         int allocatedTupleCount() const;
- *         int activeTupleCount() const;
- *         int getNumOfTuplesDeleted() const;
+ * All tables, TempTable, PersistentTable and StreamedTable are derived
+ * from this class.
  *
  * Table objects including derived classes are only instantiated via a
  * factory class (TableFactory).
@@ -114,21 +96,18 @@ const int MAX_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
 class Table {
     friend class TableFactory;
     friend class TableIterator;
-    friend class CopyOnWriteIterator;
     friend class CopyOnWriteContext;
     friend class ExecutionEngine;
     friend class TableStats;
     friend class StatsSource;
     friend class TupleBlock;
-    friend class ::CopyOnWriteTest_CopyOnWriteIterator;
-    friend class ::CompactionTest_BasicCompaction;
     friend class PersistentTableUndoDeleteAction;
+
   private:
-    // no default constructor, no copy
     Table();
     Table(Table const&);
 
-public:
+  public:
     virtual ~Table();
 
     /*
@@ -154,8 +133,8 @@ public:
     // ------------------------------------------------------------------
     // ACCESS METHODS
     // ------------------------------------------------------------------
-    /** please use TableIterator(table), not this function as this function can't be inlined.*/
-    TableIterator tableIterator();
+    virtual TableIterator& iterator() = 0;
+    virtual TableIterator *makeIterator() = 0;
 
     // ------------------------------------------------------------------
     // OPERATIONS
@@ -168,32 +147,56 @@ public:
     // ------------------------------------------------------------------
     // TUPLES AND MEMORY USAGE
     // ------------------------------------------------------------------
-    int64_t allocatedTupleCount() const { return m_data.size() * m_tuplesPerBlock; }
-    int64_t activeTupleCount() const { return m_tupleCount; }
-    TableTuple& tempTuple();
+    virtual size_t allocatedBlockCount() const = 0;
 
-    int64_t allocatedTupleMemory() const
-    {
-        return m_data.size() * m_tableAllocationSize;
+    TableTuple& tempTuple() {
+        assert (m_tempTuple.m_data);
+        return m_tempTuple;
     }
 
-    int64_t occupiedTupleMemory() const
-    {
+    int64_t allocatedTupleCount() const {
+        return allocatedBlockCount() * m_tuplesPerBlock;
+    }
+
+    int64_t activeTupleCount() const {
+        return m_tupleCount;
+    }
+
+    int64_t allocatedTupleMemory() const {
+        return allocatedBlockCount() * m_tableAllocationSize;
+    }
+
+    int64_t occupiedTupleMemory() const {
         return m_tupleCount * m_tempTuple.tupleLength();
     }
 
     // Only counts persistent table usage, currently
-    int64_t nonInlinedMemorySize() const { return m_nonInlinedMemorySize; }
+    int64_t nonInlinedMemorySize() const {
+        return m_nonInlinedMemorySize;
+    }
 
     // ------------------------------------------------------------------
     // COLUMNS
     // ------------------------------------------------------------------
-    inline const TupleSchema* schema() const { return m_schema; };
-    inline const std::string& columnName(int index) const { return m_columnNames[index]; }
-    inline int columnCount() const { return m_columnCount; };
     int columnIndex(const std::string &name) const;
-    const std::string *columnNames() { return m_columnNames; }
     std::vector<std::string> getColumnNames();
+
+    inline const TupleSchema* schema() const {
+        return m_schema;
+    }
+
+    inline const std::string& columnName(int index) const {
+        return m_columnNames[index];
+    }
+
+    inline int columnCount() const {
+        return m_columnCount;
+    }
+
+    const std::string *columnNames() {
+        return m_columnNames;
+    }
+
     // ------------------------------------------------------------------
     // INDEXES
     // ------------------------------------------------------------------
@@ -207,8 +210,13 @@ public:
     // ------------------------------------------------------------------
     // UTILITY
     // ------------------------------------------------------------------
-    CatalogId databaseId() const;
-    const std::string& name() const;
+    const std::string& name() const {
+        return m_name;
+    }
+
+    CatalogId databaseId() const {
+        return m_databaseId;
+    }
 
     virtual std::string tableType() const = 0;
     virtual std::string debug();
@@ -242,16 +250,18 @@ public:
     void loadTuplesFrom(bool allowExport,
                         SerializeInput &serialize_in,
                         Pool *stringPool = NULL);
-    //------------
-    // EL-RELATED
-    //------------
+
+
+    // ------------------------------------------------------------------
+    // EXPORT
+    // ------------------------------------------------------------------
+
     /**
      * Get the next block of committed but unreleased Export bytes
      */
-    virtual StreamBlock* getCommittedExportBytes()
-    {
+    virtual StreamBlock* getCommittedExportBytes() {
         // default implementation is to return NULL, which
-        // indicates an error)
+        // indicates an error
         return NULL;
     }
 
@@ -267,8 +277,7 @@ public:
     /**
      * Release any committed Export bytes up to the provided stream offset
      */
-    virtual bool releaseExportBytes(int64_t releaseOffset)
-    {
+    virtual bool releaseExportBytes(int64_t releaseOffset) {
         // default implementation returns false, which
         // indicates an error
         return false;
@@ -293,29 +302,8 @@ protected:
      * Implemented by persistent table and called by Table::loadTuplesFrom
      * to do additional processing for views and Export
      */
-    virtual void processLoadedTuple(bool allowExport, TableTuple &tuple) {};
-
-    TBPtr findBlock(char *tuple) {
-        TBMapI i =
-                        m_data.lower_bound(tuple);
-        if (i == m_data.end() && m_data.empty()) {
-            throwFatalException("Tried to find a tuple block for a tuple but couldn't find one");
-        }
-        if (i == m_data.end()) {
-            i--;
-            if (i.key() + m_tableAllocationSize < tuple) {
-                throwFatalException("Tried to find a tuple block for a tuple but couldn't find one");
-            }
-        } else {
-            if (i.key() != tuple) {
-                i--;
-                if (i.key() + m_tableAllocationSize < tuple) {
-                    throwFatalException("Tried to find a tuple block for a tuple but couldn't find one");
-                }
-            }
-        }
-        return i.data();
-    }
+    virtual void processLoadedTuple(bool allowExport, TableTuple &tuple) {
+    };
 
     virtual void swapTuples(TableTuple sourceTuple, TableTuple destinationTuple) {
         throwFatalException("Unsupported operation");
@@ -327,174 +315,66 @@ public:
     virtual voltdb::TableStats* getTableStats();
 
 protected:
+    // virtual block management functions
+    virtual void nextFreeTuple(TableTuple *tuple) = 0;
+
     Table(int tableAllocationTargetSize);
     void resetTable();
 
-    void nextFreeTuple(TableTuple *tuple);
-    TBPtr allocateNextBlock();
-
-    bool doCompactionWithinSubset(TBBucketMap *bucketMap);
-    void doIdleCompaction();
-    void doForcedCompaction();
     bool compactionPredicate() {
         assert(m_tuplesPinnedByUndo == 0);
         return allocatedTupleCount() - activeTupleCount() > (m_tuplesPerBlock * 3) && loadFactor() < .95;
     }
 
-    void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
-        m_blocksPendingSnapshot.erase(nextBlock);
-        if (finishedBlock.get() != NULL && !finishedBlock->isEmpty()) {
-            m_blocksNotPendingSnapshot.insert(finishedBlock);
-            int bucketIndex = finishedBlock->calculateBucketIndex();
-            if (bucketIndex != -1) {
-                finishedBlock->swapToBucket(m_blocksNotPendingSnapshotLoad[bucketIndex]);
-            }
-        }
-    }
-
-    virtual void notifyBlockWasCompactedAway(TBPtr block) {
-        throwFatalException("Operation not supported");
-    }
-
-    /**
-     * Normally this will return the tuple storage to the free list.
-     * In the memcheck build it will return the storage to the heap.
-     */
-    void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL));
-
     void initializeWithColumns(TupleSchema *schema, const std::string* columnNames, bool ownsTupleSchema);
-    virtual void onSetColumns() {};
+
+    // per table-type initialization
+    virtual void onSetColumns() {
+    };
 
     double loadFactor() {
         return static_cast<double>(activeTupleCount()) /
             static_cast<double>(allocatedTupleCount());
     }
 
-    // TUPLES AND MEMORY USAGE
+
+    // ------------------------------------------------------------------
+    // DATA
+    // ------------------------------------------------------------------
+
+  protected:
     TableTuple m_tempTuple;
     boost::scoped_array<char> m_tempTupleMemory;
-    /** not temptuple. these are for internal use. */
+
+    // not temptuple. these are for internal use.
     TableTuple m_tmpTarget1, m_tmpTarget2;
     TupleSchema* m_schema;
+
+    // schema as array of string names
+    std::string* m_columnNames;
+    char *m_columnHeaderData;
+    int32_t m_columnHeaderSize;
+
     uint32_t m_tupleCount;
     uint32_t m_tuplesPinnedByUndo;
     uint32_t m_columnCount;
     uint32_t m_tuplesPerBlock;
     uint32_t m_tupleLength;
     int64_t m_nonInlinedMemorySize;
-    // pointers to chunks of data
-    TBMap m_data;
 
-    char *m_columnHeaderData;
-    int32_t m_columnHeaderSize;
-
-    /**
-     * Set of blocks with non-empty free lists or available tuples
-     * that have never been allocated
-    **/
-    stx::btree_set<TBPtr > m_blocksWithSpace;
-
-    /**
-     * Map from load to the blocks with level of load
-     */
-    TBBucketMap m_blocksNotPendingSnapshotLoad;
-    TBBucketMap m_blocksPendingSnapshotLoad;
-
-    /**
-     * Map containing blocks that aren't pending snapshot
-     */
-    boost::unordered_set<TBPtr> m_blocksNotPendingSnapshot;
-
-    /**
-     * Map containing blocks that are pending snapshot
-     */
-    boost::unordered_set<TBPtr> m_blocksPendingSnapshot;
-
-    // schema
-    std::string* m_columnNames; // array of string names
-
-    // GENERAL INFORMATION
+    // identity information
     CatalogId m_databaseId;
     std::string m_name;
 
-    /* If this table owns the TupleSchema it is responsible for deleting it in the destructor */
+    // If this table owns the TupleSchema it is responsible for deleting it in the destructor
     bool m_ownsTupleSchema;
 
     const int m_tableAllocationTargetSize;
     int m_tableAllocationSize;
 
-    // ptr to global integer tracking temp table memory allocated per frag
-    // should be null for persistent tables
-    int* m_tempTableMemoryInBytes;
   private:
     int32_t m_refcount;
 };
-
-inline TableTuple& Table::tempTuple() {
-    assert (m_tempTuple.m_data);
-    return m_tempTuple;
-}
-
-inline const std::string& Table::name()     const { return m_name; }
-
-inline TBPtr Table::allocateNextBlock() {
-    TBPtr block(new TupleBlock(this, m_blocksNotPendingSnapshotLoad[0]));
-    m_data.insert( block->address(), block);
-    m_blocksNotPendingSnapshot.insert(block);
-    if (m_tempTableMemoryInBytes) {
-        (*m_tempTableMemoryInBytes) += m_tableAllocationSize;
-        if ((*m_tempTableMemoryInBytes) > MAX_TEMP_TABLE_MEMORY) {
-            throw SQLException(SQLException::volt_temp_table_memory_overflow,
-                               "More than 100MB of temp table memory used while"
-                               " executing SQL. Aborting.");
-        }
-    }
-    return block;
-}
-
-inline void Table::deleteTupleStorage(TableTuple &tuple, TBPtr block) {
-    tuple.setActiveFalse(); // does NOT free strings
-
-    // add to the free list
-    m_tupleCount--;
-    //m_tuplesPendingDelete--;
-
-    if (block.get() == NULL) {
-       block = findBlock(tuple.address());
-    }
-
-    bool transitioningToBlockWithSpace = !block->hasFreeTuples();
-
-    int retval = block->freeTuple(tuple.address());
-    if (retval != -1) {
-        //Check if if the block is currently pending snapshot
-        if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
-            //std::cout << "Swapping block to nonsnapshot bucket " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;
-            block->swapToBucket(m_blocksNotPendingSnapshotLoad[retval]);
-        //Check if the block goes into the pending snapshot set of buckets
-        } else if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
-            //std::cout << "Swapping block to snapshot bucket " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;
-            block->swapToBucket(m_blocksPendingSnapshotLoad[retval]);
-        } else {
-            //In this case the block is actively being snapshotted and isn't eligible for merge operations at all
-            //do nothing, once the block is finished by the iterator, the iterator will return it
-        }
-    }
-
-    if (block->isEmpty()) {
-        m_data.erase(block->address());
-        m_blocksWithSpace.erase(block);
-        m_blocksNotPendingSnapshot.erase(block);
-        assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
-        //Eliminates circular reference
-        block->swapToBucket(TBBucketPtr());
-    } else if (transitioningToBlockWithSpace) {
-        m_blocksWithSpace.insert(block);
-    }
-}
-
-
-inline voltdb::CatalogId Table::databaseId() const { return m_databaseId; }
 
 }
 #endif

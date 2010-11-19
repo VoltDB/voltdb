@@ -226,8 +226,8 @@ void ExecutionEngineTest::compareTables(voltdb::Table *first, voltdb::Table *sec
     const voltdb::TupleSchema *secondSchema = second->schema();
     ASSERT_TRUE(firstSchema->equals(secondSchema));
 
-    voltdb::TableIterator firstTI(first);
-    voltdb::TableIterator secondTI(second);
+    voltdb::TableIterator firstTI = first->iterator();
+    voltdb::TableIterator secondTI = second->iterator();
     voltdb::TableTuple firstTuple(firstSchema);
     voltdb::TableTuple secondTuple(secondSchema);
     while(firstTI.next(firstTuple)) {

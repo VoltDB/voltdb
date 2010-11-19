@@ -144,7 +144,7 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     // and insert any tuple that we find into our m_targetTable. It doesn't get any easier than that!
     //
     assert (m_tuple.sizeInValues() == m_inputTable->columnCount());
-    TableIterator iterator(m_inputTable);
+    TableIterator iterator = m_inputTable->iterator();
     while (iterator.next(m_tuple)) {
         VOLT_TRACE("Inserting tuple '%s' into target table '%s' with table schema: %s",
                    m_tuple.debug(m_targetTable->name()).c_str(), m_targetTable->name().c_str(),

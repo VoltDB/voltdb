@@ -21,7 +21,9 @@
 
 namespace voltdb {
 
-PersistentTableStats::PersistentTableStats(voltdb::PersistentTable* table) : voltdb::TableStats(table) {
+PersistentTableStats::PersistentTableStats(voltdb::PersistentTable* table)
+  : voltdb::TableStats(table)
+{
 }
 
 std::vector<std::string> PersistentTableStats::generateStatsColumnNames() {

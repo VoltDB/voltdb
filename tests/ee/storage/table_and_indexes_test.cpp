@@ -326,7 +326,7 @@ TEST_F(TableAndIndexTest, BigTest) {
     customerTempTable->insertTupleNonVirtual(*temp_tuple);
 
     TableTuple districtTuple = TableTuple(districtTempTable->schema());
-    TableIterator districtIterator(districtTempTable);
+    TableIterator districtIterator = districtTempTable->iterator();
     while (districtIterator.next(districtTuple)) {
         if (!districtTable->insertTuple(districtTuple)) {
             cout << "Failed to insert tuple from input table '"
@@ -337,7 +337,7 @@ TEST_F(TableAndIndexTest, BigTest) {
     districtTempTable->deleteAllTuplesNonVirtual(true);
 
     TableTuple warehouseTuple = TableTuple(warehouseTempTable->schema());
-    TableIterator warehouseIterator(warehouseTempTable);
+    TableIterator warehouseIterator = warehouseTempTable->iterator();
     while (warehouseIterator.next(warehouseTuple)) {
         if (!warehouseTable->insertTuple(warehouseTuple)) {
             cout << "Failed to insert tuple from input table '" << warehouseTempTable->name() << "' into target table '" << warehouseTable->name() << "'" << endl;
@@ -346,7 +346,7 @@ TEST_F(TableAndIndexTest, BigTest) {
     warehouseTempTable->deleteAllTuplesNonVirtual(true);
 
     TableTuple customerTuple = TableTuple(customerTempTable->schema());
-    TableIterator customerIterator(customerTempTable);
+    TableIterator customerIterator = customerTempTable->iterator();
     while (customerIterator.next(customerTuple)) {
         //cout << "Inserting tuple '" << customerTuple.debug(customerTempTable) << "' into target table '" << customerTable->name() << "', address '" << customerTable << endl;
         if (!customerTable->insertTuple(customerTuple)) {
@@ -388,7 +388,7 @@ TEST_F(TableAndIndexTest, BigTest) {
     temp_tuple->setNValue(20, ValueFactory::getStringValue("Some History"));
     customerTempTable->insertTupleNonVirtual(*temp_tuple);
 
-    customerIterator = TableIterator(customerTempTable);
+    customerIterator = customerTempTable->iterator();
     while (customerIterator.next(customerTuple)) {
         //cout << "Inserting tuple '" << customerTuple.debug(customerTempTable) << "' into target table '" << customerTable->name() << "', address '" << customerTable << endl;
         if (!customerTable->insertTuple(customerTuple)) {

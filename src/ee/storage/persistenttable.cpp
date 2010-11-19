@@ -82,11 +82,19 @@ TableTuple keyTuple;
 #define TABLE_BLOCKSIZE 2097152
 
 PersistentTable::PersistentTable(ExecutorContext *ctx, bool exportEnabled) :
-    Table(TABLE_BLOCKSIZE), m_executorContext(ctx), m_uniqueIndexes(NULL), m_uniqueIndexCount(0), m_allowNulls(NULL),
+    Table(TABLE_BLOCKSIZE),
+    m_iter(this, m_data.begin()),
+    m_executorContext(ctx),
+    m_uniqueIndexes(NULL), m_uniqueIndexCount(0), m_allowNulls(NULL),
     m_indexes(NULL), m_indexCount(0), m_pkeyIndex(NULL), m_wrapper(NULL),
     m_tsSeqNo(0), stats_(this), m_exportEnabled(exportEnabled),
     m_COWContext(NULL)
 {
+    for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
+        m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
+        m_blocksPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
+    }
+
     if (exportEnabled)
     {
         m_wrapper = new TupleStreamWrapper(m_executorContext->m_partitionId,
@@ -96,8 +104,14 @@ PersistentTable::PersistentTable(ExecutorContext *ctx, bool exportEnabled) :
 }
 
 PersistentTable::~PersistentTable() {
+
+    for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
+        m_blocksNotPendingSnapshotLoad[ii]->clear();
+        m_blocksPendingSnapshotLoad[ii]->clear();
+    }
+
     // delete all tuples to free strings
-    TableIterator ti(this);
+    TableIterator ti(this, m_data.begin());
     TableTuple tuple(m_schema);
 
     while (ti.next(tuple)) {
@@ -129,9 +143,77 @@ PersistentTable::~PersistentTable() {
 // ------------------------------------------------------------------
 // OPERATIONS
 // ------------------------------------------------------------------
+void PersistentTable::nextFreeTuple(TableTuple *tuple) {
+    // First check whether we have any in our list
+    // In the memcheck it uses the heap instead of a free list to help Valgrind.
+    if (!m_blocksWithSpace.empty()) {
+        VOLT_TRACE("GRABBED FREE TUPLE!\n");
+        stx::btree_set<TBPtr >::iterator begin = m_blocksWithSpace.begin();
+        TBPtr block = (*begin);
+        std::pair<char*, int> retval = block->nextFreeTuple();
+
+        /**
+         * Check to see if the block needs to move to a new bucket
+         */
+        if (retval.second != -1) {
+            //Check if if the block is currently pending snapshot
+            if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
+                block->swapToBucket(m_blocksNotPendingSnapshotLoad[retval.second]);
+            //Check if the block goes into the pending snapshot set of buckets
+            } else if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
+                block->swapToBucket(m_blocksPendingSnapshotLoad[retval.second]);
+            } else {
+                //In this case the block is actively being snapshotted and isn't eligible for merge operations at all
+                //do nothing, once the block is finished by the iterator, the iterator will return it
+            }
+        }
+
+        tuple->move(retval.first);
+        if (!block->hasFreeTuples()) {
+            m_blocksWithSpace.erase(block);
+        }
+        assert (m_columnCount == tuple->sizeInValues());
+        return;
+    }
+
+    // if there are no tuples free, we need to grab another chunk of memory
+    // Allocate a new set of tuples
+    TBPtr block = allocateNextBlock();
+
+    // get free tuple
+    assert (m_columnCount == tuple->sizeInValues());
+
+    std::pair<char*, int> retval = block->nextFreeTuple();
+
+    /**
+     * Check to see if the block needs to move to a new bucket
+     */
+    if (retval.second != -1) {
+        //Check if the block goes into the pending snapshot set of buckets
+        if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
+            //std::cout << "Swapping block to nonsnapshot bucket " << static_cast<void*>(block.get()) << " to bucket " << retval.second << std::endl;
+            block->swapToBucket(m_blocksPendingSnapshotLoad[retval.second]);
+        //Now check if it goes in with the others
+        } else if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
+            //std::cout << "Swapping block to snapshot bucket " << static_cast<void*>(block.get()) << " to bucket " << retval.second << std::endl;
+            block->swapToBucket(m_blocksNotPendingSnapshotLoad[retval.second]);
+        } else {
+            //In this case the block is actively being snapshotted and isn't eligible for merge operations at all
+            //do nothing, once the block is finished by the iterator, the iterator will return it
+        }
+    }
+
+    tuple->move(retval.first);
+    //cout << "table::nextFreeTuple(" << reinterpret_cast<const void *>(this) << ") m_usedTuples == " << m_usedTuples << endl;
+
+    if (block->hasFreeTuples()) {
+        m_blocksWithSpace.insert(block);
+    }
+}
+
 void PersistentTable::deleteAllTuples(bool freeAllocatedStrings) {
     // nothing interesting
-    TableIterator ti(this);
+    TableIterator ti(this, m_data.begin());
     TableTuple tuple(m_schema);
     while (ti.next(tuple)) {
         deleteTuple(tuple, true);
@@ -488,7 +570,7 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple) {
          * Do a table scan.
          */
         TableTuple tableTuple(m_schema);
-        TableIterator ti(this);
+        TableIterator ti(this, m_data.begin());
         while (ti.hasNext()) {
             ti.next(tableTuple);
             if (tableTuple.equalsNoSchemaCheck(tuple)) {
@@ -654,6 +736,14 @@ void PersistentTable::onSetColumns() {
     for (int i = m_columnCount - 1; i >= 0; --i) {
         m_allowNulls[i] = m_schema->columnAllowNull(i);
     }
+
+    // Also clear some used block state. this structure doesn't have
+    // an block ownership semantics - it's just a cache. I think.
+    m_blocksWithSpace.clear();
+
+    // note that any allocated memory in m_data is left alone
+    // as is m_allocatedTuples
+    m_data.clear();
 }
 
 /*
@@ -839,7 +929,7 @@ size_t PersistentTable::hashCode() {
     TableIndexScheme sourceScheme = m_pkeyIndex->getScheme();
     sourceScheme.setTree();
     boost::scoped_ptr<TableIndex> pkeyIndex(TableIndexFactory::getInstance(sourceScheme));
-    TableIterator iter(this);
+    TableIterator iter(this, m_data.begin());
     TableTuple tuple(schema());
     while (iter.next(tuple)) {
         pkeyIndex->addEntry(&tuple);
@@ -875,4 +965,130 @@ void PersistentTable::swapTuples(TableTuple sourceTuple, TableTuple destinationT
     if (!sourceTuple.isPendingDelete()) {
         updateWithSameKeyFromAllIndexes(sourceTuple, destinationTuple);
     }
+}
+
+bool PersistentTable::doCompactionWithinSubset(TBBucketMap *bucketMap) {
+    /**
+     * First find the two best candidate blocks
+     */
+    TBPtr fullest;
+    TBBucketI fullestIterator;
+    bool foundFullest = false;
+    for (int ii = (TUPLE_BLOCK_NUM_BUCKETS - 2); ii >= 0; ii--) {
+        fullestIterator = (*bucketMap)[ii]->begin();
+        if (fullestIterator != (*bucketMap)[ii]->end()) {
+            foundFullest = true;
+            fullest = *fullestIterator;
+            break;
+        }
+    }
+    if (!foundFullest) {
+        //std::cout << "Could not find a fullest block for compaction" << std::endl;
+        return false;
+    }
+
+    int fullestBucketChange = -1;
+    while (fullest->hasFreeTuples()) {
+        TBPtr lightest;
+        TBBucketI lightestIterator;
+        bool foundLightest = false;
+
+        for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
+            lightestIterator = (*bucketMap)[ii]->begin();
+            if (lightestIterator != (*bucketMap)[ii]->end()) {
+                lightest = *lightestIterator;
+                if (lightest != fullest) {
+                    foundLightest = true;
+                    break;
+                } else {
+                    lightestIterator++;
+                    if (lightestIterator != (*bucketMap)[ii]->end()) {
+                        lightest = *lightestIterator;
+                        foundLightest = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if (!foundLightest) {
+//            TBMapI iter = m_data.begin();
+//            while (iter != m_data.end()) {
+//                std::cout << "Block " << static_cast<void*>(iter.data().get()) << " has " <<
+//                        iter.data()->activeTuples() << " active tuples and " << iter.data()->lastCompactionOffset()
+//                        << " last compaction offset and is in bucket " <<
+//                        static_cast<void*>(iter.data()->currentBucket().get()) <<
+//                        std::endl;
+//                iter++;
+//            }
+//
+//            for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
+//                std::cout << "Bucket " << ii << "(" << static_cast<void*>((*bucketMap)[ii].get()) << ") has size " << (*bucketMap)[ii]->size() << std::endl;
+//                if (!(*bucketMap)[ii]->empty()) {
+//                    TBBucketI bucketIter = (*bucketMap)[ii]->begin();
+//                    while (bucketIter != (*bucketMap)[ii]->end()) {
+//                        std::cout << "\t" << static_cast<void*>(bucketIter->get()) << std::endl;
+//                        bucketIter++;
+//                    }
+//                }
+//            }
+//
+//            std::cout << "Could not find a lightest block for compaction" << std::endl;
+            return false;
+        }
+
+        std::pair<int, int> bucketChanges = fullest->merge(this, lightest);
+        int tempFullestBucketChange = bucketChanges.first;
+        if (tempFullestBucketChange != -1) {
+            fullestBucketChange = tempFullestBucketChange;
+        }
+
+        if (lightest->isEmpty()) {
+            notifyBlockWasCompactedAway(lightest);
+            m_data.erase(lightest->address());
+            m_blocksWithSpace.erase(lightest);
+            m_blocksNotPendingSnapshot.erase(lightest);
+            m_blocksPendingSnapshot.erase(lightest);
+        } else {
+            int lightestBucketChange = bucketChanges.second;
+            if (lightestBucketChange != -1) {
+                lightest->swapToBucket((*bucketMap)[lightestBucketChange]);
+            }
+        }
+    }
+
+    if (fullestBucketChange != -1) {
+        fullest->swapToBucket((*bucketMap)[fullestBucketChange]);
+    }
+    if (!fullest->hasFreeTuples()) {
+        m_blocksWithSpace.erase(fullest);
+    }
+    return true;
+}
+
+void PersistentTable::doIdleCompaction() {
+    if (!m_blocksNotPendingSnapshot.empty()) {
+        doCompactionWithinSubset(&m_blocksNotPendingSnapshotLoad);
+    }
+    if (!m_blocksPendingSnapshot.empty()) {
+        doCompactionWithinSubset(&m_blocksPendingSnapshotLoad);
+    }
+}
+
+void PersistentTable::doForcedCompaction() {
+    bool hadWork1 = true;
+    bool hadWork2 = true;
+    std::cout << "Doing forced compaction with allocated tuple count " << allocatedTupleCount() << std::endl;
+    while (compactionPredicate()) {
+        assert(hadWork1 || hadWork2);
+        if (!m_blocksNotPendingSnapshot.empty() && hadWork1) {
+            //std::cout << "Compacting blocks not pending snapshot " << m_blocksNotPendingSnapshot.size() << std::endl;
+            hadWork1 = doCompactionWithinSubset(&m_blocksNotPendingSnapshotLoad);
+        }
+        if (!m_blocksPendingSnapshot.empty() && hadWork2) {
+            //std::cout << "Compacting blocks pending snapshot " << m_blocksPendingSnapshot.size() << std::endl;
+            hadWork2 = doCompactionWithinSubset(&m_blocksPendingSnapshotLoad);
+        }
+    }
+    assert(!compactionPredicate());
+    std::cout << "Finished forced compaction with allocated tuple count " << allocatedTupleCount() << std::endl;
 }

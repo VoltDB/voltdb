@@ -20,7 +20,7 @@
 #include <vector>
 #include <utility>
 #include "common/TupleSerializer.h"
-#include "storage/table.h"
+#include "storage/persistenttable.h"
 #include "common/Pool.hpp"
 #include "common/tabletuple.h"
 #include "boost/scoped_ptr.hpp"
@@ -36,7 +36,7 @@ public:
      * Construct a copy on write context for the specified table that will serialize tuples
      * using the provided serializer
      */
-    CopyOnWriteContext(Table *m_table, TupleSerializer *m_serializer, int32_t partitionId);
+    CopyOnWriteContext(PersistentTable *m_table, TupleSerializer *m_serializer, int32_t partitionId);
 
     /**
      * Serialize tuples to the provided output until no more tuples can be serialized. Returns true
@@ -63,7 +63,7 @@ private:
     /**
      * Table being copied
      */
-    Table *m_table;
+    PersistentTable *m_table;
 
     /**
      * Temp table for copies of tuples that were dirtied.

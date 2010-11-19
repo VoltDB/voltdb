@@ -24,15 +24,15 @@
 #include "storage/TupleBlock.h"
 
 namespace voltdb {
-class Table;
+class PersistentTable;
 
 class CopyOnWriteIterator : public TupleIterator {
     friend class CopyOnWriteContext;
 public:
     CopyOnWriteIterator(
-            Table *table,
-            TBMapI start,
-            TBMapI end);
+        PersistentTable *table,
+        TBMapI start,
+        TBMapI end);
 
     /**
      * When a tuple is "dirty" it is still active, but will never be a "found" tuple
@@ -64,7 +64,7 @@ private:
     /**
      * Table being iterated over
      */
-    Table *m_table;
+    PersistentTable *m_table;
 
     /**
      * Index of the current block being iterated over

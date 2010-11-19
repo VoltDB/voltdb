@@ -49,6 +49,10 @@ class StreamedTable : public Table {
     virtual ~StreamedTable();
 
     // virtual Table functions
+    // Return a table iterator BY VALUE
+    virtual TableIterator& iterator();
+    virtual TableIterator* makeIterator();
+
     virtual void deleteAllTuples(bool freeAllocatedStrings);
     virtual bool insertTuple(TableTuple &source);
     virtual bool updateTuple(TableTuple &source, TableTuple &target, bool updatesIndexes);
@@ -70,6 +74,14 @@ class StreamedTable : public Table {
     // Stats
     voltdb::StreamedTableStats stats_;
     voltdb::TableStats *getTableStats();
+
+    // Used for table stats. Could give a real answer here with some work..
+    size_t allocatedBlockCount() const {
+        return 0;
+    }
+
+    TBPtr allocateNextBlock();
+    void nextFreeTuple(TableTuple *tuple);
 
   private:
     ExecutorContext *m_executorContext;

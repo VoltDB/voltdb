@@ -132,7 +132,7 @@ TEST_F(FilterTest, SimpleFilter) {
     ::printf("\nFilter:%s\n", equal->debug().c_str());
 
     int count = 0;
-    TableIterator iter = table->tableIterator();
+    TableIterator iter = table->iterator();
     TableTuple match(table->schema());
     while (iter.next(match)) {
         if (equal->eval(&match, NULL).isTrue()) {
@@ -168,7 +168,7 @@ TEST_F(FilterTest, OrFilter) {
     ::printf("\nFilter:%s\n", predicate->debug().c_str());
 
     int count = 0;
-    TableIterator iter = table->tableIterator();
+    TableIterator iter = table->iterator();
     TableTuple match(table->schema());
     while (iter.next(match)) {
         if (predicate->eval(&match, NULL).isTrue()) {
@@ -208,7 +208,7 @@ TEST_F(FilterTest, AndFilter) {
     ::printf("\nFilter:%s\n", predicate->debug().c_str());
 
     int count = 0;
-    TableIterator iter = table->tableIterator();
+    TableIterator iter = table->iterator();
     TableTuple match(table->schema());
     while (iter.next(match)) {
         if (predicate->eval(&match, NULL).isTrue()) {
@@ -265,7 +265,7 @@ TEST_F(FilterTest, ComplexFilter) {
     ::printf("\nFilter:%s\n", predicate->debug().c_str());
 
     int count = 0;
-    TableIterator iter = table->tableIterator();
+    TableIterator iter = table->iterator();
     TableTuple match(table->schema());
     while (iter.next(match)) {
         if (predicate->eval(&match, NULL).isTrue()) {
@@ -310,7 +310,7 @@ TEST_F(FilterTest, SubstituteFilter) {
         ::printf("\tRIGHT: %s\n", predicate->getRight()->debug().c_str());
 
         int count = 0;
-        TableIterator iter = table->tableIterator();
+        TableIterator iter = table->iterator();
         TableTuple match(table->schema());
         while (iter.next(match)) {
             if (predicate->eval(&match, NULL).isTrue()) {

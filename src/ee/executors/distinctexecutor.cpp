@@ -90,7 +90,7 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
     Table* input_table = node->getInputTables()[0];
     assert(input_table);
 
-    TableIterator iterator = input_table->tableIterator();
+    TableIterator iterator = input_table->iterator();
     TableTuple tuple(input_table->schema());
 
     std::set<NValue, NValue::ltNValue> found_values;
