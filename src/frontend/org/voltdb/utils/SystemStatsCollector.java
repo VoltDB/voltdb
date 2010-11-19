@@ -239,26 +239,27 @@ public class SystemStatsCollector {
         }
 
         // run "ps" to get stats for this pid
-        String command = String.format("ps -p %d -o rss,pmem,pcpu,time,etime", pid);
-        String results = ShellTools.cmd(command);
-
-        // parse ps into value array
-        String[] lines = results.split("\n");
-        if (lines.length != 2)
-            return null;
-        results = lines[1];
-        results = results.trim();
-        String[] values = results.split("\\s+");
-
-        // tease out all the stats
-        long rss = Long.valueOf(values[0]) * 1024;
-        double pmem = Double.valueOf(values[1]);
-        double pcpu = Double.valueOf(values[2]);
-        long time = getDurationFromPSString(values[3]);
-        long etime = getDurationFromPSString(values[4]);
+//        String command = String.format("ps -p %d -o rss,pmem,pcpu,time,etime", pid);
+//        String results = ShellTools.cmd(command);
+//
+//        // parse ps into value array
+//        String[] lines = results.split("\n");
+//        if (lines.length != 2)
+//            return null;
+//        results = lines[1];
+//        results = results.trim();
+//        String[] values = results.split("\\s+");
+//
+//        // tease out all the stats
+//        long rss = Long.valueOf(values[0]) * 1024;
+//        double pmem = Double.valueOf(values[1]);
+//        double pcpu = Double.valueOf(values[2]);
+//        long time = getDurationFromPSString(values[3]);
+//        long etime = getDurationFromPSString(values[4]);
 
         // create a new Datum which adds java stats
-        Datum d = new Datum(rss, pmem, pcpu, time, etime);
+        //Datum d = new Datum(rss, pmem, pcpu, time, etime);
+        Datum d = new Datum( 0, 0, 0, 0, 0);
         //System.out.println(d);
         return d;
     }

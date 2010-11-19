@@ -38,7 +38,7 @@
 #include <vector>
 #include <string>
 #include <stdint.h>
-#include <set>
+#include "stx/btree_set.h"
 #include "boost/scoped_ptr.hpp"
 #include "boost/unordered_set.hpp"
 #include "boost/scoped_array.hpp"
@@ -60,6 +60,7 @@ static int32_t m_primaryKeyIndex = 0;
 class CompactionTest : public Test {
 public:
     CompactionTest() {
+        m_primaryKeyIndex = 0;
         m_tuplesInserted = 0;
         m_tuplesUpdated = 0;
         m_tuplesDeleted = 0;
@@ -70,18 +71,49 @@ public:
 
         m_columnNames.push_back("1");
         m_columnNames.push_back("2");
+        m_columnNames.push_back("3");
+        m_columnNames.push_back("4");
+        m_columnNames.push_back("5");
+        m_columnNames.push_back("6");
+        m_columnNames.push_back("7");
+        m_columnNames.push_back("8");
+        m_columnNames.push_back("9");
 
         m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_INTEGER);
         m_primaryKeyIndexSchemaTypes.push_back(voltdb::VALUE_TYPE_INTEGER);
         m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_INTEGER);
+        //Filler columns
+        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
+        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
+        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
+        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
+        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
+        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
+        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
 
         m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
         m_primaryKeyIndexSchemaColumnSizes.push_back(voltdb::VALUE_TYPE_INTEGER);
         m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
 
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+
         m_tableSchemaAllowNull.push_back(false);
         m_primaryKeyIndexSchemaAllowNull.push_back(false);
         m_tableSchemaAllowNull.push_back(false);
+        m_primaryKeyIndexSchemaAllowNull.push_back(false);
+        m_primaryKeyIndexSchemaAllowNull.push_back(false);
+        m_primaryKeyIndexSchemaAllowNull.push_back(false);
+        m_primaryKeyIndexSchemaAllowNull.push_back(false);
+        m_primaryKeyIndexSchemaAllowNull.push_back(false);
+        m_primaryKeyIndexSchemaAllowNull.push_back(false);
+        m_primaryKeyIndexSchemaAllowNull.push_back(false);
+        m_primaryKeyIndexSchemaAllowNull.push_back(false);
 
         m_primaryKeyIndexColumns.push_back(0);
 
@@ -248,15 +280,15 @@ public:
 
 TEST_F(CompactionTest, BasicCompaction) {
     initTable(true);
-    addRandomUniqueTuples( m_table, 2330160);
+    addRandomUniqueTuples( m_table, 645260);
 
-    ASSERT_EQ(10, m_table->m_data.size());
+    ASSERT_EQ(20, m_table->m_data.size());
 
-    std::set<int32_t> pkeysNotDeleted;
-    boost::unordered_set<int32_t> pkeysToDelete;
-    for (int ii = 0; ii < 2330160; ii ++) {
+    stx::btree_set<int32_t> pkeysNotDeleted;
+    std::vector<int32_t> pkeysToDelete;
+    for (int ii = 0; ii < 645260; ii ++) {
         if (ii % 2 == 0) {
-            pkeysToDelete.insert(ii);
+            pkeysToDelete.push_back(ii);
         } else {
             pkeysNotDeleted.insert(ii);
         }
@@ -266,7 +298,7 @@ TEST_F(CompactionTest, BasicCompaction) {
     TableTuple key(pkeyIndex->getKeySchema());
     boost::scoped_array<char> backingStore(new char[pkeyIndex->getKeySchema()->tupleLength()]);
     key.moveNoHeader(backingStore.get());
-    for (boost::unordered_set<int32_t>::iterator ii = pkeysToDelete.begin(); ii != pkeysToDelete.end(); ii++) {
+    for (std::vector<int32_t>::iterator ii = pkeysToDelete.begin(); ii != pkeysToDelete.end(); ii++) {
         key.setNValue(0, ValueFactory::getIntegerValue(*ii));
         ASSERT_TRUE(pkeyIndex->moveToKey(&key));
         TableTuple tuple = pkeyIndex->nextValueAtKey();
@@ -275,8 +307,8 @@ TEST_F(CompactionTest, BasicCompaction) {
 
     m_table->doForcedCompaction();
 
-    std::set<int32_t> pkeysFoundAfterDelete;
-    TableIterator iter = m_table->iterator();
+    stx::btree_set<int32_t> pkeysFoundAfterDelete;
+    TableIterator& iter = m_table->iterator();
     TableTuple tuple(m_table->schema());
     while (iter.next(tuple)) {
         int32_t pkey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
@@ -305,14 +337,137 @@ TEST_F(CompactionTest, BasicCompaction) {
 
     ASSERT_EQ(pkeysFoundAfterDelete.size(), pkeysNotDeleted.size());
     ASSERT_TRUE(pkeysFoundAfterDelete == pkeysNotDeleted);
-    std::cout << "Have " << m_table->m_data.size() << " blocks left " << m_table->allocatedTupleCount() << ", " << m_table->activeTupleCount() << std::endl;
-    ASSERT_EQ( m_table->m_data.size(), 8);
+//    std::cout << "Have " << m_table->m_data.size() << " blocks left " << m_table->allocatedTupleCount() << ", " << m_table->activeTupleCount() << std::endl;
+    ASSERT_EQ( m_table->m_data.size(), 13);
 
-    for (std::set<int32_t>::iterator ii = pkeysNotDeleted.begin(); ii != pkeysNotDeleted.end(); ii++) {
+    for (stx::btree_set<int32_t>::iterator ii = pkeysNotDeleted.begin(); ii != pkeysNotDeleted.end(); ii++) {
         key.setNValue(0, ValueFactory::getIntegerValue(*ii));
         ASSERT_TRUE(pkeyIndex->moveToKey(&key));
         TableTuple tuple = pkeyIndex->nextValueAtKey();
         m_table->deleteTuple(tuple, true);
+    }
+    m_table->doForcedCompaction();
+    ASSERT_EQ( m_table->m_data.size(), 0);
+    ASSERT_EQ( m_table->activeTupleCount(), 0);
+}
+
+TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
+    initTable(true);
+    addRandomUniqueTuples( m_table, 645260);
+
+    ASSERT_EQ(20, m_table->m_data.size());
+
+    stx::btree_set<int32_t> pkeysNotDeleted[3];
+    std::vector<int32_t> pkeysToDelete[3];
+    for (int ii = 0; ii < 645260; ii ++) {
+        int foo = ii % 3;
+        pkeysToDelete[foo].push_back(ii);
+        if (ii % 3 == 0) {
+            //All keys deleted
+        } else if (ii % 3 == 1) {
+            pkeysNotDeleted[0].insert(ii);
+        } else {
+            pkeysNotDeleted[0].insert(ii);
+            pkeysNotDeleted[1].insert(ii);
+        }
+    }
+    //std::cout << pkeysToDelete[0].size() << "," << pkeysToDelete[1].size() << "," << pkeysToDelete[2].size() << std::endl;
+
+    stx::btree_set<int32_t> COWTuples;
+    int totalInsertedCOWTuples = 0;
+    DefaultTupleSerializer serializer;
+    for (int qq = 0; qq < 3; qq++) {
+        std::cout << "Starting iteration " << qq << std::endl;
+        m_table->activateCopyOnWrite(&serializer, 0);
+
+        char serializationBuffer[131072];
+        while (true) {
+            ReferenceSerializeOutput out( serializationBuffer, 131072);
+            m_table->serializeMore(&out);
+            const int serialized = static_cast<int>(out.position());
+            if (out.position() == 0) {
+                break;
+            }
+            int ii = 16;//skip partition id and row count and first tuple length
+            while (ii < (serialized - 4)) {
+                int32_t value = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
+                const bool inserted =
+                        COWTuples.insert(value).second;
+                if (!inserted) {
+                    printf("Failed in iteration %d, total inserted %d, with pkey %d\n", qq, totalInsertedCOWTuples, value);
+                }
+                ASSERT_TRUE(inserted);
+                totalInsertedCOWTuples++;
+                ii += 68;
+            }
+            if (qq == 0) {
+                if (totalInsertedCOWTuples > (645260 / 3)) {
+                    break;
+                }
+            } else if (qq == 1) {
+                if (totalInsertedCOWTuples > ((645260 / 3) * 2)) {
+                    break;
+                }
+            }
+        }
+
+        voltdb::TableIndex *pkeyIndex = m_table->primaryKeyIndex();
+        TableTuple key(pkeyIndex->getKeySchema());
+        boost::scoped_array<char> backingStore(new char[pkeyIndex->getKeySchema()->tupleLength()]);
+        key.moveNoHeader(backingStore.get());
+        for (std::vector<int32_t>::iterator ii = pkeysToDelete[qq].begin(); ii != pkeysToDelete[qq].end(); ii++) {
+            key.setNValue(0, ValueFactory::getIntegerValue(*ii));
+            ASSERT_TRUE(pkeyIndex->moveToKey(&key));
+            TableTuple tuple = pkeyIndex->nextValueAtKey();
+            m_table->deleteTuple(tuple, true);
+        }
+
+        //std::cout << "Allocated tuple count before idle compactions " << m_table->allocatedTupleCount() << std::endl;
+        m_table->doIdleCompaction();
+        m_table->doIdleCompaction();
+        //std::cout << "Allocated tuple count after idle compactions " << m_table->allocatedTupleCount() << std::endl;
+        m_table->doForcedCompaction();
+
+        stx::btree_set<int32_t> pkeysFoundAfterDelete;
+        TableIterator& iter = m_table->iterator();
+        TableTuple tuple(m_table->schema());
+        while (iter.next(tuple)) {
+            int32_t pkey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
+            key.setNValue(0, ValueFactory::getIntegerValue(pkey));
+            for (int ii = 0; ii < 4; ii++) {
+                ASSERT_TRUE(m_table->m_indexes[ii]->moveToKey(&key));
+                TableTuple indexTuple = m_table->m_indexes[ii]->nextValueAtKey();
+                ASSERT_EQ(indexTuple.address(), tuple.address());
+            }
+            pkeysFoundAfterDelete.insert(pkey);
+        }
+
+        std::vector<int32_t> diff;
+        std::insert_iterator<std::vector<int32_t> > ii( diff, diff.begin());
+        std::set_difference(pkeysNotDeleted[qq].begin(), pkeysNotDeleted[qq].end(), pkeysFoundAfterDelete.begin(), pkeysFoundAfterDelete.end(), ii);
+        for (int ii = 0; ii < diff.size(); ii++) {
+            printf("Key that was not deleted, but wasn't found is %d\n", diff[ii]);
+        }
+
+        diff.clear();
+        ii = std::insert_iterator<std::vector<int32_t> >(diff, diff.begin());
+        std::set_difference( pkeysFoundAfterDelete.begin(), pkeysFoundAfterDelete.end(), pkeysNotDeleted[qq].begin(), pkeysNotDeleted[qq].end(), ii);
+        for (int ii = 0; ii < diff.size(); ii++) {
+            printf("Key that was found after deletes, but shouldn't have been there was %d\n", diff[ii]);
+        }
+
+//        ASSERT_EQ(pkeysFoundAfterDelete.size(), pkeysNotDeleted.size());
+//        ASSERT_TRUE(pkeysFoundAfterDelete == pkeysNotDeleted);
+    //    std::cout << "Have " << m_table->m_data.size() << " blocks left " << m_table->allocatedTupleCount() << ", " << m_table->activeTupleCount() << std::endl;
+//        ASSERT_EQ( m_table->m_data.size(), 13);
+//
+//        for (stx::btree_set<int32_t>::iterator ii = pkeysNotDeleted.begin(); ii != pkeysNotDeleted.end(); ii++) {
+//            key.setNValue(0, ValueFactory::getIntegerValue(*ii));
+//            ASSERT_TRUE(pkeyIndex->moveToKey(&key));
+//            TableTuple tuple = pkeyIndex->nextValueAtKey();
+//            m_table->deleteTuple(tuple, true);
+//        }
+
     }
     m_table->doForcedCompaction();
     ASSERT_EQ( m_table->m_data.size(), 0);

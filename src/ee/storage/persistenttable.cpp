@@ -245,6 +245,7 @@ bool PersistentTable::insertTuple(TableTuple &source) {
     //
     nextFreeTuple(&m_tmpTarget1);
     m_tupleCount++;
+    m_usedTupleCount++;
 
     //
     // Then copy the source into the target
@@ -316,6 +317,7 @@ void PersistentTable::insertTupleForUndo(char *tuple, size_t wrapperOffset) {
     m_tmpTarget1.move(tuple);
     m_tmpTarget1.setPendingDeleteOnUndoReleaseFalse();
     m_tuplesPinnedByUndo--;
+    m_usedTupleCount++;
 
     // rollback Export
     if (m_exportEnabled) {
@@ -493,6 +495,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
 
     target.setPendingDeleteOnUndoReleaseTrue();
     m_tuplesPinnedByUndo++;
+    m_usedTupleCount--;
 
     /*
      * Create and register an undo action.
@@ -558,6 +561,7 @@ void PersistentTable::deleteTupleForUndo(TableTuple &tupleCopy, size_t wrapperOf
         // Delete the strings/objects
         target.freeObjectColumns();
         deleteTupleStorage(target);
+        m_usedTupleCount--;
     }
 }
 

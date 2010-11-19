@@ -62,6 +62,7 @@
 
 class CopyOnWriteTest_CopyOnWriteIterator;
 class CompactionTest_BasicCompaction;
+class CompactionTest_CompactionWithCopyOnWrite;
 
 namespace voltdb {
 
@@ -158,8 +159,19 @@ class Table {
         return allocatedBlockCount() * m_tuplesPerBlock;
     }
 
+    /**
+     * Includes tuples that are pending any kind of delete.
+     * Used by iterators to determine how many tupels to expect while scanning
+     */
     int64_t activeTupleCount() const {
         return m_tupleCount;
+    }
+
+    /*
+     * Count of tuples that actively contain user data
+     */
+    int64_t usedTupleCount() const {
+        return m_usedTupleCount;
     }
 
     int64_t allocatedTupleMemory() const {
@@ -356,6 +368,7 @@ protected:
     int32_t m_columnHeaderSize;
 
     uint32_t m_tupleCount;
+    uint32_t m_usedTupleCount;
     uint32_t m_tuplesPinnedByUndo;
     uint32_t m_columnCount;
     uint32_t m_tuplesPerBlock;

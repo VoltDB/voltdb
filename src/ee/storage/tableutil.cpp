@@ -59,7 +59,7 @@ namespace tableutil {
 
 bool getRandomTuple(const voltdb::Table* table, voltdb::TableTuple &out) {
     voltdb::Table* table2 = const_cast<voltdb::Table*>(table);
-    int cnt = (int)table->activeTupleCount();
+    int cnt = (int)table->usedTupleCount();
     if (cnt > 0) {
         int idx = (rand() % cnt);
         voltdb::TableIterator it = table2->iterator();

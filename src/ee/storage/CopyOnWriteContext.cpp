@@ -132,14 +132,12 @@ bool CopyOnWriteContext::canSafelyFreeTuple(TableTuple tuple) {
         }
         //OK it is in the very last block
     } else {
-        if (i.key() > address) {
+        if (i.key() != address) {
             i--;
             if (i.key() + m_table->m_tableAllocationSize < address) {
                 return true;
             }
             //OK... this is in this particular block
-        } else {
-            assert(false);
         }
     }
 
@@ -188,15 +186,13 @@ void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
         }
         //OK it is in the very last block
     } else {
-        if (i.key() > address) {
+        if (i.key() != address) {
             i--;
             if (i.key() + m_table->m_tableAllocationSize < address) {
                 tuple.setDirtyFalse();
                 return;
             }
             //OK... this is in this particular block
-        } else {
-            assert(false);
         }
     }
 
