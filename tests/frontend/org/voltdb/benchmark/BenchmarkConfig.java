@@ -57,6 +57,7 @@ public class BenchmarkConfig {
     public final String statsTag;//Identifies the result set
     public final String applicationName;
     public final String subApplicationName;
+    public final boolean showConsoleOutput;
     public final String pushfiles;
     public final Integer maxOutstanding;
 
@@ -91,6 +92,7 @@ public class BenchmarkConfig {
             String statsTag,
             String applicationName,
             String subApplicationName,
+            boolean showConsoleOutput,
             String pushfiles,
             Integer maxOutstanding
         ) {
@@ -127,6 +129,7 @@ public class BenchmarkConfig {
         this.statsTag = statsTag;
         this.applicationName = applicationName;
         this.subApplicationName = subApplicationName;
+        this.showConsoleOutput = showConsoleOutput;
         this.pushfiles = pushfiles;
         this.maxOutstanding = maxOutstanding;
     }

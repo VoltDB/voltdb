@@ -1511,6 +1511,7 @@ BENCHMARKS
         <arg value="STATSDATABASEURL=${statsDatabaseURL}" />
         <arg value="APPLICATIONNAME=${applicationName}" />
         <arg value="SUBAPPLICATIONNAME=${subApplicationName}" />
+        <arg value="SHOWCONSOLEOUTPUT=${showConsoleOutput}" />
 
         <!-- tpcc parameters -->
         <arg value="warehouses=${warehouses}" />
