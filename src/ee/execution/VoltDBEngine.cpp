@@ -50,6 +50,9 @@
 #include <sstream>
 #include <unistd.h>
 #include <locale>
+#ifdef LINUX
+#include <malloc.h>
+#endif // LINUX
 #include "boost/shared_array.hpp"
 #include "boost/scoped_array.hpp"
 #include "boost/foreach.hpp"
@@ -126,6 +129,30 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
 
     // require a site id, at least, to inititalize.
     m_executorContext = NULL;
+
+#ifdef LINUX
+    // We ran into an issue where memory wasn't being returned to the
+    // operating system (and thus reducing RSS) when freeing. See
+    // ENG-891 for some info. It seems that some code we use somewhere
+    // (maybe JVM, but who knows) calls mallopt and changes some of
+    // the tuning parameters. At the risk of making that software
+    // angry, the following code resets the tunable parameters to
+    // their default values.
+
+    // Note: The parameters and default values come from looking at
+    // the glibc 2.5 source, which I is the version that shipps
+    // with redhat/centos 5. The code seems to also be effective on
+    // newer versions of glibc (tested againsts 2.12.1).
+
+    mallopt(M_MXFAST, 128);                 // DEFAULT_MXFAST
+    // note that DEFAULT_MXFAST was increased to 128 for 64-bit systems
+    // sometime between glibc 2.5 and glibc 2.12.1
+    mallopt(M_TRIM_THRESHOLD, 128 * 1024);  // DEFAULT_TRIM_THRESHOLD
+    mallopt(M_TOP_PAD, 0);                  // DEFAULT_TOP_PAD
+    mallopt(M_MMAP_THRESHOLD, 128 * 1024);  // DEFAULT_MMAP_THRESHOLD
+    mallopt(M_MMAP_MAX, 65536);             // DEFAULT_MMAP_MAX
+    mallopt(M_CHECK_ACTION, 3);             // DEFAULT_CHECK_ACTION
+#endif // LINUX
 }
 
 bool VoltDBEngine::initialize(
