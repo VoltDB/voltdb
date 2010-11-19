@@ -511,7 +511,7 @@ public class DeletesClient
         while (true)
         {
             insertBatch(client);
-            //collectStats(client);
+            collectStats(client);
 
             snapshot_counter++;
             if (snapshot_counter == m_snapshotFreq)
