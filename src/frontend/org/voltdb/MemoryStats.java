@@ -22,8 +22,8 @@ import java.util.Iterator;
 
 import org.voltdb.VoltTable.ColumnInfo;
 
-public class NodeMemoryStats extends StatsSource {
-    public NodeMemoryStats(String name) {
+public class MemoryStats extends StatsSource {
+    public MemoryStats(String name) {
         super(name, false);
     }
 
@@ -69,7 +69,7 @@ public class NodeMemoryStats extends StatsSource {
 
     @Override
     protected void updateStatsRow(Object rowKey, Object[] rowValues) {
-        VoltTable t = StatsAgent.getNodeMemStatsTable();
+        VoltTable t = StatsAgent.getMemoryStatsTable();
         t.advanceRow();
 
         rowValues[columnNameToIndex.get("RSS")] = t.getLong("RSS");

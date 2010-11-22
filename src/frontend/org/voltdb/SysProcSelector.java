@@ -24,7 +24,7 @@ public enum SysProcSelector {
     INITIATOR,        // invoked as @stat initiator
     PARTITIONCOUNT,
     IOSTATS,
-    NODEMEMORY,       // info about node's memory usage
+    MEMORY,           // info about node's memory usage
     MANAGEMENT,       //Returns pretty much everything
 
     SNAPSHOTSTATUS;

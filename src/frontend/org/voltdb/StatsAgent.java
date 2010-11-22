@@ -134,7 +134,7 @@ public class StatsAgent {
         int indexMem = 0;
         int stringMem = 0;
     }
-    static Map<Integer, PartitionMemRow> m_nodeMemStats = new TreeMap<Integer, PartitionMemRow>();
+    static Map<Integer, PartitionMemRow> m_memoryStats = new TreeMap<Integer, PartitionMemRow>();
 
     static synchronized void eeUpdateMemStats(int siteId,
                                               long tupleCount,
@@ -148,7 +148,7 @@ public class StatsAgent {
         pmr.tupleAllocatedMem = tupleAllocatedMem;
         pmr.indexMem = indexMem;
         pmr.stringMem = stringMem;
-        m_nodeMemStats.put(siteId, pmr);
+        m_memoryStats.put(siteId, pmr);
     }
 
     public static VoltTable getEmptyNodeMemStatsTable() {
@@ -168,7 +168,7 @@ public class StatsAgent {
         return t;
     }
 
-    public static synchronized VoltTable getNodeMemStatsTable() {
+    public static synchronized VoltTable getMemoryStatsTable() {
         // get the host id and hostname once
         if (m_hostId == -1) {
             m_hostId = VoltDB.instance().getHostMessenger().getHostId();
@@ -192,7 +192,7 @@ public class StatsAgent {
 
         // sum up all of the site statistics
         PartitionMemRow totals = new PartitionMemRow();
-        for (PartitionMemRow pmr : m_nodeMemStats.values()) {
+        for (PartitionMemRow pmr : m_memoryStats.values()) {
             totals.tupleCount += pmr.tupleCount;
             totals.tupleDataMem += pmr.tupleDataMem;
             totals.tupleAllocatedMem += pmr.tupleAllocatedMem;
