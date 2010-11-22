@@ -264,7 +264,7 @@ public class Statistics extends VoltSystemProcedure {
                 getLowestLiveExecSiteIdForHost(hostId);
             VoltTable result = null;
             if (context.getExecutionSite().getSiteId() == lowestSiteId) {
-                result = StatsAgent.getNodeMemStatsTable();
+                result = StatsAgent.getMemoryStatsTable();
                 assert(result.getRowCount() == 1);
             }
             else {
@@ -361,8 +361,9 @@ public class Statistics extends VoltSystemProcedure {
     {
         VoltTable[] results;
         final long now = System.currentTimeMillis();
-        if (selector.toUpperCase().equals(SysProcSelector.NODEMEMORY.name())) {
-            results = getNodeMemData();
+        if ((selector.toUpperCase().equals(SysProcSelector.MEMORY.name())) ||
+            (selector.toUpperCase().equals("NODEMEMORY"))) {
+            results = getMemoryData();
             assert(results.length == 1);
         }
         else if (selector.toUpperCase().equals(SysProcSelector.TABLE.name())) {
@@ -387,7 +388,7 @@ public class Statistics extends VoltSystemProcedure {
             results = getStarvationData(interval, now);
         }
         else if (selector.toUpperCase().equals(SysProcSelector.MANAGEMENT.name())) {
-            VoltTable[] nodeMemResults = getNodeMemData();
+            VoltTable[] memoryResults = getMemoryData();
             VoltTable[] tableResults = getTableData(interval, now);
             VoltTable[] indexResults = getIndexData(interval, now);
             VoltTable[] procedureResults = getProcedureData(interval, now);
@@ -395,7 +396,7 @@ public class Statistics extends VoltSystemProcedure {
             VoltTable[] ioResults = getIOStatsData(interval, now);
             VoltTable[] starvationResults = getIOStatsData(interval, now);
             results = new VoltTable[] {
-                    nodeMemResults[0],
+                    memoryResults[0],
                     initiatorResults[0],
                     procedureResults[0],
                     ioResults[0],
@@ -485,7 +486,7 @@ public class Statistics extends VoltSystemProcedure {
         return results;
     }
 
-    private VoltTable[] getNodeMemData() {
+    private VoltTable[] getMemoryData() {
         VoltTable[] results;
         SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
         // create a work fragment to gather node memory data

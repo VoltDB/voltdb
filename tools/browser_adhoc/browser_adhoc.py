@@ -163,7 +163,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                     response = client.execute('stat initiator %d' % (interval_poll))
                 elif (button_clicked == 'NODE MEMORY'):
                     self.wfile.write('Node Memory Statistics<br>\n');
-                    response = client.execute('stat nodememory %d' % (interval_poll))
+                    response = client.execute('stat memory %d' % (interval_poll))
                 elif (button_clicked == 'IO'):
                     self.wfile.write('IO Statistics<br>\n');
                     response = client.execute('stat iostats %d' % (interval_poll))

@@ -255,7 +255,7 @@ public class RealVoltDB implements VoltDBInterface
     private Object m_instanceId[];
     private PartitionCountStats m_partitionCountStats = null;
     private IOStats m_ioStats = null;
-    private NodeMemoryStats m_nodeMemoryStats = null;
+    private MemoryStats m_memoryStats = null;
     private StatsManager m_statsManager = null;
 
     // Should the execution sites be started in recovery mode
@@ -638,9 +638,9 @@ public class RealVoltDB implements VoltDBInterface
             m_ioStats = new IOStats("IO Stats");
             m_statsAgent.registerStatsSource(SysProcSelector.IOSTATS,
                                              0, m_ioStats);
-            m_nodeMemoryStats = new NodeMemoryStats("NodeMemory Stats");
-            m_statsAgent.registerStatsSource(SysProcSelector.NODEMEMORY,
-                                             0, m_nodeMemoryStats);
+            m_memoryStats = new MemoryStats("Memory Stats");
+            m_statsAgent.registerStatsSource(SysProcSelector.MEMORY,
+                                             0, m_memoryStats);
             // Create the statistics manager and register it to JMX registry
             m_statsManager = null;
             try {
