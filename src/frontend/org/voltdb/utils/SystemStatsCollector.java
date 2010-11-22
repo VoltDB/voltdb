@@ -209,13 +209,14 @@ public class SystemStatsCollector {
          * @return A CSV-formatted line for this Datum
          */
         String toLine() {
-            return String.format("%d,%d,%d,%d,%d,%d",
+            return String.format("%d,%d,%d,%d,%d,%d,%d",
                     timestamp,
                     rss,
                     javausedheapmem,
                     javatotalheapmem,
                     javausedsysmem,
-                    javatotalsysmem);
+                    javatotalsysmem,
+                    javamaxheapmem);
         }
     }
 
