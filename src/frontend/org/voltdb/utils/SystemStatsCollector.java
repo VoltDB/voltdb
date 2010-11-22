@@ -17,21 +17,17 @@
 
 package org.voltdb.utils;
 
-import java.io.IOException;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStreamReader;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryUsage;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 
-import javax.servlet_voltpatches.ServletException;
-import javax.servlet_voltpatches.http.HttpServletRequest;
-import javax.servlet_voltpatches.http.HttpServletResponse;
-
-import org.eclipse.jetty_voltpatches.server.Request;
-import org.eclipse.jetty_voltpatches.server.Server;
-import org.eclipse.jetty_voltpatches.server.bio.SocketConnector;
-import org.eclipse.jetty_voltpatches.server.handler.AbstractHandler;
+import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.processtools.ShellTools;
 
 /**
@@ -44,12 +40,14 @@ import org.voltdb.processtools.ShellTools;
  */
 public class SystemStatsCollector {
 
-    static long cputime;
-    static long elapsedtime;
+    private enum GetRSSMode { MACOSX_NATIVE, PROCFS, PS }
+
+    static long starttime;
     static final long javamaxheapmem = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getMax();
     static long memorysize = 256;
     static int pid;
     static boolean initialized = false;
+    static GetRSSMode mode = GetRSSMode.PS;
     static Thread thread = null;
 
     final static ArrayDeque<Datum> historyL = new ArrayDeque<Datum>(); // every hour
@@ -58,14 +56,113 @@ public class SystemStatsCollector {
     final static int historySize = 720;
 
     /**
+     * All the code that is needed to read info from "ps" is
+     * packaged up here. Should work on MACOSX and LINUX.
+     * It's not fast though.
+     */
+    public static class PSScraper {
+
+        /**
+         * Structure to hold the output from "ps"
+         */
+        public static class PSData {
+            final long rss;
+            final double pmem;
+            final double pcpu;
+            long time;
+            long etime;
+
+            public PSData(long rss, double pmem, double pcpu, long time, long etime) {
+                this.rss = rss;
+                this.pmem = pmem;
+                this.pcpu = pcpu;
+                this.time = time;
+                this.etime = etime;
+            }
+        }
+
+        /**
+         * Givent the format "ps" uses for a time duration, parse it into
+         * a numbe of milliseconds.
+         */
+        static long getDurationFromPSString(String duration) {
+            String[] parts;
+
+            // split into days and sub-days
+            duration = duration.trim();
+            parts = duration.split("-");
+            assert(parts.length > 0);
+            assert(parts.length <= 2);
+            String dayString = "0"; if (parts.length == 2) dayString = parts[0];
+            String subDayString = parts[parts.length - 1];
+            long days = Long.parseLong(dayString);
+
+            // split into > seconds in 00:00:00 time and second fractions
+            subDayString = subDayString.trim();
+            parts = subDayString.split("\\.");
+            assert(parts.length > 0);
+            assert(parts.length <= 2);
+            String fractionString = "0"; if (parts.length == 2) fractionString = parts[parts.length - 1];
+            subDayString = parts[0];
+            while (fractionString.length() < 3) fractionString += "0";
+            long miliseconds = Long.parseLong(fractionString);
+
+            // split into hours,minutes,seconds
+            parts = subDayString.split(":");
+            assert(parts.length > 0);
+            assert(parts.length <= 3);
+            String hoursString = "0"; if (parts.length == 3) hoursString = parts[parts.length - 3];
+            String minutesString = "0"; if (parts.length >= 2) minutesString = parts[parts.length - 2];
+            String secondsString = parts[parts.length - 1];
+            long hours = Long.parseLong(hoursString);
+            long minutes = Long.parseLong(minutesString);
+            long seconds = Long.parseLong(secondsString);
+
+            // compound down to ms
+            hours = hours + (days * 24);
+            minutes = minutes + (hours * 60);
+            seconds = seconds + (minutes * 60);
+            miliseconds = miliseconds + (seconds * 1000);
+            return miliseconds;
+        }
+
+        /**
+         * Call up "ps" in another process and scrape the results
+         * to get memory/cpu statistics.
+         * @param pid The pid of the process to inquire about.
+         * @return Structure containing output of the "ps" call.
+         */
+        public static PSData getPSData(int pid) {
+            // run "ps" to get stats for this pid
+            String command = String.format("ps -p %d -o rss,pmem,pcpu,time,etime", pid);
+            String results = ShellTools.cmd(command);
+
+            // parse ps into value array
+            String[] lines = results.split("\n");
+            if (lines.length != 2)
+                return null;
+            results = lines[1];
+            results = results.trim();
+            String[] values = results.split("\\s+");
+
+            // tease out all the stats
+            long rss = Long.valueOf(values[0]) * 1024;
+            double pmem = Double.valueOf(values[1]) / 100.0;
+            double pcpu = Double.valueOf(values[2]) / 100.0;
+            long time = getDurationFromPSString(values[3]);
+            long etime = getDurationFromPSString(values[4]);
+
+            // create a new Datum which adds java stats
+            return new PSData(rss, pmem, pcpu, time, etime);
+        }
+    }
+
+    /**
      * Datum class is one sample of memory usage.
      */
     public static class Datum {
         public final long timestamp;
         public final long rss;
-        public final double pmem;
-        public final double pcpu;
-        public final long cputime;
         public final long javatotalheapmem;
         public final long javausedheapmem;
         public final long javatotalsysmem;
@@ -75,30 +172,18 @@ public class SystemStatsCollector {
          * Constructor accepts some system values and generates some Java values.
          *
          * @param rss Resident set size.
-         * @param pmem Percent of memory used.
-         * @param pcpu Percent of cpu used.
-         * @param cputime Total cpu usage time.
-         * @param elapsedtime Total running time of process.
          */
-        Datum(long rss, double pmem, double pcpu, long cputime, long elapsedtime) {
+        Datum(long rss) {
             MemoryMXBean mmxb = ManagementFactory.getMemoryMXBean();
             MemoryUsage muheap = mmxb.getHeapMemoryUsage();
             MemoryUsage musys = mmxb.getNonHeapMemoryUsage();
 
             timestamp = System.currentTimeMillis();
             this.rss = rss;
-            this.pmem = pmem / 100;
-            this.pcpu = pcpu;
-            this.cputime = cputime;
             javatotalheapmem = muheap.getCommitted();
             javausedheapmem = muheap.getUsed();
             javatotalsysmem = musys.getCommitted();
             javausedsysmem = musys.getUsed();
-
-            long memorysizeTemp = Math.round(rss / this.pmem / 1024 / 1024 / 1024);
-            memorysizeTemp *= 1024 * 1024 * 1024;
-            /*if (memorysizeTemp > 256)*/ memorysize = memorysizeTemp;
-
         }
 
         /**
@@ -108,10 +193,8 @@ public class SystemStatsCollector {
         public String toString() {
             StringBuffer sb = new StringBuffer();
             sb.append(String.format("%dms:\n", timestamp));
-            sb.append(String.format("  SYS: %dM RSS, %.2f%% PMEM, %.2f%% CPU, %dM Total\n",
+            sb.append(String.format("  SYS: %dM RSS, %dM Total\n",
                     rss / 1024 /1024,
-                    pmem,
-                    pcpu,
                     memorysize / 1024 / 1024));
             sb.append(String.format("  JAVA: HEAP(%d/%d/%dM) SYS(%d/%dM)\n",
                     javausedheapmem / 1024 / 1024,
@@ -134,47 +217,6 @@ public class SystemStatsCollector {
                     javausedsysmem,
                     javatotalsysmem);
         }
-    }
-
-    public static long getDurationFromPSString(String duration) {
-        String[] parts;
-
-        // split into days and sub-days
-        duration = duration.trim();
-        parts = duration.split("-");
-        assert(parts.length > 0);
-        assert(parts.length <= 2);
-        String dayString = "0"; if (parts.length == 2) dayString = parts[0];
-        String subDayString = parts[parts.length - 1];
-        long days = Long.parseLong(dayString);
-
-        // split into > seconds in 00:00:00 time and second fractions
-        subDayString = subDayString.trim();
-        parts = subDayString.split("\\.");
-        assert(parts.length > 0);
-        assert(parts.length <= 2);
-        String fractionString = "0"; if (parts.length == 2) fractionString = parts[parts.length - 1];
-        subDayString = parts[0];
-        while (fractionString.length() < 3) fractionString += "0";
-        long miliseconds = Long.parseLong(fractionString);
-
-        // split into hours,minutes,seconds
-        parts = subDayString.split(":");
-        assert(parts.length > 0);
-        assert(parts.length <= 3);
-        String hoursString = "0"; if (parts.length == 3) hoursString = parts[parts.length - 3];
-        String minutesString = "0"; if (parts.length >= 2) minutesString = parts[parts.length - 2];
-        String secondsString = parts[parts.length - 1];
-        long hours = Long.parseLong(hoursString);
-        long minutes = Long.parseLong(minutesString);
-        long seconds = Long.parseLong(secondsString);
-
-        // compound down to ms
-        hours = hours + (days * 24);
-        minutes = minutes + (hours * 60);
-        seconds = seconds + (minutes * 60);
-        miliseconds = miliseconds + (seconds * 1000);
-        return miliseconds;
     }
 
     /**
@@ -227,40 +269,80 @@ public class SystemStatsCollector {
     }
 
     /**
+     * Get the process id, the total memory size and determine the
+     * best way to get the RSS on an ongoing basis.
+     */
+    private static synchronized void initialize() {
+        String processName = java.lang.management.ManagementFactory.getRuntimeMXBean().getName();
+        String pidString = processName.substring(0, processName.indexOf('@'));
+        pid = Integer.valueOf(pidString);
+        initialized = true;
+
+        // get the RSS and other stats from scraping "ps" from the command line
+        PSScraper.PSData psdata = PSScraper.getPSData(pid);
+        assert(psdata.rss > 0);
+
+        // figure out how much memory this thing has
+        long memorysizeTemp = Math.round(psdata.rss / psdata.pmem / 1024 / 1024 / 1024);
+        memorysizeTemp *= 1024 * 1024 * 1024;
+        memorysize = memorysizeTemp;
+
+        // now try to figure out the best way to get the rss size
+        long rss = -1;
+
+        // try the mac method
+        try {
+            rss = ExecutionEngine.nativeGetRSS();
+        }
+        catch (Exception e) {}
+        if (rss > 0) mode = GetRSSMode.MACOSX_NATIVE;
+
+        // try procfs
+        rss = getRSSFromProcFS();
+        if (rss > 0) mode = GetRSSMode.PROCFS;
+    }
+
+    /**
+     * Get the RSS using the procfs. If procfs is not
+     * around, this will return -1;
+     */
+    private static long getRSSFromProcFS() {
+        try {
+            File statFile = new File(String.format("/proc/%d/stat", pid));
+            FileInputStream fis = new FileInputStream(statFile);
+            BufferedReader r = new BufferedReader(new InputStreamReader(fis));
+            String stats = r.readLine();
+            String[] parts = stats.split(" ");
+            return Long.parseLong(parts[23]);
+        }
+        catch (Exception e) {
+            return -1;
+        }
+    }
+
+    /**
      * Poll the operating system and generate a Datum
      * @return A newly created Datum instance.
      */
     private static synchronized Datum generateCurrentSample() {
         // get this info once
-        if (!initialized) {
-            String processName = java.lang.management.ManagementFactory.getRuntimeMXBean().getName();
-            String pidString = processName.substring(0, processName.indexOf('@'));
-            pid = Integer.valueOf(pidString);
+        if (!initialized) initialize();
+
+        long rss = -1;
+        switch (mode) {
+        case MACOSX_NATIVE:
+            rss = ExecutionEngine.nativeGetRSS();
+            break;
+        case PROCFS:
+            rss = getRSSFromProcFS();
+            break;
+        case PS:
+            rss = PSScraper.getPSData(pid).rss;
+            break;
         }
 
-        // run "ps" to get stats for this pid
-//        String command = String.format("ps -p %d -o rss,pmem,pcpu,time,etime", pid);
-//        String results = ShellTools.cmd(command);
-//
-//        // parse ps into value array
-//        String[] lines = results.split("\n");
-//        if (lines.length != 2)
-//            return null;
-//        results = lines[1];
-//        results = results.trim();
-//        String[] values = results.split("\\s+");
-//
-//        // tease out all the stats
-//        long rss = Long.valueOf(values[0]) * 1024;
-//        double pmem = Double.valueOf(values[1]);
-//        double pcpu = Double.valueOf(values[2]);
-//        long time = getDurationFromPSString(values[3]);
-//        long etime = getDurationFromPSString(values[4]);
-
         // create a new Datum which adds java stats
-        //Datum d = new Datum(rss, pmem, pcpu, time, etime);
-        Datum d = new Datum( 0, 0, 0, 0, 0);
-        //System.out.println(d);
+        Datum d = new Datum(rss);
         return d;
     }
 
@@ -357,73 +439,56 @@ public class SystemStatsCollector {
         return chart.getURL(minutes);
     }
 
-    /**
-     * Web server handler for manual testing. Returns a chart image page.
-     */
-    static class RequestHandler extends AbstractHandler {
-
-        @Override
-        public void handle(String target,
-                           Request baseRequest,
-                           HttpServletRequest request,
-                           HttpServletResponse response)
-                           throws IOException, ServletException {
-
-            String strURL = getGoogleChartURL(2, 320, 240, "-2min");
-
-            // just print voltdb version for now
-            String msg = "<html><body>\n";
-            msg += "<h2>VoltDB RAM Usage</h2>\n";
-            msg += "<img src='" + strURL + "' />\n";
-            msg += "</body></html>";
-
-            System.out.println(msg);
-            System.out.println(msg.length());
-
-            response.setContentType("text/html");
-            response.setStatus(HttpServletResponse.SC_OK);
-            baseRequest.setHandled(true);
-            response.getWriter().print(msg);
-        }
-
-    }
 
     /**
-     * Main for manual testing that opens a http server on 8080
-     * that serves a chart based on history data.
+     * Manual performance testing code for getting stats.
      */
     public static void main(String[] args) {
-        Server server = new Server();
+        int repeat = 1000;
+        long start, duration, correct;
+        double per;
 
-        try {
-            // The socket channel connector seems to be faster for our use
-            //SelectChannelConnector connector = new SelectChannelConnector();
-            SocketConnector connector = new SocketConnector();
+        String processName = java.lang.management.ManagementFactory.getRuntimeMXBean().getName();
+        String pidString = processName.substring(0, processName.indexOf('@'));
+        int pid = Integer.valueOf(pidString);
 
-            connector.setPort(8080);
-            connector.setName("VoltDB-HTTPD");
-            server.addConnector(connector);
+        org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(false);
 
-            server.setHandler(new RequestHandler());
-            server.start();
+        // test the default fallback performance
+        start = System.currentTimeMillis();
+        correct = 0;
+        for (int i = 0; i < repeat; i++) {
+            long rss = PSScraper.getPSData(pid).rss;
+            if (rss > 0) correct++;
         }
-        catch (Exception e) {
-            // double try to make sure the port doesn't get eaten
-            try { server.stop(); } catch (Exception e2) {}
-            try { server.destroy(); } catch (Exception e2) {}
-            throw new RuntimeException(e);
-        }
+        duration = System.currentTimeMillis() - start;
+        per = duration / (double) repeat;
+        System.out.printf("%.2f ms per \"ps\" call / %d / %d correct\n",
+                per, correct, repeat);
 
-        while(true) {
-            asyncSampleSystemNow(false, false);
-            try {
-                Thread.sleep(2000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            //Datum d = getRecentSample();
-            //System.out.println(d);
+        // test linux procfs performance
+        start = System.currentTimeMillis();
+        correct = 0;
+        for (int i = 0; i < repeat; i++) {
+            long rss = getRSSFromProcFS();
+            if (rss > 0) correct++;
         }
+        duration = System.currentTimeMillis() - start;
+        per = duration / (double) repeat;
+        System.out.printf("%.2f ms per procfs read / %d / %d correct\n",
+                per, correct, repeat);
+
+        // test mac performance
+        start = System.currentTimeMillis();
+        correct = 0;
+        for (int i = 0; i < repeat; i++) {
+            long rss = ExecutionEngine.nativeGetRSS();
+            if (rss > 0) correct++;
+        }
+        duration = System.currentTimeMillis() - start;
+        per = duration / (double) repeat;
+        System.out.printf("%.2f ms per ee.nativeGetRSS call / %d / %d correct\n",
+                per, correct, repeat);
     }
 
 }
