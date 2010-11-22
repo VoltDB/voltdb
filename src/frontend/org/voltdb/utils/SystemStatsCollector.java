@@ -28,6 +28,7 @@ import java.util.ArrayDeque;
 import java.util.HashMap;
 
 import org.voltdb.jni.ExecutionEngine;
+import org.voltdb.logging.VoltLogger;
 import org.voltdb.processtools.ShellTools;
 
 /**
@@ -250,16 +251,23 @@ public class SystemStatsCollector {
      * @param large Add result to large set?
      */
     public static synchronized void asyncSampleSystemNow(final boolean medium, final boolean large) {
-        if (thread != null) {
-            if (thread.isAlive()) return;
-            else thread = null;
-        }
+        // slow mode starts an async thread
+        if (mode == GetRSSMode.PS) {
+            if (thread != null) {
+                if (thread.isAlive()) return;
+                else thread = null;
+            }
 
-        thread = new Thread(new Runnable() {
-            @Override
-            public void run() { sampleSystemNow(medium, large); }
-        });
-        thread.start();
+            thread = new Thread(new Runnable() {
+                @Override
+                public void run() { sampleSystemNow(medium, large); }
+            });
+            thread.start();
+        }
+        // fast mode doesn't spawn a thread
+        else {
+            sampleSystemNow(medium, large);
+        }
     }
 
     /**
@@ -301,6 +309,14 @@ public class SystemStatsCollector {
         // try procfs
         rss = getRSSFromProcFS();
         if (rss > 0) mode = GetRSSMode.PROCFS;
+
+        // notify users if stats collection might be slow
+        if (mode == GetRSSMode.PS) {
+            VoltLogger logger = new VoltLogger("HOST");
+            logger.warn("System statistics will be collected in a sub-optimal "
+                    + "manner because either procfs couldn't be read from or "
+                    + "the native library couldn't be loaded.");
+        }
     }
 
     /**
