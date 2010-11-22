@@ -112,36 +112,45 @@ public class DeletesClient
         String company = randomString(60);
         String co_addr = randomString(250);
         byte deceased = (byte) (m_rand.nextBoolean() ? 1 : 0);
-        try {
-            client.callProcedure(
-                    new ProcedureCallback() {
-
-                        @Override
-                        public void clientCallback(ClientResponse response) {
-                            if (response.getStatus() != ClientResponse.SUCCESS){
-                                System.out.println("failed insert");
-                                System.out.println(response.getStatusString());
-                            }
-                            m_expectedInserts--;
+        try
+        {
+            while (!client.callProcedure(new ProcedureCallback()
+                {
+                    @Override
+                    public void clientCallback(ClientResponse response) {
+                        if (response.getStatus() != ClientResponse.SUCCESS){
+                            System.out.println("failed insert");
+                            System.out.println(response.getStatusString());
                         }
-
-                    },
-                    Insert.class.getSimpleName(),
-                    m_names[name_idx],
-                    age,
-                    weight,
-                    desc1,
-                    desc2,
-                    addr1,
-                    addr2,
-                    addr3,
-                    text1,
-                    text2,
-                    sig,
-                    ts,
-                    company,
-                    co_addr,
-                    deceased);
+                        m_expectedInserts--;
+                    }
+                },
+                Insert.class.getSimpleName(),
+                m_names[name_idx],
+                age,
+                weight,
+                desc1,
+                desc2,
+                addr1,
+                addr2,
+                addr3,
+                text1,
+                text2,
+                sig,
+                ts,
+                company,
+                co_addr,
+                deceased)
+                )
+            {
+                try
+                {
+                    client.backpressureBarrier();
+                } catch (InterruptedException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+            }
         } catch (NoConnectionsException e) {
             System.err.println("Lost connection to database, terminating");
             System.exit(-1);
@@ -231,24 +240,33 @@ public class DeletesClient
         {
             try
             {
-                client.callProcedure(
-                                     new ProcedureCallback()
-                                     {
-                                         @Override
-                                         public void clientCallback(ClientResponse response) {
-                                             if (response.getStatus() != ClientResponse.SUCCESS){
-                                                 System.out.println("failed delete batch");
-                                                 System.out.println(response.getStatusString());
-                                             }
-                                             else
-                                             {
-                                                 m_totalRows -= response.getResults()[0].asScalarLong();
-                                                 m_expectedDeletes--;
-                                                 m_totalDeletedRows += response.getResults()[0].asScalarLong();
-                                             }
-                                         }
-                                     },
-                                     "DeleteOldBatches", m_names[i], prune_ts);
+                while (!client.callProcedure(new ProcedureCallback()
+                {
+                    @Override
+                    public void clientCallback(ClientResponse response) {
+                        if (response.getStatus() != ClientResponse.SUCCESS){
+                            System.out.println("failed delete batch");
+                            System.out.println(response.getStatusString());
+                        }
+                        else
+                        {
+                            m_totalRows -= response.getResults()[0].asScalarLong();
+                            m_expectedDeletes--;
+                            m_totalDeletedRows += response.getResults()[0].asScalarLong();
+                        }
+                    }
+                },
+                "DeleteOldBatches", m_names[i], prune_ts)
+                )
+                {
+                    try
+                    {
+                        client.backpressureBarrier();
+                    } catch (InterruptedException e) {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    }
+                }
             }
             catch (NoConnectionsException e)
             {
@@ -285,23 +303,31 @@ public class DeletesClient
         {
             try
             {
-                client.callProcedure(
-                                     new ProcedureCallback()
-                                     {
-                                         @Override
-                                         public void clientCallback(ClientResponse response) {
-                                             if (response.getStatus() != ClientResponse.SUCCESS){
-                                                 System.out.println("failed delete deceased");
-                                                 System.out.println(response.getStatusString());
-                                             }
-                                             else
-                                             {
-                                                 m_totalRows -= response.getResults()[0].asScalarLong();
-                                                 m_expectedDeadDeletes--;
-                                             }
-                                         }
-                                     },
-                                     "DeleteDeceased", m_names[i]);
+                while (!client.callProcedure(new ProcedureCallback()
+                {
+                    @Override
+                    public void clientCallback(ClientResponse response) {
+                        if (response.getStatus() != ClientResponse.SUCCESS){
+                            System.out.println("failed delete deceased");
+                            System.out.println(response.getStatusString());
+                        }
+                        else
+                        {
+                            m_totalRows -= response.getResults()[0].asScalarLong();
+                            m_expectedDeadDeletes--;
+                        }
+                    }
+                },
+                "DeleteDeceased", m_names[i])
+                )
+                {
+                    try {
+                        client.backpressureBarrier();
+                    } catch (InterruptedException e) {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    }
+                }
             }
             catch (NoConnectionsException e)
             {
@@ -405,8 +431,8 @@ public class DeletesClient
         }
         try
         {
-            client.callProcedure("@SnapshotDelete", new String[] {m_snapshotDir},
-                                 new String[] {m_snapshotId});
+            VoltTable[] results = client.callProcedure("@SnapshotDelete", new String[] {m_snapshotDir},
+                                 new String[] {m_snapshotId}).getResults();
         }
         catch (NoConnectionsException e1)
         {
@@ -456,9 +482,10 @@ public class DeletesClient
 
     public static void main(String[] args)
     {
-        if (args.length != 4)
+        if (args.length != 5)
         {
             System.err.println("Client args: [average batch size] [num batches to keep] [cleanup frequency] [server list]");
+            System.exit(-1);
         }
         m_averageBatchSize = Integer.valueOf(args[0]);
         m_batchesToKeep = Integer.valueOf(args[1]);
