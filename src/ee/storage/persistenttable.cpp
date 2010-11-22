@@ -856,6 +856,7 @@ bool PersistentTable::activateCopyOnWrite(TupleSerializer *serializer, int32_t p
     //as missing from both sets. Then remove it from the load maps by providing it a NULL bucket
     TBPtr firstBlock = m_data.begin().data();
     firstBlock->swapToBucket(TBBucketPtr());
+    //std::cout << "First block for snapshot is " << static_cast<void*>(firstBlock->address()) << std::endl;
     m_blocksPendingSnapshot.erase(m_data.begin().data());
     m_COWContext.reset(new CopyOnWriteContext( this, serializer, partitionId));
     return false;
@@ -956,6 +957,7 @@ void PersistentTable::notifyBlockWasCompactedAway(TBPtr block) {
     if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
         assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
     } else {
+        assert(m_COWContext != NULL);
         assert(m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end());
         m_COWContext->notifyBlockWasCompactedAway(block);
     }
@@ -1095,4 +1097,56 @@ void PersistentTable::doForcedCompaction() {
     }
     assert(!compactionPredicate());
     std::cout << "Finished forced compaction with allocated tuple count " << allocatedTupleCount() << std::endl;
+}
+
+void PersistentTable::printBucketInfo() {
+    std::cout << std::endl;
+    TBMapI iter = m_data.begin();
+    while (iter != m_data.end()) {
+        std::cout << "Block " << static_cast<void*>(iter.data()->address()) << " has " <<
+                iter.data()->activeTuples() << " active tuples and " << iter.data()->lastCompactionOffset()
+                << " last compaction offset and is in bucket " <<
+                static_cast<void*>(iter.data()->currentBucket().get()) <<
+                std::endl;
+        iter++;
+    }
+
+    boost::unordered_set<TBPtr>::iterator blocksNotPendingSnapshot = m_blocksNotPendingSnapshot.begin();
+    std::cout << "Blocks not pending snapshot: ";
+    while (blocksNotPendingSnapshot != m_blocksNotPendingSnapshot.end()) {
+        std::cout << static_cast<void*>((*blocksNotPendingSnapshot)->address()) << ",";
+        blocksNotPendingSnapshot++;
+    }
+    std::cout << std::endl;
+    for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
+        if (m_blocksNotPendingSnapshotLoad[ii]->empty()) {
+            continue;
+        }
+        std::cout << "Bucket " << ii << "(" << static_cast<void*>(m_blocksNotPendingSnapshotLoad[ii].get()) << ") has size " << m_blocksNotPendingSnapshotLoad[ii]->size() << std::endl;
+        TBBucketI bucketIter = m_blocksNotPendingSnapshotLoad[ii]->begin();
+        while (bucketIter != m_blocksNotPendingSnapshotLoad[ii]->end()) {
+            std::cout << "\t" << static_cast<void*>((*bucketIter)->address()) << std::endl;
+            bucketIter++;
+        }
+    }
+
+    boost::unordered_set<TBPtr>::iterator blocksPendingSnapshot = m_blocksPendingSnapshot.begin();
+    std::cout << "Blocks pending snapshot: ";
+    while (blocksPendingSnapshot != m_blocksPendingSnapshot.end()) {
+        std::cout << static_cast<void*>((*blocksPendingSnapshot)->address()) << ",";
+        blocksPendingSnapshot++;
+    }
+    std::cout << std::endl;
+    for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
+        if (m_blocksPendingSnapshotLoad[ii]->empty()) {
+            continue;
+        }
+        std::cout << "Bucket " << ii << "(" << static_cast<void*>(m_blocksPendingSnapshotLoad[ii].get()) << ") has size " << m_blocksPendingSnapshotLoad[ii]->size() << std::endl;
+        TBBucketI bucketIter = m_blocksPendingSnapshotLoad[ii]->begin();
+        while (bucketIter != m_blocksPendingSnapshotLoad[ii]->end()) {
+            std::cout << "\t" << static_cast<void*>((*bucketIter)->address()) << std::endl;
+            bucketIter++;
+        }
+    }
+    std::cout << std::endl;
 }

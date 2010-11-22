@@ -474,6 +474,81 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
     ASSERT_EQ( m_table->activeTupleCount(), 0);
 }
 
+/*
+ * The problem I suspect in ENG897 is that the last
+ * block handled by the COW iterator is not returned back to the set of
+ * blocks that are not pending snapshot. This causes that block to
+ * be passed to a null COW iterator when it is compacted.
+ */
+TEST_F(CompactionTest, TestENG897) {
+    initTable(true);
+    addRandomUniqueTuples( m_table, 32263 * 5);
+
+    //Delete stuff to put everything in a bucket
+    voltdb::TableIndex *pkeyIndex = m_table->primaryKeyIndex();
+    TableTuple key(pkeyIndex->getKeySchema());
+    boost::scoped_array<char> backingStore(new char[pkeyIndex->getKeySchema()->tupleLength()]);
+    key.moveNoHeader(backingStore.get());
+    for (int ii = 0; ii < 32263 * 5; ii++) {
+        if (ii % 2 == 0) {
+            key.setNValue(0, ValueFactory::getIntegerValue(ii));
+            ASSERT_TRUE(pkeyIndex->moveToKey(&key));
+            TableTuple tuple = pkeyIndex->nextValueAtKey();
+            m_table->deleteTuple(tuple, true);
+        }
+    }
+
+    //m_table->printBucketInfo();
+
+    size_t blocksNotPendingSnapshot = m_table->getBlocksNotPendingSnapshotCount();
+    ASSERT_EQ(5, blocksNotPendingSnapshot);
+    DefaultTupleSerializer serializer;
+
+    m_table->activateCopyOnWrite(&serializer, 0);
+    for (int ii = 0; ii < 16130; ii++) {
+        if (ii % 2 == 0) {
+            continue;
+        }
+        key.setNValue(0, ValueFactory::getIntegerValue(ii));
+        ASSERT_TRUE(pkeyIndex->moveToKey(&key));
+        TableTuple tuple = pkeyIndex->nextValueAtKey();
+        m_table->deleteTuple(tuple, true);
+    }
+
+    //m_table->printBucketInfo();
+    //std::cout << "Starting snapshot serialization" << std::endl;
+    char serializationBuffer[2097152];
+    while (true) {
+        ReferenceSerializeOutput out( serializationBuffer, 2097152);
+        m_table->serializeMore(&out);
+        if (out.position() == 0) {
+            break;
+        }
+        m_table->printBucketInfo();
+    }
+    ASSERT_EQ( blocksNotPendingSnapshot, m_table->getBlocksNotPendingSnapshotCount());
+
+    //std::cout << "Finished snapshot serialization" << std::endl;
+
+    for (int ii = 16130; ii < 32261; ii++) {
+        if (ii % 2 == 0) {
+            continue;
+        }
+        key.setNValue(0, ValueFactory::getIntegerValue(ii));
+        ASSERT_TRUE(pkeyIndex->moveToKey(&key));
+        TableTuple tuple = pkeyIndex->nextValueAtKey();
+        m_table->deleteTuple(tuple, true);
+    }
+
+    //std::cout << "Before idle compaction" << std::endl;
+    //m_table->printBucketInfo();
+    m_table->activateCopyOnWrite(&serializer, 0);
+    //std::cout << "Activated COW" << std::endl;
+    //m_table->printBucketInfo();
+    m_table->doIdleCompaction();
+    //m_table->printBucketInfo();
+}
+
 int main() {
     return TestSuite::globalInstance()->runAll();
 }
