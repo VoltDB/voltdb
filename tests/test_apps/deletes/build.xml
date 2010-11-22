@@ -47,7 +47,7 @@ PRIMARY ENTRY POINTS
     <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError" />
     <jvmarg value="-XX:HeapDumpPath=/tmp" />
     <jvmarg value="-XX:-ReduceInitialCardMarks" />
-    <jvmarg value="-Djava.library.path=${voltdb.dir}" />
+    <jvmarg value="-Djava.library.path=${env.VOLTDB}" />
     <arg value="150000"/>              <!-- average batch size -->
     <arg value="5"/>                 <!-- number of batches to keep -->
     <arg value="6"/>                 <!-- number of insert/delete cycles between pruning deceased rows -->
