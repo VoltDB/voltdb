@@ -269,6 +269,13 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
             m_wrapper->setBytesUsed(streamBytesUsed);
     }
 
+    size_t getBlocksNotPendingSnapshotCount() {
+        return m_blocksNotPendingSnapshot.size();
+    }
+
+    void doIdleCompaction();
+    void printBucketInfo();
+
 protected:
 
     size_t allocatedBlockCount() const {
@@ -276,8 +283,11 @@ protected:
     }
 
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
-        m_blocksPendingSnapshot.erase(nextBlock);
-        if (finishedBlock.get() != NULL && !finishedBlock->isEmpty()) {
+        if (nextBlock != NULL) {
+            m_blocksPendingSnapshot.erase(nextBlock);
+            nextBlock->swapToBucket(TBBucketPtr());
+        }
+        if (finishedBlock != NULL && !finishedBlock->isEmpty()) {
             m_blocksNotPendingSnapshot.insert(finishedBlock);
             int bucketIndex = finishedBlock->calculateBucketIndex();
             if (bucketIndex != -1) {
@@ -288,7 +298,6 @@ protected:
 
     void nextFreeTuple(TableTuple *tuple);
     bool doCompactionWithinSubset(TBBucketMap *bucketMap);
-    void doIdleCompaction();
     void doForcedCompaction();
 
     // ------------------------------------------------------------------

@@ -28,6 +28,13 @@ CopyOnWriteIterator::CopyOnWriteIterator(
         m_location(NULL),
         m_blockOffset(0),
         m_currentBlock(NULL) {
+    //Prime the pump
+    m_table->snapshotFinishedScanningBlock(m_currentBlock, m_blockIterator.data());
+    m_location = m_blockIterator.key();
+    m_currentBlock = m_blockIterator.data();
+    m_blockIterator.data() = TBPtr();
+    m_blockOffset = 0;
+    m_blockIterator++;
 }
 
 /**
@@ -35,22 +42,23 @@ CopyOnWriteIterator::CopyOnWriteIterator(
  * and mark them as clean so that they can be copied during the next snapshot.
  */
 bool CopyOnWriteIterator::next(TableTuple &out) {
+    assert(m_currentBlock != NULL);
     while (true) {
-        if (m_currentBlock == NULL ||
-                m_blockOffset == m_currentBlock->unusedTupleBoundry()) {
+        if (m_blockOffset >= m_currentBlock->unusedTupleBoundry()) {
             if (m_blockIterator == m_end) {
+                m_table->snapshotFinishedScanningBlock(m_currentBlock, TBPtr());
                 break;
             }
             m_table->snapshotFinishedScanningBlock(m_currentBlock, m_blockIterator.data());
             m_location = m_blockIterator.key();
             m_currentBlock = m_blockIterator.data();
+            assert(m_currentBlock->address() == m_location);
             m_blockIterator.data() = TBPtr();
             m_blockOffset = 0;
             m_blockIterator++;
-        } else {
-            m_location += m_tupleLength;
         }
         assert(m_location < m_currentBlock.get()->address() + m_table->m_tableAllocationSize);
+        assert(m_location < m_currentBlock.get()->address() + (m_table->m_tupleLength * m_table->m_tuplesPerBlock));
         assert (out.sizeInValues() == m_table->columnCount());
         m_blockOffset++;
         out.move(m_location);
@@ -59,9 +67,11 @@ bool CopyOnWriteIterator::next(TableTuple &out) {
         // Return this tuple only when this tuple is not marked as deleted and isn't dirty
         if (active && !dirty) {
             out.setDirtyFalse();
+            m_location += m_tupleLength;
             return true;
         } else {
             out.setDirtyFalse();
+            m_location += m_tupleLength;
         }
     }
     return false;

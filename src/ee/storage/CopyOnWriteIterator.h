@@ -50,7 +50,7 @@ public:
             return true;
         }
 
-        if (tupleAddress > m_location) {
+        if (tupleAddress >= m_location) {
             return true;
         } else {
             return false;

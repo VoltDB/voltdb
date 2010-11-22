@@ -204,7 +204,8 @@ inline bool TableIterator::persistentNext(TableTuple &out) {
         }
         assert (out.sizeInValues() == m_table->columnCount());
         out.move(m_dataPtr);
-        assert(m_dataPtr < m_dataPtr + m_table->m_tableAllocationTargetSize);
+        assert(m_dataPtr < m_currentBlock.get()->address() + m_table->m_tableAllocationTargetSize);
+        assert(m_dataPtr < m_currentBlock.get()->address() + (m_table->m_tupleLength * m_table->m_tuplesPerBlock));
         //assert(m_foundTuples == m_location);
         ++m_location;
         ++m_blockOffset;
@@ -240,7 +241,9 @@ inline bool TableIterator::tempNext(TableTuple &out) {
         }
         assert (out.sizeInValues() == m_table->columnCount());
         out.move(m_dataPtr);
-        assert(m_dataPtr < m_dataPtr + m_table->m_tableAllocationTargetSize);
+        assert(m_dataPtr < m_currentBlock.get()->address() + m_table->m_tableAllocationTargetSize);
+        assert(m_dataPtr < m_currentBlock.get()->address() + (m_table->m_tupleLength * m_table->m_tuplesPerBlock));
+
 
         //assert(m_foundTuples == m_location);
 
