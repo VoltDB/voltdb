@@ -33,8 +33,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
-import org.voltdb.client.Client;
-import org.voltdb.client.ProcCallException;
+import org.voltdb.client.*;
 
 public class TestSystemProcedureSuite extends RegressionSuite {
 
@@ -310,6 +309,65 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         }
     }
 
+
+    // verify that the start sampler command doesn't blow up
+    public void testProfCtlStartSampler() throws Exception {
+        Client client = getClient();
+        ClientResponse resp = client.callProcedure("@ProfCtl", "SAMPLER_START");
+        VoltTable vt = resp.getResults()[0];
+        boolean foundResponse = false;
+        while (vt.advanceRow()) {
+            if (!vt.getString("Result").equalsIgnoreCase("sampler_start")) {
+                fail();
+            }
+            foundResponse = true;
+        }
+        assertTrue(foundResponse);
+    }
+
+    // verify that the gperf enable command doesn't blow up
+    public void testProfCtlGperfEnable() throws Exception {
+        Client client = getClient();
+        ClientResponse resp = client.callProcedure("@ProfCtl", "GPERF_ENABLE");
+        VoltTable vt = resp.getResults()[0];
+        boolean foundResponse = false;
+        while (vt.advanceRow()) {
+            if (vt.getString("Result").equalsIgnoreCase("GPERF_ENABLE")) {
+                foundResponse = true;
+            }
+            else {
+                assertTrue(vt.getString("Result").equalsIgnoreCase("GPERF_NOOP"));
+            }
+        }
+        assertTrue(foundResponse);
+    }
+
+
+    // verify that the gperf disable command doesn't blow up
+    public void testProfCtlGperfDisable() throws Exception {
+        Client client = getClient();
+        ClientResponse resp = client.callProcedure("@ProfCtl", "GPERF_DISABLE");
+        VoltTable vt = resp.getResults()[0];
+        boolean foundResponse = false;
+        while (vt.advanceRow()) {
+            if (vt.getString("Result").equalsIgnoreCase("gperf_disable")) {
+                foundResponse = true;
+            }
+            else {
+                assertTrue(vt.getString("Result").equalsIgnoreCase("GPERF_NOOP"));
+            }
+        }
+        assertTrue(foundResponse);
+    }
+
+
+    // verify correct behavior on invalid command
+    public void testProfCtlInvalidCommand() throws Exception {
+        Client client = getClient();
+        ClientResponse resp = client.callProcedure("@ProfCtl", "MakeAPony");
+        VoltTable vt = resp.getResults()[0];
+        assertTrue(true);
+    }
 
     //
     // Build a list of the tests to be run. Use the regression suite

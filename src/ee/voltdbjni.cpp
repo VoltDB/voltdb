@@ -78,12 +78,13 @@
 #endif // __SIZEOF_POINTER__ == 4
 #else
 #ifndef __x86_64
-#error VoltDB server does not compile or run on 32-bit platforms. The Java clien
-t library does (ant jars)
+#error VoltDB server does not compile or run on 32-bit platforms. The Java client library does (ant jars)
 #endif // __x86_64
 #endif // LINUX
 
-//#include <google/profiler.h>
+#ifdef PROFILE_ENABLED
+#include <google/profiler.h>
+#endif
 
 //#include <jni/jni.h>
 // TODO: gcc picks up wrong jni_md.h and results in compile error (bad
@@ -871,20 +872,21 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeToggl
 (JNIEnv *env, jobject obj, jlong engine_ptr, jint toggle)
 {
     VOLT_DEBUG("nativeToggleProfiler in C++ called");
+// set on build command line via build.py
+#ifdef PROFILE_ENABLED
     VoltDBEngine *engine = castToEngine(engine_ptr);
     updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
     if (engine) {
-//        if (toggle) {
-//            ProfilerStart("/tmp/gprof.prof");
-//            ProfilerDisable();
-//        }
-//        else {
-//            ProfilerStop();
-//            ProfilerFlush();
-//        }
+        if (toggle) {
+            ProfilerStart("/tmp/gprof.prof");
+        }
+        else {
+            ProfilerStop();
+            ProfilerFlush();
+        }
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
-
     }
+#endif
     return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
 }
 

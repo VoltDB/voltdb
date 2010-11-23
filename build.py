@@ -51,12 +51,20 @@ CTX.CPPFLAGS = """-Wall -Wextra -Werror -Woverloaded-virtual -Wconversion
 if gcc_major == 4 and gcc_minor >= 3:
     CTX.CPPFLAGS += " -Wno-ignored-qualifiers -fno-strict-aliasing"
 
+if CTX.PROFILE:
+    CTX.CPPFLAGS += " -fvisibility=default -DPROFILE_ENABLED"
+
 # linker flags
 CTX.LDFLAGS = """ -g3 -rdynamic -ldl"""
+
 if CTX.COVERAGE:
     CTX.LDFLAGS += " -ftest-coverage -fprofile-arcs"
+
 # for the google perftools profiler and the recommended stack unwinder
-#CTX.LDFLAGS = """ -g3 -rdynamic -lprofiler -lunwind"""
+# which you must have separately built and installed. Take some guesses
+# at the library location (/usr/local/lib).
+if CTX.PROFILE:
+    CTX.LDFLAGS = """  -L/usr/local/lib -g3 -rdynamic -lprofiler -lunwind"""
 
 # this is where the build will look for header files
 # - the test source will also automatically look in the test root dir

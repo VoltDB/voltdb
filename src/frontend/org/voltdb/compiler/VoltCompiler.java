@@ -872,7 +872,7 @@ public class VoltCompiler {
          {"org.voltdb.sysprocs.SnapshotScan",                 "false",    "false"},
          {"org.voltdb.sysprocs.SnapshotDelete",               "false",    "false"},
          {"org.voltdb.sysprocs.Shutdown",                     "false",    "false"},
-//       {"org.voltdb.sysprocs.StartSampler",                 "false",    "false"},
+         {"org.voltdb.sysprocs.ProfCtl",                      "false",    "false"},
          {"org.voltdb.sysprocs.Statistics",                   "true",     "false"},
          {"org.voltdb.sysprocs.SystemInformation",            "true",     "false"},
          {"org.voltdb.sysprocs.UpdateApplicationCatalog",     "false",    "true"},

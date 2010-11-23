@@ -26,6 +26,7 @@ class BuildContext:
         self.NM = "/usr/bin/nm"
         self.NMFLAGS = "-n"    # specialized by platform in build.py
         self.COVERAGE = False
+        self.PROFILE = False
         for arg in [x.strip().upper() for x in args]:
             if arg in ["DEBUG", "RELEASE", "MEMCHECK", "MEMCHECK_NOFREELIST"]:
                 self.LEVEL = arg
@@ -33,6 +34,8 @@ class BuildContext:
                 self.TARGET = arg
             if arg in ["COVERAGE"]:
                 self.COVERAGE = True
+            if arg in ["PROFILE"]:
+                self.PROFILE = True
 
 def readFile(filename):
     "read a file into a string"

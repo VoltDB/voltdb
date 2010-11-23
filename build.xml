@@ -264,7 +264,8 @@ DISTRIBUTION
 ***************************************
 -->
 
-<target name="voltbin" depends="compile, ee, jars">
+<macrodef name="voltbin-macro">
+  <sequential>
     <mkdir dir="${build.dir}/voltbin" />
     <copy todir="${build.dir}/voltbin" flatten="true">
         <fileset dir="${build.dir}" defaultexcludes="yes">
@@ -281,10 +282,20 @@ DISTRIBUTION
     <!-- populate the logging configuration files -->
     <copy tofile="${build.dir}/voltbin/log4j.properties" file="${src.gpl.dir}/log4j.properties"/>
     <copy tofile="${build.dir}/voltbin/log4j.xml" file="${src.gpl.dir}/log4j.xml"/>
-    <!-- strip the voltbin shared library (~40x size reduction) -->
-    <exec dir='${build.dir}/voltbin' executable='/bin/sh'>
-        <arg line="-c '/usr/bin/strip -x libvoltdb*'"/>
-    </exec>
+  </sequential>
+</macrodef>
+
+<target name="voltbin" depends="compile, ee, jars">
+  <voltbin-macro/>
+
+  <!-- strip the voltbin shared library (~40x size reduction) -->
+  <exec dir='${build.dir}/voltbin' executable='/bin/sh'>
+    <arg line="-c '/usr/bin/strip -x libvoltdb*'"/>
+  </exec>
+</target>
+
+<target name="voltbin_profile" depends="compile, ee_profile, jars">
+  <voltbin-macro/>
 </target>
 
 <!-- Copy an example and move the basebuild.xml into that example -->
@@ -814,6 +825,13 @@ NATIVE EE STUFF
     description="Build C++ JNI library and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
         <arg line="build.py ${build}" />
+    </exec>
+</target>
+
+<target name='ee_profile' depends="catalog, jnicompile"
+    description="Build C++ JNI lib dl-ing perf tools and copy it to production folder.">
+    <exec dir='.' executable='python' failonerror='true'>
+        <arg line="build.py ${build} profile" />
     </exec>
 </target>
 

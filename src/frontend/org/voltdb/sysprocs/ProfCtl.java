@@ -33,7 +33,7 @@ import org.voltdb.dtxn.DtxnConstants;
  * in the documentation.
  */
 @ProcInfo(singlePartition = false)
-public class StartSampler extends VoltSystemProcedure {
+public class ProfCtl extends VoltSystemProcedure {
 
     Database m_db = null;
     static final int DEP_ID = 1 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
@@ -50,21 +50,58 @@ public class StartSampler extends VoltSystemProcedure {
     public DependencyPair executePlanFragment(HashMap<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params, SystemProcedureExecutionContext context) {
 
-        VoltDB.instance().startSampler();
+        VoltTable table = new VoltTable(new ColumnInfo("Result", VoltType.STRING));
 
-        VoltTable table = new VoltTable(new ColumnInfo("dummy", VoltType.BIGINT));
+        if (params.toArray()[0] != null) {
+            String command = (String)params.toArray()[0];
+            if (command.equalsIgnoreCase("SAMPLER_START")) {
+                VoltDB.instance().startSampler();
+                table.addRow("SAMPLER_START");
+                return new DependencyPair(DEP_ID, table);
+            }
+            else if (command.equalsIgnoreCase("GPERF_ENABLE") || command.equalsIgnoreCase("GPERF_DISABLE")) {
+                // Choose the lowest site ID on this host to do the work.
+                int host_id = context.getExecutionSite().getCorrespondingHostId();
+                Integer lowest_site_id =
+                    VoltDB.instance().getCatalogContext().siteTracker.
+                    getLowestLiveExecSiteIdForHost(host_id);
+                if (context.getExecutionSite().getSiteId() != lowest_site_id)
+                {
+                    table.addRow("GPERF_NOOP");
+                    return new DependencyPair(DEP_ID, table);
+                }
+                if (command.equalsIgnoreCase("GPERF_ENABLE")) {
+                    context.getExecutionEngine().toggleProfiler(1);
+                    table.addRow("GPERF_ENABLE");
+                    return new DependencyPair(DEP_ID, table);
+                }
+                else {
+                    context.getExecutionEngine().toggleProfiler(0);
+                    table.addRow("GPERF_DISABLE");
+                    return new DependencyPair(DEP_ID, table);
+                }
 
+            }
+            else {
+                table.addRow("Invalid command: " + command);
+                return new DependencyPair(DEP_ID, table);
+            }
+        }
+        table.addRow("No command.");
         return new DependencyPair(DEP_ID, table);
     }
 
-    public VoltTable[] run(SystemProcedureExecutionContext ctx) {
+    public VoltTable[] run(SystemProcedureExecutionContext ctx, String command) {
 
         SynthesizedPlanFragment spf = new SynthesizedPlanFragment();
         spf.fragmentId = SysProcFragmentId.PF_startSampler;
         spf.outputDepId = DEP_ID;
         spf.inputDepIds = new int[] {};
         spf.multipartition = true;
-        spf.parameters = new ParameterSet();
+
+        ParameterSet params = new ParameterSet();
+        params.setParameters(command);
+        spf.parameters = params;
 
         // distribute and execute these fragments providing pfs and id of the
         // aggregator's output dependency table.

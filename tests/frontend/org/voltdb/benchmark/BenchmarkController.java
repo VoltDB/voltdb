@@ -380,10 +380,12 @@ public class BenchmarkController {
                     debugString =
                         " -agentlib:jdwp=transport=dt_socket,address=8001,server=y,suspend=n ";
                 }
+
                 // -agentlib:hprof=cpu=samples,
                 // depth=32,interval=10,lineno=y,monitor=y,thread=y,force=y,
                 // file=" + host + "_hprof_tpcc.txt"
                 String[] command = {
+                        "PROFILESELECTED=1",
                         "java",
                         "-XX:-ReduceInitialCardMarks",
                         "-XX:+HeapDumpOnOutOfMemoryError",
