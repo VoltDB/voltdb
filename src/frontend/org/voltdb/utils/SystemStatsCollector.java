@@ -330,7 +330,7 @@ public class SystemStatsCollector {
             BufferedReader r = new BufferedReader(new InputStreamReader(fis));
             String stats = r.readLine();
             String[] parts = stats.split(" ");
-            return Long.parseLong(parts[23]);
+            return Long.parseLong(parts[23]) * 4 * 1024;
         }
         catch (Exception e) {
             return -1;
@@ -467,7 +467,7 @@ public class SystemStatsCollector {
 
         String processName = java.lang.management.ManagementFactory.getRuntimeMXBean().getName();
         String pidString = processName.substring(0, processName.indexOf('@'));
-        int pid = Integer.valueOf(pidString);
+        pid = Integer.valueOf(pidString);
 
         org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(false);
 
