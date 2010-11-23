@@ -39,12 +39,14 @@ import org.eclipse.jetty_voltpatches.server.handler.AbstractHandler;
 import org.voltdb.CatalogContext;
 import org.voltdb.HTTPClientInterface;
 import org.voltdb.VoltDB;
+import org.voltdb.logging.VoltLogger;
 
 public class HTTPAdminListener {
 
     Server m_server = new Server();
     HTTPClientInterface httpClientInterface = new HTTPClientInterface();
     final boolean m_jsonEnabled;
+    Map<String, String> m_htmlTemplates = new HashMap<String, String>();
 
     class RequestHandler extends AbstractHandler {
 
@@ -174,30 +176,44 @@ public class HTTPAdminListener {
      */
     String getHTMLForAdminPage(Map<String,String> params) {
         try {
-            // 8 lines or so just to read the file
-            InputStream is = HTTPAdminListener.class.getResourceAsStream("admintemplate.html");
-            BufferedReader r = new BufferedReader(new InputStreamReader(is));
-            StringBuilder sb = new StringBuilder();
-            String line = null;
-            while ((line = r.readLine()) != null) {
-                sb.append(line);
-            }
-            r.close(); is.close();
-
-            // only 4 to fill out the template
-            String template = sb.toString();
+            String template = m_htmlTemplates.get("admintemplate.html");
             for (Entry<String, String> e : params.entrySet()) {
                 template = template.replace("#" + e.getKey().toUpperCase() + "#", e.getValue());
             }
             return template;
-
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             e.printStackTrace();
         }
         return "<html><body>An unrecoverable error was encountered while generating this page.</body></html>";
     }
 
+    private void loadTemplate(String name) throws Exception {
+        // 8 lines or so just to read the file
+        InputStream is = HTTPAdminListener.class.getResourceAsStream(name);
+        BufferedReader r = new BufferedReader(new InputStreamReader(is));
+        StringBuilder sb = new StringBuilder();
+        String line = null;
+        while ((line = r.readLine()) != null) {
+            sb.append(line);
+        }
+        r.close(); is.close();
+        String template = sb.toString();
+        m_htmlTemplates.put(name, template);
+    }
+
     public HTTPAdminListener(boolean jsonEnabled, int port) throws Exception {
+        // PRE-LOAD ALL HTML TEMPLATES (one for now)
+        try {
+            loadTemplate("admintemplate.html");
+        }
+        catch (Exception e) {
+            VoltLogger logger = new VoltLogger("HOST");
+            logger.error("Unable to load HTML templates from jar for admin pages.", e);
+            throw e;
+        }
+
+        // NOW START JETTY SERVER
         try {
             // The socket channel connector seems to be faster for our use
             //SelectChannelConnector connector = new SelectChannelConnector();
