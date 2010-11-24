@@ -9,10 +9,11 @@ my $revision = "";
 
 my @svnstatus = `svn status`;
 my @svninfo = `svn info`;
+my $dirty = false;
 
 if (scalar(@svnstatus) != 0) {
     print "This is a dirty svn working copy or not an svn working copy\n";
-    @svninfo = ();
+    $dirty = true;
 }
 
 if ($? != 0) {
@@ -37,6 +38,11 @@ foreach (@svninfo) {
 my $version = "0.0.0";
 if (($#ARGV + 1) > 0) {
     $version = $ARGV[0];
+}
+
+# mark dirty if that is the case
+if ($dirty) {
+    $revision .= "-dirty";
 }
 
 # create a file, buildstring.txt, and print a reasonable URL. Sadly,
