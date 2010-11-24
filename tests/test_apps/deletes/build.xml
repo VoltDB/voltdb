@@ -48,11 +48,12 @@ PRIMARY ENTRY POINTS
     <jvmarg value="-XX:HeapDumpPath=/tmp" />
     <jvmarg value="-XX:-ReduceInitialCardMarks" />
     <jvmarg value="-Djava.library.path=${env.VOLTDB}" />
-    <arg value="150000"/>              <!-- average batch size -->
+    <arg value="150000"/>            <!-- average batch size -->
     <arg value="5"/>                 <!-- number of batches to keep -->
     <arg value="6"/>                 <!-- number of insert/delete cycles between pruning deceased rows -->
     <arg value="6"/>                 <!-- number of insert/delete cycles between snapshots -->
-    <arg value="localhost" />         <!-- comma separated list of volt servers to connect to -->
+    <arg value="1"/>                 <!-- use blocking snapshots if non-zero -->
+    <arg value="localhost" />        <!-- comma separated list of volt servers to connect to -->
     <classpath refid='project.classpath'/>
     <assertions><disable/></assertions>
   </java>
