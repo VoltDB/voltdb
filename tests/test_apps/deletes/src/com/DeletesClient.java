@@ -54,6 +54,7 @@ public class DeletesClient
     static int m_batchesToKeep = 12;
     static int m_deceasedCleanupFreq = -1;
     static int m_snapshotFreq = -1;
+    static boolean m_blockingSnapshots = false;
     static String m_snapshotId = "Deletes";
     static String m_snapshotDir = "/tmp/deletes";
     static String[] m_names = new String[NUM_NAMES];
@@ -454,19 +455,29 @@ public class DeletesClient
         System.out.println("Performing Snapshot with total rows: " + m_totalRows);
         try
         {
-            client.callProcedure(
-                                 new ProcedureCallback()
-                                 {
-                                     @Override
-                                     public void clientCallback(ClientResponse response) {
-                                         if (response.getStatus() != ClientResponse.SUCCESS)
-                                         {
-                                             System.out.println("failed snapshot");
-                                             System.out.println(response.getStatusString());
+            if (m_blockingSnapshots) {
+                ClientResponse response = client.callProcedure("@SnapshotSave", m_snapshotDir, m_snapshotId, 1);
+                if (response.getStatus() != ClientResponse.SUCCESS)
+                {
+                    System.out.println("failed snapshot");
+                    System.out.println(response.getStatusString());
+                }
+            }
+            else {
+                client.callProcedure(
+                                     new ProcedureCallback()
+                                     {
+                                         @Override
+                                         public void clientCallback(ClientResponse response) {
+                                             if (response.getStatus() != ClientResponse.SUCCESS)
+                                             {
+                                                 System.out.println("failed snapshot");
+                                                 System.out.println(response.getStatusString());
+                                             }
                                          }
-                                     }
-                                 },
-                                 "@SnapshotSave", m_snapshotDir, m_snapshotId, 0);
+                                     },
+                                     "@SnapshotSave", m_snapshotDir, m_snapshotId, 0);
+            }
         }
         catch (NoConnectionsException e)
         {
@@ -478,19 +489,24 @@ public class DeletesClient
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
+        catch (ProcCallException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
     }
 
     public static void main(String[] args)
     {
-        if (args.length != 5)
+        if (args.length != 6)
         {
-            System.err.println("Client args: [average batch size] [num batches to keep] [cleanup frequency] [server list]");
+            System.err.println("Client args: [average batch size] [num batches to keep] [cleanup frequency] [blocking snapshots (1 or 0)] [server list]");
             System.exit(-1);
         }
         m_averageBatchSize = Integer.valueOf(args[0]);
         m_batchesToKeep = Integer.valueOf(args[1]);
         m_deceasedCleanupFreq = Integer.valueOf(args[2]);
         m_snapshotFreq = Integer.valueOf(args[3]);
+        m_blockingSnapshots = Integer.valueOf(args[4]) != 0;
 
         System.out.println("Starting Deletes app with:");
         System.out.printf("\tAverage batch size of %d\n", m_averageBatchSize);
@@ -498,7 +514,7 @@ public class DeletesClient
         System.out.printf("\tCleaning up deceased every %d batches\n", m_deceasedCleanupFreq);
         System.out.printf("\tSnapshotting every %d batches\n", m_snapshotFreq);
 
-        String commaSeparatedServers = args[4];
+        String commaSeparatedServers = args[5];
 
         // parse the server list
         List<String> servers = new LinkedList<String>();
