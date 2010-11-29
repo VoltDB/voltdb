@@ -518,7 +518,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 // rollup the table memory stats for this site
                 while (stats.advanceRow()) {
                     tupleCount += stats.getLong(7);
-                    tupleAllocatedMem = (int) stats.getLong(8);
+                    tupleAllocatedMem += (int) stats.getLong(8);
                     tupleDataMem += (int) stats.getLong(9);
                     stringMem += (int) stats.getLong(10);
                 }
