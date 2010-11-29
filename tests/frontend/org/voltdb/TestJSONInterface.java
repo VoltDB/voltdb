@@ -390,6 +390,11 @@ public class TestJSONInterface extends TestCase {
         System.out.println(response.statusString);
         assertEquals(ClientResponse.SUCCESS, response.status);
 
+        // now try jsonp
+        responseJSON = callProcOverJSONRaw("Procedure=@Statistics&Parameters=[TABLE]&jsonp=fooBar", 200);
+        System.out.println(responseJSON);
+        assertTrue(responseJSON.startsWith("fooBar("));
+
         server.shutdown();
         server.join();
     }

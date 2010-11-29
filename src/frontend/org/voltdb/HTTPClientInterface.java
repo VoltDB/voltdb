@@ -41,15 +41,17 @@ public class HTTPClientInterface {
 
     class JSONProcCallback implements ProcedureCallback {
 
-        Request m_request;
+        final Request m_request;
         final Continuation m_continuation;
+        final String m_jsonp;
 
-        public JSONProcCallback(Request request, Continuation continuation) {
+        public JSONProcCallback(Request request, Continuation continuation, String jsonp) {
             assert(request != null);
             assert(continuation != null);
 
             m_request = request;
             m_continuation = continuation;
+            m_jsonp = jsonp;
         }
 
         @Override
@@ -57,6 +59,12 @@ public class HTTPClientInterface {
             ClientResponseImpl rimpl = (ClientResponseImpl) clientResponse;
             String msg = rimpl.toJSONString();
 
+            // handle jsonp pattern
+            // http://en.wikipedia.org/wiki/JSON#The_Basic_Idea:_Retrieving_JSON_via_Script_Tags
+            if (m_jsonp != null)
+                msg = String.format("%s( %s )", m_jsonp, msg);
+
+            // send the response back through jetty
             HttpServletResponse response = (HttpServletResponse) m_continuation.getServletResponse();
             response.setStatus(HttpServletResponse.SC_OK);
             m_request.setHandled(true);
@@ -92,6 +100,7 @@ public class HTTPClientInterface {
             String hashedPassword = request.getParameter("Hashedpassword");
             String procName = request.getParameter("Procedure");
             String params = request.getParameter("Parameters");
+            String jsonp = request.getParameter("jsonp");
 
             // null procs are bad news
             if (procName == null) {
@@ -129,7 +138,7 @@ public class HTTPClientInterface {
             // get a connection to localhost from the pool
             client = m_connections.getClient(username, hashedPasswordBytes);
 
-            JSONProcCallback cb = new JSONProcCallback(request, continuation);
+            JSONProcCallback cb = new JSONProcCallback(request, continuation, jsonp);
             boolean success;
 
             if (params != null) {
