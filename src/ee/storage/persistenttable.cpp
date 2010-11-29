@@ -980,7 +980,7 @@ bool PersistentTable::doCompactionWithinSubset(TBBucketMap *bucketMap) {
     TBPtr fullest;
     TBBucketI fullestIterator;
     bool foundFullest = false;
-    for (int ii = (TUPLE_BLOCK_NUM_BUCKETS - 2); ii >= 0; ii--) {
+    for (int ii = (TUPLE_BLOCK_NUM_BUCKETS - 1); ii >= 0; ii--) {
         fullestIterator = (*bucketMap)[ii]->begin();
         if (fullestIterator != (*bucketMap)[ii]->end()) {
             foundFullest = true;
