@@ -30,6 +30,7 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
@@ -54,7 +55,9 @@ public class DeletesClient
     static int m_batchesToKeep = 12;
     static int m_deceasedCleanupFreq = -1;
     static int m_snapshotFreq = -1;
+    static int m_maxBatchFreq = 10;
     static boolean m_blockingSnapshots = false;
+    static boolean m_smallStrings = false;
     static String m_snapshotId = "Deletes";
     static String m_snapshotDir = "/tmp/deletes";
     static String[] m_names = new String[NUM_NAMES];
@@ -62,6 +65,9 @@ public class DeletesClient
     static long m_batchNumber = 1000;
     static int m_totalRows;
     static long m_highMem = 0;
+    static long m_highMemTime = 0;
+    static long m_highRss = 0;
+    static long m_highRssTime = 0;
     static long m_totalInserts = 0;
     static long m_totalInsertedRows = 0;
     static long m_totalInsertTime = 0;
@@ -101,17 +107,46 @@ public class DeletesClient
         int name_idx = m_rand.nextInt(NUM_NAMES);
         long age = m_rand.nextInt(100);
         long weight = m_rand.nextInt(200);
-        String desc1 = randomString(250);
-        String desc2 = randomString(250);
-        String addr1 = randomString(30);
-        String addr2 = randomString(120);
-        String addr3 = randomString(60);
-        String text1 = randomString(120);
-        String text2 = randomString(32);
-        String sig = randomString(16);
         long ts = batchNumber;
-        String company = randomString(60);
-        String co_addr = randomString(250);
+
+        String desc1 = null;
+        String desc2 = null;
+        String addr1 = null;
+        String addr2 = null;
+        String addr3 = null;
+        String text1 = null;
+        String text2 = null;
+        String sig = null;
+        String company = null;
+        String co_addr = null;
+
+        if (m_smallStrings)
+        {
+            desc1 = randomString(60);
+            desc2 = randomString(60);
+            addr1 = randomString(30);
+            addr2 = randomString(60);
+            addr3 = randomString(60);
+            text1 = randomString(60);
+            text2 = randomString(32);
+            sig = randomString(16);
+            company = randomString(60);
+            co_addr = randomString(60);
+        }
+        else
+        {
+            desc1 = randomString(250);
+            desc2 = randomString(250);
+            addr1 = randomString(30);
+            addr2 = randomString(120);
+            addr3 = randomString(60);
+            text1 = randomString(120);
+            text2 = randomString(32);
+            sig = randomString(16);
+            company = randomString(60);
+            co_addr = randomString(250);
+        }
+
         byte deceased = (byte) (m_rand.nextBoolean() ? 1 : 0);
         try
         {
@@ -160,10 +195,14 @@ public class DeletesClient
         }
     }
 
-    static void insertBatch(Client client)
+    static void insertBatch(Client client, boolean max_batch)
     {
         System.out.println("Total rows currently: " + m_totalRows);
         int to_insert = m_rand.nextInt(m_averageBatchSize * 2) + 1;
+        if (max_batch)
+        {
+            to_insert = m_averageBatchSize * 2;
+        }
         System.out.println("Inserting: " + to_insert + " rows");
         m_expectedInserts = to_insert;
         long start_time = System.currentTimeMillis();
@@ -189,28 +228,30 @@ public class DeletesClient
 
     static void parseStats(ClientResponse resp)
     {
-        //System.out.println("table stats: " + resp.getResults()[3]);
-        //System.out.println("index stats: " + resp.getResults()[4]);
         // Go ghetto for now and assume we're running on one host.
-        VoltTable table_stats = resp.getResults()[4];
+        VoltTable memory_stats = resp.getResults()[0];
+        //System.out.println("mem stats: " + memory_stats);
+        long rss = memory_stats.fetchRow(0).getLong("RSS");
+        if (rss > m_highRss)
+        {
+            m_highRss = rss;
+            m_highRssTime = System.currentTimeMillis();
+        }
         long total_mem = 0;
-        for (int ii = 0; ii < table_stats.getRowCount(); ii++) {
-            VoltTableRow row = table_stats.fetchRow(ii);
-            total_mem += row.getLong("TUPLE_ALLOCATED_MEMORY");
-            total_mem += row.getLong("STRING_DATA_MEMORY");
-        }
-        System.out.println("TOTAL ALLOCATED TABLE MEMORY: " + total_mem * 1000);
-        VoltTable index_stats = resp.getResults()[5];
-        for (int ii = 0; ii < index_stats.getRowCount(); ii++) {
-            VoltTableRow row = index_stats.fetchRow(ii);
-            total_mem += row.getLong("MEMORY_ESTIMATE");
-        }
+        total_mem += memory_stats.fetchRow(0).getLong("JAVAUSED");
+        total_mem += memory_stats.fetchRow(0).getLong("TUPLEALLOCATED");
+        total_mem += memory_stats.fetchRow(0).getLong("INDEXMEMORY");
+        total_mem += memory_stats.fetchRow(0).getLong("STRINGMEMORY");
         if (total_mem > m_highMem)
         {
             m_highMem = total_mem;
+            m_highMemTime = System.currentTimeMillis();
         }
         System.out.println("TOTAL ALLOCATED MEMORY: " + total_mem * 1000);
-        System.out.println("LARGEST MEMORY EATEN: " + m_highMem * 1000);
+        Date blah = new Date(m_highMemTime);
+        System.out.println("LARGEST MEMORY EATEN: " + m_highMem * 1000 + " at " + blah.toString());
+        blah = new Date(m_highRssTime);
+        System.out.println("LARGEST RSS EATEN: " + m_highRss * 1000 + " at " + blah.toString());
     }
 
     static void collectStats(Client client)
@@ -497,7 +538,7 @@ public class DeletesClient
 
     public static void main(String[] args)
     {
-        if (args.length != 6)
+        if (args.length != 7)
         {
             System.err.println("Client args: [average batch size] [num batches to keep] [cleanup frequency] [blocking snapshots (1 or 0)] [server list]");
             System.exit(-1);
@@ -507,6 +548,7 @@ public class DeletesClient
         m_deceasedCleanupFreq = Integer.valueOf(args[2]);
         m_snapshotFreq = Integer.valueOf(args[3]);
         m_blockingSnapshots = Integer.valueOf(args[4]) != 0;
+        m_smallStrings = Integer.valueOf(args[5]) != 0;
 
         System.out.println("Starting Deletes app with:");
         System.out.printf("\tAverage batch size of %d\n", m_averageBatchSize);
@@ -514,7 +556,7 @@ public class DeletesClient
         System.out.printf("\tCleaning up deceased every %d batches\n", m_deceasedCleanupFreq);
         System.out.printf("\tSnapshotting every %d batches\n", m_snapshotFreq);
 
-        String commaSeparatedServers = args[5];
+        String commaSeparatedServers = args[6];
 
         // parse the server list
         List<String> servers = new LinkedList<String>();
@@ -542,18 +584,43 @@ public class DeletesClient
             }
         }
 
-        // Start with sufficient random sized batches
-        for (int i = 0; i < m_batchesToKeep; i++)
+        // Start with the maximum data set we could possibly fill
+        for (int i = 0; i <= m_batchesToKeep; i++)
         {
-            insertBatch(client);
+            insertBatch(client, true);
         }
 
         // now add a batch and remove a batch
         long deceased_counter = 0;
         long snapshot_counter = 0;
+        long max_batch_counter = 0;
+        boolean fill_max = false;
+        long max_batch_remaining = 0;
         while (true)
         {
-            insertBatch(client);
+            if (max_batch_counter == m_maxBatchFreq)
+            {
+                fill_max = true;
+                max_batch_remaining = m_batchesToKeep;
+                max_batch_counter = 0;
+            }
+            else if (fill_max)
+            {
+                max_batch_remaining--;
+                fill_max = true;
+                if (max_batch_remaining == 0)
+                {
+                    fill_max = false;
+                }
+            }
+            else
+            {
+                max_batch_counter++;
+                fill_max = false;
+            }
+
+            insertBatch(client, fill_max);
+
             collectStats(client);
 
             snapshot_counter++;

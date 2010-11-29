@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<project>
+    <database>
+        <schemas>
+            <schema path='deletes-small-ddl.sql' />
+        </schemas>
+        <procedures>
+            <procedure class='com.deletes.Insert' />
+            <procedure class='com.deletes.DeleteOldBatches' />
+            <procedure class='com.deletes.DeleteDeceased' />
+        </procedures>
+        <partitions>
+            <partition table='big_table' column='fullname' />
+        </partitions>
+        <exports>
+            <connector class="org.voltdb.export.processors.RawProcessor" enabled="false">
+            </connector>
+        </exports>
+    </database>
+</project>
