@@ -1054,6 +1054,7 @@ bool PersistentTable::doCompactionWithinSubset(TBBucketMap *bucketMap) {
             m_blocksWithSpace.erase(lightest);
             m_blocksNotPendingSnapshot.erase(lightest);
             m_blocksPendingSnapshot.erase(lightest);
+            lightest->swapToBucket(TBBucketPtr());
         } else {
             int lightestBucketChange = bucketChanges.second;
             if (lightestBucketChange != -1) {
