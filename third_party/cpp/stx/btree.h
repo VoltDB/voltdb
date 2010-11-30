@@ -32,6 +32,7 @@
 #include <istream>
 #include <ostream>
 #include <assert.h>
+#include "common/ThreadLocalPool.h"
 
 // *** Debugging Macros
 
@@ -211,7 +212,7 @@ public:
     /// with BTREE_DEBUG and the key type must be std::ostream printable.
     static const bool                   debug = traits::debug;
 
-private:
+public:
     // *** Node Classes for In-Memory Nodes
 
     /// The header structure of each node in-memory. This structure is extended
@@ -1236,13 +1237,19 @@ private:
     /// this < relation.
     key_compare key_less;
 
+    boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > inner_pool;
+
+    boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > leaf_pool;
+
 public:
     // *** Constructors and Destructor
 
     /// Default constructor initializing an empty B+ tree with the standard key
     /// comparison function
     inline btree()
-        : root(NULL), headleaf(NULL), tailleaf(NULL)
+        : root(NULL), headleaf(NULL), tailleaf(NULL),
+          inner_pool(voltdb::ThreadLocalPool::getExact(sizeof(inner_node))),
+          leaf_pool(voltdb::ThreadLocalPool::getExact(sizeof(leaf_node)))
     {
     }
 
@@ -1250,14 +1257,18 @@ public:
     /// comparison object
     inline btree(const key_compare &kcf)
         : root(NULL), headleaf(NULL), tailleaf(NULL),
-          key_less(kcf)
+          key_less(kcf),
+          inner_pool(voltdb::ThreadLocalPool::getExact(sizeof(inner_node))),
+          leaf_pool(voltdb::ThreadLocalPool::getExact(sizeof(leaf_node)))
     {
     }
 
     /// Constructor initializing a B+ tree with the range [first,last)
     template <class InputIterator>
     inline btree(InputIterator first, InputIterator last)
-        : root(NULL), headleaf(NULL), tailleaf(NULL)
+        : root(NULL), headleaf(NULL), tailleaf(NULL),
+          inner_pool(voltdb::ThreadLocalPool::getExact(sizeof(inner_node))),
+          leaf_pool(voltdb::ThreadLocalPool::getExact(sizeof(leaf_node)))
     {
         insert(first, last);
     }
@@ -1267,7 +1278,9 @@ public:
     template <class InputIterator>
     inline btree(InputIterator first, InputIterator last, const key_compare &kcf)
         : root(NULL), headleaf(NULL), tailleaf(NULL),
-          key_less(kcf)
+          key_less(kcf),
+          inner_pool(voltdb::ThreadLocalPool::getExact(sizeof(inner_node))),
+          leaf_pool(voltdb::ThreadLocalPool::getExact(sizeof(leaf_node)))
     {
         insert(first, last);
     }
@@ -1361,7 +1374,11 @@ private:
     /// Allocate and initialize a leaf node
     inline leaf_node* allocate_leaf()
     {
+#ifdef MEMCHECK
         leaf_node* n = new leaf_node;
+#else
+        leaf_node* n = new (leaf_pool->malloc()) leaf_node;
+#endif
         n->initialize();
         stats.leaves++;
         return n;
@@ -1370,7 +1387,11 @@ private:
     /// Allocate and initialize an inner node
     inline inner_node* allocate_inner(unsigned short l)
     {
+#ifdef MEMCHECK
         inner_node* n = new inner_node;
+#else
+        inner_node* n = new (inner_pool->malloc()) inner_node;
+#endif
         n->initialize(l);
         stats.innernodes++;
         return n;
@@ -1381,11 +1402,21 @@ private:
     inline void free_node(node *n)
     {
         if (n->isleafnode()) {
+#ifdef MEMCHECK
             delete static_cast<leaf_node*>(n);
+#else
+            static_cast<leaf_node*>(n)->~leaf_node();
+#endif
+            leaf_pool->free(n);
             stats.leaves--;
         }
         else {
+#ifdef MEMCHECK
             delete static_cast<inner_node*>(n);
+#else
+            static_cast<inner_node*>(n)->~inner_node();
+#endif
+            inner_pool->free(n);
             stats.innernodes--;
         }
     }
@@ -1888,7 +1919,9 @@ public:
     inline btree(const btree_self &other)
         : root(NULL), headleaf(NULL), tailleaf(NULL),
           stats( other.stats ),
-          key_less( other.key_comp() )
+          key_less( other.key_comp() ),
+          inner_pool(voltdb::ThreadLocalPool::getExact(sizeof(inner_node))),
+          leaf_pool(voltdb::ThreadLocalPool::getExact(sizeof(leaf_node)))
     {
         if (size() > 0)
         {

@@ -49,6 +49,7 @@
 #include <iostream>
 #include "indexes/tableindex.h"
 #include "boost/unordered_map.hpp"
+#include "common/FastAllocator.hpp"
 
 namespace voltdb {
 
@@ -60,8 +61,11 @@ template<typename KeyType, class KeyHasher, class KeyEqualityChecker>
 class HashTableUniqueIndex : public TableIndex {
     friend class TableIndexFactory;
 
-    typedef boost::unordered_map<KeyType, const void*, KeyHasher, KeyEqualityChecker> MapType;
-
+#ifdef MEMCHECK
+    typedef boost::unordered_map<KeyType, const void*, KeyHasher, KeyEqualityChecker > MapType;
+#else
+    typedef boost::unordered_map<KeyType, const void*, KeyHasher, KeyEqualityChecker, FastAllocator<std::pair<const KeyType, const void*> > > MapType;
+#endif
 public:
 
     ~HashTableUniqueIndex() {};

@@ -219,11 +219,13 @@ void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
 void CopyOnWriteContext::notifyBlockWasCompactedAway(TBPtr block) {
     assert(!m_finishedTableScan);
     CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
-    TBPtr nextBlock = iter->m_blockIterator.data();
-    m_blocks.erase(block->address());
-    iter->m_blockIterator = m_blocks.find(nextBlock->address());
-    iter->m_end = m_blocks.end();
-    assert(iter->m_blockIterator != m_blocks.end());
+    if (iter->m_blockIterator != m_blocks.end()) {
+        TBPtr nextBlock = iter->m_blockIterator.data();
+        m_blocks.erase(block->address());
+        iter->m_blockIterator = m_blocks.find(nextBlock->address());
+        iter->m_end = m_blocks.end();
+        assert(iter->m_blockIterator != m_blocks.end());
+    }
 }
 
 CopyOnWriteContext::~CopyOnWriteContext() {}

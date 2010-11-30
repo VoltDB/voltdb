@@ -27,6 +27,7 @@
 #include "common/ValueFactory.hpp"
 #include "common/serializeio.h"
 #include "common/ExportSerializeIo.h"
+#include "common/ThreadLocalPool.h"
 
 #include <cstdlib>
 
@@ -39,7 +40,7 @@ class TableTupleExportTest : public Test {
     size_t maxElSize(std::vector<uint16_t> &keep_offsets, bool useNullStrings=false);
     size_t serElSize(std::vector<uint16_t> &keep_offsets, uint8_t*, char*, bool nulls=false);
     void verSer(int, char*);
-
+    ThreadLocalPool m_pool;
   public:
     std::vector<ValueType> columnTypes;
     std::vector<int32_t> columnLengths;

@@ -50,6 +50,7 @@
 #include "boost/unordered_map.hpp"
 #include "indexes/tableindex.h"
 #include "common/tabletuple.h"
+#include "common/FastAllocator.hpp"
 
 namespace voltdb {
 
@@ -62,7 +63,12 @@ class HashTableMultiMapIndex : public TableIndex {
 
     friend class TableIndexFactory;
 
-    typedef boost::unordered_multimap<KeyType, const void*, KeyHasher, KeyEqualityChecker> MapType;
+#ifdef MEMCHECK
+    typedef boost::unordered_multimap<KeyType, const void*, KeyHasher, KeyEqualityChecker > MapType;
+#else
+    typedef boost::unordered_multimap<KeyType, const void*, KeyHasher, KeyEqualityChecker, FastAllocator<std::pair<const KeyType, const void*> > > MapType;
+#endif
+
     typedef typename MapType::const_iterator MMCIter;
     typedef typename MapType::iterator MMIter;
 

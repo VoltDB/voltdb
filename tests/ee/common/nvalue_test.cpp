@@ -25,6 +25,7 @@
 #include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
 #include "common/serializeio.h"
+#include "common/ThreadLocalPool.h"
 
 #include <cfloat>
 #include <limits>
@@ -33,7 +34,7 @@ using namespace std;
 using namespace voltdb;
 
 class NValueTest : public Test {
-
+    ThreadLocalPool m_pool;
 };
 
 void deserDecHelper(NValue nv, ValueType &vt,

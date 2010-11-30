@@ -50,6 +50,7 @@
 #include <iostream>
 #include "indexes/tableindex.h"
 #include "common/tabletuple.h"
+#include "common/FastAllocator.hpp"
 
 namespace voltdb {
 
@@ -63,7 +64,11 @@ class BinaryTreeMultiMapIndex : public TableIndex
 
     friend class TableIndexFactory;
 
+#ifdef MEMCHECK
     typedef std::multimap<KeyType, const void*, KeyComparator> MapType;
+#else
+    typedef std::multimap<KeyType, const void*, KeyComparator, FastAllocator<std::pair<const KeyType, const void*> > > MapType;
+#endif
     typedef typename MapType::const_iterator MMCIter;
     typedef typename MapType::iterator MMIter;
     typedef typename MapType::const_reverse_iterator MMCRIter;
@@ -226,7 +231,8 @@ public:
 
     int64_t getMemoryEstimate() const
     {
-        return ((m_tmp1.getKeySize() + sizeof(void*)) * getSize());
+        return m_entries.size() *
+                (sizeof(std::pair< KeyType, void*>) + (sizeof(void*) * 3) + sizeof(std::_Rb_tree_color));
     }
 
     std::string getTypeName() const { return "BinaryTreeMultiMapIndex"; };

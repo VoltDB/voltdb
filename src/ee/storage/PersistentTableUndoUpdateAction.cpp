@@ -51,7 +51,7 @@ void PersistentTableUndoUpdateAction::undo() {
     for (std::vector<const char*>::iterator i = newUninlineableColumns.begin();
          i != newUninlineableColumns.end(); i++)
     {
-        delete [] (*i);
+        NValue::deserializeFromTupleStorage( &(*i), VALUE_TYPE_VARCHAR, false ).free();
     }
 }
 
@@ -67,7 +67,7 @@ void PersistentTableUndoUpdateAction::release() {
     for (std::vector<const char*>::iterator i = oldUninlineableColumns.begin();
          i != oldUninlineableColumns.end(); i++)
     {
-        delete [] (*i);
+        NValue::deserializeFromTupleStorage( &(*i), VALUE_TYPE_VARCHAR, false ).free();
     }
 }
 

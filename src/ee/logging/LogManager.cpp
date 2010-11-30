@@ -24,7 +24,7 @@ static pthread_once_t m_keyOnce = PTHREAD_ONCE_INIT;
 
 namespace voltdb {
 
-void createThreadLocalKey() {
+static void createThreadLocalKey() {
     (void)pthread_key_create( &m_key, NULL);
 }
 

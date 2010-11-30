@@ -59,6 +59,7 @@
 #include "common/tabletuple.h"
 #include "storage/TupleBlock.h"
 #include "stx/btree_set.h"
+#include "common/ThreadLocalPool.h"
 
 class CopyOnWriteTest_CopyOnWriteIterator;
 class CompactionTest_BasicCompaction;
@@ -387,6 +388,7 @@ protected:
 
   private:
     int32_t m_refcount;
+    ThreadLocalPool m_tlPool;
 };
 
 }
