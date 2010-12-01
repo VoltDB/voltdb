@@ -43,20 +43,6 @@ public:
      * pools up to 1 megabyte + 4 bytes.
      */
     static boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > getExact(std::size_t size);
-
-    /**
-     * Retrieve a pool that allocates approximately sized chunks of memory. Provides pools that
-     * are powers of two and powers of two + the previous power of two. The pool returned
-     * is for fulfilling requests for contiguous memory.
-     */
-    static boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > getContiguous(std::size_t size);
-
-    /**
-     * Retrieve a pool that allocate chunks that are exactly the requested size. Only creates
-     * pools up to 1 megabyte + 4 bytes. The pool returned
-     * is for fulfilling requests for contiguous memory.
-     */
-    static boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > getExactContiguous(std::size_t size);
 };
 }
 
