@@ -178,6 +178,7 @@ CTX.INPUT['catalog'] = """
 """
 
 CTX.INPUT['common'] = """
+ ThreadLocalPool.cpp
  SegvException.cpp
  SerializableEEException.cpp
  SQLException.cpp

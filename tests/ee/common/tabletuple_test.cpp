@@ -24,12 +24,14 @@
 #include "harness.h"
 #include "common/tabletuple.h"
 #include "common/ValueFactory.hpp"
+#include "common/ThreadLocalPool.h"
 
 using namespace voltdb;
 using namespace std;
 
 class TableTupleTest : public Test
 {
+    ThreadLocalPool m_pool;
 };
 
 TEST_F(TableTupleTest, ComputeNonInlinedMemory)

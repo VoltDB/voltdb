@@ -57,6 +57,7 @@
 #include "common/ValueFactory.hpp"
 #include "common/valuevector.h"
 #include "common/ValuePeeker.hpp"
+#include "common/ThreadLocalPool.h"
 
 
 using namespace std;
@@ -64,6 +65,7 @@ using namespace voltdb;
 
 class ValueArrayTest : public Test {
 public:
+    ThreadLocalPool m_pool;
     ValueArrayTest() {};
 };
 TEST_F(ValueArrayTest, BasicTest) {

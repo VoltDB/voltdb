@@ -26,6 +26,7 @@
 #include "common/types.h"
 #include "common/value_defs.h"
 #include "common/FatalException.hpp"
+#include "common/ThreadLocalPool.h"
 
 #include <cassert>
 #include <cfloat>
@@ -584,6 +585,9 @@ class NValue {
         assert(getValueType() == VALUE_TYPE_BOOLEAN);
         return *reinterpret_cast<bool*>(m_data);
     }
+
+    std::size_t getAllocationSizeForObject() const;
+    static std::size_t getAllocationSizeForObject(int32_t length);
 
     static void throwCastSQLException(const ValueType origType,
                                       const ValueType newType)
@@ -1427,8 +1431,12 @@ class NValue {
         NValue retval(VALUE_TYPE_VARCHAR);
         const int32_t length = static_cast<int32_t>(value.length());
         const int8_t lengthLength = getAppropriateObjectLengthLength(length);
-        const std::size_t minLength = value.length() + lengthLength;
+        const int32_t minLength = length + lengthLength;
+#ifdef MEMCHECK
         char *storage = new char[minLength];
+#else
+        char *storage = reinterpret_cast<char*>(ThreadLocalPool::get(minLength)->malloc());
+#endif
         setObjectLengthToLocation(length, storage);
         ::memcpy( storage + lengthLength, value.c_str(), length);
         retval.setObjectValue(storage);
@@ -1565,7 +1573,13 @@ inline NValue NValue::op_or(const NValue rhs) const {
 inline void NValue::free() const {
     switch (getValueType()) {
       case VALUE_TYPE_VARCHAR:
-        delete[] *reinterpret_cast<const char* const*>(m_data);
+#ifdef MEMCHECK
+          delete[] *reinterpret_cast<const char* const*>(m_data);
+#else
+          if (*reinterpret_cast<const char* const*>(m_data) != NULL) {
+              ThreadLocalPool::get(getObjectLength() + getObjectLengthLength())->free(*reinterpret_cast<void**>(const_cast<char*>(m_data)));
+          }
+#endif
         break;
       default:
         return;
@@ -1778,7 +1792,7 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
             else {
                 length = getObjectLength();
                 const int8_t lengthLength = getObjectLengthLength();
-                const size_t minlength = lengthLength + length;
+                const int32_t minlength = lengthLength + length;
                 char *copy = NULL;
                 if (length > maxLength) {
                     char msg[1024];
@@ -1792,7 +1806,11 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
                 if (dataPool != NULL) {
                     copy = reinterpret_cast<char*>(dataPool->allocate(length + lengthLength));
                 } else {
+#ifdef MEMCHECK
                     copy = new char[minlength];
+#else
+                    copy = reinterpret_cast<char*>(ThreadLocalPool::get(minlength)->malloc());
+#endif
                 }
                 setObjectLengthToLocation(length, copy);
                 ::memcpy(copy + lengthLength, getObjectValue(), length);
@@ -1920,12 +1938,16 @@ inline void NValue::deserializeFrom(SerializeInput &input, const ValueType type,
                   return;
               }
               const char *data = reinterpret_cast<const char*>(input.getRawPointer(length));
-              const size_t minlength = lengthLength + length;
+              const int32_t minlength = lengthLength + length;
               char *copy = NULL;
               if (dataPool != NULL) {
                   copy = reinterpret_cast<char*>(dataPool->allocate(length + lengthLength));
               } else {
+#ifdef MEMCHECK
                   copy = new char[minlength];
+#else
+                  copy = reinterpret_cast<char*>(ThreadLocalPool::get(minlength)->malloc());
+#endif
               }
               setObjectLengthToLocation( length, copy);
               ::memcpy(copy + lengthLength, data, length);
@@ -1985,12 +2007,16 @@ inline const NValue NValue::deserializeFromAllocateForStorage(SerializeInput &in
               break;
           }
           const void *str = input.getRawPointer(length);
-          const size_t minlength = lengthLength + length;
+          const int32_t minlength = lengthLength + length;
           char *copy = NULL;
           if (dataPool != NULL) {
               copy = reinterpret_cast<char*>(dataPool->allocate(length + lengthLength));
           } else {
+#ifdef MEMCHECK
               copy = new char[minlength];
+#else
+              copy = reinterpret_cast<char*>(ThreadLocalPool::get(minlength)->malloc());
+#endif
           }
           retval.setObjectLengthToLocation( length, copy);
           ::memcpy(copy + lengthLength, str, length);

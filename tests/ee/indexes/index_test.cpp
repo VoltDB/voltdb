@@ -65,6 +65,7 @@
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
 #include "execution/VoltDBEngine.h"
+#include "common/ThreadLocalPool.h"
 
 
 using namespace std;
@@ -371,6 +372,7 @@ protected:
     PersistentTable* table;
     char* m_exceptionBuffer;
     VoltDBEngine* m_engine;
+    ThreadLocalPool m_pool;
 };
 
 TEST_F(IndexTest, IntUnique) {

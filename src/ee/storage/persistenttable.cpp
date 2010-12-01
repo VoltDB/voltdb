@@ -851,11 +851,13 @@ bool PersistentTable::activateCopyOnWrite(TupleSerializer *serializer, int32_t p
     //All blocks are now pending snapshot
     m_blocksPendingSnapshot.swap(m_blocksNotPendingSnapshot);
     m_blocksPendingSnapshotLoad.swap(m_blocksNotPendingSnapshotLoad);
-    assert(m_blocksNotPendingSnapshot.empty());
-    for (int ii = 0; ii < m_blocksNotPendingSnapshotLoad.size(); ii++) {
-        assert(m_blocksNotPendingSnapshotLoad[ii]->empty());
-    }
-
+    //The first block is the block the snapshot iterator is pointing at. It is not eligible for merge
+    //ops. Remove it from the set of blocks pending snapshot so it can be easily identified
+    //as missing from both sets. Then remove it from the load maps by providing it a NULL bucket
+    TBPtr firstBlock = m_data.begin().data();
+    firstBlock->swapToBucket(TBBucketPtr());
+    //std::cout << "First block for snapshot is " << static_cast<void*>(firstBlock->address()) << std::endl;
+    m_blocksPendingSnapshot.erase(m_data.begin().data());
     m_COWContext.reset(new CopyOnWriteContext( this, serializer, partitionId));
     return false;
 }
@@ -1117,7 +1119,7 @@ void PersistentTable::printBucketInfo() {
         blocksNotPendingSnapshot++;
     }
     std::cout << std::endl;
-    for (int ii = 0; ii < m_blocksNotPendingSnapshotLoad.size(); ii++) {
+    for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         if (m_blocksNotPendingSnapshotLoad[ii]->empty()) {
             continue;
         }
@@ -1136,7 +1138,7 @@ void PersistentTable::printBucketInfo() {
         blocksPendingSnapshot++;
     }
     std::cout << std::endl;
-    for (int ii = 0; ii < m_blocksPendingSnapshotLoad.size(); ii++) {
+    for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         if (m_blocksPendingSnapshotLoad[ii]->empty()) {
             continue;
         }

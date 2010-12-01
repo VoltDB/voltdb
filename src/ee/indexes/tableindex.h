@@ -56,6 +56,7 @@
 #include "common/tabletuple.h"
 #include "common/TupleSchema.h"
 #include "indexes/IndexStats.h"
+#include "common/ThreadLocalPool.h"
 
 namespace voltdb {
 
@@ -353,6 +354,9 @@ protected:
 
     // stats
     IndexStats m_stats;
+
+private:
+    ThreadLocalPool m_tlPool;
 };
 
 }

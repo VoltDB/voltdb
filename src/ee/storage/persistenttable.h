@@ -284,7 +284,6 @@ protected:
 
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
         if (nextBlock != NULL) {
-            assert(m_blocksPendingSnapshot.find(nextBlock) != m_blocksPendingSnapshot.end());
             m_blocksPendingSnapshot.erase(nextBlock);
             nextBlock->swapToBucket(TBBucketPtr());
         }

@@ -80,7 +80,7 @@ public class TestExecutionEngine extends TestCase {
         // TODO
     }
 
-    private void loadTestTables(Catalog catalog) throws Exception
+    private void loadTestTables(ExecutionEngine engine, Catalog catalog) throws Exception
     {
         final boolean allowExport = false;
         int WAREHOUSE_TABLEID = warehouseTableId(catalog);
@@ -95,7 +95,7 @@ public class TestExecutionEngine extends TestCase {
         }
 
         System.out.println(warehousedata.toString());
-        sourceEngine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, Long.MAX_VALUE, allowExport);
+        engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, Long.MAX_VALUE, allowExport);
 
         VoltTable stockdata = new VoltTable(
                 new VoltTable.ColumnInfo("S_I_ID", VoltType.INTEGER),
@@ -105,7 +105,7 @@ public class TestExecutionEngine extends TestCase {
         for (int i = 0; i < 1000; ++i) {
             stockdata.addRow(i, i % 200, i * i);
         }
-        sourceEngine.loadTable(STOCK_TABLEID, stockdata, 0, 0, Long.MAX_VALUE, allowExport);
+        engine.loadTable(STOCK_TABLEID, stockdata, 0, 0, Long.MAX_VALUE, allowExport);
     }
 
     public void testLoadTable() throws Exception {
@@ -116,7 +116,7 @@ public class TestExecutionEngine extends TestCase {
         int WAREHOUSE_TABLEID = warehouseTableId(catalog);
         int STOCK_TABLEID = stockTableId(catalog);
 
-        loadTestTables(catalog);
+        loadTestTables( sourceEngine, catalog);
 
         assertEquals(200, sourceEngine.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         assertEquals(1000, sourceEngine.serializeTable(STOCK_TABLEID).getRowCount());
@@ -132,7 +132,7 @@ public class TestExecutionEngine extends TestCase {
         int WAREHOUSE_TABLEID = warehouseTableId(catalog);
         int STOCK_TABLEID = stockTableId(catalog);
 
-        loadTestTables(catalog);
+        loadTestTables( sourceEngine, catalog);
 
         sourceEngine.activateTableStream( WAREHOUSE_TABLEID, TableStreamType.RECOVERY );
         sourceEngine.activateTableStream( STOCK_TABLEID, TableStreamType.RECOVERY );
@@ -185,15 +185,10 @@ public class TestExecutionEngine extends TestCase {
         final AtomicReference<Boolean> destinationCompleted = new AtomicReference<Boolean>(false);
         final Catalog catalog = new Catalog();
         catalog.execute(LoadCatalogToString.THE_CATALOG);
-        sourceEngine.loadCatalog(catalog.serialize());
-        final ExecutionEngine destinationEngine =
-            new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID, destinationId, destinationId, "");
-        destinationEngine.loadCatalog(catalog.serialize());
+        final String serializedCatalog = catalog.serialize();
 
         int WAREHOUSE_TABLEID = warehouseTableId(catalog);
         int STOCK_TABLEID = stockTableId(catalog);
-
-        loadTestTables(catalog);
 
         final HashMap<Pair<String, Integer>, HashSet<Integer>> tablesAndDestinations =
             new HashMap<Pair<String, Integer>, HashSet<Integer>>();
@@ -220,10 +215,24 @@ public class TestExecutionEngine extends TestCase {
             }
         };
 
+        final AtomicReference<ExecutionEngine> sourceReference = new AtomicReference<ExecutionEngine>();
+
         Thread sourceThread = new Thread("Source thread") {
             @Override
             public void run() {
                 try {
+                    final ExecutionEngine sourceEngine =
+                        new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID, sourceId, sourceId, "");
+                    sourceReference.set(sourceEngine);
+                    sourceEngine.loadCatalog(serializedCatalog);
+
+                    try {
+                        loadTestTables( sourceEngine, catalog);
+                    } catch (Exception e) {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    }
+
                     VoltMessage message = sourceMailbox.recvBlocking();
                     assertTrue(message != null);
                     assertTrue(message instanceof RecoveryMessage);
@@ -264,9 +273,15 @@ public class TestExecutionEngine extends TestCase {
             }
         };
 
+        final AtomicReference<ExecutionEngine> destinationReference= new AtomicReference<ExecutionEngine>();
+
         Thread destinationThread = new Thread("Destination thread") {
             @Override
             public void run() {
+                final ExecutionEngine destinationEngine =
+                    new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID, destinationId, destinationId, "");
+                destinationReference.set(destinationEngine);
+                destinationEngine.loadCatalog(serializedCatalog);
                 RecoverySiteProcessorDestination destinationProcess =
                     new RecoverySiteProcessorDestination(
                             tablesAndSources,
@@ -290,13 +305,13 @@ public class TestExecutionEngine extends TestCase {
         destinationThread.join();
         sourceThread.join();
 
-        assertEquals( sourceEngine.tableHashCode(STOCK_TABLEID), destinationEngine.tableHashCode(STOCK_TABLEID));
-        assertEquals( sourceEngine.tableHashCode(WAREHOUSE_TABLEID), destinationEngine.tableHashCode(WAREHOUSE_TABLEID));
+        assertEquals( sourceReference.get().tableHashCode(STOCK_TABLEID), destinationReference.get().tableHashCode(STOCK_TABLEID));
+        assertEquals( sourceReference.get().tableHashCode(WAREHOUSE_TABLEID), destinationReference.get().tableHashCode(WAREHOUSE_TABLEID));
 
-        assertEquals(200, sourceEngine.serializeTable(WAREHOUSE_TABLEID).getRowCount());
-        assertEquals(1000, sourceEngine.serializeTable(STOCK_TABLEID).getRowCount());
-        assertEquals(200, destinationEngine.serializeTable(WAREHOUSE_TABLEID).getRowCount());
-        assertEquals(1000, destinationEngine.serializeTable(STOCK_TABLEID).getRowCount());
+        assertEquals(200, sourceReference.get().serializeTable(WAREHOUSE_TABLEID).getRowCount());
+        assertEquals(1000, sourceReference.get().serializeTable(STOCK_TABLEID).getRowCount());
+        assertEquals(200, destinationReference.get().serializeTable(WAREHOUSE_TABLEID).getRowCount());
+        assertEquals(1000, destinationReference.get().serializeTable(STOCK_TABLEID).getRowCount());
     }
 
     private int warehouseTableId(Catalog catalog) {

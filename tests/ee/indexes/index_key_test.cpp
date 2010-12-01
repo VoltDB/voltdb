@@ -27,13 +27,14 @@
 #include "common/ValueFactory.hpp"
 #include "common/TupleSchema.h"
 #include "common/tabletuple.h"
+#include "common/ThreadLocalPool.h"
 
 using namespace voltdb;
 
 class IndexKeyTest : public Test {
     public:
         IndexKeyTest() {}
-
+        ThreadLocalPool m_pool;
 };
 
 TEST_F(IndexKeyTest, Int64KeyTest) {

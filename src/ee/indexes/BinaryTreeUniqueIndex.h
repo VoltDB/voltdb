@@ -46,12 +46,16 @@
 #ifndef BINARYTREEUNIQUEINDEX_H_
 #define BINARYTREEUNIQUEINDEX_H_
 
-//#include <map>
+#ifdef USE_STL_MAP
+#include <map>
+#else
 #include "stx/btree_map.h"
+#endif
 #include <iostream>
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
 #include "indexes/tableindex.h"
+#include "common/FastAllocator.hpp"
 
 namespace voltdb {
 
@@ -63,9 +67,15 @@ template<typename KeyType, class KeyComparator, class KeyEqualityChecker>
 class BinaryTreeUniqueIndex : public TableIndex
 {
     friend class TableIndexFactory;
-
-    //typedef std::map<KeyType, const void*, KeyComparator> MapType;
+#ifdef USE_STL_MAP
+#ifdef MEMCHECK
+    typedef std::map<KeyType, const void*, KeyComparator > MapType;
+#else
+    typedef std::map<KeyType, const void*, KeyComparator, FastAllocator<std::pair<const KeyType, const void*> > > MapType;
+#endif
+#else
     typedef stx::btree_map<KeyType, const void*, KeyComparator> MapType;
+#endif
 
 public:
 
@@ -115,7 +125,11 @@ public:
         if (mapiter == m_entries.end()) {
             return false;
         }
+#ifdef USE_STL_MAP
+        mapiter->second = newTupleValue->address();
+#else
         mapiter.data() = newTupleValue->address();
+#endif
         m_updates++;
         return true;
     }

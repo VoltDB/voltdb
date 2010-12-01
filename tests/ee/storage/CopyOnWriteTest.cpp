@@ -269,9 +269,6 @@ TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
     addRandomUniqueTuples( m_table, 174762);
     voltdb::TableIterator& iterator = m_table->iterator();
     TBMap blocks(m_table->m_data);
-    DefaultTupleSerializer serializer;
-    m_table->m_blocksPendingSnapshot.swap(m_table->m_blocksNotPendingSnapshot);
-    m_table->m_blocksPendingSnapshotLoad.swap(m_table->m_blocksNotPendingSnapshotLoad);
     voltdb::CopyOnWriteIterator COWIterator(m_table, blocks.begin(), blocks.end());
     TableTuple tuple(m_table->schema());
     TableTuple COWTuple(m_table->schema());
