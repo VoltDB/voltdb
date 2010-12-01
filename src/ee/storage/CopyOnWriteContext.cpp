@@ -219,11 +219,35 @@ void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
 void CopyOnWriteContext::notifyBlockWasCompactedAway(TBPtr block) {
     assert(!m_finishedTableScan);
     CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
-    TBPtr nextBlock = iter->m_blockIterator.data();
-    m_blocks.erase(block->address());
-    iter->m_blockIterator = m_blocks.find(nextBlock->address());
-    iter->m_end = m_blocks.end();
-    assert(iter->m_blockIterator != m_blocks.end());
+    if (iter->m_blockIterator != m_blocks.end()) {
+        TBPtr nextBlock = iter->m_blockIterator.data();
+        //The next block is the one that was compacted away
+        //Need to move the iterator forward to skip it
+        if (nextBlock == block) {
+            iter->m_blockIterator++;
+
+            //There is another block after the one that was compacted away
+            if (iter->m_blockIterator != m_blocks.end()) {
+                TBPtr newNextBlock = iter->m_blockIterator.data();
+                m_blocks.erase(block->address());
+                iter->m_blockIterator = m_blocks.find(newNextBlock->address());
+                iter->m_end = m_blocks.end();
+                assert(iter->m_blockIterator != m_blocks.end());
+            } else {
+                //No block after the one compacted away
+                //set everything to end
+                m_blocks.erase(block->address());
+                iter->m_blockIterator = m_blocks.end();
+                iter->m_end = m_blocks.end();
+            }
+        } else {
+            //Some random block was compacted away. Remove it and regenerate the iterator
+            m_blocks.erase(block->address());
+            iter->m_blockIterator = m_blocks.find(nextBlock->address());
+            iter->m_end = m_blocks.end();
+            assert(iter->m_blockIterator != m_blocks.end());
+        }
+    }
 }
 
 CopyOnWriteContext::~CopyOnWriteContext() {}
