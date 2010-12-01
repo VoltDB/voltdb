@@ -524,7 +524,7 @@ TEST_F(CompactionTest, TestENG897) {
         if (out.position() == 0) {
             break;
         }
-        m_table->printBucketInfo();
+        //m_table->printBucketInfo();
     }
     ASSERT_EQ( blocksNotPendingSnapshot, m_table->getBlocksNotPendingSnapshotCount());
 

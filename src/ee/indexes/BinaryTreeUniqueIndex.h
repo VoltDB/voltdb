@@ -241,7 +241,8 @@ public:
 
     int64_t getMemoryEstimate() const
     {
-        return ((m_tmp1.getKeySize() + sizeof(void*)) * getSize());
+        return (m_entries.get_stats().leaves * sizeof(typename MapType::btree_impl::leaf_node))
+                + (m_entries.get_stats().innernodes * sizeof(typename MapType::btree_impl::inner_node));
     }
 
     std::string getTypeName() const { return "BinaryTreeUniqueIndex"; };

@@ -226,7 +226,8 @@ public:
 
     int64_t getMemoryEstimate() const
     {
-        return ((m_tmp1.getKeySize() + sizeof(void*)) * getSize());
+        return m_entries.size() *
+                (sizeof(std::pair< KeyType, void*>) + (sizeof(void*) * 3) + sizeof(std::_Rb_tree_color));
     }
 
     std::string getTypeName() const { return "BinaryTreeMultiMapIndex"; };

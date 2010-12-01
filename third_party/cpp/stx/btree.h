@@ -211,7 +211,7 @@ public:
     /// with BTREE_DEBUG and the key type must be std::ostream printable.
     static const bool                   debug = traits::debug;
 
-private:
+public:
     // *** Node Classes for In-Memory Nodes
 
     /// The header structure of each node in-memory. This structure is extended

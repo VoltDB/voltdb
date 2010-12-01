@@ -387,8 +387,7 @@ TEST_F(IndexTest, IntUnique) {
     TableIndex* index = table->index("iu");
     EXPECT_EQ(true, index != NULL);
 
-    int64_t size_guess = (sizeof(int64_t) + sizeof(void*)) * NUM_OF_TUPLES;
-    EXPECT_EQ(size_guess, index->getMemoryEstimate());
+    EXPECT_EQ( 38528, index->getMemoryEstimate());
 
     // TODO
 }
@@ -497,8 +496,7 @@ TEST_F(IndexTest, IntMulti) {
     TableIndex* index = table->index("im");
     EXPECT_EQ(true, index != NULL);
 
-    int64_t size_guess = (sizeof(int64_t) + sizeof(void*)) * NUM_OF_TUPLES;
-    EXPECT_EQ(size_guess, index->getMemoryEstimate());
+    EXPECT_EQ( 44000, index->getMemoryEstimate());
     // TODO
 }
 
@@ -518,8 +516,7 @@ TEST_F(IndexTest, IntsUnique) {
     TableIndex* index = table->index("ixu");
     EXPECT_EQ(true, index != NULL);
 
-    int64_t size_guess = (sizeof(int64_t) * 2 + sizeof(void*)) * NUM_OF_TUPLES;
-    EXPECT_EQ(size_guess, index->getMemoryEstimate());
+    EXPECT_EQ( 62520, index->getMemoryEstimate());
 
     TableTuple tuple(table->schema());
     vector<ValueType> keyColumnTypes(2, VALUE_TYPE_BIGINT);
@@ -694,8 +691,7 @@ TEST_F(IndexTest, IntsMulti) {
     TableIndex* index = table->index("ixm2");
     EXPECT_EQ(true, index != NULL);
 
-    int64_t size_guess = (sizeof(int64_t) * 2 + sizeof(void*)) * NUM_OF_TUPLES;
-    EXPECT_EQ(size_guess, index->getMemoryEstimate());
+    EXPECT_EQ( 52000, index->getMemoryEstimate());
 
     TableTuple tuple(table->schema());
     vector<ValueType> keyColumnTypes(2, VALUE_TYPE_BIGINT);
@@ -863,10 +859,7 @@ TEST_F(IndexTest, TupleKeyUnique) {
     TableIndex* index = table->index("ixu_wide");
     EXPECT_EQ(true, index != NULL);
 
-    int64_t size_guess =
-        (sizeof(int*) + sizeof(char*) + sizeof(TupleSchema*) + sizeof(void*)) *
-        NUM_OF_WIDE_TUPLES;
-    EXPECT_EQ(size_guess, index->getMemoryEstimate());
+    EXPECT_EQ( 280, index->getMemoryEstimate());
 
     // make a tuple with the table's schema
     TableTuple tuple(table->schema());
