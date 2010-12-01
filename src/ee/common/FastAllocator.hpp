@@ -74,7 +74,8 @@ public:
     }
 
     void destroy(const pointer ptr) {
-        ptr->~T();
+      ptr->~T();
+      //(void) ptr; // avoid unused variable warning
     }
 
     bool operator==(const FastAllocator &other) const {
@@ -86,15 +87,15 @@ public:
     }
 
     pointer allocate(const size_type n) {
-        const pointer ret = (n == 1) ?
-                static_cast<pointer>(
-                        ThreadLocalPool::getExact(sizeof(T))->malloc()) :
-                        static_cast<pointer>(
-                                ThreadLocalPool::getExactContiguous(sizeof(T))->ordered_malloc(n) );
-        if (ret == 0) {
-            boost::throw_exception(std::bad_alloc());
-        }
-        return ret;
+      boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> >  pool = ThreadLocalPool::getExact(sizeof(T));
+      const pointer ret = (n == 1) ?
+          static_cast<pointer>(
+              pool->malloc() ) :
+          static_cast<pointer>(
+              pool->ordered_malloc(n) );
+      if (ret == 0)
+        boost::throw_exception(std::bad_alloc());
+      return ret;
     }
 
     pointer allocate(const size_type n, const void * const) {
@@ -102,25 +103,24 @@ public:
     }
 
     pointer allocate() {
-        boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > pool = ThreadLocalPool::getExact(sizeof(T));
-        const pointer ret = pool->malloc();
-        if (ret == 0) {
-            boost::throw_exception(std::bad_alloc());
-        }
-        return ret;
+      boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > pool = ThreadLocalPool::getExact(sizeof(T));
+      const pointer ret = pool->malloc();
+      if (ret == 0)
+        boost::throw_exception(std::bad_alloc());
+      return ret;
     }
 
     void deallocate(const pointer ptr, const size_type n) {
-        if (n == 1) {
-            ThreadLocalPool::getExact(sizeof(T))->free(ptr);
-        } else {
-            ThreadLocalPool::getExactContiguous(sizeof(T))->ordered_free(ptr, n);
-        }
+      boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > pool = ThreadLocalPool::getExact(sizeof(T));
+      if (n == 1)
+        pool->free(ptr);
+      else
+        pool->free(ptr, n);
     }
 
     void deallocate(const pointer ptr) {
-        boost::shared_ptr<boost::pool<boost::default_user_allocator_malloc_free> > pool = ThreadLocalPool::getExact(sizeof(T));
-        pool->free(ptr);
+      boost::shared_ptr<boost::pool<boost::default_user_allocator_malloc_free> > pool = ThreadLocalPool::getExact(sizeof(T));
+      pool->free(ptr);
     }
 };
 }
