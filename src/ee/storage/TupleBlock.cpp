@@ -46,7 +46,8 @@ TupleBlock::TupleBlock(Table *table, TBBucketPtr bucket) :
         throwFatalException("Failed mmap");
     }
 #else
-    m_storage = static_cast<char*>(ThreadLocalPool::getExact(m_table->m_tableAllocationSize)->malloc());
+    //m_storage = static_cast<char*>(ThreadLocalPool::getExact(m_table->m_tableAllocationSize)->malloc());
+    m_storage = new char[table->m_tableAllocationSize];
 #endif
 #endif
     tupleBlocksAllocated++;
@@ -67,7 +68,7 @@ TupleBlock::~TupleBlock() {
         throwFatalException("Failed munmap");
     }
 #else
-    ThreadLocalPool::getExact(m_table->m_tableAllocationSize)->free(m_storage);
+    delete []m_storage;
 #endif
 #endif
 }
