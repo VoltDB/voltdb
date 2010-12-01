@@ -28,6 +28,8 @@
 #include "stx/btree_set.h"
 #include <math.h>
 #include <iostream>
+#include "common/ContiguousFastAllocator.hpp"
+#include "common/ThreadLocalPool.h"
 
 namespace voltdb {
 class TupleBlock;
@@ -145,8 +147,8 @@ public:
             TruncatedInt offset = m_freeList.back();
             m_freeList.pop_back();
 
-            if (((m_freeList.capacity() / 2) - 50) > m_freeList.size() && m_freeList.capacity() > 1365) {
-                std::vector<TruncatedInt>(m_freeList).swap(m_freeList);
+            if ((m_freeList.capacity() / 2) > m_freeList.size()) {
+                std::vector<TruncatedInt, ContiguousFastAllocator<TruncatedInt> >(m_freeList).swap(m_freeList);
             }
             retval += offset.unpack();
         } else {
@@ -229,6 +231,7 @@ private:
     uint32_t m_nextFreeTuple;
     uint32_t m_lastCompactionOffset;
     const double m_tuplesPerBlockDivNumBuckets;
+
     /*
      * queue of offsets to <b>once used and then deleted</b> tuples.
      * Tuples after m_nextFreeTuple are also free, this queue
@@ -236,7 +239,7 @@ private:
      * and also deleted.
      * NOTE THAT THESE ARE NOT THE ONLY FREE TUPLES.
      **/
-    std::vector<TruncatedInt> m_freeList;
+    std::vector<TruncatedInt, ContiguousFastAllocator<TruncatedInt> > m_freeList;
 
     int m_bucketIndex;
     TBBucketPtr m_bucket;
@@ -254,8 +257,10 @@ namespace boost
 
  inline void intrusive_ptr_release(voltdb::TupleBlock * p)
   {
-   if (--(p->m_references) == 0)
-     delete p;
+   if (--(p->m_references) == 0) {
+       p->~TupleBlock();
+       voltdb::ThreadLocalPool::getExact(sizeof(voltdb::TupleBlock))->free(p);
+   }
   }
 }
 
