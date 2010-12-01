@@ -25,7 +25,26 @@
 #include <string>
 #include <cassert>
 
-namespace voltdb {
+using namespace voltdb;
+using namespace std;
+
+vector<string> StatsSource::generateBaseStatsColumnNames() {
+    vector<string> columnNames;
+    columnNames.push_back("TIMESTAMP");
+    columnNames.push_back("HOST_ID");
+    columnNames.push_back("HOSTNAME");
+    columnNames.push_back("SITE_ID");
+    columnNames.push_back("PARTITION_ID");
+    return columnNames;
+}
+
+void StatsSource::populateBaseSchema(vector<ValueType> &types, vector<int32_t> &columnLengths, vector<bool> &allowNull) {
+    types.push_back(VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); allowNull.push_back(false);
+    types.push_back(VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); allowNull.push_back(false);
+    types.push_back(VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);
+    types.push_back(VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); allowNull.push_back(false);
+    types.push_back(VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); allowNull.push_back(false);
+}
 
 StatsSource::StatsSource()  : m_statsTable(NULL) {
 }
@@ -41,29 +60,29 @@ StatsSource::StatsSource()  : m_statsTable(NULL) {
  * @parameter databaseId database this source is associated with.
  */
 void StatsSource::configure(
-        std::string name,
-        voltdb::CatalogId hostId,
-        std::string hostname,
-        voltdb::CatalogId siteId,
-        voltdb::CatalogId partitionId,
-        voltdb::CatalogId databaseId) {
+        string name,
+        CatalogId hostId,
+        string hostname,
+        CatalogId siteId,
+        CatalogId partitionId,
+        CatalogId databaseId) {
     m_siteId = siteId;
     m_partitionId = partitionId;
     m_hostId = hostId;
     m_hostname = ValueFactory::getStringValue(hostname);
-    std::vector<std::string> columnNames = generateStatsColumnNames();
+    vector<string> columnNames = generateStatsColumnNames();
 
-    std::vector<voltdb::ValueType> columnTypes;
-    std::vector<int32_t> columnLengths;
-    std::vector<bool> columnAllowNull;
+    vector<ValueType> columnTypes;
+    vector<int32_t> columnLengths;
+    vector<bool> columnAllowNull;
     populateSchema(columnTypes, columnLengths, columnAllowNull);
-    TupleSchema *schema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
+    TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
 
     for (int ii = 0; ii < columnNames.size(); ii++) {
         m_columnName2Index[columnNames[ii]] = ii;
     }
 
-    m_statsTable.reset(voltdb::TableFactory::getTempTable(databaseId, name, schema, &columnNames[0], NULL));
+    m_statsTable.reset(TableFactory::getTempTable(databaseId, name, schema, &columnNames[0], NULL));
     m_statsTuple = m_statsTable->tempTuple();
 }
 
@@ -75,7 +94,7 @@ StatsSource::~StatsSource() {
  * Retrieve the name of this set of statistics
  * @return Name of statistics
  */
-std::string StatsSource::getName() {
+string StatsSource::getName() {
     return m_name;
 }
 
@@ -86,7 +105,7 @@ std::string StatsSource::getName() {
  * @param now Timestamp to return with each row
  * @return Pointer to a table containing the statistics.
  */
-voltdb::Table* StatsSource::getStatsTable(bool interval, int64_t now) {
+Table* StatsSource::getStatsTable(bool interval, int64_t now) {
     getStatsTuple(interval, now);
     return m_statsTable.get();
 }
@@ -98,7 +117,7 @@ voltdb::Table* StatsSource::getStatsTable(bool interval, int64_t now) {
  * @param Timestamp to embed in each row
  * @return Pointer to a table tuple containing the latest version of the statistics.
  */
-voltdb::TableTuple* StatsSource::getStatsTuple(bool interval, int64_t now) {
+TableTuple* StatsSource::getStatsTuple(bool interval, int64_t now) {
     m_interval = interval;
     assert (m_statsTable != NULL);
     if (m_statsTable == NULL) {
@@ -123,22 +142,17 @@ voltdb::TableTuple* StatsSource::getStatsTuple(bool interval, int64_t now) {
  * the parent class's version to obtain the list of columns contributed by ancestors and then append the columns they will be
  * contributing to the end of the list.
  */
-std::vector<std::string> StatsSource::generateStatsColumnNames() {
-    std::vector<std::string> columnNames;
-    columnNames.push_back("TIMESTAMP");
-    columnNames.push_back("HOST_ID");
-    columnNames.push_back("HOSTNAME");
-    columnNames.push_back("SITE_ID");
-    columnNames.push_back("PARTITION_ID");
-    return columnNames;
+vector<string> StatsSource::generateStatsColumnNames()
+{
+    return StatsSource::generateBaseStatsColumnNames();
 }
 
 /**
  * String representation of the statistics. Default implementation is to print the stats table.
  * @return String representation
  */
-std::string StatsSource::toString() {
-    std::string retString = "";
+string StatsSource::toString() {
+    string retString = "";
     for (int ii = 0; ii < m_statsTable->columnCount(); ii++) {
         retString += m_statsTable->columnName(ii);
         retString += "\t";
@@ -153,12 +167,7 @@ std::string StatsSource::toString() {
  * Same pattern as generateStatsColumnNames except the return value is used as an offset into the tuple schema instead of appending to
  * end of a list.
  */
-void StatsSource::populateSchema(std::vector<voltdb::ValueType> &types, std::vector<int32_t> &columnLengths, std::vector<bool> &allowNull) {
-    types.push_back(voltdb::VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT)); allowNull.push_back(false);
-    types.push_back(voltdb::VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT)); allowNull.push_back(false);
-    types.push_back(voltdb::VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);
-    types.push_back(voltdb::VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT)); allowNull.push_back(false);
-    types.push_back(voltdb::VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT)); allowNull.push_back(false);
-}
-
+void
+StatsSource::populateSchema(vector<ValueType> &types, vector<int32_t> &columnLengths, vector<bool> &allowNull) {
+    StatsSource::populateBaseSchema(types, columnLengths, allowNull);
 }

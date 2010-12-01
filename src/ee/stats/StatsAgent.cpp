@@ -26,7 +26,36 @@
 #include <string>
 #include <vector>
 
-namespace voltdb {
+using namespace voltdb;
+using namespace std;
+
+namespace
+{
+    // Super-ghetto empty stats table "factory".  Should be able to
+    // just replace the call to this in getStats() with a call to an
+    // auto-generated stats table factory based on XML or JSON input
+    // in some future happy world.  Go blow up the static methods
+    // returning schema/table parts in StatsSource and it's subclasses
+    // when this happens, too.
+    Table* getEmptyStatsTable(StatisticsSelectorType sst)
+    {
+        switch (sst)
+        {
+        case STATISTICS_SELECTOR_TYPE_TABLE:
+            {
+                return TableStats::generateEmptyTableStatsTable();
+            }
+        case STATISTICS_SELECTOR_TYPE_INDEX:
+            {
+                return IndexStats::generateEmptyIndexStatsTable();
+            }
+        default:
+            {
+                throwFatalException("Attempted to get unsupported stats type");
+            }
+        }
+    }
+}
 
 StatsAgent::StatsAgent() {}
 
@@ -36,17 +65,17 @@ StatsAgent::StatsAgent() {}
  * @param catalogId CatalogId of the resource
  * @param statsSource statsSource containing statistics for the resource
  */
-void StatsAgent::registerStatsSource(voltdb::StatisticsSelectorType sst, voltdb::CatalogId catalogId, voltdb::StatsSource* statsSource)
+void StatsAgent::registerStatsSource(StatisticsSelectorType sst, CatalogId catalogId, StatsSource* statsSource)
 {
     m_statsCategoryByStatsSelector[sst].insert(
-        std::pair<voltdb::CatalogId, voltdb::StatsSource*>(catalogId, statsSource));
+        pair<CatalogId, StatsSource*>(catalogId, statsSource));
 }
 
-void StatsAgent::unregisterStatsSource(voltdb::StatisticsSelectorType sst)
+void StatsAgent::unregisterStatsSource(StatisticsSelectorType sst)
 {
     // get the map of id-to-source
-    std::map<voltdb::StatisticsSelectorType,
-      std::multimap<voltdb::CatalogId, voltdb::StatsSource*> >::iterator it1 =
+    map<StatisticsSelectorType,
+      multimap<CatalogId, StatsSource*> >::iterator it1 =
       m_statsCategoryByStatsSelector.find(sst);
 
     if (it1 == m_statsCategoryByStatsSelector.end()) {
@@ -62,8 +91,8 @@ void StatsAgent::unregisterStatsSource(voltdb::StatisticsSelectorType sst)
  * @param interval Whether to return counters since the beginning or since the last time this was called
  * @param Timestamp to embed in each row
  */
-Table* StatsAgent::getStats(voltdb::StatisticsSelectorType sst,
-                            std::vector<voltdb::CatalogId> catalogIds,
+Table* StatsAgent::getStats(StatisticsSelectorType sst,
+                            vector<CatalogId> catalogIds,
                             bool interval, int64_t now)
 {
     assert (catalogIds.size() > 0);
@@ -71,46 +100,29 @@ Table* StatsAgent::getStats(voltdb::StatisticsSelectorType sst,
         return NULL;
     }
 
-    std::multimap<voltdb::CatalogId, voltdb::StatsSource*> *statsSources = &m_statsCategoryByStatsSelector[sst];
+    multimap<CatalogId, StatsSource*> *statsSources = &m_statsCategoryByStatsSelector[sst];
 
     Table *statsTable = m_statsTablesByStatsSelector[sst];
     if (statsTable == NULL) {
-        /*
-         * Initialize the output table the first time.
-         */
-        std::multimap<voltdb::CatalogId, voltdb::StatsSource*>::const_iterator iter =
-            statsSources->find(catalogIds[0]);
-        if (iter == statsSources->end()) {
-            return NULL;
-        }
-
-        voltdb::StatsSource *ss = iter->second;
-        voltdb::Table *table = ss->getStatsTable(interval, now);
-        statsTable = reinterpret_cast<Table*>(
-            voltdb::TableFactory::getTempTable(
-                table->databaseId(),
-                std::string("Persistent Table aggregated stats temp table"),
-                TupleSchema::createTupleSchema(table->schema()),
-                table->columnNames(),
-                NULL));
+        statsTable = getEmptyStatsTable(sst);
         m_statsTablesByStatsSelector[sst] = statsTable;
     }
 
     statsTable->deleteAllTuples(false);
 
     for (int ii = 0; ii < catalogIds.size(); ii++) {
-        std::multimap<voltdb::CatalogId, voltdb::StatsSource*>::const_iterator iter;
+        multimap<CatalogId, StatsSource*>::const_iterator iter;
         for (iter = statsSources->find(catalogIds[ii]);
              (iter != statsSources->end()) && (iter->first == catalogIds[ii]);
              iter++) {
 
-            voltdb::StatsSource *ss = iter->second;
+            StatsSource *ss = iter->second;
             assert (ss != NULL);
             if (ss == NULL) {
                 continue;
             }
 
-            voltdb::TableTuple *statsTuple = ss->getStatsTuple(interval, now);
+            TableTuple *statsTuple = ss->getStatsTuple(interval, now);
             statsTable->insertTuple(*statsTuple);
         }
     }
@@ -119,10 +131,8 @@ Table* StatsAgent::getStats(voltdb::StatisticsSelectorType sst,
 
 StatsAgent::~StatsAgent()
 {
-    for (std::map<voltdb::StatisticsSelectorType, voltdb::Table*>::iterator i = m_statsTablesByStatsSelector.begin();
+    for (map<StatisticsSelectorType, Table*>::iterator i = m_statsTablesByStatsSelector.begin();
         i != m_statsTablesByStatsSelector.end(); i++) {
         delete i->second;
     }
-}
-
 }

@@ -33,6 +33,22 @@ class TableIndex;
  */
 class IndexStats : public voltdb::StatsSource {
 public:
+    /**
+     * Static method to generate the column names for the tables which
+     * contain index stats.
+     */
+    static std::vector<std::string> generateIndexStatsColumnNames();
+
+    /**
+     * Static method to generate the remaining schema information for
+     * the tables which contain index stats.
+     */
+    static void populateIndexStatsSchema(std::vector<voltdb::ValueType>& types,
+                                         std::vector<int32_t>& columnLengths,
+                                         std::vector<bool>& allowNull);
+
+    static Table* generateEmptyIndexStatsTable();
+
     /*
      * Constructor caches reference to the table that will be generating the statistics
      */

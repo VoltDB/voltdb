@@ -32,6 +32,25 @@ namespace voltdb {
  */
 class TableStats : public voltdb::StatsSource {
 public:
+    /**
+     * Static method to generate the column names for the tables which
+     * contain persistent table stats.
+     */
+    static std::vector<std::string> generateTableStatsColumnNames();
+
+    /**
+     * Static method to generate the remaining schema information for
+     * the tables which contain persistent table stats.
+     */
+    static void populateTableStatsSchema(std::vector<voltdb::ValueType>& types,
+                                         std::vector<int32_t>& columnLengths,
+                                         std::vector<bool>& allowNull);
+
+    /**
+     * Return an empty TableStats table
+     */
+    static Table* generateEmptyTableStatsTable();
+
     /*
      * Constructor caches reference to the table that will be generating the statistics
      */

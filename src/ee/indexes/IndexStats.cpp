@@ -24,14 +24,92 @@
 #include "common/ValueFactory.hpp"
 #include "common/tabletuple.h"
 #include "storage/table.h"
+#include "storage/tablefactory.h"
 #include "indexes/tableindex.h"
 
-namespace voltdb {
+using namespace voltdb;
+using namespace std;
+
+vector<string> IndexStats::generateIndexStatsColumnNames() {
+    vector<string> columnNames = StatsSource::generateBaseStatsColumnNames();
+    columnNames.push_back("INDEX_NAME");
+    columnNames.push_back("TABLE_NAME");
+    columnNames.push_back("INDEX_TYPE");
+    columnNames.push_back("IS_UNIQUE");
+    columnNames.push_back("ENTRY_COUNT");
+    columnNames.push_back("MEMORY_ESTIMATE");
+
+    return columnNames;
+}
+
+void IndexStats::populateIndexStatsSchema(
+        vector<ValueType> &types,
+        vector<int32_t> &columnLengths,
+        vector<bool> &allowNull) {
+    StatsSource::populateBaseSchema(types, columnLengths, allowNull);
+
+    // index name
+    types.push_back(VALUE_TYPE_VARCHAR);
+    columnLengths.push_back(4096);
+    allowNull.push_back(false);
+
+    // table name
+    types.push_back(VALUE_TYPE_VARCHAR);
+    columnLengths.push_back(4096);
+    allowNull.push_back(false);
+
+    // index type
+    types.push_back(VALUE_TYPE_VARCHAR);
+    columnLengths.push_back(4096);
+    allowNull.push_back(false);
+
+    // is unique
+    types.push_back(VALUE_TYPE_TINYINT);
+    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+    allowNull.push_back(false);
+
+    // entry count
+    types.push_back(VALUE_TYPE_BIGINT);
+    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+    allowNull.push_back(false);
+
+    // memory usage
+    types.push_back(VALUE_TYPE_INTEGER);
+    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
+    allowNull.push_back(false);
+}
+
+Table*
+IndexStats::generateEmptyIndexStatsTable()
+{
+    string name = "Persistent Table aggregated index stats temp table";
+    // An empty stats table isn't clearly associated with any specific
+    // database ID.  Just pick something that works for now (Yes,
+    // abstractplannode::databaseId(), I'm looking in your direction)
+    CatalogId databaseId = 1;
+    vector<string> columnNames = IndexStats::generateIndexStatsColumnNames();
+    vector<ValueType> columnTypes;
+    vector<int32_t> columnLengths;
+    vector<bool> columnAllowNull;
+    IndexStats::populateIndexStatsSchema(columnTypes, columnLengths,
+                                         columnAllowNull);
+    TupleSchema *schema =
+        TupleSchema::createTupleSchema(columnTypes, columnLengths,
+                                       columnAllowNull, true);
+
+    return
+        reinterpret_cast<Table*>(TableFactory::getTempTable(databaseId,
+                                                            name,
+                                                            schema,
+                                                            &columnNames[0],
+                                                            NULL));
+}
+
 /*
  * Constructor caches reference to the table that will be generating the statistics
  */
 IndexStats::IndexStats(TableIndex* index)
-    : voltdb::StatsSource(), m_index(index), m_isUnique(0),
+    : StatsSource(), m_index(index), m_isUnique(0),
       m_lastTupleCount(0), m_lastMemEstimate(0)
 {
 }
@@ -47,13 +125,13 @@ IndexStats::IndexStats(TableIndex* index)
  * @parameter databaseId Database this source is associated with
  */
 void IndexStats::configure(
-        std::string name,
-        std::string tableName,
-        voltdb::CatalogId hostId,
-        std::string hostname,
-        voltdb::CatalogId siteId,
-        voltdb::CatalogId partitionId,
-        voltdb::CatalogId databaseId) {
+        string name,
+        string tableName,
+        CatalogId hostId,
+        string hostname,
+        CatalogId siteId,
+        CatalogId partitionId,
+        CatalogId databaseId) {
 
     StatsSource::configure(name, hostId, hostname, siteId, partitionId, databaseId);
     m_indexName = ValueFactory::getStringValue(m_index->getName());
@@ -67,22 +145,15 @@ void IndexStats::configure(
  * this method and call the parent class's version to obtain the list of columns contributed by
  * ancestors and then append the columns they will be contributing to the end of the list.
  */
-std::vector<std::string> IndexStats::generateStatsColumnNames() {
-    std::vector<std::string> columnNames = StatsSource::generateStatsColumnNames();
-    columnNames.push_back("INDEX_NAME");
-    columnNames.push_back("TABLE_NAME");
-    columnNames.push_back("INDEX_TYPE");
-    columnNames.push_back("IS_UNIQUE");
-    columnNames.push_back("ENTRY_COUNT");
-    columnNames.push_back("MEMORY_ESTIMATE");
-
-    return columnNames;
+vector<string> IndexStats::generateStatsColumnNames()
+{
+    return IndexStats::generateIndexStatsColumnNames();
 }
 
 /**
  * Update the stats tuple with the latest statistics available to this StatsSource.
  */
-void IndexStats::updateStatsTuple(voltdb::TableTuple *tuple) {
+void IndexStats::updateStatsTuple(TableTuple *tuple) {
     tuple->setNValue( StatsSource::m_columnName2Index["INDEX_NAME"], m_indexName);
     tuple->setNValue( StatsSource::m_columnName2Index["TABLE_NAME"], m_tableName);
     tuple->setNValue( StatsSource::m_columnName2Index["INDEX_TYPE"], m_indexType);
@@ -116,46 +187,15 @@ void IndexStats::updateStatsTuple(voltdb::TableTuple *tuple) {
  * the tuple schema instead of appending to end of a list.
  */
 void IndexStats::populateSchema(
-        std::vector<voltdb::ValueType> &types,
-        std::vector<int32_t> &columnLengths,
-        std::vector<bool> &allowNull) {
-    StatsSource::populateSchema(types, columnLengths, allowNull);
-
-    // index name
-    types.push_back(voltdb::VALUE_TYPE_VARCHAR);
-    columnLengths.push_back(4096);
-    allowNull.push_back(false);
-
-    // table name
-    types.push_back(voltdb::VALUE_TYPE_VARCHAR);
-    columnLengths.push_back(4096);
-    allowNull.push_back(false);
-
-    // index type
-    types.push_back(voltdb::VALUE_TYPE_VARCHAR);
-    columnLengths.push_back(4096);
-    allowNull.push_back(false);
-
-    // is unique
-    types.push_back(voltdb::VALUE_TYPE_TINYINT);
-    columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_TINYINT));
-    allowNull.push_back(false);
-
-    // entry count
-    types.push_back(voltdb::VALUE_TYPE_BIGINT);
-    columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-    allowNull.push_back(false);
-
-    // memory usage
-    types.push_back(voltdb::VALUE_TYPE_INTEGER);
-    columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
-    allowNull.push_back(false);
+        vector<ValueType> &types,
+        vector<int32_t> &columnLengths,
+        vector<bool> &allowNull)
+{
+    IndexStats::populateIndexStatsSchema(types, columnLengths, allowNull);
 }
 
 IndexStats::~IndexStats() {
     m_indexName.free();
     m_indexType.free();
     m_tableName.free();
-}
-
 }

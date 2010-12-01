@@ -38,6 +38,25 @@ class TableTuple;
  */
 class StatsSource {
 public:
+
+    /**
+     * Generates the list of column names that are present for every
+     * stats table.  Derived classes should implement their own static
+     * methods to generate their column names and call this method
+     * within it to populate the column name vector before adding
+     * their stat-specific column names.
+     */
+    static std::vector<std::string> generateBaseStatsColumnNames();
+
+    /**
+     * Populates the other schema information which is present for
+     * every stats table.  Usage by derived classes takes the same
+     * pattern as generateBaseStatsColumnNames.
+     */
+    static void populateBaseSchema(std::vector<voltdb::ValueType>& types,
+                                   std::vector<int32_t>& columnLengths,
+                                   std::vector<bool>& allowNull);
+
     /*
      * Do nothing constructor that initializes statTable_ and schema_ to NULL.
      */

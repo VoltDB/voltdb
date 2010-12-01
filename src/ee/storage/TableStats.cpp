@@ -21,15 +21,68 @@
 #include "common/ValueFactory.hpp"
 #include "common/tabletuple.h"
 #include "storage/table.h"
+#include "storage/tablefactory.h"
 #include <vector>
 #include <string>
 
-namespace voltdb {
+using namespace voltdb;
+using namespace std;
+
+vector<string> TableStats::generateTableStatsColumnNames() {
+    vector<string> columnNames = StatsSource::generateBaseStatsColumnNames();
+    columnNames.push_back("TABLE_NAME");
+    columnNames.push_back("TABLE_TYPE");
+    columnNames.push_back("TUPLE_COUNT");
+    columnNames.push_back("TUPLE_ALLOCATED_MEMORY");
+    columnNames.push_back("TUPLE_DATA_MEMORY");
+    columnNames.push_back("STRING_DATA_MEMORY");
+    return columnNames;
+}
+
+void TableStats::populateTableStatsSchema(
+        vector<ValueType> &types,
+        vector<int32_t> &columnLengths,
+        vector<bool> &allowNull) {
+    StatsSource::populateBaseSchema(types, columnLengths, allowNull);
+    types.push_back(VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);
+    types.push_back(VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);
+    types.push_back(VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); allowNull.push_back(false);
+    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);
+    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);
+    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);
+}
+
+Table*
+TableStats::generateEmptyTableStatsTable()
+{
+    string name = "Persistent Table aggregated table stats temp table";
+    // An empty stats table isn't clearly associated with any specific
+    // database ID.  Just pick something that works for now (Yes,
+    // abstractplannode::databaseId(), I'm looking in your direction)
+    CatalogId databaseId = 1;
+    vector<string> columnNames = TableStats::generateTableStatsColumnNames();
+    vector<ValueType> columnTypes;
+    vector<int32_t> columnLengths;
+    vector<bool> columnAllowNull;
+    TableStats::populateTableStatsSchema(columnTypes, columnLengths,
+                                         columnAllowNull);
+    TupleSchema *schema =
+        TupleSchema::createTupleSchema(columnTypes, columnLengths,
+                                       columnAllowNull, true);
+
+    return
+        reinterpret_cast<Table*>(TableFactory::getTempTable(databaseId,
+                                                            name,
+                                                            schema,
+                                                            &columnNames[0],
+                                                            NULL));
+}
+
 /*
  * Constructor caches reference to the table that will be generating the statistics
  */
-TableStats::TableStats(voltdb::Table* table)
-    : voltdb::StatsSource(), m_table(table), m_lastTupleCount(0),
+TableStats::TableStats(Table* table)
+    : StatsSource(), m_table(table), m_lastTupleCount(0),
       m_lastAllocatedTupleMemory(0), m_lastOccupiedTupleMemory(0),
       m_lastStringDataMemory(0)
 {
@@ -46,12 +99,12 @@ TableStats::TableStats(voltdb::Table* table)
  * @parameter databaseId Database this source is associated with
  */
 void TableStats::configure(
-        std::string name,
-        voltdb::CatalogId hostId,
-        std::string hostname,
-        voltdb::CatalogId siteId,
-        voltdb::CatalogId partitionId,
-        voltdb::CatalogId databaseId) {
+        string name,
+        CatalogId hostId,
+        string hostname,
+        CatalogId siteId,
+        CatalogId partitionId,
+        CatalogId databaseId) {
     StatsSource::configure(name, hostId, hostname, siteId, partitionId, databaseId);
     m_tableName = ValueFactory::getStringValue(m_table->name());
     m_tableType = ValueFactory::getStringValue(m_table->tableType());
@@ -62,21 +115,14 @@ void TableStats::configure(
  * the parent class's version to obtain the list of columns contributed by ancestors and then append the columns they will be
  * contributing to the end of the list.
  */
-std::vector<std::string> TableStats::generateStatsColumnNames() {
-    std::vector<std::string> columnNames = StatsSource::generateStatsColumnNames();
-    columnNames.push_back("TABLE_NAME");
-    columnNames.push_back("TABLE_TYPE");
-    columnNames.push_back("TUPLE_COUNT");
-    columnNames.push_back("TUPLE_ALLOCATED_MEMORY");
-    columnNames.push_back("TUPLE_DATA_MEMORY");
-    columnNames.push_back("STRING_DATA_MEMORY");
-    return columnNames;
+vector<string> TableStats::generateStatsColumnNames() {
+    return TableStats::generateTableStatsColumnNames();
 }
 
 /**
  * Update the stats tuple with the latest statistics available to this StatsSource.
  */
-void TableStats::updateStatsTuple(voltdb::TableTuple *tuple) {
+void TableStats::updateStatsTuple(TableTuple *tuple) {
     tuple->setNValue( StatsSource::m_columnName2Index["TABLE_NAME"], m_tableName);
     tuple->setNValue( StatsSource::m_columnName2Index["TABLE_TYPE"], m_tableType);
     int64_t tupleCount = m_table->activeTupleCount();
@@ -131,21 +177,13 @@ void TableStats::updateStatsTuple(voltdb::TableTuple *tuple) {
  * end of a list.
  */
 void TableStats::populateSchema(
-        std::vector<voltdb::ValueType> &types,
-        std::vector<int32_t> &columnLengths,
-        std::vector<bool> &allowNull) {
-    StatsSource::populateSchema(types, columnLengths, allowNull);
-    types.push_back(voltdb::VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);
-    types.push_back(voltdb::VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);
-    types.push_back(voltdb::VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT)); allowNull.push_back(false);
-    types.push_back(voltdb::VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER)); allowNull.push_back(false);
-    types.push_back(voltdb::VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER)); allowNull.push_back(false);
-    types.push_back(voltdb::VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER)); allowNull.push_back(false);
+        vector<ValueType> &types,
+        vector<int32_t> &columnLengths,
+        vector<bool> &allowNull) {
+    TableStats::populateTableStatsSchema(types, columnLengths, allowNull);
 }
 
 TableStats::~TableStats() {
     m_tableName.free();
     m_tableType.free();
-}
-
 }
