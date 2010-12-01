@@ -248,6 +248,7 @@ public class DeletesClient
             m_highMemTime = System.currentTimeMillis();
         }
         System.out.println("TOTAL ALLOCATED MEMORY: " + total_mem * 1000);
+        System.out.println("TOTAL RSS: " + rss * 1000);
         Date blah = new Date(m_highMemTime);
         System.out.println("LARGEST MEMORY EATEN: " + m_highMem * 1000 + " at " + blah.toString());
         blah = new Date(m_highRssTime);
@@ -585,7 +586,7 @@ public class DeletesClient
         }
 
         // Start with the maximum data set we could possibly fill
-        for (int i = 0; i <= m_batchesToKeep; i++)
+        for (int i = 0; i < m_batchesToKeep; i++)
         {
             insertBatch(client, true);
         }
@@ -598,26 +599,26 @@ public class DeletesClient
         long max_batch_remaining = 0;
         while (true)
         {
-            if (max_batch_counter == m_maxBatchFreq)
-            {
-                fill_max = true;
-                max_batch_remaining = m_batchesToKeep;
-                max_batch_counter = 0;
-            }
-            else if (fill_max)
-            {
-                max_batch_remaining--;
-                fill_max = true;
-                if (max_batch_remaining == 0)
-                {
-                    fill_max = false;
-                }
-            }
-            else
-            {
-                max_batch_counter++;
-                fill_max = false;
-            }
+            // if (max_batch_counter == m_maxBatchFreq)
+            // {
+            //     fill_max = true;
+            //     max_batch_remaining = m_batchesToKeep;
+            //     max_batch_counter = 0;
+            // }
+            // else if (fill_max)
+            // {
+            //     max_batch_remaining--;
+            //     fill_max = true;
+            //     if (max_batch_remaining == 0)
+            //     {
+            //         fill_max = false;
+            //     }
+            // }
+            // else
+            // {
+            //     max_batch_counter++;
+            //     fill_max = false;
+            // }
 
             insertBatch(client, fill_max);
 
