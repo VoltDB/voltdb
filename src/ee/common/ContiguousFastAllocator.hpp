@@ -15,32 +15,37 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef FASTALLOCATOR_HPP_
-#define FASTALLOCATOR_HPP_
+#ifndef CONTIGUOUSFASTALLOCATOR_HPP_
+#define CONTIGUOUSFASTALLOCATOR_HPP_
 #include "boost/pool/pool.hpp"
 #include "boost/shared_ptr.hpp"
 #include "common/ThreadLocalPool.h"
 
 namespace voltdb {
 
-template <typename T> class FastAllocator;
+template <typename T> class ContiguousFastAllocator;
 
-template <> class FastAllocator<void> {
+template <> class ContiguousFastAllocator<void> {
 public:
   typedef void*       pointer;
   typedef const void* const_pointer;
   // reference to void members are impossible.
   typedef void value_type;
-  template <typename U> struct rebind { typedef FastAllocator<U>
+  template <typename U> struct rebind { typedef ContiguousFastAllocator<U>
                                      other; };
 };
 
 /**
  * STL compatible allocator that allocates/deallocates from thread local
- * memory pools that serve fixed size allocations
+ * memory pools that serve fixed size allocations. Optimized
+ * for allocating contiguous memory for the vectors used by free lists. Instead of paying
+ * the overhead of contiguous allocation via ordered_allocate and ordered_free just
+ * size the contiguous memory appropriately since the max that will be asked for is bounded
+ * and generally speaking the larger sizes will only have a few allocations necessary
+ * due to compaction.
  */
 template <typename T>
-class FastAllocator {
+class ContiguousFastAllocator {
 public:
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
@@ -49,13 +54,13 @@ public:
     typedef T&        reference;
     typedef const T&  const_reference;
     typedef T         value_type;
-    template <typename U> struct rebind { typedef FastAllocator<U>
+    template <typename U> struct rebind { typedef ContiguousFastAllocator<U>
                                         other; };
-    FastAllocator() {}
+    ContiguousFastAllocator() {}
 
     template <typename U>
-    FastAllocator( const FastAllocator<U> &other) {}
-    FastAllocator(const FastAllocator<T> &other) {}
+    ContiguousFastAllocator( const ContiguousFastAllocator<U> &other) {}
+    ContiguousFastAllocator(const ContiguousFastAllocator<T> &other) {}
 
     static pointer address(reference reference) {
         return &reference;
@@ -77,11 +82,11 @@ public:
         ptr->~T();
     }
 
-    bool operator==(const FastAllocator &other) const {
+    bool operator==(const ContiguousFastAllocator &other) const {
         return true;
     }
 
-    bool operator!=(const FastAllocator &other) const {
+    bool operator!=(const ContiguousFastAllocator &other) const {
         return false;
     }
 
@@ -90,7 +95,7 @@ public:
                 static_cast<pointer>(
                         ThreadLocalPool::getExact(sizeof(T))->malloc()) :
                         static_cast<pointer>(
-                                ThreadLocalPool::getExactContiguous(sizeof(T))->ordered_malloc(n) );
+                                ThreadLocalPool::getExact(sizeof(T) * n)->malloc() );
         if (ret == 0) {
             boost::throw_exception(std::bad_alloc());
         }
@@ -114,7 +119,7 @@ public:
         if (n == 1) {
             ThreadLocalPool::getExact(sizeof(T))->free(ptr);
         } else {
-            ThreadLocalPool::getExactContiguous(sizeof(T))->ordered_free(ptr, n);
+            ThreadLocalPool::getExact(sizeof(T) * n)->free(ptr);
         }
     }
 
@@ -124,4 +129,4 @@ public:
     }
 };
 }
-#endif /* FASTALLOCATOR_HPP_ */
+#endif /* CONTIGUOUSFASTALLOCATOR_HPP_ */

@@ -28,8 +28,8 @@ static pthread_once_t m_keyOnce = PTHREAD_ONCE_INIT;
 
 typedef boost::unordered_map< std::size_t, boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > > MapType;
 typedef MapType* MapTypePtr;
-typedef std::pair<int, MapTypePtr> PairType;
-typedef std::pair<int, MapTypePtr>* PairTypePtr;
+typedef std::pair<int, std::pair<MapTypePtr, MapTypePtr> > PairType;
+typedef PairType* PairTypePtr;
 
 static void createThreadLocalKey() {
     (void)pthread_key_create( &m_key, NULL);
@@ -40,7 +40,7 @@ ThreadLocalPool::ThreadLocalPool() {
     if (pthread_getspecific(m_key) == NULL) {
         pthread_setspecific( m_key, static_cast<const void *>(
                 new PairType(
-                        1, new MapType())));
+                        1, std::pair<MapTypePtr, MapTypePtr>( new MapType(), new MapType()))));
     } else {
         PairTypePtr p =
                 static_cast<PairTypePtr>(pthread_getspecific(m_key));
@@ -52,13 +52,17 @@ ThreadLocalPool::ThreadLocalPool() {
 ThreadLocalPool::~ThreadLocalPool() {
     PairTypePtr p =
             static_cast<PairTypePtr>(pthread_getspecific(m_key));
-    if (p->first == 1) {
-        delete p->second;
-        pthread_setspecific( m_key, NULL);
-    } else {
-        pthread_setspecific( m_key, new PairType( p->first - 1, p->second));
+    assert(p != NULL);
+    if (p != NULL) {
+        if (p->first == 1) {
+            delete p->second.first;
+            delete p->second.second;
+            pthread_setspecific( m_key, NULL);
+        } else {
+            pthread_setspecific( m_key, new PairType( p->first - 1, p->second));
+        }
+        delete p;
     }
-    delete p;
 }
 
 static std::size_t getAllocationSizeForObject(std::size_t length) {
@@ -150,9 +154,26 @@ boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > Thread
     return getExact(size);
 }
 
+boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > ThreadLocalPool::getContiguous(std::size_t size) {
+    size = getAllocationSizeForObject(size);
+    return getExact(size);
+}
+
 boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > ThreadLocalPool::getExact(std::size_t size) {
     MapTypePtr pools =
-            static_cast< PairTypePtr >(pthread_getspecific(m_key))->second;
+            static_cast< PairTypePtr >(pthread_getspecific(m_key))->second.first;
+    boost::unordered_map< std::size_t, boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > >::iterator iter = pools->find(size);
+    if (iter == pools->end()) {
+        boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > pool = boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> >(new boost::pool<boost::default_user_allocator_new_delete>(size));
+        pools->insert( std::pair<std::size_t, boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > >(size, pool));
+        return pool;
+    }
+    return iter->second;
+}
+
+boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > ThreadLocalPool::getExactContiguous(std::size_t size) {
+    MapTypePtr pools =
+            static_cast< PairTypePtr >(pthread_getspecific(m_key))->second.second;
     boost::unordered_map< std::size_t, boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > >::iterator iter = pools->find(size);
     if (iter == pools->end()) {
         boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > pool = boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> >(new boost::pool<boost::default_user_allocator_new_delete>(size));

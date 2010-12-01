@@ -50,6 +50,7 @@
 #include "common/tabletuple.h"
 #include "storage/TupleBlock.h"
 #include "storage/tableiterator.h"
+#include "common/ThreadLocalPool.h"
 
 namespace voltdb {
 
@@ -232,7 +233,7 @@ inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
 }
 
 inline TBPtr TempTable::allocateNextBlock() {
-    TBPtr block(new TupleBlock(this, TBBucketPtr()));
+    TBPtr block(new (ThreadLocalPool::getExact(sizeof(TupleBlock))->malloc()) TupleBlock(this, TBBucketPtr()));
     m_data.push_back(block);
 
     if (m_tempTableMemoryInBytes) {
