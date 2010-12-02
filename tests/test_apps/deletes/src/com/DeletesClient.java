@@ -61,7 +61,7 @@ public class DeletesClient
     static String m_snapshotId = "Deletes";
     static String m_snapshotDir = "/tmp/deletes";
     static String[] m_names = new String[NUM_NAMES];
-    static Random m_rand = new Random(0);
+    static Random m_rand = new Random(System.currentTimeMillis());
     static long m_batchNumber = 1000;
     static int m_totalRows;
     static long m_highMem = 0;
@@ -82,10 +82,11 @@ public class DeletesClient
     static ArrayList<Integer> m_snapshotSizes = new ArrayList<Integer>();
     static boolean m_snapshotInProgress = false;
 
-    static String randomString(int stringSize)
+    static String randomString(int maxStringSize)
     {
         final String lazyletters = "abcdefghijklmnopqrstuvwxyz";
         StringBuilder sb = new StringBuilder();
+        int stringSize = m_rand.nextInt(maxStringSize) + 1;
         for (int j = 0; j < stringSize; j++)
         {
             int index = m_rand.nextInt(lazyletters.length());
