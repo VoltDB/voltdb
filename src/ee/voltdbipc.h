@@ -119,6 +119,8 @@ private:
 
     void hashinate(struct ipc_command* cmd);
 
+    void threadLocalPoolAllocations();
+
     void sendException( int8_t errorCode);
 
     int8_t activateTableStream(struct ipc_command *cmd);

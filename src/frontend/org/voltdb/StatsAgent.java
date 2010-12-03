@@ -133,6 +133,7 @@ public class StatsAgent {
         int tupleAllocatedMem = 0;
         int indexMem = 0;
         int stringMem = 0;
+        long pooledMem = 0;
     }
     static Map<Integer, PartitionMemRow> m_memoryStats = new TreeMap<Integer, PartitionMemRow>();
 
@@ -141,13 +142,15 @@ public class StatsAgent {
                                               int tupleDataMem,
                                               int tupleAllocatedMem,
                                               int indexMem,
-                                              int stringMem) {
+                                              int stringMem,
+                                              long pooledMemory) {
         PartitionMemRow pmr = new PartitionMemRow();
         pmr.tupleCount = tupleCount;
         pmr.tupleDataMem = tupleDataMem;
         pmr.tupleAllocatedMem = tupleAllocatedMem;
         pmr.indexMem = indexMem;
         pmr.stringMem = stringMem;
+        pmr.pooledMem = pooledMemory;
         m_memoryStats.put(siteId, pmr);
     }
 
@@ -163,7 +166,8 @@ public class StatsAgent {
                 new ColumnInfo("TUPLEALLOCATED", VoltType.INTEGER),
                 new ColumnInfo("INDEXMEMORY", VoltType.INTEGER),
                 new ColumnInfo("STRINGMEMORY", VoltType.INTEGER),
-                new ColumnInfo("TUPLECOUNT", VoltType.BIGINT)
+                new ColumnInfo("TUPLECOUNT", VoltType.BIGINT),
+                new ColumnInfo("POOLEDMEMORY", VoltType.BIGINT)
         });
         return t;
     }
@@ -198,6 +202,7 @@ public class StatsAgent {
             totals.tupleAllocatedMem += pmr.tupleAllocatedMem;
             totals.indexMem += pmr.indexMem;
             totals.stringMem += pmr.stringMem;
+            totals.pooledMem += pmr.pooledMem;
         }
 
         // get system statistics
@@ -212,7 +217,7 @@ public class StatsAgent {
         // create the row and return it
         t.addRow(m_hostId, m_hostName, rss, javaused, javaunused,
                  totals.tupleDataMem, totals.tupleAllocatedMem,
-                 totals.indexMem, totals.stringMem, totals.tupleCount);
+                 totals.indexMem, totals.stringMem, totals.tupleCount, totals.pooledMem / 1024);
         assert(t.getRowCount() == 1);
         return t;
     }

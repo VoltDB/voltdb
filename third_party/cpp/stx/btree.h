@@ -1237,9 +1237,9 @@ private:
     /// this < relation.
     key_compare key_less;
 
-    boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > inner_pool;
+    boost::shared_ptr<boost::pool<voltdb::voltdb_pool_allocator_new_delete> > inner_pool;
 
-    boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > leaf_pool;
+    boost::shared_ptr<boost::pool<voltdb::voltdb_pool_allocator_new_delete> > leaf_pool;
 
 public:
     // *** Constructors and Destructor
@@ -1377,7 +1377,8 @@ private:
 #ifdef MEMCHECK
         leaf_node* n = new leaf_node;
 #else
-        leaf_node* n = new (leaf_pool->malloc()) leaf_node;
+        //Don't cache the pool for allocations, do the get so the pool can be tweaked
+        leaf_node* n = new (voltdb::ThreadLocalPool::getExact(sizeof(leaf_node))->malloc()) leaf_node;
 #endif
         n->initialize();
         stats.leaves++;
@@ -1390,7 +1391,8 @@ private:
 #ifdef MEMCHECK
         inner_node* n = new inner_node;
 #else
-        inner_node* n = new (inner_pool->malloc()) inner_node;
+        //Don't cache the pool for allocations, do the get so the pool can be tweaked
+        inner_node* n = new (voltdb::ThreadLocalPool::getExact(sizeof(inner_node))->malloc()) inner_node;
 #endif
         n->initialize(l);
         stats.innernodes++;

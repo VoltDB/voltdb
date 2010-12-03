@@ -545,7 +545,14 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             }
 
             // update the rolled up statistics
-            StatsAgent.eeUpdateMemStats(m_siteId, tupleCount, tupleDataMem, tupleAllocatedMem, indexMem, stringMem);
+            StatsAgent.eeUpdateMemStats(
+                    m_siteId,
+                    tupleCount,
+                    tupleDataMem,
+                    tupleAllocatedMem,
+                    indexMem,
+                    stringMem,
+                    ee.getThreadLocalPoolAllocations());
         }
     }
 

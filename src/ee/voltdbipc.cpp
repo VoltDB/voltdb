@@ -34,6 +34,7 @@
 #include "common/TheHashinator.h"
 #include "execution/IPCTopend.h"
 #include "execution/VoltDBEngine.h"
+#include "common/ThreadLocalPool.h"
 
 #include <cassert>
 #include <cstdlib>
@@ -327,6 +328,9 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
       case 23:
           hashinate(cmd);
           result = kErrorCode_None;
+          break;
+      case 24:
+          threadLocalPoolAllocations();
           break;
       default:
         result = stub(cmd);
@@ -1064,6 +1068,14 @@ void VoltDBIPC::setupSigHandler(void) const {
     if(sigaction(SIGSEGV, &action, NULL) < 0)
         perror("Failed to setup signal handler for SIGSEGV");
 #endif
+}
+
+void VoltDBIPC::threadLocalPoolAllocations() {
+    std::size_t poolAllocations = ThreadLocalPool::getPoolAllocationSize();
+    char response[8];
+    response[0] = kErrorCode_Success;
+    *reinterpret_cast<std::size_t*>(&response[1]) = htonll(poolAllocations);
+    writeOrDie(m_fd, (unsigned char*)response, 5);
 }
 
 int main(int argc, char **argv) {

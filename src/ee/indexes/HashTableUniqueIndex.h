@@ -49,7 +49,7 @@
 #include <iostream>
 #include "indexes/tableindex.h"
 #include "boost/unordered_map.hpp"
-#include "common/FastAllocator.hpp"
+#include "boost_ext/FastAllocator.hpp"
 
 namespace voltdb {
 

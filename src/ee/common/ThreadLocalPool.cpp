@@ -18,29 +18,36 @@
 #include <pthread.h>
 #include <boost/unordered_map.hpp>
 #include "common/FatalException.hpp"
+#include <iostream>
 
 namespace voltdb {
 /**
  * Thread local key for storing thread specific memory pools
  */
 static pthread_key_t m_key;
+/**
+ * Thread local key for storing integer value of amount of memory allocated
+ */
+static pthread_key_t m_keyAllocated;
 static pthread_once_t m_keyOnce = PTHREAD_ONCE_INIT;
 
-typedef boost::unordered_map< std::size_t, boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > > MapType;
+typedef boost::unordered_map< std::size_t, boost::shared_ptr<boost::pool<voltdb_pool_allocator_new_delete> > > MapType;
 typedef MapType* MapTypePtr;
-typedef std::pair<int, std::pair<MapTypePtr, MapTypePtr> > PairType;
+typedef std::pair<int, MapTypePtr > PairType;
 typedef PairType* PairTypePtr;
 
 static void createThreadLocalKey() {
     (void)pthread_key_create( &m_key, NULL);
+    (void)pthread_key_create( &m_keyAllocated, NULL);
 }
 
 ThreadLocalPool::ThreadLocalPool() {
     (void)pthread_once(&m_keyOnce, createThreadLocalKey);
     if (pthread_getspecific(m_key) == NULL) {
+        pthread_setspecific( m_keyAllocated, static_cast<const void *>(new std::size_t(0)));
         pthread_setspecific( m_key, static_cast<const void *>(
                 new PairType(
-                        1, std::pair<MapTypePtr, MapTypePtr>( new MapType(), new MapType()))));
+                        1, new MapType())));
     } else {
         PairTypePtr p =
                 static_cast<PairTypePtr>(pthread_getspecific(m_key));
@@ -55,9 +62,10 @@ ThreadLocalPool::~ThreadLocalPool() {
     assert(p != NULL);
     if (p != NULL) {
         if (p->first == 1) {
-            delete p->second.first;
-            delete p->second.second;
+            delete p->second;
             pthread_setspecific( m_key, NULL);
+            delete static_cast<std::size_t*>(pthread_getspecific(m_keyAllocated));
+            pthread_setspecific( m_keyAllocated, NULL);
         } else {
             pthread_setspecific( m_key, new PairType( p->first - 1, p->second));
         }
@@ -149,37 +157,60 @@ static std::size_t getAllocationSizeForObject(std::size_t length) {
     return length + 4;
 }
 
-boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > ThreadLocalPool::get(std::size_t size) {
+boost::shared_ptr<boost::pool<voltdb_pool_allocator_new_delete> > ThreadLocalPool::get(std::size_t size) {
     size = getAllocationSizeForObject(size);
     return getExact(size);
 }
 
-boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > ThreadLocalPool::getContiguous(std::size_t size) {
-    size = getAllocationSizeForObject(size);
-    return getExactContiguous(size);
-}
-
-boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > ThreadLocalPool::getExact(std::size_t size) {
+boost::shared_ptr<boost::pool<voltdb_pool_allocator_new_delete> > ThreadLocalPool::getExact(std::size_t size) {
     MapTypePtr pools =
-            static_cast< PairTypePtr >(pthread_getspecific(m_key))->second.first;
-    boost::unordered_map< std::size_t, boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > >::iterator iter = pools->find(size);
+            static_cast< PairTypePtr >(pthread_getspecific(m_key))->second;
+    boost::unordered_map< std::size_t, boost::shared_ptr<boost::pool<voltdb_pool_allocator_new_delete> > >::iterator
+        iter = pools->find(size);
     if (iter == pools->end()) {
-        boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > pool = boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> >(new boost::pool<boost::default_user_allocator_new_delete>(size));
-        pools->insert( std::pair<std::size_t, boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > >(size, pool));
+        boost::shared_ptr<boost::pool<voltdb_pool_allocator_new_delete> > pool =
+                boost::shared_ptr<boost::pool<voltdb_pool_allocator_new_delete> >(
+                        new boost::pool<voltdb_pool_allocator_new_delete>(size));
+        pools->insert( std::pair<std::size_t, boost::shared_ptr<boost::pool<voltdb_pool_allocator_new_delete> > >(size, pool));
         return pool;
+    }
+    boost::shared_ptr<boost::pool<voltdb_pool_allocator_new_delete> > pool = iter->second;
+
+    /**
+     * The goal of this code is to bypass the pool sizing algorithm used by boost
+     * and replace it with something that bounds allocations to a series of 2 meg blocks
+     * for small allocations. For large allocations fall back to a strategy of allocating two of
+     * these huge things at a time. The goal of this bounding is make the amount of untouched but allocated
+     * memory relatively small so that the counting done by the volt allocator accurately represents the effect
+     * on RSS.
+     */
+    if (pool->get_next_size() * pool->get_requested_size() > (1024 * 1024 * 2)) {
+        //If the size of objects served by this pool is less than 256 kilobytes
+        //go ahead an allocated a 2 meg block of them
+        if (pool->get_requested_size() < (1024 * 256)) {
+            pool->set_next_size((1024 * 1024 * 2) /  pool->get_requested_size());
+        } else {
+            //For large objects allocated just two of them
+            pool->set_next_size(2);
+        }
     }
     return iter->second;
 }
 
-boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > ThreadLocalPool::getExactContiguous(std::size_t size) {
-    MapTypePtr pools =
-            static_cast< PairTypePtr >(pthread_getspecific(m_key))->second.second;
-    boost::unordered_map< std::size_t, boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > >::iterator iter = pools->find(size);
-    if (iter == pools->end()) {
-        boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > pool = boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> >(new boost::pool<boost::default_user_allocator_new_delete>(size));
-        pools->insert( std::pair<std::size_t, boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > >(size, pool));
-        return pool;
-    }
-    return iter->second;
+std::size_t ThreadLocalPool::getPoolAllocationSize() {
+    return *static_cast< std::size_t* >(pthread_getspecific(m_keyAllocated));
+}
+
+char * voltdb_pool_allocator_new_delete::malloc(const size_type bytes) {
+    (*static_cast< std::size_t* >(pthread_getspecific(m_keyAllocated))) += bytes + sizeof(std::size_t);
+    //std::cout << "Pooled memory is " << ((*static_cast< std::size_t* >(pthread_getspecific(m_keyAllocated))) / (1024 * 1024)) << " after requested allocation " << (bytes / (1024 * 1024)) <<  std::endl;
+    char *retval = new (std::nothrow) char[bytes + sizeof(std::size_t)];
+    *reinterpret_cast<std::size_t*>(retval) = bytes + sizeof(std::size_t);
+    return &retval[sizeof(std::size_t)];
+}
+
+void voltdb_pool_allocator_new_delete::free(char * const block) {
+    (*static_cast< std::size_t* >(pthread_getspecific(m_keyAllocated))) -= *reinterpret_cast<std::size_t*>(block - sizeof(std::size_t));
+    delete [](block - sizeof(std::size_t));
 }
 }

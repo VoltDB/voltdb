@@ -114,7 +114,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         ExportAction(20),
         RecoveryMessage(21),
         TableHashCode(22),
-        Hashinate(23);
+        Hashinate(23),
+        GetPoolAllocations(24);
         Commands(final int id) {
             m_id = id;
         }
@@ -1253,6 +1254,30 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
             part.flip();
             return part.getInt();
+        } catch (final Exception e) {
+            System.out.println("Exception: " + e.getMessage());
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public long getThreadLocalPoolAllocations() {
+        m_data.clear();
+        m_data.putInt(Commands.GetPoolAllocations.m_id);
+        try {
+            m_data.flip();
+            m_connection.write();
+
+            m_connection.readStatusByte();
+            ByteBuffer allocations = ByteBuffer.allocate(8);
+            while (allocations.hasRemaining()) {
+                int read = m_connection.m_socketChannel.read(allocations);
+                if (read <= 0) {
+                    throw new EOFException();
+                }
+            }
+            allocations.flip();
+            return allocations.getLong();
         } catch (final Exception e) {
             System.out.println("Exception: " + e.getMessage());
             throw new RuntimeException(e);
