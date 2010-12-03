@@ -114,13 +114,13 @@ public:
         assert(oldTupleValue->address() != newTupleValue->address());
         m_tmp1.setFromTuple(oldTupleValue, column_indices_, m_keySchema);
         std::pair<MMIter,MMIter> key_iter;
-        for (key_iter = m_entries.equal_range(m_tmp1);
-             key_iter.first != key_iter.second;
-             ++(key_iter.first))
+        for (key_iter = m_entries.equalRange(m_tmp1);
+             !key_iter.first.equals(key_iter.second);
+             key_iter.first.moveNext())
         {
-            if (key_iter.first->second == oldTupleValue->address())
+            if (key_iter.first.value() == oldTupleValue->address())
             {
-                key_iter.first->second = newTupleValue->address();
+                key_iter.first.value() = newTupleValue->address();
                 m_updates++;
                 return true;
             }
@@ -140,7 +140,7 @@ public:
         ++m_lookups;
         m_tmp1.setFromTuple(values, column_indices_, m_keySchema);
         //m_keyIter = m_entries.lower_bound(m_tmp1);
-        return (m_entries.find(m_tmp1) != m_entries.end());
+        return (!m_entries.find(m_tmp1).isEnd());
     }
 
     bool moveToKey(const TableTuple *searchKey)
@@ -160,7 +160,7 @@ public:
         ++m_lookups;
         m_begin = true;
         m_tmp1.setFromKey(searchKey);
-        m_seqIter = m_entries.lower_bound(m_tmp1);
+        m_seqIter = m_entries.lowerBound(m_tmp1);
     }
 
     void moveToGreaterThanKey(const TableTuple *searchKey)
@@ -168,7 +168,7 @@ public:
         ++m_lookups;
         m_begin = true;
         m_tmp1.setFromKey(searchKey);
-        m_seqIter = m_entries.upper_bound(m_tmp1);
+        m_seqIter = m_entries.upperBound(m_tmp1);
     }
 
     void moveToEnd(bool begin)
@@ -178,7 +178,7 @@ public:
         if (begin)
             m_seqIter = m_entries.begin();
         else
-            m_seqRIter = m_entries.rbegin();
+            m_seqIter = m_entries.rbegin();
     }
 
     TableTuple nextValue()
@@ -186,15 +186,15 @@ public:
         TableTuple retval(m_tupleSchema);
 
         if (m_begin) {
-            if (m_seqIter == m_entries.end())
+            if (m_seqIter.isEnd())
                 return TableTuple();
-            retval.move(const_cast<void*>(m_seqIter->second));
-            ++m_seqIter;
+            retval.move(const_cast<void*>(m_seqIter.value()));
+            m_seqIter.moveNext();
         } else {
-            if (m_seqRIter == (typename MapType::const_reverse_iterator) m_entries.rend())
+            if (m_seqIter.isEnd())
                 return TableTuple();
-            retval.move(const_cast<void*>(m_seqRIter->second));
-            ++m_seqRIter;
+            retval.move(const_cast<void*>(m_seqIter.value()));
+            m_seqIter.movePrev();
         }
 
         return retval;
@@ -204,19 +204,19 @@ public:
     {
         if (m_match.isNullTuple()) return m_match;
         TableTuple retval = m_match;
-        ++(m_keyIter.first);
-        if (m_keyIter.first == m_keyIter.second)
+        m_keyIter.first.moveNext();
+        if (m_keyIter.first.equals(m_keyIter.second))
             m_match.move(NULL);
         else
-            m_match.move(const_cast<void*>(m_keyIter.first->second));
+            m_match.move(const_cast<void*>(m_keyIter.first.value()));
         return retval;
     }
 
     bool advanceToNextKey()
     {
-        if (m_keyIter.second == m_entries.end())
+        if (m_keyIter.second.isEnd())
             return false;
-        return moveToKey(m_keyIter.second->first);
+        return moveToKey(m_keyIter.second.key());
     }
 
     size_t getSize() const { return m_entries.size(); }
@@ -250,11 +250,11 @@ protected:
     {
         ++m_deletes;
         std::pair<MMIter,MMIter> key_iter;
-        for (key_iter = m_entries.equal_range(key);
-             key_iter.first != key_iter.second;
-             ++(key_iter.first))
+        for (key_iter = m_entries.equalRange(key);
+             !key_iter.first.equals(key_iter.second);
+             key_iter.first.moveNext())
         {
-            if (key_iter.first->second == tuple->address())
+            if (key_iter.first.value() == tuple->address())
             {
                 m_entries.erase(key_iter.first);
                 //deleted
@@ -269,13 +269,13 @@ protected:
     {
         ++m_lookups;
         m_begin = true;
-        m_keyIter = m_entries.equal_range(key);
-        if (m_keyIter.first == m_keyIter.second)
+        m_keyIter = m_entries.equalRange(key);
+        if (m_keyIter.first.equals(m_keyIter.second))
         {
             m_match.move(NULL);
             return false;
         }
-        m_match.move(const_cast<void*>(m_keyIter.first->second));
+        m_match.move(const_cast<void*>(m_keyIter.first.value()));
         return !m_match.isNullTuple();
     }
 
@@ -285,8 +285,8 @@ protected:
 
     // iteration stuff
     bool m_begin;
-    MMCIter m_keyIter;
-    MMCIter m_seqIter;
+    typename std::pair<MMIter, MMIter> m_keyIter;
+    MMIter m_seqIter;
     TableTuple m_match;
 
     // comparison stuff
