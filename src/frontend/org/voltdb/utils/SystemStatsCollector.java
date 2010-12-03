@@ -43,7 +43,7 @@ public class SystemStatsCollector {
 
     private enum GetRSSMode { MACOSX_NATIVE, PROCFS, PS }
 
-    static long starttime;
+    static long starttime = System.currentTimeMillis();
     static final long javamaxheapmem = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getMax();
     static long memorysize = 256;
     static int pid;
@@ -456,6 +456,9 @@ public class SystemStatsCollector {
         return chart.getURL(minutes);
     }
 
+    public static long getStartTime() {
+        return starttime;
+    }
 
     /**
      * Manual performance testing code for getting stats.

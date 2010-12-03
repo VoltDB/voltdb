@@ -111,6 +111,16 @@ public class HTTPAdminListener {
                 clusterinfo += " (" + context.numberOfExecSites / context.numberOfNodes;
                 clusterinfo += " per host)";
 
+                // get the start time
+                long t = SystemStatsCollector.getStartTime();
+                Date date = new Date(t);
+                long duration = System.currentTimeMillis() - t;
+                long minutes = duration / 60000;
+                long hours = minutes / 60; minutes -= hours * 60;
+                long days = hours / 24; hours -= days * 24;
+                String starttime = String.format("%s (%dd %dh %dm)",
+                        date.toString(), days, hours, minutes);
+
                 // get the hostname, but fail gracefully
                 String hostname = "&lt;unknownhost&gt;";
                 try {
@@ -142,6 +152,7 @@ public class HTTPAdminListener {
                 params.put("version", VoltDB.instance().getVersionString());
                 params.put("buildstring", VoltDB.instance().getBuildString());
                 params.put("cluster", clusterinfo);
+                params.put("starttime", starttime);
                 params.put("csvfilename", csvFilename);
 
                 params.put("2mincharturl", SystemStatsCollector.getGoogleChartURL(2, 320, 240, "-2min"));
