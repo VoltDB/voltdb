@@ -1128,6 +1128,16 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeHashi
 
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
+ * Method:    nativeGetThreadLocalPoolAllocations
+ * Signature: ()J
+ */
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeGetThreadLocalPoolAllocations
+  (JNIEnv *, jclass) {
+    return ThreadLocalPool::getPoolAllocationSize();
+}
+
+/*
+ * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    nativeGetRSS
  * Signature: ()J
  */

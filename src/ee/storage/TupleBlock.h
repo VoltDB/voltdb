@@ -28,8 +28,9 @@
 #include "stx/btree_set.h"
 #include <math.h>
 #include <iostream>
-#include "common/ContiguousFastAllocator.hpp"
+#include "boost_ext/FastAllocator.hpp"
 #include "common/ThreadLocalPool.h"
+#include <deque>
 
 namespace voltdb {
 class TupleBlock;
@@ -146,10 +147,6 @@ public:
             retval = m_storage;
             TruncatedInt offset = m_freeList.back();
             m_freeList.pop_back();
-
-            if ((m_freeList.capacity() / 2) > m_freeList.size()) {
-                std::vector<TruncatedInt, ContiguousFastAllocator<TruncatedInt> >(m_freeList).swap(m_freeList);
-            }
             retval += offset.unpack();
         } else {
             retval = &(m_storage[m_tupleLength * m_nextFreeTuple]);
@@ -239,7 +236,7 @@ private:
      * and also deleted.
      * NOTE THAT THESE ARE NOT THE ONLY FREE TUPLES.
      **/
-    std::vector<TruncatedInt, ContiguousFastAllocator<TruncatedInt> > m_freeList;
+    std::deque<TruncatedInt, FastAllocator<TruncatedInt> > m_freeList;
 
     int m_bucketIndex;
     TBBucketPtr m_bucket;

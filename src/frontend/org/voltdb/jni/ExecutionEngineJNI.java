@@ -550,4 +550,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
         return nativeHashinate(pointer, partitionCount);
     }
+
+    @Override
+    public long getThreadLocalPoolAllocations() {
+        return nativeGetThreadLocalPoolAllocations();
+    }
 }

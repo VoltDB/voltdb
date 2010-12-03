@@ -295,6 +295,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Used for test code only (AFAIK jhugg) */
     abstract public VoltTable serializeTable(int tableId) throws EEException;
 
+    abstract public long getThreadLocalPoolAllocations();
+
     abstract public void loadTable(
         int tableId, VoltTable table, long txnId,
         long lastCommittedTxnId, long undoToken, boolean allowExport) throws EEException;
@@ -547,6 +549,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @return
      */
     protected native int nativeHashinate(long pointer, int partitionCount);
+
+    /**
+     * Retrieve the thread local counter of pooled memory that has been allocated
+     * @return
+     */
+    protected static native long nativeGetThreadLocalPoolAllocations();
 
     /**
      * @param nextUndoToken The undo token to associate with future work

@@ -55,7 +55,7 @@
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
 #include "indexes/tableindex.h"
-#include "common/FastAllocator.hpp"
+#include "boost_ext/FastAllocator.hpp"
 
 namespace voltdb {
 

@@ -21,6 +21,16 @@
 #include "boost/shared_ptr.hpp"
 
 namespace voltdb {
+
+struct voltdb_pool_allocator_new_delete
+{
+  typedef std::size_t size_type;
+  typedef std::ptrdiff_t difference_type;
+
+  static char * malloc(const size_type bytes);
+  static void free(char * const block);
+};
+
 /**
  * A wrapper around a set of pools that are local to the current thread.
  * An instance of the thread local pool must be maintained somewhere in the thread to ensure initialization
@@ -36,27 +46,15 @@ public:
      * Retrieve a pool that allocates approximately sized chunks of memory. Provides pools that
      * are powers of two and powers of two + the previous power of two.
      */
-    static boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > get(std::size_t size);
+    static boost::shared_ptr<boost::pool<voltdb_pool_allocator_new_delete> > get(std::size_t size);
 
     /**
      * Retrieve a pool that allocate chunks that are exactly the requested size. Only creates
      * pools up to 1 megabyte + 4 bytes.
      */
-    static boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > getExact(std::size_t size);
+    static boost::shared_ptr<boost::pool<voltdb_pool_allocator_new_delete> > getExact(std::size_t size);
 
-    /**
-     * Retrieve a pool that allocates approximately sized chunks of memory. Provides pools that
-     * are powers of two and powers of two + the previous power of two. The pool returned
-     * is for fulfilling requests for contiguous memory.
-     */
-    static boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > getContiguous(std::size_t size);
-
-    /**
-     * Retrieve a pool that allocate chunks that are exactly the requested size. Only creates
-     * pools up to 1 megabyte + 4 bytes. The pool returned
-     * is for fulfilling requests for contiguous memory.
-     */
-    static boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > getExactContiguous(std::size_t size);
+    static std::size_t getPoolAllocationSize();
 };
 }
 
