@@ -120,7 +120,7 @@ public:
         {
             if (key_iter.first.value() == oldTupleValue->address())
             {
-                key_iter.first.value() = newTupleValue->address();
+                key_iter.first.setValue(newTupleValue->address());
                 m_updates++;
                 return true;
             }
