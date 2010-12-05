@@ -77,16 +77,16 @@ public:
      * that stl and volt returned equal value sets.
      * Record cardinality of largest value set evaluated in chainCounter
      */
-    void verifyIterators(std::multimap<int,int> &stl,
-                         std::multimap<int,int>::iterator &stli,
-                         voltdb::CompactingMap<int, int>::iterator &volti,
-                         int val, int *chainCounter)
+    void verifyIterators(std::multimap<std::string, std::string> &stl,
+                         std::multimap<std::string, std::string>::iterator &stli,
+                         voltdb::CompactingMap<std::string, std::string>::iterator &volti,
+                         std::string val, int *chainCounter)
     {
-        std::vector<int> stlv;
-        std::vector<int> voltv;
+        std::vector<std::string> stlv;
+        std::vector<std::string> voltv;
 
         for (; stli != stl.end(); stli++) {
-            if (stli->first == val) {
+            if (stli->first.compare(val) == 0) {
                 stlv.push_back(stli->second);
             }
             else {
@@ -94,7 +94,7 @@ public:
             }
         }
         for (;!volti.isEnd(); volti.moveNext()) {
-            if (volti.key() == val) {
+            if (volti.key().compare(val) == 0) {
                 voltv.push_back(volti.value());
             }
             else {
@@ -110,7 +110,7 @@ public:
         std::sort(stlv.begin(), stlv.end());
         std::sort(voltv.begin(), voltv.end());
         for (int i=0; i < stlv.size(); i++) {
-            assert(stlv[i] == voltv[i]);
+            assert(stlv[i].compare(voltv[i]) == 0);
         }
     }
 };
@@ -290,11 +290,11 @@ TEST_F(CompactingMapTest, RandomMulti) {
     const int EQ_RANGE = 7; int equalRanges = 0;
     const int TOTAL_OPS = 8;
 
-    std::multimap<int,int> stl;
-    voltdb::CompactingMap<int, int> volt(false, std::less<int>());
+    std::multimap<std::string, std::string> stl;
+    voltdb::CompactingMap<std::string, std::string> volt(false, std::less<std::string>());
 
-    std::multimap<int,int>::iterator stli;
-    voltdb::CompactingMap<int, int>::iterator volti;
+    std::multimap<std::string, std::string>::iterator stli;
+    voltdb::CompactingMap<std::string, std::string>::iterator volti;
 
     srand(0);
 
@@ -308,7 +308,9 @@ TEST_F(CompactingMapTest, RandomMulti) {
         }
 
         int op = rand() % TOTAL_OPS;
-        int val = rand() % BIGGEST_VAL;      // the key, really
+        char buf[256];
+        snprintf(buf, 256, "%d", rand() % BIGGEST_VAL);      // the key, really
+        std::string val = buf;
 
         /*
          * Insert a new <k,v>.
@@ -337,10 +339,11 @@ TEST_F(CompactingMapTest, RandomMulti) {
                 assert(stlCount == stl.count(val));
             }
 
-            int val_value = rand();
-            stli = stl.insert(std::pair<int,int>(val, val_value));
+            snprintf(buf, 256, "%d", rand());
+            std::string val_value = buf;
+            stli = stl.insert(std::pair<std::string, std::string>(val, val_value));
             assert(stli != stl.end());
-            bool success = volt.insert(std::pair<int,int>(val, val_value));
+            bool success = volt.insert(std::pair<std::string, std::string>(val, val_value));
             assert(success);
         }
         /*
@@ -437,8 +440,8 @@ TEST_F(CompactingMapTest, RandomMulti) {
          * equal keys, but does not use the returned iterators to do iteration
          */
         else if (op == EQ_RANGE) {
-            std::pair<std::multimap<int,int>::iterator, std::multimap<int,int>::iterator> stli_pair;
-            std::pair<voltdb::CompactingMap<int, int>::iterator, voltdb::CompactingMap<int,int>::iterator> volti_pair;
+            std::pair<std::multimap<std::string, std::string>::iterator, std::multimap<std::string, std::string>::iterator> stli_pair;
+            std::pair<voltdb::CompactingMap<std::string, std::string>::iterator, voltdb::CompactingMap<std::string, std::string>::iterator> volti_pair;
             stli_pair = stl.equal_range(val);
             volti_pair = volt.equalRange(val);
 

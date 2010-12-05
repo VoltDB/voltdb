@@ -204,7 +204,8 @@ bool CompactingMap<Key, Data, Compare>::insert(std::pair<Key, Data> value) {
         // create a new node
         void *memory = m_allocator.alloc();
         assert(memory);
-        TreeNode *z = static_cast<TreeNode*>(memory);
+        // placement new
+        TreeNode *z = new(memory) TreeNode();
         z->key = value.first;
         z->value = value.second;
         z->left = z->right = &NIL;
@@ -223,7 +224,8 @@ bool CompactingMap<Key, Data, Compare>::insert(std::pair<Key, Data> value) {
         // create a new node as root
         void *memory = m_allocator.alloc();
         assert(memory);
-        TreeNode *z = static_cast<TreeNode*>(memory);
+        // placement new
+        TreeNode *z = new(memory) TreeNode();
         z->key = value.first;
         z->value = value.second;
         z->left = z->right = &NIL;
@@ -498,8 +500,9 @@ void CompactingMap<Key, Data, Compare>::deleteFixup(TreeNode *x) {
 
 template<typename Key, typename Data, typename Compare>
 void CompactingMap<Key, Data, Compare>::fragmentFixup(TreeNode *X) {
-    // tree is empty
+    // tree is empty now (after the recent delete)
     if (!m_count) {
+        X->~TreeNode();
         m_allocator.trim();
         assert(m_allocator.count() == m_count);
         return;
@@ -510,6 +513,7 @@ void CompactingMap<Key, Data, Compare>::fragmentFixup(TreeNode *X) {
 
     // if deleting the last item
     if (last == X) {
+        X->~TreeNode();
         m_allocator.trim();
         assert(m_allocator.count() == m_count);
 
@@ -551,6 +555,7 @@ void CompactingMap<Key, Data, Compare>::fragmentFixup(TreeNode *X) {
         m_root = X;
     }
 
+    last->~TreeNode();
     m_allocator.trim();
     assert(m_allocator.count() == m_count);
 }
