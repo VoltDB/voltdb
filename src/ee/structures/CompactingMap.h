@@ -93,8 +93,8 @@ public:
     public:
         iterator() : m_node(&NIL) {}
         iterator(const iterator &iter) : m_node(iter.m_node) {}
-        Key &key() const { return m_node->key; }
-        Data &value() const { return m_node->value; }
+        Key key() const { return m_node->key; }
+        Data value() const { return m_node->value; }
         void setValue(const Data value) { m_node->value = value; }
         void moveNext() { m_node = successor(m_node); }
         void movePrev() { m_node = predecessor(m_node); }
@@ -269,10 +269,7 @@ typename CompactingMap<Key, Data, Compare>::iterator CompactingMap<Key, Data, Co
 
 template<typename Key, typename Data, typename Compare>
 typename std::pair<typename CompactingMap<Key, Data, Compare>::iterator, typename CompactingMap<Key, Data, Compare>::iterator> CompactingMap<Key, Data, Compare>::equalRange(const Key &key) {
-    TreeNode *low = lookup(key, NULL);
-    if (low == &NIL)
-        return std::pair<iterator, iterator>(iterator(low), iterator(low));
-
+    TreeNode *low = lowerBound(key).m_node;
     TreeNode *high = low;
     while ((high != &NIL) && (!m_comper(key, high->key))) {
         high = successor(high);

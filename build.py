@@ -361,6 +361,11 @@ if whichtests in ("${eetestsuite}", "storage"):
      tabletuple_export_test
      TupleStreamWrapper_test
     """
+    
+if whichtests in ("${eetestsuite}", "structures"):
+    CTX.TESTS['structures'] = """
+     CompactingMapTest
+    """
 
 ###############################################################################
 # BUILD THE MAKEFILE
