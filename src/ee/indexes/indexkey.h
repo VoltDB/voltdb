@@ -308,10 +308,10 @@ private:
 
 /** comparator for Int specialized indexes. */
 template <std::size_t keySize>
-class IntsComparator {
+class IntsLessComparator {
 public:
     TupleSchema *m_keySchema;
-    IntsComparator(TupleSchema *keySchema) : m_keySchema(keySchema) {}
+    IntsLessComparator(TupleSchema *keySchema) : m_keySchema(keySchema) {}
 
     inline bool operator()(const IntsKey<keySize> &lhs, const IntsKey<keySize> &rhs) const {
         // lexographical compare could be faster for fixed N
@@ -328,6 +328,28 @@ public:
             }
         }
         return false;
+    }
+};
+
+/** comparator for Int specialized indexes. */
+template <std::size_t keySize>
+class IntsComparator {
+public:
+    TupleSchema *m_keySchema;
+    IntsComparator(TupleSchema *keySchema) : m_keySchema(keySchema) {}
+
+    inline int operator()(const IntsKey<keySize> &lhs, const IntsKey<keySize> &rhs) const {
+        // lexographical compare could be faster for fixed N
+        /*
+         * Hopefully the compiler can unroll this loop
+         */
+        for (unsigned int ii = 0; ii < keySize; ii++) {
+            const uint64_t *lvalue = &lhs.data[ii];
+            const uint64_t *rvalue = &rhs.data[ii];
+            if (*lvalue < *rvalue)  return -1;
+            else if (*lvalue > *rvalue) return 1;
+        }
+        return 0;
     }
 };
 
@@ -409,10 +431,10 @@ private:
  * Function object returns true if lhs < rhs, used for trees
  */
 template <std::size_t keySize>
-class GenericComparator {
+class GenericLessComparator {
 public:
     /** Type information passed to the constuctor as it's not in the key itself */
-    GenericComparator(TupleSchema *keySchema) : m_schema(keySchema) {}
+    GenericLessComparator(TupleSchema *keySchema) : m_schema(keySchema) {}
 
     inline bool operator()(const GenericKey<keySize> &lhs, const GenericKey<keySize> &rhs) const {
         TableTuple lhTuple(m_schema); lhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&lhs));
@@ -420,6 +442,25 @@ public:
         // lexographical compare could be faster for fixed N
         int diff = lhTuple.compare(rhTuple);
         return diff < 0;
+    }
+
+    TupleSchema *m_schema;
+};
+
+/**
+ * Function object returns true if lhs < rhs, used for trees
+ */
+template <std::size_t keySize>
+class GenericComparator {
+public:
+    /** Type information passed to the constuctor as it's not in the key itself */
+    GenericComparator(TupleSchema *keySchema) : m_schema(keySchema) {}
+
+    inline int operator()(const GenericKey<keySize> &lhs, const GenericKey<keySize> &rhs) const {
+        TableTuple lhTuple(m_schema); lhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&lhs));
+        TableTuple rhTuple(m_schema); rhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&rhs));
+        // lexographical compare could be faster for fixed N
+        return lhTuple.compare(rhTuple);
     }
 
     TupleSchema *m_schema;
@@ -542,9 +583,9 @@ class TupleKey {
     const TupleSchema *m_keyTupleSchema;
 };
 
-class TupleKeyComparator {
+class TupleKeyLessComparator {
   public:
-    TupleKeyComparator(TupleSchema *keySchema) : m_schema(keySchema) {
+    TupleKeyLessComparator(TupleSchema *keySchema) : m_schema(keySchema) {
     }
 
     // return true if lhs < rhs
@@ -553,11 +594,6 @@ class TupleKeyComparator {
         TableTuple rhTuple = rhs.getTupleForComparison();
         NValue lhValue, rhValue;
 
-        //std::cout << std::endl << "TupleKeyComparator: " <<
-        //    std::endl << lhTuple.debugNoHeader() <<
-        //    std::endl << rhTuple.debugNoHeader() <<
-        //    std::endl;
-
         for (int ii=0; ii < m_schema->columnCount(); ++ii) {
             lhValue = lhTuple.getNValue(lhs.columnForIndexColumn(ii));
             rhValue = rhTuple.getNValue(rhs.columnForIndexColumn(ii));
@@ -565,16 +601,39 @@ class TupleKeyComparator {
             int comparison = lhValue.compare(rhValue);
 
             if (comparison == VALUE_COMPARE_LESSTHAN) {
-                // std::cout << " LHS " << lhValue.debug() << " < RHS. " << rhValue.debug() << std::endl;
                 return true;
             }
             else if (comparison == VALUE_COMPARE_GREATERTHAN) {
-                // std::cout << " LHS " << lhValue.debug() << " > RHS. " << rhValue.debug() << std::endl;
                 return false;
             }
         }
-        // std::cout << " LHS == RHS. " << std::endl;
         return false;
+    }
+
+    TupleSchema *m_schema;
+};
+
+class TupleKeyComparator {
+  public:
+    TupleKeyComparator(TupleSchema *keySchema) : m_schema(keySchema) {
+    }
+
+    // return true if lhs < rhs
+    inline int operator()(const TupleKey &lhs, const TupleKey &rhs) const {
+        TableTuple lhTuple = lhs.getTupleForComparison();
+        TableTuple rhTuple = rhs.getTupleForComparison();
+        NValue lhValue, rhValue;
+
+        for (int ii=0; ii < m_schema->columnCount(); ++ii) {
+            lhValue = lhTuple.getNValue(lhs.columnForIndexColumn(ii));
+            rhValue = rhTuple.getNValue(rhs.columnForIndexColumn(ii));
+
+            int comparison = lhValue.compare(rhValue);
+
+            if (comparison == VALUE_COMPARE_LESSTHAN) return -1;
+            else if (comparison == VALUE_COMPARE_GREATERTHAN) return 1;
+        }
+        return 0;
     }
 
     TupleSchema *m_schema;
