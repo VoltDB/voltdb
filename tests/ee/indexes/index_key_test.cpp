@@ -43,7 +43,7 @@ TEST_F(IndexKeyTest, Int64KeyTest) {
     std::vector<bool> columnAllowNull(1, true);
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
 
-    voltdb::IntsComparator<1> comparator(keySchema);
+    voltdb::IntsLessComparator<1> comparator(keySchema);
     voltdb::IntsHasher<1> hasher(keySchema);
     voltdb::IntsEqualityChecker<1> equality(keySchema);
 
@@ -92,7 +92,7 @@ TEST_F(IndexKeyTest, TwoInt64KeyTest) {
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
 
 
-    voltdb::IntsComparator<2> comparator(keySchema);
+    voltdb::IntsLessComparator<2> comparator(keySchema);
     voltdb::IntsHasher<2> hasher(keySchema);
     voltdb::IntsEqualityChecker<2> equality(keySchema);
 
@@ -146,7 +146,7 @@ TEST_F(IndexKeyTest, TwoInt64RegressionKeyTest) {
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
 
 
-    voltdb::IntsComparator<2> comparator(keySchema);
+    voltdb::IntsLessComparator<2> comparator(keySchema);
     voltdb::IntsHasher<2> hasher(keySchema);
     voltdb::IntsEqualityChecker<2> equality(keySchema);
 
@@ -201,7 +201,7 @@ TEST_F(IndexKeyTest, Int32AndTwoInt8KeyTest) {
 
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
 
-    voltdb::IntsComparator<1> comparator(keySchema);
+    voltdb::IntsLessComparator<1> comparator(keySchema);
     voltdb::IntsHasher<1> hasher(keySchema);
     voltdb::IntsEqualityChecker<1> equality(keySchema);
 
@@ -262,7 +262,7 @@ TEST_F(IndexKeyTest, Int32AndTwoInt8KeyTest2) {
 
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
 
-    voltdb::IntsComparator<1> comparator(keySchema);
+    voltdb::IntsLessComparator<1> comparator(keySchema);
     voltdb::IntsHasher<1> hasher(keySchema);
     voltdb::IntsEqualityChecker<1> equality(keySchema);
 
@@ -337,7 +337,7 @@ TEST_F(IndexKeyTest, Int32AndTwoInt8RegressionTest) {
 
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
 
-    voltdb::IntsComparator<1> comparator(keySchema);
+    voltdb::IntsLessComparator<1> comparator(keySchema);
     voltdb::IntsHasher<1> hasher(keySchema);
     voltdb::IntsEqualityChecker<1> equality(keySchema);
 
@@ -378,7 +378,7 @@ TEST_F(IndexKeyTest, SingleVarChar30) {
 
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
 
-    voltdb::GenericComparator<40> comparator(keySchema);
+    voltdb::GenericLessComparator<40> comparator(keySchema);
     voltdb::GenericHasher<40> hasher(keySchema);
     voltdb::GenericEqualityChecker<40> equality(keySchema);
 
@@ -431,7 +431,7 @@ TEST_F(IndexKeyTest, Int64Packing2Int32sWithSecondNull) {
 
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
 
-    voltdb::IntsComparator<1> comparator(keySchema);
+    voltdb::IntsLessComparator<1> comparator(keySchema);
 
     voltdb::TableTuple firstTuple(keySchema);
     firstTuple.move(new char[firstTuple.tupleLength()]);

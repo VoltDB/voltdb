@@ -54,7 +54,8 @@ namespace voltdb {
  * Some or all of these issues may be fixed in the future.
  *
  */
-template<typename Key, typename Data, typename Compare=std::less<Key> >
+
+template<typename Key, typename Data, typename Compare>
 class CompactingMap {
 protected:
     static const char RED = 0;
@@ -158,9 +159,6 @@ protected:
     int fullCount(const TreeNode *n) const;
 };
 
-//template<typename Key, typename Data, typename Compare>
-//typename CompactingMap<Key, Data, Compare>::TreeNode CompactingMap<Key, Data, Compare>::NIL;
-
 template<typename Key, typename Data, typename Compare>
 CompactingMap<Key, Data, Compare>::CompactingMap(bool unique, Compare comper)
     : m_count(0),
@@ -197,10 +195,11 @@ bool CompactingMap<Key, Data, Compare>::insert(std::pair<Key, Data> value) {
         TreeNode *x = m_root;
         while (x != &NIL) {
             y = x;
-            if (m_comper(value.first, x->key)) x = x->left;
+            int cmp = m_comper(value.first, x->key);
+            if (cmp < 0) x = x->left;
             else if (m_unique) {
-                if (m_comper(x->key, value.first)) x = x->right;
-                else return false;
+                if (cmp == 0) return false;
+                else x = x->right;
             }
             else x = x->right;
         }
@@ -218,7 +217,7 @@ bool CompactingMap<Key, Data, Compare>::insert(std::pair<Key, Data> value) {
 
         // stitch it in
         if (y == &NIL) m_root = z;
-        else if (m_comper(z->key, y->key)) y->left = z;
+        else if (m_comper(z->key, y->key) < 0) y->left = z;
         else y->right = z;
 
         // rotate tree to balance if needed
@@ -251,9 +250,7 @@ typename CompactingMap<Key, Data, Compare>::iterator CompactingMap<Key, Data, Co
     if (match != &NIL) return iterator(this, match);
     assert(prev);
     match = prev;
-    //if (m_comper(key, match->key))
-    //    return iterator(this, match);
-    while ((match != &NIL) && m_comper(match->key, key))
+    while ((match != &NIL) && (m_comper(match->key, key) < 0))
         match = successor(match);
     return iterator(this, match);
 }
@@ -267,7 +264,7 @@ typename CompactingMap<Key, Data, Compare>::iterator CompactingMap<Key, Data, Co
         assert(prev);
         match = prev;
     }
-    while ((match != &NIL) && (!m_comper(key, match->key))) {
+    while ((match != &NIL) && (m_comper(key, match->key) >= 0)) {
         match = successor(match);
     }
     return iterator(this, match);
@@ -277,7 +274,7 @@ template<typename Key, typename Data, typename Compare>
 typename std::pair<typename CompactingMap<Key, Data, Compare>::iterator, typename CompactingMap<Key, Data, Compare>::iterator> CompactingMap<Key, Data, Compare>::equalRange(const Key &key) {
     TreeNode *low = lowerBound(key).m_node;
     TreeNode *high = low;
-    while ((high != &NIL) && (!m_comper(key, high->key))) {
+    while ((high != &NIL) && (m_comper(key, high->key) >= 0)) {
         high = successor(high);
     }
     return std::pair<iterator, iterator>(iterator(this, low), iterator(this, high));
@@ -334,19 +331,18 @@ typename CompactingMap<Key, Data, Compare>::TreeNode *CompactingMap<Key, Data, C
     if (prev) *prev = &NIL;
     for (TreeNode *x = m_root; x != &NIL;) {
         if (prev) *prev = x;
-        if (m_comper(x->key, key)) x = x->right;
-        else if (m_comper(key, x->key)) x = x->left;
+        int cmp = m_comper(x->key, key);
+        if (cmp < 0) x = x->right;
+        else if (cmp > 0) x = x->left;
         else if (m_unique) return x;
         else {
             bool cont = true;
             while (cont) {
                 TreeNode *pred = predecessor(x);
                 if (pred == &NIL) cont = false;
-                else if (m_comper(pred->key, x->key)) cont = false;
-                else if (m_comper(x->key, pred->key)) cont = false;
                 else {
-                    x = pred;
-                    pred = predecessor(pred);
+                    if (m_comper(pred->key, key) != 0) cont = false;
+                    else x = pred;
                 }
             }
             return x;
@@ -653,8 +649,8 @@ int CompactingMap<Key, Data, Compare>::verify(const TreeNode *n) const {
     }
 
     // check for strict ordering
-    if ((n->left != &NIL) && (m_comper(n->key, n->left->key))) return -1;
-    if ((n->right != &NIL) && (m_comper(n->right->key, n->key))) return -1;
+    if ((n->left != &NIL) && (m_comper(n->key, n->left->key) < 0)) return -1;
+    if ((n->right != &NIL) && (m_comper(n->right->key, n->key) < 0)) return -1;
 
     // recursive step (compare black height)
     int leftBH = verify(n->left);

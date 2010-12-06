@@ -400,7 +400,7 @@ TEST_F(IndexTest, ArrayUnique) {
     iu_column_indices.push_back(0);
     iu_column_types.push_back(VALUE_TYPE_BIGINT);
     init(TableIndexScheme("iu2",
-                          BALANCED_TREE_INDEX,
+                          ARRAY_INDEX,
                           iu_column_indices,
                           iu_column_types,
                           true, true, NULL));
