@@ -64,8 +64,10 @@ public class DeletesClient
     static Random m_rand = new Random(System.currentTimeMillis());
     static long m_batchNumber = 1000;
     static int m_totalRows;
-    static long m_highMem = 0;
-    static long m_highMemTime = 0;
+    static long m_highAllocMem = 0;
+    static long m_highAllocMemTime = 0;
+    static long m_highUsedMem = 0;
+    static long m_highUsedMemTime = 0;
     static long m_highRss = 0;
     static long m_highRssTime = 0;
     static long m_totalInserts = 0;
@@ -238,22 +240,34 @@ public class DeletesClient
             m_highRss = rss;
             m_highRssTime = System.currentTimeMillis();
         }
-        long total_mem = 0;
-        total_mem += memory_stats.fetchRow(0).getLong("JAVAUSED");
-        total_mem += memory_stats.fetchRow(0).getLong("TUPLEALLOCATED");
-        total_mem += memory_stats.fetchRow(0).getLong("INDEXMEMORY");
-        total_mem += memory_stats.fetchRow(0).getLong("STRINGMEMORY");
-        if (total_mem > m_highMem)
+        long alloc_mem = 0;
+        long used_mem = 0;
+        alloc_mem += memory_stats.fetchRow(0).getLong("JAVAUSED");
+        alloc_mem += memory_stats.fetchRow(0).getLong("TUPLEALLOCATED");
+        alloc_mem += memory_stats.fetchRow(0).getLong("INDEXMEMORY");
+        alloc_mem += memory_stats.fetchRow(0).getLong("POOLEDMEMORY");
+        used_mem += memory_stats.fetchRow(0).getLong("JAVAUSED");
+        used_mem += memory_stats.fetchRow(0).getLong("TUPLEDATA");
+        used_mem += memory_stats.fetchRow(0).getLong("INDEXMEMORY");
+        used_mem += memory_stats.fetchRow(0).getLong("STRINGMEMORY");
+        if (alloc_mem > m_highAllocMem)
         {
-            m_highMem = total_mem;
-            m_highMemTime = System.currentTimeMillis();
+            m_highAllocMem = alloc_mem;
+            m_highAllocMemTime = System.currentTimeMillis();
         }
-        System.out.println("TOTAL ALLOCATED MEMORY: " + total_mem * 1000);
-        System.out.println("TOTAL RSS: " + rss * 1000);
-        Date blah = new Date(m_highMemTime);
-        System.out.println("LARGEST MEMORY EATEN: " + m_highMem * 1000 + " at " + blah.toString());
+        if (used_mem > m_highUsedMem)
+        {
+            m_highUsedMem = used_mem;
+            m_highUsedMemTime = System.currentTimeMillis();
+        }
+        System.out.println("CURRENT MEMORY TOTALS (USED, ALLOCATED, RSS):");
+        System.out.println("CURRENT," + used_mem * 1000 + "," + alloc_mem * 1000 + "," + rss * 1000);
+        Date blah = new Date(m_highUsedMemTime);
+        System.out.println("LARGEST MEMORY USED: " + m_highUsedMem * 1000 + " at " + blah.toString());
+        blah = new Date(m_highAllocMemTime);
+        System.out.println("LARGEST MEMORY ALLOCATED: " + m_highAllocMem * 1000 + " at " + blah.toString());
         blah = new Date(m_highRssTime);
-        System.out.println("LARGEST RSS EATEN: " + m_highRss * 1000 + " at " + blah.toString());
+        System.out.println("LARGEST RSS: " + m_highRss * 1000 + " at " + blah.toString());
     }
 
     static void collectStats(Client client)
