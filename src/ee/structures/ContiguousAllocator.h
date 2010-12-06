@@ -41,6 +41,7 @@ class ContiguousAllocator {
     int32_t m_allocSize;
     int32_t m_chunkSize;
     Buffer *m_tail;
+    int32_t m_blockCount;
 
 public:
     /**
@@ -59,7 +60,7 @@ public:
 };
 
 ContiguousAllocator::ContiguousAllocator(int32_t allocSize, int32_t chunkSize)
-: m_count(0), m_allocSize(allocSize), m_chunkSize(chunkSize), m_tail(NULL) {}
+: m_count(0), m_allocSize(allocSize), m_chunkSize(chunkSize), m_tail(NULL), m_blockCount(0) {}
 
 ContiguousAllocator::~ContiguousAllocator() {
     while (m_tail) {
@@ -86,6 +87,7 @@ void *ContiguousAllocator::alloc() {
 
         buf->prev = m_tail;
         m_tail = buf;
+        m_blockCount++;
     }
 
     // get a pointer to where the new alloc will live
@@ -120,14 +122,12 @@ void ContiguousAllocator::trim() {
         Buffer *buf = m_tail->prev;
         free(m_tail);
         m_tail = buf;
+        m_blockCount--;
     }
 }
 
 size_t ContiguousAllocator::bytesAllocated() const {
-    int64_t blockOffset = (m_count) % m_chunkSize;
-    int64_t blockCount = m_count / m_allocSize;
-    if (blockOffset != 0) blockCount++;
-    size_t total = static_cast<size_t>(blockCount * m_allocSize * m_chunkSize);
+    size_t total = static_cast<size_t>(m_blockCount * m_allocSize * m_chunkSize);
     return total;
 }
 
