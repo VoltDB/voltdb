@@ -15,7 +15,7 @@ CREATE TABLE big_table (
     company VARCHAR(60),
     co_addr VARCHAR(60),
     deceased TINYINT DEFAULT 0,
-    PRIMARY KEY (fullname, sig, addr3, addr2)
+    CONSTRAINT NO_PK_TREE PRIMARY KEY (fullname, sig, addr3, addr2)
 );
 
 CREATE INDEX treeBigTableFullnameCompany ON big_table (fullname, sig, addr3, company, ts);
