@@ -23,6 +23,7 @@
 
 #include <iostream>
 #include <map>
+#include <algorithm>
 #include <cstdlib>
 #include <sys/time.h>
 #include "harness.h"
@@ -104,8 +105,8 @@ public:
 
         ASSERT_TRUE(stlv.size() > 0);
         ASSERT_TRUE(stlv.size() == voltv.size());
-        if (chainCounter && stlv.size() > *chainCounter) {
-            *chainCounter = stlv.size();
+        if (chainCounter && ((int)stlv.size() > (int)*chainCounter)) {
+            *chainCounter = (int)stlv.size();
         }
         std::sort(stlv.begin(), stlv.end());
         std::sort(voltv.begin(), voltv.end());
@@ -158,7 +159,7 @@ TEST_F(CompactingMapTest, Benchmark) {
     gettimeofday(&tp, NULL);
     printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
     int64_t t2 = tp.tv_sec * 1000 + tp.tv_usec / 1000;
-    printf("Time elapsed: %.2f\n", (t2 - t1) / (double) 1000);
+    printf("Time elapsed: %.2f\n", (t2 - t1) / static_cast<double>(1000));
     fflush(stdout);
 
     voltdb::CompactingMap<std::string, std::string>::iterator iter;
@@ -192,7 +193,7 @@ TEST_F(CompactingMapTest, Benchmark) {
     gettimeofday(&tp, NULL);
     printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
     int64_t t3 = tp.tv_sec * 1000 + tp.tv_usec / 1000;
-    printf("Time elapsed: %.2f\n", (t3 - t2) / (double) 1000);
+    printf("Time elapsed: %.2f\n", (t3 - t2) / static_cast<double>(1000));
     fflush(stdout);
 
     for (iter_stl = stl.begin(); iter_stl != stl.end(); iter_stl++) {
@@ -431,7 +432,7 @@ TEST_F(CompactingMapTest, RandomMulti) {
             countSizes++;
             ASSERT_TRUE(stl.size() == volt.size());
             if (stl.size() > size_greatest) {
-                size_greatest = stl.size();
+                size_greatest = (int)stl.size();
             }
         }
         //
