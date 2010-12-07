@@ -53,6 +53,8 @@
 #include "indexes/arrayuniqueindex.h"
 #include "indexes/CompactingTreeUniqueIndex.h"
 #include "indexes/CompactingTreeMultiMapIndex.h"
+#include "indexes/HashTableUniqueIndex.h"
+#include "indexes/HashTableMultiMapIndex.h"
 
 namespace voltdb {
 
@@ -85,14 +87,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
     if ((ints_only) && (unique) && (type == ARRAY_INDEX)) {
         return new ArrayUniqueIndex(schemeCopy);
     }
-
-    if ((ints_only) && (unique)) {
-        if (type == HASH_TABLE_INDEX) {
-            VOLT_INFO("Producing a tree index for %s: "
-                      "hash index not currently supported for this index key.\n",
-                      scheme.name.c_str());
-        }
-
+    if ((ints_only) && (type == BALANCED_TREE_INDEX) && (unique)) {
         if (keySize <= sizeof(uint64_t)) {
             return new CompactingTreeUniqueIndex<IntsKey<1>, IntsComparator<1>, IntsEqualityChecker<1> >(schemeCopy);
         } else if (keySize <= sizeof(int64_t) * 2) {
@@ -106,13 +101,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
         }
     }
 
-    if ((ints_only) && (!unique)) {
-        if (type == HASH_TABLE_INDEX) {
-            VOLT_INFO("Producing a tree index for %s: "
-                      "hash index not currently supported for this index key.\n",
-                      scheme.name.c_str());
-        }
-
+    if ((ints_only) && (type == BALANCED_TREE_INDEX) && (!unique)) {
         if (keySize <= sizeof(uint64_t)) {
             return new CompactingTreeMultiMapIndex<IntsKey<1>, IntsComparator<1>, IntsEqualityChecker<1> >(schemeCopy);
         } else if (keySize <= sizeof(int64_t) * 2) {
@@ -126,7 +115,35 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
         }
     }
 
-    if (unique) {
+    if ((ints_only) && (type == HASH_TABLE_INDEX) && (unique)) {
+        if (keySize <= sizeof(uint64_t)) {
+            return new HashTableUniqueIndex<IntsKey<1>, IntsHasher<1>, IntsEqualityChecker<1> >(schemeCopy);
+        } else if (keySize <= sizeof(int64_t) * 2) {
+            return new HashTableUniqueIndex<IntsKey<2>, IntsHasher<2>, IntsEqualityChecker<2> >(schemeCopy);
+        } else if (keySize <= sizeof(int64_t) * 3) {
+            return new HashTableUniqueIndex<IntsKey<3>, IntsHasher<3>, IntsEqualityChecker<3> >(schemeCopy);
+        } else if (keySize <= sizeof(int64_t) * 4) {
+            return new HashTableUniqueIndex<IntsKey<4>, IntsHasher<4>, IntsEqualityChecker<4> >(schemeCopy);
+        } else {
+            throwFatalException( "We currently only support hash index on unique integer keys of size 32 bytes or smaller..." );
+        }
+    }
+
+    if ((ints_only) && (type == HASH_TABLE_INDEX) && (!unique)) {
+        if (keySize <= sizeof(uint64_t)) {
+            return new HashTableMultiMapIndex<IntsKey<1>, IntsHasher<1>, IntsEqualityChecker<1> >(schemeCopy);
+        } else if (keySize <= sizeof(int64_t) * 2) {
+            return new HashTableMultiMapIndex<IntsKey<2>, IntsHasher<2>, IntsEqualityChecker<2> >(schemeCopy);
+        } else if (keySize <= sizeof(int64_t) * 3) {
+            return new HashTableMultiMapIndex<IntsKey<3>, IntsHasher<3>, IntsEqualityChecker<3> >(schemeCopy);
+        } else if (keySize <= sizeof(int64_t) * 4) {
+            return new HashTableMultiMapIndex<IntsKey<4>, IntsHasher<4>, IntsEqualityChecker<4> >(schemeCopy);
+        } else {
+            throwFatalException( "We currently only support hash index on non-unique integer keys of size 32 bytes of smaller..." );
+        }
+    }
+
+    if (/*(type == BALANCED_TREE_INDEX) &&*/ (unique)) {
         if (type == HASH_TABLE_INDEX) {
             VOLT_INFO("Producing a tree index for %s: "
                       "hash index not currently supported for this index key.\n",
@@ -160,7 +177,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
         }
     }
 
-    if (!unique) {
+    if (/*(type == BALANCED_TREE_INDEX) &&*/ (!unique)) {
         if (type == HASH_TABLE_INDEX) {
             VOLT_INFO("Producing a tree index for %s: "
                       "hash index not currently supported for this index key.\n",
@@ -193,6 +210,30 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
             return new CompactingTreeMultiMapIndex<TupleKey, TupleKeyComparator, TupleKeyEqualityChecker>(schemeCopy);
         }
     }
+
+    /*if ((type == HASH_TABLE_INDEX) && (unique)) {
+        switch (colCount) {
+            case 1: return new HashTableUniqueIndex<GenericKey<1>, GenericHasher<1>, GenericEqualityChecker<1> >(schemeCopy);
+            case 2: return new HashTableUniqueIndex<GenericKey<2>, GenericHasher<2>, GenericEqualityChecker<2> >(schemeCopy);
+            case 3: return new HashTableUniqueIndex<GenericKey<3>, GenericHasher<3>, GenericEqualityChecker<3> >(schemeCopy);
+            case 4: return new HashTableUniqueIndex<GenericKey<4>, GenericHasher<4>, GenericEqualityChecker<4> >(schemeCopy);
+            case 5: return new HashTableUniqueIndex<GenericKey<5>, GenericHasher<5>, GenericEqualityChecker<5> >(schemeCopy);
+            case 6: return new HashTableUniqueIndex<GenericKey<6>, GenericHasher<6>, GenericEqualityChecker<6> >(schemeCopy);
+            default: throwFatalException( "We currently only support up to 6 column generic hash indexes..." );
+        }
+    }
+
+    if ((type == HASH_TABLE_INDEX) && (!unique)) {
+        switch (colCount) {
+            case 1: return new HashTableMultiMapIndex<GenericKey<1>, GenericHasher<1>, GenericEqualityChecker<1> >(schemeCopy);
+            case 2: return new HashTableMultiMapIndex<GenericKey<2>, GenericHasher<2>, GenericEqualityChecker<2> >(schemeCopy);
+            case 3: return new HashTableMultiMapIndex<GenericKey<3>, GenericHasher<3>, GenericEqualityChecker<3> >(schemeCopy);
+            case 4: return new HashTableMultiMapIndex<GenericKey<4>, GenericHasher<4>, GenericEqualityChecker<4> >(schemeCopy);
+            case 5: return new HashTableMultiMapIndex<GenericKey<5>, GenericHasher<5>, GenericEqualityChecker<5> >(schemeCopy);
+            case 6: return new HashTableMultiMapIndex<GenericKey<6>, GenericHasher<6>, GenericEqualityChecker<6> >(schemeCopy);
+            default: throwFatalException( "We currently only support up to 6 column generic hash indexes..." );
+        }
+    }*/
 
     throwFatalException("Unsupported index scheme..." );
     return NULL;
