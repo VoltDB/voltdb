@@ -430,7 +430,7 @@ TEST_F(CompactingMapTest, BenchmarkMulti) {
     gettimeofday(&tp, NULL);
     printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
     int64_t t2 = tp.tv_sec * 1000 + tp.tv_usec / 1000;
-    printf("Time elapsed: %.2f\n", (t2 - t1) / static_cast<double>(1000));
+    printf("Time elapsed: %.2f\n", static_cast<double>(t2 - t1) / static_cast<double>(1000));
     fflush(stdout);
 
     printf("Range From VoltDB Map\n");
@@ -443,7 +443,7 @@ TEST_F(CompactingMapTest, BenchmarkMulti) {
     gettimeofday(&tp, NULL);
     printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
     int64_t t3 = tp.tv_sec * 1000 + tp.tv_usec / 1000;
-    printf("Time elapsed: %.2f\n", (t3 - t2) / static_cast<double>(1000));
+    printf("Time elapsed: %.2f\n", static_cast<double>(t3 - t2) / static_cast<double>(1000));
     fflush(stdout);
 
     printf("Done!\n");
