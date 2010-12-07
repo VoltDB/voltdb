@@ -210,8 +210,9 @@ public class StatsAgent {
         SystemStatsCollector.Datum d = SystemStatsCollector.getRecentSample();
         if (d != null) {
             rss = (int) (d.rss / 1024);
-            javaused = (int) ((d.javausedheapmem + d.javausedsysmem) / 1204);
-            javaunused = (int) ((d.javatotalheapmem + d.javatotalsysmem - javaused) / 1024);
+            double javausedFloat = d.javausedheapmem + d.javausedsysmem;
+            javaused = (int) (javausedFloat / 1024);
+            javaunused = (int) ((d.javatotalheapmem + d.javatotalsysmem - javausedFloat) / 1024);
         }
 
         // create the row and return it
