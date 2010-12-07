@@ -146,7 +146,7 @@ public:
 };
 
 TEST_F(CompactingMapTest, Benchmark) {
-    const int ITERATIONS = 100000;
+    const int ITERATIONS = 1000;
 
     std::map<std::string,std::string> stl;
     voltdb::CompactingMap<std::string, std::string, StringComparator> volt(true, StringComparator());
@@ -227,34 +227,34 @@ TEST_F(CompactingMapTest, Benchmark) {
 }
 
 TEST_F(CompactingMapTest, BenchmarkDel) {
-    const int ITERATIONS = 2000000;
+    const int ITERATIONS = 1000;
 
     std::map<std::string,std::string> stl;
     voltdb::CompactingMap<std::string, std::string, StringComparator> volt(false, StringComparator());
 
     std::map<std::string,std::string>::const_iterator iter_stl;
 
-    /*printf("Inserting into the STL Map\n");
+    printf("Inserting into the STL Map\n");
 
-    for (int i = 0; i < ITERATIONS; i++) {
-        std::string val = keyFromInt(i);
-        stl.insert(std::pair<std::string,std::string>(val,val));
-    }
+     for (int i = 0; i < ITERATIONS; i++) {
+     std::string val = keyFromInt(i);
+     stl.insert(std::pair<std::string,std::string>(val,val));
+     }
 
-    for (int i = 0; i < ITERATIONS; i += 2) {
-        std::string val = keyFromInt(i);
-        stl.insert(std::pair<std::string,std::string>(val,val));
-    }
+     for (int i = 0; i < ITERATIONS; i += 2) {
+     std::string val = keyFromInt(i);
+     stl.insert(std::pair<std::string,std::string>(val,val));
+     }
 
-    for (int i = 0; i < ITERATIONS; i += 4) {
-        std::string val = keyFromInt(i);
-        stl.insert(std::pair<std::string,std::string>(val,val));
-    }
+     for (int i = 0; i < ITERATIONS; i += 4) {
+     std::string val = keyFromInt(i);
+     stl.insert(std::pair<std::string,std::string>(val,val));
+     }
 
-    for (int i = 0; i < ITERATIONS; i += 8) {
-        std::string val = keyFromInt(i);
-        stl.insert(std::pair<std::string,std::string>(val,val));
-    }*/
+     for (int i = 0; i < ITERATIONS; i += 8) {
+     std::string val = keyFromInt(i);
+     stl.insert(std::pair<std::string,std::string>(val,val));
+     }
 
     voltdb::CompactingMap<std::string, std::string, StringComparator>::iterator iter;
 
@@ -288,13 +288,13 @@ TEST_F(CompactingMapTest, BenchmarkDel) {
 
     printf("Range From STL Map\n");
 
-    /*for (int i = 0; i < ITERATIONS; i += 2) {
-        stl.erase(keyFromInt(i));
-    }*/
+    //for (int i = 0; i < ITERATIONS; i += 2) {
+    //  stl.erase(keyFromInt(i));
+    //}
 
-    /*for (int i = 0; i < ITERATIONS; i += 1) {
-        stl.equal_range(keyFromInt(i));
-    }*/
+    //for (int i = 0; i < ITERATIONS; i += 1) {
+    //  stl.equal_range(keyFromInt(i));
+    //}
 
     gettimeofday(&tp, NULL);
     printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
@@ -304,9 +304,9 @@ TEST_F(CompactingMapTest, BenchmarkDel) {
 
     printf("Range From VoltDB Map\n");
 
-    /*for (int i = 0; i < ITERATIONS; i += 2) {
-        volt.erase(keyFromInt(i));
-    }*/
+    //for (int i = 0; i < ITERATIONS; i += 2) {
+    //  volt.erase(keyFromInt(i));
+    //}
 
     for (int i = 0; i < ITERATIONS; i += 1) {
         volt.equalRange(keyFromInt(i));
@@ -315,6 +315,134 @@ TEST_F(CompactingMapTest, BenchmarkDel) {
     gettimeofday(&tp, NULL);
     printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
     double t3 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
+    printf("Time elapsed: %.2f\n", (t3 - t2) / static_cast<double>(1000));
+    fflush(stdout);
+
+    printf("Done!\n");
+}
+
+TEST_F(CompactingMapTest, Bounds) {
+    voltdb::CompactingMap<int, int, IntComparator> volt(true, IntComparator());
+
+    ASSERT_TRUE(volt.lowerBound(1).isEnd());
+    ASSERT_TRUE(volt.upperBound(1).isEnd());
+
+    volt.insert(std::pair<int,int>(1,1));
+
+    ASSERT_TRUE(volt.lowerBound(0).key() == 1);
+    ASSERT_TRUE(volt.lowerBound(1).key() == 1);
+    ASSERT_TRUE(volt.lowerBound(2).isEnd());
+
+    ASSERT_TRUE(volt.upperBound(0).key() == 1);
+    ASSERT_TRUE(volt.upperBound(1).isEnd());
+    ASSERT_TRUE(volt.upperBound(2).isEnd());
+
+    for (int i = 3; i <= 99; i += 2)
+        volt.insert(std::pair<int,int>(i,i));
+
+    ASSERT_TRUE(volt.lowerBound(99).key() == 99);
+    ASSERT_TRUE(volt.upperBound(99).isEnd());
+    ASSERT_TRUE(volt.lowerBound(100).isEnd());
+    ASSERT_TRUE(volt.upperBound(100).isEnd());
+
+    for (int i = 0; i <= 98; i += 2) {
+        ASSERT_TRUE(volt.upperBound(i).key() == i + 1);
+        ASSERT_TRUE(volt.lowerBound(i).key() == i + 1);
+    }
+    for (int i = 1; i <= 98; i += 2) {
+        ASSERT_TRUE(volt.upperBound(i).key() == i + 2);
+        ASSERT_TRUE(volt.lowerBound(i).key() == i);
+    }
+
+    // test range
+    voltdb::CompactingMap<int, int, IntComparator> volt2(false, IntComparator());
+
+    volt2.insert(std::pair<int,int>(0,0));
+    volt2.insert(std::pair<int,int>(1,666));
+    volt2.insert(std::pair<int,int>(1,1));
+    volt2.insert(std::pair<int,int>(1,777));
+    volt2.insert(std::pair<int,int>(2,2));
+    volt2.insert(std::pair<int,int>(3,888));
+    volt2.insert(std::pair<int,int>(3,3));
+    volt2.insert(std::pair<int,int>(3,3));
+    volt2.insert(std::pair<int,int>(3,999));
+
+    std::pair<voltdb::CompactingMap<int, int, IntComparator>::iterator, voltdb::CompactingMap<int, int, IntComparator>::iterator> p;
+
+    p = volt2.equalRange(1);
+    ASSERT_TRUE(p.first.value() == 666);
+    ASSERT_TRUE(p.second.value() == 2);
+
+    p = volt2.equalRange(3);
+    ASSERT_TRUE(p.first.value() == 888);
+    ASSERT_TRUE(p.second.isEnd());
+
+    p = volt2.equalRange(2);
+    ASSERT_TRUE(p.first.value() == 2);
+    ASSERT_TRUE(p.second.value() == 888);
+}
+
+TEST_F(CompactingMapTest, BenchmarkMulti) {
+    const int ITERATIONS = 2000;
+    const int BATCH_SIZE = 50;
+    const int BATCH_COUNT = 10;
+
+    std::map<std::string, int> stl;
+    voltdb::CompactingMap<std::string, int, StringComparator> volt(false, StringComparator());
+
+    std::map<std::string,std::string>::const_iterator iter_stl;
+
+    printf("Inserting into the STL Map\n");
+
+    for (int i = 0; i < BATCH_COUNT; i++) {
+        for (int j = 0; j < BATCH_SIZE; j++) {
+            std::string val = keyFromInt(i);
+            stl.insert(std::pair<std::string,int>(val,j));
+        }
+    }
+
+    voltdb::CompactingMap<std::string, std::string, StringComparator>::iterator iter;
+
+    printf("Inserting into the VoltDB Map\n");
+
+    for (int i = 0; i < BATCH_COUNT; i++) {
+        for (int j = 0; j < BATCH_SIZE; j++) {
+            std::string val = keyFromInt(i);
+            volt.insert(std::pair<std::string,int>(val,j));
+        }
+    }
+
+    assert(volt.verify());
+
+    timeval tp;
+    gettimeofday(&tp, NULL);
+    printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
+    int64_t t1 = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+    fflush(stdout);
+
+    printf("Range From STL Map\n");
+
+    for (int i = 0; i < ITERATIONS; i += 2) {
+        int k = rand() % BATCH_COUNT;
+        stl.equal_range(keyFromInt(k));
+    }
+
+    gettimeofday(&tp, NULL);
+    printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
+    int64_t t2 = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+    printf("Time elapsed: %.2f\n", (t2 - t1) / static_cast<double>(1000));
+    fflush(stdout);
+
+    printf("Range From VoltDB Map\n");
+
+    for (int i = 0; i < ITERATIONS; i += 2) {
+        int k = rand() % BATCH_COUNT;
+        volt.equalRange(keyFromInt(k));
+    }
+
+    gettimeofday(&tp, NULL);
+    printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
+    int64_t t3 = tp.tv_sec * 1000 + tp.tv_usec / 1000;
     printf("Time elapsed: %.2f\n", (t3 - t2) / static_cast<double>(1000));
     fflush(stdout);
 
@@ -352,7 +480,7 @@ TEST_F(CompactingMapTest, Trivial) {
 }
 
 TEST_F(CompactingMapTest, RandomUnique) {
-    const int ITERATIONS = 10000;
+    const int ITERATIONS = 1000;
     const int BIGGEST_VAL = 100;
 
     const int INSERT = 0;
@@ -416,8 +544,8 @@ TEST_F(CompactingMapTest, RandomUnique) {
 }
 
 TEST_F(CompactingMapTest, RandomMulti) {
-    const int ITERATIONS  = 100000;
-    const int BIGGEST_VAL = 1000;
+    const int ITERATIONS  = 1000;
+    const int BIGGEST_VAL = 100;
 
     const int INSERT = 0;   int countInserts = 0;
     const int ERASE = 1;    int countErases = 0;
@@ -625,67 +753,6 @@ TEST_F(CompactingMapTest, RandomMulti) {
     std::cout << "LowerBounds: " << lowerBounds << " lb greatest chain: " << lb_greatestChain << std::endl;
     std::cout << "UpperBounds: " << upperBounds << " ub greatest chain: " << ub_greatestChain << std::endl;
     std::cout << "EqualRange: " << equalRanges << std::endl;
-}
-
-TEST_F(CompactingMapTest, Bounds) {
-    voltdb::CompactingMap<int, int, IntComparator> volt(true, IntComparator());
-
-    ASSERT_TRUE(volt.lowerBound(1).isEnd());
-    ASSERT_TRUE(volt.upperBound(1).isEnd());
-
-    volt.insert(std::pair<int,int>(1,1));
-
-    ASSERT_TRUE(volt.lowerBound(0).key() == 1);
-    ASSERT_TRUE(volt.lowerBound(1).key() == 1);
-    ASSERT_TRUE(volt.lowerBound(2).isEnd());
-
-    ASSERT_TRUE(volt.upperBound(0).key() == 1);
-    ASSERT_TRUE(volt.upperBound(1).isEnd());
-    ASSERT_TRUE(volt.upperBound(2).isEnd());
-
-    for (int i = 3; i <= 99; i += 2)
-        volt.insert(std::pair<int,int>(i,i));
-
-    ASSERT_TRUE(volt.lowerBound(99).key() == 99);
-    ASSERT_TRUE(volt.upperBound(99).isEnd());
-    ASSERT_TRUE(volt.lowerBound(100).isEnd());
-    ASSERT_TRUE(volt.upperBound(100).isEnd());
-
-    for (int i = 0; i <= 98; i += 2) {
-        ASSERT_TRUE(volt.upperBound(i).key() == i + 1);
-        ASSERT_TRUE(volt.lowerBound(i).key() == i + 1);
-    }
-    for (int i = 1; i <= 98; i += 2) {
-        ASSERT_TRUE(volt.upperBound(i).key() == i + 2);
-        ASSERT_TRUE(volt.lowerBound(i).key() == i);
-    }
-
-    // test range
-    voltdb::CompactingMap<int, int, IntComparator> volt2(false, IntComparator());
-
-    volt2.insert(std::pair<int,int>(0,0));
-    volt2.insert(std::pair<int,int>(1,666));
-    volt2.insert(std::pair<int,int>(1,1));
-    volt2.insert(std::pair<int,int>(1,777));
-    volt2.insert(std::pair<int,int>(2,2));
-    volt2.insert(std::pair<int,int>(3,888));
-    volt2.insert(std::pair<int,int>(3,3));
-    volt2.insert(std::pair<int,int>(3,3));
-    volt2.insert(std::pair<int,int>(3,999));
-
-    std::pair<voltdb::CompactingMap<int, int, IntComparator>::iterator, voltdb::CompactingMap<int, int, IntComparator>::iterator> p;
-
-    p = volt2.equalRange(1);
-    ASSERT_TRUE(p.first.value() == 666);
-    ASSERT_TRUE(p.second.value() == 2);
-
-    p = volt2.equalRange(3);
-    ASSERT_TRUE(p.first.value() == 888);
-    ASSERT_TRUE(p.second.isEnd());
-
-    p = volt2.equalRange(2);
-    ASSERT_TRUE(p.first.value() == 2);
-    ASSERT_TRUE(p.second.value() == 888);
 }
 
 int main() {
