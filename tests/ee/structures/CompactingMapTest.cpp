@@ -154,7 +154,7 @@ TEST_F(CompactingMapTest, Benchmark) {
     timeval tp;
     gettimeofday(&tp, NULL);
     printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
-    int64_t t1 = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+    double t1 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
     fflush(stdout);
 
     std::map<std::string,std::string>::const_iterator iter_stl;
@@ -180,7 +180,7 @@ TEST_F(CompactingMapTest, Benchmark) {
 
     gettimeofday(&tp, NULL);
     printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
-    int64_t t2 = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+    double t2 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
     printf("Time elapsed: %.2f\n", (t2 - t1) / static_cast<double>(1000));
     fflush(stdout);
 
@@ -214,7 +214,7 @@ TEST_F(CompactingMapTest, Benchmark) {
 
     gettimeofday(&tp, NULL);
     printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
-    int64_t t3 = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+    double t3 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
     printf("Time elapsed: %.2f\n", (t3 - t2) / static_cast<double>(1000));
     fflush(stdout);
 
@@ -283,7 +283,7 @@ TEST_F(CompactingMapTest, BenchmarkDel) {
     timeval tp;
     gettimeofday(&tp, NULL);
     printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
-    int64_t t1 = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+    double t1 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
     fflush(stdout);
 
     printf("Range From STL Map\n");
@@ -298,7 +298,7 @@ TEST_F(CompactingMapTest, BenchmarkDel) {
 
     gettimeofday(&tp, NULL);
     printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
-    int64_t t2 = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+    double t2 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
     printf("Time elapsed: %.2f\n", (t2 - t1) / static_cast<double>(1000));
     fflush(stdout);
 
@@ -314,7 +314,7 @@ TEST_F(CompactingMapTest, BenchmarkDel) {
 
     gettimeofday(&tp, NULL);
     printf("Time: %ld, %ld\n", (long int)tp.tv_sec, (long int)tp.tv_usec);
-    int64_t t3 = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+    double t3 = static_cast<double>(tp.tv_sec * 1000 + tp.tv_usec / 1000);
     printf("Time elapsed: %.2f\n", (t3 - t2) / static_cast<double>(1000));
     fflush(stdout);
 
