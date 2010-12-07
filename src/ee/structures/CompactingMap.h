@@ -108,6 +108,7 @@ public:
     };
 
     CompactingMap(bool unique, Compare comper);
+    ~CompactingMap();
 
     bool insert(std::pair<Key, Data> value);
     bool erase(const Key &key);
@@ -169,6 +170,16 @@ CompactingMap<Key, Data, Compare>::CompactingMap(bool unique, Compare comper)
 {
     NIL.left = NIL.right = NIL.parent = &NIL;
     NIL.color = BLACK;
+}
+
+template<typename Key, typename Data, typename Compare>
+CompactingMap<Key, Data, Compare>::~CompactingMap() {
+    iterator iter = begin();
+    while (!iter.isEnd()) {
+        iter.key().~Key();
+        iter.value().~Data();
+        iter.moveNext();
+    }
 }
 
 template<typename Key, typename Data, typename Compare>
