@@ -162,9 +162,9 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public int toggleProfiler(final int toggle) {
+    public void toggleProfiler(final int toggle) {
         // TODO Auto-generated method stub
-        return 0;
+        return;
     }
 
     @Override

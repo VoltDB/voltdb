@@ -280,13 +280,22 @@ public:
 
 TEST_F(CompactionTest, BasicCompaction) {
     initTable(true);
-    addRandomUniqueTuples( m_table, 645260);
+#ifdef MEMCHECK
+    int tupleCount = 1000;
+#else
+    int tupleCount = 645260;
+#endif
+    addRandomUniqueTuples( m_table, tupleCount);
 
+#ifdef MEMCHECK
+    ASSERT_EQ( tupleCount, m_table->m_data.size());
+#else
     ASSERT_EQ(20, m_table->m_data.size());
+#endif
 
     stx::btree_set<int32_t> pkeysNotDeleted;
     std::vector<int32_t> pkeysToDelete;
-    for (int ii = 0; ii < 645260; ii ++) {
+    for (int ii = 0; ii < tupleCount; ii ++) {
         if (ii % 2 == 0) {
             pkeysToDelete.push_back(ii);
         } else {
@@ -338,7 +347,11 @@ TEST_F(CompactionTest, BasicCompaction) {
     ASSERT_EQ(pkeysFoundAfterDelete.size(), pkeysNotDeleted.size());
     ASSERT_TRUE(pkeysFoundAfterDelete == pkeysNotDeleted);
 //    std::cout << "Have " << m_table->m_data.size() << " blocks left " << m_table->allocatedTupleCount() << ", " << m_table->activeTupleCount() << std::endl;
+#ifdef MEMCHECK
+    ASSERT_EQ( m_table->m_data.size(), 500);
+#else
     ASSERT_EQ( m_table->m_data.size(), 13);
+#endif
 
     for (stx::btree_set<int32_t>::iterator ii = pkeysNotDeleted.begin(); ii != pkeysNotDeleted.end(); ii++) {
         key.setNValue(0, ValueFactory::getIntegerValue(*ii));
@@ -353,13 +366,22 @@ TEST_F(CompactionTest, BasicCompaction) {
 
 TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
     initTable(true);
-    addRandomUniqueTuples( m_table, 645260);
+#ifdef MEMCHECK
+    int tupleCount = 1000;
+#else
+    int tupleCount = 645260;
+#endif
+    addRandomUniqueTuples( m_table, tupleCount);
 
+#ifdef MEMCHECK
+    ASSERT_EQ( tupleCount, m_table->m_data.size());
+#else
     ASSERT_EQ(20, m_table->m_data.size());
+#endif
 
     stx::btree_set<int32_t> pkeysNotDeleted[3];
     std::vector<int32_t> pkeysToDelete[3];
-    for (int ii = 0; ii < 645260; ii ++) {
+    for (int ii = 0; ii < tupleCount; ii ++) {
         int foo = ii % 3;
         pkeysToDelete[foo].push_back(ii);
         if (ii % 3 == 0) {
@@ -376,13 +398,17 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
     stx::btree_set<int32_t> COWTuples;
     int totalInsertedCOWTuples = 0;
     DefaultTupleSerializer serializer;
+    m_table->activateCopyOnWrite(&serializer, 0);
     for (int qq = 0; qq < 3; qq++) {
         std::cout << "Starting iteration " << qq << std::endl;
-        m_table->activateCopyOnWrite(&serializer, 0);
-
-        char serializationBuffer[131072];
+#ifdef MEMCHECK
+        int serializationBufferSize = 22700;
+#else
+        int serializationBufferSize = 131072;
+#endif
+        char serializationBuffer[serializationBufferSize];
         while (true) {
-            ReferenceSerializeOutput out( serializationBuffer, 131072);
+            ReferenceSerializeOutput out( serializationBuffer, serializationBufferSize);
             m_table->serializeMore(&out);
             const int serialized = static_cast<int>(out.position());
             if (out.position() == 0) {
@@ -401,11 +427,11 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
                 ii += 68;
             }
             if (qq == 0) {
-                if (totalInsertedCOWTuples > (645260 / 3)) {
+                if (totalInsertedCOWTuples > (tupleCount / 3)) {
                     break;
                 }
             } else if (qq == 1) {
-                if (totalInsertedCOWTuples > ((645260 / 3) * 2)) {
+                if (totalInsertedCOWTuples > ((tupleCount / 3) * 2)) {
                     break;
                 }
             }
@@ -472,6 +498,9 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
     m_table->doForcedCompaction();
     ASSERT_EQ( m_table->m_data.size(), 0);
     ASSERT_EQ( m_table->activeTupleCount(), 0);
+    for (int ii = 0; ii < tupleCount; ii++) {
+        ASSERT_TRUE(COWTuples.find(ii) != COWTuples.end());
+    }
 }
 
 /*
@@ -480,6 +509,7 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
  * blocks that are not pending snapshot. This causes that block to
  * be passed to a null COW iterator when it is compacted.
  */
+#ifndef MEMCHECK
 TEST_F(CompactionTest, TestENG897) {
     initTable(true);
     addRandomUniqueTuples( m_table, 32263 * 5);
@@ -548,7 +578,7 @@ TEST_F(CompactionTest, TestENG897) {
     m_table->doIdleCompaction();
     //m_table->printBucketInfo();
 }
-
+#endif
 int main() {
     return TestSuite::globalInstance()->runAll();
 }

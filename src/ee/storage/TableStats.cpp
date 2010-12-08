@@ -127,21 +127,21 @@ void TableStats::updateStatsTuple(TableTuple *tuple) {
     tuple->setNValue( StatsSource::m_columnName2Index["TABLE_TYPE"], m_tableType);
     int64_t tupleCount = m_table->activeTupleCount();
     // This overflow is unlikely (requires 2 terabytes of allocated string memory)
-    int64_t allocated_tuple_mem_kb = m_table->allocatedTupleMemory() / 1000;
-    int64_t occupied_tuple_mem_kb = m_table->occupiedTupleMemory() / 1000;
-    int64_t string_data_mem_kb = m_table->nonInlinedMemorySize() / 1000;
+    int64_t allocated_tuple_mem_kb = m_table->allocatedTupleMemory() / 1024;
+    int64_t occupied_tuple_mem_kb = m_table->occupiedTupleMemory() / 1024;
+    int64_t string_data_mem_kb = m_table->nonInlinedMemorySize() / 1024;
 
     if (interval()) {
         tupleCount = tupleCount - m_lastTupleCount;
         m_lastTupleCount = m_table->activeTupleCount();
         allocated_tuple_mem_kb =
-            allocated_tuple_mem_kb - (m_lastAllocatedTupleMemory / 1000);
+            allocated_tuple_mem_kb - (m_lastAllocatedTupleMemory / 1024);
         m_lastAllocatedTupleMemory = m_table->allocatedTupleMemory();
         occupied_tuple_mem_kb =
-            occupied_tuple_mem_kb - (m_lastOccupiedTupleMemory / 1000);
+            occupied_tuple_mem_kb - (m_lastOccupiedTupleMemory / 1024);
         m_lastOccupiedTupleMemory = m_table->occupiedTupleMemory();
         string_data_mem_kb =
-            string_data_mem_kb - (m_lastStringDataMemory / 1000);
+            string_data_mem_kb - (m_lastStringDataMemory / 1024);
         m_lastStringDataMemory = m_table->nonInlinedMemorySize();
     }
 

@@ -158,12 +158,12 @@ void IndexStats::updateStatsTuple(TableTuple *tuple) {
     tuple->setNValue( StatsSource::m_columnName2Index["TABLE_NAME"], m_tableName);
     tuple->setNValue( StatsSource::m_columnName2Index["INDEX_TYPE"], m_indexType);
     int64_t count = static_cast<int64_t>(m_index->getSize());
-    int64_t mem_estimate_kb = m_index->getMemoryEstimate() / 1000;
+    int64_t mem_estimate_kb = m_index->getMemoryEstimate() / 1024;
 
     if (interval()) {
         count = count - m_lastTupleCount;
         m_lastTupleCount = static_cast<int64_t>(m_index->getSize());
-        mem_estimate_kb = mem_estimate_kb - (m_lastMemEstimate / 1000);
+        mem_estimate_kb = mem_estimate_kb - (m_lastMemEstimate / 1024);
         m_lastMemEstimate = m_index->getMemoryEstimate();
     }
 
