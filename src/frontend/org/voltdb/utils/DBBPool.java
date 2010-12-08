@@ -635,7 +635,6 @@ public final class DBBPool {
      * @return A <tt>ByteBuffer</tt> of the requested size.
      */
     private final BBContainer allocateBuffer(final int bufferSize) {
-        bytesAllocatedGlobally.getAndAdd(bufferSize);
         bytesAllocatedLocally += bufferSize;
         try {
             final BBContainer container = DBBPool.allocateDirect( bufferSize);
@@ -743,6 +742,7 @@ public final class DBBPool {
             if (retval != null) {
                 retval.clear();
             } else {
+                bytesAllocatedGlobally.getAndAdd(capacity);
                 retval = ByteBuffer.allocateDirect(capacity);
             }
             return new BBContainer(retval, 0) {

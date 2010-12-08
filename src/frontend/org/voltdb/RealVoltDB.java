@@ -672,7 +672,7 @@ public class RealVoltDB implements VoltDBInterface
     }
 
     public HashSet<Integer> initializeForRejoin(VoltDB.Configuration config, long catalogCRC, long deploymentCRC) {
-     // sensible defaults (sorta)
+        // sensible defaults (sorta)
         String rejoinHostCredentialString = null;
         String rejoinHostAddressString = null;
 
