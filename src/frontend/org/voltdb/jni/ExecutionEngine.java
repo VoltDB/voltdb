@@ -339,7 +339,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /**
      * Instruct the EE to start/stop its profiler.
      */
-    public abstract int toggleProfiler(int toggle);
+    public abstract void toggleProfiler(int toggle);
 
     /**
      * Release all undo actions up to and including the specified undo token

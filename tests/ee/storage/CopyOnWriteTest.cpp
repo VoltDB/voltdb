@@ -105,14 +105,14 @@ public:
         m_tableSchemaAllowNull.push_back(false);
         m_primaryKeyIndexSchemaAllowNull.push_back(false);
         m_tableSchemaAllowNull.push_back(false);
-        m_primaryKeyIndexSchemaAllowNull.push_back(false);
-        m_primaryKeyIndexSchemaAllowNull.push_back(false);
-        m_primaryKeyIndexSchemaAllowNull.push_back(false);
-        m_primaryKeyIndexSchemaAllowNull.push_back(false);
-        m_primaryKeyIndexSchemaAllowNull.push_back(false);
-        m_primaryKeyIndexSchemaAllowNull.push_back(false);
-        m_primaryKeyIndexSchemaAllowNull.push_back(false);
-        m_primaryKeyIndexSchemaAllowNull.push_back(false);
+        m_tableSchemaAllowNull.push_back(false);
+        m_tableSchemaAllowNull.push_back(false);
+        m_tableSchemaAllowNull.push_back(false);
+        m_tableSchemaAllowNull.push_back(false);
+        m_tableSchemaAllowNull.push_back(false);
+        m_tableSchemaAllowNull.push_back(false);
+        m_tableSchemaAllowNull.push_back(false);
+        m_tableSchemaAllowNull.push_back(false);
 
         m_primaryKeyIndexColumns.push_back(0);
 
@@ -266,7 +266,13 @@ public:
 TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
     initTable(true);
 
-    addRandomUniqueTuples( m_table, 174762);
+#ifdef MEMCHECK
+    int tupleCount = 1000;
+#else
+    int tupleCount = 174762;
+#endif
+    addRandomUniqueTuples( m_table, tupleCount);
+
     voltdb::TableIterator& iterator = m_table->iterator();
     TBMap blocks(m_table->m_data);
     voltdb::CopyOnWriteIterator COWIterator(m_table, blocks.begin(), blocks.end());
@@ -311,7 +317,12 @@ TEST_F(CopyOnWriteTest, TestTableTupleFlags) {
 
 TEST_F(CopyOnWriteTest, BigTest) {
     initTable(true);
-    addRandomUniqueTuples( m_table, 174762);
+#ifdef MEMCHECK
+    int tupleCount = 1000;
+#else
+    int tupleCount = 174762;
+#endif
+    addRandomUniqueTuples( m_table, tupleCount);
     DefaultTupleSerializer serializer;
     for (int qq = 0; qq < 10; qq++) {
         stx::btree_set<int64_t> originalTuples;
@@ -385,7 +396,7 @@ TEST_F(CopyOnWriteTest, BigTest) {
             numTuples++;
             ASSERT_FALSE(tuple.isDirty());
         }
-        ASSERT_EQ(numTuples, 174762 + (m_tuplesInserted - m_tuplesDeleted));
+        ASSERT_EQ(numTuples, tupleCount + (m_tuplesInserted - m_tuplesDeleted));
 
         ASSERT_EQ(originalTuples.size(), COWTuples.size());
         ASSERT_TRUE(originalTuples == COWTuples);
@@ -394,7 +405,12 @@ TEST_F(CopyOnWriteTest, BigTest) {
 
 TEST_F(CopyOnWriteTest, BigTestWithUndo) {
     initTable(true);
-    addRandomUniqueTuples( m_table, 174762);
+#ifdef MEMCHECK
+    int tupleCount = 1000;
+#else
+    int tupleCount = 174762;
+#endif
+    addRandomUniqueTuples( m_table, tupleCount);
     m_engine->setUndoToken(0);
     m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0);
     DefaultTupleSerializer serializer;
@@ -474,7 +490,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
             }
             ASSERT_FALSE(tuple.isDirty());
         }
-        ASSERT_EQ(numTuples, 174762 + (m_tuplesInserted - m_tuplesDeleted));
+        ASSERT_EQ(numTuples, tupleCount + (m_tuplesInserted - m_tuplesDeleted));
 
         ASSERT_EQ(originalTuples.size(), COWTuples.size());
         ASSERT_TRUE(originalTuples == COWTuples);
@@ -483,7 +499,12 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
 
 TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
     initTable(true);
-    addRandomUniqueTuples( m_table, 174762);
+#ifdef MEMCHECK
+    int tupleCount = 1000;
+#else
+    int tupleCount = 174762;
+#endif
+    addRandomUniqueTuples( m_table, tupleCount);
     m_engine->setUndoToken(0);
     m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0);
     DefaultTupleSerializer serializer;
@@ -562,7 +583,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
             numTuples++;
             ASSERT_FALSE(tuple.isDirty());
         }
-        ASSERT_EQ(numTuples, 174762);
+        ASSERT_EQ(numTuples, tupleCount);
 
         ASSERT_EQ(originalTuples.size(), COWTuples.size());
         ASSERT_TRUE(originalTuples == COWTuples);

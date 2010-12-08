@@ -446,8 +446,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public int toggleProfiler(final int toggle) {
-        return nativeToggleProfiler(pointer, toggle);
+    public void toggleProfiler(final int toggle) {
+        nativeToggleProfiler(pointer, toggle);
+        return;
     }
 
     @Override

@@ -1408,8 +1408,8 @@ private:
             delete static_cast<leaf_node*>(n);
 #else
             static_cast<leaf_node*>(n)->~leaf_node();
-#endif
             leaf_pool->free(n);
+#endif
             stats.leaves--;
         }
         else {
@@ -1417,8 +1417,8 @@ private:
             delete static_cast<inner_node*>(n);
 #else
             static_cast<inner_node*>(n)->~inner_node();
-#endif
             inner_pool->free(n);
+#endif
             stats.innernodes--;
         }
     }

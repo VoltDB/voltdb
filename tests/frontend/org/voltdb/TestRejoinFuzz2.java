@@ -63,6 +63,10 @@ public class TestRejoinFuzz2 extends RejoinTestBase {
                     LocalCluster.FailureState.ALL_RUNNING,
                     false);
         cluster.setMaxHeap(64);
+        if (cluster.isValgrind()) {
+            //Way to much data in this test. Using less data makes it redundant
+            return;
+        }
         boolean success = cluster.compile(builder);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));

@@ -331,6 +331,7 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
           break;
       case 24:
           threadLocalPoolAllocations();
+          result = kErrorCode_None;
           break;
       default:
         result = stub(cmd);
@@ -1072,13 +1073,15 @@ void VoltDBIPC::setupSigHandler(void) const {
 
 void VoltDBIPC::threadLocalPoolAllocations() {
     std::size_t poolAllocations = ThreadLocalPool::getPoolAllocationSize();
-    char response[8];
+    char response[9];
     response[0] = kErrorCode_Success;
     *reinterpret_cast<std::size_t*>(&response[1]) = htonll(poolAllocations);
-    writeOrDie(m_fd, (unsigned char*)response, 5);
+    writeOrDie(m_fd, (unsigned char*)response, 9);
 }
 
 int main(int argc, char **argv) {
+    //Create a pool ref to init the thread local in case a poll message comes early
+    voltdb::ThreadLocalPool poolRef;
     const int pid = getpid();
     printf("==%d==\n", pid);
     fflush(stdout);

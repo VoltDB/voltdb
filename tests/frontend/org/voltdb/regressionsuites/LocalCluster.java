@@ -832,7 +832,8 @@ public class LocalCluster implements VoltServerConfig {
 
     @Override
     public boolean isValgrind() {
-        return m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC;
+        final String buildType = System.getenv().get("BUILD");
+        return buildType.startsWith("memcheck");
     }
 
     int getRandomTimestampSalt() {

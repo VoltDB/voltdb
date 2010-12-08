@@ -813,8 +813,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
      * Unsupported implementation of toggleProfiler
      */
     @Override
-    public int toggleProfiler(final int toggle) {
-        throw new UnsupportedOperationException("Not supported yet.");
+    public void toggleProfiler(final int toggle) {
+        return;
     }
 
 

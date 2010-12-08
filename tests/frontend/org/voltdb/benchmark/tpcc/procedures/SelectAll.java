@@ -63,21 +63,21 @@ import org.voltdb.*;
 )
 public class SelectAll extends VoltProcedure {
 
-    public final SQLStmt warehouse = new SQLStmt("SELECT * FROM WAREHOUSE;");
+    public final SQLStmt warehouse = new SQLStmt("SELECT * FROM WAREHOUSE ORDER BY W_ID;");
 
-    public final SQLStmt district = new SQLStmt("SELECT * FROM DISTRICT;");
+    public final SQLStmt district = new SQLStmt("SELECT * FROM DISTRICT ORDER BY D_ID;");
 
-    public final SQLStmt item = new SQLStmt("SELECT * FROM ITEM;");
+    public final SQLStmt item = new SQLStmt("SELECT * FROM ITEM ORDER BY I_ID;");
 
-    public final SQLStmt customer = new SQLStmt("SELECT * FROM CUSTOMER;");
+    public final SQLStmt customer = new SQLStmt("SELECT * FROM CUSTOMER ORDER BY C_ID;");
 
     public final SQLStmt history = new SQLStmt("SELECT * FROM HISTORY;");
 
-    public final SQLStmt stock = new SQLStmt("SELECT * FROM STOCK;");
+    public final SQLStmt stock = new SQLStmt("SELECT * FROM STOCK ORDER BY S_W_ID, S_I_ID;");
 
-    public final SQLStmt orders = new SQLStmt("SELECT * FROM ORDERS;");
+    public final SQLStmt orders = new SQLStmt("SELECT * FROM ORDERS ORDER BY O_ID;");
 
-    public final SQLStmt new_order = new SQLStmt("SELECT * FROM NEW_ORDER;");
+    public final SQLStmt new_order = new SQLStmt("SELECT * FROM NEW_ORDER ORDER BY NO_D_ID, NO_W_ID, NO_O_ID;");
 
     public final SQLStmt order_line = new SQLStmt("SELECT * FROM ORDER_LINE;");
 
