@@ -249,19 +249,19 @@ protected:
     inline bool deleteEntryPrivate(const TableTuple *tuple, const KeyType &key)
     {
         ++m_deletes;
-        std::pair<MMIter,MMIter> key_iter;
-        for (key_iter = m_entries.equalRange(key);
-             !key_iter.first.equals(key_iter.second);
-             key_iter.first.moveNext())
-        {
-            if (key_iter.first.value() == tuple->address())
-            {
-                m_entries.erase(key_iter.first);
-                //deleted
-                return true;
+        MMIter iter;
+
+        iter = m_entries.find(key);
+
+        if (iter.isEnd()) return false;
+
+        do {
+            if (iter.value() == tuple->address()) {
+                return m_entries.erase(iter);
             }
-        }
-        //key exists, but tuple not exists
+            iter.moveNext();
+        } while ((!iter.isEnd()) && (m_eq(iter.key(), key)));
+
         return false;
     }
 
