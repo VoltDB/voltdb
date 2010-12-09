@@ -1,11 +1,12 @@
 TOOLSDIR=`readlink -f $(dirname "${BASH_SOURCE[0]}")`
 TRUNKDIR=`dirname ${TOOLSDIR}`
 cd $TRUNKDIR
-ln -sf obj/release/prod voltdb
-cd examples/twitter
+ant dist
+cd obj/release/dist/examples/twitter
+ant catalog
 ant &
 sleep 60
-ant client &
+ant client -DTwitterUsername=InvalidUser -DTwitterPassword=UnknownPassword &
 sleep 20
 ant cull &
 sleep 180
