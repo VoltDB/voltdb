@@ -6,7 +6,7 @@ cd obj/release/dist/examples/twitter
 ant catalog
 ant &
 sleep 60
-ant client -DTwitterUsername=InvalidUser -DTwitterPassword=UnknownPassword &
+ant client -DTwitterUsername=$TUNAME -DTwitterPassword=$TUPASS &
 sleep 20
 ant cull &
 sleep 180
