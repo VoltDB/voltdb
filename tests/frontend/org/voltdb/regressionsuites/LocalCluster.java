@@ -712,7 +712,7 @@ public class LocalCluster implements VoltServerConfig {
         shutDownExternal(false);
     }
 
-    public void shutDownExternal(boolean forceKillEEProcs) throws InterruptedException
+    public synchronized void shutDownExternal(boolean forceKillEEProcs) throws InterruptedException
     {
         if (m_cluster != null) {
             for (Process proc : m_cluster) {
