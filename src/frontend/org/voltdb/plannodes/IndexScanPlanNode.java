@@ -17,21 +17,27 @@
 
 package org.voltdb.plannodes;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.expressions.*;
-import org.voltdb.planner.PlanStatistics;
-import org.voltdb.planner.StatsField;
-import org.voltdb.types.*;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.PlanStatistics;
+import org.voltdb.planner.StatsField;
+import org.voltdb.types.IndexLookupType;
+import org.voltdb.types.IndexType;
+import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.SortDirectionType;
 
 public class IndexScanPlanNode extends AbstractScanPlanNode {
 
@@ -265,18 +271,49 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         assert(target != null);
         DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(target.getTypeName());
         stats.incrementStatistic(0, StatsField.TREE_INDEX_LEVELS_TRAVERSED, (long)(Math.log(tableEstimates.maxTuples)));
-        // ENG-604 hack.  Prefer unique access to reduce cardinality quickly
-        // rather than scanning a tree index for equality.
-        if (m_lookupType == IndexLookupType.EQ && m_catalogIndex.getUnique())
+
+        // get the width of the index and number of columns used
+        int colCount = m_catalogIndex.getColumns().size();
+        int keyWidth = m_searchkeyExpressions.size();
+        assert(keyWidth <= colCount);
+
+        // need a double for math
+        double keyWidthFl = keyWidth;
+        // count a scan as a half cover
+        if (m_lookupType != IndexLookupType.EQ)
+            keyWidthFl -= 0.5;
+
+        double coverage = keyWidthFl / colCount;
+
+        // estimate cost of scan
+        int tuplesToRead = 0;
+
+        // minor priorities for index types (tiebreakers)
+        if (m_catalogIndex.getType() == IndexType.ARRAY.getValue())
+            tuplesToRead = 1;
+        if (m_catalogIndex.getType() == IndexType.HASH_TABLE.getValue())
+            tuplesToRead = 2;
+        if ((m_catalogIndex.getType() == IndexType.BALANCED_TREE.getValue()) ||
+            (m_catalogIndex.getType() == IndexType.BTREE.getValue()))
+            tuplesToRead = 3;
+        assert(tuplesToRead > 0);
+
+        // Perfect matches on a unique index always return low so they win
+        // add costs for less optimal index use here
+        if ((m_lookupType != IndexLookupType.EQ) ||
+             !m_catalogIndex.getUnique() &&
+             (colCount != keyWidth))
         {
-            stats.incrementStatistic(0, StatsField.TUPLES_READ, 1);
-            m_estimatedOutputTupleCount = 1;
+            // so unique covering always wins
+            tuplesToRead += 4;
+            // points for percent coverage
+            tuplesToRead += (int) (50.0 * (1.0 - coverage));
+            // points for total columns covered
+            tuplesToRead += 50 - (10 * Math.min(keyWidth, 5));
         }
-        else
-        {
-            stats.incrementStatistic(0, StatsField.TUPLES_READ, 100);
-            m_estimatedOutputTupleCount = 100;
-        }
+        stats.incrementStatistic(0, StatsField.TUPLES_READ, tuplesToRead);
+        m_estimatedOutputTupleCount = tuplesToRead;
+
         return true;
     }
 
