@@ -149,19 +149,15 @@ public abstract class ExportClientBase implements Runnable {
 
     /**
      * Perform one iteration of Export Client work.
-     *  Override if the specific client has strange workflow/termination conditions.
+     * Override if the specific client has strange workflow/termination conditions.
      * Largely for Export clients used for test.
      */
-    public void work()
+    public int work()
     {
-        // drain all the received connection messages into the
-        // RX queues for the ExportDataSinks
-        for (ExportConnection el_connection : m_exportConnections.values())
-        {
-            el_connection.work();
-        }
+        int offered_msgs = 0;
 
-        // work all the ExportDataSinks to generate outgoing messages
+        // work all the ExportDataSinks.
+        // process incoming data and generate outgoing ack/polls
         for (HashMap<Integer, ExportDataSink> part_map : m_sinks.values())
         {
             for (ExportDataSink work_sink : part_map.values())
@@ -170,20 +166,54 @@ public abstract class ExportClientBase implements Runnable {
             }
         }
 
-        // Service all the ExportDataSink TX queues
+        // drain all the received connection messages into the
+        // RX queues for the ExportDataSinks and push all acks/polls
+        // to the network.
         for (ExportConnection el_connection : m_exportConnections.values())
         {
-            el_connection.work();
+            offered_msgs = el_connection.work();
         }
+
+        return offered_msgs;
     }
 
     @Override
     public void run() {
         boolean connected = true;
+
+        // current wait time between polls
+        int poll_wait_time = 0;
+
+        // maximum value of poll_wait_time
+        final int max_poll_wait_time = 2000;
+
+        // milliseconds to increment wait time when idle
+        final int poll_back_off_addend = 100;
+
+        // factor by which poll_wait_time should be reduced when not idle.
+        final int poll_accelerate_factor = 2;
+
+
         while (connected)
         {
-            work();
+            int offered_msgs = work();
             connected = checkConnections();
+
+
+            // adjust idle loop wait time.
+            if (offered_msgs > 0) {
+                poll_wait_time = (int) Math.floor(poll_wait_time / poll_accelerate_factor);
+            }
+            else if (poll_wait_time < max_poll_wait_time) {
+                poll_wait_time += poll_back_off_addend;
+            }
+            if (poll_wait_time > 0) {
+                try {
+                    Thread.sleep(poll_wait_time);
+                } catch (InterruptedException e) {
+                }
+            }
+
         }
     }
 }

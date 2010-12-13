@@ -314,11 +314,12 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         }
 
         @Override
-        public void work() {
+        public int work() {
             super.work();
             for (ExportConnection ec : m_exportConnections.values()) {
                 System.out.printf("Export Conn Offset: %d\n", ec.getLastAckOffset());
             }
+            return 1;
         }
 
     }

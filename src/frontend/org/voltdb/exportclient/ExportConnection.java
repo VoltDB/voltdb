@@ -146,9 +146,12 @@ public class ExportConnection implements Runnable {
 
     /**
      * perform a single iteration of work for the EL connection.
+     * @return the number of server messages offered to the rxqueue(s).
      */
-    public void work()
+    public int work()
     {
+        int messagesOffered = 0;
+
         // exportxxx need better error handling code in here
         if (!m_socket.isConnected() || !m_socket.isOpen())
         {
@@ -157,7 +160,7 @@ public class ExportConnection implements Runnable {
 
         if (m_state == CLOSING)
         {
-            return;
+            return messagesOffered;
         }
 
         // loop here to empty RX ?
@@ -189,6 +192,7 @@ public class ExportConnection implements Runnable {
                 m_lastAckOffset = m.getAckOffset();
                 ExportDataSink rx_sink = m_sinks.get(m.getTableId()).get(m.getPartitionId());
                 rx_sink.getRxQueue(m_connectionName).offer(m);
+                messagesOffered++;
             }
         }
         while (m_state == CONNECTED && m != null);
@@ -218,6 +222,8 @@ public class ExportConnection implements Runnable {
                 }
             }
         }
+
+        return messagesOffered;
     }
 
     @Override

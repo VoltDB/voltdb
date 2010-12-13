@@ -192,11 +192,12 @@ public class ExportTestClient extends ExportClientBase
     }
 
     @Override
-    public void work()
+    public int work()
     {
         while (!done())
         {
             super.work();
         }
+        return 1;
     }
 }
