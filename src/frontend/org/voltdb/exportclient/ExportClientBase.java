@@ -171,7 +171,7 @@ public abstract class ExportClientBase implements Runnable {
         // to the network.
         for (ExportConnection el_connection : m_exportConnections.values())
         {
-            offered_msgs = el_connection.work();
+            offered_msgs += el_connection.work();
         }
 
         return offered_msgs;
