@@ -125,11 +125,11 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     VOLT_TRACE("Sequential Scanning table :\n %s",
                target_table->debug().c_str());
     VOLT_DEBUG("Sequential Scanning table : %s which has %d active, %d"
-               " allocated, %d deleted tuples",
+               " allocated, %d used tuples",
                target_table->name().c_str(),
                (int)target_table->activeTupleCount(),
                (int)target_table->allocatedTupleCount(),
-               (int)target_table->deletedTupleCount());
+               (int)target_table->usedTupleCount());
 
     //
     // OPTIMIZATION: NESTED PROJECTION

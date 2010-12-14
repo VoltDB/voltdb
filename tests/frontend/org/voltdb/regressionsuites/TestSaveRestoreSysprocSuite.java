@@ -27,11 +27,16 @@ import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileReader;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
+import java.util.Set;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.util.TreeSet;
 
 import junit.framework.Test;
 
@@ -137,13 +142,13 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
     private VoltTable createReplicatedTable(int numberOfItems,
             int indexBase,
-            StringBuilder sb) {
-        return createReplicatedTable(numberOfItems, indexBase, sb, false);
+            Set<String> expectedText) {
+        return createReplicatedTable(numberOfItems, indexBase, expectedText, false);
     }
 
     private VoltTable createReplicatedTable(int numberOfItems,
                                             int indexBase,
-                                            StringBuilder sb,
+                                            Set<String> expectedText,
                                             boolean generateCSV)
     {
         VoltTable repl_table =
@@ -155,8 +160,9 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         for (int i = indexBase; i < numberOfItems + indexBase; i++) {
             String stringVal = null;
             String escapedVal = null;
-
-            if (sb != null) {
+            StringBuilder sb = null;
+            if (expectedText != null) {
+                sb = new StringBuilder(64);
                 if (generateCSV) {
                     int escapable = i % 5;
                     switch (escapable) {
@@ -214,9 +220,10 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                                          stringVal,
                                          i,
                                          new Double(i)};
-            if (sb != null) {
+            if (expectedText != null) {
                 sb.append(i).append(delimeter).append(escapedVal).append(delimeter);
-                sb.append(i).append(delimeter).append(new Double(i).toString()).append('\n');
+                sb.append(i).append(delimeter).append(new Double(i).toString());
+                expectedText.add(sb.toString());
             }
             repl_table.addRow(row);
         }
@@ -267,16 +274,13 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
     }
 
     private void loadLargeReplicatedTable(Client client, String tableName,
-                                          int itemsPerChunk, int numChunks, boolean generateCSV, StringBuilder sb)
+                                          int itemsPerChunk, int numChunks, boolean generateCSV, Set<String> expectedText)
     {
         for (int i = 0; i < numChunks; i++)
         {
             VoltTable repl_table =
-                createReplicatedTable(itemsPerChunk, i * itemsPerChunk, sb, generateCSV);
+                createReplicatedTable(itemsPerChunk, i * itemsPerChunk, expectedText, generateCSV);
             loadTable(client, tableName, repl_table);
-        }
-        if (sb != null) {
-            sb.trimToSize();
         }
     }
 
@@ -421,12 +425,12 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         int num_partitioned_items_per_chunk = 120;
         int num_partitioned_chunks = 10;
 
-        StringBuilder sb = new StringBuilder();
+        Set<String> expectedText = new TreeSet<String>();
         loadLargeReplicatedTable(client, "REPLICATED_TESTER",
                                  num_replicated_items_per_chunk,
                                  num_replicated_chunks,
                                  false,
-                                 sb);
+                                 expectedText);
         loadLargePartitionedTable(client, "PARTITION_TESTER",
                                   num_partitioned_items_per_chunk,
                                   num_partitioned_chunks);
@@ -435,7 +439,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                                        TESTNONCE, (byte)1);
 
         validateSnapshot(true);
-        generateAndValidateTextFile( sb, false);
+        generateAndValidateTextFile( expectedText, false);
     }
 
     public void testCSVConversion() throws Exception
@@ -448,12 +452,12 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         int num_partitioned_items_per_chunk = 120;
         int num_partitioned_chunks = 10;
 
-        StringBuilder sb = new StringBuilder();
+        Set<String> expectedText = new TreeSet<String>();
         loadLargeReplicatedTable(client, "REPLICATED_TESTER",
                                  num_replicated_items_per_chunk,
                                  num_replicated_chunks,
                                  true,
-                                 sb);
+                                 expectedText);
         loadLargePartitionedTable(client, "PARTITION_TESTER",
                                   num_partitioned_items_per_chunk,
                                   num_partitioned_chunks);
@@ -462,7 +466,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                                        TESTNONCE, (byte)1);
 
         validateSnapshot(true);
-        generateAndValidateTextFile( sb, true);
+        generateAndValidateTextFile( expectedText, true);
     }
 
     /*
@@ -651,7 +655,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         validateSnapshot(false);
     }
 
-    private void generateAndValidateTextFile(StringBuilder expectedText, boolean csv) throws Exception {
+    private void generateAndValidateTextFile(Set<String> expectedText, boolean csv) throws Exception {
         String args[] = new String[] {
                 TESTNONCE,
                "--dir",
@@ -667,20 +671,52 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         FileInputStream fis = new FileInputStream(
                 TMPDIR + File.separator + "REPLICATED_TESTER" + (csv ? ".csv" : ".tsv"));
         try {
-            int filesize = (int)fis.getChannel().size();
-            ByteBuffer expectedBytes = ByteBuffer.wrap(expectedText.toString().getBytes("UTF-8"));
-            ByteBuffer readBytes = ByteBuffer.allocate(filesize);
-            while (readBytes.hasRemaining()) {
-                int read = fis.getChannel().read(readBytes);
-                if (read == -1) {
-                    throw new EOFException();
+            InputStreamReader isr = new InputStreamReader(fis, "UTF-8");
+            BufferedReader br = new BufferedReader(isr);
+            StringBuffer sb = new StringBuffer();
+            int nextCharInt;
+            while ((nextCharInt = br.read()) != -1) {
+                char nextChar = (char)nextCharInt;
+                if (csv) {
+                    if (nextChar == '"') {
+                        sb.append(nextChar);
+                        int nextNextCharInt = -1;
+                        char prevChar = nextChar;
+                        while ((nextNextCharInt = br.read()) != -1) {
+                            char nextNextChar = (char)nextNextCharInt;
+                            if (nextNextChar == '"') {
+                                if (prevChar == '"') {
+                                    sb.append(nextNextChar);
+                                } else {
+                                    sb.append(nextNextChar);
+                                    break;
+                                }
+                            } else {
+                                sb.append(nextNextChar);
+                            }
+                            prevChar = nextNextChar;
+                        }
+                    } else if (nextChar == '\n' || nextChar == '\r') {
+                        assertTrue(expectedText.remove(sb.toString()));
+                        sb = new StringBuffer();
+                    } else {
+                        sb.append(nextChar);
+                    }
+                } else {
+                    if (nextChar == '\\') {
+                        sb.append(nextChar);
+                        int nextNextCharInt = br.read();
+                        char nextNextChar = (char)nextNextCharInt;
+                        sb.append(nextNextChar);
+                    } else if (nextChar == '\n' || nextChar == '\r') {
+                        assertTrue(expectedText.remove(sb.toString()));
+                        sb = new StringBuffer();
+                    } else {
+                        sb.append(nextChar);
+                    }
                 }
             }
-            // this throws an exception on failure
-            new String(readBytes.array(), "UTF-8");
-
-            readBytes.flip();
-            assertTrue(expectedBytes.equals(readBytes));
+            assertTrue(expectedText.isEmpty());
         } finally {
             fis.close();
         }
