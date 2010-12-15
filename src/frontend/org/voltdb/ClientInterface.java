@@ -218,7 +218,13 @@ public class ClientInterface implements DumpManager.Dumpable {
                 throw new IllegalStateException("A thread for this ClientAcceptor is already running");
             }
             if (!m_serverSocket.socket().isBound()) {
-                m_serverSocket.socket().bind(new InetSocketAddress(m_port));
+                try {
+                    m_serverSocket.socket().bind(new InetSocketAddress(m_port));
+                } catch (IOException e) {
+                    hostLog.fatal("Client interface failed to bind to port " + m_port);
+                    hostLog.fatal("IOException message: \"" + e.getMessage() + "\"");
+                    System.exit(-1);
+                }
             }
             m_running = true;
             m_thread = new Thread( null, this, "Client connection accceptor", 262144);
