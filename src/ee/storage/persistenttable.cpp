@@ -1099,8 +1099,8 @@ void PersistentTable::doForcedCompaction() {
              * the book keeping for load buckets and merging. As the load
              * of the missing (missing from the load buckets)
              * blocks changes they should end up being inserted
-             * into the bucketing system again and will be  
-             * compacted if necessary or deleted when empty. 
+             * into the bucketing system again and will be
+             * compacted if necessary or deleted when empty.
              * This is a work around for ENG-939
              */
             if (m_failedCompactionCount % 5000 == 0) {
