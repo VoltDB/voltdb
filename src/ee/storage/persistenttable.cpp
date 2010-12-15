@@ -88,7 +88,8 @@ PersistentTable::PersistentTable(ExecutorContext *ctx, bool exportEnabled) :
     m_uniqueIndexes(NULL), m_uniqueIndexCount(0), m_allowNulls(NULL),
     m_indexes(NULL), m_indexCount(0), m_pkeyIndex(NULL), m_wrapper(NULL),
     m_tsSeqNo(0), stats_(this), m_exportEnabled(exportEnabled),
-    m_COWContext(NULL)
+    m_COWContext(NULL),
+    m_failedCompactionCount(0)
 {
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
@@ -1085,8 +1086,38 @@ void PersistentTable::doForcedCompaction() {
     bool hadWork1 = true;
     bool hadWork2 = true;
     std::cout << "Doing forced compaction with allocated tuple count " << allocatedTupleCount() << std::endl;
+    int failedCompactionCountBefore = m_failedCompactionCount;
     while (compactionPredicate()) {
         assert(hadWork1 || hadWork2);
+        if (!hadWork1 && !hadWork2) {
+            /*
+             * If this code is reached it means that the compaction predicate
+             * thinks that it should be possible to merge some blocks,
+             * but there were no blocks found in the load buckets that were
+             * eligible to be merged. This is a bug in either the predicate
+             * or more likely the code that moves blocks from bucket to bucket.
+             * This isn't fatal because the list of blocks with free space
+             * and deletion of empty blocks is handled independently of
+             * the book keeping for load buckets and merging. As the load
+             * of the missing (missing from the load buckets)
+             * blocks changes they should end up being inserted
+             * into the bucketing system again and will be  
+             * compacted if necessary or deleted when empty. 
+             * This is a work around for ENG-939
+             */
+            if (m_failedCompactionCount % 5000 == 0) {
+                std::cerr << "Compaction predicate said there should be " <<
+                             "blocks to compact but no blocks were found " <<
+                             "to be eligible for compaction. This has " <<
+                             "occured " << m_failedCompactionCount <<
+                             " times." << std::endl;
+            }
+            if (m_failedCompactionCount == 0) {
+                printBucketInfo();
+            }
+            m_failedCompactionCount++;
+            break;
+        }
         if (!m_blocksNotPendingSnapshot.empty() && hadWork1) {
             //std::cout << "Compacting blocks not pending snapshot " << m_blocksNotPendingSnapshot.size() << std::endl;
             hadWork1 = doCompactionWithinSubset(&m_blocksNotPendingSnapshotLoad);
@@ -1095,6 +1126,12 @@ void PersistentTable::doForcedCompaction() {
             //std::cout << "Compacting blocks pending snapshot " << m_blocksPendingSnapshot.size() << std::endl;
             hadWork2 = doCompactionWithinSubset(&m_blocksPendingSnapshotLoad);
         }
+    }
+    //If compactions have been failing lately, but it didn't fail this time
+    //then compaction progressed until the predicate was satisfied
+    if (failedCompactionCountBefore > 0 && failedCompactionCountBefore == m_failedCompactionCount) {
+        std::cerr << "Recovered from a failed compaction scenario and compacted to the point that the compaction predicate was satisfied after " << failedCompactionCountBefore << " failed attempts" << std::endl;
+        m_failedCompactionCount = 0;
     }
     assert(!compactionPredicate());
     std::cout << "Finished forced compaction with allocated tuple count " << allocatedTupleCount() << std::endl;

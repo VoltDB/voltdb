@@ -398,7 +398,7 @@ protected:
   private:
     // pointers to chunks of data. Specific to table impl. Don't leak this type.
     TBMap m_data;
-
+    int m_failedCompactionCount;
 };
 
 inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {
