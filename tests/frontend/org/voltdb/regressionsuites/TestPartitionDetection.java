@@ -131,7 +131,6 @@ public class TestPartitionDetection extends TestCase
         }
     }
 
-
     public void testPartitionAndVerifySnapshot() throws Exception {
         final Semaphore rateLimit = new Semaphore(10);
         final Client client = ClientFactory.createClient();

@@ -25,13 +25,15 @@ package org.voltdb.fault;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
+import java.io.File;
 
 import junit.framework.TestCase;
 
-import org.voltdb.MockVoltDB;
+import org.voltdb.*;
 import org.voltdb.VoltDB;
 import org.voltdb.fault.FaultDistributorInterface.PPDPolicyDecision;
 import org.voltdb.fault.VoltFault.FaultType;
+import org.voltdb.catalog.SnapshotSchedule;
 
 public class TestFaultDistributor extends TestCase
 {
@@ -272,5 +274,32 @@ public class TestFaultDistributor extends TestCase
         assertEquals(PPDPolicyDecision.NodeFailure, makePPDPolicyDecisions);
     }
 
+    // Bad PPD directory
+    public void testPartitionDetectionDirectoryCheck() throws Exception
+    {
+        // need to add live sites and generate a context for mock functionality
+        MockVoltDB voltdb = new MockVoltDB();
+        FaultDistributor dut = new FaultDistributor(voltdb, true);
+        voltdb.setFaultDistributor(dut);
+        VoltDB.replaceVoltDBInstanceForTest(voltdb);
+        SnapshotSchedule schedule = new SnapshotSchedule();
+        File badpath = new File("/tmp/doesnotexists");
+        badpath.delete();
+        schedule.setPath(badpath.getCanonicalPath());
+        schedule.setPrefix("foo");
+        assertFalse(dut.testPartitionDetectionDirectory(schedule));
+        assertTrue(badpath.createNewFile());
+        assertFalse(dut.testPartitionDetectionDirectory(schedule));
+        assertTrue(badpath.delete());
+        assertTrue(badpath.mkdir());
+        badpath.setWritable(false);
+        badpath.setExecutable(false);
+        badpath.setReadable(false);
+        assertFalse(dut.testPartitionDetectionDirectory(schedule));
+        badpath.setWritable(true);
+        badpath.setExecutable(true);
+        badpath.setReadable(true);
+        assertTrue(dut.testPartitionDetectionDirectory(schedule));
+    }
 
 }

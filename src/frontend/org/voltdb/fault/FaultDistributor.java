@@ -17,9 +17,12 @@
 package org.voltdb.fault;
 
 import java.util.*;
+import java.io.File;
+import java.io.IOException;
 
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
+import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.logging.VoltLogger;
@@ -467,5 +470,38 @@ public class FaultDistributor implements FaultDistributorInterface, Runnable
 
         // all remaining cases are normal node failures
         return PPDPolicyDecision.NodeFailure;
+    }
+
+    /*
+     * Check if the directory specified for the snapshot on partition detection
+     * exists, and has permissions set correctly.
+     */
+    public boolean testPartitionDetectionDirectory(SnapshotSchedule schedule) {
+        if (m_partitionDetectionEnabled) {
+            File partitionPath = new File(schedule.getPath());
+            if (!partitionPath.exists()) {
+                hostLog.error("Directory " + partitionPath + " for partition detection snapshots does not exist");
+                return false;
+            }
+            if (!partitionPath.isDirectory()) {
+                hostLog.error("Directory " + partitionPath + " for partition detection snapshots is not a directory");
+                return false;
+            }
+            File partitionPathFile = new File(partitionPath, Long.toString(System.currentTimeMillis()));
+            try {
+                partitionPathFile.createNewFile();
+                partitionPathFile.delete();
+            } catch (IOException e) {
+                hostLog.error(
+                        "Could not create a test file in " +
+                        partitionPath +
+                        " for partition detection snapshots");
+                e.printStackTrace();
+                return false;
+            }
+            return true;
+        } else {
+            return true;
+        }
     }
 }

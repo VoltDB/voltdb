@@ -399,7 +399,9 @@ public class RealVoltDB implements VoltDBInterface
             m_faultManager.registerFaultHandler(NodeFailureFault.NODE_FAILURE_CATALOG,
                                                 m_faultHandler,
                                                 FaultType.NODE_FAILURE);
-
+            if (!m_faultManager.testPartitionDetectionDirectory(m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"))) {
+                VoltDB.crashVoltDB();
+            }
 
             // Initialize the complex partitioning scheme
             TheHashinator.initialize(catalog);
