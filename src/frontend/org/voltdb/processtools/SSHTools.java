@@ -19,7 +19,6 @@ package org.voltdb.processtools;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.IOException;
 
 public class SSHTools {
 
@@ -110,7 +109,7 @@ public class SSHTools {
         command[i++] = src.getPath();
         command[i++] = createUrl(hostNameTo, pathTo);
         assert(i == len);
-        String output = ShellTools.cmd(command, generatePasswordScript());
+        String output = ShellTools.cmd(null, command, generatePasswordScript());
         if (output.length() > 1) {
             System.err.print(output);
             return false;
@@ -134,7 +133,7 @@ public class SSHTools {
         command[i++] = createUrl(hostNameFrom, pathFrom);
         command[i++] = dst.getPath();
         assert(i == len);
-        String output = ShellTools.cmd(command, generatePasswordScript());
+        String output = ShellTools.cmd(null, command, generatePasswordScript());
         if (output.length() > 1) {
             System.err.print(output);
             return false;
@@ -160,7 +159,7 @@ public class SSHTools {
         command[i++] = createUrl(hostNameTo, pathTo);
         assert(i == len);
 
-        String output = ShellTools.cmd(command, generatePasswordScript());
+        String output = ShellTools.cmd(null, command, generatePasswordScript());
         if (output.length() > 1) {
             System.err.print(output);
             return false;
@@ -170,28 +169,17 @@ public class SSHTools {
     }
 
     public ProcessData command(String hostname, String remotePath, String command[], String processName, OutputHandler handler) {
-        ProcessBuilder pb = new ProcessBuilder(convert(hostname, remotePath, command));
-        pb.redirectErrorStream(true);
         String passwordScript = generatePasswordScript();
-        if (passwordScript != null) {
-            pb.environment().put("SSH_ASKPASS", passwordScript);
-        }
-        Process p = null;
-        try {
-            p = pb.start();
-        } catch (IOException e) {
-            e.printStackTrace();
-            return null;
-        }
-        return new ProcessData( processName, handler, p);
+        return ShellTools.command(null, convert(hostname, remotePath, command),
+                                  passwordScript, processName, handler);
     }
 
     public String cmd(String hostname, String remotePath, String command) {
-        return ShellTools.cmd(convert(hostname, remotePath, command), generatePasswordScript());
+        return ShellTools.cmd(null, convert(hostname, remotePath, command), generatePasswordScript());
     }
 
     public String cmd(String hostname, String remotePath, String[] command) {
-        return ShellTools.cmd(convert(hostname, remotePath, command), generatePasswordScript());
+        return ShellTools.cmd(null, convert(hostname, remotePath, command), generatePasswordScript());
     }
 
     public String[] convert(String hostname, String remotePath, String command) {

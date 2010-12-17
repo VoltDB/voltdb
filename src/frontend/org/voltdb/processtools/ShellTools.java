@@ -18,23 +18,17 @@
 package org.voltdb.processtools;
 
 import java.io.BufferedInputStream;
+import java.io.File;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 
 public abstract class ShellTools {
 
-    public static String cmd(String command) {
-        return cmd( command, null);
-    }
-
-    public static String cmd(String command, String input) {
-        String[] command2 = command.split(" ");
-        return cmd(command2, input);
-    }
-
-    public static String cmd(String[] command, String passwordScript) {
-        StringBuilder retval = new StringBuilder();
+    private static Process createProcess(String dir, String command[], String passwordScript) {
         ProcessBuilder pb = new ProcessBuilder(command);
+        if (dir != null) {
+            File wd = new File(dir);
+            pb.directory(wd);
+        }
         pb.redirectErrorStream(true);
         if (passwordScript != null) {
             pb.environment().put("SSH_ASKPASS", passwordScript);
@@ -44,6 +38,28 @@ public abstract class ShellTools {
             p = pb.start();
         } catch (IOException e) {
             e.printStackTrace();
+            return null;
+        }
+        return p;
+    }
+
+    public static String cmd(String command) {
+        return cmd(null, command, null);
+    }
+
+    public static String cmd(String dir, String command) {
+        return cmd(dir, command, null);
+    }
+
+    public static String cmd(String dir, String command, String input) {
+        String[] command2 = command.split(" ");
+        return cmd(dir, command2, input);
+    }
+
+    public static String cmd(String dir, String[] command, String passwordScript) {
+        StringBuilder retval = new StringBuilder();
+        Process p = createProcess(dir, command, passwordScript);
+        if (p == null) {
             return null;
         }
 
@@ -64,6 +80,15 @@ public abstract class ShellTools {
         }
         p.destroy();
         return retval.toString();
+    }
+
+    public static ProcessData command(String dir, String command[], String passwordScript,
+                                      String processName, OutputHandler handler) {
+        Process p = createProcess(dir, command, passwordScript);
+        if (p == null) {
+            return null;
+        }
+        return new ProcessData(processName, handler, p);
     }
 
     public static boolean cmdToStdOut(String[] command, String passwordScript) {
