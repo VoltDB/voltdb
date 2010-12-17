@@ -371,39 +371,39 @@ public class TestSqlAggregateSuite extends RegressionSuite {
         }
     }
 
-//    // simple test case for eng205.  Use the query from above
-//    // to also test this with distinct applied
-//    public void testAggregateWithExpression() throws IOException, ProcCallException
-//    {
-//        String[] aggs = {"count", "sum", "min", "max"};
-//        long[] expected_distinct_results = {10,
-//                                            (0 + 1 + 2 + 3 + 4) * 2,
-//                                            0,
-//                                            8};
-//        long[] expected_results = {10,
-//                                   (0 + 1 + 2 + 3 + 4) * 4,
-//                                   0,
-//                                   16};
-//        String[] tables = {"P1", "R1"};
-//        for (String table : tables)
-//        {
-//            Client client = getClient();
-//            for (int i = 0; i < ROWS; ++i)
-//            {
-//                client.callProcedure("Insert", table, i, "desc",
-//                                     new BigDecimal(10.0), i / 2, 14.5);
-//            }
-//            for (int i = 0; i < aggs.length; ++i)
-//            {
-//                String query = String.format("select %s(distinct(%s.NUM * 2)), %s(%s.NUM * 2) from %s",
-//                                             aggs[i], table, aggs[i], table, table);
-//                VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
-//                results[0].advanceRow();
-//                assertEquals(expected_distinct_results[i], results[0].getLong(0));
-//                assertEquals(expected_results[i], results[0].getLong(1));
-//            }
-//        }
-//    }
+    // simple test case for eng205.  Use the query from above
+    // to also test this with distinct applied
+    public void testAggregateWithExpression() throws IOException, ProcCallException
+    {
+        String[] aggs = {"count", "sum", "min", "max"};
+        long[] expected_distinct_results = {5,
+                                            (0 + 1 + 2 + 3 + 4) * 2,
+                                            0,
+                                            8};
+        long[] expected_results = {10,
+                                   (0 + 1 + 2 + 3 + 4) * 4,
+                                   0,
+                                   8};
+        String[] tables = {"P1", "R1"};
+        for (String table : tables)
+        {
+            Client client = getClient();
+            for (int i = 0; i < ROWS; ++i)
+            {
+                client.callProcedure("Insert", table, i, "desc",
+                                     new BigDecimal(10.0), i / 2, 14.5);
+            }
+            for (int i = 0; i < aggs.length; ++i)
+            {
+                String query = String.format("select %s(distinct(%s.NUM * 2)), %s(%s.NUM * 2) from %s",
+                                             aggs[i], table, aggs[i], table, table);
+                VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
+                results[0].advanceRow();
+                assertEquals(expected_distinct_results[i], results[0].getLong(0));
+                assertEquals(expected_results[i], results[0].getLong(1));
+            }
+        }
+    }
 
     //
     // JUnit / RegressionSuite boilerplate

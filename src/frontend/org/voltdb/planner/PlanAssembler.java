@@ -861,18 +861,12 @@ public class PlanAssembler {
                     rootExpr.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR)
                 {
                     agg_input_expr = rootExpr.getLeft();
-                    // Aggregates can, in theory, handle any expression now,
-                    // but it's untested so we'll balk on anything other than
-                    // a TVE here for now --izzy
-                    if (rootExpr.getLeft() instanceof TupleValueExpression)
-                    {
-                        // XXX-IZZY this should go away when ENG-205 is fixed
-                    }
+
                     // count(*) hack.  we're not getting AGGREGATE_COUNT_STAR
                     // expression types from the parsing, so we have
                     // to detect the null inner expression case and do the
                     // switcharoo ourselves.
-                    else if (rootExpr.getExpressionType() == ExpressionType.AGGREGATE_COUNT &&
+                    if (rootExpr.getExpressionType() == ExpressionType.AGGREGATE_COUNT &&
                              rootExpr.getLeft() == null)
                     {
                         agg_expression_type = ExpressionType.AGGREGATE_COUNT_STAR;
@@ -891,10 +885,6 @@ public class PlanAssembler {
                         tve.setColumnAlias(first_col.getColumnName());
                         tve.setTableName(first_col.getTableName());
                         agg_input_expr = tve;
-                    }
-                    else
-                    {
-                        throw new PlanningErrorException("Expressions in aggregates currently unsupported");
                     }
 
                     // A bit of a hack: ProjectionNodes after the
