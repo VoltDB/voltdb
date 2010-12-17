@@ -32,6 +32,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
     public enum Members {
         AGGREGATE_COLUMNS,
         AGGREGATE_TYPE,
+        AGGREGATE_DISTINCT,
         AGGREGATE_OUTPUT_COLUMN,
         AGGREGATE_EXPRESSION,
         GROUPBY_EXPRESSIONS;
@@ -42,6 +43,9 @@ public class AggregatePlanNode extends AbstractPlanNode {
     //     good enough for what we need in TPC-C for now...
     //
     protected List<ExpressionType> m_aggregateTypes = new ArrayList<ExpressionType>();
+    // a list of whether the aggregate is over distinct elements
+    // 0 is not distinct, 1 is distinct
+    protected List<Integer> m_aggregateDistinct = new ArrayList<Integer>();
     // a list of column offsets/indexes not plan column guids.
     protected List<Integer> m_aggregateOutputColumns = new ArrayList<Integer>();
     // List of the input TVEs into the aggregates.  Maybe should become
@@ -69,7 +73,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
         // We need to have an aggregate type and column
         // We're not checking that it's a valid ExpressionType because this plannode is a temporary hack
         //
-        if (m_aggregateTypes.size() != m_aggregateExpressions.size() ||
+        if (m_aggregateTypes.size() != m_aggregateDistinct.size() ||
+            m_aggregateDistinct.size() != m_aggregateExpressions.size() ||
             m_aggregateExpressions.size() != m_aggregateOutputColumns.size())
         {
             throw new Exception("ERROR: Mismatched number of aggregate expression column attributes for PlanNode '" + this + "'");
@@ -157,16 +162,26 @@ public class AggregatePlanNode extends AbstractPlanNode {
     /**
      * Add an aggregate to this plan node.
      * @param aggType
+     * @param isDistinct  Is distinct being applied to the argument of this aggregate?
      * @param aggOutputColumn  Which output column in the output schema this
      *        aggregate should occupy
      * @param aggInputExpr  The input expression which should get aggregated
      */
     public void addAggregate(ExpressionType aggType,
+                             boolean isDistinct,
                              Integer aggOutputColumn,
                              AbstractExpression aggInputExpr)
     {
         assert(aggInputExpr != null);
         m_aggregateTypes.add(aggType);
+        if (isDistinct)
+        {
+            m_aggregateDistinct.add(1);
+        }
+        else
+        {
+            m_aggregateDistinct.add(0);
+        }
         m_aggregateOutputColumns.add(aggOutputColumn);
         try
         {
@@ -206,6 +221,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         for (int ii = 0; ii < m_aggregateTypes.size(); ii++) {
             stringer.object();
             stringer.key(Members.AGGREGATE_TYPE.name()).value(m_aggregateTypes.get(ii).name());
+            stringer.key(Members.AGGREGATE_DISTINCT.name()).value(m_aggregateDistinct.get(ii));
             stringer.key(Members.AGGREGATE_OUTPUT_COLUMN.name()).value(m_aggregateOutputColumns.get(ii));
             stringer.key(Members.AGGREGATE_EXPRESSION.name());
             stringer.object();

@@ -724,7 +724,7 @@ public class PlanAssembler {
         count_tve.setColumnName("modified_tuples");
         count_tve.setColumnAlias("modified_tuples");
         count_tve.setTableName("VOLT_TEMP_TABLE");
-        countNode.addAggregate(ExpressionType.AGGREGATE_SUM, 0, count_tve);
+        countNode.addAggregate(ExpressionType.AGGREGATE_SUM, false, 0, count_tve);
 
         // The output column. Not really based on a TVE (it is really the
         // count expression represented by the count configured above). But
@@ -861,14 +861,12 @@ public class PlanAssembler {
                     rootExpr.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR)
                 {
                     agg_input_expr = rootExpr.getLeft();
-                    // Distinct can, in theory, handle any expression now,
+                    // Aggregates can, in theory, handle any expression now,
                     // but it's untested so we'll balk on anything other than
                     // a TVE here for now --izzy
                     if (rootExpr.getLeft() instanceof TupleValueExpression)
                     {
-                        if (((AggregateExpression)rootExpr).m_distinct) {
-                            root = addDistinctNode(root, rootExpr.getLeft());
-                        }
+                        // XXX-IZZY this should go away when ENG-205 is fixed
                     }
                     // count(*) hack.  we're not getting AGGREGATE_COUNT_STAR
                     // expression types from the parsing, so we have
@@ -914,8 +912,9 @@ public class PlanAssembler {
                     tve.setColumnName("");
                     tve.setColumnAlias(col.alias);
                     tve.setTableName("VOLT_TEMP_TABLE");
-                    aggNode.addAggregate(agg_expression_type, outputColumnIndex,
-                                         agg_input_expr);
+                    boolean is_distinct = ((AggregateExpression)rootExpr).m_distinct;
+                    aggNode.addAggregate(agg_expression_type, is_distinct,
+                                         outputColumnIndex, agg_input_expr);
                     schema_col = new SchemaColumn("VOLT_TEMP_TABLE",
                                                   "",
                                                   col.alias,

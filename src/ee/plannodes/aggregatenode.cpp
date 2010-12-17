@@ -102,6 +102,12 @@ AggregatePlanNode::getAggregates() const
     return m_aggregates;
 }
 
+const vector<bool>&
+AggregatePlanNode::getDistinctAggregates() const
+{
+    return m_distinctAggregates;
+}
+
 const vector<AbstractExpression*>&
 AggregatePlanNode::getGroupByExpressions() const
 {
@@ -117,6 +123,8 @@ string AggregatePlanNode::debugInfo(const string &spacer) const {
     {
         buffer << spacer << "type="
                << expressionutil::getTypeName(m_aggregates[ctr]) << "\n";
+        buffer << spacer << "distinct="
+               << m_distinctAggregates[ctr] << "\n";
         buffer << spacer << "outcol="
                << m_aggregateOutputColumns[ctr] << "\n";
         buffer << spacer << "expr="
@@ -154,6 +162,7 @@ AggregatePlanNode::loadFromJSONObject(Object &obj,
         Value aggregateColumnValue = aggregateColumnsArray[ii];
         Object aggregateColumn = aggregateColumnValue.get_obj();
         bool containsType = false;
+        bool containsDistinct = false;
         bool containsOutputColumn = false;
         bool containsExpression = false;
         for (int zz = 0; zz < aggregateColumn.size(); zz++)
@@ -165,6 +174,16 @@ AggregatePlanNode::loadFromJSONObject(Object &obj,
                     aggregateColumn[zz].value_.get_str();
                 m_aggregates.
                     push_back(stringToExpression(aggregateColumnTypeString));
+            }
+            else if (aggregateColumn[zz].name_ == "AGGREGATE_DISTINCT")
+            {
+                containsDistinct = true;
+                bool distinct = false;
+                if (aggregateColumn[zz].value_.get_int() == 1)
+                {
+                    distinct = true;
+                }
+                m_distinctAggregates.push_back(distinct);
             }
             else if (aggregateColumn[zz].name_ == "AGGREGATE_OUTPUT_COLUMN")
             {
@@ -179,7 +198,8 @@ AggregatePlanNode::loadFromJSONObject(Object &obj,
                     push_back(AbstractExpression::buildExpressionTree(aggregateColumn[zz].value_.get_obj()));
             }
         }
-        assert(containsType && containsOutputColumn && containsExpression);
+        assert(containsType && containsDistinct &&
+               containsOutputColumn && containsExpression);
     }
 
     Value groupByExpressionsValue = find_value(obj, "GROUPBY_EXPRESSIONS");

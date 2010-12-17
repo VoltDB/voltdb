@@ -83,29 +83,63 @@ namespace voltdb {
 typedef std::vector<int> PassThroughColType;
 
 /*
+ * Type of the hash set used to check for column aggregate distinctness
+ */
+typedef boost::unordered_set<NValue,
+                             NValue::hash,
+                             NValue::equal_to> AggregateNValueSetType;
+
+/*
  * Base class for an individual aggregate that aggregates a specific
  * column for a group
  */
 class Agg
 {
 public:
+    Agg(bool isDistinct) : mIsDistinct(isDistinct)
+    {}
     virtual ~Agg() {}
     virtual void advance(const NValue val) = 0;
     virtual NValue finalize() = 0;
+protected:
+    bool includeValue(NValue val)
+    {
+        bool retval = true;
+        if (mIsDistinct)
+        {
+            // find this value in the set.  If it doesn't exist, add
+            // it, otherwise indicate it shouldn't be included in the
+            // aggregate
+            AggregateNValueSetType::iterator setval =
+                mDistinctVals.find(val);
+            if (setval == mDistinctVals.end())
+            {
+                mDistinctVals.insert(val);
+            }
+            else
+            {
+                retval = false;
+            }
+        }
+        return retval;
+    }
+
+    bool mIsDistinct;
+    AggregateNValueSetType mDistinctVals;
 };
 
 class SumAgg : public Agg
 {
   public:
-    SumAgg() :
-        m_haveAdvanced(false)
+    SumAgg(bool isDistinct) :
+        Agg(isDistinct), m_haveAdvanced(false)
     {
         // m_value initialized on first advance
     }
 
     void advance(const NValue val)
     {
-        if (val.isNull()) {
+        if (val.isNull() || !includeValue(val)) {
             return;
         }
         if (!m_haveAdvanced) {
@@ -134,15 +168,15 @@ private:
 
 class AvgAgg : public Agg {
 public:
-    AvgAgg() :
-        m_count(0)
+    AvgAgg(bool isDistinct) :
+        Agg(isDistinct), m_count(0)
     {
         // m_value initialized on first advance.
     }
 
     void advance(const NValue val)
     {
-        if (val.isNull()) {
+        if (val.isNull() || !includeValue(val)) {
             return;
         }
         if (m_count == 0) {
@@ -174,13 +208,13 @@ private:
 class CountAgg : public Agg
 {
 public:
-    CountAgg() :
-        m_count(0)
+    CountAgg(bool isDistinct) :
+        Agg(isDistinct), m_count(0)
     {}
 
     void advance(const NValue val)
     {
-        if (val.isNull())
+        if (val.isNull() || !includeValue(val))
         {
             return;
         }
@@ -199,8 +233,8 @@ private:
 class CountStarAgg : public Agg
 {
 public:
-    CountStarAgg() :
-        m_count(0)
+    CountStarAgg(bool isDistinct) :
+        Agg(isDistinct), m_count(0)
     {}
 
     void advance(const NValue val)
@@ -220,15 +254,16 @@ private:
 class MaxAgg : public Agg
 {
 public:
-    MaxAgg() :
-        m_haveAdvanced(false)
+    MaxAgg(bool isDistinct) :
+        Agg(isDistinct), m_haveAdvanced(false)
     {
         m_value.setNull();
     }
 
     void advance(const NValue val)
     {
-        if (val.isNull()) {
+        if (val.isNull() || !includeValue(val))
+        {
             return;
         }
         if (!m_haveAdvanced)
@@ -258,15 +293,16 @@ private:
 class MinAgg : public Agg
 {
 public:
-    MinAgg() :
-        m_haveAdvanced(false)
+    MinAgg(bool isDistinct) :
+        Agg(isDistinct), m_haveAdvanced(false)
     {
         m_value.setNull();
     }
 
     void advance(const NValue val)
     {
-        if (val.isNull()) {
+        if (val.isNull() || !includeValue(val))
+        {
             return;
         }
         if (!m_haveAdvanced)
@@ -298,27 +334,28 @@ private:
  * type, column type, and result type. The object is constructed in
  * memory from the provided memrory pool.
  */
-inline Agg* getAggInstance(Pool* memoryPool, ExpressionType agg_type)
+inline Agg* getAggInstance(Pool* memoryPool, ExpressionType agg_type,
+                           bool isDistinct)
 {
     Agg* agg;
     switch (agg_type) {
     case EXPRESSION_TYPE_AGGREGATE_COUNT:
-        agg = new (memoryPool->allocate(sizeof(CountAgg))) CountAgg();
+        agg = new (memoryPool->allocate(sizeof(CountAgg))) CountAgg(isDistinct);
         break;
     case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
-        agg = new (memoryPool->allocate(sizeof(CountStarAgg))) CountStarAgg();
+        agg = new (memoryPool->allocate(sizeof(CountStarAgg))) CountStarAgg(isDistinct);
         break;
     case EXPRESSION_TYPE_AGGREGATE_SUM:
-        agg = new (memoryPool->allocate(sizeof(SumAgg))) SumAgg();
+        agg = new (memoryPool->allocate(sizeof(SumAgg))) SumAgg(isDistinct);
         break;
     case EXPRESSION_TYPE_AGGREGATE_AVG:
-        agg = new (memoryPool->allocate(sizeof(AvgAgg))) AvgAgg();
+        agg = new (memoryPool->allocate(sizeof(AvgAgg))) AvgAgg(isDistinct);
         break;
     case EXPRESSION_TYPE_AGGREGATE_MIN:
-        agg = new (memoryPool->allocate(sizeof(MinAgg))) MinAgg();
+        agg = new (memoryPool->allocate(sizeof(MinAgg))) MinAgg(isDistinct);
         break;
     case EXPRESSION_TYPE_AGGREGATE_MAX  :
-        agg = new (memoryPool->allocate(sizeof(MaxAgg))) MaxAgg();
+        agg = new (memoryPool->allocate(sizeof(MaxAgg))) MaxAgg(isDistinct);
         break;
     default: {
         char message[128];
@@ -488,6 +525,7 @@ public:
                       Table* input_table,
                       Table* output_table,
                       std::vector<ExpressionType> *agg_types,
+                      const std::vector<bool>& distinctAggs,
                       const std::vector<AbstractExpression*>& groupByExpressions,
                       std::vector<ValueType> *col_types)
         : m_memoryPool(memoryPool),
@@ -497,6 +535,7 @@ public:
           m_inputTable(input_table),
           m_outputTable(output_table),
           m_aggTypes(agg_types),
+          m_distinctAggs(distinctAggs),
           m_groupByExpressions(groupByExpressions),
           m_colTypes(col_types),
           groupByKeyTuple(groupByKeySchema)
@@ -534,7 +573,8 @@ public:
                 // Map aggregate index i to the corresponding output
                 // column.
                 aggregateList->m_aggregates[i] =
-                    getAggInstance(m_memoryPool, (*m_aggTypes)[i]);
+                    getAggInstance(m_memoryPool, (*m_aggTypes)[i],
+                                   m_distinctAggs[i]);
             }
             m_aggregates.
                 insert(HashAggregateMapType::value_type(groupByKeyTuple,
@@ -590,7 +630,8 @@ public:
                 // aggregate index i and the associated output column
                 aggregates[i] =
                     getAggInstance(m_memoryPool,
-                                   (*m_aggTypes)[i]);
+                                   (*m_aggTypes)[i],
+                                   m_distinctAggs[i]);
             }
             if (!helper(m_node, aggregates, m_outputTable, m_inputTable,
                         prevTuple, m_passThroughColumns))
@@ -609,6 +650,7 @@ private:
     Table* m_inputTable;
     Table* m_outputTable;
     std::vector<ExpressionType>* m_aggTypes;
+    const std::vector<bool>& m_distinctAggs;
     const std::vector<AbstractExpression*>& m_groupByExpressions;
     std::vector<ValueType>* m_colTypes;
     HashAggregateMapType m_aggregates;
@@ -630,6 +672,7 @@ public:
                       Table* input_table,
                       Table* output_table,
                       std::vector<ExpressionType>* agg_types,
+                      const std::vector<bool>& distinctAggs,
                       const std::vector<AbstractExpression*>& groupByExpressions,
                       std::vector<ValueType>* col_types) :
         m_memoryPool(memoryPool),
@@ -639,6 +682,7 @@ public:
         m_inputTable(input_table),
         m_outputTable(output_table),
         m_aggTypes(agg_types),
+        m_distinctAggs(distinctAggs),
         m_groupByExpressions(groupByExpressions),
         m_colTypes(col_types),
         m_aggs(static_cast<Agg**>(memoryPool->allocate(sizeof(void*) *
@@ -690,7 +734,8 @@ public:
                     m_aggs[i]->~Agg();
                 }
                 m_aggs[i] =
-                    getAggInstance(m_memoryPool, (*m_aggTypes)[i]);
+                    getAggInstance(m_memoryPool, (*m_aggTypes)[i],
+                                   m_distinctAggs[i]);
             }
         }
         for (int i = 0; i < m_colTypes->size(); i++)
@@ -726,7 +771,8 @@ public:
                 //aggregate index i and the output column associated
                 //with it
                 m_aggs[i] =
-                    getAggInstance(m_memoryPool, (*m_aggTypes)[i]);
+                    getAggInstance(m_memoryPool, (*m_aggTypes)[i],
+                                   m_distinctAggs[i]);
             }
             if (!helper(m_node, m_aggs, m_outputTable, m_inputTable,
                         prevTuple, m_passThroughColumns))
@@ -745,6 +791,7 @@ private:
     Table* m_inputTable;
     Table* m_outputTable;
     std::vector<ExpressionType>* m_aggTypes;
+    const std::vector<bool>& m_distinctAggs;
     const std::vector<AbstractExpression*>& m_groupByExpressions;
     std::vector<ValueType>* m_colTypes;
     Agg** m_aggs;
@@ -861,6 +908,8 @@ bool AggregateExecutor<aggregateType>::p_execute(const NValueArray &params)
 
     TableIterator it = input_table->iterator();
 
+    const std::vector<bool> distinctAggs =
+        node->getDistinctAggregates();
     std::vector<AbstractExpression*> groupByExpressions =
         node->getGroupByExpressions();
     TableTuple prev(input_table->schema());
@@ -868,7 +917,7 @@ bool AggregateExecutor<aggregateType>::p_execute(const NValueArray &params)
     Aggregator<aggregateType> aggregator(&m_memoryPool, m_groupByKeySchema,
                                          node, &m_passThroughColumns,
                                          input_table, output_table,
-                                         &agg_types,
+                                         &agg_types, distinctAggs,
                                          groupByExpressions, &col_types);
 
     VOLT_TRACE("looping..");

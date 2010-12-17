@@ -63,6 +63,8 @@ public:
     std::vector<ExpressionType> getAggregates();
     const std::vector<ExpressionType> getAggregates() const;
 
+    const std::vector<bool>& getDistinctAggregates() const;
+
     /*
      * Returns a list of output column indices that map from each
      * aggregation to an output column. These are serialized as
@@ -97,12 +99,8 @@ protected:
     virtual void loadFromJSONObject(json_spirit::Object& obj,
                                     const catalog::Database* catalog_db);
 
-    //
-    // HACK: We use a simple type to keep track of function we are
-    // going to execute.  For TPC-C, there will only be output column
-    // produced...
-    //
     std::vector<ExpressionType> m_aggregates;
+    std::vector<bool> m_distinctAggregates;
     std::vector<int> m_aggregateOutputColumns;
     std::vector<AbstractExpression*> m_aggregateInputExpressions;
 

@@ -48,6 +48,8 @@ SELECT * from @from_tables ORDER BY _variable, _variable
 
 -- additional aggregation fun
 SELECT _agg(DISTINCT(_variable)) FROM @from_tables
+-- ENG-909
+SELECT _agg(DISTINCT(_variable)), _agg(_variable) FROM @from_tables
 SELECT _variable, _agg(_variable) FROM @from_tables GROUP BY _variable
 SELECT SUM(_variable _math _variable) FROM @from_tables
 -- ENG-199.  Substituting this generic version
