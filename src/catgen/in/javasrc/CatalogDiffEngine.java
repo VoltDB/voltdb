@@ -76,6 +76,8 @@ public class CatalogDiffEngine {
                 return true;
             if (suspect instanceof Connector)
                 return true;
+            if (suspect instanceof SnapshotSchedule)
+                return true;
         } while ((suspect = suspect.m_parent) != null);
 
         m_errors.append("May not dynamically add/drop: " + orig + "\n");
@@ -104,6 +106,8 @@ public class CatalogDiffEngine {
             if (suspect instanceof Group)
                 return true;
             if (suspect instanceof Procedure)
+                return true;
+            if (suspect instanceof SnapshotSchedule)
                 return true;
         } while ((suspect = suspect.m_parent) != null);
 

@@ -36,20 +36,20 @@ class SnapshotDaemon {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    private final TimeUnit m_frequencyUnit;
-    private final long m_frequencyInMillis;
-    private final int m_frequency;
-    private final int m_retain;
-    private final String m_path;
-    private final String m_prefix;
-    private final String m_prefixAndSeparator;
+    private TimeUnit m_frequencyUnit;
+    private long m_frequencyInMillis;
+    private int m_frequency;
+    private int m_retain;
+    private String m_path;
+    private String m_prefix;
+    private String m_prefixAndSeparator;
 
     private final SimpleDateFormat m_dateFormat = new SimpleDateFormat("'_'yyyy.MM.dd.HH.mm.ss");
 
     // true if this SnapshotDaemon is the one responsible for generating
     // snapshots
     private boolean m_isActive = false;
-    private long m_nextSnapshotTime = System.currentTimeMillis();
+    private long m_nextSnapshotTime;
 
     /**
      * Don't invoke sysprocs too close together.
@@ -102,8 +102,7 @@ class SnapshotDaemon {
 
     private State m_state = State.STARTUP;
 
-    SnapshotDaemon(final SnapshotSchedule schedule) {
-        if (schedule == null) {
+    SnapshotDaemon() {
             m_frequencyUnit = null;
             m_retain = 0;
             m_frequency = 0;
@@ -111,33 +110,6 @@ class SnapshotDaemon {
             m_prefix = null;
             m_path = null;
             m_prefixAndSeparator = null;
-        } else {
-            m_frequency = schedule.getFrequencyvalue();
-            m_retain = schedule.getRetain();
-            m_path = schedule.getPath();
-            m_prefix = schedule.getPrefix();
-            m_prefixAndSeparator = m_prefix + "_";
-            final String frequencyUnitString = schedule.getFrequencyunit().toLowerCase();
-            assert(frequencyUnitString.length() == 1);
-            final char frequencyUnit = frequencyUnitString.charAt(0);
-
-            switch (frequencyUnit) {
-            case 's':
-                m_frequencyUnit = TimeUnit.SECONDS;
-                break;
-            case 'm':
-                m_frequencyUnit = TimeUnit.MINUTES;
-                break;
-            case 'h':
-                m_frequencyUnit = TimeUnit.HOURS;
-                break;
-                default:
-                    throw new RuntimeException("Frequency unit " + frequencyUnitString + "" +
-                            " in snapshot schedule is not one of d,m,h");
-            }
-            m_frequencyInMillis = TimeUnit.MILLISECONDS.convert( m_frequency, m_frequencyUnit);
-            m_nextSnapshotTime += m_frequencyInMillis;
-        }
 
         // Register the snapshot status to the StatsAgent
         SnapshotStatus snapshotStatus = new SnapshotStatus("Snapshot Status");
@@ -149,9 +121,34 @@ class SnapshotDaemon {
     /**
      * Make this SnapshotDaemon responsible for generating snapshots
      */
-    public synchronized void makeActive()
+    public synchronized void makeActive(SnapshotSchedule schedule)
     {
         m_isActive = true;
+        m_frequency = schedule.getFrequencyvalue();
+        m_retain = schedule.getRetain();
+        m_path = schedule.getPath();
+        m_prefix = schedule.getPrefix();
+        m_prefixAndSeparator = m_prefix + "_";
+        final String frequencyUnitString = schedule.getFrequencyunit().toLowerCase();
+        assert(frequencyUnitString.length() == 1);
+        final char frequencyUnit = frequencyUnitString.charAt(0);
+
+        switch (frequencyUnit) {
+        case 's':
+            m_frequencyUnit = TimeUnit.SECONDS;
+            break;
+        case 'm':
+            m_frequencyUnit = TimeUnit.MINUTES;
+            break;
+        case 'h':
+            m_frequencyUnit = TimeUnit.HOURS;
+            break;
+            default:
+                throw new RuntimeException("Frequency unit " + frequencyUnitString + "" +
+                        " in snapshot schedule is not one of d,m,h");
+        }
+        m_frequencyInMillis = TimeUnit.MILLISECONDS.convert( m_frequency, m_frequencyUnit);
+        m_nextSnapshotTime = System.currentTimeMillis() + m_frequencyInMillis;
     }
 
     public synchronized void makeInactive() {
@@ -252,7 +249,7 @@ class SnapshotDaemon {
     }
 
     /**
-     * Invoke the \@SnapshotScan system procedure to discover
+     * Invoke the @SnapshotScan system procedure to discover
      * snapshots on disk that are managed by this daemon
      * @return
      */

@@ -45,7 +45,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Site;
-import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -389,8 +388,6 @@ public class RealVoltDB implements VoltDBInterface
             serializedCatalog = catalog.serialize();
 
             m_catalogContext = new CatalogContext(catalog, m_config.m_pathToCatalog, depCRC, catalogVersion, -1);
-            final SnapshotSchedule schedule =
-                m_catalogContext.database.getSnapshotschedule().get("default");
 
             // requires a catalog context.
             m_faultManager = new FaultDistributor(this);
@@ -621,7 +618,6 @@ public class RealVoltDB implements VoltDBInterface
                                                currSiteId,
                                                site.getInitiatorid(),
                                                config.m_port + portOffset++,
-                                               schedule,
                                                m_config.m_timestampTestingSalt);
                     m_clientInterfaces.add(ci);
                     try {

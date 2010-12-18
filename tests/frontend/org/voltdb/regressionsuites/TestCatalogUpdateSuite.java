@@ -25,6 +25,7 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.io.File;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -438,6 +439,64 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
        }
     }
 
+    private void deleteDirectory(File dir) {
+        if (!dir.exists() || !dir.isDirectory()) {
+            return;
+        }
+
+        for (File f : dir.listFiles()) {
+            assertTrue(f.delete());
+        }
+        assertTrue(dir.delete());
+    }
+
+    /**
+     * Start with snapshots disabled. Enable them to one directory, check that the snapshot files are created
+     * with the correct prefix. Update the catalog to do the snapshots in a different directory with a
+     * different prefix and check to make sure they start going to the right place. Update the catalog
+     * to disable them and then make sure no snapshots appear.
+     * @throws Exception
+     */
+    public void testEnableModifyDisableSnapshot() throws Exception {
+        deleteDirectory(new File("/tmp/snapshotdir1"));
+        deleteDirectory(new File("/tmp/snapshotdir2"));
+        try {
+            assertTrue(new File("/tmp/snapshotdir1").mkdir());
+            assertTrue(new File("/tmp/snapshotdir2").mkdir());
+            Client client = getClient();
+            String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-enable_snapshot.jar");
+            String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-enable_snapshot.xml");
+            VoltTable[] results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
+            assertTrue(results.length == 1);
+            Thread.sleep(5000);
+            for (File f : new File("/tmp/snapshotdir1").listFiles()) {
+                assertTrue(f.getName().startsWith("foo1"));
+            }
+            newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot.jar");
+            deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot.xml");
+            results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
+            assertTrue(results.length == 1);
+            Thread.sleep(5000);
+            for (File f : new File("/tmp/snapshotdir2").listFiles()) {
+                assertTrue(f.getName().startsWith("foo2"));
+            }
+            newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
+            deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml");
+            results = client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
+            assertTrue(results.length == 1);
+            deleteDirectory(new File("/tmp/snapshotdir1"));
+            deleteDirectory(new File("/tmp/snapshotdir2"));
+            assertTrue(new File("/tmp/snapshotdir1").mkdir());
+            assertTrue(new File("/tmp/snapshotdir2").mkdir());
+            Thread.sleep(5000);
+            assertTrue(new File("/tmp/snapshotdir1").listFiles().length == 0);
+            assertTrue(new File("/tmp/snapshotdir2").listFiles().length == 0);
+        } finally {
+            deleteDirectory(new File("/tmp/snapshotdir1"));
+            deleteDirectory(new File("/tmp/snapshotdir2"));
+        }
+    }
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
@@ -550,6 +609,31 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         compile = config.compile(project);
         assertTrue(compile);
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-many.xml"));
+
+
+        // A catalog change that enables snapshots
+        config = new LocalCluster("catalogupdate-cluster-enable_snapshot.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addProcedures(BASEPROCS);
+        project.setSnapshotSettings( "1s", 3, "/tmp/snapshotdir1", "foo1");
+        // build the jarfile
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-enable_snapshot.xml"));
+
+        //Another catalog change to modify the schedule
+        config = new LocalCluster("catalogupdate-cluster-change_snapshot.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addProcedures(BASEPROCS);
+        project.setSnapshotSettings( "1s", 3, "/tmp/snapshotdir2", "foo2");
+        // build the jarfile
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot.xml"));
 
         return builder;
     }

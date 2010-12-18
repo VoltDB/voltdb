@@ -80,7 +80,7 @@ public class ClientInterface implements DumpManager.Dumpable {
     private final TransactionInitiator m_initiator;
     private final AsyncCompilerWorkThread m_asyncCompilerWorkThread;
     private final ArrayList<Connection> m_connections = new ArrayList<Connection>();
-    private final SnapshotDaemon m_snapshotDaemon;
+    private final SnapshotDaemon m_snapshotDaemon = new SnapshotDaemon();
     private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
 
     // Atomically allows the catalog reference to change between access
@@ -700,7 +700,6 @@ public class ClientInterface implements DumpManager.Dumpable {
             int siteId,
             int initiatorId,
             int port,
-            SnapshotSchedule schedule,
             long timestampTestingSalt) {
 
         int myHostId = -1;
@@ -745,7 +744,7 @@ public class ClientInterface implements DumpManager.Dumpable {
         plannerThread.start();
         final ClientInterface ci = new ClientInterface(
                 port, context, network, siteId, initiator,
-                plannerThread, allPartitions, schedule,
+                plannerThread, allPartitions,
                 VoltDB.instance().recovering());
         onBackPressure.m_ci = ci;
         offBackPressure.m_ci = ci;
@@ -755,7 +754,7 @@ public class ClientInterface implements DumpManager.Dumpable {
 
     ClientInterface(int port, CatalogContext context, VoltNetwork network, int siteId,
                     TransactionInitiator initiator, AsyncCompilerWorkThread plannerThread,
-                    int[] allPartitions, SnapshotSchedule schedule, boolean recovering)
+                    int[] allPartitions, boolean recovering)
     {
         m_catalogContext.set(context);
         m_initiator = initiator;
@@ -769,7 +768,6 @@ public class ClientInterface implements DumpManager.Dumpable {
         DumpManager.register(m_dumpId, this);
 
         m_acceptor = new ClientAcceptor(port, network);
-        m_snapshotDaemon = new SnapshotDaemon(schedule);
 
         if (!recovering)
         {
@@ -780,9 +778,12 @@ public class ClientInterface implements DumpManager.Dumpable {
     // if this ClientInterface's site ID is the lowest non-execution site ID
     // in the cluster, make our SnapshotDaemon responsible for snapshots
     public void mayActivateSnapshotDaemon() {
+        SnapshotSchedule schedule = m_catalogContext.get().database.getSnapshotschedule().get("default");
         if (m_siteId ==
-                m_catalogContext.get().siteTracker.getLowestLiveNonExecSiteId()) {
-            m_snapshotDaemon.makeActive();
+                m_catalogContext.get().siteTracker.getLowestLiveNonExecSiteId() && schedule != null) {
+            m_snapshotDaemon.makeActive(schedule);
+        } else {
+            m_snapshotDaemon.makeInactive();
         }
     }
 
@@ -1082,16 +1083,8 @@ public class ClientInterface implements DumpManager.Dumpable {
         if (m_shouldUpdateCatalog.compareAndSet(true, false)) {
             m_catalogContext.set(VoltDB.instance().getCatalogContext());
             m_asyncCompilerWorkThread.notifyShouldUpdateCatalog();
-            // When the catalog updates, check to see if we're now
-            // responsible for snapshots since a node failure might have
-            // caused this
-            if (m_siteId ==
-                m_catalogContext.get().siteTracker.getLowestLiveNonExecSiteId())
-            {
-                m_snapshotDaemon.makeActive();
-            } else {
-                m_snapshotDaemon.makeInactive();
-            }
+            //Update snapshot daemon settings
+            mayActivateSnapshotDaemon();
         }
 
         // poll planner queue
