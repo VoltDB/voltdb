@@ -9,11 +9,11 @@ my $revision = "";
 
 my @svnstatus = `svn status`;
 my @svninfo = `svn info`;
-my $dirty = false;
+my $dirty = 0;
 
 if (scalar(@svnstatus) != 0) {
     print "This is a dirty svn working copy or not an svn working copy\n";
-    $dirty = true;
+    $dirty = 1;
 }
 
 if ($? != 0) {
@@ -41,8 +41,7 @@ if (($#ARGV + 1) > 0) {
 }
 
 # mark dirty if that is the case
-if ($dirty == true) {
-    print "Marking revision as 'dirty'\n";
+if ($dirty) {
     $revision .= "-dirty";
 }
 
