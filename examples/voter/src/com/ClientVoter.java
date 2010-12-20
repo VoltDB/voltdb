@@ -204,7 +204,9 @@ public class ClientVoter {
         while (endTime > currentTime) {
             num_sp_calls++;
 
-            phoneNumber = rand.nextLong() % 9999999999l;
+            // produce phone numbers between 2xx-xxx-xxxx and 9xx-xxx-xxxx
+            phoneNumber = 2000000000l + (Math.abs(rand.nextLong()) % 8000000000l);
+
             contestantNumber = (byte) (((rand.nextInt(maxContestant) * rand.nextInt(maxContestant)) % maxContestant) + 1);
             if ((num_sp_calls % 100) == 0) {
                 // introduce a potentially bad contestant number every 100 votes
