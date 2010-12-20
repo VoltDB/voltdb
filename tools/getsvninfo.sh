@@ -41,7 +41,7 @@ if (($#ARGV + 1) > 0) {
 }
 
 # mark dirty if that is the case
-if ($dirty) {
+if ($dirty == true) {
     $revision .= "-dirty";
 }
 
