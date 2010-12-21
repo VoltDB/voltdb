@@ -23,18 +23,18 @@
 
 package org.voltdb.catalog;
 
+import java.io.IOException;
+
 import junit.framework.TestCase;
 
 import org.voltdb.CatalogContext;
+import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 
 public class TestCatalogVersioning extends TestCase {
 
-    public void testSimplest() {
+    public void testSimplest() throws IOException {
         // CREATE A CATALOG AND LOAD FROM SERIALIZATION
-        Catalog catalog = new Catalog();
-        System.out.printf("Current catalog version info current/node/subtree: %d/%d/%d\n",
-                catalog.m_currentCatalogVersion, catalog.m_nodeVersion, catalog.m_subTreeVersion);
-        catalog.execute(LoadCatalogToString.THE_CATALOG);
+        Catalog catalog = TPCCProjectBuilder.getTPCCSchemaCatalog();
         System.out.printf("Current catalog version info current/node/subtree: %d/%d/%d\n",
                 catalog.m_currentCatalogVersion, catalog.m_nodeVersion, catalog.m_subTreeVersion);
 
@@ -59,7 +59,7 @@ public class TestCatalogVersioning extends TestCase {
 
         // REMOVE A PROC
 
-        catalog.execute("delete /clusters[cluster]/databases[database] procedures MilestoneOneCombined");
+        catalog.execute("delete /clusters[cluster]/databases[database] procedures InsertCustomer");
         System.out.printf("Current catalog version info current/node/subtree: %d/%d/%d\n",
                 catalog.m_currentCatalogVersion, catalog.m_nodeVersion, catalog.m_subTreeVersion);
 
@@ -73,17 +73,17 @@ public class TestCatalogVersioning extends TestCase {
 
         // CHANGE A FIELD (or two)
 
-        catalog.execute("set /clusters[cluster]/databases[database]/procedures[MilestoneOneInsert] readonly true");
+        catalog.execute("set /clusters[cluster]/databases[database]/procedures[InsertWarehouse] readonly true");
         System.out.printf("Current catalog version info current/node/subtree: %d/%d/%d\n",
                 catalog.m_currentCatalogVersion, catalog.m_nodeVersion, catalog.m_subTreeVersion);
-        catalog.execute("set /clusters[cluster]/databases[database]/procedures[MilestoneOneInsert] partitionparameter 4");
+        catalog.execute("set /clusters[cluster]/databases[database]/procedures[InsertWarehouse] partitionparameter 4");
         System.out.printf("Current catalog version info current/node/subtree: %d/%d/%d\n",
                 catalog.m_currentCatalogVersion, catalog.m_nodeVersion, catalog.m_subTreeVersion);
 
         tablesVersion = tables.getSubTreeVersion();
         procsVersion = procs.getSubTreeVersion();
-        int procNVersion = procs.get("MilestoneOneInsert").getNodeVersion();
-        int procSTVersion = procs.get("MilestoneOneInsert").getSubTreeVersion();
+        int procNVersion = procs.get("InsertWarehouse").getNodeVersion();
+        int procSTVersion = procs.get("InsertWarehouse").getSubTreeVersion();
         catalogVersion = catalog.getSubTreeVersion();
 
         assertTrue(tablesVersion < procsVersion);
@@ -96,9 +96,8 @@ public class TestCatalogVersioning extends TestCase {
 
 
     // verify that a deepCopy preserves version data
-    public void testDeepCopyVersioning() {
-        Catalog catalog = new Catalog();
-        catalog.execute(LoadCatalogToString.THE_CATALOG);
+    public void testDeepCopyVersioning() throws IOException {
+        Catalog catalog = TPCCProjectBuilder.getTPCCSchemaCatalog();
         Catalog copy = catalog.deepCopy();
 
         assertTrue(catalog != copy);
@@ -108,9 +107,8 @@ public class TestCatalogVersioning extends TestCase {
 
     // a real catalog update happens on a deep copy.
     // make sure that preserves version numbers (ENG-634)
-    public void testUpdateViaContextAPI() {
-        Catalog catalog = new Catalog();
-        catalog.execute(LoadCatalogToString.THE_CATALOG);
+    public void testUpdateViaContextAPI() throws IOException {
+        Catalog catalog = TPCCProjectBuilder.getTPCCSchemaCatalog();
 
         String addTableFoo = "add /clusters[cluster]/databases[database] tables FOO";
         String addTableBar = "add /clusters[cluster]/databases[database] tables BAR";

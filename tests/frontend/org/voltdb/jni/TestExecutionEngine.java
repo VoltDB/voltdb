@@ -38,8 +38,8 @@ import org.voltdb.TableStreamType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.LoadCatalogToString;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.messaging.MockMailbox;
 import org.voltdb.messaging.RecoveryMessage;
@@ -55,9 +55,7 @@ import org.voltdb.utils.Pair;
 public class TestExecutionEngine extends TestCase {
 
     public void testLoadCatalogs() throws Exception {
-        Catalog catalog = new Catalog();
-        catalog.execute(LoadCatalogToString.THE_CATALOG);
-        sourceEngine.loadCatalog(catalog.serialize());
+        sourceEngine.loadCatalog(m_catalog.serialize());
     }
 
     public void testLoadBadCatalogs() throws Exception {
@@ -66,7 +64,7 @@ public class TestExecutionEngine extends TestCase {
          * loaded. We are really expecting an ERROR message on the terminal in
          * this case.
          */
-        String badCatalog = LoadCatalogToString.THE_CATALOG.replaceFirst("set", "bad");
+        String badCatalog = m_catalog.serialize().replaceFirst("set", "bad");
         try {
             sourceEngine.loadCatalog(badCatalog);
         } catch (final EEException e) {
@@ -87,11 +85,18 @@ public class TestExecutionEngine extends TestCase {
         int STOCK_TABLEID = stockTableId(catalog);
 
         VoltTable warehousedata = new VoltTable(
-                new VoltTable.ColumnInfo("W_ID", VoltType.INTEGER),
-                new VoltTable.ColumnInfo("W_NAME", VoltType.STRING)
+                new VoltTable.ColumnInfo("W_ID", VoltType.SMALLINT),
+                new VoltTable.ColumnInfo("W_NAME", VoltType.STRING),
+                new VoltTable.ColumnInfo("W_STREET_1", VoltType.STRING),
+                new VoltTable.ColumnInfo("W_STREET_2", VoltType.STRING),
+                new VoltTable.ColumnInfo("W_CITY", VoltType.STRING),
+                new VoltTable.ColumnInfo("W_STATE", VoltType.STRING),
+                new VoltTable.ColumnInfo("W_ZIP", VoltType.STRING),
+                new VoltTable.ColumnInfo("W_TAX", VoltType.FLOAT),
+                new VoltTable.ColumnInfo("W_YTD", VoltType.FLOAT)
         );
         for (int i = 0; i < 200; ++i) {
-            warehousedata.addRow(i, "str" + i);
+            warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
         }
 
         System.out.println(warehousedata.toString());
@@ -99,40 +104,52 @@ public class TestExecutionEngine extends TestCase {
 
         VoltTable stockdata = new VoltTable(
                 new VoltTable.ColumnInfo("S_I_ID", VoltType.INTEGER),
-                new VoltTable.ColumnInfo("S_W_ID", VoltType.INTEGER),
-                new VoltTable.ColumnInfo("S_QUANTITY", VoltType.INTEGER)
+                new VoltTable.ColumnInfo("S_W_ID", VoltType.SMALLINT),
+                new VoltTable.ColumnInfo("S_QUANTITY", VoltType.INTEGER),
+                new VoltTable.ColumnInfo("S_DIST_01", VoltType.STRING),
+                new VoltTable.ColumnInfo("S_DIST_02", VoltType.STRING),
+                new VoltTable.ColumnInfo("S_DIST_03", VoltType.STRING),
+                new VoltTable.ColumnInfo("S_DIST_04", VoltType.STRING),
+                new VoltTable.ColumnInfo("S_DIST_05", VoltType.STRING),
+                new VoltTable.ColumnInfo("S_DIST_06", VoltType.STRING),
+                new VoltTable.ColumnInfo("S_DIST_07", VoltType.STRING),
+                new VoltTable.ColumnInfo("S_DIST_08", VoltType.STRING),
+                new VoltTable.ColumnInfo("S_DIST_09", VoltType.STRING),
+                new VoltTable.ColumnInfo("S_DIST_10", VoltType.STRING),
+                new VoltTable.ColumnInfo("S_YTD", VoltType.INTEGER),
+                new VoltTable.ColumnInfo("S_ORDER_CNT", VoltType.INTEGER),
+                new VoltTable.ColumnInfo("S_REMOTE_CNT", VoltType.INTEGER),
+                new VoltTable.ColumnInfo("S_DATA", VoltType.STRING)
         );
         for (int i = 0; i < 1000; ++i) {
-            stockdata.addRow(i, i % 200, i * i);
+            stockdata.addRow(i, i % 200, i * i, "sdist1", "sdist2", "sdist3",
+                             "sdist4", "sdist5", "sdist6", "sdist7", "sdist8",
+                             "sdist9", "sdist10", 0, 0, 0, "sdata");
         }
         engine.loadTable(STOCK_TABLEID, stockdata, 0, 0, Long.MAX_VALUE, allowExport);
     }
 
     public void testLoadTable() throws Exception {
-        Catalog catalog = new Catalog();
-        catalog.execute(LoadCatalogToString.THE_CATALOG);
-        sourceEngine.loadCatalog(catalog.serialize());
+        sourceEngine.loadCatalog(m_catalog.serialize());
 
-        int WAREHOUSE_TABLEID = warehouseTableId(catalog);
-        int STOCK_TABLEID = stockTableId(catalog);
+        int WAREHOUSE_TABLEID = warehouseTableId(m_catalog);
+        int STOCK_TABLEID = stockTableId(m_catalog);
 
-        loadTestTables( sourceEngine, catalog);
+        loadTestTables( sourceEngine, m_catalog);
 
         assertEquals(200, sourceEngine.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         assertEquals(1000, sourceEngine.serializeTable(STOCK_TABLEID).getRowCount());
     }
 
     public void testStreamTables() throws Exception {
-        final Catalog catalog = new Catalog();
-        catalog.execute(LoadCatalogToString.THE_CATALOG);
-        sourceEngine.loadCatalog(catalog.serialize());
+        sourceEngine.loadCatalog(m_catalog.serialize());
         ExecutionEngine destinationEngine = new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID, 0, 0, "");
-        destinationEngine.loadCatalog(catalog.serialize());
+        destinationEngine.loadCatalog(m_catalog.serialize());
 
-        int WAREHOUSE_TABLEID = warehouseTableId(catalog);
-        int STOCK_TABLEID = stockTableId(catalog);
+        int WAREHOUSE_TABLEID = warehouseTableId(m_catalog);
+        int STOCK_TABLEID = stockTableId(m_catalog);
 
-        loadTestTables( sourceEngine, catalog);
+        loadTestTables( sourceEngine, m_catalog);
 
         sourceEngine.activateTableStream( WAREHOUSE_TABLEID, TableStreamType.RECOVERY );
         sourceEngine.activateTableStream( STOCK_TABLEID, TableStreamType.RECOVERY );
@@ -183,12 +200,10 @@ public class TestExecutionEngine extends TestCase {
         final int destinationId = 32;
         final AtomicReference<Boolean> sourceCompleted = new AtomicReference<Boolean>(false);
         final AtomicReference<Boolean> destinationCompleted = new AtomicReference<Boolean>(false);
-        final Catalog catalog = new Catalog();
-        catalog.execute(LoadCatalogToString.THE_CATALOG);
-        final String serializedCatalog = catalog.serialize();
+        final String serializedCatalog = m_catalog.serialize();
 
-        int WAREHOUSE_TABLEID = warehouseTableId(catalog);
-        int STOCK_TABLEID = stockTableId(catalog);
+        int WAREHOUSE_TABLEID = warehouseTableId(m_catalog);
+        int STOCK_TABLEID = stockTableId(m_catalog);
 
         final HashMap<Pair<String, Integer>, HashSet<Integer>> tablesAndDestinations =
             new HashMap<Pair<String, Integer>, HashSet<Integer>>();
@@ -227,7 +242,7 @@ public class TestExecutionEngine extends TestCase {
                     sourceEngine.loadCatalog(serializedCatalog);
 
                     try {
-                        loadTestTables( sourceEngine, catalog);
+                        loadTestTables( sourceEngine, m_catalog);
                     } catch (Exception e) {
                         // TODO Auto-generated catch block
                         e.printStackTrace();
@@ -323,12 +338,10 @@ public class TestExecutionEngine extends TestCase {
     }
 
     public void testGetStats() throws Exception {
-        final Catalog catalog = new Catalog();
-        catalog.execute(LoadCatalogToString.THE_CATALOG);
-        sourceEngine.loadCatalog(catalog.serialize());
+        sourceEngine.loadCatalog(m_catalog.serialize());
 
-        final int WAREHOUSE_TABLEID = catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("WAREHOUSE").getRelativeIndex();
-        final int STOCK_TABLEID = catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("STOCK").getRelativeIndex();
+        final int WAREHOUSE_TABLEID = m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("WAREHOUSE").getRelativeIndex();
+        final int STOCK_TABLEID = m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("STOCK").getRelativeIndex();
         final int locators[] = new int[] { WAREHOUSE_TABLEID, STOCK_TABLEID };
         final VoltTable results[] = sourceEngine.getStats(SysProcSelector.TABLE, locators, false, 0L);
         assertNotNull(results);
@@ -346,11 +359,16 @@ public class TestExecutionEngine extends TestCase {
     private static final int CLUSTER_ID = 2;
     private static final int NODE_ID = 1;
 
+    TPCCProjectBuilder m_project;
+    Catalog m_catalog;
+
     @Override
     protected void setUp() throws Exception {
         super.setUp();
         VoltDB.instance().readBuildInfo();
         sourceEngine = new ExecutionEngineJNI(null, CLUSTER_ID, NODE_ID, 0, 0, "");
+        m_project = new TPCCProjectBuilder();
+        m_catalog = m_project.createTPCCSchemaCatalog();
     }
 
     @Override

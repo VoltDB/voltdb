@@ -23,15 +23,18 @@
 
 package org.voltdb.catalog;
 
+import java.io.IOException;
+
+import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 
 import junit.framework.*;
 
 public class TestCatalogSerialization extends TestCase {
 
-    public void testSimplest() {
-        Catalog catalog1 = new Catalog();
-        catalog1.execute(LoadCatalogToString.THE_CATALOG);
+    public void testSimplest() throws IOException
+    {
+        Catalog catalog1 = TPCCProjectBuilder.getTPCCSchemaCatalog();
 
         String commands = catalog1.serialize();
         // System.out.println(commands);

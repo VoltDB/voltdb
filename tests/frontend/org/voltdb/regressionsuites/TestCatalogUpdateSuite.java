@@ -38,7 +38,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.benchmark.tpcc.procedures.InsertNewOrder;
-import org.voltdb.catalog.LoadCatalogToString;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
@@ -291,8 +290,9 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
     }
 
     public void negativeTests(Client client) throws UnsupportedEncodingException {
-        // this fails because the catalog URL isn't a real thing
-        URL url = LoadCatalogToString.class.getResource("catalog.txt");
+        // this fails because the catalog URL isn't a real thing but needs to point at
+        // a file that actually exists.  Point to the compiled java class for this suite
+        URL url = TestCatalogUpdateSuite.class.getResource("TestCatalogUpdateSuite.class");
         String newCatalogURL = URLDecoder.decode(url.getPath(), "UTF-8");
         try {
             client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, "foobar");

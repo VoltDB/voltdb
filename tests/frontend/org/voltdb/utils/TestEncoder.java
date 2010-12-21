@@ -23,11 +23,12 @@
 
 package org.voltdb.utils;
 
+import java.io.IOException;
 import java.util.Random;
 
 import junit.framework.TestCase;
 
-import org.voltdb.catalog.LoadCatalogToString;
+import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 
 public class TestEncoder extends TestCase {
 
@@ -68,8 +69,8 @@ public class TestEncoder extends TestCase {
         assertEquals(someText, result);
     }
 
-    public void testB64WithBigness() {
-        String someText = LoadCatalogToString.THE_CATALOG;
+    public void testB64WithBigness() throws IOException {
+        String someText = TPCCProjectBuilder.getTPCCSchemaCatalog().serialize();
 
         String b64Text = Encoder.compressAndBase64Encode(someText);
         String result = Encoder.decodeBase64AndDecompress(b64Text);

@@ -686,10 +686,6 @@ JAVA COMPILATION
         </fileset>
     </copy>
 
-    <copy
-        file='${src.test.dir}/org/voltdb/catalog/catalog.txt'
-        todir='${build.test.dir}/org/voltdb/catalog'/>
-
     <!-- compile the individual source directories -->
     <invoke-javac srcdir="${src.hsqldb.dir}"/>
     <invoke-javac srcdir="${src.jetty.dir}"/>
