@@ -201,6 +201,17 @@ public class TestVoltProcedure extends TestCase {
         }
     }
 
+    // See ENG-807
+    static class UnexpectedFailureFourProcedure extends NullProcedureWrapper
+    {
+        public static VoltTable[] run(String arg)
+        {
+            String[] haha = {"Amusingly", "Horrible", "Message"};
+            String boom = haha[4];
+            return new VoltTable[boom.length()];
+        }
+    }
+
     static class NullProcedureWrapper extends VoltProcedure {
         VoltTable runQueryStatement(SQLStmt stmt, Object... params) {
             assert false;
@@ -257,6 +268,7 @@ public class TestVoltProcedure extends TestCase {
         manager.addProcedureForTest(BoxedDoubleProcedure.class.getName());
         manager.addProcedureForTest(LongArrayProcedure.class.getName());
         manager.addProcedureForTest(NPEProcedure.class.getName());
+        manager.addProcedureForTest(UnexpectedFailureFourProcedure.class.getName());
         site = new MockExecutionSite(1, VoltDB.instance().getCatalogContext().catalog.serialize());
         nullParam = new ParameterSet();
         nullParam.setParameters(new Object[]{null});
@@ -360,7 +372,14 @@ public class TestVoltProcedure extends TestCase {
         ClientResponse r = call(NPEProcedure.class);
         assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.getStatus());
         System.out.println(r.getStatusString());
-        assertTrue(r.getStatusString().contains("Null Pointer Exception"));
+        assertTrue(r.getStatusString().contains("java.lang.NullPointerException"));
+    }
+
+    public void testUnexpectedFailureFour() {
+        ClientResponse r = call(UnexpectedFailureFourProcedure.class);
+        assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.getStatus());
+        System.out.println(r.getStatusString());
+        assertTrue(r.getStatusString().contains("java.lang.ArrayIndexOutOfBoundsException"));
     }
 
     public void testProcedureStatsCollector() {

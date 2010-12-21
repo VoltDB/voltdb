@@ -18,6 +18,9 @@
 package org.voltdb;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.io.Writer;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -1333,6 +1336,7 @@ public abstract class VoltProcedure {
      * @return A ClientResponse containing error information
      */
     private ClientResponseImpl getErrorResponse(Throwable e) {
+        boolean expected_failure = true;
         StackTraceElement[] stack = e.getStackTrace();
         ArrayList<StackTraceElement> matches = new ArrayList<StackTraceElement>();
         for (StackTraceElement ste : stack) {
@@ -1362,26 +1366,28 @@ public abstract class VoltProcedure {
         }
         else {
             msg.append("UNEXPECTED FAILURE:\n");
+            expected_failure = false;
         }
 
-        String exMsg = e.getMessage();
-        if (exMsg == null)
-            if (e.getClass() == NullPointerException.class) {
-                exMsg = "Null Pointer Exception";
+        // if the error is something we know can happen as part of normal
+        // operation, reduce the verbosity.  Otherwise, generate
+        // more output for debuggability
+        if (expected_failure)
+        {
+            msg.append("  ").append(e.getMessage());
+            for (StackTraceElement ste : matches) {
+                msg.append("\n    at ");
+                msg.append(ste.getClassName()).append(".").append(ste.getMethodName());
+                msg.append("(").append(ste.getFileName()).append(":");
+                msg.append(ste.getLineNumber()).append(")");
             }
-            else {
-                exMsg = "Possible Null Pointer Exception (";
-                exMsg += e.getClass().getSimpleName() + ")";
-                e.printStackTrace();
-            }
-
-        msg.append("  ").append(exMsg);
-
-        for (StackTraceElement ste : matches) {
-            msg.append("\n    at ");
-            msg.append(ste.getClassName()).append(".").append(ste.getMethodName());
-            msg.append("(").append(ste.getFileName()).append(":");
-            msg.append(ste.getLineNumber()).append(")");
+        }
+        else
+        {
+            Writer result = new StringWriter();
+            PrintWriter pw = new PrintWriter(result);
+            e.printStackTrace(pw);
+            msg.append("  ").append(result.toString());
         }
 
         return getErrorResponse(
