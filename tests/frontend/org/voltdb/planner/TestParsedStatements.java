@@ -66,6 +66,7 @@ public class TestParsedStatements extends TestCase {
         m_allSQL = new AllTpccSQL();
     }
 
+    @Override
     protected void tearDown() throws Exception {
         super.tearDown();
         m_hsql.close();
@@ -87,7 +88,7 @@ public class TestParsedStatements extends TestCase {
         xmlDebugOut.close();
 
         // get a parsed statement from the xml
-        AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(stmtSQL, xmlSQL, m_db);
+        AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(stmtSQL, xmlSQL, m_db, null);
         // output a description of the parsed stmt
         PrintStream parsedDebugOut = BuildDirectoryUtils.getDebugOutputPrintStream("statement-hsql-parsed", stmtName + ".txt");
         parsedDebugOut.println(parsedStmt.toString());

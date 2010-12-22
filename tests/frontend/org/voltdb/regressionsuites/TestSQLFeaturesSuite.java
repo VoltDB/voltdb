@@ -33,14 +33,8 @@ import org.voltdb.VoltTableRow;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
-import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.FeaturesSelectAll;
-import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.PassAllArgTypes;
-import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.PassByteArrayArg;
-import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.SelectOrderLineByDistInfo;
-import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.SelfJoinTest;
-import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.UpdateTests;
-import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.WorkWithBigString;
+import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.*;
+import org.voltdb_testprocs.regressionsuites.failureprocs.InsertLotsOfData;
 
 public class TestSQLFeaturesSuite extends RegressionSuite {
 
@@ -53,7 +47,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         FeaturesSelectAll.class, UpdateTests.class,
         SelfJoinTest.class, SelectOrderLineByDistInfo.class,
         BatchedMultiPartitionTest.class, WorkWithBigString.class, PassByteArrayArg.class,
-        PassAllArgTypes.class
+        PassAllArgTypes.class, InsertLotsOfData.class, SelectWithJoinOrder.class
     };
 
     /**
@@ -236,6 +230,52 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         }
     }
 
+    public void testJoinOrder() throws Exception {
+        if (isHSQL() || isValgrind()) return;
+
+        Client client = getClient();
+
+        VoltTable[] results = null;
+        int nextId = 0;
+        for (int mb = 0; mb < 25; mb += 5) {
+            results = client.callProcedure("InsertLotsOfData", 0, nextId).getResults();
+            assertEquals(1, results.length);
+            assertTrue(nextId < results[0].asScalarLong());
+            nextId = (int) results[0].asScalarLong();
+            System.err.println("Inserted " + (mb + 5) + "mb");
+        }
+
+        for (int ii = 0; ii < 1000; ii++) {
+            client.callProcedure("InsertT1", ii);
+        }
+        client.callProcedure("InsertT2", 0);
+
+        //Right join order
+        client.callProcedure("SelectWithJoinOrder", 0);
+
+        //Wrong join order
+        boolean exception = false;
+        try {
+            client.callProcedure("SelectWithJoinOrder", 1);
+        } catch (Exception e) {
+            exception = true;
+        }
+        assertTrue(exception);
+
+        //Right join order
+        client.callProcedure("SelectRightOrder");
+
+        exception = false;
+        try {
+            client.callProcedure("SelectWrongOrder");
+        } catch (Exception e) {
+            exception = true;
+        }
+        assertTrue(exception);
+
+
+    }
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
@@ -257,12 +297,21 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         project.addPartitionInfo("ORDER_LINE", "OL_W_ID");
         project.addPartitionInfo("FIVEK_STRING", "P");
         project.addPartitionInfo("FIVEK_STRING_WITH_INDEX", "ID");
+        project.addPartitionInfo("WIDE", "P");
         project.addPartitionInfo("MANY_COLUMNS", "P");
         project.addProcedures(PROCEDURES);
         project.addStmtProcedure("InsertOrderLine",
                 "INSERT INTO ORDER_LINE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
         project.addStmtProcedure("InsertNewOrder",
                 "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID: 2");
+        project.addStmtProcedure("InsertT1",
+                "INSERT INTO T1 VALUES (?);");
+        project.addStmtProcedure("InsertT2",
+                "INSERT INTO T2 VALUES (?);");
+        project.addStmtProcedure("SelectRightOrder",
+                "SELECT * FROM WIDE, T1, T2 WHERE T2.ID = T1.ID", null, "T1,T2,WIDE");
+        project.addStmtProcedure("SelectWrongOrder",
+                "SELECT * FROM WIDE, T1, T2 WHERE T2.ID = T1.ID", null, "WIDE,T1,T2");
 
         boolean success;
 

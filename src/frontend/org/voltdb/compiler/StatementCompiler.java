@@ -54,7 +54,7 @@ public abstract class StatementCompiler {
 
     static void compile(VoltCompiler compiler, HSQLInterface hsql,
             Catalog catalog, Database db, DatabaseEstimates estimates,
-            Statement catalogStmt, String stmt, boolean singlePartition)
+            Statement catalogStmt, String stmt, String joinOrder, boolean singlePartition)
     throws VoltCompiler.VoltCompilerException {
 
         // Cleanup whitespace newlines for catalog compatibility
@@ -102,7 +102,7 @@ public abstract class StatementCompiler {
 
         CompiledPlan plan = null;
         try {
-            plan = planner.compilePlan(costModel, catalogStmt.getSqltext(),
+            plan = planner.compilePlan(costModel, catalogStmt.getSqltext(), joinOrder,
                     catalogStmt.getTypeName(), catalogStmt.getParent().getTypeName(),
                     catalogStmt.getSinglepartition(), null);
         } catch (Exception e) {

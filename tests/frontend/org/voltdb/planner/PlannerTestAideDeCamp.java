@@ -98,12 +98,15 @@ public class PlannerTestAideDeCamp {
         return compile(sql, paramCount, false);
     }
 
+    public AbstractPlanNode compile(String sql, int paramCount, boolean singlePartition) {
+        return compile(sql, paramCount, singlePartition, null);
+    }
     /**
      * Compile a statement and return the final plan graph.
      * @param sql
      * @param paramCount
      */
-    public AbstractPlanNode compile(String sql, int paramCount, boolean singlePartition)
+    public AbstractPlanNode compile(String sql, int paramCount, boolean singlePartition, String joinOrder)
     {
         Statement catalogStmt = proc.getStatements().add("stmt-" + String.valueOf(compileCounter++));
         catalogStmt.setSqltext(sql);
@@ -137,7 +140,7 @@ public class PlannerTestAideDeCamp {
                              estimates, true, false);
 
         CompiledPlan plan = null;
-        plan = planner.compilePlan(costModel, catalogStmt.getSqltext(), catalogStmt.getTypeName(),
+        plan = planner.compilePlan(costModel, catalogStmt.getSqltext(), joinOrder, catalogStmt.getTypeName(),
                                    catalogStmt.getParent().getTypeName(), catalogStmt.getSinglepartition(), null);
 
         if (plan == null)

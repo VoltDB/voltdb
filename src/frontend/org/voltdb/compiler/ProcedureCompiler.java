@@ -210,7 +210,7 @@ public abstract class ProcedureCompiler {
 
             // compile the statement
             StatementCompiler.compile(compiler, hsql, catalog, db,
-                    estimates, catalogStmt, stmt.getText(),
+                    estimates, catalogStmt, stmt.getText(), stmt.getJoinOrder(),
                     info.singlePartition);
 
             // if a single stmt is not read only, then the proc is not read only
@@ -393,7 +393,7 @@ public abstract class ProcedureCompiler {
         // compile the statement
         StatementCompiler.compile(compiler, hsql, catalog, db,
                 estimates, catalogStmt, procedureDescriptor.m_singleStmt,
-                info.singlePartition);
+                procedureDescriptor.m_joinOrder, info.singlePartition);
 
         // if the single stmt is not read only, then the proc is not read only
         boolean procHasWriteStmts = (catalogStmt.getReadonly() == false);

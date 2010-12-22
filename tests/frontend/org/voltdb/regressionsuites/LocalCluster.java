@@ -833,6 +833,9 @@ public class LocalCluster implements VoltServerConfig {
     @Override
     public boolean isValgrind() {
         final String buildType = System.getenv().get("BUILD");
+        if (buildType == null) {
+            return false;
+        }
         return buildType.startsWith("memcheck");
     }
 

@@ -79,13 +79,21 @@ public class QueryPlanner {
      *
      * @param costModel The current cost model to evaluate plans with.
      * @param sql SQL stmt text to be planned.
+     * @param sql Suggested join order to be used for the query
      * @param stmtName The name of the sql statement to be planned.
      * @param procName The name of the procedure containing the sql statement to be planned.
      * @param singlePartition Is the stmt single-partition?
      * @param paramHints
      * @return The best plan found for the SQL statement or null if none can be found.
      */
-    public CompiledPlan compilePlan(AbstractCostModel costModel, String sql, String stmtName, String procName, boolean singlePartition, ScalarValueHints[] paramHints) {
+    public CompiledPlan compilePlan(
+            AbstractCostModel costModel,
+            String sql,
+            String joinOrder,
+            String stmtName,
+            String procName,
+            boolean singlePartition,
+            ScalarValueHints[] paramHints) {
         assert(costModel != null);
         assert(sql != null);
         assert(stmtName != null);
@@ -120,7 +128,7 @@ public class QueryPlanner {
         // get a parsed statement from the xml
         AbstractParsedStmt initialParsedStmt = null;
         try {
-            initialParsedStmt = AbstractParsedStmt.parse(sql, xmlSQL, m_db);
+            initialParsedStmt = AbstractParsedStmt.parse(sql, xmlSQL, m_db, joinOrder);
         }
         catch (Exception e) {
             m_recentErrorMsg = e.getMessage();
@@ -129,6 +137,12 @@ public class QueryPlanner {
         if (initialParsedStmt == null)
         {
             m_recentErrorMsg = "Failed to parse SQL statement: " + sql;
+            return null;
+        }
+        if (initialParsedStmt.tableList.size() > 5 && initialParsedStmt.joinOrder == null) {
+            m_recentErrorMsg = "Failed to parse SQL statement: " + sql + " because a join of > 5 tables was requested"
+                               + " without specifying a join order. See documentation for instructions on manually" +
+                                 " specifying a join order";
             return null;
         }
 

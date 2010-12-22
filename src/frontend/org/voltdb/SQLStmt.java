@@ -30,6 +30,7 @@ import org.voltdb.catalog.Statement;
  */
 public class SQLStmt {
     String sqlText;
+    String joinOrder;
 
     /**
      * Construct a SQLStmt instance from a SQL statement.
@@ -38,7 +39,19 @@ public class SQLStmt {
      * place holders.
      */
     public SQLStmt(String sqlText) {
+        this(sqlText, null);
+    }
+
+    /**
+     * Construct a SQLStmt instance from a SQL statement.
+     *
+     * @param sqlText Valid VoltDB compliant SQL with question marks as parameter
+     * place holders.
+     * @param sqlText , separated list of tables used by the query specifying the order they should be joined in
+     */
+    public SQLStmt(String sqlText, String joinOrder) {
         this.sqlText = sqlText;
+        this.joinOrder = joinOrder;
     }
 
     /**
@@ -48,6 +61,10 @@ public class SQLStmt {
      */
     public String getText() {
         return sqlText;
+    }
+
+    public String getJoinOrder() {
+        return joinOrder;
     }
 
     byte statementParamJavaTypes[];

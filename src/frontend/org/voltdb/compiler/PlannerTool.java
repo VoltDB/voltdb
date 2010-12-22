@@ -391,7 +391,7 @@ public class PlannerTool {
             CompiledPlan plan = null;
             try {
                 plan = planner.compilePlan(
-                        costModel, inputLine, "PlannerTool", "PlannerToolProc", false, null);
+                        costModel, inputLine, null, "PlannerTool", "PlannerToolProc", false, null);
             } catch (Exception e) {
                 log("Error creating planner: " + e.getMessage());
                 String plannerMsg = e.getMessage();

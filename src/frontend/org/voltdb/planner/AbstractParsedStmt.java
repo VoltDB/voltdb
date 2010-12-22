@@ -109,6 +109,9 @@ public abstract class AbstractParsedStmt {
 
     public HashMap<TablePair, ArrayList<AbstractExpression>> joinSelectionList = new HashMap<TablePair, ArrayList<AbstractExpression>>();
 
+    //User specified join order, null if none is specified
+    public String joinOrder = null;
+
     // Store a table-hashed list of the columns actually used by this statement.
     // XXX An unfortunately counter-intuitive (but hopefully temporary) meaning here:
     // if this is null, that means ALL the columns get used.
@@ -120,7 +123,7 @@ public abstract class AbstractParsedStmt {
      * @param xmlSQL
      * @param db
      */
-    public static AbstractParsedStmt parse(String sql, String xmlSQL, Database db) {
+    public static AbstractParsedStmt parse(String sql, String xmlSQL, Database db, String joinOrder) {
         final String INSERT_NODE_NAME = "insert";
         final String UPDATE_NODE_NAME = "update";
         final String DELETE_NODE_NAME = "delete";
@@ -205,6 +208,7 @@ public abstract class AbstractParsedStmt {
         assert(retval.noTableSelectionList.size() == 0);
 
         retval.sql = sql;
+        retval.joinOrder = joinOrder;
 
         return retval;
     }

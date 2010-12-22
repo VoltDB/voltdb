@@ -21,6 +21,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
@@ -60,7 +61,63 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                            boolean singlePartition, int partitionCount)
     {
         super(db, parsedStmt, singlePartition, partitionCount);
-        queueAllJoinOrders();
+        //If a join order was provided
+        if (parsedStmt.joinOrder != null) {
+            //Extract the table names from the , separated list
+            ArrayList<String> tableNames = new ArrayList<String>();
+            //Don't allow dups for now since self joins aren't supported
+            HashSet<String> dupCheck = new HashSet<String>();
+            for (String table : parsedStmt.joinOrder.split(",")) {
+                tableNames.add(table.trim());
+                if (!dupCheck.add(table.trim())) {
+                    StringBuffer sb = new StringBuffer();
+                    sb.append("The specified join order \"");
+                    sb.append(parsedStmt.joinOrder).append("\" contains duplicate tables. ");
+                    sb.append("Self-joins are not supported yet.");
+                    throw new RuntimeException(sb.toString());
+                }
+            }
+
+            if (parsedStmt.tableList.size() != tableNames.size()) {
+                StringBuffer sb = new StringBuffer();
+                sb.append("The specified join order \"");
+                sb.append(parsedStmt.joinOrder).append("\" does not contain the correct number of tables\n");
+                sb.append("Expected ").append(parsedStmt.tableList.size());
+                sb.append(" but found ").append(tableNames.size()).append(" tables");
+                throw new RuntimeException(sb.toString());
+            }
+
+            Table tables[] = new Table[tableNames.size()];
+            int zz = 0;
+            ArrayList<Table> tableList = new ArrayList<Table>(parsedStmt.tableList);
+            for (int qq = tableNames.size() - 1; qq >= 0; qq--) {
+                String name = tableNames.get(qq);
+                boolean foundMatch = false;
+                for (int ii = 0; ii < tableList.size(); ii++) {
+                    if (tableList.get(ii).getTypeName().equalsIgnoreCase(name)) {
+                        tables[zz++] = tableList.remove(ii);
+                        foundMatch = true;
+                        break;
+                    }
+                }
+                if (!foundMatch) {
+                    StringBuffer sb = new StringBuffer();
+                    sb.append("The specified join order \"");
+                    sb.append(parsedStmt.joinOrder).append("\" contains ").append(name);
+                    sb.append(" which doesn't exist in the FROM clause");
+                    throw new RuntimeException(sb.toString());
+                }
+            }
+            if (zz != tableNames.size()) {
+                StringBuffer sb = new StringBuffer();
+                sb.append("The specified join order \"");
+                sb.append(parsedStmt.joinOrder).append("\" doesn't contain enough tables ");
+                throw new RuntimeException(sb.toString());
+            }
+            m_joinOrders.add(tables);
+        } else {
+            queueAllJoinOrders();
+        }
     }
 
     /**

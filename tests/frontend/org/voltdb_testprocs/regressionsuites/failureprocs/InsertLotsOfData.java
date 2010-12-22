@@ -26,7 +26,7 @@ package org.voltdb_testprocs.regressionsuites.failureprocs;
 import org.voltdb.*;
 
 @ProcInfo (
-    partitionInfo = "FIVEK_STRING.P: 0",
+    partitionInfo = "WIDE.P: 0",
     singlePartition = true
 )
 public class InsertLotsOfData extends VoltProcedure {

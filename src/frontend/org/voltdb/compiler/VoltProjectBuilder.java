@@ -71,23 +71,39 @@ public class VoltProjectBuilder {
         private final String name;
         private final String sql;
         private final String partitionInfo;
+        private final String joinOrder;
 
         public ProcedureInfo(final String groups[], final Class<?> cls) {
             this.groups = groups;
             this.cls = cls;
             this.name = cls.getSimpleName();
             this.sql = null;
+            this.joinOrder = null;
             this.partitionInfo = null;
             assert(this.name != null);
         }
 
-        public ProcedureInfo(final String groups[], final String name, final String sql, final String partitionInfo) {
+        public ProcedureInfo(
+                final String groups[],
+                final String name,
+                final String sql,
+                final String partitionInfo) {
+            this(groups, name, sql, partitionInfo, null);
+        }
+
+        public ProcedureInfo(
+                final String groups[],
+                final String name,
+                final String sql,
+                final String partitionInfo,
+                final String joinOrder) {
             assert(name != null);
             this.groups = groups;
             this.cls = null;
             this.name = name;
             this.sql = sql;
             this.partitionInfo = partitionInfo;
+            this.joinOrder = joinOrder;
             assert(this.name != null);
         }
 
@@ -273,11 +289,15 @@ public class VoltProjectBuilder {
     }
 
     public void addStmtProcedure(String name, String sql) {
-        addStmtProcedure(name, sql, null);
+        addStmtProcedure(name, sql, null, null);
     }
 
     public void addStmtProcedure(String name, String sql, String partitionInfo) {
-        addProcedures(new ProcedureInfo(new String[0], name, sql, partitionInfo));
+        addStmtProcedure( name, sql, partitionInfo, null);
+    }
+
+    public void addStmtProcedure(String name, String sql, String partitionInfo, String joinOrder) {
+        addProcedures(new ProcedureInfo(new String[0], name, sql, partitionInfo, joinOrder));
     }
 
     public void addProcedures(final Class<?>... procedures) {
@@ -588,6 +608,9 @@ public class VoltProjectBuilder {
             }
 
             final Element sql = doc.createElement("sql");
+            if (procedure.joinOrder != null) {
+                sql.setAttribute("joinOrder", procedure.joinOrder);
+            }
             proc.appendChild(sql);
 
             final Text sqltext = doc.createTextNode(procedure.sql);

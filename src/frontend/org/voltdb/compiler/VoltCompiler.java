@@ -220,6 +220,7 @@ public class VoltCompiler {
         final String m_className;
         // for single-stmt procs
         final String m_singleStmt;
+        final String m_joinOrder;
         final String m_partitionString;
 
         ProcedureDescriptor (final ArrayList<String> authGroups, final String className) {
@@ -228,16 +229,18 @@ public class VoltCompiler {
             m_authGroups = authGroups;
             m_className = className;
             m_singleStmt = null;
+            m_joinOrder = null;
             m_partitionString = null;
         }
 
-        ProcedureDescriptor (final ArrayList<String> authGroups, final String className, final String singleStmt, final String partitionString) {
+        ProcedureDescriptor (final ArrayList<String> authGroups, final String className, final String singleStmt, final String joinOrder, final String partitionString) {
             assert(className != null);
             assert(singleStmt != null);
 
             m_authGroups = authGroups;
             m_className = className;
             m_singleStmt = singleStmt;
+            m_joinOrder = joinOrder;
             m_partitionString = partitionString;
         }
     }
@@ -715,7 +718,7 @@ public class VoltCompiler {
             if (partattr != null && partattr.length() == 0)
                 partattr = null;
             return new ProcedureDescriptor(groups, classattr,
-                                           xmlproc.getSql(), partattr);
+                                           xmlproc.getSql().getValue(), xmlproc.getSql().getJoinOrder(), partattr);
         }
         else {
             String partattr = xmlproc.getPartitioninfo();

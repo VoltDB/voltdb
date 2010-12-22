@@ -106,7 +106,15 @@
         <xsd:complexType>
           <!-- a "statement procedure" specifies a single sql statement -->
           <xsd:sequence>
-            <xsd:element name="sql" type="xsd:string" minOccurs="0" maxOccurs="1"/>
+              <xsd:element name="sql" minOccurs="0" maxOccurs="1">
+                  <xsd:complexType>
+                      <xsd:simpleContent>
+                          <xsd:extension base="xsd:string">
+                              <xsd:attribute name="joinOrder" type="xsd:string" use="optional"/>
+                          </xsd:extension>
+                      </xsd:simpleContent>
+                   </xsd:complexType>
+              </xsd:element>
           </xsd:sequence>
           <xsd:attribute name="class" type="xsd:string" use="required"/>
           <xsd:attribute name="partitioninfo" type="xsd:string"/>
