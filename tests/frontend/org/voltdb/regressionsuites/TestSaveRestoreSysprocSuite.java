@@ -23,19 +23,16 @@
 
 package org.voltdb.regressionsuites;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
-import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileReader;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
-import java.nio.ByteBuffer;
 import java.util.Set;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.util.TreeSet;
 
 import junit.framework.Test;
@@ -761,11 +758,31 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         validateSnapshot(true);
     }
 
+    private void checkBeforeAndAfterMemory(VoltTable orig_mem,
+                                           VoltTable final_mem)
+    {
+        orig_mem.advanceRow();
+        final_mem.advanceRow();
+        assertFalse(0 == orig_mem.getLong("TUPLEDATA"));
+        assertFalse(0 == orig_mem.getLong("TUPLECOUNT"));
+        assertEquals(orig_mem.getLong("TUPLEDATA"), final_mem.getLong("TUPLEDATA"));
+        assertEquals(orig_mem.getLong("TUPLEALLOCATED"), final_mem.getLong("TUPLEALLOCATED"));
+        assertEquals(orig_mem.getLong("INDEXMEMORY"), final_mem.getLong("INDEXMEMORY"));
+        assertEquals(orig_mem.getLong("STRINGMEMORY"), final_mem.getLong("STRINGMEMORY"));
+        assertEquals(orig_mem.getLong("TUPLECOUNT"), final_mem.getLong("TUPLECOUNT"));
+        assertEquals(orig_mem.getLong("POOLEDMEMORY"), final_mem.getLong("POOLEDMEMORY"));
+
+        long orig_rss = orig_mem.getLong("RSS");
+        long final_rss = final_mem.getLong("RSS");
+
+        assertTrue(Math.abs(orig_rss - final_rss) < orig_rss * .1);
+    }
+
     public void testSaveAndRestoreReplicatedTable()
     throws IOException, InterruptedException, ProcCallException
     {
         System.out.println("Starting testSaveAndRestoreReplicatedTable");
-        int num_replicated_items_per_chunk = 100;
+        int num_replicated_items_per_chunk = 200;
         int num_replicated_chunks = 10;
 
         Client client = getClient();
@@ -773,6 +790,22 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         loadLargeReplicatedTable(client, "REPLICATED_TESTER",
                                  num_replicated_items_per_chunk,
                                  num_replicated_chunks);
+
+        // hacky, need to sleep long enough so the internal server tick
+        // updates the memory stats
+        Thread.sleep(1000);
+
+        VoltTable orig_mem = null;
+        try
+        {
+            orig_mem = client.callProcedure("@Statistics", "memory", 0).getResults()[0];
+            System.out.println("STATS: " + orig_mem.toString());
+        }
+        catch (Exception ex)
+        {
+            ex.printStackTrace();
+            fail("Statistics exception: " + ex.getMessage());
+        }
 
         VoltTable[] results = null;
         results = saveTables(client);
@@ -798,6 +831,20 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             ex.printStackTrace();
             fail("SnapshotRestore exception: " + ex.getMessage());
         }
+
+        VoltTable final_mem = null;
+        try
+        {
+            final_mem = client.callProcedure("@Statistics", "memory", 0).getResults()[0];
+            System.out.println("STATS: " + final_mem.toString());
+        }
+        catch (Exception ex)
+        {
+            ex.printStackTrace();
+            fail("Statistics exception: " + ex.getMessage());
+        }
+
+        checkBeforeAndAfterMemory(orig_mem, final_mem);
 
         checkTable(client, "REPLICATED_TESTER", "RT_ID",
                    num_replicated_items_per_chunk * num_replicated_chunks);
@@ -835,6 +882,22 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                                   num_partitioned_items_per_chunk,
                                   num_partitioned_chunks);
         VoltTable[] results = null;
+
+        // hacky, need to sleep long enough so the internal server tick
+        // updates the memory stats
+        Thread.sleep(1000);
+
+        VoltTable orig_mem = null;
+        try
+        {
+            orig_mem = client.callProcedure("@Statistics", "memory", 0).getResults()[0];
+            System.out.println("STATS: " + orig_mem.toString());
+        }
+        catch (Exception ex)
+        {
+            ex.printStackTrace();
+            fail("Statistics exception: " + ex.getMessage());
+        }
 
         DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = true;
         results = saveTables(client);
@@ -967,6 +1030,20 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             ex.printStackTrace();
             fail("SnapshotRestore exception: " + ex.getMessage());
         }
+
+        VoltTable final_mem = null;
+        try
+        {
+            final_mem = client.callProcedure("@Statistics", "memory", 0).getResults()[0];
+            System.out.println("STATS: " + final_mem.toString());
+        }
+        catch (Exception ex)
+        {
+            ex.printStackTrace();
+            fail("Statistics exception: " + ex.getMessage());
+        }
+
+        checkBeforeAndAfterMemory(orig_mem, final_mem);
 
         checkTable(client, "PARTITION_TESTER", "PT_ID",
                    num_partitioned_items_per_chunk * num_partitioned_chunks);
