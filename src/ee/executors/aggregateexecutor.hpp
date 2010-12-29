@@ -98,7 +98,10 @@ class Agg
 public:
     Agg(bool isDistinct) : mIsDistinct(isDistinct)
     {}
-    virtual ~Agg() {}
+    virtual ~Agg()
+    {
+        mDistinctVals.clear();
+    }
     virtual void advance(const NValue val) = 0;
     virtual NValue finalize() = 0;
 protected:
@@ -419,7 +422,7 @@ public:
                std::vector<ValueType>* col_types);
     bool nextTuple(TableTuple nextTuple, TableTuple prevTuple);
     bool finalize(TableTuple prevTuple);
-
+    void purgeAggs();
 };
 
 /*
@@ -546,6 +549,11 @@ public:
                           allocate(groupByKeySchema->tupleLength())));
     }
 
+    ~Aggregator()
+    {
+        purgeAggs();
+    }
+
     inline bool nextTuple(TableTuple nextTuple, TableTuple)
     {
         AggregateList *aggregateList;
@@ -642,6 +650,24 @@ public:
         return true;
     }
 
+    void purgeAggs()
+    {
+        for (HashAggregateMapType::const_iterator iter = m_aggregates.begin();
+             iter != m_aggregates.end();
+             iter++)
+        {
+            Agg** aggs = iter->second->m_aggregates;
+            int num_aggs = static_cast<int>(m_node->getAggregateOutputColumns().size());
+            for (int ii = 0; ii < num_aggs; ii++)
+            {
+                if (aggs[ii] != NULL)
+                {
+                    aggs[ii]->~Agg();
+                }
+            }
+        }
+    }
+
 private:
     Pool* m_memoryPool;
     TupleSchema *m_groupByKeySchema;
@@ -689,6 +715,11 @@ public:
                                                        agg_types->size())))
     {
         ::memset(m_aggs, 0, sizeof(void*) * agg_types->size());
+    }
+
+    ~Aggregator()
+    {
+        purgeAggs();
     }
 
     inline bool nextTuple(TableTuple nextTuple, TableTuple prevTuple)
@@ -781,6 +812,14 @@ public:
             }
         }
         return true;
+    }
+
+    void purgeAggs()
+    {
+        for (int ii = 0; ii < m_aggTypes->size(); ii++)
+        {
+            m_aggs[ii]->~Agg();
+        }
     }
 
 private:
