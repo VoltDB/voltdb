@@ -327,10 +327,14 @@ public class SystemStatsCollector {
         try {
             File statFile = new File(String.format("/proc/%d/stat", pid));
             FileInputStream fis = new FileInputStream(statFile);
-            BufferedReader r = new BufferedReader(new InputStreamReader(fis));
-            String stats = r.readLine();
-            String[] parts = stats.split(" ");
-            return Long.parseLong(parts[23]) * 4 * 1024;
+            try {
+                BufferedReader r = new BufferedReader(new InputStreamReader(fis));
+                String stats = r.readLine();
+                String[] parts = stats.split(" ");
+                return Long.parseLong(parts[23]) * 4 * 1024;
+            } finally {
+                fis.close();
+            }
         }
         catch (Exception e) {
             return -1;
