@@ -124,7 +124,7 @@ public:
     }
 
     pointer allocate() {
-        boost::shared_ptr<boost::pool<boost::default_user_allocator_new_delete> > pool = ThreadLocalPool::getExact(sizeof(T));
+        boost::shared_ptr<boost::pool<voltdb::voltdb_pool_allocator_new_delete> > pool = ThreadLocalPool::getExact(sizeof(T));
         const pointer ret = pool->malloc();
         if (ret == 0) {
             boost::throw_exception(std::bad_alloc());
@@ -147,7 +147,7 @@ public:
         if (ptr == NULL) {
             return;
         }
-        boost::shared_ptr<boost::pool<boost::default_user_allocator_malloc_free> > pool = ThreadLocalPool::getExact(sizeof(T));
+        boost::shared_ptr<boost::pool<voltdb::voltdb_pool_allocator_new_delete> > pool = ThreadLocalPool::getExact(sizeof(T));
         pool->free(ptr);
     }
 };
