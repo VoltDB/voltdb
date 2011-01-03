@@ -102,6 +102,10 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     public void testStatistics_Memory() throws Exception {
         Client client = getClient();
         VoltTable results[] = null;
+
+        // give time to seed the stats cache?
+        Thread.sleep(1000);
+
         results = client.callProcedure("@Statistics", "memory", 0).getResults();
 
         // one aggregate table returned
