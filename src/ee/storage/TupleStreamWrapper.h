@@ -66,6 +66,10 @@ public:
         m_uso = count;
     }
 
+    size_t allocatedBlockCount() const {
+        return m_pendingBlocks.size();
+    }
+
     /** truncate stream back to mark */
     void rollbackTo(size_t mark);
 
