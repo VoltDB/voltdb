@@ -21,7 +21,6 @@
 #include <stdint.h>
 #include <string.h>
 #include "boost/scoped_array.hpp"
-#include "boost/intrusive_ptr.hpp"
 #include "boost/shared_ptr.hpp"
 #include "boost/unordered_set.hpp"
 #include "stx/btree_map.h"
@@ -36,10 +35,11 @@ namespace voltdb {
 class TupleBlock;
 }
 
-namespace boost {
-    void intrusive_ptr_add_ref(voltdb::TupleBlock * p);
-    void intrusive_ptr_release(voltdb::TupleBlock * p);
-};
+void intrusive_ptr_add_ref(voltdb::TupleBlock * p);
+void intrusive_ptr_release(voltdb::TupleBlock * p);
+
+// LLVM wants to see intrusive_ptr_add_ref before this include.
+#include "boost/intrusive_ptr.hpp"
 
 namespace voltdb {
 class Table;
@@ -81,8 +81,8 @@ typedef std::vector<TBBucketPtr> TBBucketMap;
 const int TUPLE_BLOCK_NUM_BUCKETS = 20;
 
 class TupleBlock {
-    friend void ::boost::intrusive_ptr_add_ref(voltdb::TupleBlock * p);
-    friend void ::boost::intrusive_ptr_release(voltdb::TupleBlock * p);
+    friend void ::intrusive_ptr_add_ref(voltdb::TupleBlock * p);
+    friend void ::intrusive_ptr_release(voltdb::TupleBlock * p);
 public:
     TupleBlock(Table *table, TBBucketPtr bucket);
 
@@ -241,24 +241,21 @@ private:
     int m_bucketIndex;
     TBBucketPtr m_bucket;
 };
+
 }
 
-namespace boost
+
+inline void intrusive_ptr_add_ref(voltdb::TupleBlock * p)
 {
- inline void intrusive_ptr_add_ref(voltdb::TupleBlock * p)
-  {
     ++(p->m_references);
-  }
+}
 
-
-
- inline void intrusive_ptr_release(voltdb::TupleBlock * p)
-  {
-   if (--(p->m_references) == 0) {
-       p->~TupleBlock();
-       voltdb::ThreadLocalPool::getExact(sizeof(voltdb::TupleBlock))->free(p);
-   }
-  }
+inline void intrusive_ptr_release(voltdb::TupleBlock * p)
+{
+    if (--(p->m_references) == 0) {
+        p->~TupleBlock();
+        voltdb::ThreadLocalPool::getExact(sizeof(voltdb::TupleBlock))->free(p);
+    }
 }
 
 #endif /* VOLTDB_TUPLEBLOCK_H_ */
