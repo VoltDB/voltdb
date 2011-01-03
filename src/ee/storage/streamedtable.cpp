@@ -186,6 +186,10 @@ void StreamedTable::undo(size_t mark)
     }
 }
 
-voltdb::TableStats *StreamedTable::getTableStats() {
+TableStats *StreamedTable::getTableStats() {
     return &stats_;
+}
+
+size_t StreamedTable::allocatedBlockCount() const {
+    return 0;
 }
