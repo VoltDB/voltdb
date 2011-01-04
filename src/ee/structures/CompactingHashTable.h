@@ -88,15 +88,23 @@ namespace voltdb {
          * re-hashing process when doubling the table size.
          */
         struct HashNode {
-            uint64_t hash;
             Key key;
             Data value;
+            uint64_t hash;
+            HashNode *nextInBucket;
             HashNode *nextWithKey;
+        };
+
+        struct HashNodeSmall {
+            Key key;
+            Data value;
+            uint64_t hash;
             HashNode *nextInBucket;
         };
 
         HashNode **m_buckets;             // the array holding the buckets
         bool m_unique;                    // support unique
+        uint32_t m_nodeSize;              // sizeof(HashNode) or sizeof(HashNodeSmall)
         uint64_t m_count;                 // number of items in the hash
         uint64_t m_uniqueCount;           // number of unique keys
         uint64_t m_size;                  // current bucket count
@@ -170,6 +178,7 @@ namespace voltdb {
         bool insert(HashNode **bucket, uint64_t hash, const Key &key, const Data &value);
         /** remove, given a bucket and an exact node */
         bool remove(HashNode **bucket, HashNode *prevBucketNode, HashNode *keyHeadNode, HashNode *prevKeyNode, HashNode *node);
+        bool removeUnique(HashNode **bucket, HashNode *prevBucketNode, HashNode *node);
 
         /** after remove, ensure memory for hashnodes is contiguous */
         void deleteAndFixup(HashNode *node);
@@ -189,10 +198,11 @@ namespace voltdb {
     template<class K, class T, class H, class EK, class ET>
     CompactingHashTable<K, T, H, EK, ET>::CompactingHashTable(bool unique, Hasher hasher, KeyEqChecker keyEq, DataEqChecker dataEq)
     : m_unique(unique),
+    m_nodeSize(unique ? sizeof(HashNodeSmall) : sizeof(HashNode)),
     m_count(0),
     m_uniqueCount(0),
     m_size(BUCKET_INITIAL_COUNT),
-    m_allocator(sizeof(HashNode), ALLOCATOR_CHUNK_SIZE),
+    m_allocator(m_nodeSize, ALLOCATOR_CHUNK_SIZE),
     m_hasher(hasher),
     m_keyEq(keyEq),
     m_dataEq(dataEq)
@@ -210,8 +220,13 @@ namespace voltdb {
         for (size_t i = 0; i < m_size; ++i) {
             while (m_buckets[i]) {
                 HashNode *node = m_buckets[i];
-                remove(&(m_buckets[i]), NULL, node, NULL, node);
-                node->~HashNode();
+                if (m_unique)
+                    removeUnique(&(m_buckets[i]), NULL, node);
+                else
+                    remove(&(m_buckets[i]), NULL, node, NULL, node);
+                // safe to call the small destructor because the extra field
+                //  for the larger HashNode isn't involved
+                (reinterpret_cast<HashNodeSmall*>(node))->~HashNodeSmall();
             }
         }
 
@@ -254,8 +269,9 @@ namespace voltdb {
 
         for (HashNode *node = m_buckets[bucketOffset]; node; node = node->nextInBucket) {
             if (m_keyEq(node->key, key)) {
-                remove(&(m_buckets[bucketOffset]), prevBucketNode, node, NULL, node);
+                removeUnique(&(m_buckets[bucketOffset]), prevBucketNode, node);
                 deleteAndFixup(node);
+                checkLoadFactor();
                 return true;
             }
             prevBucketNode = node;
@@ -272,11 +288,19 @@ namespace voltdb {
 
         for (HashNode *node = m_buckets[bucketOffset]; node; node = node->nextInBucket) {
             if (m_keyEq(node->key, key)) {
+                if (m_unique) {
+                    if (!m_dataEq(node->value, value)) return false;
+                    removeUnique(&(m_buckets[bucketOffset]), prevBucketNode, node);
+                    deleteAndFixup(node);
+                    checkLoadFactor();
+                    return true;
+                }
                 keyHeadNode = node;
                 for (node = keyHeadNode; node; node = node->nextWithKey) {
                     if (m_dataEq(node->value, value)) {
                         remove(&(m_buckets[bucketOffset]), prevBucketNode, keyHeadNode, prevKeyNode, node);
                         deleteAndFixup(node);
+                        checkLoadFactor();
                         return true;
                     }
                     prevKeyNode = node;
@@ -325,20 +349,28 @@ namespace voltdb {
         // create a new node
         void *memory = m_allocator.alloc();
         assert(memory);
+        HashNode *newNode;
         // placement new
-        HashNode *newNode = new(memory) HashNode();
+        if (m_unique) {
+            newNode = reinterpret_cast<HashNode*>(new(memory) HashNodeSmall());
+        }
+        else {
+            newNode = new(memory) HashNode();
+            newNode->nextWithKey = NULL;
+        }
+
         newNode->hash = hash;
         newNode->key = key;
         newNode->value = value;
         m_count++;
 
         if (existing) {
+            // note if here, using non-unique path
             newNode->nextWithKey = existing->nextWithKey;
             existing->nextWithKey = newNode;
             newNode->nextInBucket = NULL;
         }
         else {
-            newNode->nextWithKey = NULL;
             newNode->nextInBucket = *bucket;
             *bucket = newNode;
             m_uniqueCount++;
@@ -350,6 +382,8 @@ namespace voltdb {
 
     template<class K, class T, class H, class EK, class ET>
     bool CompactingHashTable<K, T, H, EK, ET>::remove(HashNode **bucket, HashNode *prevBucketNode, HashNode *keyHeadNode, HashNode *prevKeyNode, HashNode *node) {
+        assert(!m_unique);
+
         // if not in the main list from the bucket
         // but rather linked off of an original key
         if (keyHeadNode != node) {
@@ -385,12 +419,30 @@ namespace voltdb {
     }
 
     template<class K, class T, class H, class EK, class ET>
+    bool CompactingHashTable<K, T, H, EK, ET>::removeUnique(HashNode **bucket, HashNode *prevBucketNode, HashNode *node) {
+        assert(m_unique);
+
+        if (*bucket == node)
+            *bucket = node->nextInBucket;
+        else {
+            // remove a node in the chain
+            prevBucketNode->nextInBucket = node->nextInBucket;
+        }
+        m_uniqueCount--;
+        m_count--;
+        return true;
+    }
+
+    template<class K, class T, class H, class EK, class ET>
     void CompactingHashTable<K, T, H, EK, ET>::deleteAndFixup(HashNode *node) {
         assert(node);
 
         // hash is empty now (after the recent delete)
         if (!m_count) {
-            node->~HashNode();
+            // safe to call the small destructor because the extra field
+            //  for the larger HashNode isn't involved
+            (reinterpret_cast<HashNodeSmall*>(node))->~HashNodeSmall();
+
             m_allocator.trim();
             assert(m_allocator.count() == m_count);
             return;
@@ -401,7 +453,10 @@ namespace voltdb {
 
         // if deleting the last item
         if (last == node) {
-            node->~HashNode();
+            // safe to call the small destructor because the extra field
+            //  for the larger HashNode isn't involved
+            (reinterpret_cast<HashNodeSmall*>(node))->~HashNodeSmall();
+
             m_allocator.trim();
             assert(m_allocator.count() == m_count);
             return;
@@ -415,8 +470,36 @@ namespace voltdb {
         for (HashNode *n = m_buckets[bucketOffset]; n; n = n->nextInBucket) {
             prevKeyNode = NULL;
             keyHeadNode = n;
-            for (HashNode *n2 = keyHeadNode; n2; n2 = n2->nextWithKey) {
-                if (n2 == last) {
+            if (m_unique) {
+                if (n != last) continue; // not found
+
+                // update things that point to the last node
+                if (prevKeyNode)
+                    prevKeyNode->nextWithKey = node;
+                else
+                    m_buckets[bucketOffset] = node;
+
+                // copy the last node over the deleted node
+                node->hash = last->hash;
+                node->nextInBucket = last->nextInBucket;
+                node->key = last->key;
+                node->value = last->value;
+
+                // destructor and memory release
+                (reinterpret_cast<HashNodeSmall*>(node))->~HashNodeSmall();
+                m_allocator.trim();
+                assert(m_allocator.count() == m_count);
+
+                // done
+                return;
+
+            }
+            else {
+                for (HashNode *n2 = keyHeadNode; n2; n2 = n2->nextWithKey) {
+                    if (n2 != last) {
+                        prevKeyNode = n2;
+                        continue; // not found
+                    }
 
                     // update things that point to the last node
                     if (prevKeyNode) {
@@ -439,14 +522,13 @@ namespace voltdb {
                     node->value = last->value;
 
                     // destructor and memory release
-                    last->~HashNode();
+                    node->~HashNode();
                     m_allocator.trim();
                     assert(m_allocator.count() == m_count);
 
                     // done
                     return;
                 }
-                prevKeyNode = n2;
             }
             prevBucketNode = n;
         }
@@ -505,9 +587,9 @@ namespace voltdb {
 
         for (uint64_t bucketi = 0; bucketi < m_size; ++bucketi) {
             for (HashNode *node = m_buckets[bucketi]; node; node = node->nextInBucket) {
-                for (HashNode *node2 = node; node2; node2 = node2->nextWithKey) {
-                    uint64_t hash = m_hasher(node2->key);
-                    if (hash != node2->hash) {
+                if (m_unique) {
+                    uint64_t hash = m_hasher(node->key);
+                    if (hash != node->hash) {
                         printf("Node hash doesn't match expected value.\n");
                         return false;
                     }
@@ -517,6 +599,21 @@ namespace voltdb {
                     }
 
                     ++manualCount;
+                }
+                else {
+                    for (HashNode *node2 = node; node2; node2 = node2->nextWithKey) {
+                        uint64_t hash = m_hasher(node2->key);
+                        if (hash != node2->hash) {
+                            printf("Node hash doesn't match expected value.\n");
+                            return false;
+                        }
+                        if ((hash % m_size) != bucketi) {
+                            printf("Node hash doesn't match expected bucket index.\n");
+                            return false;
+                        }
+
+                        ++manualCount;
+                    }
                 }
             }
         }
