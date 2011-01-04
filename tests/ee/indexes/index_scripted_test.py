@@ -52,7 +52,7 @@ is 5,6,7
 ls 5,6,7
 #us 5,6,7 8,9,10
 #uf 5,6,7 8,9,10
-ds 5,6,7
+#ds 5,6,7
 df 8,9,10
 exec
 begin GenericTest MultiGenericTree,MultiGenericHash,UniqueGenericTree,UniqueGenericHash str4,bint,bint

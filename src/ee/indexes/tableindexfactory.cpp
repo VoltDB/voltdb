@@ -53,6 +53,8 @@
 #include "indexes/arrayuniqueindex.h"
 #include "indexes/CompactingTreeUniqueIndex.h"
 #include "indexes/CompactingTreeMultiMapIndex.h"
+#include "indexes/CompactingHashUniqueIndex.h"
+#include "indexes/CompactingHashMultiMapIndex.h"
 #include "indexes/HashTableUniqueIndex.h"
 #include "indexes/HashTableMultiMapIndex.h"
 
