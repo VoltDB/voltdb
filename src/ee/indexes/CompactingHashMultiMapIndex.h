@@ -169,10 +169,7 @@ protected:
 
     inline bool deleteEntryPrivate(const TableTuple *tuple, const KeyType &key) {
         ++m_deletes;
-        typename MapType::iterator iter = m_entries.find(key, tuple, false);
-        if (iter.isEnd()) return false;
-        bool success = m_entries.erase(iter);
-        return success;
+        return m_entries.erase(key, tuple);
     }
 
     bool moveToKey(const KeyType &key) {

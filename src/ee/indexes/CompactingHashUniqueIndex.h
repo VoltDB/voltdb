@@ -172,10 +172,7 @@ protected:
 
     inline bool deleteEntryPrivate(const KeyType &key) {
         ++m_deletes;
-        typename MapType::iterator mapiter = m_entries.find(key);
-        if (mapiter.isEnd())
-            return false; //key not exists
-        return m_entries.erase(mapiter);
+        return m_entries.erase(key);
     }
 
     MapType m_entries;
