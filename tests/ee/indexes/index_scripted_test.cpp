@@ -279,7 +279,7 @@ void runTest()
         gettimeofday(&tStart, NULL);
 
         size_t commandCount = currentCommands.size();
-            for (size_t i = 0; i < commandCount; ++i) {
+        for (size_t i = 0; i < commandCount; ++i) {
             Command &command = currentCommands[i];
             bool result;
             if (command.op == kInsertSuccess)
