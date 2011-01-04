@@ -95,6 +95,12 @@ namespace voltdb {
             HashNode *nextWithKey;
         };
 
+        /**
+         * HashNodeSmall is some kind of dark evil magic. It is the same
+         * as the HashNode, but missing the pointer that is only used
+         * for multimap indices at the end. Using casts, unique indexes
+         * will only use this type underneath, and thus save 8B per key.
+         */
         struct HashNodeSmall {
             Key key;
             Data value;
@@ -104,7 +110,6 @@ namespace voltdb {
 
         HashNode **m_buckets;             // the array holding the buckets
         bool m_unique;                    // support unique
-        uint32_t m_nodeSize;              // sizeof(HashNode) or sizeof(HashNodeSmall)
         uint64_t m_count;                 // number of items in the hash
         uint64_t m_uniqueCount;           // number of unique keys
         uint64_t m_size;                  // current bucket count
@@ -198,11 +203,10 @@ namespace voltdb {
     template<class K, class T, class H, class EK, class ET>
     CompactingHashTable<K, T, H, EK, ET>::CompactingHashTable(bool unique, Hasher hasher, KeyEqChecker keyEq, DataEqChecker dataEq)
     : m_unique(unique),
-    m_nodeSize(unique ? sizeof(HashNodeSmall) : sizeof(HashNode)),
     m_count(0),
     m_uniqueCount(0),
     m_size(BUCKET_INITIAL_COUNT),
-    m_allocator(m_nodeSize, ALLOCATOR_CHUNK_SIZE),
+    m_allocator(unique ? sizeof(HashNodeSmall) : sizeof(HashNode), ALLOCATOR_CHUNK_SIZE),
     m_hasher(hasher),
     m_keyEq(keyEq),
     m_dataEq(dataEq)
