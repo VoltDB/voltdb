@@ -1,15 +1,15 @@
 % VoltDB
 
-Thank you for your interest in VoltDB! The VoltDB project is managed at 
+Thank you for your interest in VoltDB! The VoltDB project is managed at
 http://voltdb.com/.
 
 What is VoltDB?
 ====================
 VoltDB is an in-memory online transaction processing (OLTP) database
 designed from the ground up to be the fastest most scalable OLTP
-system in the world. VoltDB is distributed in a Community Edition 
-(GPL3 license) and in an Enterprise Edition (commercial license). 
-For difference between the two editions, see 
+system in the world. VoltDB is distributed in a Community Edition
+(GPL3 license) and in an Enterprise Edition (commercial license).
+For difference between the two editions, see
 http://voltdb.com/content/voltdb-editions-and-pricing.
 
 
@@ -21,8 +21,8 @@ example.
 
 Binary Distributions
 ===============
-Binary distributions of VoltDB Community Edition are available from the 
-VoltDB community site at http://community.voltdb.com/downloads. 
+Binary distributions of VoltDB Community Edition are available from the
+VoltDB community site at http://community.voltdb.com/downloads.
 
 
 Getting Started Building VoltDB from Source
@@ -35,19 +35,19 @@ Getting Started Building VoltDB from Source
                  in obj/release/voltdb-version.tar.gz.
 
 There are several example projects which can be compiled and run.  See
-https://svn.voltdb.com/eng/trunk/examples/README for details.
+https://svnmirror.voltdb.com/eng/trunk/examples/README for details.
 
 
 Documentation
 =============
-Documentation on using VoltDB to build OLTP applications is available from 
+Documentation on using VoltDB to build OLTP applications is available from
 the VoltDB community site at http://community.voltdb.com/documentation/
 
 
 Forums
 ======
-For help using or building VoltDB, see the VoltDB forums at 
+For help using or building VoltDB, see the VoltDB forums at
 http://community.voltdb.com/forum.
 
 
-This content is available at https://svn.voltdb.com/eng/trunk/README.
+This content is available at https://svnmirror.voltdb.com/eng/trunk/README.
