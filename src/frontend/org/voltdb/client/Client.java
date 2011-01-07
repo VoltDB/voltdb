@@ -238,6 +238,24 @@ public interface Client {
     public VoltTable getProcedureStatsInterval();
 
     /**
+     * Get client round trip latency bucket values for each connection and procedure.
+     * Bucket 1 contains transactions completed in 0-9ms, bucket 2 10ms-19ms. The
+     * final bucket includes all remaining, unaccounted, transactions.
+     * @return Table containing latency bucket stats.
+     */
+    VoltTable getClientRTTLatencies();
+
+    /**
+     * Get cluster round trip latency bucket values for each connection and procedure.
+     * This RTT is calculated by the cluster and represents the time from initiation
+     * to transaction completion within the VoltDB process.
+     * Bucket 1 contains transactions completed in 0-9ms, bucket 2 10ms-19ms. The
+     * final bucket includes all remaining, unaccounted, transactions.
+     * @return Table containing latency bucket stats.
+     */
+    VoltTable getClusterRTTLatencies();
+
+    /**
      * Get an identifier for the cluster that this client is currently connected to.
      * Will be null if the client has not been connected
      * @return An array of a Long and Integer containing the millisecond timestamp when the cluster was

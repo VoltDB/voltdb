@@ -86,6 +86,7 @@ class Distributer {
         private long m_invocationErrors = 0;
         private long m_lastInvocationErrors = 0;
 
+        // cumulative latency measured by client, used to calculate avg. lat.
         private long m_roundTripTime = 0;
         private long m_lastRoundTripTime = 0;
 
@@ -94,8 +95,14 @@ class Distributer {
         private int m_minRoundTripTime = Integer.MAX_VALUE;
         private int m_lastMinRoundTripTime = Integer.MAX_VALUE;
 
+        // cumulative latency measured by the cluster, used to calculate avg lat.
         private long m_clusterRoundTripTime = 0;
         private long m_lastClusterRoundTripTime = 0;
+
+        // 10ms buckets. Last bucket is all transactions > 190ms.
+        static int m_numberOfBuckets = 20;
+        private long m_clusterRoundTripTimeBuckets[] = new long[m_numberOfBuckets];
+        private long m_roundTripTimeBuckets[] = new long[m_numberOfBuckets];
 
         private int m_maxClusterRoundTripTime = Integer.MIN_VALUE;
         private int m_lastMaxClusterRoundTripTime = Integer.MIN_VALUE;
@@ -126,6 +133,20 @@ class Distributer {
             }
             m_roundTripTime += roundTripTime;
             m_clusterRoundTripTime += clusterRoundTripTime;
+
+            // calculate the latency buckets to increment and increment.
+            int rttBucket = (int)(Math.floor(roundTripTime / 10));
+            if (rttBucket >= m_roundTripTimeBuckets.length) {
+                rttBucket = m_roundTripTimeBuckets.length - 1;
+            }
+            m_roundTripTimeBuckets[rttBucket] += 1;
+
+            int rttClusterBucket = (int)(Math.floor(clusterRoundTripTime / 10));
+            if (rttClusterBucket >= m_clusterRoundTripTimeBuckets.length) {
+                rttClusterBucket = m_clusterRoundTripTimeBuckets.length - 1;
+            }
+            m_clusterRoundTripTimeBuckets[rttClusterBucket] += 1;
+
         }
     }
 
@@ -194,6 +215,14 @@ class Distributer {
             m_connection.writeStream().enqueue(f);
         }
 
+        /**
+         * Update the procedures statistics
+         * @param name Name of procedure being updated
+         * @param roundTrip round trip from client queued to client response callback invocation
+         * @param clusterRoundTrip round trip measured within the VoltDB cluster
+         * @param abort true of the procedure was aborted
+         * @param failure true if the procedure failed
+         */
         private void updateStats(
                 String name,
                 int roundTrip,
@@ -655,6 +684,72 @@ class Distributer {
             new ColumnInfo( "INVOCATIONS_ABORTED", VoltType.BIGINT),
             new ColumnInfo( "INVOCATIONS_FAILED", VoltType.BIGINT),
     };
+
+    private final ColumnInfo[] getRTTStatsColumns() {
+        ColumnInfo[] ci = new ColumnInfo[ProcedureStats.m_numberOfBuckets + 7];
+        ci[0] = new ColumnInfo( "TIMESTAMP", VoltType.BIGINT);
+        ci[1] = new ColumnInfo( "HOSTNAME", VoltType.STRING);
+        ci[2] = new ColumnInfo( "CONNECTION_ID", VoltType.BIGINT);
+        ci[3] = new ColumnInfo( "SERVER_HOST_ID", VoltType.BIGINT);
+        ci[4] = new ColumnInfo( "SERVER_HOSTNAME", VoltType.STRING);
+        ci[5] = new ColumnInfo( "SERVER_CONNECTION_ID", VoltType.BIGINT);
+        ci[6] = new ColumnInfo( "PROCEDURE_NAME", VoltType.STRING);
+        for (int i=0; i < ProcedureStats.m_numberOfBuckets; i++) {
+            String colName = (new Integer((i+1)*10)).toString() + "MS";
+            ci[i+7] = new ColumnInfo(colName, VoltType.INTEGER);
+        }
+        return ci;
+    }
+
+    /** Query for latency buckets for client round trip time */
+    VoltTable getClientRTTLatencies(final boolean interval) {
+        return getRTTLatencies(true, interval);
+    }
+
+    /** Query for latency buckets for internal cluster round trip time */
+    VoltTable getClusterRTTLatencies(final boolean interval) {
+        return getRTTLatencies(false, interval);
+    }
+
+    /**
+     * Query for latency bucket values by procedure by connection.
+     * @param clientRTT true if client rtt desired. false if cluster rtt desired
+     * @param interval Must be false. Interval not yet supported
+     * @return
+     */
+    private VoltTable getRTTLatencies(final boolean clientRTT, final boolean interval) {
+        if (interval == true) {
+            throw new RuntimeException("Interval stats not implemented");
+        }
+
+        final Long now = System.currentTimeMillis();
+        final VoltTable retval = new VoltTable(getRTTStatsColumns());
+
+        synchronized(m_connections) {
+            for (NodeConnection cxn : m_connections) {
+                synchronized(cxn) {
+                    for (ProcedureStats stats : cxn.m_stats.values()) {
+                        long buckets[] =
+                            clientRTT ? stats.m_roundTripTimeBuckets :
+                                stats.m_clusterRoundTripTimeBuckets;
+                        Object row[] = new Object[ProcedureStats.m_numberOfBuckets + 7];
+                        row[0] = now;
+                        row[1] = m_hostname;
+                        row[2] = cxn.connectionId();
+                        row[3] = cxn.m_hostId;
+                        row[4] = cxn.m_hostname;
+                        row[5] = cxn.m_connectionId;
+                        row[6] = stats.m_name;
+                        for (int i=0; i < ProcedureStats.m_numberOfBuckets; i++) {
+                            row[i + 7] = buckets[i];
+                        }
+                        retval.addRow(row);
+                    }
+                }
+            }
+        }
+        return retval;
+    }
 
     VoltTable getProcedureStats(final boolean interval) {
         final Long now = System.currentTimeMillis();

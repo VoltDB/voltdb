@@ -420,7 +420,17 @@ final class ClientImpl implements Client {
 
     @Override
     public VoltTable getProcedureStatsInterval() {
-        return m_distributer.getProcedureStats(false);
+        return m_distributer.getProcedureStats(true);
+    }
+
+    @Override
+    public VoltTable getClientRTTLatencies() {
+        return m_distributer.getClientRTTLatencies(false);
+    }
+
+    @Override
+    public VoltTable getClusterRTTLatencies() {
+        return m_distributer.getClusterRTTLatencies(false);
     }
 
     @Override

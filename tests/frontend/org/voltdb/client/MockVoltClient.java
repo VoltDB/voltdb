@@ -245,4 +245,16 @@ public class MockVoltClient implements Client {
         // TODO Auto-generated method stub
 
     }
+
+    @Override
+    public VoltTable getClientRTTLatencies() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public VoltTable getClusterRTTLatencies() {
+        // TODO Auto-generated method stub
+        return null;
+    }
 }
