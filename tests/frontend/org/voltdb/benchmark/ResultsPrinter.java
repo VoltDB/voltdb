@@ -27,6 +27,9 @@ import org.voltdb.benchmark.BenchmarkResults.Result;
 
 public class ResultsPrinter implements BenchmarkController.BenchmarkInterest {
 
+    long[] firstIntervalClientRTT = null;
+    long[] firstIntervalClusterRTT = null;
+
     @Override
     public void benchmarkHasUpdated(BenchmarkResults results,
             long[] clusterLatencyBuckets, long[] clientLatencyBuckets) {
@@ -53,6 +56,12 @@ public class ResultsPrinter implements BenchmarkController.BenchmarkInterest {
         long duration = results.getTotalDuration();
         long pollCount = duration / results.getIntervalDuration();
         long currentTime = pollIndex * results.getIntervalDuration();
+
+        // remember the first seen latencies; they are anomalous.
+        if (firstIntervalClientRTT == null) {
+            firstIntervalClientRTT = clientLatencyBuckets;
+            firstIntervalClusterRTT = clusterLatencyBuckets;
+        }
 
         System.out.printf("\nAt time %d out of %d (%d%%):\n", currentTime, duration, currentTime * 100 / duration);
         System.out.printf("  In the past %d ms:\n", duration / pollCount);
@@ -91,6 +100,14 @@ public class ResultsPrinter implements BenchmarkController.BenchmarkInterest {
 
             System.out.println("Latency summary");
             System.out.printf("%4s %10s %10s %5s\n", "MS", "CLIENT RTT", "VOLT RTT", "PERC");
+
+            // remove warm-up period stats from the totals
+            for (int i=0; i < firstIntervalClientRTT.length; i++) {
+                clusterLatencyBuckets[i] -= firstIntervalClusterRTT[i];
+                clientLatencyBuckets[i] -= firstIntervalClientRTT[i];
+            }
+
+
             long total_bucketed_txns = 0;
             long running_total = 0;
             int dots_printed = 0;
