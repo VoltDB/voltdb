@@ -297,6 +297,15 @@ DISTRIBUTION
   <voltbin-macro/>
 </target>
 
+<target name="voltbin_copy" depends="compile,ee,jars">
+  <voltbin-macro/>
+
+  <!-- copy the voltbin contents to $HOME/voltbin -->
+  <exec dir="${build.dir}" executable='/bin/sh'>
+    <arg line="-c 'cp voltbin/* $HOME/voltbin/'"/>
+  </exec>
+</target>
+
 <!-- Copy an example and move the basebuild.xml into that example -->
 <macrodef name="distribute-example">
     <attribute name="exampledir"/>
