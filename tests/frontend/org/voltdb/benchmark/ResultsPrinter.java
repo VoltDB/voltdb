@@ -28,7 +28,8 @@ import org.voltdb.benchmark.BenchmarkResults.Result;
 public class ResultsPrinter implements BenchmarkController.BenchmarkInterest {
 
     @Override
-    public void benchmarkHasUpdated(BenchmarkResults results) {
+    public void benchmarkHasUpdated(BenchmarkResults results,
+            long[] clusterLatencyBuckets, long[] clientLatencyBuckets) {
 
         long txnCount = 0;
         for (String client : results.getClientNames()) {
@@ -86,6 +87,25 @@ public class ResultsPrinter implements BenchmarkController.BenchmarkInterest {
                         txnCount,
                         txnCount / (double)duration * 1000.0,
                         txnCount / (double)duration * 1000.0 * 60.0);
+            }
+
+            System.out.println("Latency summary");
+            System.out.printf("%4s %10s %10s %5s\n", "MS", "CLIENT RTT", "VOLT RTT", "PERC");
+            long total_bucketed_txns = 0;
+            long running_total = 0;
+            int dots_printed = 0;
+            for (int i=0; i < clusterLatencyBuckets.length; i++) {
+                total_bucketed_txns += clusterLatencyBuckets[i];
+            }
+            for (int i=0; i < clusterLatencyBuckets.length; i++) {
+                running_total += clusterLatencyBuckets[i];
+                int dotcount = (int)Math.floor(running_total/(total_bucketed_txns / 50)) - dots_printed;
+                dots_printed += dotcount;
+                String dots = "";
+                for (int j=0; j < dotcount; j++) dots = dots.concat(".");
+                System.out.printf("%4d %10d %10d %5.1f %s\n", i*10,
+                        clientLatencyBuckets[i], clusterLatencyBuckets[i],
+                        (new Double(running_total)/new Double(total_bucketed_txns)) * 100.0, dots);
             }
             System.out.println("===============================================================================\n");
         }

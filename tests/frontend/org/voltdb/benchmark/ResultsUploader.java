@@ -87,7 +87,8 @@ public class ResultsUploader implements BenchmarkController.BenchmarkInterest {
     }
 
     @Override
-    public void benchmarkHasUpdated(BenchmarkResults results) {
+    public void benchmarkHasUpdated(BenchmarkResults results,
+            long[] clusterLatencies, long[] clientLatencies) {
         int pollIndex = results.getCompletedIntervalCount();
         long duration = results.getTotalDuration();
         long interval = results.getIntervalDuration();

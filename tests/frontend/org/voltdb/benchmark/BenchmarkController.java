@@ -104,7 +104,8 @@ public class BenchmarkController {
     String[] m_reservedHostCommand;
 
     public static interface BenchmarkInterest {
-        public void benchmarkHasUpdated(BenchmarkResults currentResults);
+        public void benchmarkHasUpdated(BenchmarkResults currentResults,
+                long[] clusterLatencyBuckets, long[] clientLatencyBuckets);
     }
 
     class ClientStatusThread extends Thread {
@@ -169,6 +170,9 @@ public class BenchmarkController {
                 else if (status.equals("RUNNING")) {
                     //System.out.println("Got running message.");
                     HashMap<String, Long> results = new HashMap<String, Long>();
+                    String clusterLatencyBuckets = null;
+                    String clientLatencyBuckets = null;
+
                     if ((parts.length % 2) != 0) {
                         m_clientPSM.killProcess(line.processName);
                         LogKeys logkey =
@@ -179,11 +183,21 @@ public class BenchmarkController {
                     }
                     for (int i = 2; i < parts.length; i += 2) {
                         String txnName = parts[i];
-                        long txnCount = Long.valueOf(parts[i+1]);
-                        results.put(txnName, txnCount);
+                        if (txnName.equals("@@ClusterLatencyBuckets")) {
+                            clusterLatencyBuckets = parts[i+1];
+                        }
+                        else if (txnName.equals("@@ClientLatencyBuckets")) {
+                            clientLatencyBuckets = parts[i+1];
+                        }
+                        else {
+                            long txnCount = Long.valueOf(parts[i+1]);
+                            results.put(txnName, txnCount);
+                        }
                     }
                     resultsToRead--;
-                    setPollResponseInfo(line.processName, time, results, null);
+                    setPollResponseInfo(line.processName, time, results, null,
+                            parseLatencyBucketString(clusterLatencyBuckets),
+                            parseLatencyBucketString(clientLatencyBuckets));
                 }
             }
         }
@@ -245,6 +259,15 @@ public class BenchmarkController {
         synchronized(m_interested) {
             m_interested.add(interest);
         }
+    }
+
+    private long[] parseLatencyBucketString(String bucketstr) {
+        String values[] = bucketstr.split("--");
+        long buckets[] = new long[values.length];
+        for (int i=0; i < values.length; i++) {
+            buckets[i] = Integer.parseInt(values[i]);
+        }
+        return buckets;
     }
 
     private ArrayList<File> parsePushFiles(String pushfiles) {
@@ -767,7 +790,9 @@ public class BenchmarkController {
             String clientName,
             long time,
             Map<String, Long> transactionCounts,
-            String errMsg)
+            String errMsg,
+            long[] clusterLatencyBuckets,
+            long[] clientLatencyBuckets)
     {
         assert(m_currentResults != null);
         BenchmarkResults resultCopy = null;
@@ -788,7 +813,8 @@ public class BenchmarkController {
             synchronized(m_interested) {
                 // notify interested parties
                 for (BenchmarkInterest interest : m_interested)
-                    interest.benchmarkHasUpdated(resultCopy);
+                    interest.benchmarkHasUpdated(resultCopy,
+                            clusterLatencyBuckets, clientLatencyBuckets);
             }
             m_maxCompletedPoll = completedCount;
 
@@ -801,15 +827,7 @@ public class BenchmarkController {
                     txnDelta += r.transactionCount;
                 }
             }
-
-            // if nothing done this segment, dump everything
-//            if (txnDelta == 0) {
-//                tryDumpAll();
-//                System.out.println("\nDUMPING!\n");
-//            }
         }
-
-
     }
 
     /** Call dump on each of the servers */

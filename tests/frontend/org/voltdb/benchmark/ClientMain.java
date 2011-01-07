@@ -37,9 +37,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.voltdb.PrivateVoltTableFactory;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
+import org.voltdb.*;
 import org.voltdb.benchmark.Verification.Expression;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
@@ -245,6 +243,27 @@ public abstract class ClientMain {
                     txncounts.append(m_counts[i].get());
                 }
             }
+
+            // For now, sum the latency buckets and send them across
+            // with the magic key "@@ClientLatencyBuckets" Delimit
+            // the buckets with "--", to avoid the normalized commas
+            // whitespace characters. Gah. Hack.
+            VoltTable clientRTTLatencies = m_voltClient.getClientRTTLatencies();
+            long[] latencies = latencySummaryHelper(clientRTTLatencies);
+            txncounts.append(", @@ClientLatencyBuckets,");
+            for (int i=0; i < latencies.length; i++) {
+                txncounts.append(latencies[i]);
+                txncounts.append("--");
+            }
+
+            VoltTable clusterRTTLatencies = m_voltClient.getClusterRTTLatencies();
+            latencies = latencySummaryHelper(clusterRTTLatencies);
+            txncounts.append(", @@ClusterLatencyBuckets,");
+            for (int i=0; i < latencies.length; i++) {
+                txncounts.append(latencies[i]);
+                txncounts.append("--");
+            }
+
             System.out.printf("%d,%s%s\n", System.currentTimeMillis(),
                               m_controlState.display, txncounts.toString());
         }
@@ -253,6 +272,20 @@ public abstract class ClientMain {
             final ControlWorker worker = new ControlWorker();
             new Thread(worker).start();
         }
+    }
+
+    /** sums the contents of a latency bucket table. */
+    private long[] latencySummaryHelper(VoltTable vt) {
+        long sums[] = new long[20];
+        for(int i=0; i < vt.getRowCount(); i++) {
+            VoltTableRow row = vt.fetchRow(i);
+            // 20  buckets
+            for (int c=0; c < 20; c++) {
+                // 7 ignored header columns
+                sums[c] += row.getLong(c + 7);
+            }
+        }
+        return sums;
     }
 
     /**
