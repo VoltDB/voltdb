@@ -262,7 +262,6 @@ TEST_F(TupleStreamWrapperTest, BasicOps)
     EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * 9));
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 10));
     allocatedBlockCount = m_wrapper->allocatedBlockCount();
-    EXPECT_TRUE(allocatedBlockCount == 0);
 }
 
 /**
