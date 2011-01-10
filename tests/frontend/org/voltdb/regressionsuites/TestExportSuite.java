@@ -336,7 +336,9 @@ public class TestExportSuite extends RegressionSuite {
         final Client client = getClient();
 
         final double rollbackPerc = 0.15;
-        double random = Math.random(); // initializes the generator
+        long seed = (long)Math.random();
+        System.out.println("TestExportRollback seed " + seed);
+        java.util.Random r = new java.util.Random(seed);
 
         // exportxxx: should pick more random data
         final Object[] rowdata = TestSQLTypesSuite.m_midValues;
@@ -347,7 +349,7 @@ public class TestExportSuite extends RegressionSuite {
                 System.out.println("Rollback test added " + pkey + " rows");
             }
             final Object[] params = convertValsToParams("ALLOW_NULLS", pkey, rowdata);
-            random = Math.random();
+            double random = r.nextDouble();
             if (random <= rollbackPerc) {
                 // note - do not update the el verifier as this rollsback
                 boolean done;

@@ -363,18 +363,12 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /**
          * Perform an action on behalf of Export.
          *
-         * @param ackAction whether or not this action include a
-         * release for stream octets
-         * @param pollAction whether or not this action requests the
-         * next buffer of unpolled octets
-         * @param if ackAction is true, the stream offset being released
          * @param if syncAction is true, the stream offset being set for a table
          * @param the catalog version qualified id of the table to which this action applies
          * @return the universal offset for any poll results (results
          * returned separatedly via QueryResults buffer)
          */
-        long exportAction(bool ackAction, bool pollAction, bool resetAction, bool syncAction,
-                          int64_t ackOffset, int64_t seqNo, int64_t tableId);
+        int64_t exportAction(bool syncAction, int64_t ackOffset, int64_t seqNo, int64_t tableId);
 
         /**
          * Retrieve a hash code for the specified table

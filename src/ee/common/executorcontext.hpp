@@ -47,16 +47,7 @@ class ExecutorContext {
                     bool exportEnabled,
                     int64_t epoch,
                     std::string hostname,
-                    CatalogId hostId) :
-        m_topEnd(topend), m_undoQuantum(undoQuantum),
-        m_txnId(0),
-        m_siteId(siteId), m_partitionId(partitionId),
-        m_hostname(hostname), m_hostId(hostId),
-        m_exportEnabled(exportEnabled), m_epoch(epoch)
-    {
-        m_lastCommittedTxnId = 0;
-        m_lastTickTime = 0;
-    }
+                    CatalogId hostId);
 
     // not always known at initial construction
     void setPartitionId(CatalogId partitionId) {
@@ -123,6 +114,8 @@ class ExecutorContext {
     int64_t lastTickTime() {
         return m_lastTickTime;
     }
+
+    static ExecutorContext* getExecutorContext();
 
   private:
     Topend *m_topEnd;

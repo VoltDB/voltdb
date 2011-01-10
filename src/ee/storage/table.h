@@ -270,15 +270,6 @@ class Table {
     // ------------------------------------------------------------------
 
     /**
-     * Get the next block of committed but unreleased Export bytes
-     */
-    virtual StreamBlock* getCommittedExportBytes() {
-        // default implementation is to return NULL, which
-        // indicates an error
-        return NULL;
-    }
-
-    /**
      * Set the current offset in bytes of the export stream for this Table
      * since startup (used for rejoin/recovery).
      */
@@ -308,6 +299,11 @@ class Table {
      * immediate flush.
      */
     virtual void flushOldTuples(int64_t timeInMillis) {
+    }
+    /**
+     * Inform the tuple stream wrapper of the table's delegate id
+     */
+    virtual void setDelegateId(int64_t delegateId) {
     }
 
 protected:

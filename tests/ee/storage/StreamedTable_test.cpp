@@ -23,6 +23,8 @@
 
 #include <cstring>
 #include <cstdlib>
+#include <queue>
+#include <vector>
 #include "harness.h"
 
 #include "common/executorcontext.hpp"
@@ -39,8 +41,11 @@
 #include "storage/streamedtable.h"
 #include "storage/StreamBlock.h"
 
+#include "boost/smart_ptr.hpp"
+
 using namespace std;
 using namespace voltdb;
+using namespace boost;
 
 const int COLUMN_COUNT = 5;
 // 5 kilobytes of buffer
@@ -49,26 +54,14 @@ const int BUFFER_SIZE = 1024 * 5;
 class MockTopend : public Topend {
   public:
     MockTopend() {
-        m_handoffcount = 0;
-        m_bytesHandedOff = 0;
     }
 
-    void handoffReadyELBuffer(
-        char* bufferPtr, int32_t bytesUsed, CatalogId tableId)
-    {
-        m_handoffcount++;
-        m_bytesHandedOff += bytesUsed;
-        delete[] bufferPtr;
-    }
-
-    virtual char* claimManagedBuffer(int32_t desiredSizeInBytes)
-    {
-        return new char[desiredSizeInBytes];
-    }
-
-    virtual void releaseManagedBuffer(char* bufferPtr)
-    {
-        delete[] bufferPtr;
+    void pushExportBuffer(int32_t partitionId, int64_t delegateId, voltdb::StreamBlock* block) {
+        partitionIds.push(partitionId);
+        delegateIds.push(delegateId);
+        blocks.push_back(shared_ptr<StreamBlock>(new StreamBlock(block)));
+        data.push_back(shared_ptr<char>(block->rawPtr()));
+        receivedExportBuffer = true;
     }
 
     virtual int loadNextDependency(
@@ -81,8 +74,11 @@ class MockTopend : public Topend {
 
     }
 
-    int m_handoffcount;
-    int m_bytesHandedOff;
+    queue<int32_t> partitionIds;
+    queue<int64_t> delegateIds;
+    vector<shared_ptr<StreamBlock> > blocks;
+    vector<shared_ptr<char> > data;
+    bool receivedExportBuffer;
 };
 
 class StreamedTableTest : public Test {
@@ -184,15 +180,18 @@ TEST_F(StreamedTableTest, BaseCase) {
     // poll from the table and make sure we get "stuff", releasing as
     // we go.  This just makes sure we don't fail catastrophically and
     // that things are basically as we expect.
-    StreamBlock* block = m_table->getCommittedExportBytes();
-    int64_t uso = block->uso();
+    vector<shared_ptr<StreamBlock> >::iterator begin = m_topend->blocks.begin();
+    int64_t uso = (*begin)->uso();
     EXPECT_EQ(uso, 0);
-    size_t offset = block->offset();
+    size_t offset = (*begin)->offset();
     EXPECT_TRUE(offset != 0);
-    while (block->offset() > 0)
-    {
-        m_table->releaseExportBytes(uso);
-        block = m_table->getCommittedExportBytes();
+    while (begin != m_topend->blocks.end()) {
+        begin++;
+        if (begin == m_topend->blocks.end()) {
+            break;
+        }
+
+        shared_ptr<StreamBlock> block = *begin;
         uso = block->uso();
         EXPECT_EQ(uso, offset);
         offset += block->offset();

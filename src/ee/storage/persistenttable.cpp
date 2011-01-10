@@ -805,32 +805,12 @@ void PersistentTable::flushOldTuples(int64_t timeInMillis)
     }
 }
 
-StreamBlock*
-PersistentTable::getCommittedExportBytes()
-{
-    if (m_exportEnabled && m_wrapper)
-    {
-        return m_wrapper->getCommittedExportBytes();
-    }
-    return NULL;
-}
-
-bool
-PersistentTable::releaseExportBytes(int64_t releaseOffset)
-{
-    if (m_exportEnabled && m_wrapper)
-    {
-        return m_wrapper->releaseExportBytes(releaseOffset);
-    }
-    return false;
-}
-
-void
-PersistentTable::resetPollMarker()
-{
-    if (m_exportEnabled && m_wrapper)
-    {
-        m_wrapper->resetPollMarker();
+/**
+ * Inform the tuple stream wrapper of the table's delegate id
+ */
+void PersistentTable::setDelegateId(int64_t delegateId) {
+    if (m_exportEnabled && m_wrapper) {
+        m_wrapper->setDelegateId(delegateId);
     }
 }
 

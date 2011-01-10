@@ -51,5 +51,9 @@ int IPCTopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
 void IPCTopend::crashVoltDB(FatalException e) {
     m_vdbipc->crashVoltDB(e);
 }
+
+void IPCTopend::pushExportBuffer(int32_t partitionId, int64_t delegateId, StreamBlock *block) {
+    m_vdbipc->pushExportBuffer(partitionId, delegateId, block);
+}
 }
 

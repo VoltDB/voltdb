@@ -262,7 +262,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
                     " for table " + table.m_name + " with export info (" + seqNo +
                     "," + bytesUsed + ")");
             if (seqNo >= 0) {
-                m_engine.exportAction(false, false, false, true, bytesUsed, seqNo, m_partitionId, tableId);
+                m_engine.exportAction( true, bytesUsed, seqNo, m_partitionId, tableId);
             }
 
         } else {

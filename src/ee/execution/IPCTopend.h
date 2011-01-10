@@ -30,6 +30,7 @@ public:
     IPCTopend( VoltDBIPC *vdbipc);
     int loadNextDependency(int32_t dependencyId, Pool *stringPool, Table* destination);
     void crashVoltDB(FatalException e);
+    void pushExportBuffer(int32_t partitionId, int64_t delegateId, StreamBlock *block);
 
 private:
     ::VoltDBIPC *m_vdbipc;

@@ -150,32 +150,12 @@ void StreamedTable::flushOldTuples(int64_t timeInMillis)
     }
 }
 
-StreamBlock*
-StreamedTable::getCommittedExportBytes()
-{
-    if (m_wrapper)
-    {
-        return m_wrapper->getCommittedExportBytes();
-    }
-    return NULL;
-}
-
-bool
-StreamedTable::releaseExportBytes(int64_t releaseOffset)
-{
-    if (m_wrapper)
-    {
-        return m_wrapper->releaseExportBytes(releaseOffset);
-    }
-    return false;
-}
-
-void
-StreamedTable::resetPollMarker()
-{
-    if (m_wrapper)
-    {
-        m_wrapper->resetPollMarker();
+/**
+ * Inform the tuple stream wrapper of the table's delegate id
+ */
+void StreamedTable::setDelegateId(int64_t delegateId) {
+    if (m_wrapper) {
+        m_wrapper->setDelegateId(delegateId);
     }
 }
 

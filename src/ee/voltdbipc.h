@@ -25,6 +25,7 @@
 #include "logging/LogProxy.h"
 #include "execution/VoltDBEngine.h"
 #include "common/FatalException.hpp"
+#include "storage/StreamBlock.h"
 
 class VoltDBIPC {
 public:
@@ -40,7 +41,7 @@ public:
         kErrorCode_RetrieveDependency = 100, //Request for dependency
         kErrorCode_DependencyFound = 101,    //Response to 100
         kErrorCode_DependencyNotFound = 102, //Also response to 100
-        kErrorCode_HandoffReadELBuffer = 103, //Indication that el buffer is next
+        kErrorCode_pushExportBuffer = 103, //Indication that el buffer is next
         kErrorCode_CrashVoltDB = 104 //Crash with reason string
     };
 
@@ -79,6 +80,7 @@ public:
      */
     void terminate();
 
+    void pushExportBuffer(int32_t partitionId, int64_t delegateId, voltdb::StreamBlock *block);
 private:
     voltdb::VoltDBEngine *m_engine;
     long int m_counter;
@@ -124,8 +126,8 @@ private:
     void sendException( int8_t errorCode);
 
     int8_t activateTableStream(struct ipc_command *cmd);
-    void  tableStreamSerializeMore(struct ipc_command *cmd);
-    void  exportAction(struct ipc_command *cmd);
+    void tableStreamSerializeMore(struct ipc_command *cmd);
+    void exportAction(struct ipc_command *cmd);
 
     void signalHandler(int signum, siginfo_t *info, void *context);
     static void signalDispatcher(int signum, siginfo_t *info, void *context);

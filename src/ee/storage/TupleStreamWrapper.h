@@ -55,6 +55,10 @@ public:
      */
     void setDefaultCapacity(size_t capacity);
 
+    void setDelegateId(int64_t delegateId) {
+        m_delegateId = delegateId;
+    }
+
     /** Read the total bytes used over the life of the stream */
     size_t bytesUsed() {
         return m_uso;
@@ -87,23 +91,6 @@ public:
                        TableTuple &tuple,
                        TupleStreamWrapper::Type type);
 
-    /**
-     * Poll the stream for a buffer of committed bytes.
-     */
-    StreamBlock* getCommittedExportBytes();
-
-    /**
-     * Release data up to (not including) releaseOffset
-     *
-     * @return true if the release was valid, false if not
-     */
-    bool releaseExportBytes(int64_t releaseOffset);
-
-    /**
-     * Reset polling offset to the ack point
-     */
-    void resetPollMarker();
-
     size_t computeOffsets(TableTuple &tuple,size_t *rowHeaderSz);
     void extendBufferChain(size_t minLength);
     void discardBlock(StreamBlock *sb);
@@ -127,18 +114,8 @@ public:
     /** Current block */
     StreamBlock *m_currBlock;
 
-    /** Fake block.  Sometimes we need to return no-progress state
-        to the caller, which we can't do with an existing StreamBlock.
-        However, the convention is that we have ownership of them,
-        so we stuff it here
-    */
-    StreamBlock* m_fakeBlock;
-
-    /** Blocks not yet polled by the top-end */
+    /** Blocks not yet committed and pushed to the top-end */
     std::deque<StreamBlock*> m_pendingBlocks;
-
-    /** Free list of blocks */
-    std::deque<StreamBlock*> m_freeBlocks;
 
     /** transaction id of the current (possibly uncommitted) transaction */
     int64_t m_openTransactionId;
@@ -152,8 +129,7 @@ public:
     /** current committed uso */
     size_t m_committedUso;
 
-    /** The oldest USO that has not yet been returned to the EE on a poll */
-    size_t m_firstUnpolledUso;
+    int64_t m_delegateId;
 };
 
 }

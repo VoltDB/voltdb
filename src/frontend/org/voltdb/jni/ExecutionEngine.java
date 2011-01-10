@@ -355,16 +355,13 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     /**
      * Execute an Export action against the execution engine.
-     * @param ackAction true if this message instructs an ack.
-     * @param pollAction true if this message instructs a poll.
      * @param syncAction TODO
      * @param ackTxnId if an ack, the transaction id being acked
      * @param tableId the table being polled or acked.
      * @param syncOffset TODO
      * @return the response ExportMessage
      */
-    public abstract ExportProtoMessage exportAction(
-            boolean ackAction, boolean pollAction, boolean resetAction, boolean syncAction,
+    public abstract ExportProtoMessage exportAction( boolean syncAction,
             long ackOffset, long seqNo, int partitionId, long tableId);
 
     /**
@@ -621,17 +618,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Perform an export poll or ack action. Poll data will be returned via the usual
      * results buffer. A single action may encompass both a poll and ack.
      * @param pointer Pointer to an engine instance
-     * @param mAckAction True if an ack is requested
-     * @param mPollAction True if a  poll is requested
      * @param mAckOffset The offset being ACKd.
      * @param mTableId The table ID being acted against.
      * @return
      */
     protected native long nativeExportAction(
             long pointer,
-            boolean ackAction,
-            boolean pollAction,
-            boolean resetAction,
             boolean syncAction,
             long mAckOffset,
             long seqNo,

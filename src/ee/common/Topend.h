@@ -20,6 +20,8 @@
 #include "common/ids.h"
 #include <string>
 #include "common/FatalException.hpp"
+#include "storage/StreamBlock.h"
+
 namespace voltdb {
 class Table;
 class Pool;
@@ -35,6 +37,8 @@ class Topend {
         int32_t dependencyId, voltdb::Pool *pool, Table* destination) = 0;
 
     virtual void crashVoltDB(voltdb::FatalException e) = 0;
+
+    virtual void pushExportBuffer(int32_t partitionId, int64_t delegateId, StreamBlock *block) = 0;
 
     virtual ~Topend()
     {

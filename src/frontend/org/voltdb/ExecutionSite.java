@@ -1162,10 +1162,7 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
             RawProcessor.ExportInternalMessage exportm =
                 (RawProcessor.ExportInternalMessage) message;
             ExportProtoMessage response =
-                ee.exportAction(exportm.m_m.isAck(),
-                                exportm.m_m.isPoll(),
-                                exportm.m_m.isClose(),
-                                exportm.m_m.isSync(),
+                ee.exportAction(exportm.m_m.isSync(),
                                 exportm.m_m.getAckOffset(),
                                 0,
                                 exportm.m_m.getPartitionId(),

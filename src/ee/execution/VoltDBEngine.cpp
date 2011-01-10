@@ -616,6 +616,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll)
             m_catalogDelegates[tcd->path()] = tcd;
             if (tcd->exportEnabled()) {
                 tcd->getTable()->incrementRefcount();
+                tcd->getTable()->setDelegateId(tcd->delegateId());
                 m_exportingTables[tcd->delegateId()] = tcd->getTable();
             }
         }
@@ -1269,9 +1270,8 @@ void VoltDBEngine::processRecoveryMessage(RecoveryProtoMsg *message) {
     table->processRecoveryMessage( message, NULL, false);
 }
 
-long
-VoltDBEngine::exportAction(bool ackAction, bool pollAction, bool resetAction,
-                           bool syncAction, int64_t ackOffset, int64_t seqNo, int64_t tableId)
+int64_t
+VoltDBEngine::exportAction(bool syncAction, int64_t ackOffset, int64_t seqNo, int64_t tableId)
 {
     map<int64_t, Table*>::iterator pos = m_exportingTables.find(tableId);
 
@@ -1279,7 +1279,6 @@ VoltDBEngine::exportAction(bool ackAction, bool pollAction, bool resetAction,
     if (pos == m_exportingTables.end()) {
         // ignore trying to sync a non-exported table
         if (syncAction) {
-            assert(ackOffset == 0);
             return 0;
         }
 
@@ -1293,58 +1292,10 @@ VoltDBEngine::exportAction(bool ackAction, bool pollAction, bool resetAction,
     }
 
     Table *table_for_el = pos->second;
-
     if (syncAction) {
         table_for_el->setExportStreamPositions(seqNo, (size_t) ackOffset);
-        // done after the sync
-        return 0;
     }
-
-    // perform any releases before polls.
-    if (ackOffset > 0) {
-        if (!table_for_el->releaseExportBytes(ackOffset)) {
-            return -1;
-        }
-    }
-
-    // perform resets after acks
-    if (resetAction) {
-        table_for_el->resetPollMarker();
-    }
-
-    // ack was successful.  Get the next buffer of committed Export bytes
-    StreamBlock* block = table_for_el->getCommittedExportBytes();
-    if (block == NULL) {
-        return -1;
-    }
-
-    // prepend the length of the block to the results buffer
-    m_resultOutput.writeInt((int)(block->unreleasedSize()));
-
-    // if the block isn't empty, copy it into the query results buffer
-    // if the block is empty, check if it is a dropped table finishing
-    // export. These tables appear in the export list but not in the
-    // current tables list.
-    if (block->unreleasedSize() != 0) {
-        m_resultOutput.writeBytes(block->dataPtr(), block->unreleasedSize());
-    }
-    else {
-        map<string, CatalogDelegate*>::iterator dels = m_catalogDelegates.begin();
-        while (dels != m_catalogDelegates.end()) {
-            CatalogDelegate *tcd = dels->second;
-            if (tcd->delegateId() == tableId) {
-                break;
-            }
-            ++dels;
-        }
-        if (dels == m_catalogDelegates.end()) {
-            table_for_el->decrementRefcount();
-            m_exportingTables.erase(pos);
-        }
-    }
-
-    // return the stream offset for the end of the returned block
-    return (block->uso() + block->offset());
+    return 0;
 }
 
 size_t VoltDBEngine::tableHashCode(int32_t tableId) {

@@ -198,8 +198,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public ExportProtoMessage exportAction(boolean ackAction, boolean pollAction,
-            boolean resetAction, boolean syncAction,
+    public ExportProtoMessage exportAction(boolean syncAction,
             long ackOffset, long seqNo, int partitionId, long mTableId) {
         // TODO Auto-generated method stub
         return null;

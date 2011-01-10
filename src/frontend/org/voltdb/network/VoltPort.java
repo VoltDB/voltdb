@@ -71,6 +71,7 @@ public class VoltPort implements Callable<VoltPort>, Connection
     private long m_lastMessagesRead = 0;
     final int m_expectedOutgoingMessageSize;
     final String m_remoteHost;
+    private String m_toString = null;
 
     /**
      * Package private so that the thread factory in VoltNetwork can clear the pool when the threads exit.
@@ -98,6 +99,7 @@ public class VoltPort implements Callable<VoltPort>, Connection
     void setKey (SelectionKey key) {
         m_selectionKey = key;
         m_channel = (SocketChannel)key.channel();
+        m_toString = super.toString() + ":" + m_channel.socket().getRemoteSocketAddress().toString();
         m_readStream = new NIOReadStream();
         m_writeStream = new NIOWriteStream(
                 this,
@@ -352,7 +354,11 @@ public class VoltPort implements Callable<VoltPort>, Connection
 
     @Override
     public String toString() {
-        return super.toString() + ":" + m_channel.socket().getRemoteSocketAddress().toString();
+        if (m_toString == null) {
+            return super.toString();
+        } else {
+            return m_toString;
+        }
     }
 
     public synchronized long getMessagesRead(boolean interval) {

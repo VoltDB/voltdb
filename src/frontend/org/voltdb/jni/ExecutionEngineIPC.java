@@ -24,6 +24,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.nio.ByteOrder;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -41,7 +42,7 @@ import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.DBBPool.BBContainer;
-
+import org.voltdb.export.ExportManager;
 
 /* Serializes data over a connection that presumably is being read
  * by a voltdb execution engine. The serialization is currently a
@@ -225,6 +226,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         static final int kErrorCode_DependencyNotFound = 102 ;
 
         /**
+         * An error code that can be sent at any time indicating that
+         * an export buffer follows
+         */
+        static final int kErrorCode_pushExportBuffer = 103;
+
+        /**
          * Invoke crash VoltDB
          */
         static final int kErrorCode_CrashVoltDB = 104;
@@ -299,6 +306,35 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     }
 
                     ExecutionEngine.crashVoltDB(message, traces, filename, lineno);
+                }
+                if (status == kErrorCode_pushExportBuffer) {
+                    ByteBuffer header = ByteBuffer.allocate(20);
+                    while (header.hasRemaining()) {
+                        final int read = m_socket.getChannel().read(header);
+                        if (read == -1) {
+                            throw new EOFException();
+                        }
+                    }
+                    header.flip();
+
+                    int partitionId = header.getInt();
+                    long delegateId = header.getLong();
+                    long uso = header.getLong();
+                    header.order(ByteOrder.LITTLE_ENDIAN);
+                    int length = header.getInt();
+                    ByteBuffer exportBuffer = ByteBuffer.allocateDirect(length + 4);
+                    exportBuffer.order(ByteOrder.LITTLE_ENDIAN);
+                    exportBuffer.putInt(length);
+                    exportBuffer.order(ByteOrder.BIG_ENDIAN);
+                    while (exportBuffer.hasRemaining()) {
+                        final int read = m_socket.getChannel().read(exportBuffer);
+                        if (read == -1) {
+                            throw new EOFException();
+                        }
+                    }
+                    exportBuffer.flip();
+                    ExportManager.pushExportBuffer( partitionId, delegateId, uso, 0, exportBuffer);
+                    continue;
                 }
 
                 try {
@@ -1125,15 +1161,11 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public ExportProtoMessage exportAction(boolean ackAction, boolean pollAction,
-            boolean resetAction, boolean syncAction,
+    public ExportProtoMessage exportAction(boolean syncAction,
             long ackOffset, long seqNo, int partitionId, long mTableId) {
         try {
             m_data.clear();
             m_data.putInt(Commands.ExportAction.m_id);
-            m_data.putInt(ackAction ? 1 : 0);
-            m_data.putInt(pollAction ? 1 : 0);
-            m_data.putInt(resetAction ? 1 : 0);
             m_data.putInt(syncAction ? 1 : 0);
             m_data.putLong(ackOffset);
             m_data.putLong(seqNo);
@@ -1165,12 +1197,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     m_connection.m_socketChannel.read(data);
                 data.flip();
 
-                ExportProtoMessage reply = null;
-                if (pollAction) {
-                    reply = new ExportProtoMessage(partitionId, mTableId);
-                    reply.pollResponse(result_offset, data);
-                }
-                return reply;
+                return null;
             }
 
         } catch (final IOException e) {

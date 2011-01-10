@@ -80,11 +80,40 @@ class ExportTestVerifier extends ExportDecoderBase
 
         // otherwise, if an error was already registered, preserve that state
         if (m_rowFailed) {
+//            Object[] decoded = null;
+//            try {
+//                decoded = decodeRow(rowData);
+//            } catch (IOException e) {
+//                // TODO Auto-generated catch block
+//                e.printStackTrace();
+//            }
+//            StringBuffer sb = new StringBuffer();
+//            sb.append("Expected: ");
+//            for (Object o : srcdata) {
+//                sb.append(o).append(',');
+//            }
+//            sb.append("\nReceived: ");
+//            for (int i = 5; i < m_tableSchema.size(); i++) {
+//                sb.append(decoded[i]).append(',');
+//            }
+//            sb.append('\n');
+//            System.out.println(sb);
             return false;
         }
 
         try {
             Object[] decoded = decodeRow(rowData);
+//            StringBuffer sb = new StringBuffer();
+//            sb.append("Expected: ");
+//            for (Object o : srcdata) {
+//                sb.append(o).append(',');
+//            }
+//            sb.append("\nReceived: ");
+//            for (int i = 5; i < m_tableSchema.size(); i++) {
+//                sb.append(decoded[i]).append(',');
+//            }
+//            sb.append('\n');
+//            System.out.println(sb);
             // iterate the schema, verify the row data
             // skip 5 cols into the Export schema since it includes the Export columns
             // (we check the operation type), but then we need to back up the

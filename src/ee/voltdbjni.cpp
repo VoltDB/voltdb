@@ -1049,9 +1049,6 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
   (JNIEnv *env,
    jobject obj,
    jlong engine_ptr,
-   jboolean ackAction,
-   jboolean pollAction,
-   jboolean resetAction,
    jboolean syncAction,
    jlong ackOffset,
    jlong seqNo,
@@ -1062,7 +1059,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
     try {
         try {
             engine->resetReusedResultOutputBuffer();
-            return engine->exportAction(ackAction, pollAction, resetAction, syncAction,
+            return engine->exportAction(syncAction,
                                         static_cast<int64_t>(ackOffset),
                                         static_cast<int64_t>(seqNo),
                                         static_cast<int64_t>(tableId));
@@ -1162,7 +1159,16 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeGetR
 #else
     return -1;
 #endif // MACOSX
+}
 
+/*
+ * Class:     org_voltdb_utils_DBBPool
+ * Method:    deleteCharArrayMemory
+ * Signature: (J)V
+ */
+SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_utils_DBBPool_deleteCharArrayMemory
+  (JNIEnv *env, jclass clazz, jlong ptr) {
+    delete[] reinterpret_cast<char*>(ptr);
 }
 
 /** @} */ // end of JNI doxygen group

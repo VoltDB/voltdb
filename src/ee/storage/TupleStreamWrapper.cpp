@@ -23,6 +23,7 @@
 #include "common/ValuePeeker.hpp"
 #include "common/tabletuple.h"
 #include "common/ExportSerializeIo.h"
+#include "common/executorcontext.hpp"
 
 #include <cstdio>
 #include <iostream>
@@ -42,9 +43,9 @@ TupleStreamWrapper::TupleStreamWrapper(CatalogId partitionId,
                                        int64_t lastFlush)
     : m_partitionId(partitionId), m_siteId(siteId),
       m_lastFlush(lastFlush), m_defaultCapacity(EL_BUFFER_SIZE),
-      m_uso(0), m_currBlock(NULL), m_fakeBlock(NULL),
+      m_uso(0), m_currBlock(NULL),
       m_openTransactionId(0), m_openTransactionUso(0),
-      m_committedTransactionId(0), m_committedUso(0), m_firstUnpolledUso(0)
+      m_committedTransactionId(0), m_committedUso(0)
 {
     assert(lastFlush > -1);
     extendBufferChain(m_defaultCapacity);
@@ -55,8 +56,7 @@ TupleStreamWrapper::setDefaultCapacity(size_t capacity)
 {
     assert (capacity > 0);
     if (m_uso != 0 || m_openTransactionId != 0 ||
-        m_openTransactionUso != 0 || m_committedTransactionId != 0 ||
-        m_committedUso != 0 || m_firstUnpolledUso != 0)
+        m_openTransactionUso != 0 || m_committedTransactionId != 0)
     {
         throwFatalException("setDefaultCapacity only callable before "
                             "TupleStreamWrapper is used");
@@ -75,22 +75,13 @@ void TupleStreamWrapper::cleanupManagedBuffers()
 {
     StreamBlock *sb = NULL;
 
-    delete m_currBlock;
+    discardBlock(m_currBlock);
     m_currBlock = NULL;
-
-    delete m_fakeBlock;
-    m_fakeBlock = NULL;
 
     while (m_pendingBlocks.empty() != true) {
         sb = m_pendingBlocks.front();
         m_pendingBlocks.pop_front();
-        delete sb;
-    }
-
-    while (m_freeBlocks.empty() != true) {
-        sb = m_freeBlocks.front();
-        m_freeBlocks.pop_front();
-        delete sb;
+        discardBlock(sb);
     }
 }
 
@@ -132,6 +123,25 @@ void TupleStreamWrapper::commit(int64_t lastCommittedTxnId, int64_t currentTxnId
     {
         m_committedUso = m_uso;
         m_committedTransactionId = m_openTransactionId;
+    }
+
+    while (!m_pendingBlocks.empty())
+    {
+        StreamBlock* block = m_pendingBlocks.front();
+        // check that the entire remainder is committed
+        if (m_committedUso >= (block->uso() + block->offset()))
+        {
+            //The block is handed off to the topend which is responsible for releasing the
+            //memory associated with the block data. The metadata is deleted here.
+            block->setLengthPrefix();
+            ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer( m_partitionId, m_delegateId, block);
+            delete block;
+            m_pendingBlocks.pop_front();
+        }
+        else
+        {
+            break;
+        }
     }
 }
 
@@ -178,6 +188,7 @@ void TupleStreamWrapper::rollbackTo(size_t mark)
  * be handed off
  */
 void TupleStreamWrapper::discardBlock(StreamBlock *sb) {
+    delete [] sb->rawPtr();
     delete sb;
 }
 
@@ -194,8 +205,17 @@ void TupleStreamWrapper::extendBufferChain(size_t minLength)
 
     if (m_currBlock) {
         if (m_currBlock->offset() > 0) {
-            m_pendingBlocks.push_back(m_currBlock);
-            m_currBlock = NULL;
+            if (m_committedUso >= (m_currBlock->uso() + m_currBlock->offset()))
+            {
+                //The block is handed off to the topend which is responsible for releasing the
+                //memory associated with the block data. The metadata is deleted here.
+                m_currBlock->setLengthPrefix();
+                ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer( m_partitionId, m_delegateId, m_currBlock);
+                delete m_currBlock;
+            } else {
+                m_pendingBlocks.push_back(m_currBlock);
+                m_currBlock = NULL;
+            }
         }
         // fully discard empty blocks. makes valgrind/testcase
         // conclusion easier.
@@ -262,7 +282,7 @@ size_t TupleStreamWrapper::appendTuple(int64_t lastCommittedTxnId,
         extendBufferChain(m_defaultCapacity);
     }
 
-    if ((m_currBlock->offset() + tupleMaxLength) > m_defaultCapacity) {
+    if ((m_currBlock->rawLength() + tupleMaxLength) > m_defaultCapacity) {
         extendBufferChain(tupleMaxLength);
     }
 
@@ -329,121 +349,7 @@ TupleStreamWrapper::computeOffsets(TableTuple &tuple,
     return *rowHeaderSz + metadataSz + dataSz;
 }
 
-void
-TupleStreamWrapper::resetPollMarker()
-{
-    if (m_pendingBlocks.empty() != true) {
-        StreamBlock *oldest_block = m_pendingBlocks.front();
-        if (oldest_block != NULL) {
-            m_firstUnpolledUso = oldest_block->unreleasedUso();
-        }
-    }
-}
 
-StreamBlock*
-TupleStreamWrapper::getCommittedExportBytes()
-{
-    StreamBlock* first_unpolled_block = NULL;
 
-    deque<StreamBlock*>::iterator pending_iter = m_pendingBlocks.begin();
-    while (pending_iter != m_pendingBlocks.end())
-    {
-        StreamBlock* block = *pending_iter;
-        // find the first block that has unpolled data
-        if (m_firstUnpolledUso < (block->uso() + block->offset()))
-        {
-            // check that the entire remainder is committed
-            if (m_committedUso >= (block->uso() + block->offset()))
-            {
-                first_unpolled_block = block;
-                // find the value to update m_firstUnpolledUso
-                m_firstUnpolledUso = block->uso() + block->offset();
-            }
-            else
-            {
-                // if the unpolled block is not committed,
-                // -- construct a fake StreamBlock that makes no progress
-                // --- unreleased USO of this block but offset of 0
-                // don't advance the first unpolled USO
-                delete m_fakeBlock;
-                m_fakeBlock = new StreamBlock(0, 0, block->unreleasedUso());
-                first_unpolled_block = m_fakeBlock;
-            }
-            break;
-        }
-        ++pending_iter;
-    }
 
-    // The first unpolled block wasn't found in the pending.
-    // It had better be m_currBlock or we've got troubles
-    // Since we're here, m_currBlock is not fully committed, so
-    // we just want to create a fake block based on its metadata
-    if (first_unpolled_block == NULL)
-    {
-        delete m_fakeBlock;
-        m_fakeBlock = new StreamBlock(0, 0, m_currBlock->unreleasedUso());
-        first_unpolled_block = m_fakeBlock;
-    }
 
-    // return the appropriate pointah
-    return first_unpolled_block;
-}
-
-bool
-TupleStreamWrapper::releaseExportBytes(int64_t releaseOffset)
-{
-    // if released offset is in an already-released past, just return success
-    if ((m_pendingBlocks.empty() && releaseOffset < m_currBlock->uso()) ||
-        (!m_pendingBlocks.empty() && releaseOffset < m_pendingBlocks.front()->uso()))
-    {
-        return true;
-    }
-
-    // if released offset is in the uncommitted bytes, then set up
-    // to release everything that is committed
-    if (releaseOffset > m_committedUso)
-    {
-        releaseOffset = m_committedUso;
-    }
-
-    bool retval = false;
-
-    if (releaseOffset >= m_currBlock->uso())
-    {
-        while (m_pendingBlocks.empty() != true) {
-            StreamBlock* sb = m_pendingBlocks.back();
-            m_pendingBlocks.pop_back();
-            discardBlock(sb);
-        }
-        m_currBlock->releaseUso(releaseOffset);
-        retval = true;
-    }
-    else
-    {
-        StreamBlock* sb = m_pendingBlocks.front();
-        while (!m_pendingBlocks.empty() && !retval)
-        {
-            if (releaseOffset >= sb->uso() + sb->offset())
-            {
-                m_pendingBlocks.pop_front();
-                discardBlock(sb);
-                sb = m_pendingBlocks.front();
-            }
-            else
-            {
-                sb->releaseUso(releaseOffset);
-                retval = true;
-            }
-        }
-    }
-
-    if (retval)
-    {
-        if (m_firstUnpolledUso < releaseOffset)
-        {
-            m_firstUnpolledUso = releaseOffset;
-        }
-    }
-
-    return retval;
-}

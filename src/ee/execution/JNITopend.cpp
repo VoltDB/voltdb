@@ -16,6 +16,7 @@
  */
 #include "JNITopend.h"
 #include <cassert>
+#include <iostream>
 
 #include "common/debuglog.h"
 #include "storage/table.h"
@@ -71,21 +72,60 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     // http://java.sun.com/javase/6/docs/technotes/guides/jni/spec/design.html#wp17074
     jclass jniClass = m_jniEnv->GetObjectClass(m_javaExecutionEngine);
     VOLT_TRACE("found class: %d", jniClass == NULL);
+    if (jniClass == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(jniClass != 0);
+        throw std::exception();
+    }
 
     m_nextDependencyMID = m_jniEnv->GetMethodID(jniClass, "nextDependencyAsBytes", "(I)[B");
-    assert(m_nextDependencyMID != 0);
+    if (m_nextDependencyMID == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_nextDependencyMID != 0);
+        throw std::exception();
+    }
 
     m_crashVoltDBMID =
         m_jniEnv->GetStaticMethodID(
             jniClass,
             "crashVoltDB",
             "(Ljava/lang/String;[Ljava/lang/String;Ljava/lang/String;I)V");
-    assert(m_crashVoltDBMID != 0);
+    if (m_crashVoltDBMID == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_crashVoltDBMID != NULL);
+        throw std::exception();
+    }
+
+    m_exportManagerClass = m_jniEnv->FindClass("org/voltdb/export/ExportManager");
+    if (m_exportManagerClass == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_exportManagerClass != NULL);
+        throw std::exception();
+    }
+
+    m_exportManagerClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_exportManagerClass));
+    if (m_exportManagerClass == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_exportManagerClass != NULL);
+        throw std::exception();
+    }
+
+    m_pushExportBufferMID = m_jniEnv->GetStaticMethodID(
+            m_exportManagerClass,
+            "pushExportBuffer",
+            "(IJJJLjava/nio/ByteBuffer;)V");
+    if (m_pushExportBufferMID == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_pushExportBufferMID != NULL);
+        throw std::exception();
+    }
 
     if (m_nextDependencyMID == 0 ||
-        m_crashVoltDBMID == 0)
+        m_crashVoltDBMID == 0 ||
+        m_pushExportBufferMID == 0 ||
+        m_exportManagerClass == 0)
     {
-        throw std::exception();
+
     }
 }
 
@@ -167,6 +207,23 @@ void JNITopend::crashVoltDB(FatalException e) {
 
 JNITopend::~JNITopend() {
     m_jniEnv->DeleteGlobalRef(m_javaExecutionEngine);
+}
+
+void JNITopend::pushExportBuffer(int32_t partitionId, int64_t delegateId, StreamBlock *block) {
+    jobject buffer = m_jniEnv->NewDirectByteBuffer( block->rawPtr(), block->rawLength());
+    if (buffer == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        throw std::exception();
+    }
+    m_jniEnv->CallStaticVoidMethod(
+            m_exportManagerClass,
+            m_pushExportBufferMID,
+            partitionId,
+            delegateId,
+            block->uso(),
+            reinterpret_cast<jlong>(block->rawPtr()),
+            buffer);
+    m_jniEnv->DeleteLocalRef(buffer);
 }
 
 }

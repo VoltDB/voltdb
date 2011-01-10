@@ -487,40 +487,16 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * data is returned in the usual results buffer, length preceded as usual.
      */
     @Override
-    public ExportProtoMessage exportAction(boolean ackAction, boolean pollAction,
-            boolean resetAction, boolean syncAction,
+    public ExportProtoMessage exportAction(boolean syncAction,
             long ackTxnId, long seqNo, int partitionId, long tableId)
     {
         deserializer.clear();
         ExportProtoMessage result = null;
-        try {
-            long offset = nativeExportAction(pointer, ackAction, pollAction, resetAction,
-                                             syncAction, ackTxnId, seqNo, tableId);
-            if (offset < 0) {
-                result = new ExportProtoMessage(partitionId, tableId);
-                result.error();
-            }
-            else if (pollAction) {
-                ByteBuffer b;
-                int byteLen = deserializer.readInt();
-                if (byteLen < 0) {
-                    throw new IOException("Invalid length in Export poll response results.");
-                }
-
-                // need to keep the embedded length in the resulting buffer.
-                // the buffer's embedded length prefix is not self-inclusive,
-                // so add it back to the byteLen.
-                deserializer.buffer().position(0);
-                b = deserializer.readBuffer(byteLen + 4);
-                result = new ExportProtoMessage(partitionId, tableId);
-                result.pollResponse(offset, b);
-            }
-        }
-        catch (IOException e) {
-            // TODO: Not going to rollback here so EEException seems wrong?
-            // Seems to indicate invalid Export data which should be hard error?
-            // Maybe this should be crashVoltDB?
-            throw new RuntimeException(e);
+        long retval = nativeExportAction(pointer,
+                                         syncAction, ackTxnId, seqNo, tableId);
+        if (retval < 0) {
+            result = new ExportProtoMessage(partitionId, tableId);
+            result.error();
         }
         return result;
     }

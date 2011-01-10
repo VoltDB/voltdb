@@ -1117,7 +1117,7 @@ public class ClientInterface implements DumpManager.Dumpable {
         }
 
         for (final Connection c : connectionsToRemove) {
-            networkLog.warn("Closing connection to " + c + " at " + now + " because it refuses to read responses");
+            networkLog.warn("Closing connection to " + c + " at " + new java.util.Date() + " because it refuses to read responses");
             c.unregister();
         }
     }

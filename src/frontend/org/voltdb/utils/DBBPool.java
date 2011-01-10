@@ -763,4 +763,9 @@ public final class DBBPool {
         }
     }
 
+    /*
+     * Delete a char array that was allocated on the native heap
+     */
+    public static native void deleteCharArrayMemory(long pointer);
+
 }

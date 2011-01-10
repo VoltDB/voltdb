@@ -208,9 +208,11 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
 
     // Export-related inherited methods
     virtual void flushOldTuples(int64_t timeInMillis);
-    virtual StreamBlock* getCommittedExportBytes();
-    virtual bool releaseExportBytes(int64_t releaseOffset);
-    virtual void resetPollMarker();
+
+    /**
+     * Inform the tuple stream wrapper of the table's delegate id
+     */
+    void setDelegateId(int64_t delegateId);
 
     /** Add a view to this table */
     void addMaterializedView(MaterializedViewMetadata *view);

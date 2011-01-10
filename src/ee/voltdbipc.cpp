@@ -193,9 +193,6 @@ typedef struct {
  */
 typedef struct {
     struct ipc_command cmd;
-    int32_t isAck;
-    int32_t isPoll;
-    int32_t isReset;
     int32_t isSync;
     int64_t offset;
     int64_t seqNo;
@@ -999,10 +996,7 @@ void VoltDBIPC::exportAction(struct ipc_command *cmd) {
     export_action *action = (export_action*)cmd;
 
     m_engine->resetReusedResultOutputBuffer();
-    long result = m_engine->exportAction(action->isAck,
-                                         action->isPoll,
-                                         action->isReset,
-                                         action->isSync,
+    long result = m_engine->exportAction(action->isSync,
                                          static_cast<int64_t>(ntohll(action->offset)),
                                          static_cast<int64_t>(ntohll(action->seqNo)),
                                          static_cast<int64_t>(ntohll(action->tableId)));
@@ -1077,6 +1071,17 @@ void VoltDBIPC::threadLocalPoolAllocations() {
     response[0] = kErrorCode_Success;
     *reinterpret_cast<std::size_t*>(&response[1]) = htonll(poolAllocations);
     writeOrDie(m_fd, (unsigned char*)response, 9);
+}
+
+void VoltDBIPC::pushExportBuffer(int32_t partitionId, int64_t delegateId, voltdb::StreamBlock *block) {
+    m_reusedResultBuffer[0] = kErrorCode_pushExportBuffer;
+    *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[1]) = htonl(partitionId);
+    *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[5]) = htonll(delegateId);
+    *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[13]) = htonll(block->uso());
+    ::memcpy( &m_reusedResultBuffer[21], block->rawPtr(), block->rawLength());
+    writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, 21);
+    writeOrDie(m_fd, (unsigned char*)block->rawPtr(), block->rawLength());
+    delete [] block->rawPtr();
 }
 
 int main(int argc, char **argv) {

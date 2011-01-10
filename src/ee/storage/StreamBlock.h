@@ -31,21 +31,30 @@ namespace voltdb
     class StreamBlock {
     public:
         StreamBlock(char* data, size_t capacity, size_t uso)
-            : m_data(data), m_capacity(capacity), m_offset(0),
-            m_releaseOffset(0), m_uso(uso)
+            : m_data(data), m_capacity(capacity), m_offset(sizeof(int32_t)),
+              m_uso(uso)
+        {
+        }
+
+        StreamBlock(StreamBlock *other)
+            : m_data(other->m_data), m_capacity(other->m_capacity), m_offset(other->m_offset),
+              m_uso(other->m_uso)
         {
         }
 
         ~StreamBlock()
         {
-            delete[] m_data;
         }
 
         /**
-         * Returns a pointer to the first unreleased octet in the block
+         * Returns a pointer to the underlying raw memory allocation
          */
-        const char* const dataPtr() const {
-            return m_data + m_releaseOffset;
+        char* rawPtr() {
+            return m_data;
+        }
+
+        int32_t rawLength() const {
+            return  static_cast<int32_t>(m_offset);
         }
 
         /**
@@ -56,13 +65,18 @@ namespace voltdb
             return m_uso;
         }
 
+        void setLengthPrefix() {
+            *reinterpret_cast<int32_t*>(m_data) = static_cast<int32_t>(offset());
+        }
+
         /**
          * Returns the additional offset from uso() to count all the
          * octets in this block.  uso() + offset() will compute the
-         * universal stream offset for the entire block.
+         * universal stream offset for the entire block. This excludes
+         * the length prefix.
          */
         const size_t offset() const {
-            return m_offset;
+            return m_offset - 4;
         }
 
         /**
@@ -72,33 +86,9 @@ namespace voltdb
             return m_capacity - m_offset;
         }
 
-        /**
-         * Returns the USO of the first unreleased octet in this block
-         */
-        const size_t unreleasedUso()
-        {
-            return m_uso + m_releaseOffset;
-        }
-
-        /**
-         * Returns the size of the unreleased data in this block.
-         */
-        const size_t unreleasedSize()
-        {
-            return m_offset - m_releaseOffset;
-        }
-
     private:
         char* mutableDataPtr() {
             return m_data + m_offset;
-        }
-
-        // The USO for octets up to which are being released
-        void releaseUso(size_t releaseUso)
-        {
-            assert(releaseUso >= m_uso);
-            m_releaseOffset = releaseUso - m_uso;
-            assert(m_releaseOffset <= m_offset);
         }
 
         void consumed(size_t consumed) {
@@ -107,12 +97,9 @@ namespace voltdb
         }
 
         void truncateTo(size_t mark) {
-            // We should NEVER be truncating back to an offset
-            // that has been released
-            assert((mark - m_uso) >= m_releaseOffset);
             // just move offset. pretty easy.
-            if (((m_uso + m_offset) >= mark ) && (m_uso <= mark)) {
-                m_offset = mark - m_uso;
+            if (((m_uso + offset()) >= mark ) && (m_uso <= mark)) {
+                m_offset = mark - m_uso + sizeof(int32_t);
             }
             else {
                 throwFatalException("Attempted Export block truncation past start of block."
@@ -124,7 +111,6 @@ namespace voltdb
         char *m_data;
         const size_t m_capacity;
         size_t m_offset;         // position for next write.
-        size_t m_releaseOffset;  // position for next read.
         size_t m_uso;            // universal stream offset of m_offset 0.
 
         friend class TupleStreamWrapper;

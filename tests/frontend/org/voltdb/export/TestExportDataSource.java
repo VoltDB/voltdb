@@ -24,43 +24,25 @@
 package org.voltdb.export;
 
 import java.net.UnknownHostException;
-
+import java.util.concurrent.atomic.AtomicReference;
+import java.nio.ByteBuffer;
 import junit.framework.TestCase;
 
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Table;
-import org.voltdb.client.ConnectionUtil;
 import org.voltdb.export.processors.RawProcessor;
-import org.voltdb.messaging.HostMessenger;
+import org.voltdb.export.processors.RawProcessor.ExportInternalMessage;
 import org.voltdb.messaging.MessagingException;
-import org.voltdb.messaging.VoltMessage;
 
 public class TestExportDataSource extends TestCase {
 
-    private static class MockHostMessenger extends HostMessenger {
-        public MockHostMessenger() throws UnknownHostException {
-            super(null, // VoltNetwork
-                  ConnectionUtil.getLocalAddress(), // Coordinator IP
-                  1,    // expected hosts,
-                  0,    // catalogCRC
-                  0,    // deploymentCRC
-                  null); // hostLog);
-        }
-
-        @Override
-        public void send(final int siteId, final int mailboxId, final VoltMessage msg) {
-            this.siteId = siteId;
-            this.mailboxId = mailboxId;
-            this.msg = msg;
-        }
-
-        public int siteId = -1;
-        public int mailboxId = -1;
-        public VoltMessage msg = null;
+    static {
+        org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
     }
 
+    private static final int MAGIC_TUPLE_SIZE = 94;
     MockVoltDB m_mockVoltDB = new MockVoltDB();
     int m_host = 0;
     int m_site = 1;
@@ -112,8 +94,177 @@ public class TestExportDataSource extends TestCase {
     }
 
     public void testPoll() throws MessagingException, UnknownHostException {
-        MockHostMessenger hm = new MockHostMessenger();
-        m_mockVoltDB.setHostMessenger(hm);
+        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
+        Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
+        ExportDataSource s = new ExportDataSource("database",
+                                            table.getTypeName(),
+                                            table.getIsreplicated(),
+                                            m_part,
+                                            m_site,
+                                            table.getRelativeIndex(),
+                                            table.getColumns());
+        ByteBuffer foo = ByteBuffer.allocate(24);
+        foo.order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        foo.putInt(20);
+        foo.order(java.nio.ByteOrder.BIG_ENDIAN);
+        foo.position(0);
+        s.pushExportBuffer(23, 0, foo);
+
+        ExportProtoMessage m = new ExportProtoMessage(m_part, table.getRelativeIndex());
+        RawProcessor.ExportInternalMessage pair = new RawProcessor.ExportInternalMessage(null, m);
+
+        final AtomicReference<ExportInternalMessage> ref = new AtomicReference<ExportInternalMessage>();
+        ExportManager.setInstanceForTest(new ExportManager() {
+           @Override
+           public void queueMessage(ExportInternalMessage mbp) {
+               ref.set(mbp);
+           }
+        });
+        m.poll();
+        s.exportAction(pair);
+        ExportInternalMessage mbp = ref.get();
+
+        assertEquals(m_part, mbp.m_m.m_partitionId);
+        assertEquals(table.getRelativeIndex(), mbp.m_m.m_tableId);
+        assertEquals( 43, mbp.m_m.m_offset);
+        foo.flip();
+        assertEquals( foo, mbp.m_m.m_data);
+    }
+
+    /**
+     * Test basic release.  create two buffers, release the first one, and
+     * ensure that our next poll returns the second one.
+     */
+    public void testSimpleRelease() throws Exception
+    {
+        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
+        Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
+        ExportDataSource s = new ExportDataSource("database",
+                                            table.getTypeName(),
+                                            table.getIsreplicated(),
+                                            m_part,
+                                            m_site,
+                                            table.getRelativeIndex(),
+                                            table.getColumns());
+
+        // we get nothing with no data
+        ExportProtoMessage m = new ExportProtoMessage(m_part, table.getRelativeIndex());
+        RawProcessor.ExportInternalMessage pair = new RawProcessor.ExportInternalMessage(null, m);
+
+        final AtomicReference<ExportInternalMessage> ref = new AtomicReference<ExportInternalMessage>();
+        ExportManager.setInstanceForTest(new ExportManager() {
+           @Override
+           public void queueMessage(ExportInternalMessage mbp) {
+               ref.set(mbp);
+           }
+        });
+        m.poll();
+        s.exportAction(pair);
+
+        ExportInternalMessage mbp = ref.get();
+        assertEquals(mbp.m_m.getAckOffset(), 0);
+        assertEquals(mbp.m_m.m_data.getInt(), 0);
+
+        ByteBuffer firstBuffer = ByteBuffer.allocate(4 + MAGIC_TUPLE_SIZE * 9);
+        s.pushExportBuffer(0, 0, firstBuffer);
+
+        ByteBuffer secondBuffer = ByteBuffer.allocate(4 + MAGIC_TUPLE_SIZE * 10);
+        s.pushExportBuffer(MAGIC_TUPLE_SIZE * 9, 0, secondBuffer);
+
+        // release the first buffer
+        m.ack(MAGIC_TUPLE_SIZE * 9);
+        m.poll();
+        ref.set(null);
+        s.exportAction(pair);
+
+        // now get the second
+        mbp = ref.get();
+        assertEquals(MAGIC_TUPLE_SIZE * 19, mbp.m_m.getAckOffset());
+        assertEquals(MAGIC_TUPLE_SIZE * 10, mbp.m_m.m_data.remaining() - 4);
+    }
+
+    /**
+     * Test that attempting to release uncommitted bytes only releases what
+     * is committed
+     */
+    public void testReleaseUncommitted() throws Exception
+    {
+        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
+        Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
+        ExportDataSource s = new ExportDataSource("database",
+                                            table.getTypeName(),
+                                            table.getIsreplicated(),
+                                            m_part,
+                                            m_site,
+                                            table.getRelativeIndex(),
+                                            table.getColumns());
+
+        // we get nothing with no data
+        ExportProtoMessage m = new ExportProtoMessage(m_part, table.getRelativeIndex());
+        RawProcessor.ExportInternalMessage pair = new RawProcessor.ExportInternalMessage(null, m);
+
+        final AtomicReference<ExportInternalMessage> ref = new AtomicReference<ExportInternalMessage>();
+        ExportManager.setInstanceForTest(new ExportManager() {
+           @Override
+           public void queueMessage(ExportInternalMessage mbp) {
+               ref.set(mbp);
+           }
+        });
+        m.poll();
+        s.exportAction(pair);
+
+        ExportInternalMessage mbp = ref.get();
+        assertEquals(mbp.m_m.getAckOffset(), 0);
+        assertEquals(mbp.m_m.m_data.getInt(), 0);
+
+        ByteBuffer firstBuffer = ByteBuffer.allocate(4 + MAGIC_TUPLE_SIZE * 3);
+        s.pushExportBuffer(0, 0, firstBuffer);
+
+        // release part of the committed data
+        m.ack(MAGIC_TUPLE_SIZE * 2);
+        s.exportAction(pair);
+
+        //Verify the release was done correctly, should only get one tuple back
+        m.close();
+        s.exportAction(pair);
+        mbp = ref.get();
+        assertEquals(mbp.m_m.getAckOffset(), MAGIC_TUPLE_SIZE * 3);
+        mbp.m_m.m_data.order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        assertEquals(mbp.m_m.m_data.getInt(), MAGIC_TUPLE_SIZE);
+
+        //Reset close flag
+        m = new ExportProtoMessage(m_part, table.getRelativeIndex());
+        m.poll();
+        pair = new RawProcessor.ExportInternalMessage(null, m);
+
+        // now try to release past committed data
+        m.ack(MAGIC_TUPLE_SIZE * 10);
+        s.exportAction(pair);
+
+        //verify that we have moved to the end of the committed data
+        mbp = ref.get();
+        assertEquals(mbp.m_m.getAckOffset(), MAGIC_TUPLE_SIZE * 3);
+        assertEquals(mbp.m_m.m_data.getInt(), 0);
+
+        ByteBuffer secondBuffer = ByteBuffer.allocate(4 + MAGIC_TUPLE_SIZE * 6);
+        s.pushExportBuffer(MAGIC_TUPLE_SIZE * 3, 0, secondBuffer);
+
+        m.ack(MAGIC_TUPLE_SIZE * 3);
+        s.exportAction(pair);
+
+        // now, more data and make sure we get the all of it
+        mbp = ref.get();
+        assertEquals(mbp.m_m.getAckOffset(), MAGIC_TUPLE_SIZE * 9);
+        mbp.m_m.m_data.order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        assertEquals(mbp.m_m.m_data.getInt(), MAGIC_TUPLE_SIZE * 6);
+    }
+
+    /**
+     * Test that attempting to release on a non-buffer boundary will return
+     * the remaining un-acked partial buffer when we poll
+     */
+    public void testReleaseOnNonBoundary() throws Exception
+    {
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
         ExportDataSource s = new ExportDataSource("database",
@@ -127,11 +278,328 @@ public class TestExportDataSource extends TestCase {
         ExportProtoMessage m = new ExportProtoMessage(m_part, table.getRelativeIndex());
         RawProcessor.ExportInternalMessage pair = new RawProcessor.ExportInternalMessage(null, m);
 
+        final AtomicReference<ExportInternalMessage> ref = new AtomicReference<ExportInternalMessage>();
+        ExportManager.setInstanceForTest(new ExportManager() {
+           @Override
+           public void queueMessage(ExportInternalMessage mbp) {
+               ref.set(mbp);
+           }
+        });
+        m.poll();
+
+        ByteBuffer firstBuffer = ByteBuffer.allocate(4 + MAGIC_TUPLE_SIZE * 9);
+        s.pushExportBuffer(0, 0, firstBuffer);
+
+        ByteBuffer secondBuffer = ByteBuffer.allocate(4 + MAGIC_TUPLE_SIZE * 10);
+        s.pushExportBuffer(MAGIC_TUPLE_SIZE * 9, 0, secondBuffer);
+
+        // release part of the first buffer
+        m.ack(MAGIC_TUPLE_SIZE * 4);
         s.exportAction(pair);
 
-        assertEquals(m_site, hm.siteId);
-        assertEquals(0, hm.mailboxId);
-        assertTrue(hm.msg instanceof RawProcessor.ExportInternalMessage);
-        assertEquals(pair, hm.msg);
+        ExportInternalMessage mbp = ref.get();
+
+        // get the first buffer and make sure we get the remainder
+        assertEquals(mbp.m_m.getAckOffset(), MAGIC_TUPLE_SIZE * 9);
+        mbp.m_m.m_data.order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        assertEquals(mbp.m_m.m_data.getInt(), MAGIC_TUPLE_SIZE * 5);
+
+        //Now get the second buffer
+        m.ack(MAGIC_TUPLE_SIZE * 9);
+        s.exportAction(pair);
+
+        mbp = ref.get();
+        assertEquals(mbp.m_m.getAckOffset(), MAGIC_TUPLE_SIZE * 19);
+        mbp.m_m.m_data.order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        assertEquals(mbp.m_m.m_data.getInt(), MAGIC_TUPLE_SIZE * 10);
     }
+
+//    /**
+//     * Test that releasing everything in steps and then polling results in
+//     * the right StreamBlock
+//     */
+//    public void testReleaseAllInAlignedSteps() throws Exception
+//    {
+//        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
+//        Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
+//        ExportDataSource s = new ExportDataSource("database",
+//                                            table.getTypeName(),
+//                                            table.getIsreplicated(),
+//                                            m_part,
+//                                            m_site,
+//                                            table.getRelativeIndex(),
+//                                            table.getColumns());
+//
+//        // we get nothing with no data
+//        ExportProtoMessage m = new ExportProtoMessage(m_part, table.getRelativeIndex());
+//        RawProcessor.ExportInternalMessage pair = new RawProcessor.ExportInternalMessage(null, m);
+//
+//        final AtomicReference<ExportInternalMessage> ref = new AtomicReference<ExportInternalMessage>();
+//        ExportManager.setInstanceForTest(new ExportManager() {
+//           @Override
+//           public void queueMessage(ExportInternalMessage mbp) {
+//               ref.set(mbp);
+//           }
+//        });
+//
+//        ByteBuffer firstBuffer = ByteBuffer.allocate(4 + MAGIC_TUPLE_SIZE * 9);
+//        s.pushExportBuffer(0, 0, firstBuffer);
+//
+//        ByteBuffer secondBuffer = ByteBuffer.allocate(4 + MAGIC_TUPLE_SIZE * 10);
+//        s.pushExportBuffer(MAGIC_TUPLE_SIZE * 9, 0, secondBuffer);
+//
+//        // release the first buffer
+//        m.ack(MAGIC_TUPLE_SIZE * 9);
+//        s.exportAction(pair);
+//
+//        ExportInternalMessage mbp = ref.get();
+//        bool released = m_wrapper->releaseExportBytes((MAGIC_TUPLE_SIZE * 9));
+//        EXPECT_TRUE(released);
+//
+//
+//        // release the second buffer
+//        released = m_wrapper->releaseExportBytes((MAGIC_TUPLE_SIZE * 19));
+//        EXPECT_TRUE(released);
+//
+//        // now get the current state
+//        results = m_wrapper->getCommittedExportBytes();
+//        EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * 19));
+//        EXPECT_EQ(results->unreleasedUso(), (MAGIC_TUPLE_SIZE * 19));
+//        EXPECT_EQ(results->offset(), 0);
+//        EXPECT_EQ(results->unreleasedSize(), 0);
+//    }
+//
+//    /**
+//     * Test that releasing multiple blocks at once and then polling results in
+//     * the right StreamBlock
+//     */
+//    TEST_F(TupleStreamWrapperTest, ReleaseAllAtOnce)
+//    {
+//        // we get nothing with no data
+//        StreamBlock* results = m_wrapper->getCommittedExportBytes();
+//        EXPECT_EQ(results->uso(), 0);
+//        EXPECT_EQ(results->unreleasedUso(), 0);
+//        EXPECT_EQ(results->offset(), 0);
+//        EXPECT_EQ(results->unreleasedSize(), 0);
+//
+//        for (int i = 1; i < 10; i++)
+//        {
+//            appendTuple(i-1, i);
+//        }
+//        m_wrapper->periodicFlush(-1, 0, 9, 9);
+//
+//        for (int i = 10; i < 20; i++)
+//        {
+//            appendTuple(i-1, i);
+//        }
+//        m_wrapper->periodicFlush(-1, 0, 19, 19);
+//
+//        // release everything
+//        bool released;
+//        released = m_wrapper->releaseExportBytes((MAGIC_TUPLE_SIZE * 19));
+//        EXPECT_TRUE(released);
+//
+//        // now get the current state
+//        results = m_wrapper->getCommittedExportBytes();
+//        EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * 19));
+//        EXPECT_EQ(results->unreleasedUso(), (MAGIC_TUPLE_SIZE * 19));
+//        EXPECT_EQ(results->offset(), 0);
+//        EXPECT_EQ(results->unreleasedSize(), 0);
+//    }
+//
+//    /**
+//     * Test that releasing bytes earlier than recorded history just succeeds
+//     */
+//    TEST_F(TupleStreamWrapperTest, ReleasePreHistory)
+//    {
+//        // we get nothing with no data
+//        StreamBlock* results = m_wrapper->getCommittedExportBytes();
+//        EXPECT_EQ(results->uso(), 0);
+//        EXPECT_EQ(results->unreleasedUso(), 0);
+//        EXPECT_EQ(results->offset(), 0);
+//        EXPECT_EQ(results->unreleasedSize(), 0);
+//
+//        for (int i = 1; i < 10; i++)
+//        {
+//            appendTuple(i-1, i);
+//        }
+//        m_wrapper->periodicFlush(-1, 0, 9, 9);
+//
+//        for (int i = 10; i < 20; i++)
+//        {
+//            appendTuple(i-1, i);
+//        }
+//        m_wrapper->periodicFlush(-1, 0, 19, 19);
+//
+//        // release everything
+//        bool released;
+//        released = m_wrapper->releaseExportBytes((MAGIC_TUPLE_SIZE * 19));
+//        EXPECT_TRUE(released);
+//
+//        // now release something early in what just got released
+//        released = m_wrapper->releaseExportBytes((MAGIC_TUPLE_SIZE * 4));
+//        EXPECT_TRUE(released);
+//
+//        // now get the current state
+//        results = m_wrapper->getCommittedExportBytes();
+//        EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * 19));
+//        EXPECT_EQ(results->unreleasedUso(), (MAGIC_TUPLE_SIZE * 19));
+//        EXPECT_EQ(results->offset(), 0);
+//        EXPECT_EQ(results->unreleasedSize(), 0);
+//    }
+//
+//    /**
+//     * Test that releasing at a point in the current stream block
+//     * works correctly
+//     */
+//    TEST_F(TupleStreamWrapperTest, ReleaseInCurrentBlock)
+//    {
+//        // we get nothing with no data
+//        StreamBlock* results = m_wrapper->getCommittedExportBytes();
+//        EXPECT_EQ(results->uso(), 0);
+//        EXPECT_EQ(results->unreleasedUso(), 0);
+//        EXPECT_EQ(results->offset(), 0);
+//        EXPECT_EQ(results->unreleasedSize(), 0);
+//
+//        // Fill the current buffer with some stuff
+//        for (int i = 1; i < 10; i++)
+//        {
+//            appendTuple(i-1, i);
+//        }
+//
+//        // release part of the way into the current buffer
+//        bool released;
+//        released = m_wrapper->releaseExportBytes((MAGIC_TUPLE_SIZE * 4));
+//        EXPECT_TRUE(released);
+//
+//        // Poll and verify that we get a StreamBlock that indicates that
+//        // there's no data available at the new release point
+//        results = m_wrapper->getCommittedExportBytes();
+//        EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * 4));
+//        EXPECT_EQ(results->unreleasedUso(), (MAGIC_TUPLE_SIZE * 4));
+//        EXPECT_EQ(results->offset(), 0);
+//        EXPECT_EQ(results->unreleasedSize(), 0);
+//
+//        // Now, flush the buffer and then verify that the next poll gets
+//        // the right partial result
+//        m_wrapper->periodicFlush(-1, 0, 9, 9);
+//        results = m_wrapper->getCommittedExportBytes();
+//        EXPECT_EQ(results->uso(), 0);
+//        EXPECT_EQ(results->unreleasedUso(), (MAGIC_TUPLE_SIZE * 4));
+//        EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 9));
+//        EXPECT_EQ(results->unreleasedSize(), (MAGIC_TUPLE_SIZE * 5));
+//    }
+//
+//    /**
+//     * Test that reset allows re-polling data
+//     */
+//    TEST_F(TupleStreamWrapperTest, ResetInFirstBlock)
+//    {
+//        // Fill the current buffer with some stuff
+//        for (int i = 1; i < 10; i++)
+//        {
+//            appendTuple(i-1, i);
+//        }
+//
+//        // Flush all data
+//        m_wrapper->periodicFlush(-1, 0, 10, 10);
+//
+//        // Poll and verify that data is returned
+//        StreamBlock* results = m_wrapper->getCommittedExportBytes();
+//        EXPECT_EQ(results->uso(), 0);
+//        EXPECT_EQ(results->unreleasedUso(), 0);
+//        EXPECT_EQ(results->offset(), MAGIC_TUPLE_SIZE * 9);
+//        EXPECT_EQ(results->unreleasedSize(), MAGIC_TUPLE_SIZE * 9);
+//
+//        // Poll again and see that an empty block is returned
+//        // (Not enough data to require more than one block)
+//        results = m_wrapper->getCommittedExportBytes();
+//        EXPECT_EQ(results->uso(), MAGIC_TUPLE_SIZE * 9);
+//        EXPECT_EQ(results->offset(), 0);
+//        EXPECT_EQ(results->unreleasedUso(), results->uso());
+//
+//        // Reset the stream and get the first poll again
+//        m_wrapper->resetPollMarker();
+//        results = m_wrapper->getCommittedExportBytes();
+//        EXPECT_EQ(results->uso(), 0);
+//        EXPECT_EQ(results->unreleasedUso(), 0);
+//        EXPECT_EQ(results->offset(), MAGIC_TUPLE_SIZE * 9);
+//        EXPECT_EQ(results->unreleasedSize(), MAGIC_TUPLE_SIZE * 9);
+//    }
+//
+//    TEST_F(TupleStreamWrapperTest, ResetInPartiallyAckedBlock)
+//    {
+//        // Fill the current buffer with some stuff
+//        for (int i = 1; i < 10; i++) {
+//            appendTuple(i-1, i);
+//        }
+//
+//        // Ack the first 4 tuples.
+//        bool released = m_wrapper->releaseExportBytes(MAGIC_TUPLE_SIZE * 4);
+//        EXPECT_TRUE(released);
+//
+//        // Poll and verify that we get a StreamBlock that indicates that
+//        // there's no data available at the new release point
+//        // (because the full block is not committed)
+//        StreamBlock* results = m_wrapper->getCommittedExportBytes();
+//        EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * 4));
+//        EXPECT_EQ(results->unreleasedUso(), (MAGIC_TUPLE_SIZE * 4));
+//        EXPECT_EQ(results->offset(), 0);
+//        EXPECT_EQ(results->unreleasedSize(), 0);
+//
+//        // reset the poll point; this should not change anything.
+//        m_wrapper->resetPollMarker();
+//
+//        // Same verification as above.
+//        results = m_wrapper->getCommittedExportBytes();
+//        EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * 4));
+//        EXPECT_EQ(results->unreleasedUso(), (MAGIC_TUPLE_SIZE * 4));
+//        EXPECT_EQ(results->offset(), 0);
+//        EXPECT_EQ(results->unreleasedSize(), 0);
+//    }
+//
+//    TEST_F(TupleStreamWrapperTest, ResetInPartiallyAckedCommittedBlock)
+//    {
+//        // write some, committing as tuples are added
+//        int i = 0;  // keep track of the current txnid
+//        for (i = 1; i < 10; i++) {
+//            appendTuple(i-1, i);
+//        }
+//
+//        // partially ack the buffer
+//        bool released = m_wrapper->releaseExportBytes(MAGIC_TUPLE_SIZE * 4);
+//        EXPECT_TRUE(released);
+//
+//        // wrap and require a new buffer
+//        int tuples_to_fill = BUFFER_SIZE / MAGIC_TUPLE_SIZE + 10;
+//        for (int j = 0; j < tuples_to_fill; j++, i++) {
+//            appendTuple(i, i+1);
+//        }
+//
+//        // poll - should get the content post release (in the old buffer)
+//        StreamBlock* results = m_wrapper->getCommittedExportBytes();
+//        EXPECT_EQ(results->uso(), 0);
+//        EXPECT_EQ(results->unreleasedUso(), MAGIC_TUPLE_SIZE * 4);
+//        EXPECT_TRUE(results->offset() > 0);
+//
+//        // poll again.
+//         m_wrapper->getCommittedExportBytes();
+//
+//        // reset. Aftwards, should be able to get original block back
+//        m_wrapper->resetPollMarker();
+//
+//        results = m_wrapper->getCommittedExportBytes();
+//        EXPECT_EQ(results->uso(), 0);
+//        EXPECT_EQ(results->unreleasedUso(), MAGIC_TUPLE_SIZE * 4);
+//        EXPECT_TRUE(results->offset() > 0);
+//
+//        // flush should also not change the reset base poll point
+//        m_wrapper->periodicFlush(-1, 0, i, i);
+//        m_wrapper->resetPollMarker();
+//
+//        results = m_wrapper->getCommittedExportBytes();
+//        EXPECT_EQ(results->uso(), 0);
+//        EXPECT_EQ(results->unreleasedUso(), MAGIC_TUPLE_SIZE * 4);
+//        EXPECT_TRUE(results->offset() > 0);
+//    }
 }

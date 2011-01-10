@@ -20,7 +20,9 @@ package org.voltdb.export;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.TreeSet;
+import java.util.TreeMap;
+import java.util.HashMap;
+import java.nio.ByteBuffer;
 
 import org.voltdb.CatalogContext;
 import org.voltdb.catalog.Cluster;
@@ -33,6 +35,7 @@ import org.voltdb.export.processors.RawProcessor.ExportInternalMessage;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.network.InputHandler;
+import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.LogKeys;
 
 /**
@@ -79,7 +82,7 @@ public class ExportManager
     /**
      * Existing datasources that have been advertised to processors
      */
-    TreeSet<ExportDataSource> m_dataSources = new TreeSet<ExportDataSource>();
+    HashMap<Integer, TreeMap<Long, ExportDataSource>> m_dataSourcesByPartition = new HashMap<Integer, TreeMap<Long, ExportDataSource>>();
 
     /** Obtain the global ExportManager via its instance() method */
     private static ExportManager m_self;
@@ -105,6 +108,14 @@ public class ExportManager
     public static ExportManager instance() {
         assert (m_self != null);
         return m_self;
+    }
+
+    public static void setInstanceForTest(ExportManager self) {
+        m_self = self;
+    }
+
+    protected ExportManager() {
+        m_hostId = 0;
     }
 
     /**
@@ -182,20 +193,24 @@ public class ExportManager
         // make the catalog versioned table id. there is coordinated logic
         // common/CatalogDelegate.cpp
         long tmp = (long)(catalogContext.catalogVersion) << 32L;
-        long delegateId = tmp + table.getRelativeIndex();
+        final long delegateId = tmp + table.getRelativeIndex();
 
         for (Integer site : sites) {
-
+            Integer partition = siteTracker.getPartitionForSite(site);
             ExportDataSource exportDataSource = new ExportDataSource("database",
                               table.getTypeName(),
                               table.getIsreplicated(),
-                              siteTracker.getPartitionForSite(site),
+                              partition,
                               site,
                               delegateId,
                               table.getColumns());
-
-            if (!m_dataSources.contains(exportDataSource)) {
-                m_dataSources.add(exportDataSource);
+            TreeMap<Long, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(partition);
+            if (dataSourcesForPartition == null) {
+                dataSourcesForPartition = new TreeMap<Long, ExportDataSource>();
+                m_dataSourcesByPartition.put(partition, dataSourcesForPartition);
+            }
+            if (!dataSourcesForPartition.containsKey(delegateId)) {
+                dataSourcesForPartition.put(delegateId, exportDataSource);
                 newProcessor.addDataSource(exportDataSource);
             }
         }
@@ -246,5 +261,29 @@ public class ExportManager
             }
         }
         return null;
+    }
+
+    public static void pushExportBuffer(int partitionId, long delegateId, long uso, long bufferPtr, ByteBuffer buffer) {
+        ExportManager instance = instance();
+        assert(instance.m_dataSourcesByPartition.containsKey(partitionId));
+        assert(instance.m_dataSourcesByPartition.get(partitionId).containsKey(delegateId));
+        TreeMap<Long, ExportDataSource> sources = instance.m_dataSourcesByPartition.get(partitionId);
+
+        if (sources == null) {
+            exportLog.error("Could not find export data sources for partition "
+                    + partitionId + " the export data is being discarded");
+            DBBPool.deleteCharArrayMemory(bufferPtr);
+            return;
+        }
+
+        ExportDataSource source = sources.get(delegateId);
+        if (source == null) {
+            exportLog.error("Could not find export data source for partition " + partitionId +
+                    " delegate id " + delegateId + " the export data is being discarded");
+            DBBPool.deleteCharArrayMemory(bufferPtr);
+            return;
+        }
+
+        source.pushExportBuffer(uso, bufferPtr, buffer);
     }
 }
