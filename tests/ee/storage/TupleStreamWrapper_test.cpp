@@ -245,9 +245,6 @@ TEST_F(TupleStreamWrapperTest, BasicOps)
     }
     m_wrapper->periodicFlush(-1, 0, 19, 19);
 
-    allocatedBlockCount = m_wrapper->allocatedBlockCount();
-    EXPECT_TRUE(allocatedBlockCount == 2);
-
     // get the first buffer flushed
     ASSERT_TRUE(m_topend.receivedExportBuffer);
     shared_ptr<StreamBlock> results = m_topend.blocks.front();
