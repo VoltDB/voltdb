@@ -43,7 +43,6 @@ import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
-import org.voltdb.utils.Encoder;
 
 /**
  * Compiles individual SQL statements and updates the given catalog.
@@ -120,6 +119,9 @@ public abstract class StatementCompiler {
             throw compiler.new VoltCompilerException(msg);
         }
 
+        /* COMMENTING OUT CODE FOR THE DESIGNER IN THE MAIN
+           VOLTDB TRUNK
+
         // serialize full where clause to the catalog
         // for the benefit of the designer
         if (plan.fullWhereClause != null) {
@@ -147,6 +149,7 @@ public abstract class StatementCompiler {
             String hexString = Encoder.hexEncode(json);
             catalogStmt.setFullplan(hexString);
         }
+        */
 
         // Input Parameters
         // We will need to update the system catalogs with this new information
