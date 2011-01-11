@@ -51,4 +51,9 @@ public class DeletePlanNode extends AbstractOperationPlanNode {
         super.toJSONString(stringer);
         stringer.key(Members.TRUNCATE.name()).value(m_truncate);
     }
+
+    @Override
+    protected String explainPlanForNode(String indent) {
+        return "DELETE";
+    }
 }

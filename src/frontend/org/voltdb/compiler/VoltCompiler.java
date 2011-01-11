@@ -71,6 +71,7 @@ import org.voltdb.compiler.projectfile.SnapshotType;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.StringInputStream;
@@ -307,6 +308,8 @@ public class VoltCompiler {
             return false;
         }
 
+        HashMap<String, byte[]> explainPlans = getExplainPlans(catalog);
+
         // WRITE CATALOG TO JAR HERE
         final String catalogCommands = catalog.serialize();
 
@@ -333,6 +336,9 @@ public class VoltCompiler {
             m_jarOutput.put("project.xml", new File(projectFileURL));
             for (final Entry<String, String> e : m_ddlFilePaths.entrySet())
                 m_jarOutput.put(e.getKey(), new File(e.getValue()));
+            // write all the plans to a folder in the jarfile
+            //for (final Entry<String, byte[]> e : explainPlans.entrySet())
+            //    m_jarOutput.put("plans/" + e.getKey(), e.getValue());
             m_jarOutput.writeToFile(new File(jarOutputPath));
         } catch (final Exception e) {
             return false;
@@ -345,6 +351,32 @@ public class VoltCompiler {
         }
 
         return true;
+    }
+
+    /**
+     * Get textual explain plan info for each plan from the
+     * catalog to be shoved into the catalog jarfile.
+     */
+    HashMap<String, byte[]> getExplainPlans(Catalog catalog) {
+        HashMap<String, byte[]> retval = new HashMap<String, byte[]>();
+        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        assert(db != null);
+        for (Procedure proc : db.getProcedures()) {
+            for (Statement stmt : proc.getStatements()) {
+                String s = "SQL: " + stmt.getSqltext() + "\n";
+                s += "COST: " + Integer.toString(stmt.getCost()) + "\n";
+                s += "PLAN:\n\n";
+                s += Encoder.hexDecodeToString(stmt.getExplainplan()) + "\n";
+                byte[] b = null;
+                try {
+                    b = s.getBytes("UTF-8");
+                } catch (UnsupportedEncodingException e) {
+                    assert(false);
+                }
+                retval.put(proc.getTypeName() + "_" + stmt.getTypeName() + ".txt", b);
+            }
+        }
+        return retval;
     }
 
     @SuppressWarnings("unchecked")

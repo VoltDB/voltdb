@@ -68,4 +68,8 @@ public class MockPlanNode extends AbstractPlanNode
 
     }
 
+    @Override
+    protected String explainPlanForNode(String indent) {
+        return "MOCK";
+    }
 }

@@ -123,4 +123,9 @@ public class DistinctPlanNode extends AbstractPlanNode {
         m_distinctExpression.toJSONString(stringer);
         stringer.endObject();
     }
+
+    @Override
+    protected String explainPlanForNode(String indent) {
+        return "DISTINCT";
+    }
 }

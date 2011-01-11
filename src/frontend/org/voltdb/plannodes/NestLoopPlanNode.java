@@ -17,7 +17,7 @@
 
 package org.voltdb.plannodes;
 
-import org.voltdb.types.*;
+import org.voltdb.types.PlanNodeType;
 
 public class NestLoopPlanNode extends AbstractJoinPlanNode {
 
@@ -28,5 +28,10 @@ public class NestLoopPlanNode extends AbstractJoinPlanNode {
     @Override
     public PlanNodeType getPlanNodeType() {
         return PlanNodeType.NESTLOOP;
+    }
+
+    @Override
+    protected String explainPlanForNode(String indent) {
+        return "NEST LOOP JOIN";
     }
 }

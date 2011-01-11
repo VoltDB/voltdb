@@ -136,6 +136,7 @@ begin Statement             "A parameterized SQL statement embedded in a stored 
   string exptree            "A serialized representation of the original expression tree"
   string fullplan           "A serialized representation of the un-fragmented plan"
   int cost                  "The cost of this plan measured in arbitrary units"
+  string explainplan        "A human-readable plan description"
 end
 
 begin StmtParameter            "A parameter for a parameterized SQL statement"

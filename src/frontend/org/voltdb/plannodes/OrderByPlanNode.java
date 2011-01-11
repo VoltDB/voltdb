@@ -17,14 +17,17 @@
 
 package org.voltdb.plannodes;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Vector;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.types.*;
+import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.SortDirectionType;
 
 public class OrderByPlanNode extends AbstractPlanNode {
 
@@ -145,5 +148,10 @@ public class OrderByPlanNode extends AbstractPlanNode {
             stringer.endObject();
         }
         stringer.endArray();
+    }
+
+    @Override
+    protected String explainPlanForNode(String indent) {
+        return "ORDER BY (SORT)";
     }
 }

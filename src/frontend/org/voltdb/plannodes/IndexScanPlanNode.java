@@ -69,6 +69,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // at runtime in the lookup on the index
     protected List<AbstractExpression> m_searchkeyExpressions = new ArrayList<AbstractExpression>();
 
+    // textual description of index usage for explain plan
+    protected String m_indexUsage = null;
+
     // ???
     protected Boolean m_keyIterate = false;
 
@@ -333,5 +336,13 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             stringer.value(ae);
         }
         stringer.endArray();
+    }
+
+    @Override
+    protected String explainPlanForNode(String indent) {
+        String retval = "INDEX SCAN of \"" + m_targetTableName + "\"";
+        retval += " using \"" + m_targetIndexName + "\"";
+        if (m_indexUsage != null) retval += " " + m_indexUsage;
+        return retval;
     }
 }

@@ -19,6 +19,7 @@ package org.voltdb.planner;
 
 import java.util.ArrayList;
 import java.util.List;
+
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.NodeSchema;
@@ -56,7 +57,22 @@ public class CompiledPlan {
      */
     public List<Fragment> fragments = new ArrayList<Fragment>();
 
+    /**
+     * The SQL text of the statement
+     */
     public String sql = null;
+
+    /**
+     * Cost of the plan as extimated (not necessarily well)
+     * by the planner
+     */
+    public double cost = 0.0;
+
+    /**
+     * The textual explanation of aggregation, join order and
+     * access path selection.
+     */
+    public String explainedPlan = null;
 
     /** A list of parameter names, indexes and types */
     public List<ParameterInfo> parameters = new ArrayList<ParameterInfo>();

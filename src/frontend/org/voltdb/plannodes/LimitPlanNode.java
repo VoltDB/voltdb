@@ -125,4 +125,9 @@ public class LimitPlanNode extends AbstractPlanNode {
         }
         m_outputSchema.sortByTveIndex();
     }
+
+    @Override
+    protected String explainPlanForNode(String indent) {
+        return "LIMIT";
+    }
 }

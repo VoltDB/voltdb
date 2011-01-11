@@ -24,7 +24,7 @@ import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.planner.PlanStatistics;
 import org.voltdb.planner.StatsField;
-import org.voltdb.types.*;
+import org.voltdb.types.PlanNodeType;
 
 public class SeqScanPlanNode extends AbstractScanPlanNode {
 
@@ -47,4 +47,8 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
         return true;
     }
 
+    @Override
+    protected String explainPlanForNode(String indent) {
+        return "SEQUENTIAL SCAN of \"" + m_targetTableName + "\"";
+    }
 }

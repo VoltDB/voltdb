@@ -17,7 +17,8 @@
 
 package org.voltdb.plannodes;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
@@ -25,7 +26,8 @@ import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.types.*;
+import org.voltdb.types.ExpressionType;
+import org.voltdb.types.PlanNodeType;
 
 public class AggregatePlanNode extends AbstractPlanNode {
 
@@ -100,6 +102,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         return;
     }
 
+    @Override
     public void resolveColumnIndexes()
     {
         // Aggregates need to resolve indexes for the output schema but don't need
@@ -241,5 +244,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
             }
             stringer.endArray();
         }
+    }
+
+    @Override
+    protected String explainPlanForNode(String indent) {
+        return "AGGREGATION";
     }
 }

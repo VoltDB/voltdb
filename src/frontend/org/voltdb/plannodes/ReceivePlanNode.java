@@ -20,7 +20,7 @@ package org.voltdb.plannodes;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.types.*;
+import org.voltdb.types.PlanNodeType;
 
 public class ReceivePlanNode extends AbstractPlanNode {
 
@@ -54,5 +54,10 @@ public class ReceivePlanNode extends AbstractPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
+    }
+
+    @Override
+    protected String explainPlanForNode(String indent) {
+        return "NODE RECIEVE";
     }
 }

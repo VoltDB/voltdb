@@ -20,7 +20,7 @@ package org.voltdb.plannodes;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
-import org.voltdb.types.*;
+import org.voltdb.types.PlanNodeType;
 
 public class MaterializePlanNode extends ProjectionPlanNode {
 
@@ -67,5 +67,10 @@ public class MaterializePlanNode extends ProjectionPlanNode {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         stringer.key(Members.BATCHED.name()).value(m_batched);
+    }
+
+    @Override
+    protected String explainPlanForNode(String indent) {
+        return "MATERIALIZE TUPLE from parameters and/or literals";
     }
 }

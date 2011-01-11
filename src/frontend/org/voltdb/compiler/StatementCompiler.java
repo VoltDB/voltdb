@@ -181,6 +181,18 @@ public abstract class StatementCompiler {
         }
         catalogStmt.setReplicatedtabledml(plan.replicatedTableDML);
 
+        // output the explained plan to disk for debugging
+        PrintStream plansOut = BuildDirectoryUtils.getDebugOutputPrintStream(
+                "statement-winner-plans", name + ".txt");
+        plansOut.println("SQL: " + plan.sql);
+        plansOut.println("COST: " + Double.toString(plan.cost));
+        plansOut.println("PLAN:\n");
+        plansOut.println(plan.explainedPlan);
+        plansOut.close();
+
+        // set the explain plan output into the catalog (in hex)
+        catalogStmt.setExplainplan(Encoder.hexEncode(plan.explainedPlan));
+
         int i = 0;
         Collections.sort(plan.fragments);
         for (CompiledPlan.Fragment fragment : plan.fragments) {
@@ -206,8 +218,8 @@ public abstract class StatementCompiler {
             }
 
             // output the plan to disk for debugging
-            PrintStream plansOut = BuildDirectoryUtils.getDebugOutputPrintStream(
-                    "statement-winner-plans", name + "-" + String.valueOf(i++) + ".txt");
+            plansOut = BuildDirectoryUtils.getDebugOutputPrintStream(
+                    "statement-winner-plan-fragments", name + "-" + String.valueOf(i++) + ".txt");
             plansOut.println(json);
             plansOut.close();
 

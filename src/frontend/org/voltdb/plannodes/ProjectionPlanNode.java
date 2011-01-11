@@ -17,7 +17,8 @@
 
 package org.voltdb.plannodes;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
@@ -25,9 +26,12 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
-import org.voltdb.expressions.*;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.PlanStatistics;
-import org.voltdb.types.*;
+import org.voltdb.types.ExpressionType;
+import org.voltdb.types.PlanNodeType;
 
 public class ProjectionPlanNode extends AbstractPlanNode {
 
@@ -152,5 +156,10 @@ public class ProjectionPlanNode extends AbstractPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
+    }
+
+    @Override
+    protected String explainPlanForNode(String indent) {
+        return "PROJECTION";
     }
 }

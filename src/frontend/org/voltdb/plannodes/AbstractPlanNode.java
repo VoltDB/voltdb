@@ -17,8 +17,15 @@
 
 package org.voltdb.plannodes;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Vector;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONString;
@@ -29,7 +36,7 @@ import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.planner.PlanStatistics;
 import org.voltdb.planner.StatsField;
-import org.voltdb.types.*;
+import org.voltdb.types.PlanNodeType;
 
 public abstract class AbstractPlanNode implements JSONString, Comparable<AbstractPlanNode> {
 
@@ -563,4 +570,20 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         }
         stringer.endArray();
     }
+
+    public String toExplainPlanString() {
+        StringBuilder sb = new StringBuilder();
+        explainPlan_recurse(sb, "");
+        return sb.toString();
+    }
+
+    public void explainPlan_recurse(StringBuilder sb, String indent) {
+        String nodePlan = explainPlanForNode(indent);
+        sb.append(indent + nodePlan + "\n");
+        for (AbstractPlanNode node : m_children) {
+            node.explainPlan_recurse(sb, indent + " ");
+        }
+    }
+
+    protected abstract String explainPlanForNode(String indent);
 }

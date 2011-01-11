@@ -25,7 +25,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.types.*;
+import org.voltdb.types.PlanNodeType;
 
 public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
 
@@ -177,5 +177,16 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         } else if (!m_inlineNodes.containsKey(PlanNodeType.INDEXSCAN)) {
             throw new Exception("ERROR: No inline PlanNode with type '" + PlanNodeType.INDEXSCAN + "' was set for " + this);
         }
+    }
+
+    @Override
+    protected String explainPlanForNode(String indent) {
+        AbstractPlanNode node = m_inlineNodes.get(PlanNodeType.INDEXSCAN);
+        assert(node != null);
+        StringBuilder sb = new StringBuilder();
+        sb.append("NESTLOOP INDEX JOIN\n");
+        sb.append(indent).append(" ");
+        sb.append(node.explainPlanForNode(indent + " "));
+        return sb.toString();
     }
 }

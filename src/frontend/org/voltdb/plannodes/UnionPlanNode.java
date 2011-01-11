@@ -17,7 +17,7 @@
 
 package org.voltdb.plannodes;
 
-import org.voltdb.types.*;
+import org.voltdb.types.PlanNodeType;
 
 public class UnionPlanNode extends AbstractPlanNode {
 
@@ -30,9 +30,15 @@ public class UnionPlanNode extends AbstractPlanNode {
         return PlanNodeType.UNION;
     }
 
+    @Override
     public void resolveColumnIndexes()
     {
         // This node doesn't actually exist
         assert(false);
+    }
+
+    @Override
+    protected String explainPlanForNode(String indent) {
+        return "UNION";
     }
 }

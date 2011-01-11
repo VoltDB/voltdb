@@ -162,6 +162,7 @@ public class QueryPlanner {
 
         HashMap<String, String> planOutputs = new HashMap<String, String>();
         HashMap<String, String> dotPlanOutputs = new HashMap<String, String>();
+        HashMap<String, String> explainPlanOutputs = new HashMap<String, String>();
         String winnerName = "";
 
         // index of the currently being "costed" plan
@@ -196,6 +197,9 @@ public class QueryPlanner {
 
                 // iterate through the subset of plans
                 for (CompiledPlan plan : optimizedPlans) {
+
+                    // add in the sql to the plan
+                    plan.sql = sql;
 
                     // this plan is final, resolve all the column index references
                     plan.fragments.get(0).planGraph.resolveColumnIndexes();
@@ -232,11 +236,11 @@ public class QueryPlanner {
                     }
 
                     // compute the cost based on the resources using the current cost model
-                    double cost = costModel.getPlanCost(stats);
+                    plan.cost = costModel.getPlanCost(stats);
 
                     // find the minimum cost plan
-                    if (cost < minCost) {
-                        minCost = cost;
+                    if (plan.cost < minCost) {
+                        minCost = plan.cost;
                         // free the PlanColumns held by the previous best plan
                         bestPlan = plan;
                     }
@@ -244,11 +248,18 @@ public class QueryPlanner {
                     // output a description of the parsed stmt
                     String filename = String.valueOf(i++);
                     if (bestPlan == plan) winnerName = filename;
-                    json = "COST: " + String.valueOf(cost) + "\n" + json;
+                    json = "PLAN:\n" + json;
+                    json = "COST: " + String.valueOf(plan.cost) + "\n" + json;
+                    assert (plan.sql != null);
+                    json = "SQL: " + plan.sql + "\n" + json;
                     planOutputs.put(filename, json);
 
                     // create a graph friendly version
                     dotPlanOutputs.put(filename, nodeList.toDOTString("name"));
+
+                    // get the explained plan for the node
+                    plan.explainedPlan = planGraph.toExplainPlanString();
+                    explainPlanOutputs.put(filename, plan.explainedPlan);
                 }
             }
         }
@@ -260,6 +271,7 @@ public class QueryPlanner {
         }
 
         // reset all the plan node ids for a given plan
+        // this makes the ids deterministic
         bestPlan.resetPlanNodeIds();
 
         if (!m_quietPlanner)
@@ -272,7 +284,7 @@ public class QueryPlanner {
                 }
                 PrintStream candidatePlanOut =
                     BuildDirectoryUtils.getDebugOutputPrintStream("statement-all-plans/" + procName + "_" + stmtName,
-                                                                  filename + ".txt");
+                                                                  filename + "-json.txt");
 
                 candidatePlanOut.println(output.getValue());
                 candidatePlanOut.close();
@@ -286,6 +298,19 @@ public class QueryPlanner {
                 PrintStream candidatePlanOut =
                     BuildDirectoryUtils.getDebugOutputPrintStream("statement-all-plans/" + procName + "_" + stmtName,
                                                                   filename + ".dot");
+
+                candidatePlanOut.println(output.getValue());
+                candidatePlanOut.close();
+            }
+
+            for (Entry<String, String> output : explainPlanOutputs.entrySet()) {
+                String filename = output.getKey();
+                if (winnerName.equals(filename)) {
+                    filename = "WINNER " + filename;
+                }
+                PrintStream candidatePlanOut =
+                    BuildDirectoryUtils.getDebugOutputPrintStream("statement-all-plans/" + procName + "_" + stmtName,
+                                                                  filename + ".txt");
 
                 candidatePlanOut.println(output.getValue());
                 candidatePlanOut.close();
