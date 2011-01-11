@@ -43,6 +43,7 @@ import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
+import org.voltdb.utils.Encoder;
 
 /**
  * Compiles individual SQL statements and updates the given catalog.
