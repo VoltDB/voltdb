@@ -337,8 +337,8 @@ public class VoltCompiler {
             for (final Entry<String, String> e : m_ddlFilePaths.entrySet())
                 m_jarOutput.put(e.getKey(), new File(e.getValue()));
             // write all the plans to a folder in the jarfile
-            //for (final Entry<String, byte[]> e : explainPlans.entrySet())
-            //    m_jarOutput.put("plans/" + e.getKey(), e.getValue());
+            for (final Entry<String, byte[]> e : explainPlans.entrySet())
+                m_jarOutput.put("plans/" + e.getKey(), e.getValue());
             m_jarOutput.writeToFile(new File(jarOutputPath));
         } catch (final Exception e) {
             return false;
