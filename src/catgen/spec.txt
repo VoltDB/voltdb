@@ -133,8 +133,6 @@ begin Statement             "A parameterized SQL statement embedded in a stored 
   StmtParameter* parameters "The set of parameters to this SQL statement"
   PlanFragment* fragments   "The set of plan fragments used to execute this statement"
   Column* output_columns    "The set of columns in the output table"
-  string exptree            "A serialized representation of the original expression tree"
-  string fullplan           "A serialized representation of the un-fragmented plan"
   int cost                  "The cost of this plan measured in arbitrary units"
   string explainplan        "A human-readable plan description"
 end

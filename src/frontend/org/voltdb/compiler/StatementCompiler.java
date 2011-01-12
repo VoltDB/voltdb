@@ -120,38 +120,6 @@ public abstract class StatementCompiler {
             throw compiler.new VoltCompilerException(msg);
         }
 
-        /* COMMENTING OUT CODE FOR THE DESIGNER IN THE MAIN
-           VOLTDB TRUNK
-
-        // serialize full where clause to the catalog
-        // for the benefit of the designer
-        if (plan.fullWhereClause != null) {
-            String json = "ERROR";
-            try {
-                String jsonCompact = plan.fullWhereClause.toJSONString();
-                json = jsonCompact;
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-            String hexString = Encoder.hexEncode(json);
-            catalogStmt.setExptree(hexString);
-        }
-
-        // serialize full plan to the catalog
-        // for the benefit of the designer
-        if (plan.fullWinnerPlan != null) {
-            String json = "ERROR";
-            try {
-                String jsonCompact = plan.fullWinnerPlan.toJSONString();
-                json = jsonCompact;
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-            String hexString = Encoder.hexEncode(json);
-            catalogStmt.setFullplan(hexString);
-        }
-        */
-
         // Input Parameters
         // We will need to update the system catalogs with this new information
         // If this is an adhoc query then there won't be any parameters
