@@ -385,8 +385,8 @@ public class PersistentBinaryDeque implements BinaryDeque {
             currentSegment.add(object);
         }
 
-        assert(segments.size() > 0);
         segments.add(currentSegment);
+        assert(segments.size() > 0);
 
         //Calculate the index for the first segment to push at the front
         //This will be the index before the first segment available for read or
