@@ -1039,7 +1039,8 @@ public class ClientInterface implements DumpManager.Dumpable {
                     // procedure are horrible, horrible, horrible.
                     m_initiator.createTransaction(changeResult.connectionId, changeResult.hostname,
                                                   task, false, true, true, m_allPartitions,
-                                                  m_allPartitions.length, changeResult.clientData, 0, 0);
+                                                  m_allPartitions.length, changeResult.clientData, 0,
+                                                  EstTime.currentTimeMillis());
                 }
                 else {
                     throw new RuntimeException(
@@ -1188,7 +1189,8 @@ public class ClientInterface implements DumpManager.Dumpable {
             // initiate the transaction
            m_initiator.createTransaction(-1, "SnapshotDaemon", spi, catProc.getReadonly(),
                                          catProc.getSinglepartition(), catProc.getEverysite(),
-                                         m_allPartitions, m_allPartitions.length, m_snapshotDaemonAdapter, 0, 0);
+                                         m_allPartitions, m_allPartitions.length, m_snapshotDaemonAdapter,
+                                         0, EstTime.currentTimeMillis());
        }
     }
 
