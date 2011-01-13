@@ -248,6 +248,21 @@ public class AggregatePlanNode extends AbstractPlanNode {
 
     @Override
     protected String explainPlanForNode(String indent) {
-        return "AGGREGATION";
+        StringBuilder sb = new StringBuilder();
+        sb.append("AGGREGATION ops: ");
+        for (ExpressionType e : m_aggregateTypes) {
+            switch (e) {
+            case AGGREGATE_AVG: sb.append("avg, "); break;
+            case AGGREGATE_COUNT: sb.append("count, "); break;
+            case AGGREGATE_COUNT_STAR: sb.append("count(*), "); break;
+            case AGGREGATE_MAX: sb.append("max, "); break;
+            case AGGREGATE_MIN: sb.append("min, "); break;
+            case AGGREGATE_SUM: sb.append("sum, "); break;
+            default: assert(false);
+            }
+        }
+        // trim the last ", " from the string
+        sb.setLength(sb.length() - 2);
+        return sb.toString();
     }
 }

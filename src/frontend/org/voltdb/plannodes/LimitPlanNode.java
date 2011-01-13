@@ -128,6 +128,12 @@ public class LimitPlanNode extends AbstractPlanNode {
 
     @Override
     protected String explainPlanForNode(String indent) {
-        return "LIMIT";
+        String retval = "";
+        if (m_limit >= 0)
+            retval += "LIMIT " + String.valueOf(m_limit) + " ";
+        if (m_offset > 0)
+            retval += "OFFSET " + String.valueOf(m_offset) + " ";
+        // remove the last space
+        return retval.substring(0, retval.length() - 1);
     }
 }

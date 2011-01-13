@@ -578,10 +578,29 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     public void explainPlan_recurse(StringBuilder sb, String indent) {
-        String nodePlan = explainPlanForNode(indent);
-        sb.append(indent + nodePlan + "\n");
+        // skip projection nodes basically (they're boring as all get out)
+        String extraIndent = " ";
+        if (getPlanNodeType() == PlanNodeType.PROJECTION) {
+            extraIndent = "";
+        }
+        else {
+            String nodePlan = explainPlanForNode(indent);
+            sb.append(indent + nodePlan + "\n");
+        }
+
+        for (AbstractPlanNode inlineNode : m_inlineNodes.values()) {
+            // don't bother with inlined projections
+            if (inlineNode.getPlanNodeType() == PlanNodeType.PROJECTION)
+                continue;
+            sb.append(indent + "inline (");
+            sb.append(inlineNode.explainPlanForNode(indent));
+            sb.append(")\n");
+        }
+
         for (AbstractPlanNode node : m_children) {
-            node.explainPlan_recurse(sb, indent + " ");
+            // inline nodes shouldn't have children I hope
+            assert(m_isInline == false);
+            node.explainPlan_recurse(sb, indent + extraIndent);
         }
     }
 

@@ -181,12 +181,6 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
 
     @Override
     protected String explainPlanForNode(String indent) {
-        AbstractPlanNode node = m_inlineNodes.get(PlanNodeType.INDEXSCAN);
-        assert(node != null);
-        StringBuilder sb = new StringBuilder();
-        sb.append("NESTLOOP INDEX JOIN\n");
-        sb.append(indent).append(" ");
-        sb.append(node.explainPlanForNode(indent + " "));
-        return sb.toString();
+        return "NESTLOOP INDEX JOIN";
     }
 }
