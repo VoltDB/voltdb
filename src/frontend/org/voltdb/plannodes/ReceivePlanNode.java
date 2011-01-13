@@ -58,6 +58,6 @@ public class ReceivePlanNode extends AbstractPlanNode {
 
     @Override
     protected String explainPlanForNode(String indent) {
-        return "NODE RECIEVE";
+        return "RECIEVE FROM ALL PARTITIONS";
     }
 }
