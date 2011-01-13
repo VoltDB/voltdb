@@ -1018,7 +1018,8 @@ public class ClientInterface implements DumpManager.Dumpable {
                         // initiate the transaction
                         m_initiator.createTransaction(plannedStmt.connectionId, plannedStmt.hostname,
                                                       task, false, false, false, m_allPartitions,
-                                                      m_allPartitions.length, plannedStmt.clientData, 0, 0);
+                                                      m_allPartitions.length, plannedStmt.clientData,
+                                                      0, EstTime.currentTimeMillis());
                     }
                 }
                 else if (result instanceof CatalogChangeResult) {
