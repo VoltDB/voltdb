@@ -133,7 +133,12 @@ public class LimitPlanNode extends AbstractPlanNode {
             retval += "LIMIT " + String.valueOf(m_limit) + " ";
         if (m_offset > 0)
             retval += "OFFSET " + String.valueOf(m_offset) + " ";
-        // remove the last space
-        return retval.substring(0, retval.length() - 1);
+        if (retval.length() > 0) {
+            // remove the last space
+            return retval.substring(0, retval.length() - 1);
+        }
+        else {
+            return "LIMIT with parameter";
+        }
     }
 }
