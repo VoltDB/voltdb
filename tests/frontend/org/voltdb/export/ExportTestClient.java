@@ -123,7 +123,7 @@ public class ExportTestClient extends ExportClientBase
         for (ExportConnection connection : m_exportConnections.values())
         {
             HashMap<Long, Long> seen_responses = new HashMap<Long, Long>();
-            for (AdvertisedDataSource source : connection.getDataSources())
+            for (AdvertisedDataSource source : connection.dataSources)
             {
                 try
                 {
@@ -165,7 +165,7 @@ public class ExportTestClient extends ExportClientBase
                     if (seen_responses.containsKey(table_hash))
                     {
                         System.out.println("Saw duplicate response from connection: " +
-                                           connection.getConnectionName());
+                                           connection.name);
                         System.out.println("   for table: " + source.tableName() +
                                            ", " + source.partitionId());
                         retval = false;
@@ -181,10 +181,10 @@ public class ExportTestClient extends ExportClientBase
                     System.exit(1);
                 }
             }
-            if (seen_responses.entrySet().size() != connection.getDataSources().size())
+            if (seen_responses.entrySet().size() != connection.dataSources.size())
             {
                 System.out.println("Didn't see enough responses from connection: " +
-                                   connection.getConnectionName());
+                                   connection.name);
                 retval = false;
             }
         }

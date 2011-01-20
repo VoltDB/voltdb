@@ -20,22 +20,25 @@ package org.voltdb.exportclient;
 import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.LinkedList;
-import java.util.Queue;
 import java.util.Map.Entry;
+import java.util.Queue;
 
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.logging.VoltLogger;
 
-
-public class ExportDataSink implements Runnable
-{
+/**
+ * Represents the export connection to a single export table
+ * in the database for a single partition.
+ *
+ */
+public class ExportDataSink {
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
 
-    private long m_tableId = -1;
-    private int m_partitionId = -1;
-    private final String m_tableName;
-    private final ExportDecoderBase m_decoder;
-    private String m_activeConnection = null;
+    final long tableId;
+    final int partitionId;
+    final String m_tableName;
+    final ExportDecoderBase m_decoder;
+    String m_activeConnection = null;
 
     private final HashMap<String, LinkedList<ExportProtoMessage>> m_rxQueues;
     private final HashMap<String, LinkedList<ExportProtoMessage>> m_txQueues;
@@ -43,102 +46,70 @@ public class ExportDataSink implements Runnable
     boolean m_started = false;
 
     public ExportDataSink(int partitionId, long tableId,
-                      String tableName, ExportDecoderBase decoder)
-    {
-        m_tableId = tableId;
-        m_partitionId = partitionId;
+                      String tableName, ExportDecoderBase decoder) {
+        this.tableId = tableId;
+        this.partitionId = partitionId;
         m_tableName = tableName;
         m_decoder = decoder;
         m_rxQueues = new HashMap<String, LinkedList<ExportProtoMessage>>();
         m_txQueues = new HashMap<String, LinkedList<ExportProtoMessage>>();
     }
 
-    public long getTableId()
-    {
-        return m_tableId;
-    }
-
-    public int getPartitionId()
-    {
-        return m_partitionId;
-    }
-
-    void addExportConnection(String connectionName)
-    {
-        if (m_activeConnection == null)
-        {
+    void addExportConnection(String connectionName) {
+        if (m_activeConnection == null) {
             m_activeConnection = connectionName;
         }
         m_rxQueues.put(connectionName, new LinkedList<ExportProtoMessage>());
         m_txQueues.put(connectionName, new LinkedList<ExportProtoMessage>());
     }
 
-    Queue<ExportProtoMessage> getRxQueue(String connectionName)
-    {
+    Queue<ExportProtoMessage> getRxQueue(String connectionName) {
         return m_rxQueues.get(connectionName);
     }
 
-    Queue<ExportProtoMessage> getTxQueue(String connectionName)
-    {
+    Queue<ExportProtoMessage> getTxQueue(String connectionName) {
         return m_txQueues.get(connectionName);
-    }
-
-    // XXX hacky "for when we move to threading" blah
-    @Override
-    public void run()
-    {
-        while (true)
-        {
-            work();
-        }
     }
 
     public void work()
     {
-        if (!m_started)
-        {
+        if (!m_started) {
             poll();
             m_started = true;
         }
-        for (Entry<String, LinkedList<ExportProtoMessage>> rx_conn : m_rxQueues.entrySet())
-        {
+        for (Entry<String, LinkedList<ExportProtoMessage>> rx_conn : m_rxQueues.entrySet()) {
             ExportProtoMessage m = rx_conn.getValue().poll();
-            if (m != null && m.isPollResponse())
-            {
+            if (m != null && m.isPollResponse()) {
                 m_activeConnection = rx_conn.getKey();
                 handlePollResponse(m);
             }
         }
     }
 
-    private void poll()
-    {
+    private void poll() {
         m_logger.trace("Polling table " + m_tableName +
-                       ", partition " + m_partitionId + " for new data.");
+                       ", partition " + partitionId + " for new data.");
 
-        ExportProtoMessage m = new ExportProtoMessage(m_partitionId, m_tableId);
+        ExportProtoMessage m = new ExportProtoMessage(partitionId, tableId);
         m.poll();
         m_txQueues.get(m_activeConnection).offer(m);
     }
 
-    private void pollAndAck(ExportProtoMessage prev)
-    {
+    private void pollAndAck(ExportProtoMessage prev) {
         m_logger.debug("Poller, table " + m_tableName + ": pollAndAck " +
                        prev.getAckOffset());
-        ExportProtoMessage next = new ExportProtoMessage(m_partitionId, m_tableId);
+        ExportProtoMessage next = new ExportProtoMessage(partitionId, tableId);
         next.poll().ack(prev.getAckOffset());
-        ExportProtoMessage ack = new ExportProtoMessage(m_partitionId, m_tableId);
+        ExportProtoMessage ack = new ExportProtoMessage(partitionId, tableId);
         ack.ack(prev.getAckOffset());
-        for (String connectionName : m_txQueues.keySet())
-        {
-            if (connectionName.equals(m_activeConnection))
-            {
+
+        for (String connectionName : m_txQueues.keySet()) {
+            if (connectionName.equals(m_activeConnection)) {
                 m_logger.debug("POLLANDACK: " + connectionName + ", offset: " +
                                prev.getAckOffset());
                 m_txQueues.get(m_activeConnection).offer(next);
             }
-            else
-            {
+            else {
                 m_logger.debug("ACK: " + connectionName + ", offset: " +
                                prev.getAckOffset());
                 m_txQueues.get(connectionName).offer(ack);
@@ -146,8 +117,7 @@ public class ExportDataSink implements Runnable
         }
     }
 
-    private void handlePollResponse(ExportProtoMessage m)
-    {
+    private void handlePollResponse(ExportProtoMessage m) {
         // Poll data is all encoded little endian.
         m.getData().order(ByteOrder.LITTLE_ENDIAN);
         try {
@@ -161,7 +131,7 @@ public class ExportDataSink implements Runnable
             // read the streamblock length prefix.
             int ttllength = m.getData().getInt();
             m_logger.trace("Poller: table: " + m_tableName +
-                           ", partition: " + m_partitionId +
+                           ", partition: " + partitionId +
                            " : data payload bytes: " + ttllength);
 
             // a stream block prefix of 0 also means empty queue.

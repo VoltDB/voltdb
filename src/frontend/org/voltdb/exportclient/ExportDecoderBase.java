@@ -27,14 +27,18 @@ import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.types.TimestampType;
 
+/**
+ * Provide the basic functionality of decoding tuples from our
+ * export wire protocol into arrays of POJOs.
+ *
+ */
 public abstract class ExportDecoderBase
 {
     protected AdvertisedDataSource m_source;
     // This is available as a convenience, could go away.
     protected ArrayList<VoltType> m_tableSchema;
 
-    public ExportDecoderBase(AdvertisedDataSource source)
-    {
+    public ExportDecoderBase(AdvertisedDataSource source) {
         m_source = source;
         m_tableSchema = source.columnTypes();
     }
@@ -54,9 +58,7 @@ public abstract class ExportDecoderBase
      * a poll.  Default behavior is to do nothing, but can be overridden
      * if the decoder cares about this case.
      */
-    public void noDataReceived(long ackOffset)
-    {
-    }
+    public void noDataReceived(long ackOffset) {}
 
     /**
      * Decode a byte array of row data into an array of Objects corresponding
@@ -68,37 +70,33 @@ public abstract class ExportDecoderBase
         FastDeserializer fds = new FastDeserializer(rowData, ByteOrder.LITTLE_ENDIAN);
         Object[] retval = new Object[m_tableSchema.size()];
         boolean[] is_null = extractNullFlags(fds);
-        for (int i = 0; i < m_tableSchema.size(); i++)
-        {
-            if (is_null[i])
-            {
+        for (int i = 0; i < m_tableSchema.size(); i++) {
+            if (is_null[i]) {
                 retval[i] = null;
             }
-            else
-            {
+            else {
                 retval[i] = decodeNextColumn(fds, m_tableSchema.get(i));
             }
         }
         return retval;
     }
 
-    boolean[] extractNullFlags(FastDeserializer fds) throws IOException
-    {
+    boolean[] extractNullFlags(FastDeserializer fds) throws IOException {
         // compute the number of bytes necessary to hold one bit per
         // schema column
         int null_array_length = ((m_tableSchema.size() + 7) & -8) >> 3;
         byte[] null_array = new byte[null_array_length];
-        for (int i = 0; i < null_array_length; i++)
-        {
+        for (int i = 0; i < null_array_length; i++) {
             null_array[i] = fds.readByte();
         }
+
         boolean[] retval = new boolean[m_tableSchema.size()];
+
         // The null flags were written with this mapping to column index:
         // given an array of octets, the index into the array for the flag is
         // column index / 8, and the bit in that byte for the flag is
         // 0x80 >> (column index % 8).
-        for (int i = 0; i < m_tableSchema.size(); i++)
-        {
+        for (int i = 0; i < m_tableSchema.size(); i++) {
             int index = i >> 3;
             int bit = i % 8;
             byte mask = (byte)(0x80 >>> bit);
@@ -110,9 +108,7 @@ public abstract class ExportDecoderBase
 
     // This does not decode an arbitrary column because fds keeps getting consumed.
     // Rather, it decodes the next non-null column in the FastDeserializer
-    Object decodeNextColumn(FastDeserializer fds, VoltType columnType)
-    throws IOException
-    {
+    Object decodeNextColumn(FastDeserializer fds, VoltType columnType) throws IOException {
         Object retval = null;
         switch (columnType) {
         case TINYINT:
@@ -151,17 +147,16 @@ public abstract class ExportDecoderBase
      * @return decoded BigDecimal value
      * @throws IOException
      */
-    static public BigDecimal decodeDecimal(final FastDeserializer fds) throws IOException
-    {
+    static public BigDecimal decodeDecimal(final FastDeserializer fds) throws IOException {
         final int strlength = fds.readInt();
         final byte[] strdata = new byte[strlength];
         fds.readFully(strdata);
         final String str = new String(strdata);
         BigDecimal bd = null;
-        try
-        {
+        try {
             bd = new BigDecimal(str);
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             System.out.println("error creating decimal from string(" + str + ")");
             e.printStackTrace();
         }
@@ -173,8 +168,7 @@ public abstract class ExportDecoderBase
      * @param fds
      * @throws IOException
      */
-    static public String decodeString(final FastDeserializer fds) throws IOException
-    {
+    static public String decodeString(final FastDeserializer fds) throws IOException {
         final int strlength = fds.readInt();
         final byte[] strdata = new byte[strlength];
         fds.readFully(strdata);
@@ -186,8 +180,7 @@ public abstract class ExportDecoderBase
      * @param fds
      * @throws IOException
      */
-    static public TimestampType decodeTimestamp(final FastDeserializer fds) throws IOException
-    {
+    static public TimestampType decodeTimestamp(final FastDeserializer fds) throws IOException {
         final Long val = fds.readLong();
         return new TimestampType(val);
     }
@@ -197,8 +190,7 @@ public abstract class ExportDecoderBase
      * @param fds
      * @throws IOException
      */
-    static public double decodeFloat(final FastDeserializer fds) throws IOException
-    {
+    static public double decodeFloat(final FastDeserializer fds) throws IOException {
         return fds.readDouble();
     }
 
@@ -207,8 +199,7 @@ public abstract class ExportDecoderBase
      * @param fds
      * @throws IOException
      */
-    static public long decodeBigInt(final FastDeserializer fds) throws IOException
-    {
+    static public long decodeBigInt(final FastDeserializer fds) throws IOException {
         return fds.readLong();
     }
 
@@ -217,8 +208,7 @@ public abstract class ExportDecoderBase
      * @param fds
      * @throws IOException
      */
-    static public int decodeInteger(final FastDeserializer fds) throws IOException
-    {
+    static public int decodeInteger(final FastDeserializer fds) throws IOException {
         return (int)fds.readLong();
     }
 
@@ -227,8 +217,7 @@ public abstract class ExportDecoderBase
      * @param fds
      * @throws IOException
      */
-    static public short decodeSmallInt(final FastDeserializer fds) throws IOException
-    {
+    static public short decodeSmallInt(final FastDeserializer fds) throws IOException {
         return (short)fds.readLong();
     }
 
@@ -237,8 +226,7 @@ public abstract class ExportDecoderBase
      * @param fds
      * @throws IOException
      */
-    static public byte decodeTinyInt(final FastDeserializer fds) throws IOException
-    {
+    static public byte decodeTinyInt(final FastDeserializer fds) throws IOException {
         return (byte)fds.readLong();
     }
 }

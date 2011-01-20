@@ -28,6 +28,8 @@ import org.voltdb.logging.VoltLogger;
 
 /**
  * Provides an extensible base class for writing Export clients
+ * Manages a set of connections to servers and a record of all of
+ * the partitions and tables that are actively being exported.
  */
 
 public abstract class ExportClientBase implements Runnable {
@@ -62,10 +64,8 @@ public abstract class ExportClientBase implements Runnable {
      */
     public abstract ExportDecoderBase constructExportDecoder(AdvertisedDataSource source);
 
-    private void constructExportDataSinks(ExportConnection elConnection)
-    {
-        for (AdvertisedDataSource source : elConnection.getDataSources())
-        {
+    private void constructExportDataSinks(ExportConnection elConnection) {
+        for (AdvertisedDataSource source : elConnection.dataSources) {
             // Construct the app-specific decoder supplied by subclass
             // and build an ExportDataSink for this data source
             m_logger.info("Creating decoder for table: " + source.tableName() +
@@ -76,13 +76,11 @@ public abstract class ExportClientBase implements Runnable {
             int part_id = source.partitionId();
             HashMap<Integer, ExportDataSink> part_map =
                 m_sinks.get(table_id);
-            if (part_map == null)
-            {
+            if (part_map == null) {
                 part_map = new HashMap<Integer, ExportDataSink>();
                 m_sinks.put(table_id, part_map);
             }
-            if (!part_map.containsKey(part_id))
-            {
+            if (!part_map.containsKey(part_id)) {
                 ExportDecoderBase decoder = constructExportDecoder(source);
                 sink = new ExportDataSink(source.partitionId(),
                                       source.tableId(),
@@ -92,7 +90,7 @@ public abstract class ExportClientBase implements Runnable {
             }
             sink = part_map.get(part_id);
             // and plug the ExportConnection into the ExportDataSink
-            sink.addExportConnection(elConnection.getConnectionName());
+            sink.addExportConnection(elConnection.name);
         }
     }
 
@@ -103,20 +101,18 @@ public abstract class ExportClientBase implements Runnable {
      * table/partition pair.
      * @throws IOException
      */
-    public void connectToExportServers(String username, String password) throws IOException
-    {
-        if (m_servers == null || m_servers.size() == 0)
-        {
+    public void connectToExportServers(String username, String password) throws IOException {
+        if (m_servers == null || m_servers.size() == 0) {
             m_logger.fatal("No servers provided for Export, exiting...");
             throw new RuntimeException("No servers provided for Export connection");
         }
-        for (InetSocketAddress server_addr : m_servers)
-        {
+
+        for (InetSocketAddress server_addr : m_servers) {
             ExportConnection exportConnection =
                 new ExportConnection(username, password, server_addr, m_sinks);
             exportConnection.openExportConnection();
             constructExportDataSinks(exportConnection);
-            m_exportConnections.put(exportConnection.getConnectionName(), exportConnection);
+            m_exportConnections.put(exportConnection.name, exportConnection);
         }
     }
 
@@ -135,10 +131,8 @@ public abstract class ExportClientBase implements Runnable {
     boolean checkConnections()
     {
         boolean retval = true;
-        for (String el_connection : m_exportConnections.keySet())
-        {
-            if (!m_exportConnections.get(el_connection).isConnected())
-            {
+        for (String el_connection : m_exportConnections.keySet()) {
+            if (!m_exportConnections.get(el_connection).isConnected()) {
                 m_logger.error("Lost connection: " + el_connection +
                                ", Closing...");
                 retval = false;
@@ -158,10 +152,8 @@ public abstract class ExportClientBase implements Runnable {
 
         // work all the ExportDataSinks.
         // process incoming data and generate outgoing ack/polls
-        for (HashMap<Integer, ExportDataSink> part_map : m_sinks.values())
-        {
-            for (ExportDataSink work_sink : part_map.values())
-            {
+        for (HashMap<Integer, ExportDataSink> part_map : m_sinks.values()) {
+            for (ExportDataSink work_sink : part_map.values()) {
                 work_sink.work();
             }
         }
@@ -169,8 +161,7 @@ public abstract class ExportClientBase implements Runnable {
         // drain all the received connection messages into the
         // RX queues for the ExportDataSinks and push all acks/polls
         // to the network.
-        for (ExportConnection el_connection : m_exportConnections.values())
-        {
+        for (ExportConnection el_connection : m_exportConnections.values()) {
             offered_msgs += el_connection.work();
         }
 
@@ -193,12 +184,9 @@ public abstract class ExportClientBase implements Runnable {
         // factor by which poll_wait_time should be reduced when not idle.
         final int poll_accelerate_factor = 2;
 
-
-        while (connected)
-        {
+        while (connected) {
             int offered_msgs = work();
             connected = checkConnections();
-
 
             // adjust idle loop wait time.
             if (offered_msgs > 0) {
@@ -210,8 +198,8 @@ public abstract class ExportClientBase implements Runnable {
             if (poll_wait_time > 0) {
                 try {
                     Thread.sleep(poll_wait_time);
-                } catch (InterruptedException e) {
                 }
+                catch (InterruptedException e) {}
             }
 
         }

@@ -32,10 +32,10 @@ import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 
 /**
- * Manage the connection to the server's EL port
+ * Manage the connection to a single server's export port
  */
 
-public class ExportConnection implements Runnable {
+public class ExportConnection {
 
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
 
@@ -43,9 +43,11 @@ public class ExportConnection implements Runnable {
     static final private int CONNECTING = 1;
     static final private int CONNECTED = 2;
     static final private int CLOSING = 3;
+
     private int m_state = CLOSED;
-    private final String m_connectionName;
-    private final InetSocketAddress m_serverAddr;
+
+    public final String name;
+    private final InetSocketAddress serverAddr;
     private SocketChannel m_socket;
 
     private final String m_username;
@@ -53,7 +55,8 @@ public class ExportConnection implements Runnable {
 
     // cached reference to ELClientBase's collection of ELDataSinks
     private final HashMap<Long, HashMap<Integer, ExportDataSink>> m_sinks;
-    private ArrayList<AdvertisedDataSource> m_dataSources;
+
+    public final ArrayList<AdvertisedDataSource> dataSources;
 
     private long m_lastAckOffset;
 
@@ -65,8 +68,9 @@ public class ExportConnection implements Runnable {
         m_username = username != null ? username : "";
         m_password = password != null ? password : "";
         m_sinks = dataSinks;
-        m_serverAddr = serverAddr;
-        m_connectionName = serverAddr.toString();
+        this.serverAddr = serverAddr;
+        name = serverAddr.toString();
+        dataSources = new ArrayList<AdvertisedDataSource>();
     }
 
     /**
@@ -76,29 +80,27 @@ public class ExportConnection implements Runnable {
      */
     public void openExportConnection() throws IOException
     {
-        m_logger.info("Starting EL Client socket to: " + m_connectionName);
+        m_logger.info("Starting EL Client socket to: " + name);
         byte hashedPassword[] = ConnectionUtil.getHashedPassword(m_password);
         Object[] cxndata =
             ConnectionUtil.
-            getAuthenticatedExportConnection(m_serverAddr.getHostName(),
+            getAuthenticatedExportConnection(serverAddr.getHostName(),
                                              m_username,
                                              hashedPassword,
-                                             m_serverAddr.getPort());
+                                             serverAddr.getPort());
 
         m_socket = (SocketChannel) cxndata[0];
 
-        if (m_state == CLOSED)
-        {
+        if (m_state == CLOSED) {
             open();
             m_state = CONNECTING;
         }
 
-        while (m_state == CONNECTING)
-        {
+        while (m_state == CONNECTING) {
             ExportProtoMessage m = nextMessage();
             if (m != null && m.isOpenResponse())
             {
-                m_dataSources = m.getAdvertisedDataSources();
+                dataSources.addAll(m.getAdvertisedDataSources());
                 m_state = CONNECTED;
             }
         }
@@ -112,27 +114,7 @@ public class ExportConnection implements Runnable {
         m_state = CLOSED;
 
         // perhaps a more controversial assertion?
-        m_dataSources = null;
-    }
-
-    /**
-     * Retrieve the list of data sources returned by the
-     * open response provided by the server
-     * @return List of advertised sources
-     */
-    public ArrayList<AdvertisedDataSource> getDataSources()
-    {
-        return m_dataSources;
-    }
-
-    /**
-     * Retrieve the name of this connection.  This is currently
-     * equivalent to InetSocketAddress.toString()
-     * @return Connection name
-     */
-    public String getConnectionName()
-    {
-        return m_connectionName;
+        dataSources.clear();
     }
 
     /**
@@ -153,21 +135,18 @@ public class ExportConnection implements Runnable {
         int messagesOffered = 0;
 
         // exportxxx need better error handling code in here
-        if (!m_socket.isConnected() || !m_socket.isOpen())
-        {
+        if (!m_socket.isConnected() || !m_socket.isOpen()) {
             m_state = CLOSING;
         }
 
-        if (m_state == CLOSING)
-        {
+        if (m_state == CLOSING) {
             return messagesOffered;
         }
 
         // loop here to empty RX ?
         // receive data from network and hand to the proper ELProtocolHandler RX queue
         ExportProtoMessage m = null;
-        do
-        {
+        do {
             try {
                 m = nextMessage();
             } catch (IOException e) {
@@ -175,43 +154,36 @@ public class ExportConnection implements Runnable {
                 m_state = CLOSING;
             }
 
-            if (m != null && m.isError())
-            {
+            if (m != null && m.isError()) {
                 // XXX handle error from server, just die for now
                 m_state = CLOSING;
             }
 
             // exportxxx need better error handling code in here
-            if (!m_socket.isConnected() || !m_socket.isOpen())
-            {
+            if (!m_socket.isConnected() || !m_socket.isOpen()) {
                 m_state = CLOSING;
             }
 
-            if (m != null && m.isPollResponse())
-            {
+            if (m != null && m.isPollResponse()) {
                 m_lastAckOffset = m.getAckOffset();
                 ExportDataSink rx_sink = m_sinks.get(m.getTableId()).get(m.getPartitionId());
-                rx_sink.getRxQueue(m_connectionName).offer(m);
+                rx_sink.getRxQueue(name).offer(m);
                 messagesOffered++;
             }
         }
         while (m_state == CONNECTED && m != null);
 
         // service all the ELDataSink TX queues
-        for (HashMap<Integer, ExportDataSink> part_map : m_sinks.values())
-        {
-            for (ExportDataSink tx_sink : part_map.values())
-            {
+        for (HashMap<Integer, ExportDataSink> part_map : m_sinks.values()) {
+            for (ExportDataSink tx_sink : part_map.values()) {
                 Queue<ExportProtoMessage> tx_queue =
-                    tx_sink.getTxQueue(m_connectionName);
+                    tx_sink.getTxQueue(name);
                 // this connection might not be connected to every sink
-                if (tx_queue != null)
-                {
+                if (tx_queue != null) {
                     // XXX loop to drain the tx queue?
                     ExportProtoMessage tx_m =
                         tx_queue.poll();
-                    if (tx_m != null)
-                    {
+                    if (tx_m != null) {
                         try {
                             sendMessage(tx_m);
                         } catch (IOException e) {
@@ -224,16 +196,6 @@ public class ExportConnection implements Runnable {
         }
 
         return messagesOffered;
-    }
-
-    @Override
-    public void run()
-    {
-        // XXX termination?
-        while (m_state == CONNECTED)
-        {
-            work();
-        }
     }
 
     private void open() throws IOException
@@ -249,39 +211,32 @@ public class ExportConnection implements Runnable {
         FastDeserializer fds;
         final ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
         int bytes_read = 0;
-        do
-        {
+        do {
             bytes_read = m_socket.read(lengthBuffer);
         }
         while (lengthBuffer.hasRemaining() && bytes_read > 0);
 
-        if (bytes_read < 0)
-        {
+        if (bytes_read < 0) {
             // Socket closed, try to bail out
             m_state = CLOSING;
             return null;
         }
 
-        if (bytes_read == 0)
-        {
-            if (lengthBuffer.position() != 0 && m_socket.isConnected())
-            {
+        if (bytes_read == 0) {
+            if (lengthBuffer.position() != 0 && m_socket.isConnected()) {
                 // we're committed now, baby
-                do
-                {
+                do {
                     bytes_read = m_socket.read(lengthBuffer);
                 }
                 while (lengthBuffer.hasRemaining() && bytes_read >= 0);
 
-                if (bytes_read < 0)
-                {
+                if (bytes_read < 0) {
                     //  Socket closed, try to bail out
                     m_state = CLOSING;
                     return null;
                 }
             }
-            else
-            {
+            else {
                 // non-blocking case
                 return null;
             }
@@ -290,14 +245,12 @@ public class ExportConnection implements Runnable {
         lengthBuffer.flip();
         int length = lengthBuffer.getInt();
         ByteBuffer messageBuf = ByteBuffer.allocate(length);
-        do
-        {
+        do {
             bytes_read = m_socket.read(messageBuf);
         }
         while (messageBuf.remaining() > 0 && bytes_read >= 0);
 
-        if (bytes_read < 0)
-        {
+        if (bytes_read < 0) {
             //  Socket closed, try to bail out
             m_state = CLOSING;
             return null;
