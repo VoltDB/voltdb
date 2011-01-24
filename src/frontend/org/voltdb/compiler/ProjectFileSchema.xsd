@@ -110,7 +110,7 @@
                   <xsd:complexType>
                       <xsd:simpleContent>
                           <xsd:extension base="xsd:string">
-                              <xsd:attribute name="joinOrder" type="xsd:string" use="optional"/>
+                              <xsd:attribute name="joinorder" type="xsd:string" use="optional"/>
                           </xsd:extension>
                       </xsd:simpleContent>
                    </xsd:complexType>

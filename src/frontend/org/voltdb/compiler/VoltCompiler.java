@@ -750,7 +750,7 @@ public class VoltCompiler {
             if (partattr != null && partattr.length() == 0)
                 partattr = null;
             return new ProcedureDescriptor(groups, classattr,
-                                           xmlproc.getSql().getValue(), xmlproc.getSql().getJoinOrder(), partattr);
+                                           xmlproc.getSql().getValue(), xmlproc.getSql().getJoinorder(), partattr);
         }
         else {
             String partattr = xmlproc.getPartitioninfo();

@@ -609,7 +609,7 @@ public class VoltProjectBuilder {
 
             final Element sql = doc.createElement("sql");
             if (procedure.joinOrder != null) {
-                sql.setAttribute("joinOrder", procedure.joinOrder);
+                sql.setAttribute("joinorder", procedure.joinOrder);
             }
             proc.appendChild(sql);
 
