@@ -82,7 +82,7 @@ public class LocalSingleProcessServer implements VoltServerConfig {
     }
 
     @Override
-    public boolean compileWithPartitiondDetection(VoltProjectBuilder builder, String ppdPath,  String ppdPrefix) {
+    public boolean compileWithPartitiondDetection(VoltProjectBuilder builder, String ppdPath, String ppdPrefix) {
         // this doesn't really make a lot of sense, in that you can't partition a single node,
         // but I suppose it is still feasible user configuration
         int hostCount = 1;
@@ -92,7 +92,7 @@ public class LocalSingleProcessServer implements VoltServerConfig {
             return true;
         }
         m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication, "localhost",
-                                     true, ppdPath, ppdPrefix);
+                                     "/tmp/vdb", true, ppdPath, ppdPrefix);
         m_pathToDeployment = builder.getPathToDeployment();
         return m_compiled;
     }

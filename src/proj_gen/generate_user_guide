@@ -21,6 +21,4 @@ To build the example skeleton project:
 - when complete, hit Ctrl C in the server terminal window to exit VOLT DB
 
 This content is available in
-https://hzproject.com/svn/repos/build/newtrunk/src/proj_gen.
-
-
+https://svn.voltdb.com/eng/trunk/src/proj_gen

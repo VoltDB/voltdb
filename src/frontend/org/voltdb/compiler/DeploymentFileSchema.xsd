@@ -37,6 +37,8 @@
   <xs:complexType name="deploymentType">
     <xs:all>
       <xs:element name="cluster" minOccurs="1" maxOccurs="1" type="clusterType"/>
+      <xs:element name="snapshot" type="snapshotType" minOccurs="0" maxOccurs="1" />
+      <xs:element name="paths" minOccurs="1" maxOccurs="1" type="pathsType" />
       <xs:element name="users" minOccurs="0" maxOccurs="1" type="usersType"/>
       <xs:element name="httpd" minOccurs="0" maxOccurs="1" type="httpdType"/>
     </xs:all>
@@ -59,7 +61,6 @@
           <xs:element name="snapshot" minOccurs="1" maxOccurs="1">
              <xs:complexType>
                  <xs:attribute name="prefix" type="xs:string" use="required"/>
-                 <xs:attribute name="path" type="xs:string" use="required"/>
              </xs:complexType>
           </xs:element>
       </xs:all>
@@ -91,5 +92,37 @@
     </xs:sequence>
     <xs:attribute name="port" type="xs:int" use="optional" default="0"/>
   </xs:complexType>
+  
+  <!-- <paths> -->
+  <xs:complexType name="pathsType">
+    <xs:all>
+      <xs:element name="voltroot" minOccurs="1" maxOccurs="1">
+        <xs:complexType>
+          <xs:attribute name="path" type="xs:string" use="required"/>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="snapshots" minOccurs="0" maxOccurs="1">
+        <xs:complexType>
+          <xs:attribute name="path" type="xs:string" use="required"/>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="partitiondetectionsnapshot" minOccurs="0" maxOccurs="1">
+        <xs:complexType>
+          <xs:attribute name="path" type="xs:string" use="required"/>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="exportoverflow" minOccurs="0" maxOccurs="1">
+        <xs:complexType>
+          <xs:attribute name="path" type="xs:string" use="required"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:all>
+  </xs:complexType>
 
+  <!-- <snapshot> -->
+  <xs:complexType name="snapshotType">
+    <xs:attribute name="frequency" type="xs:string" use="required"  />
+    <xs:attribute name="retain" type="xs:integer" use="required" />
+    <xs:attribute name="prefix" type="xs:string" use="required" />
+  </xs:complexType>
 </xs:schema>

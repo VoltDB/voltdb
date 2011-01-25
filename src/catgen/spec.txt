@@ -13,6 +13,7 @@ begin Cluster           "A set of connected hosts running one or more database a
   int httpdportno       "The port number httpd will listen on. A 0 value implies 8080."
   bool jsonapi          "Is the http/json interface enabled?"
   bool networkpartition "Is network partition detection enabled?"
+  string voltRoot "Directory tree where snapshots, ppd snapshots, export data etc. will be output to"
   SnapshotSchedule* faultSnapshots "Configuration for snapshots generated in response to faults."
 end
 

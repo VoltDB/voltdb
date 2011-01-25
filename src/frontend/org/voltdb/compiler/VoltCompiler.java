@@ -67,7 +67,6 @@ import org.voltdb.compiler.projectfile.ProceduresType;
 import org.voltdb.compiler.projectfile.ProjectType;
 import org.voltdb.compiler.projectfile.SchemasType;
 import org.voltdb.compiler.projectfile.SecurityType;
-import org.voltdb.compiler.projectfile.SnapshotType;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.CatalogUtil;
@@ -495,63 +494,6 @@ public class VoltCompiler {
         // create the database in the catalog
         m_catalog.execute("add /clusters[cluster] databases " + databaseName);
         Database db = m_catalog.getClusters().get("cluster").getDatabases().get(databaseName);
-
-        SnapshotType snapshotSettings = database.getSnapshot();
-        if (snapshotSettings != null) {
-            SnapshotSchedule schedule = db.getSnapshotschedule().add("default");
-            String frequency = snapshotSettings.getFrequency();
-            if (!frequency.endsWith("s") &&
-                    !frequency.endsWith("m") &&
-                    !frequency.endsWith("h")) {
-                throw new VoltCompilerException(
-                        "Snapshot frequency " + frequency +
-                        " needs to end with time unit specified" +
-                        " that is one of [s, m, h] (seconds, minutes, hours)");
-            }
-
-            int frequencyInt = 0;
-            String frequencySubstring = frequency.substring(0, frequency.length() - 1);
-            try {
-                frequencyInt = Integer.parseInt(frequencySubstring);
-            } catch (Exception e) {
-                throw new VoltCompilerException("Frequency " + frequencySubstring +
-                        " is not an integer ");
-            }
-
-            String prefix = snapshotSettings.getPrefix();
-            if (prefix == null || prefix.isEmpty()) {
-                throw new VoltCompilerException("Snapshot prefix " + prefix +
-                " is not a valid prefix ");
-            }
-
-            if (prefix.contains("-") || prefix.contains(",")) {
-                throw new VoltCompilerException("Snapshot prefix " + prefix +
-                " cannot include , or - ");
-            }
-
-            String path = snapshotSettings.getPath();
-            if (path == null || path.isEmpty()) {
-                throw new VoltCompilerException("Snapshot path " + path +
-                " is not a valid path ");
-            }
-
-            if (snapshotSettings.getRetain() == null) {
-                throw new VoltCompilerException("Snapshot retain value not provided");
-            }
-
-            int retain = snapshotSettings.getRetain().intValue();
-            if (retain < 1) {
-                throw new VoltCompilerException("Snapshot retain value " + retain +
-                        " is not a valid value. Must be 1 or greater.");
-            }
-
-            schedule.setFrequencyunit(
-                    frequency.substring(frequency.length() - 1, frequency.length()));
-            schedule.setFrequencyvalue(frequencyInt);
-            schedule.setPath(path);
-            schedule.setPrefix(prefix);
-            schedule.setRetain(retain);
-        }
 
         // schemas/schema
         for (SchemasType.Schema schema : database.getSchemas().getSchema()) {

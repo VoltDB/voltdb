@@ -376,12 +376,11 @@ public class VoltProjectBuilder {
             String path,
             String prefix) {
         assert(frequency != null);
-        assert(path != null);
         assert(prefix != null);
         m_snapshotFrequency = frequency;
         m_snapshotRetain = retain;
-        m_snapshotPath = path;
         m_snapshotPrefix = prefix;
+        m_snapshotPath = path;
     }
 
 
@@ -425,22 +424,23 @@ public class VoltProjectBuilder {
                            final String leaderAddress) {
         VoltCompiler compiler = new VoltCompiler();
         return compile(compiler, jarPath, sitesPerHost, hostCount, replication, leaderAddress,
-                       false, "none", "none");
+                    "/tmp/vdb", false, null, "none");
     }
 
     public boolean compile(
             final String jarPath, final int sitesPerHost,
             final int hostCount, final int replication, final String leaderAddress,
-            final boolean ppdEnabled, final String ppdPath, final String ppdPrefix)
+            final String voltRoot, final boolean ppdEnabled, final String ppdPath, final String ppdPrefix)
     {
         VoltCompiler compiler = new VoltCompiler();
         return compile(compiler, jarPath, sitesPerHost, hostCount, replication, leaderAddress,
-                       ppdEnabled, ppdPath, ppdPrefix);
+                       voltRoot, ppdEnabled, ppdPath, ppdPrefix);
     }
 
     public boolean compile(final VoltCompiler compiler, final String jarPath, final int sitesPerHost,
                            final int hostCount, final int replication, final String leaderAddress,
-                           final boolean ppdEnabled, final String ppdPath, final String ppdPrefix) {
+                           final String voltRoot, final boolean ppdEnabled,
+                           final String ppdPath, final String ppdPrefix) {
         assert(jarPath != null);
         assert(sitesPerHost >= 1);
         assert(hostCount >= 1);
@@ -507,7 +507,10 @@ public class VoltProjectBuilder {
         final String projectPath = projectFile.getPath();
 
         boolean success = compiler.compile(projectPath, jarPath, m_compilerDebugPrintStream, m_procInfoOverrides);
-        m_pathToDeployment = writeDeploymentFile(hostCount, sitesPerHost, leaderAddress, replication, ppdEnabled, ppdPath, ppdPrefix);
+        m_pathToDeployment = writeDeploymentFile(
+                hostCount, sitesPerHost, leaderAddress,
+                replication, voltRoot, ppdEnabled,
+                ppdPath, ppdPrefix);
 
         return success;
     }
@@ -681,15 +684,6 @@ public class VoltProjectBuilder {
                 }
             }
         }
-
-        if (m_snapshotPath != null) {
-            final Element snapshot = doc.createElement("snapshot");
-            snapshot.setAttribute("frequency", m_snapshotFrequency);
-            snapshot.setAttribute("path", m_snapshotPath);
-            snapshot.setAttribute("prefix", m_snapshotPrefix);
-            snapshot.setAttribute("retain", Integer.toString(m_snapshotRetain));
-            database.appendChild(snapshot);
-        }
     }
 
     /**
@@ -728,7 +722,8 @@ public class VoltProjectBuilder {
      * @param kFactor Replication factor.
      * @return Returns the path the temporary file was written to.
      */
-    private String writeDeploymentFile(int hostCount, int sitesPerHost, String leader, int kFactor,
+    private String writeDeploymentFile(
+            int hostCount, int sitesPerHost, String leader, int kFactor, String voltRoot,
             boolean ppdEnabled, String ppdPath, String ppdPrefix) {
         DocumentBuilderFactory docFactory;
         DocumentBuilder docBuilder;
@@ -755,13 +750,40 @@ public class VoltProjectBuilder {
         cluster.setAttribute("kfactor", new Integer(kFactor).toString());
         deployment.appendChild(cluster);
 
+        // <paths>
+        final Element paths = doc.createElement("paths");
+        final Element voltroot = doc.createElement("voltroot");
+        voltroot.setAttribute("path", voltRoot);
+        paths.appendChild(voltroot);
+
+        if (ppdPath != null) {
+            final Element ppdPathElement = doc.createElement("partitiondetectionsnapshot");
+            ppdPathElement.setAttribute("path", ppdPath);
+            paths.appendChild(ppdPathElement);
+        }
+
+        if (m_snapshotPath != null) {
+            final Element snapshotPathElement = doc.createElement("snapshots");
+            snapshotPathElement.setAttribute("path", m_snapshotPath);
+            paths.appendChild(snapshotPathElement);
+        }
+
+        deployment.appendChild(paths);
+
+        if (m_snapshotPrefix != null) {
+            final Element snapshot = doc.createElement("snapshot");
+            snapshot.setAttribute("frequency", m_snapshotFrequency);
+            snapshot.setAttribute("prefix", m_snapshotPrefix);
+            snapshot.setAttribute("retain", Integer.toString(m_snapshotRetain));
+            deployment.appendChild(snapshot);
+        }
+
         // <cluster>/<partition-detection>/<snapshot>
         if (ppdEnabled) {
             final Element ppd = doc.createElement("partition-detection");
             cluster.appendChild(ppd);
             ppd.setAttribute("enabled", "true");
             final Element ss = doc.createElement("snapshot");
-            ss.setAttribute("path", ppdPath);
             ss.setAttribute("prefix", ppdPrefix);
             ppd.appendChild(ss);
         }

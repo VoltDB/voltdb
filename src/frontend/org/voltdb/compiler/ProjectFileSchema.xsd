@@ -62,17 +62,8 @@
       <xsd:element name="partitions" type="partitionsType" minOccurs="0"/>
       <xsd:element name="classdependencies" type="classdependenciesType" minOccurs="0"/>
       <xsd:element name="exports" type="exportsType" minOccurs="0"/>
-      <xsd:element name="snapshot" type="snapshotType" minOccurs="0" maxOccurs="1" />
     </xsd:all>
     <xsd:attribute name="name" type="xsd:string" use="optional" default="database"/>
-  </xsd:complexType>
-
-  <!-- <snapshot> -->
-  <xsd:complexType name="snapshotType">
-    <xsd:attribute name="frequency" type="xsd:string" use="required"  />
-    <xsd:attribute name="retain" type="xsd:integer" use="required" />
-    <xsd:attribute name="path" type="xsd:string" use="required" />
-    <xsd:attribute name="prefix" type="xsd:string" use="required" />
   </xsd:complexType>
 
   <!-- <groups> -->

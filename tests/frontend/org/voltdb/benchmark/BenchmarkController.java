@@ -244,7 +244,6 @@ public class BenchmarkController {
         }
 
         if (config.snapshotFrequency != null
-                && config.snapshotPath != null
                 && config.snapshotPrefix != null
                 && config.snapshotRetain > 0) {
             m_projectBuilder.setSnapshotSettings(
@@ -919,6 +918,7 @@ public class BenchmarkController {
         boolean localmode = false;
         String useProfile = "";
         String backend = "jni";
+        String voltRoot = null;
         String snapshotPath = null;
         String snapshotFrequency = null;
         String snapshotPrefix = null;
@@ -1041,6 +1041,8 @@ public class BenchmarkController {
                 listenForDebugger = Boolean.parseBoolean(parts[1]);
             } else if (parts[0].equals("BACKEND")) {
                 backend = parts[1];
+            } else if (parts[0].equals("VOLTROOT")) {
+                voltRoot = parts[1];
             } else if (parts[0].equals("SNAPSHOTPATH")) {
                 snapshotPath = parts[1];
             } else if (parts[0].equals("SNAPSHOTFREQUENCY")) {
@@ -1164,7 +1166,7 @@ public class BenchmarkController {
                                                      backend, hostlist,
                 sitesPerHost, k_factor, clientlist, processesPerClient, interval, duration,
                 remotePath, remoteUser, listenForDebugger, serverHeapSize, clientHeapSize,
-                localmode, useProfile, checkTransaction, checkTables, snapshotPath, snapshotPrefix,
+                localmode, useProfile, checkTransaction, checkTables, voltRoot, snapshotPath, snapshotPrefix,
                 snapshotFrequency, snapshotRetain, databaseURL[0], databaseURL[1], statsTag,
                 applicationName, subApplicationName, showConsoleOutput,
                 pushfiles, maxOutstanding);

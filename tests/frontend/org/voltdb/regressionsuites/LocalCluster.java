@@ -338,12 +338,12 @@ public class LocalCluster implements VoltServerConfig {
     }
 
     @Override
-    public boolean compileWithPartitiondDetection(VoltProjectBuilder builder, String ppdPath,  String ppdPrefix) {
+    public boolean compileWithPartitiondDetection(VoltProjectBuilder builder, String ppdPath, String ppdPrefix) {
         if (m_compiled) {
             return true;
         }
         m_compiled = builder.compile(m_jarFileName, m_siteCount, m_hostCount, m_replication, "localhost",
-                                     true, ppdPath, ppdPrefix);
+                                     "/tmp/vdb", true, ppdPath, ppdPrefix);
         m_pathToDeployment = builder.getPathToDeployment();
         return m_compiled;
     }

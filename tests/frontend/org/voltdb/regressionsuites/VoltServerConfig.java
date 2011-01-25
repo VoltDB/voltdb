@@ -88,5 +88,6 @@ public interface VoltServerConfig {
     public boolean isValgrind();
 
     boolean compileWithPartitiondDetection(VoltProjectBuilder builder,
-            String ppdPath, String ppdPrefix);
+            String ppdPath,
+            String ppdPrefix);
 }

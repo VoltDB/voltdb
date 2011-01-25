@@ -388,7 +388,6 @@ public class RealVoltDB implements VoltDBInterface
             serializedCatalog = catalog.serialize();
 
             m_catalogContext = new CatalogContext(catalog, m_config.m_pathToCatalog, depCRC, catalogVersion, -1);
-
             // requires a catalog context.
             m_faultManager = new FaultDistributor(this);
             // Install a handler for NODE_FAILURE faults to update the catalog

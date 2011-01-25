@@ -53,6 +53,7 @@ public class MockVoltDB implements VoltDBInterface
     int m_howManyCrashes = 0;
     FaultDistributorInterface m_faultDistributor = null;
     HostMessenger m_hostMessenger = null;
+    public String m_voltRoot = "/tmp/vdb";
 
     public MockVoltDB()
     {

@@ -17,6 +17,7 @@
 
 package org.voltdb.utils;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -67,7 +68,8 @@ import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
-import org.voltdb.fault.VoltFault.FaultType;
+import org.voltdb.compiler.deploymentfile.PathsType;
+import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.types.ConstraintType;
@@ -432,11 +434,17 @@ public abstract class CatalogUtil {
         // set the cluster info
         setClusterInfo(catalog, deployment.getCluster());
 
+        //set path and path overrides
+        setPathsInfo(catalog, deployment.getPaths());
+
         // set the users info
         setUsersInfo(catalog, deployment.getUsers());
 
         // set the HTTPD info
         setHTTPDInfo(catalog, deployment.getHttpd());
+
+        //Set the snapshot schedule
+        setSnapshotInfo( catalog, deployment.getSnapshot());
 
         return getDeploymentCRC(deployment);
     }
@@ -468,7 +476,7 @@ public abstract class CatalogUtil {
         sb.append(ct.getHostcount()).append(",");
         sb.append(ct.getKfactor()).append(",");
         sb.append(ct.getLeader()).append(",");
-        sb.append(ct.getSitesperhost()).append("\n");
+        sb.append(ct.getSitesperhost()).append(",");
 
         sb.append(" PARTITIONDETECTION ");
         PartitionDetectionType pdt = ct.getPartitionDetection();
@@ -477,7 +485,6 @@ public abstract class CatalogUtil {
             PartitionDetectionType.Snapshot st = pdt.getSnapshot();
             assert(st != null);
             sb.append(st.getPrefix()).append(",");
-            sb.append(st.getPath()).append("\n");
         }
 
         sb.append(" USERS ");
@@ -654,13 +661,173 @@ public abstract class CatalogUtil {
                 CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
                 SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
                 sched.setPrefix(cluster.getPartitionDetection().getSnapshot().getPrefix());
-                sched.setPath(cluster.getPartitionDetection().getSnapshot().getPath());
             }
             else {
                 catCluster.setNetworkpartition(false);
             }
 
         }
+    }
+
+    private static void validateDirectory(String type, File path) {
+        if (!path.exists()) {
+            hostLog.fatal("Specified " + type + " \"" + path + "\" does not exist");
+            VoltDB.crashVoltDB();
+        }
+        if (!path.isDirectory()) {
+            hostLog.fatal("Specified " + type + " \"" + path + "\" is not a directory");
+            VoltDB.crashVoltDB();
+        }
+        if (!path.canRead()) {
+            hostLog.fatal("Specified " + type + " \"" + path + "\" is not readable");
+            VoltDB.crashVoltDB();
+        }
+        if (!path.canWrite()) {
+            hostLog.fatal("Specified " + type + " \"" + path + "\" is not writable");
+            VoltDB.crashVoltDB();
+        }
+        if (!path.canExecute()) {
+            hostLog.fatal("Specified " + type + " \"" + path + "\" is not executable");
+            VoltDB.crashVoltDB();
+        }
+    }
+
+    /**
+     * Set the auto-snapshot settings in the catalog from the deployment file
+     * @param catalog The catalog to be updated.
+     * @param snapshot A reference to the <snapshot> element of the deployment.xml file.
+     */
+    private static void setSnapshotInfo(Catalog catalog, SnapshotType snapshotSettings) {
+        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        if (snapshotSettings != null) {
+            SnapshotSchedule schedule = db.getSnapshotschedule().add("default");
+            String frequency = snapshotSettings.getFrequency();
+            if (!frequency.endsWith("s") &&
+                    !frequency.endsWith("m") &&
+                    !frequency.endsWith("h")) {
+                hostLog.fatal(
+                        "Snapshot frequency " + frequency +
+                        " needs to end with time unit specified" +
+                        " that is one of [s, m, h] (seconds, minutes, hours)");
+                VoltDB.crashVoltDB();
+            }
+
+            int frequencyInt = 0;
+            String frequencySubstring = frequency.substring(0, frequency.length() - 1);
+            try {
+                frequencyInt = Integer.parseInt(frequencySubstring);
+            } catch (Exception e) {
+                hostLog.fatal("Frequency " + frequencySubstring +
+                        " is not an integer ");
+                VoltDB.crashVoltDB();
+            }
+
+            String prefix = snapshotSettings.getPrefix();
+            if (prefix == null || prefix.isEmpty()) {
+                hostLog.fatal("Snapshot prefix " + prefix +
+                " is not a valid prefix ");
+                VoltDB.crashVoltDB();
+            }
+
+            if (prefix.contains("-") || prefix.contains(",")) {
+                hostLog.fatal("Snapshot prefix " + prefix +
+                " cannot include , or - ");
+                VoltDB.crashVoltDB();
+            }
+
+            if (snapshotSettings.getRetain() == null) {
+                hostLog.fatal("Snapshot retain value not provided");
+                VoltDB.crashVoltDB();
+            }
+
+            int retain = snapshotSettings.getRetain().intValue();
+            if (retain < 1) {
+                hostLog.fatal("Snapshot retain value " + retain +
+                        " is not a valid value. Must be 1 or greater.");
+                VoltDB.crashVoltDB();
+            }
+
+            schedule.setFrequencyunit(
+                    frequency.substring(frequency.length() - 1, frequency.length()));
+            schedule.setFrequencyvalue(frequencyInt);
+            schedule.setPrefix(prefix);
+            schedule.setRetain(retain);
+        }
+    }
+
+    /**
+     * Set voltroot path, and set the path overrides for export overflow, partition, etc.
+     * @param catalog The catalog to be updated.
+     * @param paths A reference to the <paths> element of the deployment.xml file.
+     */
+    private static void setPathsInfo(Catalog catalog, PathsType paths) {
+        assert(paths != null);
+
+        File voltRoot = new File(paths.getVoltroot().getPath());
+        validateDirectory("volt root", voltRoot);
+
+        File snapshotPath;
+        if (paths.getSnapshots() == null) {
+            snapshotPath = new File(voltRoot, "snapshots");
+            if (!snapshotPath.exists()) {
+                if (!snapshotPath.mkdir()) {
+                    hostLog.fatal("Failed to create snapshot directory \"" + snapshotPath + "\"");
+                }
+            }
+        } else {
+            snapshotPath = new File(paths.getSnapshots().getPath());
+        }
+
+        validateDirectory("snapshot path", snapshotPath);
+
+        File ppdSnapshotPath;
+        if (paths.getPartitiondetectionsnapshot() == null) {
+            ppdSnapshotPath = new File(voltRoot, "partition_detection_snapshot");
+            if (!ppdSnapshotPath.exists()) {
+                if (!ppdSnapshotPath.mkdir()) {
+                    hostLog.fatal("Failed to create partition detection snapshot directory \""
+                            + ppdSnapshotPath + "\"");
+                }
+            }
+        } else {
+            ppdSnapshotPath = new File(paths.getPartitiondetectionsnapshot().getPath());
+        }
+
+        validateDirectory("partition detection snapshot path", ppdSnapshotPath);
+
+        File exportOverflowPath;
+        if (paths.getExportoverflow() == null) {
+            exportOverflowPath = new File(voltRoot, "export_overflow");
+            if (!exportOverflowPath.exists()) {
+                if (!exportOverflowPath.mkdir()) {
+                    hostLog.fatal("Failed to create export overflow directory \""
+                            + exportOverflowPath + "\"");
+                }
+            }
+        } else {
+            exportOverflowPath = new File(paths.getExportoverflow().getPath());
+        }
+
+        validateDirectory("export overflow", exportOverflowPath);
+
+        //Set the volt root in the catalog
+        catalog.getClusters().get("cluster").setVoltroot(voltRoot.getPath());
+
+        //Set the auto-snapshot schedule path if there are auto-snapshots
+        SnapshotSchedule schedule = catalog.getClusters().get("cluster").getDatabases().
+            get("database").getSnapshotschedule().get("default");
+        if (schedule != null) {
+            schedule.setPath(snapshotPath.getPath());
+        }
+
+        //Now update the path in the schedule for ppd
+        schedule = catalog.getClusters().get("cluster").getFaultsnapshots().get("CLUSTER_PARTITION");
+        if (schedule != null) {
+            schedule.setPath(ppdSnapshotPath.getPath());
+        }
+
+        //No set the volt root
+        catalog.getClusters().get("cluster").setVoltroot(voltRoot.getPath());
     }
 
     /**

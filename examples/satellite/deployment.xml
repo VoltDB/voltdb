@@ -6,4 +6,7 @@
        <user name="signal" password="wernher" groups="signal-group" />
        <user name="admin" password="nasa" groups="admin-group" />
     </users>
+    <paths>
+        <voltroot path="/tmp" />
+    </paths>
 </deployment>

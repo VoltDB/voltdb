@@ -46,6 +46,7 @@ import org.voltdb.compiler.VoltCompiler.Feedback;
 import org.voltdb.regressionsuites.TestExportSuite;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
+import org.voltdb.utils.CatalogUtil;
 
 public class TestVoltCompiler extends TestCase {
 
@@ -223,11 +224,13 @@ public class TestVoltCompiler extends TestCase {
                 VoltCompiler.readFileFromJarfile("/tmp/snapshot_settings_test.jar", "catalog.txt");
             final Catalog cat = new Catalog();
             cat.execute(catalogContents);
+            CatalogUtil.compileDeploymentAndGetCRC( cat, builder.getPathToDeployment());
             SnapshotSchedule schedule =
                 cat.getClusters().get("cluster").getDatabases().
                     get("database").getSnapshotschedule().get("default");
             assertEquals(32, schedule.getFrequencyvalue());
             assertEquals("m", schedule.getFrequencyunit());
+            //Will be empty because the deployment file initialization is what sets this value
             assertEquals("/tmp", schedule.getPath());
             assertEquals("woobar", schedule.getPrefix());
         } finally {

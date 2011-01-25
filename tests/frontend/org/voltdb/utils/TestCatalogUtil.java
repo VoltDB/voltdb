@@ -117,6 +117,7 @@ public class TestCatalogUtil extends TestCase {
         final String dep1 = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
                             "<deployment>" +
                             "<cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2'/>" +
+                            "<paths><voltroot path=\"/tmp\" /></paths>" +
                             "<httpd port='0'>" +
                             "<jsonapi enabled='true'/>" +
                             "</httpd>" +
@@ -126,6 +127,7 @@ public class TestCatalogUtil extends TestCase {
         final String dep2 = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
                             "<deployment>" +
                             "<cluster hostcount='4' kfactor='1' leader='localhost' sitesperhost='2'/>" +
+                            "<paths><voltroot path=\"/tmp\" /></paths>" +
                             "<httpd port='0'>" +
                             "<jsonapi enabled='true'/>" +
                             "</httpd>" +
@@ -135,6 +137,7 @@ public class TestCatalogUtil extends TestCase {
         final String dep3 = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
                             "<deployment>" +
                             "   <cluster hostcount='3' kfactor='1' leader='localhost' sitesperhost='2' />" +
+                            "<paths><voltroot path=\"/tmp\" /></paths>" +
                             "   <httpd port='0' >" +
                             "       <jsonapi enabled='true'/>" +
                             "   </httpd>" +

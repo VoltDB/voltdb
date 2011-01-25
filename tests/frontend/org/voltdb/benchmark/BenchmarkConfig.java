@@ -48,6 +48,7 @@ public class BenchmarkConfig {
     public final String useProfile;
     public final float checkTransaction;
     public final boolean checkTables;
+    public final String voltRoot;
     public final String snapshotPath;
     public final String snapshotPrefix;
     public final String snapshotFrequency;
@@ -83,6 +84,7 @@ public class BenchmarkConfig {
             String useProfile,
             float checkTransaction,
             boolean checkTables,
+            String voltRoot,
             String snapshotPath,
             String snapshotPrefix,
             String snapshotFrequency,
@@ -120,6 +122,7 @@ public class BenchmarkConfig {
         this.useProfile = useProfile;
         this.checkTransaction = checkTransaction;
         this.checkTables = checkTables;
+        this.voltRoot = voltRoot;
         this.snapshotPath = snapshotPath;
         this.snapshotPrefix = snapshotPrefix;
         this.snapshotFrequency = snapshotFrequency;
