@@ -322,9 +322,6 @@ import org.voltdb.utils.Pair;
                     handler,
                     handler.getExpectedOutgoingMessageSize(),
                     channel.socket().getInetAddress().getHostName());
-        synchronized (m_ports) {
-            m_ports.add(port);
-        }
         port.registering();
 
         acquireRegistrationLock();
@@ -336,6 +333,9 @@ import org.voltdb.utils.Pair;
 
             return port;
         } finally {
+            synchronized (m_ports) {
+                m_ports.add(port);
+            }
             releaseRegistrationLock();
         }
     }
