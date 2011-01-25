@@ -34,9 +34,6 @@ public class Catalog extends CatalogType {
 
     CatalogMap<Cluster> m_clusters;
 
-    // package private version number
-    int m_currentCatalogVersion = 1;
-
     /**
      * Create a new Catalog hierarchy.
      */
@@ -47,10 +44,6 @@ public class Catalog extends CatalogType {
         m_relativeIndex = 1;
     }
 
-    public int getCatalogVersion() {
-        return m_currentCatalogVersion;
-    }
-
     /**
      * Run one or more single-line catalog commands separated by newlines.
      * See the docs for more info on catalog statements.
@@ -58,7 +51,6 @@ public class Catalog extends CatalogType {
      * newlines
      */
     public void execute(final String commands) {
-        m_currentCatalogVersion++;
 
         int ctr = 0;
         for (String line : commands.split("\n")) {
@@ -175,9 +167,6 @@ public class Catalog extends CatalogType {
         Catalog copy = new Catalog();
         // Note that CatalogType.deepCopy isn't called on the catalog node.
         // need to fully compensate for that here.
-        copy.m_currentCatalogVersion = m_currentCatalogVersion;
-        copy.m_nodeVersion = m_nodeVersion;
-        copy.m_subTreeVersion = m_subTreeVersion;
         copy.m_relativeIndex = 1;
         copy.m_clusters.copyFrom(m_clusters);
 
