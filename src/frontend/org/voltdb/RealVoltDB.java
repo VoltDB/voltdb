@@ -1138,10 +1138,10 @@ public class RealVoltDB implements VoltDBInterface
                 }
                 return contextTracker.m_context;
             }
-            else if (m_catalogContext.catalog.getCatalogVersion() != expectedCatalogVersion) {
+            else if (m_catalogContext.catalogVersion != expectedCatalogVersion) {
                 throw new RuntimeException("Trying to update main catalog context with diff " +
                 "commands generated for an out-of date catalog. Expected catalog version: " +
-                expectedCatalogVersion + " does not match actual version: " + m_catalogContext.catalog.getCatalogVersion());
+                expectedCatalogVersion + " does not match actual version: " + m_catalogContext.catalogVersion);
             }
 
             // 0. A new catalog! Update the global context and the context tracker

@@ -41,14 +41,12 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
     Catalog m_catalog;
     CatalogType m_parent;
     String m_path;
-    int m_subTreeVersion;
 
     CatalogMap(Catalog catalog, CatalogType parent, String path, Class<T> cls) {
         this.m_catalog = catalog;
         this.m_parent = parent;
         this.m_path = path;
         this.m_cls = cls;
-        this.m_subTreeVersion = catalog.m_currentCatalogVersion;
     }
 
     /**
@@ -97,10 +95,6 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
         return m_items.values().iterator();
     }
 
-    public int getSubTreeVersion() {
-        return m_subTreeVersion;
-    }
-
     /**
      * Create a new instance of a CatalogType as a child of this map with a
      * given name. Note: this just makes a catalog command and calls
@@ -119,9 +113,6 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
             x.m_parentMap = this;
 
             m_items.put(name, x);
-
-            // update versioning if needed
-            updateVersioning();
 
             // assign a relative index to every child item
             int index = 1;
@@ -146,9 +137,6 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
 
             m_items.remove(name);
 
-            // update versioning if needed
-            updateVersioning();
-
             // assign a relative index to every child item
             int index = 1;
             for (Entry<String, T> e : m_items.entrySet()) {
@@ -156,13 +144,6 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
             }
         } catch (Exception ex) {
             throw new RuntimeException(ex);
-        }
-    }
-
-    void updateVersioning() {
-        if (m_subTreeVersion != m_catalog.m_currentCatalogVersion) {
-            m_subTreeVersion = m_catalog.m_currentCatalogVersion;
-            m_parent.updateSubTreeVersion();
         }
     }
 
@@ -180,7 +161,6 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
         for (Entry<String, T> e : castedMap.m_items.entrySet()) {
             m_items.put(e.getKey(), (T) e.getValue().deepCopy(m_catalog, m_parent));
         }
-        m_subTreeVersion = catalogMap.m_subTreeVersion;
     }
 
     @Override

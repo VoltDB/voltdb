@@ -319,7 +319,7 @@ public class AsyncCompilerWorkThread extends Thread implements DumpManager.Dumpa
             // store the version of the catalog the diffs were created against.
             // verified when / if the update procedure runs in order to verify
             // catalogs only move forward
-            retval.expectedCatalogVersion = context.catalog.getCatalogVersion();
+            retval.expectedCatalogVersion = context.catalogVersion;
 
             // compute the diff in StringBuilder
             CatalogDiffEngine diff = new CatalogDiffEngine(context.catalog, newCatalog);

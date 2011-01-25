@@ -139,6 +139,40 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         return failType != DONT_FAIL;
     }
 
+
+    public void testCatalogUpdateAfterRejoin() throws Exception {
+        System.out.println("testCatalogUpdateAfterRejoin");
+        VoltProjectBuilder builder = getBuilderForTest();
+
+        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        boolean success = cluster.compile(builder);
+        assertTrue(success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+
+        try {
+            cluster.startUp();
+
+            for (int ii = 0; ii < 3; ii++) {
+                cluster.shutDownSingleHost(1);
+                Thread.sleep(1000);
+                cluster.recoverOne( 1, 0, "localhost");
+
+                String newCatalogURL = Configuration.getPathToCatalogForTest("rejoin.jar");
+                String deploymentURL = Configuration.getPathToCatalogForTest("rejoin.xml");
+
+                Client client = ClientFactory.createClient();
+                client.createConnection("localhost");
+
+                VoltTable[] results =
+                    client.callProcedure("@UpdateApplicationCatalog", newCatalogURL, deploymentURL).getResults();
+                assertTrue(results.length == 1);
+                client.close();
+            }
+        } finally {
+            cluster.shutDown();
+        }
+    }
+
     public void testRejoinSysprocButFail() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("rejoin.jar"), 1, 1, 0, "localhost");
@@ -325,7 +359,6 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
     }
 
     public void testRejoinWithExport() throws Exception {
-        System.out.println("testRejoinWithExport");
         VoltProjectBuilder builder = getBuilderForTest();
         builder.addExportTable("blah", false);
         builder.addExportTable("blah_replicated", false);
