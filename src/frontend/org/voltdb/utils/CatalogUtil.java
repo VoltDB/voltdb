@@ -434,6 +434,9 @@ public abstract class CatalogUtil {
         // set the cluster info
         setClusterInfo(catalog, deployment.getCluster());
 
+        //Set the snapshot schedule
+        setSnapshotInfo( catalog, deployment.getSnapshot());
+
         //set path and path overrides
         setPathsInfo(catalog, deployment.getPaths());
 
@@ -442,9 +445,6 @@ public abstract class CatalogUtil {
 
         // set the HTTPD info
         setHTTPDInfo(catalog, deployment.getHttpd());
-
-        //Set the snapshot schedule
-        setSnapshotInfo( catalog, deployment.getSnapshot());
 
         return getDeploymentCRC(deployment);
     }
