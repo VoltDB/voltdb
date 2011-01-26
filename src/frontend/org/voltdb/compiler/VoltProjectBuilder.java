@@ -423,8 +423,27 @@ public class VoltProjectBuilder {
     public boolean compile(final String jarPath, final int sitesPerHost, final int hostCount, final int replication,
                            final String leaderAddress) {
         VoltCompiler compiler = new VoltCompiler();
+        String voltRootPath = "/tmp/" + System.getProperty("user.name");
+        java.io.File voltRootFile = new java.io.File(voltRootPath);
+        if (!voltRootFile.exists()) {
+            if (!voltRootFile.mkdir()) {
+                throw new RuntimeException("Unable to create voltroot \"" + voltRootPath + "\" for test");
+            }
+        }
+        if (!voltRootFile.isDirectory()) {
+            throw new RuntimeException("voltroot \"" + voltRootPath + "\" for test exists but is not a directory");
+        }
+        if (!voltRootFile.canRead()) {
+            throw new RuntimeException("voltroot \"" + voltRootPath + "\" for test exists but is not readable");
+        }
+        if (!voltRootFile.canWrite()) {
+            throw new RuntimeException("voltroot \"" + voltRootPath + "\" for test exists but is not writable");
+        }
+        if (!voltRootFile.canExecute()) {
+            throw new RuntimeException("voltroot \"" + voltRootPath + "\" for test exists but is not writable");
+        }
         return compile(compiler, jarPath, sitesPerHost, hostCount, replication, leaderAddress,
-                    "/tmp/vdb", false, null, "none");
+                    voltRootPath, false, null, "none");
     }
 
     public boolean compile(
